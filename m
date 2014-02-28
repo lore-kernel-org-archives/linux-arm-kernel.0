@@ -1,61 +1,205 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 28 Feb 2014 15:54:03 +0100
-Subject: Rogue low pulse on TXD created by amba-pl011.c during startup
-Message-ID: <20140228155403.2bed6fe5@ipc1.ka-ro>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Feb 2014 08:56:00 -0600
+Subject: [PATCH v2 5/7] ARM: of: introduce common routine for DMA
+ configuration
+In-Reply-To: <1393535872-20915-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAL_JsqKtTKvFiafzh1PyQvNmkW8zEu9XRT4fNkigVe1MvxbH-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 27, 2014 at 3:17 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> This patch introduces ARM specific function arm_dt_dma_configure()
+> which intended to retrieve DMA configuration from DT and setup Platform
+> device's DMA parameters.
+>
+> The DMA configuration in DT has to be specified using "dma-ranges"
+> and "dam-coherent" properties if supported. The DMA configuration applied
 
-The following portion of the code in drivers/tty/serial/amba_pl011.c
-produces a low pulse (actually a NUL character with 5 bits and maximum
-baud rate) on the serial output each time the startup function is
-called.
- 1516)	static int pl011_startup(struct uart_port *port)
-[...]
- 1537)	/*
- 1538)	 * Provoke TX FIFO interrupt into asserting.
- 1539)	 */
- 1540)	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
- 1541)	writew(cr, uap->port.membase + UART011_CR);
- 1542)	writew(0, uap->port.membase + UART011_FBRD);
- 1543)	writew(1, uap->port.membase + UART011_IBRD);
- 1544)	writew(0, uap->port.membase + uap->lcrh_rx);
- 1545)	if (uap->lcrh_tx != uap->lcrh_rx) {
- 1546)		int i;
- 1547)		/*
- 1548)		 * Wait 10 PCLKs before writing LCRH_TX register,
- 1549)		 * to get this delay write read only register 10 times
- 1550)		 */
- 1551)          for (i = 0; i < 10; ++i)
- 1552)			writew(0xff, uap->port.membase + UART011_MIS);
- 1553)		writew(0, uap->port.membase + uap->lcrh_tx);
- 1554)	}
- 1555)	writew(0, uap->port.membase + UART01x_DR);
-** This write causes the NUL character to be sent.
- 1556)	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
- 1557)		barrier();
+s/dam/dma/
 
-Can anyone enlighten me what this is meant to achieve?
-The git history doesn't provide any clue, since this code was already
-in the initial commit.
-I also found no clue in the i.MX28 Reference Manual and the ARM
-PrimeCell UART (PL011) ? Reference Manual (DDI0183.pdf).
+> by arm_dt_dma_configure() as following:
+>  - call of_get_dma_range() and get supported DMA range info
+>    (dma_addr, cpu_addr, dma_size);
+>  - if "not found" then fill dma_mask as DMA_BIT_MASK(32)
+>    (this is default behaviour);
+>  - if "failed" then clean up dma_mask (DMA not supported)
+>  - if ok then update devices DMA configuration:
+>       set dma_mask to (dma_addr + dma_size - 1)
+>       set dma_pfn_offset to PFN_DOWN(cpu_addr - dma_addr)
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/include/asm/prom.h |    3 +++
+>  arch/arm/kernel/devtree.c   |   61 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c       |    5 +++-
+>  include/linux/of.h          |    2 +-
+>  4 files changed, 69 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> index b681575..1acb732 100644
+> --- a/arch/arm/include/asm/prom.h
+> +++ b/arch/arm/include/asm/prom.h
+> @@ -11,11 +11,13 @@
+>  #ifndef __ASMARM_PROM_H
+>  #define __ASMARM_PROM_H
+>
+> +struct device;
+>  #ifdef CONFIG_OF
+>
+>  extern const struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+>  extern void arm_dt_memblock_reserve(void);
+>  extern void __init arm_dt_init_cpu_maps(void);
+> +extern void arm_dt_dma_configure(struct device *dev);
+>
+>  #else /* CONFIG_OF */
+>
+> @@ -26,6 +28,7 @@ static inline const struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+>
+>  static inline void arm_dt_memblock_reserve(void) { }
+>  static inline void arm_dt_init_cpu_maps(void) { }
+> +static inline void arm_dt_dma_configure(struct device *dev) { }
+>
+>  #endif /* CONFIG_OF */
+>  #endif /* ASMARM_PROM_H */
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index f751714..926b5dd 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -18,6 +18,9 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/of_dma.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/slab.h>
+>
+>  #include <asm/cputype.h>
+>  #include <asm/setup.h>
+> @@ -235,3 +238,61 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>
+>         return mdesc;
+>  }
+> +
+> +void arm_dt_dma_configure(struct device *dev)
 
-The code does not work without this block of code (on an i.MX28).
+The implementation may be ARM specific, but the need for the function
+should not be.
 
-Does anybody have an idea how to prevent the rogue
-pulse from being sent on the TX line?
+> +{
+> +       dma_addr_t dma_addr;
+> +       phys_addr_t paddr, size;
+> +       dma_addr_t dma_mask;
+> +       int ret;
+> +
+> +       /*
+> +        * if dma-ranges property doesn't exist - use 32 bits DMA mask
+> +        * by default and don't set skip archdata.dma_pfn_offset
+> +        */
+> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+> +       if (ret == -ENODEV) {
+> +               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +               if (!dev->dma_mask)
+> +                       dev->dma_mask = &dev->coherent_dma_mask;
+> +               return;
+> +       }
+> +
+> +       /* if failed - disable DMA for device */
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to configure DMA\n");
+> +               return;
+> +       }
+> +
+> +       /* DMA ranges found. Calculate and set dma_pfn_offset */
+> +       dev->archdata.dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+> +
+> +       /* Configure DMA mask */
+> +       dev->dma_mask = kmalloc(sizeof(*dev->dma_mask), GFP_KERNEL);
 
+I don't believe that any ARM platform needs dma_mask to be different
+from coherent_dma_mask. I traced the history to when 2 masks were
+defined and this was my conclusion. Russell has also recently stated
+the same:
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+https://lkml.org/lkml/2013/8/9/205
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> +       if (!dev->dma_mask)
+> +               return;
+> +
+> +       dma_mask = dma_addr + size - 1;
+> +
+> +       ret = arm_dma_set_mask(dev, dma_mask);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to set DMA mask %#08x\n", dma_mask);
+> +               kfree(dev->dma_mask);
+> +               dev->dma_mask = NULL;
+> +               return;
+> +       }
+> +
+> +       dev_dbg(dev, "dma_pfn_offset(%#08lx) dma_mask(%#016llx)\n",
+> +               dev->archdata.dma_pfn_offset, *dev->dma_mask);
+> +
+> +       if (of_dma_is_coherent(dev->of_node)) {
+> +               set_dma_ops(dev, &arm_coherent_dma_ops);
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+All but this line could be in a common function. So make an arm
+version of the function that calls the common function and then does
+this. Or perhaps a per arch "get dma ops" function is all that is
+needed.
+
+> +               dev_dbg(dev, "device is dma coherent\n");
+> +       }
+> +
+> +       ret = dma_set_coherent_mask(dev, dma_mask);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to set coherent DMA mask %#08x\n",
+> +                       dma_mask);
+> +       }
+> +}
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..97d5533 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -213,10 +213,13 @@ static struct platform_device *of_platform_device_create_pdata(
+>
+>  #if defined(CONFIG_MICROBLAZE)
+>         dev->archdata.dma_mask = 0xffffffffUL;
+
+This should be moved into a microblaze specific version of the function.
+
+> -#endif
+> +#elif defined(CONFIG_ARM_LPAE)
+> +       arm_dt_dma_configure(&dev->dev);
+> +#else
+>         dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>         if (!dev->dev.dma_mask)
+>                 dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+> +#endif
+>         dev->dev.bus = &platform_bus_type;
+>         dev->dev.platform_data = platform_data;
+>
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 70c64ba..a321058 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -136,7 +136,7 @@ static inline unsigned long of_read_ulong(const __be32 *cell, int size)
+>         return of_read_number(cell, size);
+>  }
+>
+> -#if defined(CONFIG_SPARC)
+> +#if defined(CONFIG_SPARC) || defined(CONFIG_ARM_LPAE)
+>  #include <asm/prom.h>
+
+No. The idea here is to get rid of including prom.h.
+
+Rob
