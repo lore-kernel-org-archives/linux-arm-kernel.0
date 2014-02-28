@@ -1,29 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 28 Feb 2014 09:18:02 +0530
-Subject: [PATCH v3 1/3] cpufreq: stats: Remove redundant cpufreq_cpu_get()
- call
-In-Reply-To: <1393552716-9754-1-git-send-email-skannan@codeaurora.org>
-References: <1393552716-9754-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAKohpomjtE7Rtrs-TgxtSo658+4p0AHLzr9niN1GnkkrDqTxTw@mail.gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 27 Feb 2014 21:45:47 -0600
+Subject: [PATCH v4 5/9] Input: pmic8xxx-pwrkey - Migrate to DT
+In-Reply-To: <1393552520-9068-6-git-send-email-sboyd@codeaurora.org>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140228034547.GE7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 February 2014 07:28, Saravana Kannan <skannan@codeaurora.org> wrote:
-> __cpufreq_stats_create_table always gets pass the valid and real policy
-> struct. So, there's no need to call cpufreq_cpu_get() to get the policy
-> again.
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+On Thu, Feb 27, 2014 at 05:55:16PM -0800, Stephen Boyd wrote:
+> The driver is only supported on DT enabled platforms. Convert the
+> driver to DT so that it can probe properly.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/cpufreq/cpufreq_stats.c | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
+> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+> @@ -172,7 +178,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	platform_set_drvdata(pdev, pwrkey);
+> -	device_init_wakeup(&pdev->dev, pdata->wakeup);
+> +	device_init_wakeup(&pdev->dev, 1);
 
-All patches look fine now. Rafael you can queue them up as per your
-convenience.
+Is there a particular reason you aren't providing a 'linux,wakeup'
+property for pwrkey?
 
-@Saravana: Though I am quite sure you still need my patches to get
-your initial issue fixed. So, can you please get them tested as early
-as possible, so that we can get them in for 3.14?
-
-@Srivatsa: Your reviews will also help :)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
