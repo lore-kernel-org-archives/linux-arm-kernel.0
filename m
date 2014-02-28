@@ -1,28 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Feb 2014 16:58:17 +0000
-Subject: [PATCH v2 3/3] arm64: is_compat_task is defined both in
- asm/compat.h and linux/compat.h
-In-Reply-To: <1393320025-2855-4-git-send-email-takahiro.akashi@linaro.org>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
- <1393320025-2855-4-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140228165817.GE30996@mudshark.cambridge.arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 28 Feb 2014 11:07:31 -0600
+Subject: [PATCH 3/5] documentation/iommu: update description of ARM System
+ MMU binding
+In-Reply-To: <20140228162114.GA30996@mudshark.cambridge.arm.com>
+References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
+ <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+ <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
+ <20140228162114.GA30996@mudshark.cambridge.arm.com>
+Message-ID: <5310C253.40804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 09:20:25AM +0000, AKASHI Takahiro wrote:
-> kernel/seccomp.c includes linux/compat.h and, indicrectly, asm/compat.h
-> via asm/syscall.h. Due to the duplicated definitions of is_compat_task,
-> compiling this file will fail in the case of !CONFIG_COMPAT.
-> So this patch
-> 1) removes is_compat_task() definition from asm/compat.h
-> 2) replaces asm/compat.h to linux/compat.h in kernel/*.c
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
+On 02/28/2014 10:21 AM, Will Deacon wrote:
+>>> > >+- calxeda,smmu-secure-config-access : Enable proper handling of buggy
+>>> > >+                  implementations that always use secure access to
+>>> > >+                  SMMU configuration registers. In this case non-secure
+>>> > >+                 aliases of secure registers have to be used during
+>>> > >+                 SMMU configuration.
+>> >
+>> >I'm confused.  Why does this property have a "calxeda" prefix?  How is
+>> >it a Calxeda-specific property?
 
-You built this, right? If so,
+> Because they wired up their SMMU backwards. It's basically an
+> implementation-specific erratum workaround.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Hmmmm....
 
-Will
+Other than making the same wiring mistake, is there any reason any other 
+ARM chip would need this property set?
+
+The reason I ask is that it's kinda weird (well, to me at least) that we 
+have an property named for a specific SoC, but the implementation and 
+documentation tries so hard to hide that fact.  I would think that the 
+binding document would provide some explanation as to why the property 
+has a "calxeda" prefix.
