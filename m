@@ -1,38 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Feb 2014 17:36:36 +0000
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <CALicx6v12DWQSqpP=pa_gJmyOqm4LmFHWc_9=n8Rt7M=krB+dQ@mail.gmail.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
- <CAKv+Gu_yMFE7YLKG=KuiW-vCjbjkpWDjyBx+43PW4t32M7P22g@mail.gmail.com>
- <CALicx6t+V8Vt7u-8saV=e1KzK99D=_O_UsSvPrdMY3j9xR3opw@mail.gmail.com>
- <CAKv+Gu9-XqLmvZ1HhCKvgM5=BvZWbR8SSnb7oJzMqGja_LHbAw@mail.gmail.com>
- <CALicx6uRtxhj0+Fj98WtFAXssbV5G6sNQjkWikxaZnbMkBmWhA@mail.gmail.com>
- <CALicx6v12DWQSqpP=pa_gJmyOqm4LmFHWc_9=n8Rt7M=krB+dQ@mail.gmail.com>
-Message-ID: <20140228173636.GG30996@mudshark.cambridge.arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 28 Feb 2014 10:39:57 -0700
+Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
+In-Reply-To: <7755759.E1g1jlxbyc@wuerfel>
+References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+ <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
+ <7755759.E1g1jlxbyc@wuerfel>
+Message-ID: <20140228173957.GC7773@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 11:08:58AM +0000, Vijay Kilari wrote:
-> On Fri, Nov 29, 2013 at 3:27 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> >>> KGDB, being kernel debugger it was thought that allow
-> >>> debugging only if kernel mode is supported.
-> >>> In fact, I proposed (previous email)  to remove this condition and
-> >>> allow to reading neon
-> >>> registers always and allow write only if neon is in kernel mode.
-> >>>
-> >>
-> >> I think KGDB is a special case here and should not considered as a
-> >> user of kernel mode NEON. So even writing the registers should
-> >> allowable regardless of this setting imo.
-> >>
+On Fri, Feb 28, 2014 at 10:27:13AM +0100, Arnd Bergmann wrote:
+> On Thursday 27 February 2014 17:19:54 Tim Harvey wrote:
+> > The TI XIO2001 PCIe-to-PCI bridge used on Ventana expansion boards
+> > has its slot-to-bridge IRQ mapping reversed from the PCI specification:
+> > 
+> >   INTA->INTD
+> >   INTB->INTC
+> >   INTC->INTB
+> >   INTD->INTA
+> > 
+> > Implement a custom swizzle function that does a fixup on the interrupt for
+> > devices on the first TI XIO2001 bridge in the tree.
+> > 
 > 
->  Can we avoid checking on NEON state and allow debugger to
-> access NEON registers irrespective of state to keep it simple?
-> and just compile config is enough?
+> I'm pretty sure you can express that by using a more specific
+> 'interrupt-map' property that defines the correct mapping for
+> the PCIe-to-PCI bridge in the board file.
 
-I'm afraid I don't follow... I think we *do* need to do the relevant
-flush/sync operations, I just don't think it should be predicated on
-KERNEL_MODE_NEON.
+Yes, the correct way to handle this is to define a stanza for the
+PCIe-PCI bridge and then place an interrupt map in that stanza that
+describes the downstream translation.
 
-Will
+Nobody should be messing with IRQ numbers in code on DT platforms.
+
+DTs using the mvebu driver have an example of this:
+
+                pcie-controller {
+                        compatible = "marvell,kirkwood-pcie";
+                        status = "disabled";
+                        device_type = "pci";
+
+                        pcie at 1,0 {
+                                device_type = "pci";
+                                reg = <0x0800 0 0 0 0>;
+                                      ^^^^^^^ This is the PCI device
+				      ID of the bridge
+                                interrupt-map-mask = <0 0 0 0>;
+                                interrupt-map = <0 0 0 0 &intc 9>;
+
+Which says 'INTA/B/C/D of devices downstream of bridge 00:01.0 map to
+&intc input 9'
+
+In particular, this is probably not a TI XIO2001 problem, but a board
+design problem - the swizzle rules were not properly followed when
+wiring up the PCI ISDEL and INTx pins on the downstream PCI bus.
+
+Jason
