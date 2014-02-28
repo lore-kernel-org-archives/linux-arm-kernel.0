@@ -1,86 +1,63 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 28 Feb 2014 16:04:16 -0300
-Subject: [PATCH 1/1] ARM: dts: omap3-igep: fix boot fail due wrong
- compatible match
-In-Reply-To: <20140228185736.GE15399@atomide.com>
-References: <1393077576-25730-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=nomABe13t+zKL1=ofeGvB2hL7B3tVU6KohzGw9y5OTKg@mail.gmail.com>
- <20140228185736.GE15399@atomide.com>
-Message-ID: <CABxcv=kFLr4BUW-Lak7gj59THDJYo7SLwUQ+R7Vm45nc8XOG9Q@mail.gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 28 Feb 2014 13:11:29 -0600
+Subject: [PATCH v4 7/9] devicetree: bindings: Document PM8921/8058 keypads
+In-Reply-To: <20140228183708.GF2487@codeaurora.org>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-8-git-send-email-sboyd@codeaurora.org>
+ <20140228135527.GF7308@joshc.qualcomm.com>
+ <20140228183708.GF2487@codeaurora.org>
+Message-ID: <20140228191129.GH7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Fri, Feb 28, 2014 at 3:57 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Javier Martinez Canillas <javier@dowhile0.org> [140228 10:52]:
->> Hi Tony,
->>
->> On Sat, Feb 22, 2014 at 10:59 AM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->> > This patch is based on commit:
->> >
->> > 016c12d2 ("ARM: OMAP3: Fix hardware detection for omap3630 when booted with device tree")
->> >
->> > and fixes a boot hang due the IGEP board being wrongly initialized
->> > as an OMAP3430 platform instead of an OMAP3630.
->> >
->> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> > ---
->> >
->> > Tony and Benoit,
->> >
->> > Sorry for posting this patch this late on the -rc cycle but I just didn't
->> > have time before to test IGEP boards against 3.14.
->> >
->> > I hope this fix can still make it to 3.14 since is a very big issue
->> > (board not even booting).
->> >
->> > Thanks a lot and best regards,
->> > Javier
->> >
->> >  arch/arm/boot/dts/omap3-igep0020.dts | 2 +-
->> >  arch/arm/boot/dts/omap3-igep0030.dts | 2 +-
->> >  2 files changed, 2 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
->> > index 25a2b5f..f2779ac 100644
->> > --- a/arch/arm/boot/dts/omap3-igep0020.dts
->> > +++ b/arch/arm/boot/dts/omap3-igep0020.dts
->> > @@ -14,7 +14,7 @@
->> >
->> >  / {
->> >         model = "IGEPv2 (TI OMAP AM/DM37x)";
->> > -       compatible = "isee,omap3-igep0020", "ti,omap3";
->> > +       compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
->> >
->> >         leds {
->> >                 pinctrl-names = "default";
->> > diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
->> > index 145c58c..2793749 100644
->> > --- a/arch/arm/boot/dts/omap3-igep0030.dts
->> > +++ b/arch/arm/boot/dts/omap3-igep0030.dts
->> > @@ -13,7 +13,7 @@
->> >
->> >  / {
->> >         model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
->> > -       compatible = "isee,omap3-igep0030", "ti,omap3";
->> > +       compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
->> >
->> >         leds {
->> >                 pinctrl-names = "default";
->> > --
->> > 1.8.5.3
->> >
->>
->> I saw you send a pull request for 3.14-rc4 fixes and this fix was not included.
->>
->> Are you planning to send more fixes for 3.14?
+On Fri, Feb 28, 2014 at 10:37:08AM -0800, Stephen Boyd wrote:
+> On 02/28, Josh Cartwright wrote:
+> > On Thu, Feb 27, 2014 at 05:55:18PM -0800, Stephen Boyd wrote:
+> > > +
+> > > +EXAMPLE
+> > > +
+> > > +	keypad {
+> > > +		compatible = "qcom,pm8921-keypad";
+> > > +		interrupt-parent = <&pmicintc>;
+> > > +		interrupts = <74 1>, <75 1>;
+> > > +		linux,keymap = <
+> > > +			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
+> > > +			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
+> > > +			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
+> > > +			MATRIX_KEY(0, 3, KEY_CAMERA)
+> > > +			>;
+> > > +		keypad,num-rows = <1>;
+> > > +		keypad,num-columns = <5>;
+> > > +		debounce = <15>;
+> > > +		scan-delay = <32>;
+> > > +		row-hold = <91500>;
+> > > +	};
+> >
+> > It odd to me that these newly created bindings don't have 'reg'
+> > properties, even though the device clearly has a register region.
+> >
+> > I suppose it makes sense from a "port over from platform data to DT"
+> > perspective, as these drivers have just assumed the location of their
+> > registers to be fixed; however I suspect things will need to be changed
+> > if/when we hope to share these drivers with pm8841/pm8941 and beyond...
+> >
 >
-> Yes hoping to send one more set, got this one tagged for it.
->
+> Agreed. I would love it if the platform OF code would create
+> IORESOURCE_REG resources for any reg properties that aren't
+> translatable to CPU addresses. That way we don't have to pick out the
+> reg property from DT with special OF code (like you've done in
+> rtc-pm8xxx).
 
-Great, thanks a lot for your help!
+Yes, I agree this would be nice.  The rtc-pm8xxx register parsing magic
+is misplaced/ugly.  I'll see about taking a crack at this and seeing
+what it looks like.
 
-Best regards,
-Javier
+> I'll throw the reg property into the binding so that in
+> the future we can support the register moving around (although at the
+> moment the driver will ignore it).
+
+Great, I think this sounds good.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
