@@ -1,70 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 28 Feb 2014 14:42:52 +0100
-Subject: [PATCH v6 07/11] drivers: dma-coherent: add initialization from device
- tree
-In-Reply-To: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1393594976-16728-8-git-send-email-m.szyprowski@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 28 Feb 2014 14:43:28 +0100
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1393595008.3802.35.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for handling 'shared-dma-pool' reserved-memory device tree
-nodes.
+Hi Tomi,
 
-Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+Am Freitag, den 28.02.2014, 14:20 +0200 schrieb Tomi Valkeinen:
+> Add DT binding documentation for DVI Connector.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
+> new file mode 100644
+> index 000000000000..6a0aff866c78
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
+> @@ -0,0 +1,26 @@
+> +DVI Connector
+> +==============
+> +
+> +Required properties:
+> +- compatible: "dvi-connector"
+> +
+> +Optional properties:
+> +- label: a symbolic name for the connector
+> +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/base/dma-coherent.c |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+For the i.MX bindings I had called this property 'ddc', but
+Documentation/devicetree/bindings/panel/simple-panel.txt already
+uses 'ddc-i2c-bus'. We should definitely standardize this.
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index bc256b641027..0a5fc7f3d03e 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -218,3 +218,43 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
- 	return 0;
- }
- EXPORT_SYMBOL(dma_mmap_from_coherent);
-+
-+/*
-+ * Support for reserved memory regions defined in device tree
-+ */
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
-+
-+static void rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
-+{
-+	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
-+		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-+}
-+
-+static void rmem_dma_device_release(struct reserved_mem *rmem,
-+				    struct device *dev)
-+{
-+	dma_release_declared_memory(dev);
-+}
-+
-+static const struct reserved_mem_ops rmem_dma_ops = {
-+	.device_init	= rmem_dma_device_init,
-+	.device_release	= rmem_dma_device_release,
-+};
-+
-+static int __init rmem_dma_setup(struct reserved_mem *rmem,
-+				 unsigned long node,
-+				 const char *uname)
-+{
-+	if (of_get_flat_dt_prop(node, "reusable", NULL))
-+		return -EINVAL;
-+
-+	rmem->ops = &rmem_dma_ops;
-+	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
-+		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
-+#endif
--- 
-1.7.9.5
+> +Required nodes:
+> +- Video port for DVI input
+> +
+> +Example
+> +-------
+> +
+> +dvi0: connector at 0 {
+> +	compatible = "dvi-connector";
+> +	label = "dvi";
+> +
+> +	i2c-bus = <&i2c3>;
+> +
+> +	dvi_connector_in: endpoint {
+> +		remote-endpoint = <&tfp410_out>;
+> +	};
+> +};
+
+regards
+Philipp
