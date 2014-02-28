@@ -1,48 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Feb 2014 15:34:01 +0100
-Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping when
- DEBUG is enabled
-Message-ID: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 28 Feb 2014 15:35:42 +0100
+Subject: [PATCH] usb: gadget: atmel_usba: fix crash when no endpoint are
+ specified
+In-Reply-To: <1393515733-15764-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1393515733-15764-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53109EBE.4020900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug trace in the atmel_usba_stop function made the assumption
-that the driver pointer passed in parameter was not NULL. Since the
-commit "usb: gadget: udc-core: fix a regression during gadget driver
-unbinding", it was no more always true. This lead to a kernel crash.
+On 27/02/2014 16:42, Alexandre Belloni :
+> If no endpoints are present in the device tree, the kernel will cras hwith the
 
-This commit now use the driver pointer stored in udc which fixes this
-issue.
+s/cras hwith/crash with/
 
-Since the commit which have triggered this issue was backported to the
-3.2 stable branch, then this one should also be backported to the same
-kernel.
+> following error:
+> 
+> Unable to handle kernel paging request at virtual address 00101008
+> [...]
+> [<c0222ff4>] (composite_dev_prepare) from [<c022326c>] (composite_bind+0x5c/0x190)
+> [<c022326c>] (composite_bind) from [<c021ff8c>] (udc_bind_to_driver+0x48/0xf0)
+> [<c021ff8c>] (udc_bind_to_driver) from [<c02208e0>] (usb_gadget_probe_driver+0x7c/0xa0)
+> [<c02208e0>] (usb_gadget_probe_driver) from [<c0008970>] (do_one_initcall+0x94/0x140)
+> [<c0008970>] (do_one_initcall) from [<c04b4b50>] (kernel_init_freeable+0xec/0x1b4)
+> [<c04b4b50>] (kernel_init_freeable) from [<c0376cc4>] (kernel_init+0x8/0xe4)
+> [<c0376cc4>] (kernel_init) from [<c0009590>] (ret_from_fork+0x14/0x24)
+> Code: e5950014 e1a04001 e5902008 e3a010d0 (e5922008)
+> ---[ end trace 35c74bdd89b373d0 ]---
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> 
+> This checks for that case and returns an error, not allowing the driver to be
+> loaded with no endpoints.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/usb/gadget/atmel_usba_udc.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> index 52771d4c44bc..e3e0c8ff242e 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> @@ -1914,6 +1914,12 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>  		i++;
+>  	}
+>  
+> +	if (i == 0) {
+> +		dev_err(&pdev->dev, "of_probe: no endpoint specified\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
 
-Cc: stable at vger.kernel.org # v3.2+
-Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
----
- drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+It is better for debugging when creating a DT for a new SoC. So, okay.
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 52771d4c44bc..167843de2d8a 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
- 	toggle_bias(0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 
--	udc->driver = NULL;
--
- 	clk_disable_unprepare(udc->hclk);
- 	clk_disable_unprepare(udc->pclk);
- 
--	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
-+	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
-+
-+	udc->driver = NULL;
- 
- 	return 0;
- }
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+>  	return eps;
+>  err:
+>  	return ERR_PTR(ret);
+> 
+
+
 -- 
-1.8.1.2
+Nicolas Ferre
