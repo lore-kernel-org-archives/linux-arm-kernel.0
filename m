@@ -1,36 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Feb 2014 10:12:26 +0000
-Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <1392017945-4507-8-git-send-email-dave.long@linaro.org>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <1392017945-4507-8-git-send-email-dave.long@linaro.org>
-Message-ID: <20140228101226.GO21483@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 28 Feb 2014 11:12:47 +0100
+Subject: [PATCH] ARM: i.MX6: clk: Remove usbphy clock hacks
+In-Reply-To: <20140228004050.GA23189@shlinux1.ap.freescale.net>
+References: <1393489138-24406-1-git-send-email-s.hauer@pengutronix.de>
+ <20140227120616.GA27749@shlinux1.ap.freescale.net>
+ <20140227144744.GN17250@pengutronix.de>
+ <20140228004050.GA23189@shlinux1.ap.freescale.net>
+Message-ID: <20140228101246.GA17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
-> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
-> index 7cd1763..179deac 100644
-> --- a/arch/arm/kernel/probes.c
-> +++ b/arch/arm/kernel/probes.c
-> @@ -12,11 +12,9 @@
->   */
->  
->  #include <linux/kernel.h>
-> -#include <linux/kprobes.h>
->  #include <asm/system_info.h>
+On Fri, Feb 28, 2014 at 08:40:51AM +0800, Peter Chen wrote:
+> On Thu, Feb 27, 2014 at 03:47:45PM +0100, Sascha Hauer wrote:
+> > >  		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
+> > >  		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
+> > >  		break;
+> > >  	case USBPHY_INTERFACE_MODE_ULPI:
+> > >  		portsc = PORTSC_PTS(PTS_ULPI);
+> > >  		lpm = DEVLC_PTS(PTS_ULPI);
+> > > +		ret = usb_phy_init(ci->transceiver);
+> > > +		if (ret)
+> > > +			return ret;
+> > >  		break;
+> > >  	case USBPHY_INTERFACE_MODE_SERIAL:
+> > >  		portsc = PORTSC_PTS(PTS_SERIAL);
+> > >  		lpm = DEVLC_PTS(PTS_SERIAL);
+> > >  		sts = 1;
+> > > +		ret = usb_phy_init(ci->transceiver);
+> > > +		if (ret)
+> > > +			return ret;
+> > >  		break;
+> > >  	case USBPHY_INTERFACE_MODE_HSIC:
+> > > +		ret = usb_phy_init(ci->transceiver);
+> > > +		if (ret)
+> > > +			return ret;
+> > >  		portsc = PORTSC_PTS(PTS_HSIC);
+> > >  		lpm = DEVLC_PTS(PTS_HSIC);
+> > 
+> > It seems you try to adjust the order in which PORTSC is configured and
+> > the phy is initialized. Instead of ordering the phy setup and register
+> > writes you just reorder some variable initializations.
+> > 
+> > We discussed this back and forth here and think that the phy clock
+> > should be enabled/disabled via runtime pm ops as needed by the chipidea
+> > driver. Hacking the init order depending on the phy type like you did above
+> > doesn't sound like a good plan.
+> > 
+> 
+> The portsc.pts is only need to be set only time, at initialization routine,
+> the same for phy init.
+> 
+> After init finishes, we can control phy clock by runtime pm, it was what
+> I did for PM patchset for chipidea driver.
 
-How well has this code been tested?  This file doesn't even build because
-(I suspect) the above change:
+I'm talking about runtime pm for the phy, not for the chipidea driver.
 
-arch/arm/kernel/probes.c: In function 'test_alu_write_pc_interworking':
-arch/arm/kernel/probes.c:68:2: error: implicit declaration of function 'BUG_ON' [-Werror=implicit-function-declaration]
-make[2]: *** [arch/arm/kernel/probes.o] Error 1
-
-This is because linux/kprobes.h includes linux/bug.h, which would provide
-the requirements for BUG_ON().
+Sascha
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
