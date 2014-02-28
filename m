@@ -1,45 +1,62 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 28 Feb 2014 22:43:09 +0100
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <20140212160431.GB28112@sirena.org.uk>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
- <20140210114154.GQ1757@sirena.org.uk> <1392039072.3585.15.camel@x220>
- <20140210141255.GI1757@sirena.org.uk> <1392046242.3585.41.camel@x220>
- <20140210163621.GA13533@sirena.org.uk> <1392070159.27939.34.camel@x220>
- <20140212160431.GB28112@sirena.org.uk>
-Message-ID: <1393623789.4052.17.camel@x220>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Feb 2014 13:52:56 -0800
+Subject: [PATCH v2] ARM: dts: tps65910 backup battery regulator
+In-Reply-To: <20140216220142.GA31006@pengutronix.de>
+References: <1387539808-24910-3-git-send-email-mpa@pengutronix.de>
+ <1389888503-32013-1-git-send-email-mpa@pengutronix.de>
+ <20140216220142.GA31006@pengutronix.de>
+Message-ID: <20140228215256.GC13624@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-12 at 16:04 +0000, Mark Brown wrote:
-> On Mon, Feb 10, 2014 at 11:09:19PM +0100, Paul Bolle wrote:
-> > See, if you scan v3.10:arch/arm/mach-exynos/mach-smdkv310.c you'll
-> > notice the string "smdk-audio". If you grep that string you get a few
-> > hits. But none in v3.10:sound/soc/samsung/smdk_wm9713.c. And if you scan
-> > v3.10:sound/soc/samsung/smdk_wm9713.c for strings you'll find stuff like
-> > "wm9713-hifi",  "wm9713-codec", and "soc-audio". But these don't show up
-> > in v3.10:arch/arm/mach-exynos/mach-smdkv310.c. So it's not obvious how
-> > these two files relate.
+* Markus Pargmann <mpa@pengutronix.de> [140216 14:04]:
+> Hi,
 > 
-> > And I'm left wondering why SND_SOC_SAMSUNG_SMDK_WM9713 actually depends
-> > on (among other symbols) MACH_SMDKV310 and MACH_SMDKC210 in v3.10.
+> On Thu, Jan 16, 2014 at 05:08:23PM +0100, Markus Pargmann wrote:
+> > This patch adds a devicetree node for the backup battery regulator.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> > Hi,
+> > 
+> > Mark Brown applied [1] the other part of the series which adds 'vbb' as
+> > regulator-compatible. I forgot to add you in Cc.
 > 
-> The hardware is physically present on those boards but must be selected
-> with DIP switches, the device registration needs to be changed in the
-> kernel when that happens (as the DT must be when it is in use).
+> Any comments on this?
 
-In v3.14-rc4 these two symbols suddenly got removed, see commit
-eaff64705dd5 ("ASoC: samsung: Remove invalid dependencies"). It does
-exactly what I proposed last year, see
-https://lkml.org/lkml/2013/7/14/27 . (That link currently shows a rather
-empty page; is lkml.org having problems again?)
+Thanks applying into omap-for-v3.15/dt.
 
-That commit is fine with me, of course. I now see no reason to continue
-my, rather slowly progressing, search for the problem that you wanted to
-get properly fixed. I suppose another commit already fixed it.
+Regards,
 
-Thanks,
-
-
-Paul Bolle
+Tony
+ 
+> > [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289815/focus=290089
+> > 
+> >  arch/arm/boot/dts/tps65910.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
+> > index 92693a8..b0ac665 100644
+> > --- a/arch/arm/boot/dts/tps65910.dtsi
+> > +++ b/arch/arm/boot/dts/tps65910.dtsi
+> > @@ -82,5 +82,10 @@
+> >  			reg = <12>;
+> >  			regulator-compatible = "vmmc";
+> >  		};
+> > +
+> > +		vbb_reg: regulator at 13 {
+> > +			reg = <13>;
+> > +			regulator-compatible = "vbb";
+> > +		};
+> >  	};
+> >  };
+> > -- 
+> > 1.8.5.2
+> > 
+> > 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
