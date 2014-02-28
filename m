@@ -1,23 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 12:58:13 +0100
-Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
-In-Reply-To: <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Fri, 28 Feb 2014 17:24:54 +0530
+Subject: [PATCH V7 01/10] clk: SPEAr13XX: Fix pcie clock name
+In-Reply-To: <cover.1393568715.git.mohit.kumar@st.com>
 References: <cover.1393568715.git.mohit.kumar@st.com>
- <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
-Message-ID: <7430033.eK9aHCDe8b@wuerfel>
+Message-ID: <60f333b653aa66d76cdeb3fc2274947e0332d380.1393568715.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
-> +                       interrupts = <0 68 0x4>;
-> +                       interrupt-map-mask = <0 0 0 0>;
-> +                       interrupt-map = <0x0 0 &gic 68>;
-> 
+From: Pratyush Anand <pratyush.anand@st.com>
 
->From the discussion we just had on the imx version of this driver, I suspect
-what you want instead is to drop the interrupts property and fix the interrupt
-map to be
+Follow dt clock naming convention for PCIe clocks.
 
-interrupt-map = <0x0 0 &gic 0 68 0x4>;
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Mohit Kumar <mohit.kumar@st.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: spear-devel at list.st.com
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clk/spear/spear1310_clock.c |    6 +++---
+ drivers/clk/spear/spear1340_clock.c |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-	Arnd
+diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+index 65894f7..4daa597 100644
+--- a/drivers/clk/spear/spear1310_clock.c
++++ b/drivers/clk/spear/spear1310_clock.c
+@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.0");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.1");
++	clk_register_clkdev(clk, NULL, "b1800000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.2");
++	clk_register_clkdev(clk, NULL, "b4000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index fe835c1..5a5c664 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
+ 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+-- 
+1.7.0.1
