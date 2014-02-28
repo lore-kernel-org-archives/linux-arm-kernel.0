@@ -1,44 +1,28 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Feb 2014 11:18:11 -0500
-Subject: [PATCH v6 0/2] Introduce AEMIF driver for Davinci/Keystone archs
-In-Reply-To: <20140228160635.GA6144@kroah.com>
-References: <1393262772-24442-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5310AEA8.1070804@ti.com> <20140228160635.GA6144@kroah.com>
-Message-ID: <5310B6C3.1020501@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Feb 2014 16:21:14 +0000
+Subject: [PATCH 3/5] documentation/iommu: update description of ARM
+ System MMU binding
+In-Reply-To: <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
+References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
+ <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+ <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
+Message-ID: <20140228162114.GA30996@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 11:06 AM, Greg KH wrote:
-> On Fri, Feb 28, 2014 at 10:43:36AM -0500, Santosh Shilimkar wrote:
->> Greg,
->>
->> On Monday 24 February 2014 12:26 PM, Ivan Khoronzhuk wrote:
->>> These patches introduce Async External Memory Interface (EMIF16/AEMIF)
->>> controller driver for Davinci/Keystone archs.
->>>
->>> For more informations see documentation:
->>> Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
->>> OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
->>> Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
->>>
->> [..]
->>
->>>
->>> v5..v6:
->>> - memory: ti-aemif: introduce AEMIF driver
->>> - memory: ti-aemif: add bindings for AEMIF driver
->>> 	changed opaque names for cs node properties
->>>
->> Can you please pick these two patches ? 
+On Fri, Feb 28, 2014 at 04:17:43PM +0000, Timur Tabi wrote:
+> On Fri, Feb 21, 2014 at 11:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > +- calxeda,smmu-secure-config-access : Enable proper handling of buggy
+> > +                  implementations that always use secure access to
+> > +                  SMMU configuration registers. In this case non-secure
+> > +                 aliases of secure registers have to be used during
+> > +                 SMMU configuration.
 > 
-> Asking for a response with less than a weeks time is really bold:
->   $ ~/bin/mdfrm -c ~/mail/todo/
->   521 messages in /home/gregkh/mail/todo/
-> 
-> Give me a chance to catch up please...
-> 
-Sorry for that. This version was just minor update from previous
-version and hence asked it. 
+> I'm confused.  Why does this property have a "calxeda" prefix?  How is
+> it a Calxeda-specific property?
 
-Regards,
-Santosh
+Because they wired up their SMMU backwards. It's basically an
+implementation-specific erratum workaround.
+
+Will
