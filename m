@@ -1,56 +1,180 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 28 Feb 2014 13:30:48 +0800
-Subject: [PATCH v3] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <CAGsJ_4ywPTbUnfVVFFNFMSwG0CGckxKqHZ81rvEDFK-_1H25tA@mail.gmail.com>
-References: <1391855002-26098-1-git-send-email-21cnbao@gmail.com>
- <lel46f$q2d$1@ger.gmane.org>
- <CAGsJ_4xLtXV6WtVhLgzFAaU9oG5UOt+LonFktBipQf_a6Yutng@mail.gmail.com>
- <CAMiSF3CczVV+Ob++_ACcwE+OXvFH8f9v1E=Q1F5x7Zz1BjCCzg@mail.gmail.com>
- <CAGsJ_4ywPTbUnfVVFFNFMSwG0CGckxKqHZ81rvEDFK-_1H25tA@mail.gmail.com>
-Message-ID: <CAGsJ_4z=udVOMzFK0TrpFHKHZFOPvYYs0DVrT_1j3KUVsOdspw@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 28 Feb 2014 05:50:13 +0000
+Subject: [PATCH v4] can: xilinx CAN controller support.
+In-Reply-To: <530E0B92.5010903@pengutronix.de>
+References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
+ <530D0A9C.5090402@pengutronix.de>
+ <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
+ <530DEA7C.6010609@pengutronix.de>
+ <678ca296-8687-4e7c-9014-ae69d886a068@CO9EHSMHS014.ehs.local>
+ <530E0B92.5010903@pengutronix.de>
+Message-ID: <2e3bfd38-37d5-4102-af79-821196c6c732@CH1EHSMHS006.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-28 11:01 GMT+08:00 Barry Song <21cnbao@gmail.com>:
-> 2014-02-27 18:51 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
->> 2014-02-27 3:49 GMT+01:00 Barry Song <21cnbao@gmail.com>:
->>> Hello Romain,
->>>
->>> 2014-02-27 0:19 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
->>>>
->>>> Describing the clocks this way seems limiting to me.
->>>>
->>>> Each output of the PWM controller on SiRFatlasVI and SiRFprimaII can
->>>> independently use one clock among many for signal generation, with
->>>> three PLLs and two external clock inputs available.
->>>
->>> yes, that is the hardware spec. and i feel so happy you have read it.
->>> now i get one more sirfsoc friend.
->>>
->>> 32K of RTC is too small to generate a normal PWM signal, PLLs in the
->>> design can change for DVFS.
->>> so that means a notifier callback is needed if PLL is changed for
->>> CPUFreq, this makes SW buggy and complex.
->>>
->> Well, my specific concern was the use of the bypass mode on the 32kHz
->> clock. As the PWM driver is also the interface for external clock distribution,
->> and 32 kHz is a common requirement for external devices, I wish to avoid
->> compounding error rates. I will get a less precise clock if I divide the 26 MHz
->> instead.
->
-> Hi Romain,
->
-> do you have a real user scenarios for this 32KHz? as the 1st step, i
-> want a clean and general enough pwm driver, if there is any special
-> requirement, i want to execute a "demanding page" when the "page
-> fault" happened as this will make the whole flow more smooth. that
-> means we make it lazy by incremental patches. but if you do want to
-> use it for the moment, it is a "page fault" now. so we can have it
-> immediately and it is better you can help to double-test :-)
+Hi Marc,
 
-Huayi told me bluetooth/wifi is using 32768. if we bypass rtc
-directly, it is better.
-currently the 26MHz can be divided to 32K, but i agree with you that
-bypassing rtc is better.
 
--barry
+> -----Original Message-----
+> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> Sent: Wednesday, February 26, 2014 9:13 PM
+> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
+> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org
+> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
+>
+> On 02/26/2014 03:46 PM, Appana Durga Kedareswara Rao wrote:
+> > Hi Marc,
+> >
+> >
+> >> -----Original Message-----
+> >> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> >> Sent: Wednesday, February 26, 2014 6:52 PM
+> >> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
+> >> grant.likely at linaro.org; robh+dt at kernel.org;
+> >> linux-can at vger.kernel.org
+> >> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >> linux- kernel at vger.kernel.org; devicetree at vger.kernel.org
+> >> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
+> >>
+> >> On 02/26/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
+> >>>> This loop looks broken. Can you explain how it works.
+> >>>>
+> >>>> What it shoud do is:
+> >>>> We have put (priv->tx_head - priv->tx_tail) CAN frames into the FIFO.
+> >>>> This means at maximum there could be this amount of CAN frames
+> >>>> which have been successfully transmitted. For every cycle in this
+> >>>> while loop you
+> >>>> should:
+> >>>> a) check if a CAN frame has successfully been transmitted
+> >>>>    (as this CAN core uses a FIFO it should be "oldest")
+> >>>>    A read_reg() of some kind is missing in your loop.
+> >>>> b) if needed, remove this event from the FIFO or
+> >>>>    mark the interrupt as done. Whatever you hardware needs.
+> >>>> c) update your statistics
+> >>>> d) Use can_get_echo_skb to push this frame into the networking
+> >>>> stack
+> >>>> e) As a CAN frame has been transmitted successfully, wake the
+> tx_queue.
+> >>>>
+> >>>>> +   while (priv->tx_head - priv->tx_tail > 0) {
+> >>>>> +           if (isr & XCAN_IXR_TXFLL_MASK) {
+> >>>>> +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
+> >>>>> +                                   XCAN_IXR_TXFLL_MASK);
+> >>>>> +                   netif_stop_queue(ndev);
+> >>>>
+> >>>> Why do you stop the queue here? A CAN frame has successfully been
+> >>>> transmitted, there should be room in the FIFO.
+> >>>>
+> >>>>> +                   break;
+> >>>>> +           }
+> >>>>> +           can_get_echo_skb(ndev, priv->tx_tail %
+> >>>>> +                                   priv->xcan_echo_skb_max_tx);
+> >>>>> +           priv->tx_tail++;
+> >>>>> +   }
+> >>>>> +
+> >>>
+> >>> The below are the bit fields available for the Transmit FIFO.
+> >>> 1) In the ISR(interrupt status register)  Tx Ok interrupt and Tx
+> >>> fifo full
+> >> interrupt.
+> >>> 2) in the SR(Status Register) Tx fifo full condition.
+> >>>
+> >>>
+> >>> I am modifying the entire tx interrupt logic to like below.
+> >>>
+> >>> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr) {
+> >>>         struct xcan_priv *priv = netdev_priv(ndev);
+> >>>         struct net_device_stats *stats = &ndev->stats;
+> >>>
+> >>>             while (priv->tx_head - priv->tx_tail > 0) {
+> >>>                 if (isr & XCAN_IXR_TXFLL_MASK) {
+> >>>                         priv->write_reg(priv, XCAN_ICR_OFFSET,
+> >>>                                         XCAN_IXR_TXFLL_MASK);
+> >>>                           break;
+> >>>                 }
+> >>>                 can_get_echo_skb(ndev, priv->tx_tail %
+> >>>                                         priv->xcan_echo_skb_max_tx);
+> >>>                 priv->tx_tail++;
+> >>>          stats->tx_packets++;
+> >>>         netif_wake_queue(ndev);
+> >>>               can_led_event(ndev, CAN_LED_EVENT_TX);
+> >>>
+> >>>         }
+> >>
+> >> You just need to wake the queue once.
+> >
+> > Ok
+> >>
+> >>> }
+> >>>
+> >>>
+> >>> Are you Ok with the above logic?
+> >>
+> >> No, how can you tell how many frames have been transmitted?
+> >
+> > There is no register to read how many can frames are transmitted.
+> > The only way to know Is by reading this parameter
+> > (stats->tx_packets++;) through ip command
+>
+> stats->tx_packets is calculated in the above loop and the loop is
+> broken. Let me illustrate the problem:
+>
+> - xmit is called 10 times in a row
+> - this means you have 10 CAN frames in the TX FIFO
+> - a single CAN frame gets transmitted
+> - you get an interrupt
+> - you enter the above routine and loop 10 times and echo the CAN frame
+>   back into the stack
+>
+> Now every application sees 10 transmitted packages, but there is only one
+> transmitted. Every time you loop you have to check if the CAN frame has
+> already been transmitted or not. Is that possible with the hardware?
+
+        The only way to know whether the TX packet is transmitted successfully or not is by using the Tx Ok interrupt from the ISR.
+This interrupt will come for every Tx Packet.
+So I am thinking of there is no loop required in the TX interrupt routine. As it is called for each and every packet.
+
+static void xcan_tx_interrupt(struct net_device *ndev, u32 isr)
+{
+        struct xcan_priv *priv = netdev_priv(ndev);
+        struct net_device_stats *stats = &ndev->stats;
+
+
+        can_get_echo_skb(ndev, priv->tx_tail %
+                                priv->xcan_echo_skb_max_tx);
+        priv->tx_tail++;
+        stats->tx_packets++;
+        can_led_event(ndev, CAN_LED_EVENT_TX);
+        netif_wake_queue(ndev);
+}
+
+If you want me to put some locks for this Will put some spin_locks in the _xmit and in the tx interrupt routine (for the tx_head and tx_tail).
+
+
+Regards,
+Kedar.
+
+>
+> > ip -d -s link show can
+> > Or using ifconfig command.
+> >
+> > At the h/w level it can transmit Max upto 64 packets (Max fifo depth)
+> > We need to monitor the Tx fifo full bit in the ISR(Interrupt Status Register)
+> or Tx fifo full bit in the SR(Status Register) and if it is full we need to stop
+> the queue that is
+> > I am doing in the _xmit by reading the status register before proceeding
+> the   packet transmission.
+>
+> Marc
+>
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
