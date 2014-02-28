@@ -1,133 +1,47 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 28 Feb 2014 22:09:25 +0100
-Subject: [PATCH 1/4] ARM: r7s72100: add clock nodes to dtsi
+Date: Fri, 28 Feb 2014 22:09:27 +0100
+Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
 In-Reply-To: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
 References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1393621768-12568-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1393621768-12568-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
-Only essential clocks are added for now. Other clocks will be added when
-needed.
-
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 78 +++++++++++++++++++++++++++++-
- include/dt-bindings/clock/r7s72100-clock.h | 25 ++++++++++
- 2 files changed, 102 insertions(+), 1 deletion(-)
- create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index ee70071..f6d4b5d 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -1,13 +1,15 @@
- /*
-  * Device Tree Source for the r7s72100 SoC
-  *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013-14 Renesas Solutions Corp.
-+ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/clock/r7s72100-clock.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -28,6 +30,80 @@
- 		spi4 = &spi4;
- 	};
- 
-+	clocks {
-+		ranges;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		/* External root clock */
-+		extal_clk: extal_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			/* This value must be overriden by the board. */
-+			clock-frequency = <0>;
-+			clock-output-names = "extal";
-+		};
-+
-+		/* Special CPG clocks */
-+		cpg_clocks: cpg_clocks at fcfe0000 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-cpg-clocks",
-+				     "renesas,rz-cpg-clocks";
-+			reg = <0xfcfe0000 0x18>;
-+			clocks = <&extal_clk>;
-+			clock-output-names = "pll", "i", "g";
-+		};
-+
-+		/* Fixed factor clocks */
-+		b_clk: b_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks 0>;
-+			clock-mult = <1>;
-+			clock-div = <3>;
-+			clock-output-names = "b";
-+		};
-+		p1_clk: p1_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks 0>;
-+			clock-mult = <1>;
-+			clock-div = <6>;
-+			clock-output-names = "p1";
-+		};
-+		p0_clk: p0_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks 0>;
-+			clock-mult = <1>;
-+			clock-div = <12>;
-+			clock-output-names = "p0";
-+		};
-+
-+		/* MSTP clocks */
-+		mstp3_clks: mstp3_clks at fcfe0420 {
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0420 4>;
-+			clocks = <&p0_clk>;
-+			#clock-cells = <1>;
-+			renesas,clock-indices = <R7S72100_CLK_MTU2>;
-+			clock-output-names = "mtu2";
-+		};
-+
-+		mstp4_clks: mstp4_clks at fcfe0424 {
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0424 4>;
-+			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
-+				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
-+			#clock-cells = <1>;
-+			renesas,clock-indices = <
-+				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2 R7S72100_CLK_SCIF3
-+				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5 R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7
-+			>;
-+			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+Mike: if you are fine with this driver, it would be good if you could apply it.
+Then, we can deal with the orthogonal dependencies in mach-shmobile seperately
+and know that the driver is already in place when the rest gets resolved.
+Thanks!
+
+ drivers/clk/shmobile/Makefile |   1 +
+ drivers/clk/shmobile/clk-rz.c | 112 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 113 insertions(+)
+ create mode 100644 drivers/clk/shmobile/clk-rz.c
+
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index 9ecef14..5404cb9 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
++obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
+ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
+diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
 new file mode 100644
-index 0000000..eced0a8
+index 0000000..ec1c795
 --- /dev/null
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -0,0 +1,25 @@
++++ b/drivers/clk/shmobile/clk-rz.c
+@@ -0,0 +1,112 @@
 +/*
++ * rz Core CPG Clocks
++ *
++ * Copyright (C) 2013 Ideas On Board SPRL
 + * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -135,22 +49,106 @@ index 0000000..eced0a8
 + * the Free Software Foundation; version 2 of the License.
 + */
 +
-+#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
-+#define __DT_BINDINGS_CLOCK_R7S72100_H__
++#include <linux/clk-provider.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
 +
-+/* MSTP3 */
-+#define R7S72100_CLK_MTU2	3
++struct rz_cpg {
++	struct clk_onecell_data data;
++	void __iomem *reg;
++};
 +
-+/* MSTP4 */
-+#define R7S72100_CLK_SCIF0	7
-+#define R7S72100_CLK_SCIF1	6
-+#define R7S72100_CLK_SCIF2	5
-+#define R7S72100_CLK_SCIF3	4
-+#define R7S72100_CLK_SCIF4	3
-+#define R7S72100_CLK_SCIF5	2
-+#define R7S72100_CLK_SCIF6	1
-+#define R7S72100_CLK_SCIF7	0
++#define CPG_FRQCR	0x10
++#define CPG_FRQCR2	0x14
 +
-+#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
++/* -----------------------------------------------------------------------------
++ * Initialization
++ */
++
++static struct clk * __init
++rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const char *name)
++{
++	u32 val;
++	unsigned mult, frqcr_tab[4] = { 3, 2, 0, 1 };
++
++	if (strcmp(name, "pll") == 0) {
++		/* FIXME: cpg_mode should be read from GPIO. But no GPIO support yet */
++		unsigned cpg_mode = 0; /* hardcoded to EXTAL for now */
++		const char *parent_name = of_clk_get_parent_name(np, 0);
++
++		mult = cpg_mode ? (32 / 4) : 30;
++		return clk_register_fixed_factor(NULL, name, parent_name, 0, mult, 1);
++	}
++
++	/* FIXME:"i" and "g" are variable clocks with non-integer dividers (e.g. 2/3)
++	 * and the constraint that always g <= i. To get the rz platform started,
++	 * let them run@fixed current speed and implement the details later.
++	 */
++	if (strcmp(name, "i") == 0)
++		val = (clk_readl(cpg->reg + CPG_FRQCR) >> 8) & 3;
++	else if (strcmp(name, "g") == 0)
++		val = clk_readl(cpg->reg + CPG_FRQCR2) & 3;
++	else
++		return ERR_PTR(-EINVAL);
++
++	mult = frqcr_tab[val];
++	return clk_register_fixed_factor(NULL, name, "pll", 0, mult, 3);
++}
++
++static void __init rz_cpg_clocks_init(struct device_node *np)
++{
++	struct rz_cpg *cpg;
++	struct clk **clks;
++	unsigned i;
++	int num_clks;
++
++	num_clks = of_property_count_strings(np, "clock-output-names");
++	if (WARN(num_clks < 0, "can't count CPG clocks\n"))
++		goto out;
++
++	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
++	if (WARN(!cpg, "out of memory!\n"))
++		goto out;
++
++	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
++	if (WARN(!clks, "out of memory!\n"))
++		goto free_cpg;
++
++	cpg->data.clks = clks;
++	cpg->data.clk_num = num_clks;
++
++	cpg->reg = of_iomap(np, 0);
++	if (WARN(!cpg->reg, "can't remap CPG registers!\n"))
++		goto free_clks;
++
++	for (i = 0; i < num_clks; ++i) {
++		const char *name;
++		struct clk *clk;
++
++		of_property_read_string_index(np, "clock-output-names", i, &name);
++
++		clk = rz_cpg_register_clock(np, cpg, name);
++		if (IS_ERR(clk))
++			pr_err("%s: failed to register %s %s clock (%ld)\n",
++			       __func__, np->name, name, PTR_ERR(clk));
++		else
++			cpg->data.clks[i] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++	return;
++
++free_clks:
++	kfree(clks);
++free_cpg:
++	kfree(cpg);
++out:
++	return;
++}
++CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks",
++	       rz_cpg_clocks_init);
 -- 
 1.8.5.1
