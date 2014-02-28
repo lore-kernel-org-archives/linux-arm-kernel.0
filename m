@@ -1,63 +1,82 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Feb 2014 09:17:08 -0500
-Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
-In-Reply-To: <10040083.PbPEQQPCjl@wuerfel>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
- <1393535872-20915-5-git-send-email-santosh.shilimkar@ti.com>
- <10040083.PbPEQQPCjl@wuerfel>
-Message-ID: <53109A64.9030701@ti.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Fri, 28 Feb 2014 15:19:43 +0100
+Subject: change kmalloc into vmalloc for large memory allocations
+In-Reply-To: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
+Message-ID: <s5hlhwvb9q8.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 04:39 AM, Arnd Bergmann wrote:
-> On Thursday 27 February 2014 16:17:49 Santosh Shilimkar wrote:
->> +
->> +/**
->> + * of_dma_is_coherent - Check if device is coherent
->> + * @np:        device node
->> + *
->> + * It returns true if "dma-coherent" property was found
->> + * for this device in DT.
->> + */
->> +bool of_dma_is_coherent(struct device_node *np)
->> +{
->> +       struct device_node *node = np;
->> +
->> +       while (node) {
->> +               if (of_property_read_bool(node, "dma-coherent")) {
->> +                       of_node_put(node);
->> +                       return true;
->> +               }
->> +               node = of_get_next_parent(node);
->> +       }
->> +       return false;
->> +}
->> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
->>
+At Fri, 28 Feb 2014 16:15:23 +0800,
+Wang, Yalin wrote:
 > 
-> This won't work on architectures that are always coherent and
-> did not need 'dma-coherent' properties before, such as IBM
-> Power servers.
+> Hi 
 > 
-> That said, I think the property makes sense, and we already have
-> platforms using it (highbank is the one I'm aware of).
 > 
-> We probably need ways to override this function in both ways:
-> "always coherent" (powerpc, x86), and "never coherent" (keystone
-> without LPAE) from platform code, and it would be nice to put
-> either option into DT in a global location as well. We may have
-> to go through a few iterations of this patch to get the best
-> algorithm, but I think the interface is good at least.
+> I find there is some drivers use kmalloc to allocate large 
+> Memorys during module_init,  some can be changed to use vmalloc
+> To save some low mem, I add log in kernel to track ,
+> And list them here:
 > 
-Probably we should discuss bit more next week at connect. The
-current 'dma-coherent' is a per device property. For arch's
-which are always coherent, the per device property doesn't make
-sense.
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drivers/usb/gadget/f_mass_storage.c?h=master#n2724
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/sound/soc/soc-core.c?h=master#n3772
 
-BTW, the current users of this API is only ARM32 bit port
-and if this satisfies the ARM platforms, we should get
-this in kernel and then address other cases on need
-basis.
+At least the ASoC runtime case doesn't use the allocated memory as
+buffer, and they are allocated only once per device, thus it shouldn't
+be the problem you stated.  If it really consumes so much memory, we
+need to rethink, instead of allocating an array but allocate each
+object, for example.
 
-Regards,
-Santosh
+
+thanks,
+
+Takashi
+
+
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_ftp.c?h=master#n603
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_h323_main.c?h=master#n1849
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_irc.c?h=master#n247
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_sane.c?h=master#n195
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drivers/input/evdev.c?h=master#n403
+> 
+> 
+> they allocate large memory from 10k~64K , 
+> this will use lots of low mem, instead if we use 
+> vmalloc for these drivers , it will be good for some devices
+> like smart phone, we often encounter some errors like kmalloc failed 
+> because there is not enough low mem , especially when the device has physical 
+> memory less than 1GB .
+> 
+> 
+> could this module change the memory allocation into vmalloc ?
+> 
+> I was thinking that if we can introduce a helper function in kmalloc.h like this :
+> 
+> Kmalloc(size, flags)
+> {
+> 	If (size > PAGE_SIZE && flags&CAN_USE_VMALLOC_FLAG)
+> 		return vmalloc(size);
+> 	Else
+> 		return real_kmalloc(size);
+> }
+> 
+> Kfree(ptr)
+> {
+> 	If (is_vmalloc_addr(ptr))
+> 		Vfree(ptr);
+> 	Else
+> 		Kfree(ptr);
+> }
+> 
+> 
+> But we need add some flags to ensure always use kmalloc for
+> Some special use (dma etc..)
+> 
+> How do you think of it ?
+> 
+> Thanks
+> 
+> 
+> 
