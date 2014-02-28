@@ -1,58 +1,69 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Feb 2014 18:18:37 -0500
-Subject: [PATCH 0/3] soc: Introduce drivers/soc and add Keystone QMSS driver
-Message-ID: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 28 Feb 2014 18:18:38 -0500
+Subject: [PATCH 1/3] soc: Introduce drivers/soc place-holder for SOC specific
+ drivers
+In-Reply-To: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1393629520-12713-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Based on earlier thread "https://lkml.org/lkml/2013/10/7/662" and
-further discussion at Kernel Summit'2013, series creates 'driver/soc'
-for drivers which are very SOC specific.
+further discussion at Kernel Summit'2013, it was agreed to create
+'driver/soc' for drivers which are quite SOC specific.
 
-Then we add the Keystone QMSS (Queue Manager SubSystem) driver.
-The QMSS found on Keystone SOCs is one of the main hardware sub
-system which forms the backbone of the Keystone Multi-core Navigator.
-QMSS consist of queue managers, packed-data structure processors(PDSP),
-linking RAM, descriptor pools and infrastructure DMA.
-
-Sandeep Nair (2):
-  soc: keystone: add QMSS driver
-  firmware: add Keystone QMSS PDSP accumulator firmware blob
-
-Santosh Shilimkar (1):
-  soc: Introduce drivers/soc place-holder for SOC specific drivers
+Lets take the discussion forward with this patch.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Sandeep Nair <sandeep_n@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-
- .../devicetree/bindings/soc/keystone-qmss.txt      |  209 +++
- drivers/Kconfig                                    |    4 +
- drivers/Makefile                                   |    7 +
- drivers/soc/Kconfig                                |    5 +
- drivers/soc/Makefile                               |    5 +
- drivers/soc/keystone/Kconfig                       |   15 +
- drivers/soc/keystone/Makefile                      |    5 +
- drivers/soc/keystone/qmss_acc.c                    |  591 ++++++++
- drivers/soc/keystone/qmss_queue.c                  | 1533 ++++++++++++++++++++
- drivers/soc/keystone/qmss_queue.h                  |  236 +++
- firmware/Makefile                                  |    1 +
- .../keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex |  110 ++
- include/linux/soc/keystone_qmss.h                  |  390 +++++
- 13 files changed, 3111 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/keystone-qmss.txt
+Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/Kconfig     |    2 ++
+ drivers/Makefile    |    4 ++++
+ drivers/soc/Kconfig |    3 +++
+ 3 files changed, 9 insertions(+)
  create mode 100644 drivers/soc/Kconfig
- create mode 100644 drivers/soc/Makefile
- create mode 100644 drivers/soc/keystone/Kconfig
- create mode 100644 drivers/soc/keystone/Makefile
- create mode 100644 drivers/soc/keystone/qmss_acc.c
- create mode 100644 drivers/soc/keystone/qmss_queue.c
- create mode 100644 drivers/soc/keystone/qmss_queue.h
- create mode 100644 firmware/keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex
- create mode 100644 include/linux/soc/keystone_qmss.h
 
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index b3138fb..37f955f 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -130,6 +130,8 @@ source "drivers/staging/Kconfig"
+ 
+ source "drivers/platform/Kconfig"
+ 
++source "drivers/soc/Kconfig"
++
+ source "drivers/clk/Kconfig"
+ 
+ source "drivers/hwspinlock/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 8e3b8b0..0d8e2a4 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -132,6 +132,10 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
+ obj-$(CONFIG_VLYNQ)		+= vlynq/
+ obj-$(CONFIG_STAGING)		+= staging/
+ obj-y				+= platform/
++
++# SOC specific drivers
++obj-y				+= soc/
++
+ #common clk code
+ obj-y				+= clk/
+ 
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+new file mode 100644
+index 0000000..2f9d7d0
+--- /dev/null
++++ b/drivers/soc/Kconfig
+@@ -0,0 +1,3 @@
++menu "SOC specific Drivers"
++
++endmenu
 -- 
 1.7.9.5
