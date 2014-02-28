@@ -1,55 +1,51 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 28 Feb 2014 14:20:14 +0200
-Subject: [PATCH 7/9] Doc/DT: Add DT binding documentation for Sony acx565akm
- panel
+Date: Fri, 28 Feb 2014 14:20:13 +0200
+Subject: [PATCH 6/9] Doc/DT: Add DT binding documentation for MIPI DSI CM Panel
 In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1393590016-9361-8-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1393590016-9361-7-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for Sony acx565akm panel
+Add DT binding documentation for MIPI DSI Command Mode Panel.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Reviewed-by: Sebastian Reichel <sre@debian.org>
 Reviewed-by: Archit Taneja <archit@ti.com>
 ---
- .../devicetree/bindings/video/sony,acx565akm.txt   | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
+ .../devicetree/bindings/video/panel-dsi-cm.txt     | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/panel-dsi-cm.txt
 
-diff --git a/Documentation/devicetree/bindings/video/sony,acx565akm.txt b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
+diff --git a/Documentation/devicetree/bindings/video/panel-dsi-cm.txt b/Documentation/devicetree/bindings/video/panel-dsi-cm.txt
 new file mode 100644
-index 000000000000..cd9cfdf7e3fe
+index 000000000000..73f422556d4f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
-@@ -0,0 +1,28 @@
-+Sony ACX565AKM SDI Panel
-+========================
++++ b/Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+@@ -0,0 +1,26 @@
++Generic MIPI DSI Command Mode Panel
++===================================
 +
 +Required properties:
-+- compatible: "sony,acx565akm"
++- compatible: "panel-dsi-cm"
 +
 +Optional properties:
 +- label: a symbolic name for the panel
-+- gpios: panel reset gpio
++- gpios: panel reset gpio and TE gpio
 +
 +Required nodes:
-+- Video port for SDI input
++- Video port for DSI input
 +
 +Example
 +-------
 +
-+acx565akm at 2 {
-+	compatible = "sony,acx565akm";
-+	spi-max-frequency = <6000000>;
-+	reg = <2>;
++lcd0: display {
++	compatible = "tpo,taal", "panel-dsi-cm";
++	label = "lcd0";
 +
-+	label = "lcd";
-+	gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
++	gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
 +
-+	lcd_in: endpoint {
-+		remote-endpoint = <&sdi_out>;
++	lcd0_in: endpoint {
++		remote-endpoint = <&dsi1_out_ep>;
 +	};
 +};
 -- 
