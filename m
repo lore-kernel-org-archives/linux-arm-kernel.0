@@ -1,133 +1,37 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 17:25:17 +0100
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <20140228155937.GQ21483@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Feb 2014 16:27:52 +0000
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>
-Message-ID: <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140228162752.GU21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 28.02.2014, 15:59 +0000 schrieb Russell King - ARM
-Linux:
-> On Fri, Feb 28, 2014 at 02:20:10PM +0200, Tomi Valkeinen wrote:
-> > Add DT binding documentation for DVI Connector.
-> > 
-> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Reviewed-by: Archit Taneja <archit@ti.com>
-> > ---
-> >  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
-> > new file mode 100644
-> > index 000000000000..6a0aff866c78
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
-> > @@ -0,0 +1,26 @@
-> > +DVI Connector
-> > +==============
-> > +
-> > +Required properties:
-> > +- compatible: "dvi-connector"
-> > +
-> > +Optional properties:
-> > +- label: a symbolic name for the connector
-> > +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-> > +
-> > +Required nodes:
-> > +- Video port for DVI input
-> > +
-> > +Example
-> > +-------
-> > +
-> > +dvi0: connector at 0 {
-> > +	compatible = "dvi-connector";
-> > +	label = "dvi";
-> > +
-> > +	i2c-bus = <&i2c3>;
-> > +
-> > +	dvi_connector_in: endpoint {
-> > +		remote-endpoint = <&tfp410_out>;
-> > +	};
-> > +};
+On Fri, Feb 28, 2014 at 02:20:07PM +0200, Tomi Valkeinen wrote:
+> Shortly about the display components in the series, in the order of probable
+> public interest:
 > 
-> This looks far too simplistic.  There are different classes of DVI
-> connector - there is:
-> 
-> DVI A - analogue only
-> DVI D - digital only (single and dual link)
-> DVI I - both (single and dual digital link)
-> 
-> DRM at least makes a distinction between these three classes, and this
-> disctinction is part of the user API.  How would a display system know
-> which kind of DVI connector is wired up on the board from this DT
-> description?
+> * Analog TV, DVI and HDMI Connectors represent a respective connector on the
+>   board. They don't do much, but they do mark the end of the video pipeline (from
+>   the board's pov), and they should also in the future offer ways to handle
+>   things like the +5V pin on DVI and HDMI connector and HPD pin.
 
-Maybe this could be inferred from the sources connected to it. For
-example a i.MX5 board with the SoC internal TV Encoder and an external
-SiI902x HDMI encoder connected to the same DVI I connector:
+The big thing which concerns me is that we're using very generic
+compatible strings here - has anyone done any searches to see whether
+there are any existing standards for this kind of stuff already?
 
-ipu {
-	port at 2 {
-		ipu_di0_disp0: endpoint {
-			remote-endpoint = <&sii902x_in>;
-		};
-	};
-	port at 3 {
-		ipu_di1_tve: endpoint {
-			remote-endpoint = <&tve_in>;
-		};
-	};
-};
+Even if none can be found, if we're going to create something like
+this, it should probably become a public standard not just for Linux.
 
-&sii902x {
-	compatible = "si,sii9022";
+If we're not willing to do that, I'd suggest prefixing the compatible
+strings with "linux," as a "company" identifier so that there's no
+chance that we may hit some major problem caused by a conflicting
+implementation in the future.
 
-	port at 0 {
-		sii902x_in: endpoint {
-			remote-endpoint = <&ipu_di0>;
-		};
-	};
-	port at 1 {
-		sii902x_out: endpoint {
-			remote-endpoint = <&dvi_d_in>;
-		};
-	};
-};
+We could alternatively take the view that Linux will only ever be used
+with Linux specific DT files, but I think that's a rather broken
+approach given what DT is supposed to be.
 
-&tve {
-	compatible = "fsl,imx53-tve";
-	port at 0 {
-		tve_in: endpoint {
-			remote-endpoint = <&ipu_di1>;
-		};
-	};
-	port at 1 {
-		tve_out: endpoint {
-			remote-endpoint = <&dvi_a_in>;
-		};
-	};
-};
-
-dvi-connector {
-	compatible = "dvi-connector";
-	ddc-i2c-bus = <&i2c3>;
-
-	port {
-		dvi_d_in: endpoint at 0 {
-			remote-endpoint = <&sii902x_out>;
-		};
-		dvi_a_in: endpoint at 1 {
-			remote-endpoint = <&tve_out>;
-		};
-	};
-};
-
-It should be possible to let the connector know that those two endpoints
-are connected to a TMDS source and to a VGA source, respectively.
-
-regards
-Philipp
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
