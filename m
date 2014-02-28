@@ -1,213 +1,49 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 28 Feb 2014 13:56:56 +0100
-Subject: [PATCH v4] can: xilinx CAN controller support.
-In-Reply-To: <48409965-e214-43b7-8b6a-08bf075707e1@CO9EHSMHS001.ehs.local>
-References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
- <530D0A9C.5090402@pengutronix.de>
- <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
- <530DEA7C.6010609@pengutronix.de>
- <678ca296-8687-4e7c-9014-ae69d886a068@CO9EHSMHS014.ehs.local>
- <530E0B92.5010903@pengutronix.de>
- <2e3bfd38-37d5-4102-af79-821196c6c732@CH1EHSMHS006.ehs.local>
- <53104995.4010305@pengutronix.de>
- <48409965-e214-43b7-8b6a-08bf075707e1@CO9EHSMHS001.ehs.local>
-Message-ID: <53108798.7090902@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 28 Feb 2014 13:57:36 +0100
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <531087C0.1090501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2014 01:44 PM, Appana Durga Kedareswara Rao wrote:
-> Hi Marc,
-> 
-> 
->> -----Original Message-----
->> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
->> Sent: Friday, February 28, 2014 2:02 PM
->> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
->> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org
->> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org; devicetree at vger.kernel.org
->> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
->>
->> On 02/28/2014 06:50 AM, Appana Durga Kedareswara Rao wrote:
->>> Hi Marc,
->>>
->>>
->>>> -----Original Message-----
->>>> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
->>>> Sent: Wednesday, February 26, 2014 9:13 PM
->>>> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
->>>> grant.likely at linaro.org; robh+dt at kernel.org;
->>>> linux-can at vger.kernel.org
->>>> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->>>> linux- kernel at vger.kernel.org; devicetree at vger.kernel.org
->>>> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
->>>>
->>>> On 02/26/2014 03:46 PM, Appana Durga Kedareswara Rao wrote:
->>>>> Hi Marc,
->>>>>
->>>>>
->>>>>> -----Original Message-----
->>>>>> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
->>>>>> Sent: Wednesday, February 26, 2014 6:52 PM
->>>>>> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal
->> Simek;
->>>>>> grant.likely at linaro.org; robh+dt at kernel.org;
->>>>>> linux-can at vger.kernel.org
->>>>>> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->>>>>> linux- kernel at vger.kernel.org; devicetree at vger.kernel.org
->>>>>> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
->>>>>>
->>>>>> On 02/26/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
->>>>>>>> This loop looks broken. Can you explain how it works.
->>>>>>>>
->>>>>>>> What it shoud do is:
->>>>>>>> We have put (priv->tx_head - priv->tx_tail) CAN frames into the
->> FIFO.
->>>>>>>> This means at maximum there could be this amount of CAN frames
->>>>>>>> which have been successfully transmitted. For every cycle in this
->>>>>>>> while loop you
->>>>>>>> should:
->>>>>>>> a) check if a CAN frame has successfully been transmitted
->>>>>>>>    (as this CAN core uses a FIFO it should be "oldest")
->>>>>>>>    A read_reg() of some kind is missing in your loop.
->>>>>>>> b) if needed, remove this event from the FIFO or
->>>>>>>>    mark the interrupt as done. Whatever you hardware needs.
->>>>>>>> c) update your statistics
->>>>>>>> d) Use can_get_echo_skb to push this frame into the networking
->>>>>>>> stack
->>>>>>>> e) As a CAN frame has been transmitted successfully, wake the
->>>> tx_queue.
->>>>>>>>
->>>>>>>>> +   while (priv->tx_head - priv->tx_tail > 0) {
->>>>>>>>> +           if (isr & XCAN_IXR_TXFLL_MASK) {
->>>>>>>>> +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
->>>>>>>>> +                                   XCAN_IXR_TXFLL_MASK);
->>>>>>>>> +                   netif_stop_queue(ndev);
->>>>>>>>
->>>>>>>> Why do you stop the queue here? A CAN frame has successfully
->> been
->>>>>>>> transmitted, there should be room in the FIFO.
->>>>>>>>
->>>>>>>>> +                   break;
->>>>>>>>> +           }
->>>>>>>>> +           can_get_echo_skb(ndev, priv->tx_tail %
->>>>>>>>> +                                   priv->xcan_echo_skb_max_tx);
->>>>>>>>> +           priv->tx_tail++;
->>>>>>>>> +   }
->>>>>>>>> +
->>>>>>>
->>>>>>> The below are the bit fields available for the Transmit FIFO.
->>>>>>> 1) In the ISR(interrupt status register)  Tx Ok interrupt and Tx
->>>>>>> fifo full
->>>>>> interrupt.
->>>>>>> 2) in the SR(Status Register) Tx fifo full condition.
->>>>>>>
->>>>>>>
->>>>>>> I am modifying the entire tx interrupt logic to like below.
->>>>>>>
->>>>>>> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr) {
->>>>>>>         struct xcan_priv *priv = netdev_priv(ndev);
->>>>>>>         struct net_device_stats *stats = &ndev->stats;
->>>>>>>
->>>>>>>             while (priv->tx_head - priv->tx_tail > 0) {
->>>>>>>                 if (isr & XCAN_IXR_TXFLL_MASK) {
->>>>>>>                         priv->write_reg(priv, XCAN_ICR_OFFSET,
->>>>>>>                                         XCAN_IXR_TXFLL_MASK);
->>>>>>>                           break;
->>>>>>>                 }
->>>>>>>                 can_get_echo_skb(ndev, priv->tx_tail %
->>>>>>>                                         priv->xcan_echo_skb_max_tx);
->>>>>>>                 priv->tx_tail++;
->>>>>>>          stats->tx_packets++;
->>>>>>>         netif_wake_queue(ndev);
->>>>>>>               can_led_event(ndev, CAN_LED_EVENT_TX);
->>>>>>>
->>>>>>>         }
->>>>>>
->>>>>> You just need to wake the queue once.
->>>>>
->>>>> Ok
->>>>>>
->>>>>>> }
->>>>>>>
->>>>>>>
->>>>>>> Are you Ok with the above logic?
->>>>>>
->>>>>> No, how can you tell how many frames have been transmitted?
->>>>>
->>>>> There is no register to read how many can frames are transmitted.
->>>>> The only way to know Is by reading this parameter
->>>>> (stats->tx_packets++;) through ip command
->>>>
->>>> stats->tx_packets is calculated in the above loop and the loop is
->>>> broken. Let me illustrate the problem:
->>>>
->>>> - xmit is called 10 times in a row
->>>> - this means you have 10 CAN frames in the TX FIFO
->>>> - a single CAN frame gets transmitted
->>>> - you get an interrupt
->>>> - you enter the above routine and loop 10 times and echo the CAN frame
->>>>   back into the stack
->>>>
->>>> Now every application sees 10 transmitted packages, but there is only
->>>> one transmitted. Every time you loop you have to check if the CAN
->>>> frame has already been transmitted or not. Is that possible with the
->> hardware?
->>>
->>>         The only way to know whether the TX packet is transmitted
->> successfully or not is by using the Tx Ok interrupt from the ISR.
->>> This interrupt will come for every Tx Packet.
->>> So I am thinking of there is no loop required in the TX interrupt routine. As
->> it is called for each and every packet.
->>
->> What happens if the interrupt handler is delayed? For example in a RT
->> enabled system the interrupt handler runs as a thread. There might be other
->> threads with higher priority. The hardware will probably send all CAN
->> frames in the FIFO, so you want to reduce the overhead and loop in the tx
->> complete handler.
->>
-> Yes I agree with your comment.
-> It will be good to have a loop in the Tx interrupt handler
-> I am modifying the Tx interrupt handler like below.
-> 
-> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr)
-> {
->         struct xcan_priv *priv = netdev_priv(ndev);
->         struct net_device_stats *stats = &ndev->stats;
-> 
->         while (priv->tx_head - priv->tx_tail > 0) {
->                 if (!(isr & XCAN_IXR_TXOK_MASK)) {
->                         break;
->                 }
->                 can_get_echo_skb(ndev, priv->tx_tail %
->                                         priv->xcan_echo_skb_max_tx);
->                 priv->tx_tail++;
->                 stats->tx_packets++;
->                 can_led_event(ndev, CAN_LED_EVENT_TX);
->                 isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
->         }
->         netif_wake_queue(ndev);
-> }
-> 
-> Are you Ok with this?
+On 02/28/14 13:20, Tomi Valkeinen wrote:
+> This series is a re-send of
+> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
+>
+...
+> Shortly about the display components in the series, in the order of probable
+> public interest:
+>
+> * Analog TV, DVI and HDMI Connectors represent a respective connector on the
+>    board. They don't do much, but they do mark the end of the video pipeline (from
+>    the board's pov), and they should also in the future offer ways to handle
+>    things like the +5V pin on DVI and HDMI connector and HPD pin.
+>
+> * MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
+>    using the respective video bus.
+>
+> * Sony acx565akm is an SPI controlled panel using flatlink video bus.
+>
+> * TFP410 is a DPI to DVI encoder.
+>
+> * TPD12S015 is a HDMI companion chip, used on OMAP boards.
 
-Do you have to ACK the interrupt, so that TXOK_MASK is finally cleared?
-The use case is here: m CAN frames are put into the FIFO, n out of m CAN
-frames are transferred, where n < m. In this case you have to leave the
-loop after n, but "priv->tx_head - priv->tx_tail == m".
+Tomi,
 
-Marc
+Out of curiosity, will there be DT nodes for pull-up resistors soon,
+too? ;)
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Honestly, TPD12S015 is a level shifter, there is nothing in it that
+would justify a DT node nor a driver.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/58c31ebb/attachment.sig>
+Above you already note, that connector nodes should offer HPD in the
+future, but I guess the binding should represent that now already.
+I will be a DT stub anyway, the corresponding video sink driver will
+have to look it up.
+
+Looking through the bindings for DVI and HDMI, I guess HPD gpio is
+better kept in those nodes. From the relevant (DT) properties DVI and
+HDMI connectors are in no way different.
+
+Sebastian
