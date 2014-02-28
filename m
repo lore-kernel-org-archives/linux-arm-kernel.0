@@ -1,31 +1,69 @@
-From: gregkh@linuxfoundation.org ('gregkh@linuxfoundation.org')
-Date: Fri, 28 Feb 2014 08:33:04 -0800
-Subject: change kmalloc into vmalloc for large memory allocations
-In-Reply-To: <35FD53F367049845BC99AC72306C23D102844605F38D@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
- <53104ECA.4010702@freescale.com>
- <35FD53F367049845BC99AC72306C23D102844605F38D@CNBJMBX05.corpusers.net>
-Message-ID: <20140228163304.GA15614@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 28 Feb 2014 09:34:33 -0700
+Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
+ level
+In-Reply-To: <20140228055818.GA29849@sirena.org.uk>
+References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
+ <20140227210227.GE2931@xora-haswell> <530FAFAE.5050800@wwwdotorg.org>
+ <20140228055818.GA29849@sirena.org.uk>
+Message-ID: <5310BA99.4050203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 05:20:08PM +0800, Wang, Yalin wrote:
-> Hi  
+On 02/27/2014 10:58 PM, Mark Brown wrote:
+> On Thu, Feb 27, 2014 at 02:35:42PM -0700, Stephen Warren wrote:
+>> On 02/27/2014 02:02 PM, Graeme Gregory wrote:
 > 
+>>>> +- ti,irq-externally-inverted : If missing, the polarity of the Palmas IRQ
+>>>> +  output should be set to the opposite of the polarity indicated by the IRQ
+>>>> +  specifier in the interrupts property. If absent, the polarity should be
+>>>> +  configured to match. This allows the representation of an inverter between
+>>>> +  the Palmas IRQ output and the interrupt parent's IRQ input.
 > 
-> Yeah,  
-> Dma buffer must be allocated by kmalloc,
+>>> This has got to be the wrong way to do things, all this leads to is every
+>>> device doing this property in its own way and having totally inconsistent
+>>> properties all meaning the same thing.
 > 
-> But the modules I list should can all be changed to use
-> vmalloc, because the buffer is only used by software,
-> Not by any hardware .
+>>> If there is some other hardware inverting lines then there should be
+>>> a generic binding for this in DT. This is not describing the palmas hardware
+>>> but some external object to the palmas.
+> 
+>> I'd be fine with removing the "ti," vendor prefix from the property
+>> name, and promoting it to be a cross-device standard.
+> 
+>> I'm not sure that many devices will need this though; most don't have
+>> configurable output polarity. Still, I guess that shouldn't stop us from
+>> creating standards for the cases where it is needed.
+> 
+> It's really common for PMICs and CODECs to be able to set any interrupt
+> polarity at least.
+> 
+>> If the DT reviewers can ack the concept, I'm happy to respin the patch
+>> with the more generic property name.
+> 
+> I'm not sure that renaming the property really deals with the concerns
+> though since drivers still all need to manually add support for this,
+> shouldn't there be an interrupt controller described in the DT which
+> just chains on to the parent with the polarity inverted to do the
+> impedence match?
 
-Are you sure about that?  The USB gadget driver needs DMA memory from
-what I can tell, have you tried your change out on a system that does
-not allow the USB controller to access non-DMA memory?
+I had thought of that when first dealing with this a couple years ago,
+but Olof suggested that was too complicated.
 
-And I agree with Steve, just fix the individual drivers, don't do a
-"hidden" change of where the memory is allocated from, that's not a good
-idea and will cause problems later.
+Certainly, adding an "inverting" interrupt controller into the path
+would solve the problem without inventing any new concept in DT.
+However, the inverter really isn't an interrupt controller in any
+meaningful fashion. It has no status/mask/enable/... registers at all;
+it's nothing more than an inverter gate, at least in my case. Hence, I'm
+actually not convinced that adding an extra interrupt controller into
+the path is correct here.
 
-greg k-h
+Another alternative might be to add an extra IRQ bit in the IRQ
+specifier (and something similar would be needed for GPIO specifiers)
+that indicates "inversion between source and destination". This could be
+queried by drivers in exactly the same way as the existing polarity/type
+IRQ flags. We'd need to update each individual IRQ controller binding to
+enable that flag, since each binding defines its own definition of such
+flags. (although in practice since most use the same centrally suggested
+flags, this wouldn't be any more than just saying yes, this binding
+allows that new flag to be used).
