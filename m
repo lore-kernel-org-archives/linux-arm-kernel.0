@@ -1,59 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Feb 2014 15:38:17 -0800
-Subject: [PATCH] arm: omap: remove OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF
-In-Reply-To: <1392576697.28866.27.camel@x220>
-References: <1392576697.28866.27.camel@x220>
-Message-ID: <20140228233817.GZ13624@atomide.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Fri, 28 Feb 2014 15:38:54 -0800
+Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
+References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
+ <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+ <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
+ <20140228201557.29118.62126@capellas-linux>
+ <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
+Message-ID: <53111e0f.a50a430a.6ef6.ffff99ae@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [140216 10:54]:
-> The Kconfig symbols OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF were added in
-> v2.6.36. They have never been used. Setting them has no effect. These
-> symbols can safely be removed.
+Quoting Lorenzo Pieralisi (2014-02-28 14:49:33)
+> On Fri, Feb 28, 2014 at 08:15:57PM +0000, Sebastian Capella wrote:
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Tested with "git grep".
+> [...]
+> 
+> > > > +
+> > > > +/*
+> > > > + * The framework loads the hibernation image into a linked list anchored
+> > > > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
+> > > > + * destinations.
+> > > > + *
+> > > > + * To make this work if resume is triggered from initramfs, the
+> > > > + * pagetables need to be switched to allow writes to kernel mem.
+> > > > + */
+> > > 
+> > > Comment above needs updating. We are switching page tables to a set of
+> > > page tables that are certain to live at the same location in the older
+> > > kernel, that's the only reason, as we discussed. soft_restart will make
+> > > sure (again) to switch to 1:1 page tables so that we can call cpu_resume
+> > > with the MMU off.
+> > 
+> > How does this look?
+> > 
+> > The framework loads as much of the hibernation image to final physical
+> > pages as possible.  Any pages that were in use, will need to be restored
+> > prior to the soft_restart.  The pages to restore are maintained in
+> > the list anchored at restore_pblist.  At this point, we can swap the
+> > pages to their final location.  We must switch the mapping to 1:1 to
+> > ensure that when we overwrite the page table physical pages we're using
+> > a known physical location (idmap_pgd) with known contents.
+> 
+> It is ok, a tad too verbose. All I care about is a comment describing
+> what's really needed, the existing one was confusing and wrong.
 
-Thanks applying into omap-for-v3.15/soc with the related entries also
-removed from arch/arm/mach-omap2/mux.h.
+Maybe more like: 
 
-Regards,
+Restore physical pages that were in use while loading hibernation image.
+Use idmap_pgd so our page tables use the same physical address as the
+hibernation image.  Will be overwriten with the same contents.
 
-Tony
- 
-> A sort of related cleanup would be removing the preprocessoer defines of
-> OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF that are unused since v3.14-rc1.
+> > > > +/*
+> > > > + * Resume from the hibernation image.
+> > > > + * Due to the kernel heap / data restore, stack contents change underneath
+> > > > + * and that would make function calls impossible; switch to a temporary
+> > > > + * stack within the nosave region to avoid that problem.
+> > > > + */
+> > > > +int swsusp_arch_resume(void)
+> > > > +{
+> > > > +     extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+> > > > +     call_with_stack(arch_restore_image, 0,
+> > > > +             resume_stack + sizeof(resume_stack));
+> > > 
+> > > This does not guarantee your stack is 8-byte aligned, that's not AAPCS
+> > > compliant and might buy you trouble.
+> > > 
+> > > Either you align the stack or you align the pointer you are passing.
+> > > 
+> > > Please have a look at kernel/process.c
+> > 
+> > I've added this for now, do you see any issues?
+> > 
+> > -static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
+> > +static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
+> > -               resume_stack + sizeof(resume_stack));
+> > +               resume_stack + ARRAY_SIZE(resume_stack));
 > 
->  arch/arm/mach-omap2/Kconfig | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 7d4934e..bb51eeb 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -165,12 +165,6 @@ config SOC_TI81XX
->  	depends on ARCH_OMAP3
->  	default y
->  
-> -config OMAP_PACKAGE_ZAF
-> -       bool
-> -
-> -config OMAP_PACKAGE_ZAC
-> -       bool
-> -
->  config OMAP_PACKAGE_CBC
->         bool
->  
-> @@ -280,7 +274,6 @@ config MACH_NOKIA_N8X0
->  	default y
->  	select MACH_NOKIA_N810
->  	select MACH_NOKIA_N810_WIMAX
-> -	select OMAP_PACKAGE_ZAC
->  
->  config MACH_NOKIA_RX51
->  	bool "Nokia N900 (RX-51) phone"
-> -- 
-> 1.8.5.3
-> 
+> I do not see why the stack depends on the PAGE_SIZE. I would be surprised
+> if you need more than a few bytes (given that soft_restart switches stack
+> again...), go through it with a debugger, it is easy to check the stack
+> usage and allow for some extra buffer (but half a page is not needed).
+
+I assuming this is becase the no-save region is one page anyway (we skip
+restoring the no-save region physical page).  So maybe 1/2 is a way to
+leave some room for whatever else may need to be here, but in any case
+the 4k is used for nosave.  I think you're right that it can be much less.
+
+I'll check into this...
+
+Thanks!
+
+Sebastian
