@@ -1,61 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 14:43:28 +0100
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1393595008.3802.35.camel@paszta.hi.pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 28 Feb 2014 14:42:55 +0100
+Subject: [PATCH v6 10/11] arm64: add support for reserved memory defined by
+ device tree
+In-Reply-To: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
+References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1393594976-16728-11-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+Enable reserved memory initialization from device tree.
 
-Am Freitag, den 28.02.2014, 14:20 +0200 schrieb Tomi Valkeinen:
-> Add DT binding documentation for DVI Connector.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Reviewed-by: Archit Taneja <archit@ti.com>
-> ---
->  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
-> new file mode 100644
-> index 000000000000..6a0aff866c78
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
-> @@ -0,0 +1,26 @@
-> +DVI Connector
-> +==============
-> +
-> +Required properties:
-> +- compatible: "dvi-connector"
-> +
-> +Optional properties:
-> +- label: a symbolic name for the connector
-> +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm64/Kconfig   |    1 +
+ arch/arm64/mm/init.c |    1 +
+ 2 files changed, 2 insertions(+)
 
-For the i.MX bindings I had called this property 'ddc', but
-Documentation/devicetree/bindings/panel/simple-panel.txt already
-uses 'ddc-i2c-bus'. We should definitely standardize this.
-
-> +Required nodes:
-> +- Video port for DVI input
-> +
-> +Example
-> +-------
-> +
-> +dvi0: connector at 0 {
-> +	compatible = "dvi-connector";
-> +	label = "dvi";
-> +
-> +	i2c-bus = <&i2c3>;
-> +
-> +	dvi_connector_in: endpoint {
-> +		remote-endpoint = <&tfp410_out>;
-> +	};
-> +};
-
-regards
-Philipp
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc7202a..6abf15407dca 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -43,6 +43,7 @@ config ARM64
+ 	select NO_BOOTMEM
+ 	select OF
+ 	select OF_EARLY_FLATTREE
++	select OF_RESERVED_MEM
+ 	select PERF_USE_VMALLOC
+ 	select POWER_RESET
+ 	select POWER_SUPPLY
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d0b4c2efda90..3fb8d50dfdaa 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -160,6 +160,7 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(base, size);
+ 	}
+ 
++	early_init_fdt_scan_reserved_mem();
+ 	dma_contiguous_reserve(0);
+ 
+ 	memblock_allow_resize();
+-- 
+1.7.9.5
