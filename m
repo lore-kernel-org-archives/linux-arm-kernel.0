@@ -1,16 +1,16 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 28 Feb 2014 07:26:03 +0100
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 28 Feb 2014 07:58:11 +0100
 Subject: [PATCH v4 0/4] ARM: zynq: cpufreq support
-In-Reply-To: <20140227175217.GW13293@xsjandreislx>
+In-Reply-To: <3402bb7c-3dec-403a-9356-65af803e1b0a@AM1EHSMHS017.ehs.local>
 References: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
- <20140227175217.GW13293@xsjandreislx>
-Message-ID: <2aebf1c5-f0d6-41a9-b6f7-c709ceecc9a1@AM1EHSMHS006.ehs.local>
+ <3402bb7c-3dec-403a-9356-65af803e1b0a@AM1EHSMHS017.ehs.local>
+Message-ID: <53103383.8090604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/27/2014 06:52 PM, S?ren Brinkmann wrote:
 > Hi Daniel, Michal,
-> 
+>
 > On Wed, 2014-02-19 at 03:14PM -0800, Soren Brinkmann wrote:
 >> Hi,
 >>
@@ -27,19 +27,29 @@ On 02/27/2014 06:52 PM, S?ren Brinkmann wrote:
 >> 	S?ren
 >>
 >> Soren Brinkmann (4):
->>   clocksource/cadence_ttc: Call clockevents_update_freq() with IRQs
->>     enabled
->>   clocksource/cadence_ttc: Overhaul clocksource frequency adjustment
->>   arm: zynq: Don't use arm_global_timer with cpufreq
->>   arm: zynq: Add support for cpufreq
-> 
+>>    clocksource/cadence_ttc: Call clockevents_update_freq() with IRQs
+>>      enabled
+>>    clocksource/cadence_ttc: Overhaul clocksource frequency adjustment
+>>    arm: zynq: Don't use arm_global_timer with cpufreq
+>>    arm: zynq: Add support for cpufreq
+>
 > Any comments? I think most of these should be pretty straight forward
 > and it would be nice to get some ACKs - or tell me what's wrong. :)
 > 'clocksource/cadence_ttc: Overhaul clocksource frequency adjustment'
 > might deserve a more thorough review.
 
-No problem from my side.
-Daniel?
+Hi Soren,
 
-Thanks,
-Michal
+I will be at Linaro Connect. Give me a couple of days, I will review 
+them again.
+
+Thanks
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
