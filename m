@@ -1,35 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 21:33:57 +0100
-Subject: [PATCH v2 1/9] ARM: centralize common multi-platform kconfig
- options
-In-Reply-To: <7h38j3t2ba.fsf@paris.lan>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <201402282115.55948.arnd@arndb.de> <7h38j3t2ba.fsf@paris.lan>
-Message-ID: <201402282133.57910.arnd@arndb.de>
+Date: Fri, 28 Feb 2014 21:39:39 +0100
+Subject: [PATCH] ARM: tegra: add LED options back into tegra_defconfig
+In-Reply-To: <1392932240-14480-1-git-send-email-swarren@wwwdotorg.org>
+References: <1392932240-14480-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201402282139.40122.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014, Kevin Hilman wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 7d1588e..cf35d18 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -304,6 +304,7 @@ config ARCH_MULTIPLATFORM
-> >       bool "Allow multiple platforms to be selected"
-> >       select ARCH_WANT_OPTIONAL_GPIOLIB
-> >       select AUTO_ZRELADDR
-> > +     select CLKSRC_OF
-> >       select COMMON_CLK
-> >       select GENERIC_CLOCKEVENTS
-> >       select MULTI_IRQ_HANDLER
+On Thursday 20 February 2014, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Yup, that's it.  With that, sunxi_defconfig is booting again.
+> The last time tegra_defconfig was rebuilt, various LEDs options were
+> somehow selected by other options, and hence their entries in
+> tegra_defconfig were removed by "make savedefconfig". However, for some
+> reason this is no longer happening, so we need to add the entries back
+> into tegra_defconfig so the they are enabled in .config.
 > 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Fixes: db079b1811d1 ("ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS)"
+> Reported-by: Marc Dietrich <marvin24@gmx.de>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Another fix for 3.14.
 
-I've added this patch on the *for-next* branch for now, while we
-still decide whether it is the correct solution. The alternative
-would be to only select it from the clocksource drivers that want
-it.
+Applied to fixes branch.
 
 	Arnd
