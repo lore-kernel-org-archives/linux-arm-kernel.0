@@ -1,35 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 21:04:14 +0100
-Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
-In-Reply-To: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
-References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <201402282104.14295.arnd@arndb.de>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Fri, 28 Feb 2014 12:15:57 -0800
+Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
+References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
+ <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+ <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
+Message-ID: <20140228201557.29118.62126@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014, Lucas Stach wrote:
-> This series cleans up the PCI irq mapping for all
-> the ARM PCI host drivers, so they handle it in the
-> way defined in the common PCI bindings.
+Sorry, I appear to be having problems with my emails where list emails are
+bouncing back to me.  I'm working on correcting this now.
+
+Quoting Lorenzo Pieralisi (2014-02-28 01:50:22)
+> On Thu, Feb 27, 2014 at 11:57:58PM +0000, Sebastian Capella wrote:
 > 
-> Testing appreciated.
+> [...]
 > 
-> Lucas Stach (7):
->   ARM: dts: tegra: add PCIe interrupt mapping properties
->   PCI: tegra: use new OF interrupt mapping when possible
->   PCI: rcar: use new OF interrupt mapping when possible
->   ARM: dts: exynos5440: fix PCIe interrupt mapping
->   ARM: dts: imx6: add PCIe interrupt mapping properties
->   PCI: designware: use new OF interrupt mapping when possible
->   PCI: designware: split samsung and fsl bindings
+> > diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
+> > new file mode 100644
+> > index 0000000..a41e0e3
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/hibernate.c
+...
+> > +#include <linux/suspend.h>
+> > +#include <asm/tlbflush.h>
+> > +#include <asm/cacheflush.h>
+> 
+> You can drop tlbflush.h and cacheflush.h, they do not seem to be needed.
 
-Patches 1-6
+Done! Thanks!
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > +
+> > +/*
+> > + * The framework loads the hibernation image into a linked list anchored
+> > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
+> > + * destinations.
+> > + *
+> > + * To make this work if resume is triggered from initramfs, the
+> > + * pagetables need to be switched to allow writes to kernel mem.
+> > + */
+> 
+> Comment above needs updating. We are switching page tables to a set of
+> page tables that are certain to live at the same location in the older
+> kernel, that's the only reason, as we discussed. soft_restart will make
+> sure (again) to switch to 1:1 page tables so that we can call cpu_resume
+> with the MMU off.
 
-For the last patch, the clock information looks like it needs to
-be fixed. I realize that you are just documenting what the driver
-is using at the moment, but that is not a proper way of establishing
-a binding.
+How does this look?
 
-	Arnd
+The framework loads as much of the hibernation image to final physical
+pages as possible.  Any pages that were in use, will need to be restored
+prior to the soft_restart.  The pages to restore are maintained in
+the list anchored at restore_pblist.  At this point, we can swap the
+pages to their final location.  We must switch the mapping to 1:1 to
+ensure that when we overwrite the page table physical pages we're using
+a known physical location (idmap_pgd) with known contents.
+
+> > +/*
+> > + * Resume from the hibernation image.
+> > + * Due to the kernel heap / data restore, stack contents change underneath
+> > + * and that would make function calls impossible; switch to a temporary
+> > + * stack within the nosave region to avoid that problem.
+> > + */
+> > +int swsusp_arch_resume(void)
+> > +{
+> > +     extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+> > +     call_with_stack(arch_restore_image, 0,
+> > +             resume_stack + sizeof(resume_stack));
+> 
+> This does not guarantee your stack is 8-byte aligned, that's not AAPCS
+> compliant and might buy you trouble.
+> 
+> Either you align the stack or you align the pointer you are passing.
+> 
+> Please have a look at kernel/process.c
+
+I've added this for now, do you see any issues?
+
+-static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
++static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
+-               resume_stack + sizeof(resume_stack));
++               resume_stack + ARRAY_SIZE(resume_stack));
+
+Thanks Lorenzo!
+
+Sebastian
