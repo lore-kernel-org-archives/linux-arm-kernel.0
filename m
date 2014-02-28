@@ -1,25 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Feb 2014 10:53:10 +0900
-Subject: [PATCH 2/4] ARM: dove: prepare new Dove DT Kconfig variable
-In-Reply-To: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140228015310.GC9383@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Feb 2014 17:55:11 -0800
+Subject: [PATCH v4 0/9] Use regmap+devm+DT in pm8xxx input drivers
+Message-ID: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 10:28:03PM +0100, Sebastian Hesselbarth wrote:
-> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
-> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
-> DT-only MACH_DOVE to mmc, thermal, wdt, and asoc Kconfigs.
+These patches move the pm8xxx input drivers over to use devm_* APIs
+and regmap. This breaks the dependency of these drivers on the pm8xxx
+specific read/write calls and also simplifies the probe code a bit.
+Finally we add devicetree support to these drivers so they can be probed
+on the platforms that are supported upstream.
 
-I'd be much happier merging this sort of stuff individually through the
-subsystems, we already have an annoying conflict here...  Is there some
-bisection problem with doing that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/41d4daaa/attachment.sig>
+Changes since v3:
+ * Dropped devm conversion patch for pwrkey
+ * Fixed compilation of keypad
+
+Changes since v2:
+ * Rebased to v3.14-rc3
+
+Changes since v1:
+ * Picked up Dmitry's version of devm for pwrkey
+ * Added DT bindings and parsing patches
+ * Dropped patches picked up by Dmitry
+
+Stephen Boyd (9):
+  Input: pmic8xxx-keypad - Fix build by removing gpio configuration
+  Input: pmic8xxx-keypad - Migrate to devm_* APIs
+  Input: pmic8xxx-keypad - Migrate to regmap APIs
+  Input: pmic8xxx-keypad - Migrate to DT
+  Input: pmic8xxx-pwrkey - Migrate to DT
+  Input: pm8xxx-vibrator - Add DT match table
+  devicetree: bindings: Document PM8921/8058 keypads
+  devicetree: bindings: Document PM8921/8058 power keys
+  devicetree: bindings: Document PM8921/8058 vibrators
+
+ .../bindings/input/qcom,pm8xxx-keypad.txt          |  72 +++++
+ .../bindings/input/qcom,pm8xxx-pwrkey.txt          |  39 +++
+ .../devicetree/bindings/input/qcom,pm8xxx-vib.txt  |  16 +
+ drivers/input/keyboard/pmic8xxx-keypad.c           | 348 ++++++++-------------
+ drivers/input/misc/pm8xxx-vibrator.c               |   8 +
+ drivers/input/misc/pmic8xxx-pwrkey.c               |  33 +-
+ include/linux/input/pmic8xxx-keypad.h              |  52 ---
+ include/linux/input/pmic8xxx-pwrkey.h              |  31 --
+ 8 files changed, 286 insertions(+), 313 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-keypad.txt
+ create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
+ create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-vib.txt
+ delete mode 100644 include/linux/input/pmic8xxx-keypad.h
+ delete mode 100644 include/linux/input/pmic8xxx-pwrkey.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
