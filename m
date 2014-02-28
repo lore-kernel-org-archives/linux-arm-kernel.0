@@ -1,53 +1,37 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Fri, 28 Feb 2014 20:07:44 +0200
-Subject: [PATCH 4/5] ARM: dts: keystone: update reset node to work with reset
- driver
+Date: Fri, 28 Feb 2014 20:07:45 +0200
+Subject: [PATCH 5/5] ARM: keystone: enable reset driver support
 In-Reply-To: <1393610865-23630-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1393610865-23630-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1393610865-23630-5-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1393610865-23630-6-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset controller registers are part of the PLL Controller MMRs.
-According to TRM there are the following registers:
-RSTYPE, RSCTRL, RSCFG and RSISO. Currently declared only one of them,
-but that is not enough to correctly setup reset properties, so add
-whole range of pll registers - pllregs.
-
-Also add range for reset multiplex registers for SoC on the device.
-These registers are located in Bootcfg memory space and needed
-to setup behaviour after appropriate watchdog is triggered.
-
-Add "ti,wdt_list" option to declare what watchdog are used to reboot
-the SoC.
+Enable reset driver support in order to have opportunity
+to reboot SoC by watchdog and by software.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
 CC: Russell King <linux@arm.linux.org.uk>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
- arch/arm/boot/dts/keystone.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/configs/keystone_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 3a83ffe..7092208 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -99,7 +99,9 @@
- 
- 		rstctrl: reset-controller {
- 			compatible = "ti,keystone-reset";
--			reg = <0x023100e8 4>;	/* pll reset control reg */
-+			reg = <0x23100e4 0x10>, <0x2620328 0x10>;
-+			reg-names = "pllregs", "muxregs";
-+			ti,wdt_list = <0>;
- 		};
- 
- 		/include/ "keystone-clocks.dtsi"
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 4582e16..3f9c688 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -130,6 +130,9 @@ CONFIG_SPI=y
+ CONFIG_SPI_DAVINCI=y
+ CONFIG_SPI_SPIDEV=y
+ # CONFIG_HWMON is not set
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_KEYSTONE=y
+ CONFIG_WATCHDOG=y
+ CONFIG_USB=y
+ CONFIG_USB_DEBUG=y
 -- 
 1.8.3.2
