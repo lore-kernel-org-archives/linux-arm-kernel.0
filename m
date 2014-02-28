@@ -1,45 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Feb 2014 16:25:03 -0800
-Subject: [PATCHv2 14/16] ARM: OMAP3: hwmod data: cleanup data for IOMMUs
-In-Reply-To: <530F0255.0@epfl.ch>
-References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
- <1392315347-32967-15-git-send-email-s-anna@ti.com>
- <20140226171824.GH11654@atomide.com> <530E2B67.9050300@ti.com>
- <530F0255.0@epfl.ch>
-Message-ID: <20140228002502.GB14514@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 27 Feb 2014 19:27:03 -0500
+Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead
+ of CONFIG_OF
+In-Reply-To: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <530FD7D7.9000104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Florian Vaussard <florian.vaussard@epfl.ch> [140227 01:19]:
-> Hi,
+On Thursday 27 February 2014 07:20 PM, Santosh Shilimkar wrote:
+> The of-dma.c is compiled out with !CONFIG_OF_DMA but the functions in
+> the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
+> to avoid build errors with CONFIG_OFF && !CONFIG_OF_DMA
 > 
-> On 02/26/2014 06:59 PM, Suman Anna wrote:
-> > Tony,
-> > 
-> > On 02/26/2014 11:18 AM, Tony Lindgren wrote:
-> >> * Suman Anna <s-anna@ti.com> [140213 10:19]:
-> >>> From: Florian Vaussard <florian.vaussard@epfl.ch>
-> >>>
-> >>> The irq numbers, ocp address space and device attribute data
-> >>> have all been cleaned up for OMAP3 IOMMUs. All this data is
-> >>> populated via the corresponding dt node.
-> >>>
-> >>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> >>> Signed-off-by: Suman Anna <s-anna@ti.com>
-> >>
-> >> This will need to wait until we've made omap3 to be DT only
-> >> as this will break idling of things for the legacy booting.
-> >>
-> > 
-> > OK, will drop this and I will adjust Patch 9 to support the legacy boot
-> > for OMAP3 ISP.
-> > 
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  include/linux/of_dma.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> BTW, Tony do you have a new window for omap3 to be DT onyl?
+> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+> index 0322363..3d2beab 100644
+> --- a/include/linux/of_dma.h
+> +++ b/include/linux/of_dma.h
+> @@ -31,7 +31,7 @@ struct of_dma_filter_info {
+>  	dma_filter_fn	filter_fn;
+>  };
+>  
+> -#ifdef CONFIG_OF
+> +#ifdef CONFIG_OF_DMA
+Sorry.. Typo here.. Should have been CONFIG_DMA_OF
 
-I think a good point would be when we have DSS working with DT,
-and have a .dts file for the Pandora board.
+>From 31242461b6ba5e8c0c5ee26e394fa4cab61e3aa1 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 27 Feb 2014 19:13:36 -0500
+Subject: [PATCH] dma: of: Move the functions under CONFIG_DMA_OF instead of
+ CONFIG_OF
 
-Regards,
+The of-dma.c is compiled out with !CONFIG_DMA_OF but the functions in
+the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
+to avoid build errors with CONFIG_OFF && !CONFIG_DMA_OF
 
-Tony
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ include/linux/of_dma.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+index 0322363..0ea24f4 100644
+--- a/include/linux/of_dma.h
++++ b/include/linux/of_dma.h
+@@ -31,7 +31,7 @@ struct of_dma_filter_info {
+ 	dma_filter_fn	filter_fn;
+ };
+ 
+-#ifdef CONFIG_OF
++#ifdef CONFIG_DMA_OF
+ extern int of_dma_controller_register(struct device_node *np,
+ 		struct dma_chan *(*of_dma_xlate)
+ 		(struct of_phandle_args *, struct of_dma *),
+-- 
+1.7.9.5
