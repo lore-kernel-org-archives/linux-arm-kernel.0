@@ -1,55 +1,53 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 28 Feb 2014 18:12:23 +0200
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <20140228155937.GQ21483@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Feb 2014 16:13:43 +0000
+Subject: [PATCH 9/9] Doc/DT: Add DT binding documentation for tpd12s015
+ encoder
+In-Reply-To: <1393590016-9361-10-git-send-email-tomi.valkeinen@ti.com>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>
-Message-ID: <5310B567.7040605@ti.com>
+ <1393590016-9361-10-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20140228161343.GS21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 17:59, Russell King - ARM Linux wrote:
-
->> +dvi0: connector at 0 {
->> +	compatible = "dvi-connector";
->> +	label = "dvi";
->> +
->> +	i2c-bus = <&i2c3>;
->> +
->> +	dvi_connector_in: endpoint {
->> +		remote-endpoint = <&tfp410_out>;
->> +	};
->> +};
+On Fri, Feb 28, 2014 at 02:20:16PM +0200, Tomi Valkeinen wrote:
+> Add DT binding documentation for tpd12s015 encoder
 > 
-> This looks far too simplistic.  There are different classes of DVI
-> connector - there is:
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/ti,tpd12s015.txt     | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
 > 
-> DVI A - analogue only
-> DVI D - digital only (single and dual link)
-> DVI I - both (single and dual digital link)
-> 
-> DRM at least makes a distinction between these three classes, and this
-> disctinction is part of the user API.  How would a display system know
-> which kind of DVI connector is wired up on the board from this DT
-> description?
+> diff --git a/Documentation/devicetree/bindings/video/ti,tpd12s015.txt b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+> new file mode 100644
+> index 000000000000..26e6d32e3f20
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+> @@ -0,0 +1,44 @@
+> +TPD12S015 HDMI level shifter and ESD protection chip
+> +====================================================
+> +
+> +Required properties:
+> +- compatible: "ti,tpd12s015"
+> +
+> +Optional properties:
+> +- gpios: CT CP HPD, LS OE and HPD gpios
 
-Yes, I think that's a valid change. But do we also need to specify
-single/dual link, in addition to the three types?
+If this is supposed to give people a clue about what these GPIOs are,
+it completely fails to do this.  CT CP?  HPD is obviously the hotplug
+detect signal, but why are there two - HDMI only has a single detect
+pin on the connector.
 
-I guess the compatible string is the easiest way for differentation, at
-least for the three main types, i.e. "dvi-d-connector" etc.
+While it makes sense to stick all three into one property, is it
+possible that not all of these may be routed to a GPIO?  If so, how
+do you specify that one (or more) of these does not exist?
 
-"dvi-d-1l-connector" and "dvi-d-2l-connector" for the single/dual link?
-That looks a bit funny.
+Another issue here is that other HDMI encoders are available - should
+every encoder define its own set of bindings, or should there be a
+base set of bindings which all encoders should conform to - such as
+always having a HDMI output port?
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/e3be1e68/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
