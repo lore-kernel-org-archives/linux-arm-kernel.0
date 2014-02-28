@@ -1,38 +1,66 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Thu, 27 Feb 2014 17:47:21 -0800
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <530FD3CF.2040900@codeaurora.org>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
- <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
- <530FD3CF.2040900@codeaurora.org>
-Message-ID: <530FEAA9.7040601@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 28 Feb 2014 10:50:25 +0900
+Subject: [RFC PATCH 0/3] PCI: imx6: fixup for add-in card IRQ mismapping
+In-Reply-To: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <000701cf3427$72f1c590$58d550b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2014 04:09 PM, Stephen Boyd wrote:
-> On 02/27/14 15:57, Sebastian Capella wrote:
->> diff --git a/arch/arm/include/asm/memory.h
->> b/arch/arm/include/asm/memory.h index 8756e4b..1079ea8 100644 ---
->> a/arch/arm/include/asm/memory.h +++
->> b/arch/arm/include/asm/memory.h @@ -291,6 +291,7 @@ static inline
->> void *phys_to_virt(phys_addr_t x) */ #define __pa(x)
->> __virt_to_phys((unsigned long)(x)) #define __va(x)			((void
->> *)__phys_to_virt((phys_addr_t)(x))) +#define __pa_symbol(x)
->> __pa(RELOC_HIDE((unsigned long)(x), 0))
+On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
 > 
-> Just curious, is there a reason for the RELOC_HIDE() here? Or 
-> __pa_symbol() for that matter? It looks like only x86 uses this on
-> the __nosave_{begin,end} symbol. Maybe it's copy-pasta?
+> An add-in card used on the Ventana IMX6 SoC based family of boards has a
+> TI XIO2001 PCIe-to-PCI bridge where the INTA/B/C/D mappings between the
+> bridge and the four mini-PCI slots are swapped (INTD/C/B/A).
 
->From my understanding this needs to stick around so long as gcc 3.x is
-supported (did it get dropped yet?) on ARM Linux since it doesn't
-support -fno-strict-overflow.
+(+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
 
-> I also wonder if anyone has thought about making a __weak 
-> pfn_is_nosave() function so that architectures don't need to
-> implement the same thing every time. Consolidating those shouldn't
-> be part of this patch though.
+This problem happens from the 'Board', not a 'SoC'.
+'TI XIO2001 PCIe-to-PCI bridge' is not a 'SoC'.
+'pci-imx6.c' is the driver for 'IMX6 PCI IP', not for 'IMX6 SoC based
+board'. Isn't it?
+
+Then, the workaround code for board problem should NOT be
+included to './drivers/pci/host/' side.
+
+Also, please add the following members to CC list. They will give
+important comments.
+
+: Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG
+
+Best regards,
+Jingoo Han
+
 > 
-
-Yes, I think just a couple of the architectures do anything besides
-checking if the address falls within the nosave section.
+> This series adds legacy PCI interrupt mapping to support PCI bridges on
+> IMX6 PCIe host controllers, adds the ability to use a host-specific
+> custom swizzle function, then uses that to fix the IRQ mapping.
+> 
+> I'm hoping this is the right way to perform such a workaround - please provide
+> feedback if not.  Patch1 will likely collide with the owrk Lucas is doing
+> with device-tree bindings and MSI support.  I'm happy to re-base if/when
+> needed.
+> 
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> ---
+> Tim Harvey (3):
+>   PCI: designware: add legacy PCI interrupt mapping
+>   PCI: designware: add ability for custom swizzle
+>   PCI: imx6: ventana: fixup for IRQ mismapping
+> 
+>  arch/arm/boot/dts/imx6qdl.dtsi     |  2 +-
+>  drivers/pci/host/pci-exynos.c      |  7 ++++--
+>  drivers/pci/host/pci-imx6.c        | 47 ++++++++++++++++++++++++++++++++++----
+>  drivers/pci/host/pcie-designware.c | 11 ++++++++-
+>  drivers/pci/host/pcie-designware.h |  3 ++-
+>  include/linux/pci_ids.h            |  1 +
+>  6 files changed, 62 insertions(+), 9 deletions(-)
+> 
+> --
+> 1.8.3.2
