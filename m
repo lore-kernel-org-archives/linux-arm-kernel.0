@@ -1,37 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 28 Feb 2014 08:06:35 -0800
-Subject: [PATCH v6 0/2] Introduce AEMIF driver for Davinci/Keystone archs
-In-Reply-To: <5310AEA8.1070804@ti.com>
-References: <1393262772-24442-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5310AEA8.1070804@ti.com>
-Message-ID: <20140228160635.GA6144@kroah.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Feb 2014 18:12:23 +0200
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <20140228155937.GQ21483@n2100.arm.linux.org.uk>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
+ <20140228155937.GQ21483@n2100.arm.linux.org.uk>
+Message-ID: <5310B567.7040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 10:43:36AM -0500, Santosh Shilimkar wrote:
-> Greg,
-> 
-> On Monday 24 February 2014 12:26 PM, Ivan Khoronzhuk wrote:
-> > These patches introduce Async External Memory Interface (EMIF16/AEMIF)
-> > controller driver for Davinci/Keystone archs.
-> > 
-> > For more informations see documentation:
-> > Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-> > OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> > Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
-> > 
-> [..]
-> 
-> > 
-> > v5..v6:
-> > - memory: ti-aemif: introduce AEMIF driver
-> > - memory: ti-aemif: add bindings for AEMIF driver
-> > 	changed opaque names for cs node properties
-> > 
-> Can you please pick these two patches ? 
+On 28/02/14 17:59, Russell King - ARM Linux wrote:
 
-Asking for a response with less than a weeks time is really bold:
-  $ ~/bin/mdfrm -c ~/mail/todo/
-  521 messages in /home/gregkh/mail/todo/
+>> +dvi0: connector at 0 {
+>> +	compatible = "dvi-connector";
+>> +	label = "dvi";
+>> +
+>> +	i2c-bus = <&i2c3>;
+>> +
+>> +	dvi_connector_in: endpoint {
+>> +		remote-endpoint = <&tfp410_out>;
+>> +	};
+>> +};
+> 
+> This looks far too simplistic.  There are different classes of DVI
+> connector - there is:
+> 
+> DVI A - analogue only
+> DVI D - digital only (single and dual link)
+> DVI I - both (single and dual digital link)
+> 
+> DRM at least makes a distinction between these three classes, and this
+> disctinction is part of the user API.  How would a display system know
+> which kind of DVI connector is wired up on the board from this DT
+> description?
 
-Give me a chance to catch up please...
+Yes, I think that's a valid change. But do we also need to specify
+single/dual link, in addition to the three types?
+
+I guess the compatible string is the easiest way for differentation, at
+least for the three main types, i.e. "dvi-d-connector" etc.
+
+"dvi-d-1l-connector" and "dvi-d-2l-connector" for the single/dual link?
+That looks a bit funny.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/e3be1e68/attachment.sig>
