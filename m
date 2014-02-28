@@ -1,34 +1,39 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Feb 2014 14:18:43 +0900
-Subject: [PATCH v5 6/7] arm64: Add 'notrace' attribute to unwind_frame() for
- ftrace
+Date: Fri, 28 Feb 2014 14:18:44 +0900
+Subject: [PATCH v5 7/7] arm64: add __ASSEMBLY__ in asm/insn.h
 In-Reply-To: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
  <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1393564724-3966-7-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1393564724-3966-8-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-walk_stackframe() calls unwind_frame(), and if walk_stackframe() is
-"notrace", unwind_frame() should be also "notrace".
+Since insn.h is indirectly included in asm/entry-ftrace.S,
+we need to exclude some declarations by __ASSEMBLY__.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/stacktrace.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/insn.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index c3b6c63..54122c4 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -35,7 +35,7 @@
-  *	ldp	x29, x30, [sp]
-  *	add	sp, sp, #0x10
-  */
--int unwind_frame(struct stackframe *frame)
-+int notrace unwind_frame(struct stackframe *frame)
- {
- 	unsigned long high, low;
- 	unsigned long fp = frame->fp;
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index c44ad39..dc1f73b 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -21,6 +21,7 @@
+ /* A64 instructions are always 32 bits. */
+ #define	AARCH64_INSN_SIZE		4
+ 
++#ifndef __ASSEMBLY__
+ /*
+  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+  * Section C3.1 "A64 instruction index by encoding":
+@@ -104,5 +105,6 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
++#endif /* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_INSN_H */
 -- 
 1.7.9.5
