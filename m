@@ -1,58 +1,133 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Feb 2014 14:42:35 -0600
-Subject: [PATCHv3 04/13] Documentation: dt: add OMAP iommu bindings
+Date: Fri, 28 Feb 2014 14:42:36 -0600
+Subject: [PATCHv3 05/13] iommu/omap: add devicetree support
 In-Reply-To: <1393620164-14633-1-git-send-email-s-anna@ti.com>
 References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
-Message-ID: <1393620164-14633-5-git-send-email-s-anna@ti.com>
+Message-ID: <1393620164-14633-6-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
-the standard bindings used by OMAP peripherals, this patch uses a
-'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
-bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
+As OMAP2+ is moving to a full DT boot for all SoC families, commit
+7ce93f3 "ARM: OMAP2+: Fix more missing data for omap3.dtsi file"
+adds basic DT bits for OMAP3. But the driver is not yet converted,
+so this will not work and driver will not be probed. Convert it!
+
+The legacy boot mode is still supported until OMAP3 is converted
+to DT-boot only.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: split bindings document, add dra7 and bus error back]
+[s-anna at ti.com: dev_name adaptation and improved error checking]
 Signed-off-by: Suman Anna <s-anna@ti.com>
+[tony at atomide.com: Ack for arch/arm/*omap* parts]
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+ arch/arm/mach-omap2/omap-iommu.c |  5 +++++
+ drivers/iommu/omap-iommu.c       | 42 ++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 43 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
-new file mode 100644
-index 0000000..42531dc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
-@@ -0,0 +1,26 @@
-+OMAP2+ IOMMU
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+index f6daae8..f1fab56 100644
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -10,6 +10,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/of.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+@@ -58,6 +59,10 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+ 
+ static int __init omap_iommu_init(void)
+ {
++	/* If dtb is there, the devices will be created dynamically */
++	if (of_have_populated_dt())
++		return -ENODEV;
 +
-+Required properties:
-+- compatible : Should be one of,
-+		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
-+		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
-+		"ti,dra7-iommu" for DRA7xx IOMMU instances
-+- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
-+- reg        : Address space for the configuration registers
-+- interrupts : Interrupt specifier for the IOMMU instance
+ 	return omap_hwmod_for_each_by_class("mmu", omap_iommu_dev_init, NULL);
+ }
+ /* must be ready before omap3isp is probed */
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 217952b..eb73ef2 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -23,6 +23,9 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_iommu.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+@@ -936,17 +939,39 @@ static int omap_iommu_probe(struct platform_device *pdev)
+ 	struct omap_iommu *obj;
+ 	struct resource *res;
+ 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
++	struct device_node *of = pdev->dev.of_node;
+ 
+ 	obj = devm_kzalloc(&pdev->dev, sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+ 	if (!obj)
+ 		return -ENOMEM;
+ 
+-	obj->nr_tlb_entries = pdata->nr_tlb_entries;
+-	obj->name = pdata->name;
++	if (of) {
++		obj->name = dev_name(&pdev->dev);
++		obj->nr_tlb_entries = 32;
++		err = of_property_read_u32(of, "ti,#tlb-entries",
++					   &obj->nr_tlb_entries);
++		if (err && err != -EINVAL)
++			return err;
++		if (obj->nr_tlb_entries != 32 && obj->nr_tlb_entries != 8)
++			return -EINVAL;
++		/*
++		 * da_start and da_end are needed for omap-iovmm, so hardcode
++		 * these values as used by OMAP3 ISP - the only user for
++		 * omap-iovmm
++		 */
++		obj->da_start = 0;
++		obj->da_end = 0xfffff000;
++	} else {
++		obj->nr_tlb_entries = pdata->nr_tlb_entries;
++		obj->name = pdata->name;
++		obj->da_start = pdata->da_start;
++		obj->da_end = pdata->da_end;
++	}
++	if (obj->da_end <= obj->da_start)
++		return -EINVAL;
 +
-+Optional properties:
-+- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
-+                    Should be either 8 or 32 (default: 32)
-+- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
-+		          back a bus error response on MMU faults.
+ 	obj->dev = &pdev->dev;
+ 	obj->ctx = (void *)obj + sizeof(*obj);
+-	obj->da_start = pdata->da_start;
+-	obj->da_end = pdata->da_end;
+ 
+ 	spin_lock_init(&obj->iommu_lock);
+ 	mutex_init(&obj->mmap_lock);
+@@ -987,11 +1012,20 @@ static int omap_iommu_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct of_device_id omap_iommu_of_match[] = {
++	{ .compatible = "ti,omap2-iommu" },
++	{ .compatible = "ti,omap4-iommu" },
++	{ .compatible = "ti,dra7-iommu"	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, omap_iommu_of_match);
 +
-+Example:
-+	/* OMAP3 ISP MMU */
-+	mmu_isp: mmu at 480bd400 {
-+		compatible = "ti,omap2-iommu";
-+		reg = <0x480bd400 0x80>;
-+		interrupts = <24>;
-+		ti,hwmods = "mmu_isp";
-+		ti,#tlb-entries = <8>;
-+	};
+ static struct platform_driver omap_iommu_driver = {
+ 	.probe	= omap_iommu_probe,
+ 	.remove	= omap_iommu_remove,
+ 	.driver	= {
+ 		.name	= "omap-iommu",
++		.of_match_table = of_match_ptr(omap_iommu_of_match),
+ 	},
+ };
+ 
 -- 
 1.9.0
