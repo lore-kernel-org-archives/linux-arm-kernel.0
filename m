@@ -1,32 +1,48 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Sat,  1 Mar 2014 14:58:51 +0100
-Subject: [PATCH v2 4/7] ARM: dts: omap3-gta04: Add twl4030 charger
+Date: Sat,  1 Mar 2014 14:58:53 +0100
+Subject: [PATCH v2 6/7] ARM: dts: omap3-gta04: Enable mmc2 for wifi
 In-Reply-To: <1393682334-26805-1-git-send-email-marek@goldelico.com>
 References: <1393682334-26805-1-git-send-email-marek@goldelico.com>
-Message-ID: <1393682334-26805-5-git-send-email-marek@goldelico.com>
+Message-ID: <1393682334-26805-7-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: NeilBrown <neilb@suse.de>
 
-Define twl4030 charger node used for charging.
+This requires vaux4.
 
+Reset line isn't used yet, so wifi isn't reliable.
+But it does work once per boot.
+
+Signed-off-by: NeilBrown <neilb@suse.de>
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-index 7f29315..42fc12e 100644
+index 41a21bd..d556e3a 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dts
 +++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -186,3 +186,7 @@
- 	pinctrl-0 = <&uart3_pins>;
+@@ -178,7 +178,9 @@
  };
  
-+&charger {
-+	bb_uvolt = <3200000>;
-+	bb_uamp = <150>;
+ &mmc2 {
+-	status = "disabled";
++	vmmc-supply = <&vaux4>;
++	bus-width = <4>;
++	ti,non-removable;
+ };
+ 
+ &mmc3 {
+@@ -204,3 +206,8 @@
+ 	bb_uvolt = <3200000>;
+ 	bb_uamp = <150>;
+ };
++
++&vaux4 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <3150000>;
 +};
 -- 
 1.8.3.2
