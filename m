@@ -1,110 +1,56 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 01 Mar 2014 14:17:34 +0100
-Subject: [linux-sunxi] [PATCH v3 1/4] ARM: sunxi: Add driver for sunxi
- usb phy
-In-Reply-To: <CAGb2v64Gg6QKn4KRXQ2uGR_rFb1mFD1fgzN_6MJDnLuv_JYf6g@mail.gmail.com>
-References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
- <1393157352-21104-2-git-send-email-hdegoede@redhat.com>
- <CAGb2v64Gg6QKn4KRXQ2uGR_rFb1mFD1fgzN_6MJDnLuv_JYf6g@mail.gmail.com>
-Message-ID: <5311DDEE.6070404@redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Sat, 1 Mar 2014 19:08:51 +0530
+Subject: [PATCH v2 5/5] phy: mvebu-sata: prepare new Dove DT Kconfig
+ variable
+In-Reply-To: <1393662801-17950-5-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393662801-17950-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <5311E2EB.70301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Saturday 01 March 2014 02:03 PM, Sebastian Hesselbarth wrote:
+> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE Kconfig.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Kishon,
+>
+> Mark Brown requested to take the corresponding ASoC patch through
+> his tree. Therefore, I have split the former patch into individual subsystem
+> patches. This patch also received an update, to not break bisectability
+> we add DT-enabled MACH_DOVE and maintain ARCH_DOVE, which is non-DT only
+> after conversion. ARCH_DOVE will be removed, when legacy mach-dove will
+> be removed.
 
-On 02/26/2014 04:12 PM, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Sun, Feb 23, 2014 at 8:09 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The Allwinner A1x / A2x SoCs have 2 or 3 usb phys which are all accessed
->> through a single set of registers. Besides this there are also some other
->> phy related bits which need poking, which are per phy, but shared between the
->> ohci and ehci controllers, so these are also controlled from this new phy
->> driver.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  26 ++
->>  drivers/phy/Kconfig                                |  11 +
->>  drivers/phy/Makefile                               |   1 +
->>  drivers/phy/phy-sun4i-usb.c                        | 329 +++++++++++++++++++++
->>  4 files changed, 367 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->>  create mode 100644 drivers/phy/phy-sun4i-usb.c
->>
-> [..]
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> new file mode 100644
->> index 0000000..31c4611
->> --- /dev/null
->> +++ b/drivers/phy/phy-sun4i-usb.c
-> [..]
->> +static int sun4i_usb_phy_probe(struct platform_device *pdev)
->> +{
->> +       struct sun4i_usb_phy_data *data;
->> +       struct device *dev = &pdev->dev;
->> +       struct device_node *np = dev->of_node;
->> +       void __iomem *pmu = NULL;
->> +       struct phy_provider *phy_provider;
->> +       struct reset_control *reset;
->> +       struct regulator *vbus;
->> +       struct resource *res;
->> +       struct phy *phy;
->> +       char name[16];
->> +       int i;
->> +
->> +       data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> +       if (!data)
->> +               return -ENOMEM;
->> +
->> +       mutex_init(&data->mutex);
->> +
->> +       if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
->> +               data->num_phys = 2;
->> +       else
->> +               data->num_phys = 3;
->> +
->> +       if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy"))
->> +               data->disc_thresh = 3;
->> +       else
->> +               data->disc_thresh = 2;
->> +
->> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
->> +       data->base = devm_ioremap_resource(dev, res);
->> +       if (IS_ERR(data->base))
->> +               return PTR_ERR(data->base);
->> +
->> +       data->clk = devm_clk_get(dev, "usb_phy");
->> +       if (IS_ERR(data->clk)) {
->> +               dev_err(dev, "could not get usb_phy clock\n");
->> +               return PTR_ERR(data->clk);
->> +       }
->> +
->> +       /* Skip 0, 0 is the phy for otg which is not yet supported. */
->> +       for (i = 1; i < data->num_phys; i++) {
->> +               snprintf(name, sizeof(name), "usb%d_vbus", i);
->> +               vbus = devm_regulator_get_optional(dev, name);
->> +               if (IS_ERR(vbus)) {
->> +                       if (PTR_ERR(vbus) == -EPROBE_DEFER)
->> +                               return -EPROBE_DEFER;
->> +                       vbus = NULL;
->> +               }
->> +
->> +               snprintf(name, sizeof(name), "usb%d_reset", i);
->> +               reset = devm_reset_control_get(dev, name);
->> +               if (IS_ERR(reset)) {
-> 
-> I got around to rebasing my musb tree. I see you fixed the reset
-> control error path. You got one.
-> 
->> +                       dev_err(dev, "failed to get reset %s\n", name);
->> +                       return PTR_ERR(phy);
-> 
-> But you missed one here. And phy is uninitialized until later,
-> so this will break big time.
+Cool.. Should this patch be going through PHY tree?
 
-Ah, my bad, this is fixed now for v4 of the patch.
-
-Regards,
-
-Hans
+Cheers
+Kishon
+>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   drivers/phy/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index c7a551c2d5f1..e81daff7b5a3 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
+>
+>   config PHY_MVEBU_SATA
+>   	def_bool y
+> -	depends on ARCH_KIRKWOOD || ARCH_DOVE
+> +	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_DOVE
+>   	depends on OF
+>   	select GENERIC_PHY
+>
+>
