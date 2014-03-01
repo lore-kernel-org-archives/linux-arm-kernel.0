@@ -1,112 +1,120 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 19:12:33 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140226222147.GE16149@cbox>
-References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel> <
- 20140226200537.GC16149@cbox> <6873065.LH15I057sX@wuerfel> <
- CABGGisxHOVqLcG7hVAuAzdeic41KWSLLBSjQLSJQcjTXLhNCow@mail.gmail.com> <
- 20140226222147.GE16149@cbox>
-Message-ID: <20140301191233.4A62CC4084F@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 19:58:53 +0000
+Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
+In-Reply-To: <53105CC6.1090902@samsung.com>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com> <
+ 1392985527-6260-2-git-send-email-m.szyprowski@samsung.com> <20140226115108.
+ 211D2C40A89@trevor.secretlab.ca> <53105CC6.1090902@samsung.com>
+Message-ID: <20140301195853.4236DC40B36@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Feb 2014 14:21:47 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Feb 26, 2014 at 03:56:02PM -0600, Rob Herring wrote:
-> > On Wed, Feb 26, 2014 at 2:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Wednesday 26 February 2014 12:05:37 Christoffer Dall wrote:
-> > >> On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
-> > >> > On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
-> > >>
-> > >> The most common response I've been getting so far is that people
-> > >> generally want their VMs to look close to the real thing, but not sure
-> > >> how valid an argument that is.
-> > >>
-> > >> Some people feel strongly about this and seem to think that ARMv8
-> > >> kernels will only work with ACPI in the future...
+On Fri, 28 Feb 2014 10:54:14 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello,
+> 
+> On 2014-02-26 12:51, Grant Likely wrote:
+> > On Fri, 21 Feb 2014 13:25:17 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > From: Grant Likely <grant.likely@linaro.org>
 > > >
-> > > That is certainly a misconception that has caused a lot of trouble.
-> > > We will certainly keep supporting FDT boot in ARMv8 indefinitely,
-> > > and I expect that most systems will not use ACPI at all.
-> > 
-> > Furthermore, even enterprise distro kernels will boot DT based kernels
-> > assuming the h/w support is mainlined despite statements to the
-> > contrary. It is a requirement in mainline kernels that DT and ACPI
-> > support to coexist. Distros are not going to go out of their way to
-> > undo/break that. And since the boot interface is DT, you can't simply
-> > turn off DT. :)
-> > 
+> > > Reserved memory nodes allow for the reservation of static (fixed
+> > > address) regions, or dynamically allocated regions for a specific
+> > > purpose.
+> > >
+> > > Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> > > [joshc: Based on binding document proposed (in non-patch form) here:
+> > >  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+> > >  adapted to support #memory-region-cells]
+> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > ---
+> > >  .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
+> > >  1 file changed, 138 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > > new file mode 100644
+> > > index 000000000000..a606ce90c9c4
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > > @@ -0,0 +1,138 @@
+> > > +*** Reserved memory regions ***
+> > > +
+> > > +Reserved memory is specified as a node under the /reserved-memory node.
+> > > +The operating system shall exclude reserved memory from normal usage
+> > > +one can create child nodes describing particular reserved (excluded from
+> > > +normal use) memory regions. Such memory regions are usually designed for
+> > > +the special usage by various device drivers.
+> > > +
+> > > +Parameters for each memory region can be encoded into the device tree
+> > > +with the following nodes:
+> > > +
+> > > +/reserved-memory node
+> > > +---------------------
+> > > +#address-cells, #size-cells (required) - standard definition
+> > > +    - Should use the same values as the root node
+> > > +#memory-region-cells (required) - dictates number of cells used in the child
+> > > +                                  nodes memory-region specifier
+> >
+> > I still don't like this portion of the binding. I'm not convinced that
+> > it is necessary in the majority of cases and it is going to be very
+> > driver specific. I would rather drop it entirely from the common
+> > binding. If a specific driver needs to do something like the above then
+> > it can have a driver specific binding. Otherwise I think the default
+> > should be a simple phandle with no arguments to a single reserved memory
+> > node.
+> >
+> > Ben, can you weigh in on the current state of this document. I'm mostly
+> > happy with it aside from my comment above. Do you think this is ready to
+> > be merged?
+> >
+> > > +ranges (required) - standard definition
+> > > +    - Should be empty
+> > > +
+> > > +/reserved-memory/ child nodes
+> > > +-----------------------------
+> > > +Each child of the reserved-memory node specifies one or more regions of
+> > > +reserved memory. Each child node may either use a 'reg' property to
+> > > +specify a specific range of reserved memory, or a 'size' property with
+> > > +optional constraints to request a dynamically allocated block of memory.
+> > > +
+> > > +Following the generic-names recommended practice, node names should
+> > > +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
+> > > +address (@<address>) should be appended to the name if the node is a
+> > > +static allocation.
+> > > +
+> > > +Properties:
+> > > +Requires either a) or b) below.
+> > > +a) static allocation
+> > > +   reg (required) - standard definition
+> > > +b) dynamic allocation
+> > > +   size (required) - length based on parent's #size-cells
+> > > +                   - Size in bytes of memory to reserve.
+> > > +   alignment (optional) - length based on parent's #size-cells
+> > > +                        - Address boundary for alignment of allocation.
+> > > +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
+> > > +                           - Specifies regions of memory that are
+> > > +                             acceptable to allocate from.
+> > > +
+> > > +If both reg and size are present, then the reg property takes precedence
+> > > +and size is ignored.
+> > > +
+> > > +Additional properties:
+> > > +compatible (optional) - standard definition
+> > > +    - may contain the following strings:
+> > > +        - shared-dma-pool: This indicates a region of memory meant to be
+> > > +          used as a shared pool of DMA buffers for a set of devices. It can
+> > > +          be used by an operating system to instanciate the necessary pool
+> > > +          management subsystem if necessary.
+> > > +        - vendor specific string in the form <vendor>,[<device>-]<usage>
+> >
+> > Add "Use vendor strings to identify regions dedicates for a specific
+> > vendor device. For example: 'acme,framebuffer'. Platform code can use vendor
+> > strings to identify device specific regions"
 > 
-> Personally I'm all for simplicity so I don't want to push any agenda for
-> ACPI in VMs.
-> 
-> Note that the spec does not mandate the use of ACPI, it just tells you
-> how to do it if you wish to.
-> 
-> But, we can change the spec to require full FDT description of the
-> system, unless of course some of the ACPI-in-VM supporters manage to
-> convince the rest.
+> So do you want to completely drop phandle based links between device 
+> nodes and memory regions?
 
-Given that we don't even have a reliable view of what ACPI is going to
-look like on hardware yet, it probably is appropriate to omit talking
-about it entirely for v1.0.
-
-... although let me walk through the implications of how that could be
-done:
-
-Option 1: If v1.0 requires VM provide FDT, and v2.0 requires VM provide
-          either FDT or ACPI:
-- v1.0 VM shall always provide an FDT
-- v2.0 VM might provide ACPI without FDT
-- v1.0 OS must accept FDT
-- v2.0 OS must accept both ACPI and FDT
-Implications:
-  - a v1.0 OS might not boot on a v2.0 VM (because it cannot handle ACPI)
-  - a v2.0 OS will always boot on both v1.0 and v2.0 VMs
-  - ACPI-only OS not supported by this spec (Windows; potentially RHEL)
-  - FDT-only OS not supported by v2.0 of the spec. If we're only talking
-    Linux this isn't a problem, but it does put additional burden on
-    anyone doing a domain-specific OS. (for example, a bare-metal
-    networking application using virtualized devices)
-
-Option 2: If v1.0 requires FDT, and v2.0 requires either FDT only or FDT+ACPI
-- v1.0 and v2.0 VMs shall always provide and FDT
-- v2.0 VMs may additionally provide ACPI
-- v1.0 and v2.0 OSes must accept FDT
-- No requirement for OS to accept ACPI
-Impliciations:
-  - a v1.0 OS will boot on a v1.0 and v2.0 VM (FDT is always provided)
-  - a v2.0 OS will boot on a v1.0 and v2.0 VM
-  - ACPI-only OS not supported by this spec for all configurations.
-    There would need to be a stronger version of the spec (v2.0-ACPI) to
-    specify the configuration usable by ACPI OSes.
-
-Option 3: If v1.0 requires FDT, and v2.0 requires both FDT and ACPI
-- v1.0 and v2.0 VMs shall always provide and FDT
-- v2.0 VMs shall always provide ACPI
-- v1.0 OSes must accept FDT
-- v2.0 OS may accept either ACPI or FDT
-Impliciations:
-  - a v1.0 OS will boot on a v1.0 and v2.0 VM (FDT is always provided)
-  - a v2.0 OS will boot on a v1.0 and v2.0 VM
-  - Both FDT-only and ACPI-only OSes supported by v2.0 version of spec
-
-Someone is going to be unhappy no matter what is chosen. I think it is
-critical to be really clear about who the audience is. Doing the above
-also highlights for me the cost adding either/or options to the spec.
-Every 'or' option given to VMs adds cost to the OS. ie. if the spec
-allows the VM to implement either ACPI or FDT, then a compliant OS must
-support both. Alternately, if the spec allows the OS to implement only
-ACPI or only FDT, then compliant VMs are forced to implement both. In
-both cases it is a non-trivial burden (As far as I know, no ACPI-on-arm
-work has been done for *BSD, and it is yet to be done for all the VMs).
-The spec will be the most useful if as many options as possible are
-eliminated.
-
-Right now I think option 2 above makes the most sense; require FDT and
-make ACPI an optional extension. That will support almost all Linux
-vendors immediately and possibly even FreeBSD. As others have said,
-Windows is a complete unknown and we have no idea if they will be
-interested in the spec (nor is this the right forum for that
-conversation, but I will bring it up with my contacts).
+I meant nothing of the sort. That was merely a comment to clarify the
+documentation. I wrote 'can' not 'must'.
 
 g.
