@@ -1,342 +1,84 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 02 Mar 2014 13:30:51 +0800
-Subject: [PATCH v6 03/11] drivers: of: add initialization code for dynamic
- reserved memory
-In-Reply-To: <1393594976-16728-4-git-send-email-m.szyprowski@samsung.com>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
- 1393594976-16728-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140302053051.6FFCAC41038@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 19:54:19 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <alpine.DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
+References: <20140226183454.GA14639@cbox> <
+ CACxGe6tjuytsYAn6Hadf0AK+REzHgRydgbHPafL8+Sdtd_tMUA@mail.gmail.com> <alpine
+ .DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
+Message-ID: <20140301195419.0DB5DC40B0D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Feb 2014 14:42:48 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This patch adds support for dynamically allocated reserved memory regions
-> declared in device tree. Such regions are defined by 'size', 'alignment'
-> and 'alloc-ranges' properties.
+On Thu, 27 Feb 2014 12:27:58 +0000, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> On Wed, 26 Feb 2014, Grant Likely wrote:
+> > > VM Platform
+> > > -----------
+> > > The specification does not mandate any specific memory map. ??The guest
+> > > OS must be able to enumerate all processing elements, devices, and
+> > > memory through HW description data (FDT, ACPI) or a bus-specific
+> > > mechanism such as PCI.
+> > >
+> > > The virtual platform must support at least one of the following ARM
+> > > execution states:
+> > > ?? (1) aarch32 virtual CPUs on aarch32 physical CPUs
+> > > ?? (2) aarch32 virtual CPUs on aarch64 physical CPUs
+> > > ?? (3) aarch64 virtual CPUs on aarch64 physical CPUs
+> > >
+> > > It is recommended to support both (2) and (3) on aarch64 capable
+> > > physical systems.
+> > >
+> > > The virtual hardware platform must provide a number of mandatory
+> > > peripherals:
+> > >
+> > > ?? Serial console: ??The platform should provide a console,
+> > > ?? based on an emulated pl011, a virtio-console, or a Xen PV console.
+> > 
+> > For portable disk image, can Xen PV be dropped from the list? pl011 is part of SBSA, and virtio is getting standardised, but Xen PV is
+> > implementation specific.
 > 
-> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+> Does an interface need OASIS' rubber stamp to be "standard"?  If so, we
+> should also drop FDT from this document. The SBSA has not been published
+> by any OASIS-like standardization body either, so maybe we should drop
+> the SBSA too.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Grant Likely <grant.likely@linaro.org>
+> If it doesn't need OASIS nice logo on the side to be a standard, then
+> the Xen PV interfaces are a standard too. Give a look at
+> xen/include/public/io, they go as back as 2004, and they have multiple
+> different implementations of the frontends and backends in multiple
+> operating systems today.
+> 
+> There is no reason why another hypervisor couldn't implement the same
+> interface and in fact I know for a fact that it was considered for KVM.
 
-Applied, thanks.
+Allow me to elaborate. I'm not trying to punish Xen here, but I'm
+deliberately pushing back against "either/or" options in the spec. In
+this case the spec says the VM must implement one of pl011 *or* virtio
+*or* xenpv. That gives lots of implementation choice to VM projects.
+
+The downside is that spec-compliant OSes are required to implement
+support for *all three*. This is a non-issue for Linux guests because all
+those drivers are already there*, but it a real cost for niche guests.
+
+The reason why a cut-dowm pl011 exists in SBSA is to provide a
+bare-minimum output device that is always available. I would be far
+happier for this spec to not give the VMs an option at all here. Now
+that I think about it, it probably isn't appropriate to allow
+virtio-console to be an option either. It should flat out require the
+cut-down pl011 register interface. Make everything else optional. 'sane'
+linux distros will enable virtio-console and xenpv and the kernel should
+use whichever it finds in normal operation. Then no matter what crazy
+guest the user wants to run there is still a known-safe fallback for
+console output when things go wrong.
+
+* aside from the footprint required to enable all of them
+
+I've just had another thought. In the majority of cases the fallback
+pl011 won't get used by the guest anyway unless asked to because the
+UEFI OS Loader (EFI_STUB for Linux) will use the UEFI console drivers.
+I expect the Xen UEFI port will use xenpv, and the kvm UEFI port will
+use virtio. After UEFI exit boot services the OS is responsible for it's
+own console output. If it has drivers for virtio-console or xenpv, then
+fine; it discovers the interface and all is good. But if it doesn't,
+then the fallback will at least work.
 
 g.
-
-> ---
->  drivers/of/Kconfig              |    6 ++
->  drivers/of/Makefile             |    1 +
->  drivers/of/fdt.c                |   13 ++-
->  drivers/of/of_reserved_mem.c    |  188 +++++++++++++++++++++++++++++++++++++++
->  include/linux/of_reserved_mem.h |   21 +++++
->  5 files changed, 227 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/of/of_reserved_mem.c
->  create mode 100644 include/linux/of_reserved_mem.h
-> 
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index c6973f101a3e..30a7d87a8077 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -75,4 +75,10 @@ config OF_MTD
->  	depends on MTD
->  	def_bool y
->  
-> +config OF_RESERVED_MEM
-> +	depends on OF_EARLY_FLATTREE
-> +	bool
-> +	help
-> +	  Helpers to allow for reservation of memory regions
-> +
->  endmenu # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index efd05102c405..ed9660adad77 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -9,3 +9,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
->  obj-$(CONFIG_OF_PCI)	+= of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-> +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 819e11209718..510c0d8de8a0 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -15,6 +15,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_fdt.h>
-> +#include <linux/of_reserved_mem.h>
->  #include <linux/sizes.h>
->  #include <linux/string.h>
->  #include <linux/errno.h>
-> @@ -450,7 +451,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
->  	phys_addr_t base, size;
->  	unsigned long len;
->  	__be32 *prop;
-> -	int nomap;
-> +	int nomap, first = 1;
->  
->  	prop = of_get_flat_dt_prop(node, "reg", &len);
->  	if (!prop)
-> @@ -477,6 +478,10 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
->  				uname, &base, (unsigned long)size / SZ_1M);
->  
->  		len -= t_len;
-> +		if (first) {
-> +			fdt_reserved_mem_save_node(node, uname, base, size);
-> +			first = 0;
-> +		}
->  	}
->  	return 0;
->  }
-> @@ -512,6 +517,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
->  {
->  	static int found;
->  	const char *status;
-> +	int err;
->  
->  	if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
->  		if (__reserved_mem_check_root(node) != 0) {
-> @@ -534,7 +540,9 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
->  	if (status && strcmp(status, "okay") != 0 && strcmp(status, "ok") != 0)
->  		return 0;
->  
-> -	__reserved_mem_reserve_reg(node, uname);
-> +	err = __reserved_mem_reserve_reg(node, uname);
-> +	if (err == -ENOENT && of_get_flat_dt_prop(node, "size", NULL))
-> +		fdt_reserved_mem_save_node(node, uname, 0, 0);
->  
->  	/* scan next node */
->  	return 0;
-> @@ -550,6 +558,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
->  void __init early_init_fdt_scan_reserved_mem(void)
->  {
->  	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
-> +	fdt_init_reserved_mem();
->  }
->  
->  /**
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> new file mode 100644
-> index 000000000000..69b811779585
-> --- /dev/null
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -0,0 +1,188 @@
-> +/*
-> + * Device tree based initialization code for reserved memory.
-> + *
-> + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
-> + * Copyright (c) 2013,2014 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> + * Author: Josh Cartwright <joshc@codeaurora.org>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of the
-> + * License or (at your optional) any later version of the license.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/mm.h>
-> +#include <linux/sizes.h>
-> +#include <linux/of_reserved_mem.h>
-> +
-> +#define MAX_RESERVED_REGIONS	16
-> +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
-> +static int reserved_mem_count;
-> +
-> +#if defined(CONFIG_HAVE_MEMBLOCK)
-> +#include <linux/memblock.h>
-> +int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
-> +	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
-> +	phys_addr_t *res_base)
-> +{
-> +	/*
-> +	 * We use __memblock_alloc_base() because memblock_alloc_base()
-> +	 * panic()s on allocation failure.
-> +	 */
-> +	phys_addr_t base = __memblock_alloc_base(size, align, end);
-> +	if (!base)
-> +		return -ENOMEM;
-> +
-> +	/*
-> +	 * Check if the allocated region fits in to start..end window
-> +	 */
-> +	if (base < start) {
-> +		memblock_free(base, size);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	*res_base = base;
-> +	if (nomap)
-> +		return memblock_remove(base, size);
-> +	return 0;
-> +}
-> +#else
-> +int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
-> +	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
-> +	phys_addr_t *res_base)
-> +{
-> +	pr_err("Reserved memory not supported, ignoring region 0x%llx%s\n",
-> +		  size, nomap ? " (nomap)" : "");
-> +	return -ENOSYS;
-> +}
-> +#endif
-> +
-> +/**
-> + * res_mem_save_node() - save fdt node for second pass initialization
-> + */
-> +void __init fdt_reserved_mem_save_node(unsigned long node, const char *uname,
-> +				      phys_addr_t base, phys_addr_t size)
-> +{
-> +	struct reserved_mem *rmem = &reserved_mem[reserved_mem_count];
-> +
-> +	if (reserved_mem_count == ARRAY_SIZE(reserved_mem)) {
-> +		pr_err("Reserved memory: not enough space all defined regions.\n");
-> +		return;
-> +	}
-> +
-> +	rmem->fdt_node = node;
-> +	rmem->name = uname;
-> +	rmem->base = base;
-> +	rmem->size = size;
-> +
-> +	reserved_mem_count++;
-> +	return;
-> +}
-> +
-> +/**
-> + * res_mem_alloc_size() - allocate reserved memory described by 'size', 'align'
-> + *			  and 'alloc-ranges' properties
-> + */
-> +static int __init __reserved_mem_alloc_size(unsigned long node,
-> +	const char *uname, phys_addr_t *res_base, phys_addr_t *res_size)
-> +{
-> +	int t_len = (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32);
-> +	phys_addr_t start = 0, end = 0;
-> +	phys_addr_t base = 0, align = 0, size;
-> +	unsigned long len;
-> +	__be32 *prop;
-> +	int nomap;
-> +	int ret;
-> +
-> +	prop = of_get_flat_dt_prop(node, "size", &len);
-> +	if (!prop)
-> +		return -EINVAL;
-> +
-> +	if (len != dt_root_size_cells * sizeof(__be32)) {
-> +		pr_err("Reserved memory: invalid size property in '%s' node.\n",
-> +				uname);
-> +		return -EINVAL;
-> +	}
-> +	size = dt_mem_next_cell(dt_root_size_cells, &prop);
-> +
-> +	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
-> +
-> +	prop = of_get_flat_dt_prop(node, "alignment", &len);
-> +	if (prop) {
-> +		if (len != dt_root_addr_cells * sizeof(__be32)) {
-> +			pr_err("Reserved memory: invalid alignment property in '%s' node.\n",
-> +				uname);
-> +			return -EINVAL;
-> +		}
-> +		align = dt_mem_next_cell(dt_root_addr_cells, &prop);
-> +	}
-> +
-> +	prop = of_get_flat_dt_prop(node, "alloc-ranges", &len);
-> +	if (prop) {
-> +
-> +		if (len % t_len != 0) {
-> +			pr_err("Reserved memory: invalid alloc-ranges property in '%s', skipping node.\n",
-> +			       uname);
-> +			return -EINVAL;
-> +		}
-> +
-> +		base = 0;
-> +
-> +		while (len > 0) {
-> +			start = dt_mem_next_cell(dt_root_addr_cells, &prop);
-> +			end = start + dt_mem_next_cell(dt_root_size_cells,
-> +						       &prop);
-> +
-> +			ret = early_init_dt_alloc_reserved_memory_arch(size,
-> +					align, start, end, nomap, &base);
-> +			if (ret == 0) {
-> +				pr_debug("Reserved memory: allocated memory for '%s' node: base %pa, size %ld MiB\n",
-> +					uname, &base,
-> +					(unsigned long)size / SZ_1M);
-> +				break;
-> +			}
-> +			len -= t_len;
-> +		}
-> +
-> +	} else {
-> +		ret = early_init_dt_alloc_reserved_memory_arch(size, align,
-> +							0, 0, nomap, &base);
-> +		if (ret == 0)
-> +			pr_debug("Reserved memory: allocated memory for '%s' node: base %pa, size %ld MiB\n",
-> +				uname, &base, (unsigned long)size / SZ_1M);
-> +	}
-> +
-> +	if (base == 0) {
-> +		pr_info("Reserved memory: failed to allocate memory for node '%s'\n",
-> +			uname);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	*res_base = base;
-> +	*res_size = size;
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * fdt_init_reserved_mem - allocate and init all saved reserved memory regions
-> + */
-> +void __init fdt_init_reserved_mem(void)
-> +{
-> +	int i;
-> +	for (i = 0; i < reserved_mem_count; i++) {
-> +		struct reserved_mem *rmem = &reserved_mem[i];
-> +		unsigned long node = rmem->fdt_node;
-> +		int err = 0;
-> +
-> +		if (rmem->size == 0)
-> +			err = __reserved_mem_alloc_size(node, rmem->name,
-> +						 &rmem->base, &rmem->size);
-> +	}
-> +}
-> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-> new file mode 100644
-> index 000000000000..89226ed7d954
-> --- /dev/null
-> +++ b/include/linux/of_reserved_mem.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __OF_RESERVED_MEM_H
-> +#define __OF_RESERVED_MEM_H
-> +
-> +struct reserved_mem {
-> +	const char			*name;
-> +	unsigned long			fdt_node;
-> +	phys_addr_t			base;
-> +	phys_addr_t			size;
-> +};
-> +
-> +#ifdef CONFIG_OF_RESERVED_MEM
-> +void fdt_init_reserved_mem(void);
-> +void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
-> +			       phys_addr_t base, phys_addr_t size);
-> +#else
-> +static inline void fdt_init_reserved_mem(void) { }
-> +static inline void fdt_reserved_mem_save_node(unsigned long node,
-> +		const char *uname, phys_addr_t base, phys_addr_t size) { }
-> +#endif
-> +
-> +#endif /* __OF_RESERVED_MEM_H */
-> -- 
-> 1.7.9.5
-> 
