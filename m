@@ -1,9 +1,9 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Mar 2014 20:26:25 +0100
-Subject: [PATCH 06/19] ARM: sun7i: dt: Add USB host bindings
+Date: Sat,  1 Mar 2014 20:26:27 +0100
+Subject: [PATCH 08/19] ARM: sun4i: dt: Add USB host nodes to cubieboard dts
 In-Reply-To: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
 References: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393701998-3553-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393701998-3553-9-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,78 +14,59 @@ Add nodes for the usb-phy and ehci- and ohci-usb-host controllers.
 Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 9952c1e..0db55ac 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -439,6 +439,38 @@
- 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 20407ac..4684cbe 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -34,11 +34,33 @@
+ 			};
  		};
  
 +		usbphy: phy at 01c13400 {
-+			#phy-cells = <1>;
-+			compatible = "allwinner,sun7i-a20-usb-phy";
-+			reg = <0x01c13400 0x10 0x01c14800 0x4 0x01c1c800 0x4>;
-+			reg-names = "phy_ctrl", "pmu1", "pmu2";
-+			clocks = <&usb_clk 8>;
-+			clock-names = "usb_phy";
-+			resets = <&usb_clk 1>, <&usb_clk 2>;
-+			reset-names = "usb1_reset", "usb2_reset";
-+			status = "disabled";
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
 +		};
 +
 +		ehci0: usb at 01c14000 {
-+			compatible = "allwinner,sun7i-a20-ehci", "generic-ehci";
-+			reg = <0x01c14000 0x100>;
-+			interrupts = <0 39 4>;
-+			clocks = <&ahb_gates 1>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
 +		ohci0: usb at 01c14400 {
-+			compatible = "allwinner,sun7i-a20-ohci", "generic-ohci";
-+			reg = <0x01c14400 0x100>;
-+			interrupts = <0 64 4>;
-+			clocks = <&usb_clk 6>, <&ahb_gates 2>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
- 		spi2: spi at 01c17000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c17000 0x1000>;
-@@ -458,6 +490,26 @@
- 			status = "disabled";
+ 		ahci: sata at 01c18000 {
+ 			target-supply = <&reg_ahci_5v>;
+ 			status = "okay";
  		};
  
 +		ehci1: usb at 01c1c000 {
-+			compatible = "allwinner,sun7i-a20-ehci", "generic-ehci";
-+			reg = <0x01c1c000 0x100>;
-+			interrupts = <0 40 4>;
-+			clocks = <&ahb_gates 3>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
 +		ohci1: usb at 01c1c400 {
-+			compatible = "allwinner,sun7i-a20-ohci", "generic-ohci";
-+			reg = <0x01c1c400 0x100>;
-+			interrupts = <0 65 4>;
-+			clocks = <&usb_clk 7>, <&ahb_gates 4>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
- 		spi3: spi at 01c1f000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c1f000 0x1000>;
+ 		pinctrl at 01c20800 {
+ 			led_pins_cubieboard: led_pins at 0 {
+ 				allwinner,pins = "PH20", "PH21";
+@@ -87,4 +109,12 @@
+ 	reg_ahci_5v: ahci-5v {
+ 		status = "okay";
+ 	};
++
++	reg_usb1_vbus: usb1-vbus {
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
+ };
 -- 
 1.9.0
