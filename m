@@ -1,71 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 28 Feb 2014 21:59:19 -0500
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15
-Message-ID: <20140301025919.GQ1872@titan.lakedaemon.net>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 28 Feb 2014 19:06:29 -0800
+Subject: [PATCH 1/2] i2c: Add driver for Cadence I2C controller
+In-Reply-To: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <8af0e222-6337-4ec4-b718-099a9decc5ec@TX2EHSMHS034.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Fri, 2014-02-28 at 04:00PM -0800, Soren Brinkmann wrote:
+> Add a driver for the Cadence I2C controller. This controller is for
+> example found in Xilinx Zynq.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-cadence.txt        |  21 +
+>  MAINTAINERS                                        |   1 +
+>  drivers/i2c/busses/Kconfig                         |   7 +
+>  drivers/i2c/busses/Makefile                        |   1 +
+>  drivers/i2c/busses/i2c-cadence.c                   | 901 +++++++++++++++++++++
+>  5 files changed, 931 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
+>  create mode 100644 drivers/i2c/busses/i2c-cadence.c
+> 
+[...]
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index f5ed03164d86..7806c1654068 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -375,6 +375,13 @@ config I2C_BLACKFIN_TWI_CLK_KHZ
+>  	help
+>  	  The unit of the TWI clock is kHz.
+>  
+> +config I2C_CADENCE
+> +	tristate "Cadence I2C Controller"
+> +	depends on ARCH_ZYNQ
+This can be reduced to a dependency on COMMON_CLK only, I think.
 
-Here's a collection of small changes to drivers relevant to mvebu SoCs.
-We typically take the mbus changes through arm-soc.  The rtc maintainer
-has expressed preferences for driver changes to go through the concerned
-SoC tree.  The config oneliners for the kirkwood move have been Acked by
-the major subsystem maintainers.
-
-All changes have been in -next at least 4 days.
-
-Please pull.
-
-thx,
-
-Jason.
-
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.15
-
-for you to fetch changes up to ff1f0018cf66080d8e6f59791e552615648a033a:
-
-  drivers: Enable building of Kirkwood drivers for mach-mvebu (2014-02-24 17:28:31 +0000)
-
-----------------------------------------------------------------
-mvebu drivers for v3.15
-
- - mvebu mbus
-    - use of_find_matching_node_and_match
-
- - rtc
-    - use PTR_ERR_OR_ZERO in isl12057
-    - work around issue in mv where date returned is 2038
-
- - kirkwood -> mach-mvebu
-    - various Kconfig oneliners to allow building kirkwood in -mvebu/
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      drivers: Enable building of Kirkwood drivers for mach-mvebu
-
-Fengguang Wu (1):
-      rtc: isl12057: use PTR_ERR_OR_ZERO to fix coccinelle warnings
-
-Josh Cartwright (1):
-      bus: mvebu-mbus: make use of of_find_matching_node_and_match
-
-Thomas Petazzoni (1):
-      rtc: mv: reset date if after year 2038
-
- drivers/bus/mvebu-mbus.c    |  3 +--
- drivers/cpufreq/Kconfig.arm |  2 +-
- drivers/cpuidle/Kconfig.arm |  2 +-
- drivers/leds/Kconfig        |  4 ++--
- drivers/phy/Kconfig         |  2 +-
- drivers/rtc/rtc-isl12057.c  |  5 +----
- drivers/rtc/rtc-mv.c        | 12 ++++++++++++
- drivers/thermal/Kconfig     |  2 +-
- sound/soc/kirkwood/Kconfig  |  2 +-
- 9 files changed, 21 insertions(+), 13 deletions(-)
+	S?ren
