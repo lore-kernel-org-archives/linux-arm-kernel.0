@@ -1,10 +1,9 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Mar 2014 20:26:32 +0100
-Subject: [PATCH 13/19] ARM: sun5i: dt: Add USB host nodes to
- a10s-olinuxino-micro
+Date: Sat,  1 Mar 2014 20:26:34 +0100
+Subject: [PATCH 15/19] ARM: sun7i: dt: Add USB host nodes to cubietruck dts
 In-Reply-To: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
 References: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393701998-3553-14-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393701998-3553-16-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,27 +11,20 @@ Add nodes for the usb-phy and ehci- and ohci-usb-host controllers.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 27 ++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 3c9f8b3..23611b7 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index ef5fed8..cb25d3c 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -20,11 +20,33 @@
+ 	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
  
- /dts-v1/;
- /include/ "sun5i-a10s.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
- 
- / {
- 	model = "Olimex A10s-Olinuxino Micro";
-@@ -34,6 +35,19 @@
- 			};
- 		};
- 
+ 	soc at 01c00000 {
 +		usbphy: phy at 01c13400 {
 +			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
 +			status = "okay";
 +		};
 +
@@ -44,31 +36,32 @@ index 3c9f8b3..23611b7 100644
 +			status = "okay";
 +		};
 +
- 		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PE3";
-@@ -41,6 +55,13 @@
- 				allwinner,drive = <1>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			usb1_vbus_pin_olinuxino_m: usb1_vbus_pin at 0 {
-+				allwinner,pins = "PB10";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
+ 		ahci: sata at 01c18000 {
+ 			target-supply = <&reg_ahci_5v>;
+ 			status = "okay";
  		};
  
- 		uart0: serial at 01c28000 {
-@@ -98,4 +119,10 @@
- 			default-state = "on";
- 		};
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
+ 		pinctrl at 01c20800 {
+ 			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
+ 				allwinner,pins = "PH12";
+@@ -109,4 +131,12 @@
+ 		gpio = <&pio 7 12 0>;
+ 		status = "okay";
  	};
 +
 +	reg_usb1_vbus: usb1-vbus {
-+		pinctrl-0 = <&usb1_vbus_pin_olinuxino_m>;
-+		gpio = <&pio 1 10 0>;
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
 +		status = "okay";
 +	};
  };
