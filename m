@@ -1,235 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Feb 2014 18:23:26 -0800
-Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings 0
- failures (next/next-20140228))
-In-Reply-To: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
-References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
-Message-ID: <5311449E.90902@codeaurora.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 28 Feb 2014 18:28:34 -0800
+Subject: [PATCH 2/2] ARM: zynq: dt: Add I2C nodes to Zynq device tree
+In-Reply-To: <1393632046-20062-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1393632046-20062-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <ce5fbea5-de6e-4a29-9807-cccf0f59f654@CO9EHSMHS021.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/14 23:57, Olof's autobuilder wrote:
-> Warnings:
->       3 drivers/irqchip/irq-mmp.c:199:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       3 drivers/irqchip/irq-mmp.c:212:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       3 drivers/irqchip/irq-sirfsoc.c:51:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       3 drivers/irqchip/irq-sun4i.c:140:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       3 drivers/irqchip/irq-sun4i.c:39:70: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       3 drivers/irqchip/irq-vt8500.c:183:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       4 drivers/irqchip/irq-orion.c:35:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->       5 drivers/irqchip/irq-armada-370-xp.c:415:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->      13 drivers/irqchip/irq-vic.c:244:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->      28 drivers/irqchip/irq-gic.c:283:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
->
+On Fri, 2014-02-28 at 04:00PM -0800, Soren Brinkmann wrote:
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
+>  arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 166 insertions(+)
+> 
+[...]
+> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> index c913f77a21eb..91a3a560f03b 100644
+> --- a/arch/arm/boot/dts/zynq-zc702.dts
+> +++ b/arch/arm/boot/dts/zynq-zc702.dts
+[...]
+> +
+> +		i2c at 7 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <7>;
+> +			hwmon at 52 {
+> +				compatible = "pmbus,ucd9248";
+> +				reg = <52>;
+> +			};
+> +			hwmon at 53 {
+> +				compatible = "pmbus,ucd9248";
+> +				reg = <53>;
+> +			};
+> +			hwmon at 54 {
+> +				compatible = "pmbus,ucd9248";
+All these occurrences of 'pmbus' should rather be replaced with 'ti'.
+I wasn't aware of how this DT node to I2C probing works - and still
+haven't fully understood it - but the vendor prefix is apparently a
+don't care and we could simply use the correct one here.
+I have no idea how I came up with the description using 'pmbus' (we
+carry this in our vendor tree for quite a while already).
+Is there any document describing how a DT node is matched to an
+appropriate driver? These I2C drivers usually don't have the common
+'struct of_device_id'. Hence my preferred way of simply grepping through
+the kernel for the compatibility string does not work.
 
-These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
-2014-02-08). Before that change asmlinkage was defined to nothing on
-ARM, but now it's __visible. Should we just drop asmlinkage here?
+[...]
+> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+> index 88f62c50382e..dab30f80d5b0 100644
+> --- a/arch/arm/boot/dts/zynq-zc706.dts
+> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+[...]
+> +		i2c at 7 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <7>;
+> +			ucd90120 at 65 {
+> +				compatible = "pmbus,ucd90120";
+same here
 
-----8<----
-
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] irqchip: Remove asmlinkage from static functions
-
-LTO patches add __visible to the asmlinkage define, causing
-compilation warnings like:
-
-  drivers/irqchip/irq-gic.c:283:1: warning: 'externally_visible'
-  attribute have effect only on public objects [-Wattributes]
-
-Drop asmlinkage here to avoid such warnings.
-
-Cc: Andi Kleen <ak@linux.intel.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/irqchip/irq-armada-370-xp.c | 2 +-
- drivers/irqchip/irq-bcm2835.c       | 4 ++--
- drivers/irqchip/irq-gic.c           | 2 +-
- drivers/irqchip/irq-mmp.c           | 6 ++----
- drivers/irqchip/irq-moxart.c        | 2 +-
- drivers/irqchip/irq-orion.c         | 2 +-
- drivers/irqchip/irq-sirfsoc.c       | 2 +-
- drivers/irqchip/irq-sun4i.c         | 4 ++--
- drivers/irqchip/irq-vic.c           | 2 +-
- drivers/irqchip/irq-vt8500.c        | 3 +--
- drivers/irqchip/irq-zevio.c         | 2 +-
- 11 files changed, 14 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index cd79503abea9..41be897df8d5 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -410,7 +410,7 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
- 	chained_irq_exit(chip, desc);
- }
- 
--static asmlinkage void __exception_irq_entry
-+static void __exception_irq_entry
- armada_370_xp_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqstat, irqnr;
-diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-index 1693b8e7f26a..5916d6cdafa1 100644
---- a/drivers/irqchip/irq-bcm2835.c
-+++ b/drivers/irqchip/irq-bcm2835.c
-@@ -95,7 +95,7 @@ struct armctrl_ic {
- };
- 
- static struct armctrl_ic intc __read_mostly;
--static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
-+static void __exception_irq_entry bcm2835_handle_irq(
- 	struct pt_regs *regs);
- 
- static void armctrl_mask_irq(struct irq_data *d)
-@@ -196,7 +196,7 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
- 	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
- }
- 
--static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
-+static void __exception_irq_entry bcm2835_handle_irq(
- 	struct pt_regs *regs)
- {
- 	u32 stat, irq;
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a917b144895e..63922b9ba6b7 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -279,7 +279,7 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
- #define gic_set_wake	NULL
- #endif
- 
--static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqstat, irqnr;
- 	struct gic_chip_data *gic = &gic_data[0];
-diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
-index 2cb7cd0bc2f5..3c8827fe83f3 100644
---- a/drivers/irqchip/irq-mmp.c
-+++ b/drivers/irqchip/irq-mmp.c
-@@ -194,8 +194,7 @@ static struct mmp_intc_conf mmp2_conf = {
- 	.conf_mask	= 0x7f,
- };
- 
--static asmlinkage void __exception_irq_entry
--mmp_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry mmp_handle_irq(struct pt_regs *regs)
- {
- 	int irq, hwirq;
- 
-@@ -207,8 +206,7 @@ mmp_handle_irq(struct pt_regs *regs)
- 	handle_IRQ(irq, regs);
- }
- 
--static asmlinkage void __exception_irq_entry
--mmp2_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry mmp2_handle_irq(struct pt_regs *regs)
- {
- 	int irq, hwirq;
- 
-diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
-index 5552fc2bf28a..00b3cc908f76 100644
---- a/drivers/irqchip/irq-moxart.c
-+++ b/drivers/irqchip/irq-moxart.c
-@@ -44,7 +44,7 @@ struct moxart_irq_data {
- 
- static struct moxart_irq_data intc;
- 
--static asmlinkage void __exception_irq_entry handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry handle_irq(struct pt_regs *regs)
- {
- 	u32 irqstat;
- 	int hwirq;
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index 8e41be62812e..e25f246cd2fb 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -30,7 +30,7 @@
- 
- static struct irq_domain *orion_irq_domain;
- 
--static asmlinkage void
-+static void
- __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
- {
- 	struct irq_domain_chip_generic *dgc = orion_irq_domain->gc;
-diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
-index 3a070c587ed9..581eefe331ae 100644
---- a/drivers/irqchip/irq-sirfsoc.c
-+++ b/drivers/irqchip/irq-sirfsoc.c
-@@ -47,7 +47,7 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 	ct->regs.mask = SIRFSOC_INT_RISC_MASK0;
- }
- 
--static asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
- {
- 	void __iomem *base = sirfsoc_irqdomain->host_data;
- 	u32 irqstat, irqnr;
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index a5438d889245..9fbff030c700 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -36,7 +36,7 @@
- static void __iomem *sun4i_irq_base;
- static struct irq_domain *sun4i_irq_domain;
- 
--static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
-+static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
- 
- static void sun4i_irq_ack(struct irq_data *irqd)
- {
-@@ -136,7 +136,7 @@ static int __init sun4i_of_init(struct device_node *node,
- }
- IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-ic", sun4i_of_init);
- 
--static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
- {
- 	u32 irq, hwirq;
- 
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index fd2c980e4cea..37dab0b472cd 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -240,7 +240,7 @@ static void vic_handle_irq_cascaded(unsigned int irq, struct irq_desc *desc)
-  * Keep iterating over all registered VIC's until there are no pending
-  * interrupts.
-  */
--static asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
- {
- 	int i, handled;
- 
-diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
-index 1846e7d66681..eb6e91efdec8 100644
---- a/drivers/irqchip/irq-vt8500.c
-+++ b/drivers/irqchip/irq-vt8500.c
-@@ -178,8 +178,7 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
- 	.xlate = irq_domain_xlate_onecell,
- };
- 
--static asmlinkage
--void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
- {
- 	u32 stat, i;
- 	int irqnr, virq;
-diff --git a/drivers/irqchip/irq-zevio.c b/drivers/irqchip/irq-zevio.c
-index 8ed04c4a43ee..ceb3a4318f73 100644
---- a/drivers/irqchip/irq-zevio.c
-+++ b/drivers/irqchip/irq-zevio.c
-@@ -50,7 +50,7 @@ static void zevio_irq_ack(struct irq_data *irqd)
- 	readl(gc->reg_base + regs->ack);
- }
- 
--static asmlinkage void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
-+static void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
- {
- 	int irqnr;
- 
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+	S?ren
