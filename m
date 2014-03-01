@@ -1,23 +1,44 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Sat, 01 Mar 2014 21:07:30 +0100
-Subject: [PATCH v4 3/4] ARM: OMAP2+: add legacy display for omap3 DBB056
-In-Reply-To: <20140228223824.GN13624@atomide.com>
-References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
- <1392387656-15186-4-git-send-email-chf.fritz@googlemail.com>
- <52FE29BF.9040307@ti.com>  <20140228223824.GN13624@atomide.com>
-Message-ID: <1393704450.4909.41.camel@mars>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 02 Mar 2014 00:38:47 +0100
+Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
+ suspend
+In-Reply-To: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
+References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7021741.2WcVMr4q95@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-28 at 14:38 -0800, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140214 06:38]:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt
-> > 
-> > That way you have it ready and tested if DSS DT goes forward.
+On Saturday, March 01, 2014 11:56:03 AM Ulf Hansson wrote:
+> Patch 1 -> 2:
+> These patches provides two new runtime PM helper functions which intend to be
+> used from system suspend/resume callbacks, to make sure devices are put into low
+> power state during system suspend and brought back to full power at system
+> resume.
 > 
-> Applying only patches 1 & 2 into omap-for-v3.15/dt thanks.
+> The prerequisite is to have all levels of a device's runtime PM callbacks to be
+> defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
+> for CONFIG_PM.
+> 
+> By using the new runtime PM helper functions especially the two scenarios below
+> will be addressed.
+> 
+> 1) The PM core prevents .runtime_suspend callbacks from being invoked during
+> system suspend. That means even for a runtime PM centric subsystem and driver,
+> the device needs to be put into low power state from a system suspend callback.
+> Otherwise it may very well be left in full power state (runtime resumed) while
+> the system is suspended. By using the new helper functions, we make sure to walk
+> the hierarchy of a device's power domain, subsystem and driver.
+> 
+> 2) Subsystems and drivers need to cope with all the combinations of
+> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
+> addresses this.
 
-I'll send a display support patch as soon as DSS DT is in linux-next.
+OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
+and I think it'd be better to push them through the respective subsystem trees
+later anyway.
 
- Thanks
-  -- Christoph
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
