@@ -1,150 +1,180 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Mar 2014 12:30:26 +0000
-Subject: [PATCH v6 00/14] uprobes: Add uprobes support for ARM
-In-Reply-To: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20140301123026.GD21483@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 01 Mar 2014 13:54:04 +0100
+Subject: [PATCH v7 08/15] ahci-imx: Port to library-ised ahci_platform
+In-Reply-To: <20140301112424.GB21483@n2100.arm.linux.org.uk>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+ <1393084424-31099-9-git-send-email-hdegoede@redhat.com>
+ <20140228210820.GZ21483@n2100.arm.linux.org.uk> <5311B8A8.1000501@redhat.com>
+ <20140301112424.GB21483@n2100.arm.linux.org.uk>
+Message-ID: <5311D86C.3010803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 02:38:51AM -0500, David Long wrote:
-> This patch series adds basic uprobes support to ARM. It is based on patches
-> developed earlier by Rabin Vincent. That approach of adding hooks into
-> the kprobes instruction parsing code was not well received. This approach
-> separates the ARM instruction parsing code in kprobes out into a separate set
-> of functions which can be used by both kprobes and uprobes. Both kprobes and
-> uprobes then provide their own semantic action tables to process the results of
-> the parsing.
+Hi,
 
-Here's more build errors, from omap4430-sdp's randconfig build from
-last night - note that the linker can't always get the filenames
-right:
+On 03/01/2014 12:24 PM, Russell King - ARM Linux wrote:
+> I've moved the devicetree mailing list to the To: header in case anyone
+> there wants to comment on this.
+> 
+> On Sat, Mar 01, 2014 at 11:38:32AM +0100, Hans de Goede wrote:
+>> I'm sure Tejun would welcome patches to add a dts property for
+>> setting the board-specific phy parameters, but I won't be
+>> writing it.
+> 
+> Don't worry, I already have something :)
 
-arch/arm/kernel/built-in.o: In function `do_work_pending':
-psci_smp.c:(.text+0x2e44): undefined reference to `uprobe_notify_resume'
-arch/arm/kernel/built-in.o: In function `uprobe_trap_handler':
-psci_smp.c:(.text+0x79d4): undefined reference to `uprobe_pre_sstep_notifier'
-psci_smp.c:(.text+0x79e8): undefined reference to `uprobe_post_sstep_notifier'
-arch/arm/kernel/built-in.o: In function `set_swbp':
-psci_smp.c:(.text+0x7a54): undefined reference to `uprobe_write_opcode'
-kernel/built-in.o: In function `mmput.part.45':
-context_tracking.c:(.text+0xaf0): undefined reference to `uprobe_clear_state'
-kernel/built-in.o: In function `mm_release':
-context_tracking.c:(.text+0xd3c): undefined reference to `uprobe_free_utask'
-kernel/built-in.o: In function `copy_process.part.47':
-context_tracking.c:(.text+0x1748): undefined reference to `uprobe_copy_process'
-kernel/built-in.o: In function `get_signal_to_deliver':
-context_tracking.c:(.text+0x111bc): undefined reference to `uprobe_deny_signal'
-kernel/built-in.o: In function `probe_event_enable.constprop.5':
-context_tracking.c:(.text+0x9f0b8): undefined reference to `uprobe_register'
-kernel/built-in.o: In function `trace_uprobe_register':
-context_tracking.c:(.text+0x9f134): undefined reference to `uprobe_unregister'
-kernel/built-in.o: In function `dup_mmap':
-context_tracking.c:(.text.unlikely+0x354): undefined reference to `uprobe_start_dup_mmap'
-context_tracking.c:(.text.unlikely+0x380): undefined reference to `uprobe_dup_mmap'
-context_tracking.c:(.text.unlikely+0x5e8): undefined reference to `uprobe_end_dup_mmap'
-mm/built-in.o: In function `unmap_single_vma':
-page_isolation.c:(.text+0x22d10): undefined reference to `uprobe_munmap'
-mm/built-in.o: In function `vma_adjust':
-page_isolation.c:(.text+0x2748c): undefined reference to `uprobe_munmap'
-page_isolation.c:(.text+0x274a0): undefined reference to `uprobe_munmap'
-page_isolation.c:(.text+0x27858): undefined reference to `uprobe_mmap'
-page_isolation.c:(.text+0x2786c): undefined reference to `uprobe_mmap'
-page_isolation.c:(.text+0x2788c): undefined reference to `uprobe_munmap'
-page_isolation.c:(.text+0x2790c): undefined reference to `uprobe_mmap'
-mm/built-in.o: In function `mmap_region':
-page_isolation.c:(.text+0x2963c): undefined reference to `uprobe_mmap'
-make[1]: *** [vmlinux] Error 1
-make[1]: Target `zImage' not remade because of errors.
+Great.
 
-So, let's take uprobe_notify_resume().  This is unconditionally referenced
-by arch/arm/kernel/signal.c:
+>>> I'm in two minds about this - whether to make the existing binding
+>>> with its compatible string always use these settings, and invent a
+>>> new compatible string for one which is fully configurable (as it
+>>> _should_ have been from the very start) or whether to make this
+>>> the default if the various properties aren't specified.
+>>
+>> IMHO this does not warrant doing a new compatibole-string. Simply
+>> default to the current hardcoded phy settings if no settings are
+>> specified through devicetree.
+> 
+> The problem is that we need to keep existing setups working - which
+> means when there's no properties specified, we need to default to the
+> settings hard-coded into the driver.
+> 
+> That means introducing properties like:
+> 
+> 	fsl,no-spread-spectrum
+> 
+> so that the hard-coded defaults can be turned off, and also deal with
+> a whole load of defaults for the other properties.  That's not
+> particularly nice.  Doing it this way, what I currently have is this:
+> 
+> struct reg_value {
+>         u32 of_value;
+>         u32 reg_value;
+> };
+> 
+> struct reg_property {
+>         const char *name;
+>         const struct reg_value *values;
+>         size_t num_values;
+>         u32 def_value;
+>         u32 set_value;
+> };
+> 
+> static const struct reg_value gpr13_tx_level[] = {
+>         {  937, IMX6Q_GPR13_SATA_TX_LVL_0_937_V },
+>         {  947, IMX6Q_GPR13_SATA_TX_LVL_0_947_V },
+> ...
+>         { 1230, IMX6Q_GPR13_SATA_TX_LVL_1_230_V },
+>         { 1240, IMX6Q_GPR13_SATA_TX_LVL_1_240_V }
+> };
+> 
+> static const struct reg_value gpr13_tx_boost[] = {
+>         {    0, IMX6Q_GPR13_SATA_TX_BOOST_0_00_DB },
+>         {  370, IMX6Q_GPR13_SATA_TX_BOOST_0_37_DB },
+> ...
+>         {  528, IMX6Q_GPR13_SATA_TX_BOOST_5_28_DB },
+>         {  575, IMX6Q_GPR13_SATA_TX_BOOST_5_75_DB }
+> };
+> 
+> static const struct reg_value gpr13_tx_atten[] = {
+>         {  8, IMX6Q_GPR13_SATA_TX_ATTEN_8_16 },
+>         {  9, IMX6Q_GPR13_SATA_TX_ATTEN_9_16 },
+> ...
+>         { 14, IMX6Q_GPR13_SATA_TX_ATTEN_14_16 },
+>         { 16, IMX6Q_GPR13_SATA_TX_ATTEN_16_16 },
+> };
+> 
+> static const struct reg_value gpr13_rx_eq[] = {
+>         {  500, IMX6Q_GPR13_SATA_RX_EQ_VAL_0_5_DB },
+>         { 1000, IMX6Q_GPR13_SATA_RX_EQ_VAL_1_0_DB },
+> ...
+>         { 3500, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_5_DB },
+>         { 4000, IMX6Q_GPR13_SATA_RX_EQ_VAL_4_0_DB },
+> };
+> 
+> static const struct reg_property gpr13_props[] = {
+>         {
+>                 .name = "fsl,transmit-level-mV",
+>                 .values = gpr13_tx_level,
+>                 .num_values = ARRAY_SIZE(gpr13_tx_level),
+>                 .def_value = IMX6Q_GPR13_SATA_TX_LVL_1_025_V,
+>         }, {
+>                 .name = "fsl,transmit-boost-mdB",
+>                 .values = gpr13_tx_boost,
+>                 .num_values = ARRAY_SIZE(gpr13_tx_boost),
+>                 .def_value = IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB,
+>         }, {
+>                 .name = "fsl,transmit-atten-16ths",
+>                 .values = gpr13_tx_atten,
+>                 .num_values = ARRAY_SIZE(gpr13_tx_atten),
+>                 .def_value = IMX6Q_GPR13_SATA_TX_ATTEN_9_16,
+>         }, {
+>                 .name = "fsl,receive-eq-mdB",
+>                 .values = gpr13_rx_eq,
+>                 .num_values = ARRAY_SIZE(gpr13_rx_eq),
+>                 .def_value = IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB,
+>         }, {
+>                 .name = "fsl,no-spread-spectrum",
+>                 .def_value = IMX6Q_GPR13_SATA_MPLL_SS_EN,
+>                 .set_value = 0,
+>         },
+> };
+> 
+> and then a bunch of code to read through these tables and work out the
+> GPR13 register value from it - it doesn't handle everything yet because
+> I've not worked out a good way to do the last remaining three - I'm
+> thinking that they want to be strings:
+> 
+>                 regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+>                                    IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK |
+> ...
+>                                    IMX6Q_GPR13_SATA_TX_EDGE_RATE,
+>                                    IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
+>                                    IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
+>                                    IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
+>                                    reg_value);
+> 
+> 	RX_LOS_LVL: SATA1I / SATA1M / SATA1X / SATA2I / SATA2M / SATA2X
+> 	RX_DPLL_MODE: 1P_1F / 2P_2F / 1P_4F / 2P_4F
+> 	SPD_MODE: 3P0G / 1P5G (I do wonder whether this should be changed
+> 		when the Linux wants to slow the link speed.)
+> 
+> With a new compatible string, we can use the hard-coded version for
+> fsl,imx6q-ahci, but require all properties (with values) to be specified
+> for a different compatible string, thereby eliminating all the defaults,
+> and making things like "no-spread-spectrum" be a positive property instead
+> of negative, and this simplifies the parsing code.
 
-                                syscall = 0;
-                        } else if (thread_flags & _TIF_UPROBE) {
-                                clear_thread_flag(TIF_UPROBE);
-                                uprobe_notify_resume(regs);
-                        } else {
-                                clear_thread_flag(TIF_NOTIFY_RESUME);
-                                tracehook_notify_resume(regs);
-                        }
+I see, that does make sense. So consider my +1 for keeping the same
+compatible string changed to a 0
 
-and is declared in include/linux/uprobes.h:
+> There's also the obvious question about which of these properties should
+> be generic ones for AHCI/SATA interfaces...  The only one I see with any
+> kind of electrical properties specified is sata_highbank:
+> 
+> - calxeda,tx-atten  : a u32 array that contains TX attenuation override
+>                         codes, one per port. The upper 3 bytes are always
+>                         0 and thus ignored.
+> 
+> and that seems to be a register-coded value rather than an actual
+> attenuation figure.
+> 
+> A simpler solution to this would be to just provide an imx6-specific
+> property which encodes the GPR13 value directly, and not bother with
+> trying to provide individual properties.
 
-	#ifdef CONFIG_UPROBES
-	#include <asm/uprobes.h>
-	...
-	extern void uprobe_notify_resume(struct pt_regs *regs);
-	...
-	#else /* !CONFIG_UPROBES */
-	...
-	static inline void uprobe_notify_resume(struct pt_regs *regs)
-	{
-	}
-	...
-	#endif /* !CONFIG_UPROBES */
+Yes, that is actually the direction I was thinking in. I think it is
+great we know what all the bits do in so much detail in the freescale
+case, but for many other phys we don't have such extensive documentation.
 
-It is defined in kernel/events/uprobes.c:
+Still I can see how in the freescale case you do want to use that
+documentation to do something better then coding a register value inside
+the devicetree.
 
-	kernel/events/uprobes.c:void uprobe_notify_resume(struct pt_regs *regs)
+OTOH I do like the KISS value of jut specifying a register value.
 
-which is built when CONFIG_UPROBES is set:
+So in the end it is all up to you I'm afraid.
 
-	obj-$(CONFIG_UPROBES) += uprobes.o
+Regards,
 
-but, the events directory is only built when CONFIG_PERF_EVENTS is also
-set:
-
-	obj-$(CONFIG_PERF_EVENTS) += events/
-
-and the failing configuration has:
-
-	# CONFIG_PERF_EVENTS is not set
-	CONFIG_UPROBES=y
-
-Clearly, it doesn't make sense for UPROBES to be enabled with PERF_EVENTS
-disabled - and indeed the Kconfig ensures that this dependency is properly
-expressed:
-
-	config UPROBES
-	        bool "Transparent user-space probes (EXPERIMENTAL)"
-	        depends on UPROBE_EVENT && PERF_EVENTS
-	        default n
-	        select PERCPU_RWSEM
-
-but where this all falls down is here:
-
-	config UPROBE_EVENT
-	        bool "Enable uprobes-based dynamic events"
-	        depends on ARCH_SUPPORTS_UPROBES
-	        depends on MMU
-	        select UPROBES
-	        select PROBE_EVENTS
-	        select TRACING
-	        default n
-
-Which is yet another brilliant example of why this "select" crap is soo
-evil.  Yes, the failing configuration has:
-
-	CONFIG_UPROBE_EVENT=y
-
-Ineed, there was a Kconfig warning:
-
-	warning: (UPROBE_EVENT) selects UPROBES which has unmet direct dependencies (UPROBE_EVENT && PERF_EVENTS)
-
-This is not your fault.  It's the fault of everyone who passed through
-commit f3f096cfedf8113380c56fc855275cc75cd8cf55 without properly reviewing
-it and paying attention to that select crap.  Given how evil "select" is,
-it's something which should always be thoroughly reviewed - with analysis
-of the dependencies.  I believe commits which introduce new select
-statements should document an analysis of why those new select statements
-are appropriate and how they ensure that any dependencies of the selected
-symbol are not violated.
-
-Therefore, I will not take the ARM uprobes code while this kind of
-select abortion is present - it needs to be fixed first to avoid these
-build errors.  Sorry.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Hans
