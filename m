@@ -1,40 +1,54 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 15:27:56 +0000
+Date: Sat, 01 Mar 2014 19:20:41 +0000
 Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140226183454.GA14639@cbox>
-References: <20140226183454.GA14639@cbox>
-Message-ID: <20140301152756.67A02C40238@trevor.secretlab.ca>
+In-Reply-To: <20140226222553.GF16149@cbox>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel> <
+ 20140226214843.GD12169@bivouac.eciton.net> <20140226222553.GF16149@cbox>
+Message-ID: <20140301192041.40196C4089C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer. I've got another comment on the text, this time about the format of the ESP:
+On Wed, 26 Feb 2014 14:25:53 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Feb 26, 2014 at 09:48:43PM +0000, Leif Lindholm wrote:
+> > On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
+> > > On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
+> > > > ARM VM System Specification
+> > > > ===========================
+> > > > 
+> > > > Goal
+> > > > ----
+> > > > The goal of this spec is to allow suitably-built OS images to run on
+> > > > all ARM virtualization solutions, such as KVM or Xen.
+> > > > 
+> > > > Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+> > > > they aim to be hypervisor agnostic.
+> > > > 
+> > > > Note that simply adhering to the SBSA [2] is not a valid approach,
+> > > > for example because the SBSA mandates EL2, which will not be available
+> > > > for VMs.  Further, the SBSA mandates peripherals like the pl011, which
+> > > > may be controversial for some ARM VM implementations to support.
+> > > > This spec also covers the aarch32 execution mode, not covered in the
+> > > > SBSA.
+> > > 
+> > > I would prefer if we can stay as close as possible to SBSA for individual
+> > > hardware components, and only stray from it when there is a strong reason.
+> > > pl011-subset doesn't sound like a significant problem to implement,
+> > > especially as SBSA makes the DMA part of that optional. Can you
+> > > elaborate on what hypervisor would have a problem with that?
+> > 
+> > I believe it comes down to how much extra overhead pl011-access-trap
+> > would be over virtio-console. If low, then sure.
+> > (Since there are certain things we cannot provide SBSA-compliant in
+> > the guest anyway, I wouldn't consider lack of pl011 to be a big issue.)
+> > 
+> 
+> I don't think it's about overhead, sure pl011 may be slower, but it's a
+> serial port, does anyone care about performance of a console? pl011
+> should be good enough for sure.
 
-On Wed, 26 Feb 2014 10:34:54 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-[...]
-> Image format
-> ------------
-> The image format, as presented to the VM, needs to be well-defined in
-> order for prepared disk images to be bootable across various
-> virtualization implementations.
-> 
-> The raw disk format as presented to the VM must be partitioned with a
-> GUID Partition Table (GPT).  The bootable software must be placed in the
-> EFI System Partition (ESP), using the UEFI removable media path, and
-> must be an EFI application complying to the UEFI Specification 2.4
-> Revision A [6].
-> 
-> The ESP partition's GPT entry's partition type GUID must be
-> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-> 
-> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> state.
-
-I would also reference section 3.3 (Boot Option Variables Default Boot
-Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
-restate the meaning of the requirement in this spec, but the UEFI spec
-is the authoritative source. Distributed VM disk images fall under the
-same scenario as the firmware not having any valid boot variables.
+The reason pl011 is specified in the SBSA is to have a reliable output
+port available from the first instruction. It is a debug feature.
+Hardware vendors aren't even need to wire it up to a physical serial
+port. It is just as valid to wire it to the RAS controller.
 
 g.
