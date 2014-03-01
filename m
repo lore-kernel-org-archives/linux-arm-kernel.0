@@ -1,84 +1,97 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 19:54:19 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <alpine.DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
-References: <20140226183454.GA14639@cbox> <
- CACxGe6tjuytsYAn6Hadf0AK+REzHgRydgbHPafL8+Sdtd_tMUA@mail.gmail.com> <alpine
- .DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
-Message-ID: <20140301195419.0DB5DC40B0D@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 21:13:48 +0000
+Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <530B8B46.6060003@samsung.com>
+References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com> <
+ 1392829124-25705-4-git-send-email-s.nawrocki@samsung.com> <20140220140928.
+ 27132C4050F@trevor.secretlab.ca> <53072C9D.5040303@samsung.com> <
+ 20140224004826.22529.87768@quantum> <530B8B46.6060003@samsung.com>
+Message-ID: <20140301211348.98ECEC40FF7@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Feb 2014 12:27:58 +0000, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> On Wed, 26 Feb 2014, Grant Likely wrote:
-> > > VM Platform
-> > > -----------
-> > > The specification does not mandate any specific memory map. ??The guest
-> > > OS must be able to enumerate all processing elements, devices, and
-> > > memory through HW description data (FDT, ACPI) or a bus-specific
-> > > mechanism such as PCI.
-> > >
-> > > The virtual platform must support at least one of the following ARM
-> > > execution states:
-> > > ?? (1) aarch32 virtual CPUs on aarch32 physical CPUs
-> > > ?? (2) aarch32 virtual CPUs on aarch64 physical CPUs
-> > > ?? (3) aarch64 virtual CPUs on aarch64 physical CPUs
-> > >
-> > > It is recommended to support both (2) and (3) on aarch64 capable
-> > > physical systems.
-> > >
-> > > The virtual hardware platform must provide a number of mandatory
-> > > peripherals:
-> > >
-> > > ?? Serial console: ??The platform should provide a console,
-> > > ?? based on an emulated pl011, a virtio-console, or a Xen PV console.
-> > 
-> > For portable disk image, can Xen PV be dropped from the list? pl011 is part of SBSA, and virtio is getting standardised, but Xen PV is
-> > implementation specific.
+On Mon, 24 Feb 2014 19:11:18 +0100, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> On 24/02/14 01:48, Mike Turquette wrote:
+> > Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
+> >> > On 20/02/14 15:09, Grant Likely wrote:
+> >> > [...]
+> >>>>> > >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>>> > >> > index 7c52c29..d618498 100644
+> >>>>> > >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>>> > >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>>> > >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
+> >>>>> > >> >    ("pll" and "pll-switched").
+> >>>>> > >> >  * The UART has its baud clock connected the external oscillator and its
+> >>>>> > >> >    register clock connected to the PLL clock (the "pll-switched" signal)
+> >>>>> > >> > +
+> >>>>> > >> > +==Static initial configuration of clock parent and clock frequency==
+> >>>>> > >> > +
+> >>>>> > >> > +Some platforms require static configuration of (parts of) the clock controller
+> >>>>> > >> > +often determined by the board design. Such a configuration can be specified in
+> >>>>> > >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
+> >>>>> > >> > +properties. The former should contain phandle and clock specifier of the parent
+> >>>>> > >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
+> >>>>> > >> > +should be listed in the clock-names property and a phandle and a clock specifier
+> >>>>> > >> > +pair corresponding to it should be present in the clocks property.
+> >>>>> > >> > +
+> >>>>> > >> > +    uart at a000 {
+> >>>>> > >> > +        compatible = "fsl,imx-uart";
+> >>>>> > >> > +        reg = <0xa000 0x1000>;
+> >>>>> > >> > +  ...
+> >>>>> > >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
+> >>>>> > >> > +        clock-names = "baud", "mux";
+> >>>>> > >> > +
+> >>>>> > >> > +  mux-clk-parent = <&pll 1>;
+> >>>>> > >> > +  baud-clk-rate = <460800>;
+> >>> > >
+> >>> > > This mixes patterns for references to clocks. Plus it requires composing
+> >>> > > property names which is a little painful. I'd rather see a list of
+> >>> > > tuples to match the existing pattern already in use
+> >>> > > 
+> >>> > >       clocks = <&clkcon 0>, <&clkcon 3>;
+> >>> > >       clock-names = "baud", "mux";
+> >>> > >       clock-parents = <0> <&pll 1>;
+> >>> > >       clock-rates = <0> <460800>;
+> >> > 
+> >> > Thank you for the review. This looks much better to me. My bad, I wasn't 
+> >> > aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
+> >> > to be specifying exact meaning of the 'phandle' property values, except 
+> >> > they be unique. Anyway, it seems to be clearly documented within the
+> >> > __of_parse_phandle_with_args() function. 
+> >> > 
+> >> > I'll try this modified binding instead, presumably it would be useful to 
+> >> > have a variant of __of_parse_phandle_with_args() function which would 
+> >> > accept a context data containing result of previous call within an iteration, 
+> >> > similarly as of_property_next_string() is written. So we don't iterate 
+> >> > from beginning of the list with each __of_parse_phandle_with_args() call. 
+> >> > But it's an optimization issue that could be considered separately I guess.
+> >
+> > I was always partial to the regulator style of blahblah-supply but
+> > Grant's suggestion is much cleaner with respect to the rest of the clock
+> > binding.
 > 
-> Does an interface need OASIS' rubber stamp to be "standard"?  If so, we
-> should also drop FDT from this document. The SBSA has not been published
-> by any OASIS-like standardization body either, so maybe we should drop
-> the SBSA too.
+> I don't have a strong opinion, I'm slightly inclined towards Grant's suggestion,
+> which doesn't have a problem of limiting effective clk name to 21 characters.
 > 
-> If it doesn't need OASIS nice logo on the side to be a standard, then
-> the Xen PV interfaces are a standard too. Give a look at
-> xen/include/public/io, they go as back as 2004, and they have multiple
-> different implementations of the frontends and backends in multiple
-> operating systems today.
+> Also DT property names with underscores coming from the clock names are a bit
+> incorrect and it might be not immediately obvious which part of name is a 
+> canonical property's name and which is clock's name. Let's consider property 
+> names like:
 > 
-> There is no reason why another hypervisor couldn't implement the same
-> interface and in fact I know for a fact that it was considered for KVM.
+> mux-clk-parent, divider-clk-rate, sclk_mmc0-clk-parent, sclk_uart_baud0-clk-parent,
+> etc.
+> 
+> > I guess it will be a bit ugly if a very long array is needed with a
+> > sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
+> > only a single clock needs to have its parent or rate specified.
+> 
+> It was also concerning me, but this inconvenience could be mitigated by 
+> reordering content of clocks/clock-names properties so that the clocks for
+> which parents and/or rates are being assigned are first on the list.
+> Then number of padding zeros is minimized.
 
-Allow me to elaborate. I'm not trying to punish Xen here, but I'm
-deliberately pushing back against "either/or" options in the spec. In
-this case the spec says the VM must implement one of pl011 *or* virtio
-*or* xenpv. That gives lots of implementation choice to VM projects.
-
-The downside is that spec-compliant OSes are required to implement
-support for *all three*. This is a non-issue for Linux guests because all
-those drivers are already there*, but it a real cost for niche guests.
-
-The reason why a cut-dowm pl011 exists in SBSA is to provide a
-bare-minimum output device that is always available. I would be far
-happier for this spec to not give the VMs an option at all here. Now
-that I think about it, it probably isn't appropriate to allow
-virtio-console to be an option either. It should flat out require the
-cut-down pl011 register interface. Make everything else optional. 'sane'
-linux distros will enable virtio-console and xenpv and the kernel should
-use whichever it finds in normal operation. Then no matter what crazy
-guest the user wants to run there is still a known-safe fallback for
-console output when things go wrong.
-
-* aside from the footprint required to enable all of them
-
-I've just had another thought. In the majority of cases the fallback
-pl011 won't get used by the guest anyway unless asked to because the
-UEFI OS Loader (EFI_STUB for Linux) will use the UEFI console drivers.
-I expect the Xen UEFI port will use xenpv, and the kvm UEFI port will
-use virtio. After UEFI exit boot services the OS is responsible for it's
-own console output. If it has drivers for virtio-console or xenpv, then
-fine; it discovers the interface and all is good. But if it doesn't,
-then the fallback will at least work.
+If the array really gets that long for a device, then groups of clocks
+can also be split off into sub-nodes.
 
 g.
