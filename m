@@ -1,48 +1,39 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Sat,  1 Mar 2014 14:58:53 +0100
-Subject: [PATCH v2 6/7] ARM: dts: omap3-gta04: Enable mmc2 for wifi
+Date: Sat,  1 Mar 2014 14:58:54 +0100
+Subject: [PATCH v2 7/7] ARM: dts: omap3-gta04: Add bma180 accelerometer
 In-Reply-To: <1393682334-26805-1-git-send-email-marek@goldelico.com>
 References: <1393682334-26805-1-git-send-email-marek@goldelico.com>
-Message-ID: <1393682334-26805-7-git-send-email-marek@goldelico.com>
+Message-ID: <1393682334-26805-8-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: NeilBrown <neilb@suse.de>
 
-This requires vaux4.
-
-Reset line isn't used yet, so wifi isn't reliable.
-But it does work once per boot.
+Add node for bma180 driver.
 
 Signed-off-by: NeilBrown <neilb@suse.de>
-Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap3-gta04.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-index 41a21bd..d556e3a 100644
+index d556e3a..f8ad125 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dts
 +++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -178,7 +178,9 @@
- };
+@@ -110,6 +110,14 @@
+ 		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
+ 	};
  
- &mmc2 {
--	status = "disabled";
-+	vmmc-supply = <&vaux4>;
-+	bus-width = <4>;
-+	ti,non-removable;
- };
- 
- &mmc3 {
-@@ -204,3 +206,8 @@
- 	bb_uvolt = <3200000>;
- 	bb_uamp = <150>;
- };
++	/* accelerometer */
++	bma180 at 41 {
++		compatible = "bosch,bma180";
++		reg = <0x41>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>;
++	};
 +
-+&vaux4 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <3150000>;
-+};
+ 	/* leds */
+ 	tca6507 at 45 {
+ 		compatible = "ti,tca6507";
 -- 
 1.8.3.2
