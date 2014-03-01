@@ -1,286 +1,401 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Sat, 01 Mar 2014 00:40:35 +0000
-Subject: Device Tree file for Zyxel NSA320
-Message-ID: <53112C83.9010700@baker-net.org.uk>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Sat, 1 Mar 2014 02:39:05 +0000
+Subject: [PATCH v3 5/5] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <CACoXjckem9p0uKRBTF67xJ6-_nM2mxcmRyfsb0jue2TiVZiuxQ@mail.gmail.com>
+References: <1393592902-24750-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393592902-24750-6-git-send-email-Liviu.Dudau@arm.com>
+ <CACoXjck59jA1Ub8mHB0zn16krCxagUgH8BmJVnLQ8KGpFg7WpA@mail.gmail.com>
+ <CACoXjckem9p0uKRBTF67xJ6-_nM2mxcmRyfsb0jue2TiVZiuxQ@mail.gmail.com>
+Message-ID: <20140301023905.GB31753@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 28, 2014 at 06:07:05PM -0800, Tanmay Inamdar wrote:
+> Earlier email did not deliver to mailing lists because of plain text
+> setting problem on my side. Apologies for spamming. Sending it again.
+> 
+> Hello Liviu,
+> 
 
-I've been trying to get my Zyxel NSA320 working with kernel 3.14-rc1 and 
-device tree. I've included on CC the two developers who produced old 
-style board files for the NSA310 / 320 in case you've already looked at 
-this.
+Hello Tanmay,
 
-I've developed a file (below) which is enough to get it to boot but I've 
-got a couple of outstanding issues that I'd appreciate some advice on.
+> While porting X-Gene PCIe driver to v2 series, following problems were observed.
 
-First, the USB ports aren't working. I presume this is because on this 
-board mpp21, instead of taking it's usual role as MPP21_SATA0_ACTn is 
-used as a control line for power to the USB ports. My dmesg contains
+Thanks for trying it out.
 
-Kirkwood: MV88F6281-A1.
-Feroceon L2: Enabling L2
-Feroceon L2: Cache support initialised.
-[Firmware Info]: /ocp at f1000000/ethernet-controller at 72000/ethernet0-
-port at 0: local-mac-address is not set
-bio: create slab <bio-0> at 0
-USB Power Off: Failed to request enable GPIO21: -517
-reg-fixed-voltage 1.regulator: Failed to register regulator: -517
-platform 1.regulator: Driver reg-fixed-voltage requests probe deferral
-vgaarb: loaded
-SCSI subsystem initialized
+> 
+> 1. In 'of_create_pci_host_bridge' function, bus_range is defined
+> locally. So, while walking over list of resources in bridge->windows
+> later, during X-Gene controller related setup, garbage values are
+> found in the resource. Please allocate it dynamically.
 
-and I can't see any indication that the deferred registration ever succeeds.
+Bah, sorry for that. Will fix.
 
-/sys/kernel/debug/pinctrl/f1010000.pinctrl/pinmux-pins contains
+> 
+> 2. 'domain_nr' problem is partially solved. There are still some
+> places where functions are getting invalid domain_nr.  For example,
+> 'pci_alloc_child_bus' tries to get domain_nr when bridge is not
+> assigned to bus. You may want to look for all the places where
+> pci_domain_nr is used. Please see below dump -->
+> 
+> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at
+> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
+> sysfs_warn_dup+0x80/0xc0()
+> sysfs: cannot create duplicate filename '/class/pci_bus/0000:01'
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc4+ #37
+> Call trace:
+> [<ffffffc000088140>] dump_backtrace+0x0/0x140
+> [<ffffffc000088294>] show_stack+0x14/0x20
+> [<ffffffc0004f64b0>] dump_stack+0x78/0xc4
+> [<ffffffc000096c88>] warn_slowpath_common+0x88/0xc0
+> [<ffffffc000096d10>] warn_slowpath_fmt+0x50/0x60
+> [<ffffffc0001b8260>] sysfs_warn_dup+0x80/0xc0
+> [<ffffffc0001b8718>] sysfs_do_create_link_sd.isra.2+0xf8/0x100
+> [<ffffffc0001b8740>] sysfs_create_link+0x20/0x40
+> [<ffffffc000322f5c>] device_add+0x41c/0x520
+> [<ffffffc00032307c>] device_register+0x1c/0x40
+> [<ffffffc0004f1924>] pci_add_new_bus+0x284/0x380
+> [<ffffffc0002c51a0>] pci_scan_bridge+0x4e0/0x540
+> [<ffffffc0002c52b4>] pci_scan_child_bus+0xb4/0x140
+> [<ffffffc0004f1a34>] pci_rescan_bus+0x14/0x40
+> [<ffffffc0006a12d4>] xgene_pcie_probe_bridge+0x688/0x750
+> [<ffffffc000327c64>] platform_drv_probe+0x24/0x60
+> [<ffffffc000325d74>] really_probe+0xf4/0x220
+> [<ffffffc000325fc4>] __driver_attach+0xa4/0xc0
+> [<ffffffc000323e18>] bus_for_each_dev+0x58/0xa0
+> [<ffffffc000325800>] driver_attach+0x20/0x40
+> [<ffffffc0003253d0>] bus_add_driver+0x150/0x220
+> [<ffffffc000326780>] driver_register+0x60/0x120
+> [<ffffffc000327c20>] __platform_driver_register+0x60/0x80
+> [<ffffffc0006a0c44>] xgene_pcie_driver_init+0x18/0x20
+> [<ffffffc0000814c4>] do_one_initcall+0xe4/0x160
 
-pin 21 (PIN21): (MUX UNCLAIMED) mvebu-gpio:21
+do you have your xgene_pcie_driver_init being called out of some subsys_initcall?
+If so, remove it and let the generic DT parsing code match your driver. The
+bridge should've been associated with the root bus by the time the child busses
+are scanned and allocated, unless I'm missing something obvious.
 
-but /sys/kernel/debug/pinctrl/f1010000.pinctrl/pinconf-groups says
-21 (mpp21):current: gpio(io), available = [ ts(mp1) tdm(rx0ql) ge1(txd1) 
-audio(spdifo) sata0(act) ]
+Also, can you share your version of your driver with me?
 
-so I suspect it has defaulted to the right mode but 
-/sys/kernel/debug/gpio says
+Best regards,
+Liviu
 
-  gpio-21  (USB Power Off       ) out lo
+> [<ffffffc00068c938>] kernel_init_freeable+0x138/0x1d8
+> [<ffffffc0004f06b0>] kernel_init+0x10/0xe0
+> ---[ end trace 53db1c3a7fbdeb88 ]---
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at
+> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:711
+> pci_add_new_bus+0x36c/0x380()
+> 
+> Thanks,
+> Tanmay
+> 
+> On Fri, Feb 28, 2014 at 6:01 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> > Hello Liviu,
+> >
+> > While porting X-Gene PCIe driver to v2 series, following problems were
+> > observed.
+> >
+> > 1. In 'of_create_pci_host_bridge' function, bus_range is defined locally.
+> > So, while walking over list of resources in bridge->windows later, during
+> > X-Gene controller related setup, garbage values are found in the resource.
+> > Please allocate it dynamically.
+> >
+> > 2. 'domain_nr' problem is partially solved. There are still some places
+> > where functions are getting invalid domain_nr.  For example,
+> > 'pci_alloc_child_bus' tries to get domain_nr when bridge is not assigned to
+> > bus. You may want to look for all the places where pci_domain_nr is used.
+> > Please see below dump -->
+> >
+> > pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> > ------------[ cut here ]------------
+> > WARNING: CPU: 0 PID: 1 at
+> > /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
+> > sysfs_warn_dup+0x80/0xc0()
+> > sysfs: cannot create duplicate filename '/class/pci_bus/0000:01'
+> > Modules linked in:
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc4+ #37
+> > Call trace:
+> > [<ffffffc000088140>] dump_backtrace+0x0/0x140
+> > [<ffffffc000088294>] show_stack+0x14/0x20
+> > [<ffffffc0004f64b0>] dump_stack+0x78/0xc4
+> > [<ffffffc000096c88>] warn_slowpath_common+0x88/0xc0
+> > [<ffffffc000096d10>] warn_slowpath_fmt+0x50/0x60
+> > [<ffffffc0001b8260>] sysfs_warn_dup+0x80/0xc0
+> > [<ffffffc0001b8718>] sysfs_do_create_link_sd.isra.2+0xf8/0x100
+> > [<ffffffc0001b8740>] sysfs_create_link+0x20/0x40
+> > [<ffffffc000322f5c>] device_add+0x41c/0x520
+> > [<ffffffc00032307c>] device_register+0x1c/0x40
+> > [<ffffffc0004f1924>] pci_add_new_bus+0x284/0x380
+> > [<ffffffc0002c51a0>] pci_scan_bridge+0x4e0/0x540
+> > [<ffffffc0002c52b4>] pci_scan_child_bus+0xb4/0x140
+> > [<ffffffc0004f1a34>] pci_rescan_bus+0x14/0x40
+> > [<ffffffc0006a12d4>] xgene_pcie_probe_bridge+0x688/0x750
+> > [<ffffffc000327c64>] platform_drv_probe+0x24/0x60
+> > [<ffffffc000325d74>] really_probe+0xf4/0x220
+> > [<ffffffc000325fc4>] __driver_attach+0xa4/0xc0
+> > [<ffffffc000323e18>] bus_for_each_dev+0x58/0xa0
+> > [<ffffffc000325800>] driver_attach+0x20/0x40
+> > [<ffffffc0003253d0>] bus_add_driver+0x150/0x220
+> > [<ffffffc000326780>] driver_register+0x60/0x120
+> > [<ffffffc000327c20>] __platform_driver_register+0x60/0x80
+> > [<ffffffc0006a0c44>] xgene_pcie_driver_init+0x18/0x20
+> > [<ffffffc0000814c4>] do_one_initcall+0xe4/0x160
+> > [<ffffffc00068c938>] kernel_init_freeable+0x138/0x1d8
+> > [<ffffffc0004f06b0>] kernel_init+0x10/0xe0
+> > ---[ end trace 53db1c3a7fbdeb88 ]---
+> > ------------[ cut here ]------------
+> > WARNING: CPU: 0 PID: 1 at
+> > /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:711
+> > pci_add_new_bus+0x36c/0x380()
+> >
+> > Thanks,
+> > Tanmay
+> >
+> >
+> >
+> > On Fri, Feb 28, 2014 at 5:08 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >>
+> >> Several platforms use a rather generic version of parsing
+> >> the device tree to find the host bridge ranges. Move the common code
+> >> into the generic PCI code and use it to create a pci_host_bridge
+> >> structure that can be used by arch code.
+> >>
+> >> Based on early attempts by Andrew Murray to unify the code.
+> >> Used powerpc and microblaze PCI code as starting point.
+> >>
+> >> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >>
+> >> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> >> index 06ace62..feb8436 100644
+> >> --- a/drivers/pci/host-bridge.c
+> >> +++ b/drivers/pci/host-bridge.c
+> >> @@ -6,9 +6,13 @@
+> >>  #include <linux/init.h>
+> >>  #include <linux/pci.h>
+> >>  #include <linux/module.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/of_pci.h>
+> >>
+> >>  #include "pci.h"
+> >>
+> >> +static int domain_nr;
+> >> +
+> >>  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+> >>  {
+> >>         while (bus->parent)
+> >> @@ -91,3 +95,133 @@ void pcibios_bus_to_resource(struct pci_bus *bus,
+> >> struct resource *res,
+> >>         res->end = region->end + offset;
+> >>  }
+> >>  EXPORT_SYMBOL(pcibios_bus_to_resource);
+> >> +
+> >> +/**
+> >> + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from
+> >> DT
+> >> + * @dev: device node of the host bridge having the range property
+> >> + * @resources: list where the range of resources will be added after DT
+> >> parsing
+> >> + * @io_base: pointer to a variable that will contain the physical address
+> >> for
+> >> + * the start of the I/O range.
+> >> + *
+> >> + * If this function returns an error then the @resources list will be
+> >> freed.
+> >> + *
+> >> + * This function will parse the "ranges" property of a PCI host bridge
+> >> device
+> >> + * node and setup the resource mapping based on its content. It is
+> >> expected
+> >> + * that the property conforms with the Power ePAPR document.
+> >> + *
+> >> + * Each architecture is then offered the chance of applying their own
+> >> + * filtering of pci_host_bridge_windows based on their own restrictions
+> >> by
+> >> + * calling pcibios_fixup_bridge_ranges(). The filtered list of windows
+> >> + * can then be used when creating a pci_host_bridge structure.
+> >> + */
+> >> +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
+> >> +               struct list_head *resources, resource_size_t *io_base)
+> >> +{
+> >> +       struct resource *res;
+> >> +       struct of_pci_range range;
+> >> +       struct of_pci_range_parser parser;
+> >> +       int err;
+> >> +
+> >> +       pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> >> +
+> >> +       /* Check for ranges property */
+> >> +       err = of_pci_range_parser_init(&parser, dev);
+> >> +       if (err)
+> >> +               return err;
+> >> +
+> >> +       pr_debug("Parsing ranges property...\n");
+> >> +       for_each_of_pci_range(&parser, &range) {
+> >> +               /* Read next ranges element */
+> >> +               pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> >> +                               range.pci_space, range.pci_addr);
+> >> +               pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> >> +                                       range.cpu_addr, range.size);
+> >> +
+> >> +               /*
+> >> +                * If we failed translation or got a zero-sized region
+> >> +                * then skip this range
+> >> +                */
+> >> +               if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> >> +                       continue;
+> >> +
+> >> +               res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> >> +               if (!res) {
+> >> +                       err = -ENOMEM;
+> >> +                       goto bridge_ranges_nomem;
+> >> +               }
+> >> +
+> >> +               of_pci_range_to_resource(&range, dev, res);
+> >> +
+> >> +               if (resource_type(res) == IORESOURCE_IO)
+> >> +                       *io_base = range.cpu_addr;
+> >> +
+> >> +               pci_add_resource_offset(resources, res,
+> >> +                               res->start - range.pci_addr);
+> >> +       }
+> >> +
+> >> +       /* Apply architecture specific fixups for the ranges */
+> >> +       pcibios_fixup_bridge_ranges(resources);
+> >> +
+> >> +       return 0;
+> >> +
+> >> +bridge_ranges_nomem:
+> >> +       pci_free_resource_list(resources);
+> >> +       return err;
+> >> +}
+> >> +
+> >> +/**
+> >> + * of_create_pci_host_bridge - Create a PCI host bridge structure using
+> >> + * information passed in the DT.
+> >> + * @parent: device owning this host bridge
+> >> + * @ops: pci_ops associated with the host controller
+> >> + * @host_data: opaque data structure used by the host controller.
+> >> + *
+> >> + * returns a pointer to the newly created pci_host_bridge structure, or
+> >> + * NULL if the call failed.
+> >> + *
+> >> + * This function will try to obtain the host bridge domain number by
+> >> + * using of_alias_get_id() call with "pci-domain" as a stem. If that
+> >> + * fails, a local allocator will be used that will put each host bridge
+> >> + * in a new domain.
+> >> + */
+> >> +struct pci_host_bridge *
+> >> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
+> >> void *host_data)
+> >> +{
+> >> +       int err, domain, busno;
+> >> +       struct resource bus_range;
+> >> +       struct pci_bus *root_bus;
+> >> +       struct pci_host_bridge *bridge;
+> >> +       resource_size_t io_base;
+> >> +       LIST_HEAD(res);
+> >> +
+> >> +       domain = of_alias_get_id(parent->of_node, "pci-domain");
+> >> +       if (domain == -ENODEV)
+> >> +               domain = domain_nr++;
+> >> +
+> >> +       err = of_pci_parse_bus_range(parent->of_node, &bus_range);
+> >> +       if (err) {
+> >> +               dev_info(parent, "No bus range for %s, using default
+> >> [0-255]\n",
+> >> +                       parent->of_node->full_name);
+> >> +               bus_range.start = 0;
+> >> +               bus_range.end = 255;
+> >> +               bus_range.flags = IORESOURCE_BUS;
+> >> +       }
+> >> +       busno = bus_range.start;
+> >> +       pci_add_resource(&res, &bus_range);
+> >> +
+> >> +       /* now parse the rest of host bridge bus ranges */
+> >> +       if (pci_host_bridge_of_get_ranges(parent->of_node, &res,
+> >> &io_base))
+> >> +               return NULL;
+> >> +
+> >> +       /* then create the root bus */
+> >> +       root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
+> >> +                                               ops, host_data, &res);
+> >> +       if (!root_bus)
+> >> +               return NULL;
+> >> +
+> >> +       bridge = to_pci_host_bridge(root_bus->bridge);
+> >> +       bridge->io_base = io_base;
+> >> +
+> >> +       return bridge;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(of_create_pci_host_bridge);
+> >> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> >> index 1eed009..0c5e269 100644
+> >> --- a/include/linux/pci.h
+> >> +++ b/include/linux/pci.h
+> >> @@ -395,6 +395,7 @@ struct pci_host_bridge {
+> >>         struct device dev;
+> >>         struct pci_bus *bus;            /* root bus */
+> >>         int domain_nr;
+> >> +       resource_size_t io_base;        /* physical address for the start
+> >> of I/O area */
+> >>         struct list_head windows;       /* pci_host_bridge_windows */
+> >>         void (*release_fn)(struct pci_host_bridge *);
+> >>         void *release_data;
+> >> @@ -1786,11 +1787,23 @@ static inline struct device_node
+> >> *pci_bus_to_OF_node(struct pci_bus *bus)
+> >>         return bus ? bus->dev.of_node : NULL;
+> >>  }
+> >>
+> >> +struct pci_host_bridge *
+> >> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
+> >> +                       void *host_data);
+> >> +
+> >> +void pcibios_fixup_bridge_ranges(struct list_head *resources);
+> >>  #else /* CONFIG_OF */
+> >>  static inline void pci_set_of_node(struct pci_dev *dev) { }
+> >>  static inline void pci_release_of_node(struct pci_dev *dev) { }
+> >>  static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
+> >>  static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
+> >> +
+> >> +static inline struct pci_host_bridge *
+> >> +pci_host_bridge_of_init(struct device *parent, struct pci_ops *ops,
+> >> +                       void *host_data)
+> >> +{
+> >> +       return NULL;
+> >> +}
+> >>  #endif  /* CONFIG_OF */
+> >>
+> >>  #ifdef CONFIG_EEH
+> >> --
+> >> 1.9.0
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-so it is being held in the wrong state and sysfs thinks the kernel owns 
-it so won't let me export it to modify from userspace.
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
 
-The other issue I've found is that the Ethernet only works if I have 
-booted the original kernel at least once since the unit was powered on. 
-It does get the correct MAC address when it doesn't work. I'm not sure 
-what might be causing that other than that Ethernet from uboot 
-apparently only works if connected to a 1G switch.
-
-Whilst writing this device tree file I have noticed that the Ethernet 
-node is missing from the NSA310 files. Unfortunately there are 2 
-variants of the 310 and I've only ever seen one board setup file that 
-specifies the phy number and as that doesn't match the 320 I don't feel 
-able to fix that without someone to test it.
-
-I do realise that when sending this as a proper patch you will need a 
-signed off by and you will need it sent via something other than 
-Thunderbird that can be relied upon not to mangle the patch. It would 
-also seem to make sense to rename kirkwood-nsa310-common.dtsi to 
-kirkwood-nsa3x0-common.dtsi (I believe that whilst the 310 and 320 are 
-fairly similar from a hardware perspective the 325 is quite different so 
-I believe 3x0 is an appropriate name)
-
-Thanks
-
-Adam Baker
-
-diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts 
-b/arch/arm/boot/dts/kirkwood-nsa320.dts
-new file mode 100644
-index 0000000..d91a480
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -0,0 +1,203 @@
-+/dts-v1/;
-+
-+#include "kirkwood-nsa310-common.dtsi"
-+
-+/ {
-+       model = "Zyxel NSA320";
-+	compatible = "zyxel,nsa320", "marvell,kirkwood-88f6281", 
-"marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pinctrl-0 = <&pmx_unknown>;
-+			pinctrl-names = "default";
-+
-+			pmx_led_hdd2_green: pmx-led-hdd2-green {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd2_red: pmx-led-hdd2-red {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_green: pmx-led-usb-green {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_red: pmx-led-usb-red {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_green: pmx-led-sys-green {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_red: pmx-led-sys-red {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_copy: pmx-btn-copy {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_green: pmx-led-copy-green {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_red: pmx-led-copy-red {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_green: pmx-led-hdd1-green {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_red: pmx-led-hdd1-red {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_unknown: pmx-unknown {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_power: pmx-btn-power {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			pcf8563: pcf8563 at 51 {
-+				compatible = "pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2 {
-+			label = "Copy Button";
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-+		};
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_hdd2_green &pmx_led_hdd2_red
-+			     &pmx_led_usb_green &pmx_led_usb_red
-+			     &pmx_led_sys_green &pmx_led_sys_red
-+			     &pmx_led_copy_green &pmx_led_copy_red
-+			     &pmx_led_hdd1_green &pmx_led_hdd1_red>;
-+		pinctrl-names = "default";
-+
-+		green-sys {
-+			label = "nsa320:green:sys";
-+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-sys {
-+			label = "nsa320:red:sys";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd1 {
-+			label = "nsa320:green:hdd1";
-+			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd1 {
-+			label = "nsa320:red:hdd1";
-+			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd2 {
-+			label = "nsa320:green:hdd2";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd2 {
-+			label = "nsa320:red:hdd2";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-usb {
-+			label = "nsa320:green:usb";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-usb {
-+			label = "nsa320:red:usb";
-+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-copy {
-+			label = "nsa320:green:copy";
-+			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-copy {
-+			label = "nsa320:red:copy";
-+			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&mdio {
-+       	status = "okay";
-+
-+        ethphy0: ethernet-phy at 1 {
-+                reg = <1>;
-+       	};
-+};
-+
-+&eth0 {
-+       	status = "okay";
-+       	ethernet0-port at 0 {
-+               	phy-handle = <&ethphy0>;
-+       	};
-+};
+ One small step
+   for me ...
