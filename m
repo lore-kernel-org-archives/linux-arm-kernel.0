@@ -1,106 +1,91 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Mar 2014 20:26:20 +0100
-Subject: [PATCH 01/19] ARM: sunxi: dt: Add sunxi-common-regulators include file
+Date: Sat,  1 Mar 2014 20:26:23 +0100
+Subject: [PATCH 04/19] ARM: sun4i: dt: Add USB host bindings
 In-Reply-To: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
 References: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393701998-3553-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393701998-3553-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most sunxi boards with a sata connector also have a gpio controlled connector
-for sata target power and almost all sunxi boards have a gpio controlled vbus
-for usb1 and usb2.
+From: Roman Byshko <rbyshko@gmail.com>
 
-This commit adds an include file for the regulators representing these
-supplies, avoiding the need to copy and paste the regulator code to allmost
-all sunxi board dts files.
+Add nodes for the usb-phy and ehci- and ohci-usb-host controllers.
 
+Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sunxi-common-regulators.dtsi | 75 ++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 arch/arm/boot/dts/sunxi-common-regulators.dtsi
+ arch/arm/boot/dts/sun4i-a10.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-new file mode 100644
-index 0000000..18eeac0
---- /dev/null
-+++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-@@ -0,0 +1,75 @@
-+/*
-+ * sunxi boards common regulator (ahci target power supply, usb-vbus) code
-+ *
-+ * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/ {
-+	soc at 01c00000 {
-+		pio: pinctrl at 01c20800 {
-+			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PB8";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
-+				allwinner,pins = "PH6";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			usb2_vbus_pin_a: usb2_vbus_pin at 0 {
-+				allwinner,pins = "PH3";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index e073c41..b5e5bf2 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -377,6 +377,38 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		usbphy: phy at 01c13400 {
++			#phy-cells = <1>;
++			compatible = "allwinner,sun4i-a10-usb-phy";
++			reg = <0x01c13400 0x10 0x01c14800 0x4 0x01c1c800 0x4>;
++			reg-names = "phy_ctrl", "pmu1", "pmu2";
++			clocks = <&usb_clk 8>;
++			clock-names = "usb_phy";
++			resets = <&usb_clk 1>, <&usb_clk 2>;
++			reset-names = "usb1_reset", "usb2_reset";
++			status = "disabled";
 +		};
-+	};
 +
-+	reg_ahci_5v: ahci-5v {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ahci_pwr_pin_a>;
-+		regulator-name = "ahci-5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&pio 1 8 0>;
-+		status = "disabled";
-+	};
++		ehci0: usb at 01c14000 {
++			compatible = "allwinner,sun4i-a10-ehci", "generic-ehci";
++			reg = <0x01c14000 0x100>;
++			interrupts = <39>;
++			clocks = <&ahb_gates 1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+	reg_usb1_vbus: usb1-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb1_vbus_pin_a>;
-+		regulator-name = "usb1-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&pio 7 6 0>;
-+		status = "disabled";
-+	};
++		ohci0: usb at 01c14400 {
++			compatible = "allwinner,sun4i-a10-ohci", "generic-ohci";
++			reg = <0x01c14400 0x100>;
++			interrupts = <64>;
++			clocks = <&usb_clk 6>, <&ahb_gates 2>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+	reg_usb2_vbus: usb2-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb2_vbus_pin_a>;
-+		regulator-name = "usb2-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&pio 7 3 0>;
-+		status = "disabled";
-+	};
-+};
+ 		spi2: spi at 01c17000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c17000 0x1000>;
+@@ -396,6 +428,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		ehci1: usb at 01c1c000 {
++			compatible = "allwinner,sun4i-a10-ehci", "generic-ehci";
++			reg = <0x01c1c000 0x100>;
++			interrupts = <40>;
++			clocks = <&ahb_gates 3>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci1: usb at 01c1c400 {
++			compatible = "allwinner,sun4i-a10-ohci", "generic-ohci";
++			reg = <0x01c1c400 0x100>;
++			interrupts = <65>;
++			clocks = <&usb_clk 7>, <&ahb_gates 4>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
+ 		spi3: spi at 01c1f000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c1f000 0x1000>;
 -- 
 1.9.0
