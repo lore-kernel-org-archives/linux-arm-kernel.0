@@ -1,11 +1,17 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Mar 2014 01:13:21 -0500
-Subject: [GIT PULL] pinctrl: mvebu: driver changes for v3.15
-Message-ID: <20140301061321.GU1872@titan.lakedaemon.net>
+Date: Sat, 1 Mar 2014 02:11:08 -0500
+Subject: [GIT PULL V2] pinctrl: mvebu: driver changes for v3.15
+In-Reply-To: <20140301061321.GU1872@titan.lakedaemon.net>
+References: <20140301061321.GU1872@titan.lakedaemon.net>
+Message-ID: <20140301071108.GV1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Linus,
+
+V2 - removed inadvertent patches touching dove.dtsi.  They're in
+mvebu/dt going through arm-soc.
+
 
 Here's the pull request we talked about earlier in the week.  I've
 merged them all into one branch as you requested.
@@ -13,9 +19,6 @@ merged them all into one branch as you requested.
 This branch is currently included in mvebu/for-next which is included in
 linux-next.  Both for testing.  This branch is only required for boot
 testing.  There are no other dependencies.
-
-This series does touch dove.dtsi, but doesn't conflict with anything we
-are sending up this cycle.
 
 If you need to rebase these, please let me know so I can pull them out
 of mvebu/for-next.  We don't want a conflict in linux-next.  Also, in
@@ -37,9 +40,9 @@ are available in the git repository at:
 
   git://git.infradead.org/linux-mvebu.git tags/mvebu-pinctrl-3.15
 
-for you to fetch changes up to 03366607962ced33f7f0253f5aa229f599ff7e01:
+for you to fetch changes up to 7cab36e5eee9dd9efd2f290b2c831a960d94b565:
 
-  Merge tag 'tags/for-mvebu-pinctrl-3xx' into mvebu/pinctrl (2014-03-01 05:50:51 +0000)
+  Merge tag 'tags/for-mvebu-pinctrl-3xx' into mvebu/pinctrl (2014-03-01 07:03:52 +0000)
 
 ----------------------------------------------------------------
 
@@ -53,10 +56,10 @@ mvebu pinctrl changes for v3.15
 ----------------------------------------------------------------
 Jason Cooper (3):
       Merge tag 'tags/for-mvebu-pinctrl-cleanup' into mvebu/pinctrl
-      Merge tag 'tags/for-mvebu-pinctrl-dove' into mvebu/pinctrl
+      Merge remote-tracking branch 'shesselba/for-mvebu/pinctrl-dove' into mvebu/pinctrl
       Merge tag 'tags/for-mvebu-pinctrl-3xx' into mvebu/pinctrl
 
-Sebastian Hesselbarth (23):
+Sebastian Hesselbarth (21):
       pinctrl: mvebu: count unnamed controls and allocate name buffer
       pinctrl: mvebu: remove obsolete per-control name buffer allocation
       pinctrl: mvebu: identify generic controls by name
@@ -72,8 +75,6 @@ Sebastian Hesselbarth (23):
       pinctrl: mvebu: dove: reuse mpp_{set,get} in pmu callbacks
       devicetree: bindings: add missing Marvell Dove SoC documentation
       devicetree: bindings: update MVEBU pinctrl binding documentation
-      ARM: dove: add additional pinctrl registers
-      ARM: dove: add global-config register node
       pinctrl: mvebu: dove: request additional resources
       pinctrl: mvebu: dove: request syscon regmap for global registers
       pinctrl: mvebu: dove: use remapped mpp base registers
@@ -94,7 +95,6 @@ Thomas Petazzoni (3):
  .../bindings/pinctrl/marvell,dove-pinctrl.txt      |   1 +
  .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |   1 +
  .../bindings/pinctrl/marvell,mvebu-pinctrl.txt     |   2 +-
- arch/arm/boot/dts/dove.dtsi                        |  10 +-
  drivers/pinctrl/mvebu/Kconfig                      |   9 +
  drivers/pinctrl/mvebu/Makefile                     |   2 +
  drivers/pinctrl/mvebu/pinctrl-armada-370.c         |  20 +-
@@ -105,7 +105,7 @@ Thomas Petazzoni (3):
  drivers/pinctrl/mvebu/pinctrl-kirkwood.c           |  25 +-
  drivers/pinctrl/mvebu/pinctrl-mvebu.c              | 122 ++----
  drivers/pinctrl/mvebu/pinctrl-mvebu.h              |  55 ++-
- 19 files changed, 1489 insertions(+), 292 deletions(-)
+ 18 files changed, 1480 insertions(+), 291 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/marvell,dove.txt
  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
