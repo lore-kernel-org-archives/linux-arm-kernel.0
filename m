@@ -1,39 +1,28 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Sat,  1 Mar 2014 14:58:54 +0100
-Subject: [PATCH v2 7/7] ARM: dts: omap3-gta04: Add bma180 accelerometer
-In-Reply-To: <1393682334-26805-1-git-send-email-marek@goldelico.com>
-References: <1393682334-26805-1-git-send-email-marek@goldelico.com>
-Message-ID: <1393682334-26805-8-git-send-email-marek@goldelico.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 1 Mar 2014 15:29:54 +0100
+Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140301142954.GB4307@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: NeilBrown <neilb@suse.de>
+On Wed, Feb 26, 2014 at 04:33:20PM +0900, Simon Horman wrote:
+> Declare all core and MSTP clocks currently used by r8a7779-based boards.
+> 
+> Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Add node for bma180 driver.
+I wonder if patches 2-4 shouldn't be squashed? I think it would make
+reviewing/finding typos easier.
 
-Signed-off-by: NeilBrown <neilb@suse.de>
----
- arch/arm/boot/dts/omap3-gta04.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-index d556e3a..f8ad125 100644
---- a/arch/arm/boot/dts/omap3-gta04.dts
-+++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -110,6 +110,14 @@
- 		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
- 	};
- 
-+	/* accelerometer */
-+	bma180 at 41 {
-+		compatible = "bosch,bma180";
-+		reg = <0x41>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	/* leds */
- 	tca6507 at 45 {
- 		compatible = "ti,tca6507";
--- 
-1.8.3.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140301/8772ffa3/attachment-0001.sig>
