@@ -1,45 +1,23 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 01 Mar 2014 20:29:11 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/7] mfd: AXP20x: Add support for AXP202
- and AXP209
-In-Reply-To: <CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>	<53121151.9050804@redhat.com>
- <CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>
-Message-ID: <53123507.6020607@redhat.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Sat, 01 Mar 2014 21:07:30 +0100
+Subject: [PATCH v4 3/4] ARM: OMAP2+: add legacy display for omap3 DBB056
+In-Reply-To: <20140228223824.GN13624@atomide.com>
+References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
+ <1392387656-15186-4-git-send-email-chf.fritz@googlemail.com>
+ <52FE29BF.9040307@ti.com>  <20140228223824.GN13624@atomide.com>
+Message-ID: <1393704450.4909.41.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/01/2014 06:17 PM, Carlo Caione wrote:
-> On Sat, Mar 1, 2014 at 5:56 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi Carlo,
->>
->> Great work, thanks for all the time you're putting into this!
+On Fri, 2014-02-28 at 14:38 -0800, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140214 06:38]:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt
+> > 
+> > That way you have it ready and tested if DSS DT goes forward.
 > 
-> Hi Hans :)
-> 
->> I've 2 questions:
->>
->> 1) What dependencies does this patch-set have? Obviously it needs the NMI irq
->> patches for A20, anything else ?  I no longer see any use of a special flag
->> for ack on unmask, is that no longer needed ?
-> 
-> Yes, the only dependency is on the NMI controller patch.
-> After a discussion with Maxime and Thomas I decided to not push for
-> including the special flag for ack on unmask in the irqchip core but
-> to use the unmask callback as in the v3 version of the NMI controller
-> driver (so no flag needed)
-> 
->> 2) No poweroff functionality ? That would be really great to have.
-> 
-> Actually in [PATCH 1/7] I support the poweroff using the pm_power_off hook.
+> Applying only patches 1 & 2 into omap-for-v3.15/dt thanks.
 
-Ah I missed that, cool.
+I'll send a display support patch as soon as DSS DT is in linux-next.
 
-I'm doing with sunxi hacking for today, but I'll add these to sunxi-devel
-and them give them a test run tomorrow.
-
-Regards,
-
-Hans
+ Thanks
+  -- Christoph
