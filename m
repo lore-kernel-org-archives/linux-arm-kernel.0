@@ -1,36 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 1 Mar 2014 15:35:22 -0800
-Subject: ccf: where to put constraints?
-In-Reply-To: <20140228212412.GD2517@katana>
-References: <20140224201046.GA13155@katana>
- <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
- <20140228212412.GD2517@katana>
-Message-ID: <CAPtuhTjc3HUO+iAedQ64_A6oSNzp8WNfggdH2aJmnVzj2A2wNQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 02 Mar 2014 00:59:25 +0100
+Subject: [PATCH] PM / Sleep: Set pm_generic functions to NULL for
+ !CONFIG_PM_SLEEP
+In-Reply-To: <CAPDyKFrhyBZV6yUogxTQPdFPg=1R3UZ0Yr_VfXrTivMaNeGVEQ@mail.gmail.com>
+References: <1392811761-28201-1-git-send-email-ulf.hansson@linaro.org>
+ <20140219122715.GB32069@amd.pavel.ucw.cz>
+ <CAPDyKFrhyBZV6yUogxTQPdFPg=1R3UZ0Yr_VfXrTivMaNeGVEQ@mail.gmail.com>
+Message-ID: <1517514.5FC3TgtPH4@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 1:24 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> Hi S?ren,
->
->> I.e. when a clock consumer needs to be notified about its input clock
->> being changed it registers a clock notifier.
->
-> I found the notifiers, too, but I am still not sure they are proper for
-> my case. There, CPU and GPU clocks are siblings, there is no
-> parent-child relationship.
+On Thursday, February 27, 2014 09:29:31 AM Ulf Hansson wrote:
+> On 19 February 2014 13:27, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Wed 2014-02-19 13:09:21, Ulf Hansson wrote:
+> >> Previously only a subset of the functions were defined and set to NULL
+> >> while !CONFIG_PM_SLEEP. Let's make them all available so they can be
+> >> used no matter of CONFIG_PM_SLEEP or not.
+> >>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >
+> > Reviewed-by: Pavel Machek <pavel@ucw.cz>
+> >
+> 
+> Hi Rafael,
+> 
+> If you have no concern with this one, I would appreciate if it could
+> go in for 3.15.
+> 
+> I have some patches for the amba bus (driver/amba/bus.c) that would
+> require these pointers to be available.
 
-Hi Wolfram,
+I've queued it up for 3.15, thanks!
 
-No parent-child relationship is required. The cpufreq driver you have
-in mind could subscribe to notifiers for both your GPU clock as well
-as your CPU clock and listen for any changes, waiting to take action.
-
-Regards,
-Mike
-
->
-> Anyhow, I have been told cpufreq is not needed currently, so this task
-> is postponed. Thanks for the input nonetheless!
->
->    Wolfram
->
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
