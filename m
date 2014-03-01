@@ -1,150 +1,54 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Sat,  1 Mar 2014 11:56:04 +0100
-Subject: [PATCH V3 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
+Date: Sat,  1 Mar 2014 11:56:06 +0100
+Subject: [PATCH 3/8] spi: pl022: Let runtime PM callbacks be available for
+ CONFIG_PM
 In-Reply-To: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
 References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1393671371-2398-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1393671371-2398-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While fetching the proper runtime PM callback, we walk the hierarchy of
-device's power domains, subsystems and drivers.
+Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
+callbacks. This means the callbacks becomes available for both
+CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
+combinations of these scenarios.
 
-This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
-clean up the code by using a macro that handles this.
-
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Mark Brown <broonie@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
+ drivers/spi/spi-pl022.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Changes in v3:
-	Added functions to return the callbacks, which will be the only users of
-	the macro. According to comments from Alan Stern and Kevin Hilman.
-
-Changes in v2:
-	Updated the macro to return a callback instead.
-	Suggested by Josh Cartwright.
-
----
- drivers/base/power/runtime.c |   78 +++++++++++++++++++++---------------------
- 1 file changed, 39 insertions(+), 39 deletions(-)
-
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 72e00e6..ac495b1 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -13,6 +13,42 @@
- #include <trace/events/rpm.h>
- #include "power.h"
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 74a0729..6dfcabf 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2277,7 +2277,7 @@ pl022_remove(struct amba_device *adev)
+ 	return 0;
+ }
  
-+#define RPM_GET_CALLBACK(dev, cb)				\
-+({								\
-+	int (*__rpm_cb)(struct device *__d);			\
-+								\
-+	if (dev->pm_domain)					\
-+		__rpm_cb = dev->pm_domain->ops.cb;		\
-+	else if (dev->type && dev->type->pm)			\
-+		__rpm_cb = dev->type->pm->cb;			\
-+	else if (dev->class && dev->class->pm)			\
-+		__rpm_cb = dev->class->pm->cb;			\
-+	else if (dev->bus && dev->bus->pm)			\
-+		__rpm_cb = dev->bus->pm->cb;			\
-+	else							\
-+		__rpm_cb = NULL;				\
-+								\
-+	if (!__rpm_cb && dev->driver && dev->driver->pm)	\
-+		__rpm_cb = dev->driver->pm->cb;			\
-+								\
-+	__rpm_cb;						\
-+})
-+
-+static int (*rpm_get_suspend_cb(struct device *dev))(struct device *)
-+{
-+	return RPM_GET_CALLBACK(dev, runtime_suspend);
-+}
-+
-+static int (*rpm_get_resume_cb(struct device *dev))(struct device *)
-+{
-+	return RPM_GET_CALLBACK(dev, runtime_resume);
-+}
-+
-+static int (*rpm_get_idle_cb(struct device *dev))(struct device *)
-+{
-+	return RPM_GET_CALLBACK(dev, runtime_idle);
-+}
-+
- static int rpm_resume(struct device *dev, int rpmflags);
- static int rpm_suspend(struct device *dev, int rpmflags);
+-#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
++#ifdef CONFIG_PM
+ /*
+  * These two functions are used from both suspend/resume and
+  * the runtime counterparts to handle external resources like
+@@ -2343,7 +2343,7 @@ static int pl022_resume(struct device *dev)
+ }
+ #endif	/* CONFIG_PM */
  
-@@ -310,19 +346,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+-#ifdef CONFIG_PM_RUNTIME
++#ifdef CONFIG_PM
+ static int pl022_runtime_suspend(struct device *dev)
+ {
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+@@ -2363,7 +2363,7 @@ static int pl022_runtime_resume(struct device *dev)
  
- 	dev->power.idle_notification = true;
+ static const struct dev_pm_ops pl022_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+-	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
++	SET_PM_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+ };
  
--	if (dev->pm_domain)
--		callback = dev->pm_domain->ops.runtime_idle;
--	else if (dev->type && dev->type->pm)
--		callback = dev->type->pm->runtime_idle;
--	else if (dev->class && dev->class->pm)
--		callback = dev->class->pm->runtime_idle;
--	else if (dev->bus && dev->bus->pm)
--		callback = dev->bus->pm->runtime_idle;
--	else
--		callback = NULL;
--
--	if (!callback && dev->driver && dev->driver->pm)
--		callback = dev->driver->pm->runtime_idle;
-+	callback = rpm_get_idle_cb(dev);
- 
- 	if (callback)
- 		retval = __rpm_callback(callback, dev);
-@@ -492,19 +516,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
- 
- 	__update_runtime_status(dev, RPM_SUSPENDING);
- 
--	if (dev->pm_domain)
--		callback = dev->pm_domain->ops.runtime_suspend;
--	else if (dev->type && dev->type->pm)
--		callback = dev->type->pm->runtime_suspend;
--	else if (dev->class && dev->class->pm)
--		callback = dev->class->pm->runtime_suspend;
--	else if (dev->bus && dev->bus->pm)
--		callback = dev->bus->pm->runtime_suspend;
--	else
--		callback = NULL;
--
--	if (!callback && dev->driver && dev->driver->pm)
--		callback = dev->driver->pm->runtime_suspend;
-+	callback = rpm_get_suspend_cb(dev);
- 
- 	retval = rpm_callback(callback, dev);
- 	if (retval)
-@@ -724,19 +736,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
- 
- 	__update_runtime_status(dev, RPM_RESUMING);
- 
--	if (dev->pm_domain)
--		callback = dev->pm_domain->ops.runtime_resume;
--	else if (dev->type && dev->type->pm)
--		callback = dev->type->pm->runtime_resume;
--	else if (dev->class && dev->class->pm)
--		callback = dev->class->pm->runtime_resume;
--	else if (dev->bus && dev->bus->pm)
--		callback = dev->bus->pm->runtime_resume;
--	else
--		callback = NULL;
--
--	if (!callback && dev->driver && dev->driver->pm)
--		callback = dev->driver->pm->runtime_resume;
-+	callback = rpm_get_resume_cb(dev);
- 
- 	retval = rpm_callback(callback, dev);
- 	if (retval) {
+ static struct vendor_data vendor_arm = {
 -- 
 1.7.9.5
