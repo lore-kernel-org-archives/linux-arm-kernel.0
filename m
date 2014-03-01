@@ -1,45 +1,81 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 19:25:37 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <11174980.YJ21cfsHoG@wuerfel>
-References: <20140226183454.GA14639@cbox> <20140226214843.GD12169@bivouac.
- eciton.net> <alpine.DEB.2.02.1402271229370.31489@kaball.uk.xensource.com> <
- 11174980.YJ21cfsHoG@wuerfel>
-Message-ID: <20140301192537.3B2AAC40951@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 21:11:54 +0000
+Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <20140224004826.22529.87768@quantum>
+References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com> <
+ 1392829124-25705-4-git-send-email-s.nawrocki@samsung.com> <20140220140928.
+ 27132C4050F@trevor.secretlab.ca> <53072C9D.5040303@samsung.com> <
+ 20140224004826.22529.87768@quantum>
+Message-ID: <20140301211154.38FE7C40F28@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Feb 2014 15:00:44 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 27 February 2014 12:31:55 Stefano Stabellini wrote:
-> > On Wed, 26 Feb 2014, Leif Lindholm wrote:
-> > > > >   no FDT.  In this case, the VM implementation must provide ACPI, and
-> > > > >   the OS must be able to locate the ACPI root pointer through the UEFI
-> > > > >   system table.
-> > > > > 
-> > > > > For more information about the arm and arm64 boot conventions, see
-> > > > > Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-> > > > > Linux kernel source tree.
-> > > > > 
-> > > > > For more information about UEFI and ACPI booting, see [4] and [5].
-> > > > 
-> > > > What's the point of having ACPI in a virtual machine? You wouldn't
-> > > > need to abstract any of the hardware in AML since you already know
-> > > > what the virtual hardware is, so I can't see how this would help
-> > > > anyone.
+On Sun, 23 Feb 2014 16:48:26 -0800, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
+> > On 20/02/14 15:09, Grant Likely wrote:
+> > [...]
+> > >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > >> > index 7c52c29..d618498 100644
+> > >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
+> > >> >    ("pll" and "pll-switched").
+> > >> >  * The UART has its baud clock connected the external oscillator and its
+> > >> >    register clock connected to the PLL clock (the "pll-switched" signal)
+> > >> > +
+> > >> > +==Static initial configuration of clock parent and clock frequency==
+> > >> > +
+> > >> > +Some platforms require static configuration of (parts of) the clock controller
+> > >> > +often determined by the board design. Such a configuration can be specified in
+> > >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
+> > >> > +properties. The former should contain phandle and clock specifier of the parent
+> > >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
+> > >> > +should be listed in the clock-names property and a phandle and a clock specifier
+> > >> > +pair corresponding to it should be present in the clocks property.
+> > >> > +
+> > >> > +    uart at a000 {
+> > >> > +        compatible = "fsl,imx-uart";
+> > >> > +        reg = <0xa000 0x1000>;
+> > >> > +  ...
+> > >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
+> > >> > +        clock-names = "baud", "mux";
+> > >> > +
+> > >> > +  mux-clk-parent = <&pll 1>;
+> > >> > +  baud-clk-rate = <460800>;
+> > >
+> > > This mixes patterns for references to clocks. Plus it requires composing
+> > > property names which is a little painful. I'd rather see a list of
+> > > tuples to match the existing pattern already in use
 > > > 
-> > > The point is that if we need to share any real hw then we need to use
-> > > whatever the host has.
+> > >       clocks = <&clkcon 0>, <&clkcon 3>;
+> > >       clock-names = "baud", "mux";
+> > >       clock-parents = <0> <&pll 1>;
+> > >       clock-rates = <0> <460800>;
+> > 
+> > Thank you for the review. This looks much better to me. My bad, I wasn't 
+> > aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
+> > to be specifying exact meaning of the 'phandle' property values, except 
+> > they be unique. Anyway, it seems to be clearly documented within the
+> > __of_parse_phandle_with_args() function. 
+> > 
+> > I'll try this modified binding instead, presumably it would be useful to 
+> > have a variant of __of_parse_phandle_with_args() function which would 
+> > accept a context data containing result of previous call within an iteration, 
+> > similarly as of_property_next_string() is written. So we don't iterate 
+> > from beginning of the list with each __of_parse_phandle_with_args() call. 
+> > But it's an optimization issue that could be considered separately I guess.
 > 
-> I would be more comfortable defining in the spec that you cannot share
-> hardware at all. Obviously that doesn't stop anyone from actually
-> sharing hardware with the guest, but at that point it would become
-> noncompliant with this spec, with the consequence that you couldn't
-> expect a compliant guest image to run on that hardware, but that is
-> exactly something we can't guarantee anyway because we don't know
-> what drivers might be needed.
+> I was always partial to the regulator style of blahblah-supply but
+> Grant's suggestion is much cleaner with respect to the rest of the clock
+> binding.
+> 
+> I guess it will be a bit ugly if a very long array is needed with a
+> sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
+> only a single clock needs to have its parent or rate specified.
+> 
+> Is there a reason not to support both methods?
 
-I don't think this spec should say *anything* about sharing hardware.
-This spec is about producing portable disk images. Assigning hardware
-into guests is rather orthogonal to whether or not hardware is assigned.
+Yes. Complexity. Having two ways to do it is far worse to maintain.
 
 g.
