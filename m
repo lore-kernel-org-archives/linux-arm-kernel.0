@@ -1,99 +1,217 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Feb 2014 18:44:30 -0500
-Subject: [PATCH] dma: Add Keystone Packet DMA Engine driver
-In-Reply-To: <21183060.JRdahJE8pQ@wuerfel>
-References: <1393628200-12317-1-git-send-email-santosh.shilimkar@ti.com>
- <21183060.JRdahJE8pQ@wuerfel>
-Message-ID: <53111F5E.9080609@ti.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri, 28 Feb 2014 16:00:46 -0800
+Subject: [PATCH 2/2] ARM: zynq: dt: Add I2C nodes to Zynq device tree
+In-Reply-To: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1393632046-20062-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 06:14 PM, Arnd Bergmann wrote:
-> On Friday 28 February 2014 17:56:40 Santosh Shilimkar wrote:
->> The Packet DMA driver sets up the dma channels and flows for the
->> QMSS(Queue Manager SubSystem) who triggers the actual data movements
->> across clients using destination queues. Every client modules like
->> NETCP(Network Coprocessor), SRIO(Serial Rapid IO) and CRYPTO
->> Engines has its own instance of packet dma hardware. QMSS has also
->> an internal packet DMA module which is used as an infrastructure
->> DMA with zero copy.
->>
->> Patch adds DMAEngine driver for Keystone Packet DMA hardware.
->> The specifics on the device tree bindings for Packet DMA can be
->> found in:
->>         Documentation/devicetree/bindings/dma/keystone-pktdma.txt
->>
->> The driver implements the configuration functions using standard DMAEngine
->> apis. The data movement is managed by QMSS device driver.
-> 
-> The description of this sounds a bit like the x-gene queue manager/tag
-> manager, rather than a traditional DMA engine. For that driver, we
-> decided to use the mailbox subsystem instead of the DMA subsystem.
-> 
-> Can you explain what kind of data is actually getting transferred
-> in by your hardware here? You say the DMA is performed by the QMSS,
-> so do you use the pktdma driver to drive the data transfers of the
-> QMSS or do you just use it for flow control by passing short (a few
-> bytes) messages and also have to program the pktdma?
->
-I don't know what x-gene stuff is, but the keystone packet dma
-is hardware DMA controller(per client subystem) which has all
-the traditional DMA controller properties. The packet DMA needs
-to be setup just like any slave dma configuration. The actual
-data transfers are triggered by operations on Queue Manager
-SubSystem.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
+ arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 166 insertions(+)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 8b67b19392ec..fb1e1e7cae8f 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -48,6 +48,28 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges;
  
-I just posted the QMSS driver as well which explains how the system
-work. 
-
->> +
->> +bool dma_keystone_filter_fn(struct dma_chan *chan, void *param)
->> +{
->> +       if (chan->device->dev->driver == &keystone_dma_driver.driver) {
->> +               struct keystone_dma_chan *kdma_chan = from_achan(chan);
->> +               unsigned chan_id = *(u32 *)param & KEYSTONE_DMA_CHAN_ID_MASK;
->> +               unsigned chan_type = *(u32 *)param >> KEYSTONE_DMA_TYPE_SHIFT;
->> +
->> +               if (chan_type == KEYSTONE_DMA_TX_CHAN_TYPE &&
->> +                   kdma_chan->direction == DMA_MEM_TO_DEV)
->> +                       return chan_id  == kdma_chan->channel;
->> +
->> +               if (chan_type == KEYSTONE_DMA_RX_FLOW_TYPE &&
->> +                   kdma_chan->direction == DMA_DEV_TO_MEM)
->> +                       return chan_id  == kdma_chan->flow;
->> +       }
->> +       return false;
->> +}
->> +EXPORT_SYMBOL_GPL(dma_keystone_filter_fn);
-> 
-> The filter function should be removed here and replaced with a simpler
-> custom xlate function calling dma_get_slave_chan() on the matching
-> channel.
->
-Can you please expand your comment please ? I though the filter function
-is the one should implement for specific channel allocations.
-
->> diff --git a/include/linux/keystone-pktdma.h b/include/linux/keystone-pktdma.h
->> new file mode 100644
->> index 0000000..e6a66c8
->> --- /dev/null
->> +++ b/include/linux/keystone-pktdma.h
->> @@ -0,0 +1,168 @@
-> 
-> A DMA engine driver should not have a public API. Please move all the
-> contents of the two header files into the driver itself to ensure none
-> of this is visible to slave drivers. If it turns out that you use
-> declarations from this header in slave drivers at the moment, please
-> explain what they are so we can discuss alternative solutions.
-> 
-Yes the slave drivers make use of these. The dt-binding header is created
-because some the macro's are shared between DTS and code.
-
-keystone-pktdma.h carriers information about the packet dma config
-which is done by slave drivers. It also contains the dma descriptor
-format and its associate macro's used by slave drivers. Since
-the hardware perspective, the descriptor represent the packet
-format dma expects and hence its left in the dma header header.
-
-Regards,
-Santosh 
++		i2c0: zynq-i2c at e0004000 {
++			compatible = "cdns,i2c-r1p10";
++			status = "disabled";
++			clocks = <&clkc 38>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 25 4>;
++			reg = <0xE0004000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c1: zynq-i2c at e0005000 {
++			compatible = "cdns,i2c-r1p10";
++			status = "disabled";
++			clocks = <&clkc 39>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 48 4>;
++			reg = <0xE0005000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		intc: interrupt-controller at f8f01000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index c913f77a21eb..91a3a560f03b 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -34,6 +34,82 @@
+ 	phy-mode = "rgmii";
+ };
+ 
++&i2c0 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	i2cswitch at 74 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x74>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++			si570: clock-generator at 5d {
++				#clock-cells = <0>;
++				compatible = "silabs,si570";
++				temperature-stability = <50>;
++				reg = <0x5d>;
++				factory-fout = <156250000>;
++				clock-frequency = <148500000>;
++			};
++		};
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++			eeprom at 54 {
++				compatible = "at,24c08";
++				reg = <0x54>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++			gpio at 21 {
++				compatible = "ti,tca6416";
++				reg = <0x21>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++			rtc at 51 {
++				compatible = "nxp,pcf8563";
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 7 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <7>;
++			hwmon at 52 {
++				compatible = "pmbus,ucd9248";
++				reg = <52>;
++			};
++			hwmon at 53 {
++				compatible = "pmbus,ucd9248";
++				reg = <53>;
++			};
++			hwmon at 54 {
++				compatible = "pmbus,ucd9248";
++				reg = <54>;
++			};
++		};
++	};
++};
++
+ &sdhci0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 88f62c50382e..dab30f80d5b0 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -35,6 +35,74 @@
+ 	phy-mode = "rgmii";
+ };
+ 
++&i2c0 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	i2cswitch at 74 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x74>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++			si570: clock-generator at 5d {
++				#clock-cells = <0>;
++				compatible = "silabs,si570";
++				temperature-stability = <50>;
++				reg = <0x5d>;
++				factory-fout = <156250000>;
++				clock-frequency = <148500000>;
++			};
++		};
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++			eeprom at 54 {
++				compatible = "at,24c08";
++				reg = <0x54>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++			gpio at 21 {
++				compatible = "ti,tca6416";
++				reg = <0x21>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++			rtc at 51 {
++				compatible = "nxp,pcf8563";
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 7 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <7>;
++			ucd90120 at 65 {
++				compatible = "pmbus,ucd90120";
++				reg = <0x65>;
++			};
++		};
++	};
++};
++
+ &sdhci0 {
+ 	status = "okay";
+ };
+-- 
+1.9.0.1.g4196000
