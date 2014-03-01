@@ -1,92 +1,106 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Mar 2014 20:26:21 +0100
-Subject: [PATCH 02/19] ARM: sun4i: dt: Add ahci / sata support
+Date: Sat,  1 Mar 2014 20:26:20 +0100
+Subject: [PATCH 01/19] ARM: sunxi: dt: Add sunxi-common-regulators include file
 In-Reply-To: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
 References: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393701998-3553-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393701998-3553-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oliver Schinagl <oliver@schinagl.nl>
+Most sunxi boards with a sata connector also have a gpio controlled connector
+for sata target power and almost all sunxi boards have a gpio controlled vbus
+for usb1 and usb2.
 
-This patch adds sunxi sata support to A10 boards that have such a connector.
-Some boards also feature a regulator via a GPIO and support for this is also
-added.
+This commit adds an include file for the regulators representing these
+supplies, avoiding the need to copy and paste the regulator code to allmost
+all sunxi board dts files.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 10 ++++++++++
- arch/arm/boot/dts/sun4i-a10.dtsi           |  8 ++++++++
- 3 files changed, 22 insertions(+)
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi | 75 ++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sunxi-common-regulators.dtsi
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index cbd2e13..d6ec839 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -35,6 +35,10 @@
- 			};
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			status = "okay";
-+		};
+diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+new file mode 100644
+index 0000000..18eeac0
+--- /dev/null
++++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+@@ -0,0 +1,75 @@
++/*
++ * sunxi boards common regulator (ahci target power supply, usb-vbus) code
++ *
++ * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- 		pinctrl at 01c20800 {
- 			emac_power_pin_a1000: emac_power_pin at 0 {
- 				allwinner,pins = "PH15";
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index b139ee6..20407ac 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -12,6 +12,7 @@
- 
- /dts-v1/;
- /include/ "sun4i-a10.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
- 
- / {
- 	model = "Cubietech Cubieboard";
-@@ -33,6 +34,11 @@
- 			};
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
++/ {
++	soc at 01c00000 {
++		pio: pinctrl at 01c20800 {
++			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
++				allwinner,pins = "PB8";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
 +
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-@@ -77,4 +83,8 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
++			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
++				allwinner,pins = "PH6";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			usb2_vbus_pin_a: usb2_vbus_pin at 0 {
++				allwinner,pins = "PH3";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++	};
 +
 +	reg_ahci_5v: ahci-5v {
-+		status = "okay";
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&ahci_pwr_pin_a>;
++		regulator-name = "ahci-5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 1 8 0>;
++		status = "disabled";
 +	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index a850482c..e073c41 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -388,6 +388,14 @@
- 			#size-cells = <0>;
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			compatible = "allwinner,sun4i-a10-ahci";
-+			reg = <0x01c18000 0x1000>;
-+			interrupts = <56>;
-+			clocks = <&pll6 0>, <&ahb_gates 25>;
-+			status = "disabled";
-+		};
 +
- 		spi3: spi at 01c1f000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c1f000 0x1000>;
++	reg_usb1_vbus: usb1-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb1_vbus_pin_a>;
++		regulator-name = "usb1-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 7 6 0>;
++		status = "disabled";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb2_vbus_pin_a>;
++		regulator-name = "usb2-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 7 3 0>;
++		status = "disabled";
++	};
++};
 -- 
 1.9.0
