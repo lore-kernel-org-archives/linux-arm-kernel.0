@@ -1,362 +1,235 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Fri, 28 Feb 2014 18:07:05 -0800
-Subject: [PATCH v3 5/5] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <CACoXjck59jA1Ub8mHB0zn16krCxagUgH8BmJVnLQ8KGpFg7WpA@mail.gmail.com>
-References: <1393592902-24750-1-git-send-email-Liviu.Dudau@arm.com>
- <1393592902-24750-6-git-send-email-Liviu.Dudau@arm.com>
- <CACoXjck59jA1Ub8mHB0zn16krCxagUgH8BmJVnLQ8KGpFg7WpA@mail.gmail.com>
-Message-ID: <CACoXjckem9p0uKRBTF67xJ6-_nM2mxcmRyfsb0jue2TiVZiuxQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Feb 2014 18:23:26 -0800
+Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings 0
+ failures (next/next-20140228))
+In-Reply-To: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
+References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
+Message-ID: <5311449E.90902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier email did not deliver to mailing lists because of plain text
-setting problem on my side. Apologies for spamming. Sending it again.
+On 02/27/14 23:57, Olof's autobuilder wrote:
+> Warnings:
+>       3 drivers/irqchip/irq-mmp.c:199:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       3 drivers/irqchip/irq-mmp.c:212:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       3 drivers/irqchip/irq-sirfsoc.c:51:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       3 drivers/irqchip/irq-sun4i.c:140:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       3 drivers/irqchip/irq-sun4i.c:39:70: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       3 drivers/irqchip/irq-vt8500.c:183:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       4 drivers/irqchip/irq-orion.c:35:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>       5 drivers/irqchip/irq-armada-370-xp.c:415:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>      13 drivers/irqchip/irq-vic.c:244:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>      28 drivers/irqchip/irq-gic.c:283:1: warning: 'externally_visible' attribute have effect only on public objects [-Wattributes]
+>
 
-Hello Liviu,
+These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
+2014-02-08). Before that change asmlinkage was defined to nothing on
+ARM, but now it's __visible. Should we just drop asmlinkage here?
 
-While porting X-Gene PCIe driver to v2 series, following problems were observed.
+----8<----
 
-1. In 'of_create_pci_host_bridge' function, bus_range is defined
-locally. So, while walking over list of resources in bridge->windows
-later, during X-Gene controller related setup, garbage values are
-found in the resource. Please allocate it dynamically.
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] irqchip: Remove asmlinkage from static functions
 
-2. 'domain_nr' problem is partially solved. There are still some
-places where functions are getting invalid domain_nr.  For example,
-'pci_alloc_child_bus' tries to get domain_nr when bridge is not
-assigned to bus. You may want to look for all the places where
-pci_domain_nr is used. Please see below dump -->
+LTO patches add __visible to the asmlinkage define, causing
+compilation warnings like:
 
-pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at
-/home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
-sysfs_warn_dup+0x80/0xc0()
-sysfs: cannot create duplicate filename '/class/pci_bus/0000:01'
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc4+ #37
-Call trace:
-[<ffffffc000088140>] dump_backtrace+0x0/0x140
-[<ffffffc000088294>] show_stack+0x14/0x20
-[<ffffffc0004f64b0>] dump_stack+0x78/0xc4
-[<ffffffc000096c88>] warn_slowpath_common+0x88/0xc0
-[<ffffffc000096d10>] warn_slowpath_fmt+0x50/0x60
-[<ffffffc0001b8260>] sysfs_warn_dup+0x80/0xc0
-[<ffffffc0001b8718>] sysfs_do_create_link_sd.isra.2+0xf8/0x100
-[<ffffffc0001b8740>] sysfs_create_link+0x20/0x40
-[<ffffffc000322f5c>] device_add+0x41c/0x520
-[<ffffffc00032307c>] device_register+0x1c/0x40
-[<ffffffc0004f1924>] pci_add_new_bus+0x284/0x380
-[<ffffffc0002c51a0>] pci_scan_bridge+0x4e0/0x540
-[<ffffffc0002c52b4>] pci_scan_child_bus+0xb4/0x140
-[<ffffffc0004f1a34>] pci_rescan_bus+0x14/0x40
-[<ffffffc0006a12d4>] xgene_pcie_probe_bridge+0x688/0x750
-[<ffffffc000327c64>] platform_drv_probe+0x24/0x60
-[<ffffffc000325d74>] really_probe+0xf4/0x220
-[<ffffffc000325fc4>] __driver_attach+0xa4/0xc0
-[<ffffffc000323e18>] bus_for_each_dev+0x58/0xa0
-[<ffffffc000325800>] driver_attach+0x20/0x40
-[<ffffffc0003253d0>] bus_add_driver+0x150/0x220
-[<ffffffc000326780>] driver_register+0x60/0x120
-[<ffffffc000327c20>] __platform_driver_register+0x60/0x80
-[<ffffffc0006a0c44>] xgene_pcie_driver_init+0x18/0x20
-[<ffffffc0000814c4>] do_one_initcall+0xe4/0x160
-[<ffffffc00068c938>] kernel_init_freeable+0x138/0x1d8
-[<ffffffc0004f06b0>] kernel_init+0x10/0xe0
----[ end trace 53db1c3a7fbdeb88 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at
-/home/tinamdar/work/open-source/linux/drivers/pci/probe.c:711
-pci_add_new_bus+0x36c/0x380()
+  drivers/irqchip/irq-gic.c:283:1: warning: 'externally_visible'
+  attribute have effect only on public objects [-Wattributes]
 
-Thanks,
-Tanmay
+Drop asmlinkage here to avoid such warnings.
 
-On Fri, Feb 28, 2014 at 6:01 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-> Hello Liviu,
->
-> While porting X-Gene PCIe driver to v2 series, following problems were
-> observed.
->
-> 1. In 'of_create_pci_host_bridge' function, bus_range is defined locally.
-> So, while walking over list of resources in bridge->windows later, during
-> X-Gene controller related setup, garbage values are found in the resource.
-> Please allocate it dynamically.
->
-> 2. 'domain_nr' problem is partially solved. There are still some places
-> where functions are getting invalid domain_nr.  For example,
-> 'pci_alloc_child_bus' tries to get domain_nr when bridge is not assigned to
-> bus. You may want to look for all the places where pci_domain_nr is used.
-> Please see below dump -->
->
-> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at
-> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
-> sysfs_warn_dup+0x80/0xc0()
-> sysfs: cannot create duplicate filename '/class/pci_bus/0000:01'
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc4+ #37
-> Call trace:
-> [<ffffffc000088140>] dump_backtrace+0x0/0x140
-> [<ffffffc000088294>] show_stack+0x14/0x20
-> [<ffffffc0004f64b0>] dump_stack+0x78/0xc4
-> [<ffffffc000096c88>] warn_slowpath_common+0x88/0xc0
-> [<ffffffc000096d10>] warn_slowpath_fmt+0x50/0x60
-> [<ffffffc0001b8260>] sysfs_warn_dup+0x80/0xc0
-> [<ffffffc0001b8718>] sysfs_do_create_link_sd.isra.2+0xf8/0x100
-> [<ffffffc0001b8740>] sysfs_create_link+0x20/0x40
-> [<ffffffc000322f5c>] device_add+0x41c/0x520
-> [<ffffffc00032307c>] device_register+0x1c/0x40
-> [<ffffffc0004f1924>] pci_add_new_bus+0x284/0x380
-> [<ffffffc0002c51a0>] pci_scan_bridge+0x4e0/0x540
-> [<ffffffc0002c52b4>] pci_scan_child_bus+0xb4/0x140
-> [<ffffffc0004f1a34>] pci_rescan_bus+0x14/0x40
-> [<ffffffc0006a12d4>] xgene_pcie_probe_bridge+0x688/0x750
-> [<ffffffc000327c64>] platform_drv_probe+0x24/0x60
-> [<ffffffc000325d74>] really_probe+0xf4/0x220
-> [<ffffffc000325fc4>] __driver_attach+0xa4/0xc0
-> [<ffffffc000323e18>] bus_for_each_dev+0x58/0xa0
-> [<ffffffc000325800>] driver_attach+0x20/0x40
-> [<ffffffc0003253d0>] bus_add_driver+0x150/0x220
-> [<ffffffc000326780>] driver_register+0x60/0x120
-> [<ffffffc000327c20>] __platform_driver_register+0x60/0x80
-> [<ffffffc0006a0c44>] xgene_pcie_driver_init+0x18/0x20
-> [<ffffffc0000814c4>] do_one_initcall+0xe4/0x160
-> [<ffffffc00068c938>] kernel_init_freeable+0x138/0x1d8
-> [<ffffffc0004f06b0>] kernel_init+0x10/0xe0
-> ---[ end trace 53db1c3a7fbdeb88 ]---
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at
-> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:711
-> pci_add_new_bus+0x36c/0x380()
->
-> Thanks,
-> Tanmay
->
->
->
-> On Fri, Feb 28, 2014 at 5:08 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->>
->> Several platforms use a rather generic version of parsing
->> the device tree to find the host bridge ranges. Move the common code
->> into the generic PCI code and use it to create a pci_host_bridge
->> structure that can be used by arch code.
->>
->> Based on early attempts by Andrew Murray to unify the code.
->> Used powerpc and microblaze PCI code as starting point.
->>
->> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>
->> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
->> index 06ace62..feb8436 100644
->> --- a/drivers/pci/host-bridge.c
->> +++ b/drivers/pci/host-bridge.c
->> @@ -6,9 +6,13 @@
->>  #include <linux/init.h>
->>  #include <linux/pci.h>
->>  #include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_pci.h>
->>
->>  #include "pci.h"
->>
->> +static int domain_nr;
->> +
->>  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
->>  {
->>         while (bus->parent)
->> @@ -91,3 +95,133 @@ void pcibios_bus_to_resource(struct pci_bus *bus,
->> struct resource *res,
->>         res->end = region->end + offset;
->>  }
->>  EXPORT_SYMBOL(pcibios_bus_to_resource);
->> +
->> +/**
->> + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from
->> DT
->> + * @dev: device node of the host bridge having the range property
->> + * @resources: list where the range of resources will be added after DT
->> parsing
->> + * @io_base: pointer to a variable that will contain the physical address
->> for
->> + * the start of the I/O range.
->> + *
->> + * If this function returns an error then the @resources list will be
->> freed.
->> + *
->> + * This function will parse the "ranges" property of a PCI host bridge
->> device
->> + * node and setup the resource mapping based on its content. It is
->> expected
->> + * that the property conforms with the Power ePAPR document.
->> + *
->> + * Each architecture is then offered the chance of applying their own
->> + * filtering of pci_host_bridge_windows based on their own restrictions
->> by
->> + * calling pcibios_fixup_bridge_ranges(). The filtered list of windows
->> + * can then be used when creating a pci_host_bridge structure.
->> + */
->> +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
->> +               struct list_head *resources, resource_size_t *io_base)
->> +{
->> +       struct resource *res;
->> +       struct of_pci_range range;
->> +       struct of_pci_range_parser parser;
->> +       int err;
->> +
->> +       pr_info("PCI host bridge %s ranges:\n", dev->full_name);
->> +
->> +       /* Check for ranges property */
->> +       err = of_pci_range_parser_init(&parser, dev);
->> +       if (err)
->> +               return err;
->> +
->> +       pr_debug("Parsing ranges property...\n");
->> +       for_each_of_pci_range(&parser, &range) {
->> +               /* Read next ranges element */
->> +               pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
->> +                               range.pci_space, range.pci_addr);
->> +               pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
->> +                                       range.cpu_addr, range.size);
->> +
->> +               /*
->> +                * If we failed translation or got a zero-sized region
->> +                * then skip this range
->> +                */
->> +               if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
->> +                       continue;
->> +
->> +               res = kzalloc(sizeof(struct resource), GFP_KERNEL);
->> +               if (!res) {
->> +                       err = -ENOMEM;
->> +                       goto bridge_ranges_nomem;
->> +               }
->> +
->> +               of_pci_range_to_resource(&range, dev, res);
->> +
->> +               if (resource_type(res) == IORESOURCE_IO)
->> +                       *io_base = range.cpu_addr;
->> +
->> +               pci_add_resource_offset(resources, res,
->> +                               res->start - range.pci_addr);
->> +       }
->> +
->> +       /* Apply architecture specific fixups for the ranges */
->> +       pcibios_fixup_bridge_ranges(resources);
->> +
->> +       return 0;
->> +
->> +bridge_ranges_nomem:
->> +       pci_free_resource_list(resources);
->> +       return err;
->> +}
->> +
->> +/**
->> + * of_create_pci_host_bridge - Create a PCI host bridge structure using
->> + * information passed in the DT.
->> + * @parent: device owning this host bridge
->> + * @ops: pci_ops associated with the host controller
->> + * @host_data: opaque data structure used by the host controller.
->> + *
->> + * returns a pointer to the newly created pci_host_bridge structure, or
->> + * NULL if the call failed.
->> + *
->> + * This function will try to obtain the host bridge domain number by
->> + * using of_alias_get_id() call with "pci-domain" as a stem. If that
->> + * fails, a local allocator will be used that will put each host bridge
->> + * in a new domain.
->> + */
->> +struct pci_host_bridge *
->> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
->> void *host_data)
->> +{
->> +       int err, domain, busno;
->> +       struct resource bus_range;
->> +       struct pci_bus *root_bus;
->> +       struct pci_host_bridge *bridge;
->> +       resource_size_t io_base;
->> +       LIST_HEAD(res);
->> +
->> +       domain = of_alias_get_id(parent->of_node, "pci-domain");
->> +       if (domain == -ENODEV)
->> +               domain = domain_nr++;
->> +
->> +       err = of_pci_parse_bus_range(parent->of_node, &bus_range);
->> +       if (err) {
->> +               dev_info(parent, "No bus range for %s, using default
->> [0-255]\n",
->> +                       parent->of_node->full_name);
->> +               bus_range.start = 0;
->> +               bus_range.end = 255;
->> +               bus_range.flags = IORESOURCE_BUS;
->> +       }
->> +       busno = bus_range.start;
->> +       pci_add_resource(&res, &bus_range);
->> +
->> +       /* now parse the rest of host bridge bus ranges */
->> +       if (pci_host_bridge_of_get_ranges(parent->of_node, &res,
->> &io_base))
->> +               return NULL;
->> +
->> +       /* then create the root bus */
->> +       root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
->> +                                               ops, host_data, &res);
->> +       if (!root_bus)
->> +               return NULL;
->> +
->> +       bridge = to_pci_host_bridge(root_bus->bridge);
->> +       bridge->io_base = io_base;
->> +
->> +       return bridge;
->> +}
->> +EXPORT_SYMBOL_GPL(of_create_pci_host_bridge);
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 1eed009..0c5e269 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -395,6 +395,7 @@ struct pci_host_bridge {
->>         struct device dev;
->>         struct pci_bus *bus;            /* root bus */
->>         int domain_nr;
->> +       resource_size_t io_base;        /* physical address for the start
->> of I/O area */
->>         struct list_head windows;       /* pci_host_bridge_windows */
->>         void (*release_fn)(struct pci_host_bridge *);
->>         void *release_data;
->> @@ -1786,11 +1787,23 @@ static inline struct device_node
->> *pci_bus_to_OF_node(struct pci_bus *bus)
->>         return bus ? bus->dev.of_node : NULL;
->>  }
->>
->> +struct pci_host_bridge *
->> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
->> +                       void *host_data);
->> +
->> +void pcibios_fixup_bridge_ranges(struct list_head *resources);
->>  #else /* CONFIG_OF */
->>  static inline void pci_set_of_node(struct pci_dev *dev) { }
->>  static inline void pci_release_of_node(struct pci_dev *dev) { }
->>  static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
->>  static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
->> +
->> +static inline struct pci_host_bridge *
->> +pci_host_bridge_of_init(struct device *parent, struct pci_ops *ops,
->> +                       void *host_data)
->> +{
->> +       return NULL;
->> +}
->>  #endif  /* CONFIG_OF */
->>
->>  #ifdef CONFIG_EEH
->> --
->> 1.9.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Cc: Andi Kleen <ak@linux.intel.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 2 +-
+ drivers/irqchip/irq-bcm2835.c       | 4 ++--
+ drivers/irqchip/irq-gic.c           | 2 +-
+ drivers/irqchip/irq-mmp.c           | 6 ++----
+ drivers/irqchip/irq-moxart.c        | 2 +-
+ drivers/irqchip/irq-orion.c         | 2 +-
+ drivers/irqchip/irq-sirfsoc.c       | 2 +-
+ drivers/irqchip/irq-sun4i.c         | 4 ++--
+ drivers/irqchip/irq-vic.c           | 2 +-
+ drivers/irqchip/irq-vt8500.c        | 3 +--
+ drivers/irqchip/irq-zevio.c         | 2 +-
+ 11 files changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index cd79503abea9..41be897df8d5 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -410,7 +410,7 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static asmlinkage void __exception_irq_entry
++static void __exception_irq_entry
+ armada_370_xp_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat, irqnr;
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index 1693b8e7f26a..5916d6cdafa1 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -95,7 +95,7 @@ struct armctrl_ic {
+ };
+ 
+ static struct armctrl_ic intc __read_mostly;
+-static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
++static void __exception_irq_entry bcm2835_handle_irq(
+ 	struct pt_regs *regs);
+ 
+ static void armctrl_mask_irq(struct irq_data *d)
+@@ -196,7 +196,7 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
+ 	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
+ }
+ 
+-static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
++static void __exception_irq_entry bcm2835_handle_irq(
+ 	struct pt_regs *regs)
+ {
+ 	u32 stat, irq;
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index a917b144895e..63922b9ba6b7 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -279,7 +279,7 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
+ #define gic_set_wake	NULL
+ #endif
+ 
+-static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat, irqnr;
+ 	struct gic_chip_data *gic = &gic_data[0];
+diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
+index 2cb7cd0bc2f5..3c8827fe83f3 100644
+--- a/drivers/irqchip/irq-mmp.c
++++ b/drivers/irqchip/irq-mmp.c
+@@ -194,8 +194,7 @@ static struct mmp_intc_conf mmp2_conf = {
+ 	.conf_mask	= 0x7f,
+ };
+ 
+-static asmlinkage void __exception_irq_entry
+-mmp_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry mmp_handle_irq(struct pt_regs *regs)
+ {
+ 	int irq, hwirq;
+ 
+@@ -207,8 +206,7 @@ mmp_handle_irq(struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
+ }
+ 
+-static asmlinkage void __exception_irq_entry
+-mmp2_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry mmp2_handle_irq(struct pt_regs *regs)
+ {
+ 	int irq, hwirq;
+ 
+diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
+index 5552fc2bf28a..00b3cc908f76 100644
+--- a/drivers/irqchip/irq-moxart.c
++++ b/drivers/irqchip/irq-moxart.c
+@@ -44,7 +44,7 @@ struct moxart_irq_data {
+ 
+ static struct moxart_irq_data intc;
+ 
+-static asmlinkage void __exception_irq_entry handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat;
+ 	int hwirq;
+diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
+index 8e41be62812e..e25f246cd2fb 100644
+--- a/drivers/irqchip/irq-orion.c
++++ b/drivers/irqchip/irq-orion.c
+@@ -30,7 +30,7 @@
+ 
+ static struct irq_domain *orion_irq_domain;
+ 
+-static asmlinkage void
++static void
+ __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
+ {
+ 	struct irq_domain_chip_generic *dgc = orion_irq_domain->gc;
+diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
+index 3a070c587ed9..581eefe331ae 100644
+--- a/drivers/irqchip/irq-sirfsoc.c
++++ b/drivers/irqchip/irq-sirfsoc.c
+@@ -47,7 +47,7 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 	ct->regs.mask = SIRFSOC_INT_RISC_MASK0;
+ }
+ 
+-static asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
+ {
+ 	void __iomem *base = sirfsoc_irqdomain->host_data;
+ 	u32 irqstat, irqnr;
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index a5438d889245..9fbff030c700 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -36,7 +36,7 @@
+ static void __iomem *sun4i_irq_base;
+ static struct irq_domain *sun4i_irq_domain;
+ 
+-static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
++static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
+ 
+ static void sun4i_irq_ack(struct irq_data *irqd)
+ {
+@@ -136,7 +136,7 @@ static int __init sun4i_of_init(struct device_node *node,
+ }
+ IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-ic", sun4i_of_init);
+ 
+-static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irq, hwirq;
+ 
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index fd2c980e4cea..37dab0b472cd 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -240,7 +240,7 @@ static void vic_handle_irq_cascaded(unsigned int irq, struct irq_desc *desc)
+  * Keep iterating over all registered VIC's until there are no pending
+  * interrupts.
+  */
+-static asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+ {
+ 	int i, handled;
+ 
+diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
+index 1846e7d66681..eb6e91efdec8 100644
+--- a/drivers/irqchip/irq-vt8500.c
++++ b/drivers/irqchip/irq-vt8500.c
+@@ -178,8 +178,7 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
+ 	.xlate = irq_domain_xlate_onecell,
+ };
+ 
+-static asmlinkage
+-void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 stat, i;
+ 	int irqnr, virq;
+diff --git a/drivers/irqchip/irq-zevio.c b/drivers/irqchip/irq-zevio.c
+index 8ed04c4a43ee..ceb3a4318f73 100644
+--- a/drivers/irqchip/irq-zevio.c
++++ b/drivers/irqchip/irq-zevio.c
+@@ -50,7 +50,7 @@ static void zevio_irq_ack(struct irq_data *irqd)
+ 	readl(gc->reg_base + regs->ack);
+ }
+ 
+-static asmlinkage void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
+ {
+ 	int irqnr;
+ 
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
