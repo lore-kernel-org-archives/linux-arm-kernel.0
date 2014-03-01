@@ -1,81 +1,40 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 21:11:54 +0000
-Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <20140224004826.22529.87768@quantum>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com> <
- 1392829124-25705-4-git-send-email-s.nawrocki@samsung.com> <20140220140928.
- 27132C4050F@trevor.secretlab.ca> <53072C9D.5040303@samsung.com> <
- 20140224004826.22529.87768@quantum>
-Message-ID: <20140301211154.38FE7C40F28@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 15:27:56 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140226183454.GA14639@cbox>
+References: <20140226183454.GA14639@cbox>
+Message-ID: <20140301152756.67A02C40238@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Feb 2014 16:48:26 -0800, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
-> > On 20/02/14 15:09, Grant Likely wrote:
-> > [...]
-> > >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > >> > index 7c52c29..d618498 100644
-> > >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
-> > >> >    ("pll" and "pll-switched").
-> > >> >  * The UART has its baud clock connected the external oscillator and its
-> > >> >    register clock connected to the PLL clock (the "pll-switched" signal)
-> > >> > +
-> > >> > +==Static initial configuration of clock parent and clock frequency==
-> > >> > +
-> > >> > +Some platforms require static configuration of (parts of) the clock controller
-> > >> > +often determined by the board design. Such a configuration can be specified in
-> > >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
-> > >> > +properties. The former should contain phandle and clock specifier of the parent
-> > >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
-> > >> > +should be listed in the clock-names property and a phandle and a clock specifier
-> > >> > +pair corresponding to it should be present in the clocks property.
-> > >> > +
-> > >> > +    uart at a000 {
-> > >> > +        compatible = "fsl,imx-uart";
-> > >> > +        reg = <0xa000 0x1000>;
-> > >> > +  ...
-> > >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
-> > >> > +        clock-names = "baud", "mux";
-> > >> > +
-> > >> > +  mux-clk-parent = <&pll 1>;
-> > >> > +  baud-clk-rate = <460800>;
-> > >
-> > > This mixes patterns for references to clocks. Plus it requires composing
-> > > property names which is a little painful. I'd rather see a list of
-> > > tuples to match the existing pattern already in use
-> > > 
-> > >       clocks = <&clkcon 0>, <&clkcon 3>;
-> > >       clock-names = "baud", "mux";
-> > >       clock-parents = <0> <&pll 1>;
-> > >       clock-rates = <0> <460800>;
-> > 
-> > Thank you for the review. This looks much better to me. My bad, I wasn't 
-> > aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
-> > to be specifying exact meaning of the 'phandle' property values, except 
-> > they be unique. Anyway, it seems to be clearly documented within the
-> > __of_parse_phandle_with_args() function. 
-> > 
-> > I'll try this modified binding instead, presumably it would be useful to 
-> > have a variant of __of_parse_phandle_with_args() function which would 
-> > accept a context data containing result of previous call within an iteration, 
-> > similarly as of_property_next_string() is written. So we don't iterate 
-> > from beginning of the list with each __of_parse_phandle_with_args() call. 
-> > But it's an optimization issue that could be considered separately I guess.
-> 
-> I was always partial to the regulator style of blahblah-supply but
-> Grant's suggestion is much cleaner with respect to the rest of the clock
-> binding.
-> 
-> I guess it will be a bit ugly if a very long array is needed with a
-> sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
-> only a single clock needs to have its parent or rate specified.
-> 
-> Is there a reason not to support both methods?
+Hi Christoffer. I've got another comment on the text, this time about the format of the ESP:
 
-Yes. Complexity. Having two ways to do it is far worse to maintain.
+On Wed, 26 Feb 2014 10:34:54 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+[...]
+> Image format
+> ------------
+> The image format, as presented to the VM, needs to be well-defined in
+> order for prepared disk images to be bootable across various
+> virtualization implementations.
+> 
+> The raw disk format as presented to the VM must be partitioned with a
+> GUID Partition Table (GPT).  The bootable software must be placed in the
+> EFI System Partition (ESP), using the UEFI removable media path, and
+> must be an EFI application complying to the UEFI Specification 2.4
+> Revision A [6].
+> 
+> The ESP partition's GPT entry's partition type GUID must be
+> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+> 
+> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+> state.
+
+I would also reference section 3.3 (Boot Option Variables Default Boot
+Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
+restate the meaning of the requirement in this spec, but the UEFI spec
+is the authoritative source. Distributed VM disk images fall under the
+same scenario as the firmware not having any valid boot variables.
 
 g.
