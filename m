@@ -1,35 +1,47 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 1 Mar 2014 10:49:18 +0800
-Subject: [PATCH v4] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <CAGsJ_4zcwCx0RNMNx8YaDBFtGE=02-B79+WKDGeky80X5agcuw@mail.gmail.com>
-References: <1389190369-2012-1-git-send-email-21cnbao@gmail.com>
- <20140120074857.GJ26823@intel.com>
- <CAGsJ_4zcwCx0RNMNx8YaDBFtGE=02-B79+WKDGeky80X5agcuw@mail.gmail.com>
-Message-ID: <CAGsJ_4zMYGTS4CyCsTAH_5PMK3v4Pr+e88YjXL=d3A=EjPf9rQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 1 Mar 2014 12:13:58 +0900
+Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
+ level
+In-Reply-To: <5310BA99.4050203@wwwdotorg.org>
+References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
+ <20140227210227.GE2931@xora-haswell>
+ <530FAFAE.5050800@wwwdotorg.org>
+ <20140228055818.GA29849@sirena.org.uk>
+ <5310BA99.4050203@wwwdotorg.org>
+Message-ID: <20140301031358.GI29849@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-01-20 17:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
-> 2014/1/20 Vinod Koul <vinod.koul@intel.com>:
->> On Wed, Jan 08, 2014 at 10:12:49PM +0800, Barry Song wrote:
->>> From: Barry Song <Baohua.Song@csr.com>
->>>
->>> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
->>> we add a xlate() to let dma clients be able to find right dma_chan by generic
->>> "dmas" properties in dts.
->>>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Lars-Peter Clausen <lars@metafoo.de>
->>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> Look okay, need an ACk from DT maintainers before I can apply...
+On Fri, Feb 28, 2014 at 09:34:33AM -0700, Stephen Warren wrote:
+> On 02/27/2014 10:58 PM, Mark Brown wrote:
 
-Hi Vinod,
-v5 is sent to devicetree list and there is no object.
-http://www.spinics.net/lists/devicetree/msg19677.html
-this patch is using general dt-binding for dma completely same with
-other dma drivers, there is no special binding here.
-so i think there is no reason to wait for merging since now updates
-for its clients e.g. SPI, UART have been in 3.14-rc.
+> > I'm not sure that renaming the property really deals with the concerns
+> > though since drivers still all need to manually add support for this,
+> > shouldn't there be an interrupt controller described in the DT which
+> > just chains on to the parent with the polarity inverted to do the
+> > impedence match?
 
--barry
+> I had thought of that when first dealing with this a couple years ago,
+> but Olof suggested that was too complicated.
+
+It's not obvious to me that it should be especially hard but I've not
+thought about it too deeply.
+
+> Another alternative might be to add an extra IRQ bit in the IRQ
+> specifier (and something similar would be needed for GPIO specifiers)
+> that indicates "inversion between source and destination". This could be
+> queried by drivers in exactly the same way as the existing polarity/type
+> IRQ flags. We'd need to update each individual IRQ controller binding to
+> enable that flag, since each binding defines its own definition of such
+> flags. (although in practice since most use the same centrally suggested
+> flags, this wouldn't be any more than just saying yes, this binding
+> allows that new flag to be used).
+
+Yes, doing something on the controller side seems more obvious here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140301/be9631ae/attachment.sig>
