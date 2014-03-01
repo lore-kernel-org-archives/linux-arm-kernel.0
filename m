@@ -1,44 +1,36 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 02 Mar 2014 00:38:47 +0100
-Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
- suspend
-In-Reply-To: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7021741.2WcVMr4q95@vostro.rjw.lan>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 1 Mar 2014 15:35:22 -0800
+Subject: ccf: where to put constraints?
+In-Reply-To: <20140228212412.GD2517@katana>
+References: <20140224201046.GA13155@katana>
+ <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
+ <20140228212412.GD2517@katana>
+Message-ID: <CAPtuhTjc3HUO+iAedQ64_A6oSNzp8WNfggdH2aJmnVzj2A2wNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 01, 2014 11:56:03 AM Ulf Hansson wrote:
-> Patch 1 -> 2:
-> These patches provides two new runtime PM helper functions which intend to be
-> used from system suspend/resume callbacks, to make sure devices are put into low
-> power state during system suspend and brought back to full power at system
-> resume.
-> 
-> The prerequisite is to have all levels of a device's runtime PM callbacks to be
-> defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
-> for CONFIG_PM.
-> 
-> By using the new runtime PM helper functions especially the two scenarios below
-> will be addressed.
-> 
-> 1) The PM core prevents .runtime_suspend callbacks from being invoked during
-> system suspend. That means even for a runtime PM centric subsystem and driver,
-> the device needs to be put into low power state from a system suspend callback.
-> Otherwise it may very well be left in full power state (runtime resumed) while
-> the system is suspended. By using the new helper functions, we make sure to walk
-> the hierarchy of a device's power domain, subsystem and driver.
-> 
-> 2) Subsystems and drivers need to cope with all the combinations of
-> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
-> addresses this.
+On Fri, Feb 28, 2014 at 1:24 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> Hi S?ren,
+>
+>> I.e. when a clock consumer needs to be notified about its input clock
+>> being changed it registers a clock notifier.
+>
+> I found the notifiers, too, but I am still not sure they are proper for
+> my case. There, CPU and GPU clocks are siblings, there is no
+> parent-child relationship.
 
-OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
-and I think it'd be better to push them through the respective subsystem trees
-later anyway.
+Hi Wolfram,
 
-Thanks!
+No parent-child relationship is required. The cpufreq driver you have
+in mind could subscribe to notifiers for both your GPU clock as well
+as your CPU clock and listen for any changes, waiting to take action.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Regards,
+Mike
+
+>
+> Anyhow, I have been told cpufreq is not needed currently, so this task
+> is postponed. Thanks for the input nonetheless!
+>
+>    Wolfram
+>
