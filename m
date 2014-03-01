@@ -1,179 +1,91 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 02 Mar 2014 13:00:12 +0800
-Subject: [PATCH v6 01/11] of: document bindings for reserved-memory nodes
-In-Reply-To: <1393594976-16728-2-git-send-email-m.szyprowski@samsung.com>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
- 1393594976-16728-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140302050012.8F71DC40372@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 15:41:08 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <530F39C3.5060808@codeaurora.org>
+References: <20140226183454.GA14639@cbox> <530E402C.9040502@codeaurora.org>
+ <20140226195111.GB16149@cbox> <530F39C3.5060808@codeaurora.org>
+Message-ID: <20140301154108.ECF54C40567@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Feb 2014 14:42:46 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> From: Grant Likely <grant.likely@linaro.org>
+On Thu, 27 Feb 2014 08:12:35 -0500, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Christoffer,
 > 
-> Reserved memory nodes allow for the reservation of static (fixed
-> address) regions, or dynamically allocated regions for a specific
-> purpose.
+> On 02/26/2014 02:51 PM, Christoffer Dall wrote:
+> > On Wed, Feb 26, 2014 at 02:27:40PM -0500, Christopher Covington wrote:
 > 
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> [joshc: Based on binding document proposed (in non-patch form) here:
->  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
->  adapted to support #memory-region-cells]
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> [mszyprow: removed #memory-region-cells property]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>> Image format
+> >>> ------------
+> >>> The image format, as presented to the VM, needs to be well-defined in
+> >>> order for prepared disk images to be bootable across various
+> >>> virtualization implementations.
+> >>>
+> >>> The raw disk format as presented to the VM must be partitioned with a
+> >>> GUID Partition Table (GPT).  The bootable software must be placed in the
+> >>> EFI System Partition (ESP), using the UEFI removable media path, and
+> >>> must be an EFI application complying to the UEFI Specification 2.4
+> >>> Revision A [6].
+> >>>
+> >>> The ESP partition's GPT entry's partition type GUID must be
+> >>> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+> >>> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+> >>>
+> >>> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+> >>> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+> >>> state.
+> >>>
+> >>> This ensures that tools for both Xen and KVM can load a binary UEFI
+> >>> firmware which can read and boot the EFI application in the disk image.
+> >>>
+> >>> A typical scenario will be GRUB2 packaged as an EFI application, which
+> >>> mounts the system boot partition and boots Linux.
+> >>>
+> >>>
+> >>> Virtual Firmware
+> >>> ----------------
+> >>> The VM system must be able to boot the EFI application in the ESP.  It
+> >>> is recommended that this is achieved by loading a UEFI binary as the
+> >>> first software executed by the VM, which then executes the EFI
+> >>> application.  The UEFI implementation should be compliant with UEFI
+> >>> Specification 2.4 Revision A [6] or later.
+> >>>
+> >>> This document strongly recommends that the VM implementation supports
+> >>> persistent environment storage for virtual firmware implementation in
+> >>> order to ensure probable use cases such as adding additional disk images
+> >>> to a VM or running installers to perform upgrades.
+> >>>
+> >>> The binary UEFI firmware implementation should not be distributed as
+> >>> part of the VM image, but is specific to the VM implementation.
+> >>
+> >> Can you elaborate on the motivation for requiring that the kernel be stuffed
+> >> into a disk image and for requiring such a heavyweight bootloader/firmware? By
+> >> doing so you would seem to exclude those requiring an optimized boot process.
 
-Merged, thanks.
+This spec doesn't exclude or prevent VMs from doing that if the user
+wants to. It is about specifying the base requirements for a disk image
+to be portable. Any disk image conforming to this spec should boot on
+any VM conforming to the spec.
+
+> > What's the alternative?  Shipping kernels externally and loading them
+> > externally?  Sure you can do that, but then distros can't upgrade the
+> > kernel themselves, and you have to come up with a convention for how to
+> > ship kernels, initrd's etc.
+> 
+> The self-hosted upgrades use case makes sense. I can imagine using a
+> pass-through or network filesystem to do it in the case of external loading,
+> something like the following.
+
+Network booting is actually something else that is already supported and
+doesn't use the filesystem protocol at all. DHCP+TFTP to obtain the 2nd
+stage loader (which can do whatever it wants) is the preferred way to do
+things. The problem with trying to provide a network filesystem
+
+Section 3.4.2 (Boot via LOAD_FILE_PROTOCOL) and 3.4.2.1 (Network
+Booting) covers that scenario. Network boot uses most of the Preboot
+eXecution Environment (PXE) spec except it retrieves an EFI executable
+instead of a PXE executable. It is expected that PXE server will then
+supply all the boot configuration to the client. The exact same thing
+can be done with VMs... all of which is out of scope for this section
+because it is talking about disk images!  :-)
 
 g.
-
-> ---
->  .../bindings/reserved-memory/reserved-memory.txt   |  136 ++++++++++++++++++++
->  1 file changed, 136 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> new file mode 100644
-> index 000000000000..8b0d747a38e7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> @@ -0,0 +1,136 @@
-> +*** Reserved memory regions ***
-> +
-> +Reserved memory is specified as a node under the /reserved-memory node.
-> +The operating system shall exclude reserved memory from normal usage
-> +one can create child nodes describing particular reserved (excluded from
-> +normal use) memory regions. Such memory regions are usually designed for
-> +the special usage by various device drivers.
-> +
-> +Parameters for each memory region can be encoded into the device tree
-> +with the following nodes:
-> +
-> +/reserved-memory node
-> +---------------------
-> +#address-cells, #size-cells (required) - standard definition
-> +    - Should use the same values as the root node
-> +ranges (required) - standard definition
-> +    - Should be empty
-> +
-> +/reserved-memory/ child nodes
-> +-----------------------------
-> +Each child of the reserved-memory node specifies one or more regions of
-> +reserved memory. Each child node may either use a 'reg' property to
-> +specify a specific range of reserved memory, or a 'size' property with
-> +optional constraints to request a dynamically allocated block of memory.
-> +
-> +Following the generic-names recommended practice, node names should
-> +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-> +address (@<address>) should be appended to the name if the node is a
-> +static allocation.
-> +
-> +Properties:
-> +Requires either a) or b) below.
-> +a) static allocation
-> +   reg (required) - standard definition
-> +b) dynamic allocation
-> +   size (required) - length based on parent's #size-cells
-> +                   - Size in bytes of memory to reserve.
-> +   alignment (optional) - length based on parent's #size-cells
-> +                        - Address boundary for alignment of allocation.
-> +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-> +                           - Specifies regions of memory that are
-> +                             acceptable to allocate from.
-> +
-> +If both reg and size are present, then the reg property takes precedence
-> +and size is ignored.
-> +
-> +Additional properties:
-> +compatible (optional) - standard definition
-> +    - may contain the following strings:
-> +        - shared-dma-pool: This indicates a region of memory meant to be
-> +          used as a shared pool of DMA buffers for a set of devices. It can
-> +          be used by an operating system to instanciate the necessary pool
-> +          management subsystem if necessary.
-> +        - vendor specific string in the form <vendor>,[<device>-]<usage>
-> +no-map (optional) - empty property
-> +    - Indicates the operating system must not create a virtual mapping
-> +      of the region as part of its standard mapping of system memory,
-> +      nor permit speculative access to it under any circumstances other
-> +      than under the control of the device driver using the region.
-> +reusable (optional) - empty property
-> +    - The operating system can use the memory in this region with the
-> +      limitation that the device driver(s) owning the region need to be
-> +      able to reclaim it back. Typically that means that the operating
-> +      system can use that region to store volatile or cached data that
-> +      can be otherwise regenerated or migrated elsewhere.
-> +
-> +Linux implementation note:
-> +- If a "linux,cma-default" property is present, then Linux will use the
-> +  region for the default pool of the contiguous memory allocator.
-> +
-> +Device node references to reserved memory
-> +-----------------------------------------
-> +Regions in the /reserved-memory node may be referenced by other device
-> +nodes by adding a memory-region property to the device node.
-> +
-> +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-> +
-> +Example
-> +-------
-> +This example defines 3 contiguous regions are defined for Linux kernel:
-> +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-> +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-> +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	memory {
-> +		reg = <0x40000000 0x40000000>;
-> +	};
-> +
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		/* global autoconfigured region for contiguous allocations */
-> +		linux,cma {
-> +			compatible = "shared-dma-pool";
-> +			reusable;
-> +			#memory-region-cells = <0>;
-> +			size = <0x4000000>;
-> +			alignment = <0x2000>;
-> +			linux,cma-default;
-> +		};
-> +
-> +		display_reserved: framebuffer at 78000000 {
-> +			#memory-region-cells = <0>;
-> +			reg = <0x78000000 0x800000>;
-> +		};
-> +
-> +		multimedia_reserved: multimedia at 77000000 {
-> +			compatible = "acme,multimedia-memory";
-> +			#memory-region-cells = <1>;
-> +			reg = <0x77000000 0x4000000>;
-> +		};
-> +	};
-> +
-> +	/* ... */
-> +
-> +	fb0: video at 12300000 {
-> +		memory-region = <&display_reserved>;
-> +		/* ... */
-> +	};
-> +
-> +	scaler: scaler at 12500000 {
-> +		memory-region = <&multimedia_reserved 0xdeadbeef>;
-> +		/* ... */
-> +	};
-> +
-> +	codec: codec at 12600000 {
-> +		memory-region = <&multimedia_reserved 0xfeebdaed>;
-> +		/* ... */
-> +	};
-> +};
-> -- 
-> 1.7.9.5
-> 
