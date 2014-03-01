@@ -1,54 +1,69 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 19:20:41 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140226222553.GF16149@cbox>
-References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel> <
- 20140226214843.GD12169@bivouac.eciton.net> <20140226222553.GF16149@cbox>
-Message-ID: <20140301192041.40196C4089C@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 20:20:48 +0000
+Subject: [PATCH v5 06/11] drivers: of: initialize and assign reserved
+ memory to newly created devices
+In-Reply-To: <530F0F24.2080903@samsung.com>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com> <
+ 1392985527-6260-7-git-send-email-m.szyprowski@samsung.com> <20140226121445.
+ 54D2DC40A89@trevor.secretlab.ca> <530F0F24.2080903@samsung.com>
+Message-ID: <20140301202048.39FB9C40B6D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Feb 2014 14:25:53 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Feb 26, 2014 at 09:48:43PM +0000, Leif Lindholm wrote:
-> > On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
-> > > > ARM VM System Specification
-> > > > ===========================
-> > > > 
-> > > > Goal
-> > > > ----
-> > > > The goal of this spec is to allow suitably-built OS images to run on
-> > > > all ARM virtualization solutions, such as KVM or Xen.
-> > > > 
-> > > > Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-> > > > they aim to be hypervisor agnostic.
-> > > > 
-> > > > Note that simply adhering to the SBSA [2] is not a valid approach,
-> > > > for example because the SBSA mandates EL2, which will not be available
-> > > > for VMs.  Further, the SBSA mandates peripherals like the pl011, which
-> > > > may be controversial for some ARM VM implementations to support.
-> > > > This spec also covers the aarch32 execution mode, not covered in the
-> > > > SBSA.
-> > > 
-> > > I would prefer if we can stay as close as possible to SBSA for individual
-> > > hardware components, and only stray from it when there is a strong reason.
-> > > pl011-subset doesn't sound like a significant problem to implement,
-> > > especially as SBSA makes the DMA part of that optional. Can you
-> > > elaborate on what hypervisor would have a problem with that?
-> > 
-> > I believe it comes down to how much extra overhead pl011-access-trap
-> > would be over virtio-console. If low, then sure.
-> > (Since there are certain things we cannot provide SBSA-compliant in
-> > the guest anyway, I wouldn't consider lack of pl011 to be a big issue.)
-> > 
+On Thu, 27 Feb 2014 11:10:44 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello,
 > 
-> I don't think it's about overhead, sure pl011 may be slower, but it's a
-> serial port, does anyone care about performance of a console? pl011
-> should be good enough for sure.
+> On 2014-02-26 13:14, Grant Likely wrote:
+> > On Fri, 21 Feb 2014 13:25:22 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > Use recently introduced of_reserved_mem_device_init() function to
+> > > automatically assign respective reserved memory region to the newly created
+> > > platform and amba device.
+> > >
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >
+> > I'm wary on this patch. It hides the assignment of regions into the core
+> > code and I worry that it is the wrong level of abstraction. I would
+> > think that drivers should know that they need a reserved memory region
+> > and should be calling the API to obtain the region directly rather than
+> > doing it for them. The reason being is that there may be some situations
+> > where the common code isn't quite right and the driver needs to override
+> > the behaviour. If it is called automatically then the driver cannot do
+> > that.
+> >
+> > Is it really a big burden to have the driver call the reserved memory
+> > init function?
+> 
+> If a device requires very special handling of the reserved memory region,
+> it may simply provide its own reserved memory region driver which will do
+> the required early initialization.
+> 
+> If we assume that driver needs to initialize reserved region manually, then
+> why do we ever bother with adding support for custom reserved memory drivers
+> and assigning regions to a device node? We can simply stick with just a set
+> of reserved regions and tell drivers to use them.
+> 
+> In my opinion for most typical use cases a board designer will assign
+> 'dma-shared-pool' driver to the given set of devices, which in turn ensures
+> that all memory allocations for dma purposes for those device will be
+> served from that region. It is really not a driver role to initialize it
+> in such case. Driver should focus on controlling hw operations, regardless
+> the way the hardware module has been integrated to the system.
+> 
+> I can perfectly imagine a generic driver which operates the same way in any
+> of the following cases (depends mainly on the hw version): 1) restricted
+> dma window, 2) iommu for all dma for the given device, 3) fully featured
+> memory master for dma for the given device (no restrictions), if the
+> respective kernel subsystems did the correct initialization and provide
+> their own methods for managing DMA operation. I already have a working
+> platform glue code for the above cases tested with Samsung multimedia
+> drivers. No changes to the drivers were required.
 
-The reason pl011 is specified in the SBSA is to have a reliable output
-port available from the first instruction. It is a debug feature.
-Hardware vendors aren't even need to wire it up to a physical serial
-port. It is just as valid to wire it to the RAS controller.
+I don't have issue with the above. What I do have issue with is that by
+putting the call into core code, it means this binding gets applied to
+every platform devices, regardless of whether or not it makes sense. Yes
+of course there should be a common function for setting it up, and
+of_reserved_mem_device_init() looks about right. However, I strongly
+think that the setup call should be performed by the driver's .probe
+hook. I don't want it in of_platform_device_create_pdata().
 
 g.
