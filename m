@@ -1,65 +1,71 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 28 Feb 2014 18:28:34 -0800
-Subject: [PATCH 2/2] ARM: zynq: dt: Add I2C nodes to Zynq device tree
-In-Reply-To: <1393632046-20062-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
- <1393632046-20062-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <ce5fbea5-de6e-4a29-9807-cccf0f59f654@CO9EHSMHS021.ehs.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 28 Feb 2014 21:59:19 -0500
+Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15
+Message-ID: <20140301025919.GQ1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-28 at 04:00PM -0800, Soren Brinkmann wrote:
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
->  arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
->  3 files changed, 166 insertions(+)
-> 
-[...]
-> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> index c913f77a21eb..91a3a560f03b 100644
-> --- a/arch/arm/boot/dts/zynq-zc702.dts
-> +++ b/arch/arm/boot/dts/zynq-zc702.dts
-[...]
-> +
-> +		i2c at 7 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <7>;
-> +			hwmon at 52 {
-> +				compatible = "pmbus,ucd9248";
-> +				reg = <52>;
-> +			};
-> +			hwmon at 53 {
-> +				compatible = "pmbus,ucd9248";
-> +				reg = <53>;
-> +			};
-> +			hwmon at 54 {
-> +				compatible = "pmbus,ucd9248";
-All these occurrences of 'pmbus' should rather be replaced with 'ti'.
-I wasn't aware of how this DT node to I2C probing works - and still
-haven't fully understood it - but the vendor prefix is apparently a
-don't care and we could simply use the correct one here.
-I have no idea how I came up with the description using 'pmbus' (we
-carry this in our vendor tree for quite a while already).
-Is there any document describing how a DT node is matched to an
-appropriate driver? These I2C drivers usually don't have the common
-'struct of_device_id'. Hence my preferred way of simply grepping through
-the kernel for the compatibility string does not work.
+Guys,
 
-[...]
-> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-> index 88f62c50382e..dab30f80d5b0 100644
-> --- a/arch/arm/boot/dts/zynq-zc706.dts
-> +++ b/arch/arm/boot/dts/zynq-zc706.dts
-[...]
-> +		i2c at 7 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <7>;
-> +			ucd90120 at 65 {
-> +				compatible = "pmbus,ucd90120";
-same here
+Here's a collection of small changes to drivers relevant to mvebu SoCs.
+We typically take the mbus changes through arm-soc.  The rtc maintainer
+has expressed preferences for driver changes to go through the concerned
+SoC tree.  The config oneliners for the kirkwood move have been Acked by
+the major subsystem maintainers.
 
-	S?ren
+All changes have been in -next at least 4 days.
+
+Please pull.
+
+thx,
+
+Jason.
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.15
+
+for you to fetch changes up to ff1f0018cf66080d8e6f59791e552615648a033a:
+
+  drivers: Enable building of Kirkwood drivers for mach-mvebu (2014-02-24 17:28:31 +0000)
+
+----------------------------------------------------------------
+mvebu drivers for v3.15
+
+ - mvebu mbus
+    - use of_find_matching_node_and_match
+
+ - rtc
+    - use PTR_ERR_OR_ZERO in isl12057
+    - work around issue in mv where date returned is 2038
+
+ - kirkwood -> mach-mvebu
+    - various Kconfig oneliners to allow building kirkwood in -mvebu/
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      drivers: Enable building of Kirkwood drivers for mach-mvebu
+
+Fengguang Wu (1):
+      rtc: isl12057: use PTR_ERR_OR_ZERO to fix coccinelle warnings
+
+Josh Cartwright (1):
+      bus: mvebu-mbus: make use of of_find_matching_node_and_match
+
+Thomas Petazzoni (1):
+      rtc: mv: reset date if after year 2038
+
+ drivers/bus/mvebu-mbus.c    |  3 +--
+ drivers/cpufreq/Kconfig.arm |  2 +-
+ drivers/cpuidle/Kconfig.arm |  2 +-
+ drivers/leds/Kconfig        |  4 ++--
+ drivers/phy/Kconfig         |  2 +-
+ drivers/rtc/rtc-isl12057.c  |  5 +----
+ drivers/rtc/rtc-mv.c        | 12 ++++++++++++
+ drivers/thermal/Kconfig     |  2 +-
+ sound/soc/kirkwood/Kconfig  |  2 +-
+ 9 files changed, 21 insertions(+), 13 deletions(-)
