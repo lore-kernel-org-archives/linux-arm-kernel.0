@@ -1,53 +1,32 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Sat,  1 Mar 2014 14:58:52 +0100
-Subject: [PATCH v2 5/7] ARM: dts: omap3-gta04: Add basic sound support
+Date: Sat,  1 Mar 2014 14:58:51 +0100
+Subject: [PATCH v2 4/7] ARM: dts: omap3-gta04: Add twl4030 charger
 In-Reply-To: <1393682334-26805-1-git-send-email-marek@goldelico.com>
 References: <1393682334-26805-1-git-send-email-marek@goldelico.com>
-Message-ID: <1393682334-26805-6-git-send-email-marek@goldelico.com>
+Message-ID: <1393682334-26805-5-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: NeilBrown <neilb@suse.de>
 
-This adds basic sound support for gta04 board.
+Define twl4030 charger node used for charging.
 
-Signed-off-by: NeilBrown <neilb@suse.de>
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-index 42fc12e..41a21bd 100644
+index 7f29315..42fc12e 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dts
 +++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -36,6 +36,14 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "gta04";
-+
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+	};
+@@ -186,3 +186,7 @@
+ 	pinctrl-0 = <&uart3_pins>;
  };
  
- &omap3_pmx_core {
-@@ -80,6 +88,12 @@
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
- 	};
-+
-+	twl_audio: audio {
-+		compatible = "ti,twl4030-audio";
-+		codec {
-+		};
-+	};
- };
- 
- #include "twl4030.dtsi"
++&charger {
++	bb_uvolt = <3200000>;
++	bb_uamp = <150>;
++};
 -- 
 1.8.3.2
