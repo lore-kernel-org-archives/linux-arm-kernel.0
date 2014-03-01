@@ -1,83 +1,45 @@
-From: tonyho.profession@gmail.com (tonyho)
-Date: Sun, 02 Mar 2014 15:57:31 +0800
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140224215443.9748.65580@capellas-linux>
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
- <20140128182245.18840.51279@capellas-linux>
- <loom.20140216T140206-196@post.gmane.org>
- <20140224215443.9748.65580@capellas-linux>
-Message-ID: <5312E46B.8020900@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 01 Mar 2014 19:25:37 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <11174980.YJ21cfsHoG@wuerfel>
+References: <20140226183454.GA14639@cbox> <20140226214843.GD12169@bivouac.
+ eciton.net> <alpine.DEB.2.02.1402271229370.31489@kaball.uk.xensource.com> <
+ 11174980.YJ21cfsHoG@wuerfel>
+Message-ID: <20140301192537.3B2AAC40951@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian:
-You're kind, and thank you firtly.
-Now I have try to booting you hibernation_3.13_russMerge branch kernel 
-from uboot(Version 2013-10) in BBB, and I don't know how to build the dtb.
-I have built the uImage using:
-1. make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-
-none-linux-gnueabi- omap2plus_defconfig && make ARCH=arm 
-CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-none-linux-gnueabi- 
-uImage LOADADDR=0x80008000
-2. And I load the uImage using the ext4load from TF card?
-(1)ext4load mmc 0:2 80007f00 /boot/uImage
-(2)and 'iminfo 0x80007f00' hints image is OK.
-(3)The Kernel Command Line is 'init=/linuxrc console=ttyO0,115200n8 
-run_hardware_tests root=/dev/mmcblk0p2 ro rootfstype=ext4 rootwait' and 
-I select the 'Always use the default kernel command line'
-and the configuration has been verified in other version linux kernel 
-source code.
-(4)But when I 'bootm 80007f00', it just print the 'Starting kernel ...' 
-and nothing more. And the USERLED0-3 in BBB are off.
-3. I guess this is caused by I haven't load a dts to memory
-(1)Can you tell me how to build the dtb? Like 'make XXX.dtb/dts'?
-(2)And which dtb should be loaded into memory? What the address should 
-be load for the dtb files?
+On Thu, 27 Feb 2014 15:00:44 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 27 February 2014 12:31:55 Stefano Stabellini wrote:
+> > On Wed, 26 Feb 2014, Leif Lindholm wrote:
+> > > > >   no FDT.  In this case, the VM implementation must provide ACPI, and
+> > > > >   the OS must be able to locate the ACPI root pointer through the UEFI
+> > > > >   system table.
+> > > > > 
+> > > > > For more information about the arm and arm64 boot conventions, see
+> > > > > Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+> > > > > Linux kernel source tree.
+> > > > > 
+> > > > > For more information about UEFI and ACPI booting, see [4] and [5].
+> > > > 
+> > > > What's the point of having ACPI in a virtual machine? You wouldn't
+> > > > need to abstract any of the hardware in AML since you already know
+> > > > what the virtual hardware is, so I can't see how this would help
+> > > > anyone.
+> > > 
+> > > The point is that if we need to share any real hw then we need to use
+> > > whatever the host has.
+> 
+> I would be more comfortable defining in the spec that you cannot share
+> hardware at all. Obviously that doesn't stop anyone from actually
+> sharing hardware with the guest, but at that point it would become
+> noncompliant with this spec, with the consequence that you couldn't
+> expect a compliant guest image to run on that hardware, but that is
+> exactly something we can't guarantee anyway because we don't know
+> what drivers might be needed.
 
-4. I use the busybox to be the rootfs, and it test OK. I prepare add a 
-resume command to /sys/power/resume in inittab. Should this work?
+I don't think this spec should say *anything* about sharing hardware.
+This spec is about producing portable disk images. Assigning hardware
+into guests is rather orthogonal to whether or not hardware is assigned.
 
-
-
-On 02/25/2014 05:54 AM, Sebastian Capella wrote:
-> Quoting TonyHo (2014-02-16 05:11:47)
->> Hi Sebastian ,Pavel ,Russ:
->>   I want to build the kernelhttps://github.com/russdill/linux/commits/arm-
->> hibernation-am33xx-v3.12 to be used in BeagleBone black too, after I clone
->> and checkout the branch, I'm not sure whether my opration is right, can
->> someone help me to comfirm?
->> Below is my operation:
->> 1. make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-
->> none-linux-gnueabi- omap2plus_defconfig . Is the omap2plus_defconfig is
->> right configuration file?
->> 2. russdill says his board is BeagleBone(http://www.youtube.com/watch?
->> v=3hdbH-Ur-hE), so if there would be some modificaiton to be done before
->> compile this source code?
->> 3. Is there any intructions about using and compiling the hibernation source
->> code?
-> Hi Tony,
->
-> I use omap2plus_defconfig.
->
-> I have been working with BeagleBone Black (bbb) for hibernation on this branch:
->
-> http://git.linaro.org/git-ro/people/sebastian.capella/linux.git  hibernation_3.13_russMerge
->
-> I ran into a few minor issues on Russ' branch for bbb that I had to work
-> around.  In the end it worked fine, but I know I had to add some entries
-> in the dts files at least for it to work.
->
-> On bbb I'm resuming from initramfs by echoing the hibernation
-> swap device onto /sys/power/resume during my initscript, but before
-> remounting the partitions.  You may need to do similar.
->
-> You will have to change power managemennt -> hibernation to on in
-> menuconfig.
->
-> I can help more, please let me know what you have and how you'd like to
-> set it up.
->
-> Thanks!
->
-> Sebastian
+g.
