@@ -1,157 +1,112 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 02 Mar 2014 13:40:43 +0800
-Subject: [PATCH v6 05/11] drivers: of: add automated assignment of
- reserved regions to client devices
-In-Reply-To: <1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
- 1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140302054043.4F48AC414EF@trevor.secretlab.ca>
+Date: Sat, 01 Mar 2014 19:12:33 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140226222147.GE16149@cbox>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel> <
+ 20140226200537.GC16149@cbox> <6873065.LH15I057sX@wuerfel> <
+ CABGGisxHOVqLcG7hVAuAzdeic41KWSLLBSjQLSJQcjTXLhNCow@mail.gmail.com> <
+ 20140226222147.GE16149@cbox>
+Message-ID: <20140301191233.4A62CC4084F@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Feb 2014 14:42:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This patch adds code for automated assignment of reserved memory regions
-> to struct device. reserved_mem->ops->device_init()/device_cleanup()
-> callbacks are called to perform reserved memory driver specific
-> initialization and cleanup
+On Wed, 26 Feb 2014 14:21:47 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Feb 26, 2014 at 03:56:02PM -0600, Rob Herring wrote:
+> > On Wed, Feb 26, 2014 at 2:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Wednesday 26 February 2014 12:05:37 Christoffer Dall wrote:
+> > >> On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
+> > >> > On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
+> > >>
+> > >> The most common response I've been getting so far is that people
+> > >> generally want their VMs to look close to the real thing, but not sure
+> > >> how valid an argument that is.
+> > >>
+> > >> Some people feel strongly about this and seem to think that ARMv8
+> > >> kernels will only work with ACPI in the future...
+> > >
+> > > That is certainly a misconception that has caused a lot of trouble.
+> > > We will certainly keep supporting FDT boot in ARMv8 indefinitely,
+> > > and I expect that most systems will not use ACPI at all.
+> > 
+> > Furthermore, even enterprise distro kernels will boot DT based kernels
+> > assuming the h/w support is mainlined despite statements to the
+> > contrary. It is a requirement in mainline kernels that DT and ACPI
+> > support to coexist. Distros are not going to go out of their way to
+> > undo/break that. And since the boot interface is DT, you can't simply
+> > turn off DT. :)
+> > 
 > 
-> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+> Personally I'm all for simplicity so I don't want to push any agenda for
+> ACPI in VMs.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Note that the spec does not mandate the use of ACPI, it just tells you
+> how to do it if you wish to.
+> 
+> But, we can change the spec to require full FDT description of the
+> system, unless of course some of the ACPI-in-VM supporters manage to
+> convince the rest.
 
-Hi Marek,
+Given that we don't even have a reliable view of what ACPI is going to
+look like on hardware yet, it probably is appropriate to omit talking
+about it entirely for v1.0.
 
-I've not applied this one yet, only because there is still the open
-issue of whether or not these functions should be called from drivers or
-from core code. I don't actually have any problems with the content of
-this patch. Once the user is sorted out I'll merge it.
+... although let me walk through the implications of how that could be
+done:
+
+Option 1: If v1.0 requires VM provide FDT, and v2.0 requires VM provide
+          either FDT or ACPI:
+- v1.0 VM shall always provide an FDT
+- v2.0 VM might provide ACPI without FDT
+- v1.0 OS must accept FDT
+- v2.0 OS must accept both ACPI and FDT
+Implications:
+  - a v1.0 OS might not boot on a v2.0 VM (because it cannot handle ACPI)
+  - a v2.0 OS will always boot on both v1.0 and v2.0 VMs
+  - ACPI-only OS not supported by this spec (Windows; potentially RHEL)
+  - FDT-only OS not supported by v2.0 of the spec. If we're only talking
+    Linux this isn't a problem, but it does put additional burden on
+    anyone doing a domain-specific OS. (for example, a bare-metal
+    networking application using virtualized devices)
+
+Option 2: If v1.0 requires FDT, and v2.0 requires either FDT only or FDT+ACPI
+- v1.0 and v2.0 VMs shall always provide and FDT
+- v2.0 VMs may additionally provide ACPI
+- v1.0 and v2.0 OSes must accept FDT
+- No requirement for OS to accept ACPI
+Impliciations:
+  - a v1.0 OS will boot on a v1.0 and v2.0 VM (FDT is always provided)
+  - a v2.0 OS will boot on a v1.0 and v2.0 VM
+  - ACPI-only OS not supported by this spec for all configurations.
+    There would need to be a stronger version of the spec (v2.0-ACPI) to
+    specify the configuration usable by ACPI OSes.
+
+Option 3: If v1.0 requires FDT, and v2.0 requires both FDT and ACPI
+- v1.0 and v2.0 VMs shall always provide and FDT
+- v2.0 VMs shall always provide ACPI
+- v1.0 OSes must accept FDT
+- v2.0 OS may accept either ACPI or FDT
+Impliciations:
+  - a v1.0 OS will boot on a v1.0 and v2.0 VM (FDT is always provided)
+  - a v2.0 OS will boot on a v1.0 and v2.0 VM
+  - Both FDT-only and ACPI-only OSes supported by v2.0 version of spec
+
+Someone is going to be unhappy no matter what is chosen. I think it is
+critical to be really clear about who the audience is. Doing the above
+also highlights for me the cost adding either/or options to the spec.
+Every 'or' option given to VMs adds cost to the OS. ie. if the spec
+allows the VM to implement either ACPI or FDT, then a compliant OS must
+support both. Alternately, if the spec allows the OS to implement only
+ACPI or only FDT, then compliant VMs are forced to implement both. In
+both cases it is a non-trivial burden (As far as I know, no ACPI-on-arm
+work has been done for *BSD, and it is yet to be done for all the VMs).
+The spec will be the most useful if as many options as possible are
+eliminated.
+
+Right now I think option 2 above makes the most sense; require FDT and
+make ACPI an optional extension. That will support almost all Linux
+vendors immediately and possibly even FreeBSD. As others have said,
+Windows is a complete unknown and we have no idea if they will be
+interested in the spec (nor is this the right forum for that
+conversation, but I will bring it up with my contacts).
 
 g.
-
-> ---
->  drivers/of/of_reserved_mem.c    |   70 +++++++++++++++++++++++++++++++++++++++
->  include/linux/of_reserved_mem.h |    7 ++++
->  2 files changed, 77 insertions(+)
-> 
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> index daaaf935911d..5c45016efd31 100644
-> --- a/drivers/of/of_reserved_mem.c
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -206,8 +206,16 @@ void __init fdt_init_reserved_mem(void)
->  	for (i = 0; i < reserved_mem_count; i++) {
->  		struct reserved_mem *rmem = &reserved_mem[i];
->  		unsigned long node = rmem->fdt_node;
-> +		unsigned long len;
-> +		__be32 *prop;
->  		int err = 0;
->  
-> +		prop = of_get_flat_dt_prop(node, "phandle", &len);
-> +		if (!prop)
-> +			prop = of_get_flat_dt_prop(node, "linux,phandle", &len);
-> +		if (prop)
-> +			rmem->phandle = of_read_number(prop, len/4);
-> +
->  		if (rmem->size == 0)
->  			err = __reserved_mem_alloc_size(node, rmem->name,
->  						 &rmem->base, &rmem->size);
-> @@ -215,3 +223,65 @@ void __init fdt_init_reserved_mem(void)
->  			__reserved_mem_init_node(rmem);
->  	}
->  }
-> +
-> +static inline struct reserved_mem *__find_rmem(struct device_node *node)
-> +{
-> +	unsigned int i;
-> +
-> +	if (!node->phandle)
-> +		return NULL;
-> +
-> +	for (i = 0; i < reserved_mem_count; i++)
-> +		if (reserved_mem[i].phandle == node->phandle)
-> +			return &reserved_mem[i];
-> +	return NULL;
-> +}
-> +
-> +/**
-> + * of_reserved_mem_device_init() - assign reserved memory region to given device
-> + *
-> + * This function assign memory region pointed by "memory-region" device tree
-> + * property to the given device.
-> + */
-> +void of_reserved_mem_device_init(struct device *dev)
-> +{
-> +	struct reserved_mem *rmem;
-> +	struct device_node *np;
-> +
-> +	np = of_parse_phandle(dev->of_node, "memory-region", 0);
-> +	if (!np)
-> +		return;
-> +
-> +	rmem = __find_rmem(np);
-> +	of_node_put(np);
-> +
-> +	if (!rmem || !rmem->ops || !rmem->ops->device_init)
-> +		return;
-> +
-> +	rmem->ops->device_init(rmem, dev);
-> +	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
-> +}
-> +
-> +/**
-> + * of_reserved_mem_device_release() - release reserved memory device structures
-> + *
-> + * This function releases structures allocated for memory region handling for
-> + * the given device.
-> + */
-> +void of_reserved_mem_device_release(struct device *dev)
-> +{
-> +	struct reserved_mem *rmem;
-> +	struct device_node *np;
-> +
-> +	np = of_parse_phandle(dev->of_node, "memory-region", 0);
-> +	if (!np)
-> +		return;
-> +
-> +	rmem = __find_rmem(np);
-> +	of_node_put(np);
-> +
-> +	if (!rmem || !rmem->ops || !rmem->ops->device_release)
-> +		return;
-> +
-> +	rmem->ops->device_release(rmem, dev);
-> +}
-> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-> index 9b1fbb7f29fc..6a54e6565b89 100644
-> --- a/include/linux/of_reserved_mem.h
-> +++ b/include/linux/of_reserved_mem.h
-> @@ -8,6 +8,7 @@ struct reserved_mem_ops;
->  struct reserved_mem {
->  	const char			*name;
->  	unsigned long			fdt_node;
-> +	unsigned long			phandle;
->  	const struct reserved_mem_ops	*ops;
->  	phys_addr_t			base;
->  	phys_addr_t			size;
-> @@ -25,6 +26,9 @@ typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
->  				      unsigned long node, const char *uname);
->  
->  #ifdef CONFIG_OF_RESERVED_MEM
-> +void of_reserved_mem_device_init(struct device *dev);
-> +void of_reserved_mem_device_release(struct device *dev);
-> +
->  void fdt_init_reserved_mem(void);
->  void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
->  			       phys_addr_t base, phys_addr_t size);
-> @@ -37,6 +41,9 @@ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
->  				init : init }
->  
->  #else
-> +static inline void of_reserved_mem_device_init(struct device *dev) { }
-> +static inline void of_reserved_mem_device_release(struct device *pdev) { }
-> +
->  static inline void fdt_init_reserved_mem(void) { }
->  static inline void fdt_reserved_mem_save_node(unsigned long node,
->  		const char *uname, phys_addr_t base, phys_addr_t size) { }
-> -- 
-> 1.7.9.5
-> 
