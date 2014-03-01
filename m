@@ -1,50 +1,45 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 01 Mar 2014 20:27:19 +0100
-Subject: [GIT PULL] Rockchip SMP support for 3.15
-Message-ID: <2945154.fxjrIo87Hl@phil>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 01 Mar 2014 20:29:11 +0100
+Subject: [linux-sunxi] Re: [PATCH 0/7] mfd: AXP20x: Add support for AXP202
+ and AXP209
+In-Reply-To: <CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>
+References: <1393692352-10839-1-git-send-email-carlo@caione.org>	<53121151.9050804@redhat.com>
+ <CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>
+Message-ID: <53123507.6020607@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+Hi,
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+On 03/01/2014 06:17 PM, Carlo Caione wrote:
+> On Sat, Mar 1, 2014 at 5:56 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi Carlo,
+>>
+>> Great work, thanks for all the time you're putting into this!
+> 
+> Hi Hans :)
+> 
+>> I've 2 questions:
+>>
+>> 1) What dependencies does this patch-set have? Obviously it needs the NMI irq
+>> patches for A20, anything else ?  I no longer see any use of a special flag
+>> for ack on unmask, is that no longer needed ?
+> 
+> Yes, the only dependency is on the NMI controller patch.
+> After a discussion with Maxime and Thomas I decided to not push for
+> including the special flag for ack on unmask in the irqchip core but
+> to use the unmask callback as in the v3 version of the NMI controller
+> driver (so no flag needed)
+> 
+>> 2) No poweroff functionality ? That would be really great to have.
+> 
+> Actually in [PATCH 1/7] I support the poweroff using the pm_power_off hook.
 
-are available in the git repository at:
+Ah I missed that, cool.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.15-rockchip-smp
+I'm doing with sunxi hacking for today, but I'll add these to sunxi-devel
+and them give them a test run tomorrow.
 
-for you to fetch changes up to a7a2b3118b410fb3cd3a8363b157c56f4211ee05:
+Regards,
 
-  ARM: rockchip: add smp bringup code (2014-03-01 17:21:57 +0100)
-
-----------------------------------------------------------------
-SMP-support for RK3066 and RK3188 SoCs from Rockchip.
-
-----------------------------------------------------------------
-
-The sram specific changes for reserved regions got already picked up
-by Greg KH separately and do not cause compilation issues if missing.
-
-Heiko Stuebner (4):
-      ARM: rockchip: add snoop-control-unit
-      ARM: rockchip: add sram dt nodes and documentation
-      ARM: rockchip: add power-management-unit
-      ARM: rockchip: add smp bringup code
-
- .../devicetree/bindings/arm/rockchip/pmu.txt       |  16 ++
- .../devicetree/bindings/arm/rockchip/smp-sram.txt  |  30 ++++
- arch/arm/boot/dts/rk3066a.dtsi                     |  13 ++
- arch/arm/boot/dts/rk3188.dtsi                      |  13 ++
- arch/arm/boot/dts/rk3xxx.dtsi                      |  10 ++
- arch/arm/mach-rockchip/Kconfig                     |   1 +
- arch/arm/mach-rockchip/Makefile                    |   1 +
- arch/arm/mach-rockchip/core.h                      |  22 +++
- arch/arm/mach-rockchip/headsmp.S                   |  30 ++++
- arch/arm/mach-rockchip/platsmp.c                   | 184 +++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  |   2 +
- 11 files changed, 322 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
- create mode 100644 arch/arm/mach-rockchip/core.h
- create mode 100644 arch/arm/mach-rockchip/headsmp.S
- create mode 100644 arch/arm/mach-rockchip/platsmp.c
+Hans
