@@ -1,9 +1,9 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat,  1 Mar 2014 09:33:21 +0100
-Subject: [PATCH v2 5/5] phy: mvebu-sata: prepare new Dove DT Kconfig variable
+Date: Sat,  1 Mar 2014 09:33:19 +0100
+Subject: [PATCH v2 3/5] thermal: dove: prepare new Dove DT Kconfig variable
 In-Reply-To: <1393662801-17950-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393662801-17950-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393662801-17950-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393662801-17950-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,37 +13,36 @@ DT-only MACH_DOVE Kconfig.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Kishon,
+Rui, Eduardo,
 
 Mark Brown requested to take the corresponding ASoC patch through
 his tree. Therefore, I have split the former patch into individual subsystem
-patches. This patch also received an update, to not break bisectability
-we add DT-enabled MACH_DOVE and maintain ARCH_DOVE, which is non-DT only
-after conversion. ARCH_DOVE will be removed, when legacy mach-dove will
-be removed.
+patches.              
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: linux-pm at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/phy/Kconfig | 2 +-
+ drivers/thermal/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index c7a551c2d5f1..e81daff7b5a3 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 35c066489a19..07b5e56e9a97 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -150,7 +150,7 @@ config KIRKWOOD_THERMAL
  
- config PHY_MVEBU_SATA
- 	def_bool y
--	depends on ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_DOVE
+ config DOVE_THERMAL
+ 	tristate "Temperature sensor on Marvell Dove SoCs"
+-	depends on ARCH_DOVE
++	depends on ARCH_DOVE || MACH_DOVE
  	depends on OF
- 	select GENERIC_PHY
- 
+ 	help
+ 	  Support for the Dove thermal sensor driver in the Linux thermal
 -- 
 1.8.5.3
