@@ -1,30 +1,34 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Mar 2014 20:26:27 +0100
-Subject: [PATCH 08/19] ARM: sun4i: dt: Add USB host nodes to cubieboard dts
+Date: Sat,  1 Mar 2014 20:26:29 +0100
+Subject: [PATCH 10/19] ARM: sun4i: dt: Add USB host nodes to mini-xplus dts
 In-Reply-To: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
 References: <1393701998-3553-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393701998-3553-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393701998-3553-11-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Byshko <rbyshko@gmail.com>
-
 Add nodes for the usb-phy and ehci- and ohci-usb-host controllers.
 
-Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 31 ++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 20407ac..4684cbe 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -34,11 +34,33 @@
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index 70b3323..dd84a9e 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -13,16 +13,47 @@
  
+ /dts-v1/;
+ /include/ "sun4i-a10.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
+ 
+ / {
+ 	model = "PineRiver Mini X-Plus";
+ 	compatible = "pineriver,mini-xplus", "allwinner,sun4i-a10";
+ 
+ 	soc at 01c00000 {
 +		usbphy: phy at 01c13400 {
 +			usb1_vbus-supply = <&reg_usb1_vbus>;
 +			usb2_vbus-supply = <&reg_usb2_vbus>;
@@ -39,11 +43,6 @@ index 20407ac..4684cbe 100644
 +			status = "okay";
 +		};
 +
- 		ahci: sata at 01c18000 {
- 			target-supply = <&reg_ahci_5v>;
- 			status = "okay";
- 		};
- 
 +		ehci1: usb at 01c1c000 {
 +			status = "okay";
 +		};
@@ -52,12 +51,11 @@ index 20407ac..4684cbe 100644
 +			status = "okay";
 +		};
 +
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-@@ -87,4 +109,12 @@
- 	reg_ahci_5v: ahci-5v {
- 		status = "okay";
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
  	};
 +
 +	reg_usb1_vbus: usb1-vbus {
