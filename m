@@ -1,93 +1,82 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 01 Mar 2014 11:38:32 +0100
-Subject: [PATCH v7 08/15] ahci-imx: Port to library-ised ahci_platform
-In-Reply-To: <20140228210820.GZ21483@n2100.arm.linux.org.uk>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
- <1393084424-31099-9-git-send-email-hdegoede@redhat.com>
- <20140228210820.GZ21483@n2100.arm.linux.org.uk>
-Message-ID: <5311B8A8.1000501@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Sat,  1 Mar 2014 11:56:03 +0100
+Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
+ suspend
+Message-ID: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Patch 1 -> 2:
+These patches provides two new runtime PM helper functions which intend to be
+used from system suspend/resume callbacks, to make sure devices are put into low
+power state during system suspend and brought back to full power at system
+resume.
 
-On 02/28/2014 10:08 PM, Russell King - ARM Linux wrote:
-> On Sat, Feb 22, 2014 at 04:53:37PM +0100, Hans de Goede wrote:
->> +		/*
->> +		 * set PHY Paremeters, two steps to configure the GPR13,
->> +		 * one write for rest of parameters, mask of first write
->> +		 * is 0x07ffffff, and the other one write for setting
->> +		 * the mpll_clk_en.
->> +		 */
->> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
->> +				   IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK |
->> +				   IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK |
->> +				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK |
->> +				   IMX6Q_GPR13_SATA_SPD_MODE_MASK |
->> +				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
->> +				   IMX6Q_GPR13_SATA_TX_ATTEN_MASK |
->> +				   IMX6Q_GPR13_SATA_TX_BOOST_MASK |
->> +				   IMX6Q_GPR13_SATA_TX_LVL_MASK |
->> +				   IMX6Q_GPR13_SATA_MPLL_CLK_EN |
->> +				   IMX6Q_GPR13_SATA_TX_EDGE_RATE,
->> +				   IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB |
->> +				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
->> +				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
->> +				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
->> +				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
->> +				   IMX6Q_GPR13_SATA_TX_ATTEN_9_16 |
->> +				   IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
->> +				   IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
->
-> While I see this, I'll stick an oar in.
->
-> It is totally wrong for this to be hard-coded into the driver - many
-> of these should be specified via DT, since they're board specific.
-> These are already different from the reset default in this register.
->
-> The side effect of this hard coding is that eSATA just doesn't work
-> at all on some boards - the board I have requires TX_LVL_1_104V and
-> TX_BOOST_0_00_DB.
+The prerequisite is to have all levels of a device's runtime PM callbacks to be
+defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
+for CONFIG_PM.
 
-I completely agree that if this is board specific it should be
-settable (override-able since we've existing dt files without a setting
-for it).
+By using the new runtime PM helper functions especially the two scenarios below
+will be addressed.
 
-> Hence, I'd ask that while you move stuff like this around, you bear
-> in mind that we do need to add additional properties.
+1) The PM core prevents .runtime_suspend callbacks from being invoked during
+system suspend. That means even for a runtime PM centric subsystem and driver,
+the device needs to be put into low power state from a system suspend callback.
+Otherwise it may very well be left in full power state (runtime resumed) while
+the system is suspended. By using the new helper functions, we make sure to walk
+the hierarchy of a device's power domain, subsystem and driver.
 
-I understand, but my interest in the imx code only goes as far as
-not making it regress. I already went above and beyond duty by
-buying an imx board with sata and cleaning up the horific platform
-device driver instantiating a platform device hack there was.
+2) Subsystems and drivers need to cope with all the combinations of
+CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
+addresses this.
 
-My interest in platform-ahci was to clean it up so that it could be
-used as a proper basis to build other ARM ahci drivers on top of,
-such as a driver for the allwinner A10 and A20 ahci controller.
+Patch 3 -> 4:
+Fixup system suspend for spi-pl022 driver, by using the new runtime PM helper
+functions.
 
-While at this I ended up having to clean up the imx driver too, so
-as to not break at. As a bonus I fixed it to not loose the harddisk
-after a suspend / resume cycle, and that is really as far as my
-interest in the imx driver goes.
+These patches is based upon the latest next-branch for spi-pl022 driver. They
+will not apply to Rafael's linux-pm tree, but are included in this patchset for
+reference and to receive comments/acks.
 
-I'm sure Tejun would welcome patches to add a dts property for
-setting the board-specific phy parameters, but I won't be
-writing it.
+Patch 5:
+Fixup system suspend for i2c-nomadik driver, by using the new runtime PM helper
+functions.
 
-> I'm in two minds about this - whether to make the existing binding
-> with its compatible string always use these settings, and invent a
-> new compatible string for one which is fully configurable (as it
-> _should_ have been from the very start) or whether to make this
-> the default if the various properties aren't specified.
+This patch is based upon the latest next-branch for the i2c-nomadik driver. They
+will not apply to Rafael's linux-pm tree, but are included in this patchset for
+reference and to receive comments/acks.
 
-IMHO this does not warrant doing a new compatibole-string. Simply
-default to the current hardcoded phy settings if no settings are
-specified through devicetree.
+Patch 6 -> 8:
+Fixup system suspend for mmci driver, by using the new runtime PM helper
+functions.
 
-> Either way, this driver is electrically unusable as it stands here.
 
-That is only true on some boards.
+A final note, the amba bus has converted to use the SET_PM_RUNTIME_PM_OPS
+which is needed for these patches to work with only CONFIG_PM_SLEEP and not
+CONFIG_PM_RUNTIME. Anyway, the patches for the amba bus have recently been
+applied by Russell and resides in his ARM tree.
 
-Regards,
+Changes in v3:
+	This is repost of the patchset. Only patch 1 and patch 2 has been
+	updated to v3, the rest are still in v1.
 
-Hans
+Ulf Hansson (8):
+  PM / Runtime: Fetch runtime PM callbacks using a macro
+  PM / Sleep / Runtime: Add pm_runtime_suspend|resume_force functions
+  spi: pl022: Let runtime PM callbacks be available for CONFIG_PM
+  spi: pl022: Don't ignore power domain and amba bus at system suspend
+  i2c: nomadik: Fixup system suspend
+  mmc: mmci: Mask IRQs for all variants during runtime suspend
+  mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
+  mmc: mmci: Put the device into low power state at system suspend
+
+ drivers/base/power/Makefile      |    3 +-
+ drivers/base/power/runtime.c     |  162 +++++++++++++++++++++++++++++---------
+ drivers/i2c/busses/i2c-nomadik.c |   14 ++--
+ drivers/mmc/host/mmci.c          |   60 ++++----------
+ drivers/spi/spi-pl022.c          |   58 +++++---------
+ include/linux/pm_runtime.h       |    4 +
+ 6 files changed, 170 insertions(+), 131 deletions(-)
+
+-- 
+1.7.9.5
