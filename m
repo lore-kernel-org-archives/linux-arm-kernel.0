@@ -1,95 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sun, 2 Mar 2014 00:13:58 +0530
-Subject: [PATCH 3/4] ARM: DT: STi: Add DT node for MiPHY365x
-In-Reply-To: <1392377036-12816-3-git-send-email-lee.jones@linaro.org>
-References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
- <1392377036-12816-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <53122A6E.3070001@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 1 Mar 2014 19:58:30 +0100
+Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <20140228163431.GV21483@n2100.arm.linux.org.uk>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
+ <20140228160612.GR21483@n2100.arm.linux.org.uk>
+ <5310B609.1010105@ti.com>
+ <20140228163431.GV21483@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdVpT2Y-KQO46o=zbRSgqgx2mbBsPjGgoTDDwwfCOxUCmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 28, 2014 at 5:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> There's actually three HDMI connectors:
+>
+>   All three connectors carry all required HDMI signals, including a TMDS
+>   link. The Type B connector is slightly larger and carries a second TMDS
+>   link, which is necessary to support very high resolution displays using
+>   dual link. The Type C connector carries the same signals as the Type A
+>   but is more compact and intended for mobile applications.
+>
+> So, Type C and Type A are electrically the same.
 
-On Friday 14 February 2014 04:53 PM, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
->
-> Cc: devicetree at vger.kernel.org
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+There's also D (e.g. on BeagleBone Black) and E:
 
-since this uses 'dt-bindings/phy/phy-miphy365x.h' which is used in phy 
-driver as well, I need ACK from dt maintainers so that I can queue both 
-the driver and dt patches myself.
+http://en.wikipedia.org/wiki/HDMI#Connectors
 
-Thanks
-Kishon
-> ---
->   arch/arm/boot/dts/stih416-b2020-revE.dts |  6 +++++-
->   arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
->   arch/arm/boot/dts/stih416.dtsi           | 13 +++++++++++++
->   3 files changed, 24 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> index a874570..dbe67fa 100644
-> --- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> @@ -32,6 +32,10 @@
->   		ethernet1: ethernet at fef08000 {
->   			snps,reset-gpio 	= <&PIO0 7>;
->   		};
-> -	};
->
-> +		miphy365x_phy: miphy365x at 0 {
-> +			st,pcie_tx_pol_inv = <1>;
-> +			st,sata_gen = "gen3";
-> +		};
-> +	};
->   };
-> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> index 276f28d..fd9cbad 100644
-> --- a/arch/arm/boot/dts/stih416-b2020.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020.dts
-> @@ -13,4 +13,10 @@
->   	model = "STiH416 B2020";
->   	compatible = "st,stih416", "st,stih416-b2020";
->
-> +	soc {
-> +		miphy365x_phy: miphy365x at 0 {
-> +			st,pcie_tx_pol_inv = <1>;
-> +			st,sata_gen = "gen3";
-> +		};
-> +	};
->   };
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index 85b8063..9fd8efb 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -9,6 +9,8 @@
->   #include "stih41x.dtsi"
->   #include "stih416-clock.dtsi"
->   #include "stih416-pinctrl.dtsi"
-> +
-> +#include <dt-bindings/phy/phy-miphy365x.h>
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
->   #include <dt-bindings/reset-controller/stih416-resets.h>
->   / {
-> @@ -140,5 +142,16 @@
->   			clocks		= <&CLK_S_ICN_REG_0>;
->   		};
->
-> +		miphy365x_phy: miphy365x at 0 {
-> +			compatible      = "st,miphy365x-phy";
-> +			reg        	= <0xfe382000 0x100>,
-> +					  <0xfe38a000 0x100>,
-> +					  <0xfe394000 0x100>,
-> +					  <0xfe804000 0x100>;
-> +			reg-names  	= "sata0", "sata1", "pcie0", "pcie1";
-> +
-> +			#phy-cells 	= <2>;
-> +			st,syscfg  	= <&syscfg_rear>;
-> +		};
->   	};
->   };
->
+Electrically they seem to be the same as A/C.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
