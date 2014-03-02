@@ -1,41 +1,51 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 2 Mar 2014 09:29:39 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140301195419.0DB5DC40B0D@trevor.secretlab.ca>
-References: <20140226183454.GA14639@cbox>
- <alpine.DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
- <20140301195419.0DB5DC40B0D@trevor.secretlab.ca>
-Message-ID: <CAFEAcA-q6OMuKO=Wxi9GELoQc4LVJED3Zgerb8ESyMoqw3pkCA@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Sun, 02 Mar 2014 05:37:13 -0500
+Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
+ probes code
+In-Reply-To: <20140228101226.GO21483@n2100.arm.linux.org.uk>
+References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+ <1392017945-4507-8-git-send-email-dave.long@linaro.org>
+ <20140228101226.GO21483@n2100.arm.linux.org.uk>
+Message-ID: <531309D9.6050708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2014 19:54, Grant Likely <grant.likely@linaro.org> wrote:
-> Allow me to elaborate. I'm not trying to punish Xen here, but I'm
-> deliberately pushing back against "either/or" options in the spec. In
-> this case the spec says the VM must implement one of pl011 *or* virtio
-> *or* xenpv. That gives lots of implementation choice to VM projects.
+On 02/28/14 05:12, Russell King - ARM Linux wrote:
+> On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
+>> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
+>> index 7cd1763..179deac 100644
+>> --- a/arch/arm/kernel/probes.c
+>> +++ b/arch/arm/kernel/probes.c
+>> @@ -12,11 +12,9 @@
+>>    */
+>>
+>>   #include <linux/kernel.h>
+>> -#include <linux/kprobes.h>
+>>   #include <asm/system_info.h>
+>
+> How well has this code been tested?  This file doesn't even build because
+> (I suspect) the above change:
+>
+> arch/arm/kernel/probes.c: In function 'test_alu_write_pc_interworking':
+> arch/arm/kernel/probes.c:68:2: error: implicit declaration of function 'BUG_ON' [-Werror=implicit-function-declaration]
+> make[2]: *** [arch/arm/kernel/probes.o] Error 1
+>
+> This is because linux/kprobes.h includes linux/bug.h, which would provide
+> the requirements for BUG_ON().
+>
 
->From the VM implementation side, of course, we want to push back
-against "must be X and only X" settings in the spec. My feeling is
-that if you're a VM that doesn't already handle X then implementing
-it is potentially quite a bit of work (especially if it implies implementing
-a bus framework or whatever that you don't have any support for,
-as might be the case for requiring virtio in Xen). On the other hand
-Linux already has support for all the options and is easy to configure
-with all the options enabled. So when I was looking through / making
-comments on this spec my preference generally came down on the
-side of "give the VM side the flexibility to select 1 from some small
-number of N".
+It was tested by building and running on Panda with all four 
+permutations of uprobes and kprobes enabled/disabled.  x86 was also test 
+built and run to verify no regressions, and other testing was done 
+inside Linaro for arm64 endianess correctness.  Very recently daily 
+build testing has been added and this config problem has shown up, and 
+our test configs adjusted accordingly.  I think the problem was masked 
+on panda by CONFIG_PROFILING being set for that (and many other) 
+platform(s).  On x86 it looks like the problem is avoided by 
+CONFIG_PERF_EVENTS always being set in arch/x86/Kconfig.
 
-(Sometimes, as with GIC choices, the "flexibility must be in the
-guest, not the VM" approach is forced by host h/w possibilities.)
+I was not aware of the use/requirement (or existence even) of randconfig 
+for validation testing, nor did I know a config dependency issue like 
+this one would be considered a showstopper problem.
 
-For initial console in particular it might be reasonable to require
-"minimal pl011". On the other hand I don't think we want to imply
-"as a guest it's OK for you not to support Xen pv console" because
-that is saying "console performance will be terrible on Xen". How
-about "must implement minimal pl011, and also at least one of
-virtio-console, interrupt-driven pl011 or xen pv console" ?
-
-thanks
--- PMM
+-dl
