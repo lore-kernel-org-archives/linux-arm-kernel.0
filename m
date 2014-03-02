@@ -1,55 +1,143 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  2 Mar 2014 16:24:13 +0100
-Subject: =?UTF-8?q?=5BPATCH=201/3=5D=20DT=3A=20I2C=3A=20Add=20trivial=20bindings=20used=20by=20kirkwood=20boards?=
-Message-ID: <1393773855-9592-1-git-send-email-andrew@lunn.ch>
+Date: Sun,  2 Mar 2014 16:24:15 +0100
+Subject: [PATCH 3/3] ARM: Kirkwood: DT: Add missing vendor prefix
+In-Reply-To: <1393773855-9592-1-git-send-email-andrew@lunn.ch>
+References: <1393773855-9592-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1393773855-9592-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a number of eeproms and temperature sensors/fan controllers used
-by kirkwood boards.
+Add vendor prefixes to compatible strings where they are missing.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/i2c/trivial-devices.txt         | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
+ arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
+ arch/arm/boot/dts/kirkwood-nsa310.dts          | 2 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts         | 2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts   | 2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index e11ed0fe770c..7faa3eab2549 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -13,7 +13,22 @@ ad,ad7414		SMBus/I2C Digital Temperature Sensor in 6-Pin SOT with SMBus Alert an
- ad,adm9240		ADM9240:  Complete System Hardware Monitor for uProcessor-Based Systems
- adi,adt7461		+/-1C TDM Extended Temp Range I.C
- adt7461			+/-1C TDM Extended Temp Range I.C
-+adi,adt7473		+/-1C TDM Extended Temp Range I.C
-+adi,adt7475		+/-1C TDM Extended Temp Range I.C
-+adi,adt7476		+/-1C TDM Extended Temp Range I.C
-+adi,adt7490		+/-1C TDM Extended Temp Range I.C
-+at,24c00		i2c serial eeprom  (24cxx)
-+at,24c01		i2c serial eeprom  (24cxx)
-+at,24c02		i2c serial eeprom  (24cxx)
-+at,24c04		i2c serial eeprom  (24cxx)
- at,24c08		i2c serial eeprom  (24cxx)
-+at,24c16		i2c serial eeprom  (24cxx)
-+at,24c32		i2c serial eeprom  (24cxx)
-+at,24c64		i2c serial eeprom  (24cxx)
-+at,24c128		i2c serial eeprom  (24cxx)
-+at,24c256		i2c serial eeprom  (24cxx)
-+at,24c512		i2c serial eeprom  (24cxx)
-+at,24c1024		i2c serial eeprom  (24cxx)
- atmel,24c02		i2c serial eeprom  (24cxx)
- atmel,at97sc3204t	i2c trusted platform module (TPM)
- capella,cm32181		CM32181: Ambient Light Sensor
-@@ -45,8 +60,10 @@ maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
- maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
- maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
- mc,rv3029c2		Real Time Clock Module with I2C-Bus
-+national,lm63		Temperature sensor with integrated fan control
- national,lm75		I2C TEMP SENSOR
- national,lm80		Serial Interface ACPI-Compatible Microprocessor System Hardware Monitor
-+national,lm85		Temperature sensor with integrated fan control
- national,lm92		?0.33?C Accurate, 12-Bit + Sign Temperature Sensor and Thermal Window Comparator with Two-Wire Interface
- nuvoton,npct501		i2c trusted platform module (TPM)
- nxp,pca9556		Octal SMBus and I2C registered interface
+diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
+index 40791053106b..6becedebaa4e 100644
+--- a/arch/arm/boot/dts/kirkwood-b3.dts
++++ b/arch/arm/boot/dts/kirkwood-b3.dts
+@@ -75,7 +75,7 @@
+ 			m25p16 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "m25p16";
++				compatible = "st,m25p16";
+ 				reg = <0>;
+ 				spi-max-frequency = <40000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+index 0e06fd3cee4d..3b62aeeaa3a2 100644
+--- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
++++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+@@ -46,7 +46,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mx25l4005a";
++				compatible = "mxicy,mx25l4005a";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index ef3463e0ae19..28b3ee369778 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -43,7 +43,7 @@
+ 			m25p40 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mx25l1606e";
++				compatible = "mxicy,mx25l1606e";
+ 				reg = <0>;
+ 				spi-max-frequency = <50000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+index 2cb0dc529165..32c6fb4a1162 100644
+--- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
++++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+@@ -56,7 +56,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mx25l12805d";
++				compatible = "mxicy,mx25l12805d";
+ 				reg = <0>;
+ 				spi-max-frequency = <50000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 743152f31a81..594bad0e386e 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -32,7 +32,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mx25l4005a";
++				compatible = "mxicy,mx25l4005a";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index 03fa24cf3344..0a07af9d8e58 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -104,7 +104,7 @@
+ 			status = "okay";
+ 
+ 			adt7476: adt7476a at 2e {
+-				compatible = "adt7476";
++				compatible = "adi,adt7476";
+ 				reg = <0x2e>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+index a5e779452867..27ca6a79c48a 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+@@ -94,7 +94,7 @@
+ 			status = "okay";
+ 
+ 			lm85: lm85 at 2e {
+-				compatible = "lm85";
++				compatible = "national,lm85";
+ 				reg = <0x2e>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index b88da9392c32..0650beafc1de 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -40,7 +40,7 @@
+ 			pinctrl-names = "default";
+ 
+ 			s35390a: s35390a at 30 {
+-				compatible = "s35390a";
++				compatible = "sii,s35390a";
+ 				reg = <0x30>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+index b2f7cae06839..895506743e4d 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+@@ -52,7 +52,7 @@
+ 			pinctrl-names = "default";
+ 
+ 			s24c02: s24c02 at 50 {
+-				compatible = "24c02";
++				compatible = "at,24c02";
+ 				reg = <0x50>;
+ 			};
+ 		};
 -- 
 1.8.5.3
