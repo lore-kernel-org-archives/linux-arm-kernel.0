@@ -1,70 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 02 Mar 2014 23:21:40 +0100
-Subject: [PATCH 4/4] ARM: shmobile: r7s72100: use workaround for non
- DT-clocks
-In-Reply-To: <1393621768-12568-5-git-send-email-wsa@the-dreams.de>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <1393621768-12568-5-git-send-email-wsa@the-dreams.de>
-Message-ID: <1712106.fu6iC2mT2W@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 2 Mar 2014 15:04:48 -0800
+Subject: [GIT PULL] two omap dt regression fixes for v3.14-rc4
+Message-ID: <20140302230448.GB5000@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+The following changes since commit 4b41636878ee32d4c45a49de7749abca9721bd6a:
 
-Thank you for the patch.
+  ARM: OMAP3: Fix pinctrl interrupts for core2 (2014-02-27 15:35:48 -0800)
 
-On Friday 28 February 2014 22:09:28 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
-> workaround via clkdev for now.
+are available in the git repository at:
 
-What about adding a DT node for the serial port instead ? :-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-dt-rc4
 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
->  arch/arm/mach-shmobile/board-genmai-reference.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c
-> b/arch/arm/mach-shmobile/board-genmai-reference.c index 7630c10..91dcdd0
-> 100644
-> --- a/arch/arm/mach-shmobile/board-genmai-reference.c
-> +++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-> @@ -18,18 +18,29 @@
->   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> USA */
-> 
-> -#include <linux/clk-provider.h>
->  #include <linux/kernel.h>
->  #include <linux/of_platform.h>
-> +#include <mach/clock.h>
->  #include <mach/common.h>
->  #include <mach/r7s72100.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> 
-> +#ifdef CONFIG_COMMON_CLK
-> +/*
-> + * This is a really crude hack to provide clkdev support to platform
-> + * devices until they get moved to DT.
-> + */
-> +static const struct clk_name clk_names[] = {
-> +	{ "mtu2", NULL, "sh_mtu2.0" },
-> +	{ "scif2", NULL, "sh-sci.2" },
-> +};
-> +#endif
-> +
->  static void __init genmai_add_standard_devices(void)
->  {
->  #ifdef CONFIG_COMMON_CLK
-> -	of_clk_init(NULL);
-> +	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
->  #else
->  	r7s72100_clock_init();
->  #endif
+for you to fetch changes up to ae41a3030ce8901853b3cfd5e118a4b0288aa068:
 
--- 
-Regards,
+  ARM: dts: omap3-gta04: Add ti,omap36xx to compatible property to avoid problems with booting (2014-03-02 09:44:45 -0800)
 
-Laurent Pinchart
+----------------------------------------------------------------
+Two omap3430 vs 3630 device tree regression fixes for
+issues booting 3430 based boards.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (1):
+      ARM: dts: omap3-igep: fix boot fail due wrong compatible match
+
+Marek Belisko (1):
+      ARM: dts: omap3-gta04: Add ti,omap36xx to compatible property to avoid problems with booting
+
+ arch/arm/boot/dts/omap3-gta04.dts    | 2 +-
+ arch/arm/boot/dts/omap3-igep0020.dts | 2 +-
+ arch/arm/boot/dts/omap3-igep0030.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
