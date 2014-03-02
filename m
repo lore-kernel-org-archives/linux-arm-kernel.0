@@ -1,117 +1,133 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 02 Mar 2014 07:02:06 -0500
-Subject: [PATCH v6 00/14] uprobes: Add uprobes support for ARM
-In-Reply-To: <20140301123026.GD21483@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 2 Mar 2014 12:11:33 +0000
+Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
+ probes code
+In-Reply-To: <531309D9.6050708@linaro.org>
 References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <20140301123026.GD21483@n2100.arm.linux.org.uk>
-Message-ID: <53131DBE.7020500@linaro.org>
+ <1392017945-4507-8-git-send-email-dave.long@linaro.org>
+ <20140228101226.GO21483@n2100.arm.linux.org.uk> <531309D9.6050708@linaro.org>
+Message-ID: <20140302121133.GF21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oleg,
+On Sun, Mar 02, 2014 at 05:37:13AM -0500, David Long wrote:
+> On 02/28/14 05:12, Russell King - ARM Linux wrote:
+>> On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
+>>> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
+>>> index 7cd1763..179deac 100644
+>>> --- a/arch/arm/kernel/probes.c
+>>> +++ b/arch/arm/kernel/probes.c
+>>> @@ -12,11 +12,9 @@
+>>>    */
+>>>
+>>>   #include <linux/kernel.h>
+>>> -#include <linux/kprobes.h>
+>>>   #include <asm/system_info.h>
+>>
+>> How well has this code been tested?  This file doesn't even build because
+>> (I suspect) the above change:
+>>
+>> arch/arm/kernel/probes.c: In function 'test_alu_write_pc_interworking':
+>> arch/arm/kernel/probes.c:68:2: error: implicit declaration of function 'BUG_ON' [-Werror=implicit-function-declaration]
+>> make[2]: *** [arch/arm/kernel/probes.o] Error 1
+>>
+>> This is because linux/kprobes.h includes linux/bug.h, which would provide
+>> the requirements for BUG_ON().
+>>
+>
+> It was tested by building and running on Panda with all four  
+> permutations of uprobes and kprobes enabled/disabled.  x86 was also test  
+> built and run to verify no regressions, and other testing was done  
+> inside Linaro for arm64 endianess correctness.  Very recently daily  
+> build testing has been added and this config problem has shown up, and  
+> our test configs adjusted accordingly.  I think the problem was masked  
+> on panda by CONFIG_PROFILING being set for that (and many other)  
+> platform(s).  On x86 it looks like the problem is avoided by  
+> CONFIG_PERF_EVENTS always being set in arch/x86/Kconfig.
+>
+> I was not aware of the use/requirement (or existence even) of randconfig  
+> for validation testing, nor did I know a config dependency issue like  
+> this one would be considered a showstopper problem.
 
-I've been looking at arch/Kconfig and kernel/trace/Kconfig where they 
-deal with uprobes.  The relevant items are CONFIG_UPROBES and 
-CONFIG_UPROBE_EVENT.  It just doesn't look right to me.  It looks like 
-"select" is used in part maybe just to avoid the recursive dependency 
-error that would be generated if "depends on" were used in both places. 
-However I don't think UPROBES should be dependent on UPROBE_EVENT, only 
-the other way around.  As RK noted in previous email (copied in part 
-below) the select does not pull in the lower level dependencies.  This 
-all works on x86 only because arch/x86/Kconfig defines CONFIG_PERF_EVENT 
-(which feels like a big hammer).  We don't need to do this on ARM, and 
-we don't do it.  The result is that, unless PERF_EVENT is set 
-separately, uprobes tends not to build.  I was lucking-out in my testing 
-due to other default config items turning on PERF_EVENT.
+The point of randconfig is to find those combinations which you haven't
+tested.  For example, you say above that you tested on a Panda board.
+However, there's dependencies in this code for ARMv5, ARMv6 and ARMv7 as
+well, which you haven't tested for by only targetting Panda.
 
-What do you think about the following patch?:
+For example, the failure above is caused if you try and build this code
+with support for ARMv6 enabled.  This causes test_alu_write_pc_interworking()
+to be built, which finds the problem with BUG_ON().
 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 80bbb8c..8793066 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -87,7 +87,8 @@ config KPROBES_ON_FTRACE
->
->  config UPROBES
->  	bool "Transparent user-space probes (EXPERIMENTAL)"
-> -	depends on UPROBE_EVENT && PERF_EVENTS
-> +	depends on ARCH_SUPPORTS_UPROBES
-> +	depends on PERF_EVENTS
->  	default n
->  	select PERCPU_RWSEM
->  	help
-> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> index 015f85a..7d2647e 100644
-> --- a/kernel/trace/Kconfig
-> +++ b/kernel/trace/Kconfig
-> @@ -422,9 +422,8 @@ config KPROBE_EVENT
->
->  config UPROBE_EVENT
->  	bool "Enable uprobes-based dynamic events"
-> -	depends on ARCH_SUPPORTS_UPROBES
->  	depends on MMU
-> -	select UPROBES
-> +	depends on UPROBES
->  	select PROBE_EVENTS
->  	select TRACING
->  	default n
+What the overall requirement here is that we avoid new regressions - in
+this case, it's a missing include file indirectly included via
+linux/kprobes.h.
 
+One of my biggest gripes is that people like reducing the include files
+in their sources to the barest minimum, relying on indirect includes to
+give them what their .c file requires.  This is - as is demonstrated
+above - very fragile, and leads to these kinds of unexpected build failures.
+If people thought about it properly, they'd realise that this is no way to
+behave.  Instead, a .c file should always include the headers that it has
+a direct requirement for.  In this case, that's linux/bug.h.  This problem
+is compounded by ARM having a multitude of configuration options which
+directly affect compiled code.
 
-This removes the pseudo-recursive dependency.  The downside is that now 
-you have to set PERF_EVENTS to use UPROBES, and UPROBES to use 
-UPROBE_EVENT, whereas before on x86 you only had to set UPROBE_EVENT (as 
-long as PERF_EVENTS stays hardcoded on). I think this could be avoided 
-by making each "depends on" a "selects", since they apply transitively. 
-  I'm sensing this would be an unpopular idea though.
+Again, this is not your fault, but the author of kprobes.c who made a
+rather poor decision in only including (originally) six headers:
 
--dl
++#include <linux/kernel.h>
++#include <linux/kprobes.h>
++#include <linux/module.h>
++#include <linux/stringify.h>
++#include <asm/traps.h>
++#include <asm/cacheflush.h>
 
+despite requiring more.
 
+However, this is not the reason I dropped your patch series - I dropped
+them because of the other problem I mailed about, caused by the Kconfig
+dependencies.  That needs fixing first to avoid the problem your changes
+have uncovered - it's no good fixing it afterwards because it can end
+up breaking git bisect.  The precise time where you don't want git bisect
+to break is during a merge window, and that's when this code will be going
+in.
 
-On 03/01/14 07:30, Russell King - ARM Linux wrote:
+Now that I look closer at this, the UPROBES Kconfig stuff is totally
+insane - this commit:
 
-[ ... ]
+commit f3f096cfedf8113380c56fc855275cc75cd8cf55
+Author: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
+Date:   Wed Apr 11 16:00:43 2012 +0530
 
-> Clearly, it doesn't make sense for UPROBES to be enabled with PERF_EVENTS
-> disabled - and indeed the Kconfig ensures that this dependency is properly
-> expressed:
->
-> 	config UPROBES
-> 	        bool "Transparent user-space probes (EXPERIMENTAL)"
-> 	        depends on UPROBE_EVENT && PERF_EVENTS
-> 	        default n
-> 	        select PERCPU_RWSEM
->
-> but where this all falls down is here:
->
-> 	config UPROBE_EVENT
-> 	        bool "Enable uprobes-based dynamic events"
-> 	        depends on ARCH_SUPPORTS_UPROBES
-> 	        depends on MMU
-> 	        select UPROBES
-> 	        select PROBE_EVENTS
-> 	        select TRACING
-> 	        default n
->
-> Which is yet another brilliant example of why this "select" crap is soo
-> evil.  Yes, the failing configuration has:
->
-> 	CONFIG_UPROBE_EVENT=y
->
-> Ineed, there was a Kconfig warning:
->
-> 	warning: (UPROBE_EVENT) selects UPROBES which has unmet direct dependencies (UPROBE_EVENT && PERF_EVENTS)
->
-> This is not your fault.  It's the fault of everyone who passed through
-> commit f3f096cfedf8113380c56fc855275cc75cd8cf55 without properly reviewing
-> it and paying attention to that select crap.  Given how evil "select" is,
-> it's something which should always be thoroughly reviewed - with analysis
-> of the dependencies.  I believe commits which introduce new select
-> statements should document an analysis of why those new select statements
-> are appropriate and how they ensure that any dependencies of the selected
-> symbol are not violated.
->
-> Therefore, I will not take the ARM uprobes code while this kind of
-> select abortion is present - it needs to be fixed first to avoid these
-> build errors.  Sorry.
->
+    tracing: Provide trace events interface for uprobes
+
+introduced this madness:
+
+config UPROBES
+        bool "Transparent user-space probes (EXPERIMENTAL)"
+        depends on UPROBE_EVENT && PERF_EVENTS
+        default n
+        select PERCPU_RWSEM
+
+config UPROBE_EVENT
+        bool "Enable uprobes-based dynamic events"
+        depends on ARCH_SUPPORTS_UPROBES
+        depends on MMU
+        select UPROBES
+        select PROBE_EVENTS
+        select TRACING
+
+What this expresses is that UPROBES can't be enabled unless UPROBE_EVENT
+is enabled.  If UPROBE_EVENT is enabled, then UPROBES is force-enabled
+irrespective of its dependencies.  Hence, this forces UPROBES to *always*
+have the same value as UPROBE_EVENT, it can never be anything different.
+
+I'm at a loss to understand why we have these two configuration options.
+The above commit just looks totally wrong from the Kconfig perspective.
+
+Maybe Srikar Dronamraju can comment about what the original intention
+was here - but it looks like one or other should just be killed off.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
