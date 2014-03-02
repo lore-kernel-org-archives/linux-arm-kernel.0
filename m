@@ -1,91 +1,219 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 15:41:08 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <530F39C3.5060808@codeaurora.org>
-References: <20140226183454.GA14639@cbox> <530E402C.9040502@codeaurora.org>
- <20140226195111.GB16149@cbox> <530F39C3.5060808@codeaurora.org>
-Message-ID: <20140301154108.ECF54C40567@trevor.secretlab.ca>
+Date: Sun, 02 Mar 2014 13:28:42 +0800
+Subject: [PATCH v6 02/11] drivers: of: add initialization code for static
+ reserved memory
+In-Reply-To: <1393594976-16728-3-git-send-email-m.szyprowski@samsung.com>
+References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
+ 1393594976-16728-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140302052842.EB26FC40E0C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Feb 2014 08:12:35 -0500, Christopher Covington <cov@codeaurora.org> wrote:
-> Hi Christoffer,
+On Fri, 28 Feb 2014 14:42:47 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> This patch adds support for static (defined by 'reg' property) reserved
+> memory regions declared in device tree.
 > 
-> On 02/26/2014 02:51 PM, Christoffer Dall wrote:
-> > On Wed, Feb 26, 2014 at 02:27:40PM -0500, Christopher Covington wrote:
+> Memory blocks can be reliably reserved only during early boot. This must
+> happen before the whole memory management subsystem is initialized,
+> because we need to ensure that the given contiguous blocks are not yet
+> allocated by kernel. Also it must happen before kernel mappings for the
+> whole low memory are created, to ensure that there will be no mappings
+> (for reserved blocks). Typically, all this happens before device tree
+> structures are unflattened, so we need to get reserved memory layout
+> directly from fdt.
 > 
-> >>> Image format
-> >>> ------------
-> >>> The image format, as presented to the VM, needs to be well-defined in
-> >>> order for prepared disk images to be bootable across various
-> >>> virtualization implementations.
-> >>>
-> >>> The raw disk format as presented to the VM must be partitioned with a
-> >>> GUID Partition Table (GPT).  The bootable software must be placed in the
-> >>> EFI System Partition (ESP), using the UEFI removable media path, and
-> >>> must be an EFI application complying to the UEFI Specification 2.4
-> >>> Revision A [6].
-> >>>
-> >>> The ESP partition's GPT entry's partition type GUID must be
-> >>> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> >>> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-> >>>
-> >>> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> >>> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> >>> state.
-> >>>
-> >>> This ensures that tools for both Xen and KVM can load a binary UEFI
-> >>> firmware which can read and boot the EFI application in the disk image.
-> >>>
-> >>> A typical scenario will be GRUB2 packaged as an EFI application, which
-> >>> mounts the system boot partition and boots Linux.
-> >>>
-> >>>
-> >>> Virtual Firmware
-> >>> ----------------
-> >>> The VM system must be able to boot the EFI application in the ESP.  It
-> >>> is recommended that this is achieved by loading a UEFI binary as the
-> >>> first software executed by the VM, which then executes the EFI
-> >>> application.  The UEFI implementation should be compliant with UEFI
-> >>> Specification 2.4 Revision A [6] or later.
-> >>>
-> >>> This document strongly recommends that the VM implementation supports
-> >>> persistent environment storage for virtual firmware implementation in
-> >>> order to ensure probable use cases such as adding additional disk images
-> >>> to a VM or running installers to perform upgrades.
-> >>>
-> >>> The binary UEFI firmware implementation should not be distributed as
-> >>> part of the VM image, but is specific to the VM implementation.
-> >>
-> >> Can you elaborate on the motivation for requiring that the kernel be stuffed
-> >> into a disk image and for requiring such a heavyweight bootloader/firmware? By
-> >> doing so you would seem to exclude those requiring an optimized boot process.
-
-This spec doesn't exclude or prevent VMs from doing that if the user
-wants to. It is about specifying the base requirements for a disk image
-to be portable. Any disk image conforming to this spec should boot on
-any VM conforming to the spec.
-
-> > What's the alternative?  Shipping kernels externally and loading them
-> > externally?  Sure you can do that, but then distros can't upgrade the
-> > kernel themselves, and you have to come up with a convention for how to
-> > ship kernels, initrd's etc.
+> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 > 
-> The self-hosted upgrades use case makes sense. I can imagine using a
-> pass-through or network filesystem to do it in the case of external loading,
-> something like the following.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
 
-Network booting is actually something else that is already supported and
-doesn't use the filesystem protocol at all. DHCP+TFTP to obtain the 2nd
-stage loader (which can do whatever it wants) is the preferred way to do
-things. The problem with trying to provide a network filesystem
-
-Section 3.4.2 (Boot via LOAD_FILE_PROTOCOL) and 3.4.2.1 (Network
-Booting) covers that scenario. Network boot uses most of the Preboot
-eXecution Environment (PXE) spec except it retrieves an EFI executable
-instead of a PXE executable. It is expected that PXE server will then
-supply all the boot configuration to the client. The exact same thing
-can be done with VMs... all of which is out of scope for this section
-because it is talking about disk images!  :-)
+Applied, thanks.
 
 g.
+
+> ---
+>  drivers/of/fdt.c       |  131 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_fdt.h |    3 ++
+>  2 files changed, 134 insertions(+)
+> 
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 758b4f8b30b7..819e11209718 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+> +#include <linux/sizes.h>
+>  #include <linux/string.h>
+>  #include <linux/errno.h>
+>  #include <linux/slab.h>
+> @@ -440,6 +441,118 @@ struct boot_param_header *initial_boot_params;
+>  #ifdef CONFIG_OF_EARLY_FLATTREE
+>  
+>  /**
+> + * res_mem_reserve_reg() - reserve all memory described in 'reg' property
+> + */
+> +static int __init __reserved_mem_reserve_reg(unsigned long node,
+> +					     const char *uname)
+> +{
+> +	int t_len = (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32);
+> +	phys_addr_t base, size;
+> +	unsigned long len;
+> +	__be32 *prop;
+> +	int nomap;
+> +
+> +	prop = of_get_flat_dt_prop(node, "reg", &len);
+> +	if (!prop)
+> +		return -ENOENT;
+> +
+> +	if (len && len % t_len != 0) {
+> +		pr_err("Reserved memory: invalid reg property in '%s', skipping node.\n",
+> +		       uname);
+> +		return -EINVAL;
+> +	}
+> +
+> +	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+> +
+> +	while (len >= t_len) {
+> +		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
+> +		size = dt_mem_next_cell(dt_root_size_cells, &prop);
+> +
+> +		if (base && size &&
+> +		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
+> +			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %ld MiB\n",
+> +				uname, &base, (unsigned long)size / SZ_1M);
+> +		else
+> +			pr_info("Reserved memory: failed to reserve memory for node '%s': base %pa, size %ld MiB\n",
+> +				uname, &base, (unsigned long)size / SZ_1M);
+> +
+> +		len -= t_len;
+> +	}
+> +	return 0;
+> +}
+> +
+> +/**
+> + * __reserved_mem_check_root() - check if #size-cells, #address-cells provided
+> + * in /reserved-memory matches the values supported by the current implementation,
+> + * also check if ranges property has been provided
+> + */
+> +static int __reserved_mem_check_root(unsigned long node)
+> +{
+> +	__be32 *prop;
+> +
+> +	prop = of_get_flat_dt_prop(node, "#size-cells", NULL);
+> +	if (!prop || be32_to_cpup(prop) != dt_root_size_cells)
+> +		return -EINVAL;
+> +
+> +	prop = of_get_flat_dt_prop(node, "#address-cells", NULL);
+> +	if (!prop || be32_to_cpup(prop) != dt_root_addr_cells)
+> +		return -EINVAL;
+> +
+> +	prop = of_get_flat_dt_prop(node, "ranges", NULL);
+> +	if (!prop)
+> +		return -EINVAL;
+> +	return 0;
+> +}
+> +
+> +/**
+> + * fdt_scan_reserved_mem() - scan a single FDT node for reserved memory
+> + */
+> +static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
+> +					  int depth, void *data)
+> +{
+> +	static int found;
+> +	const char *status;
+> +
+> +	if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
+> +		if (__reserved_mem_check_root(node) != 0) {
+> +			pr_err("Reserved memory: unsupported node format, ignoring\n");
+> +			/* break scan */
+> +			return 1;
+> +		}
+> +		found = 1;
+> +		/* scan next node */
+> +		return 0;
+> +	} else if (!found) {
+> +		/* scan next node */
+> +		return 0;
+> +	} else if (found && depth < 2) {
+> +		/* scanning of /reserved-memory has been finished */
+> +		return 1;
+> +	}
+> +
+> +	status = of_get_flat_dt_prop(node, "status", NULL);
+> +	if (status && strcmp(status, "okay") != 0 && strcmp(status, "ok") != 0)
+> +		return 0;
+> +
+> +	__reserved_mem_reserve_reg(node, uname);
+> +
+> +	/* scan next node */
+> +	return 0;
+> +}
+> +
+> +/**
+> + * early_init_fdt_scan_reserved_mem() - create reserved memory regions
+> + *
+> + * This function grabs memory from early allocator for device exclusive use
+> + * defined in device tree structures. It should be called by arch specific code
+> + * once the early allocator (i.e. memblock) has been fully activated.
+> + */
+> +void __init early_init_fdt_scan_reserved_mem(void)
+> +{
+> +	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
+> +}
+> +
+> +/**
+>   * of_scan_flat_dt - scan flattened tree blob and call callback on each.
+>   * @it: callback function
+>   * @data: context data pointer
+> @@ -856,6 +969,16 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+>  	memblock_add(base, size);
+>  }
+>  
+> +int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
+> +					phys_addr_t size, bool nomap)
+> +{
+> +	if (memblock_is_region_reserved(base, size))
+> +		return -EBUSY;
+> +	if (nomap)
+> +		return memblock_remove(base, size);
+> +	return memblock_reserve(base, size);
+> +}
+> +
+>  /*
+>   * called from unflatten_device_tree() to bootstrap devicetree itself
+>   * Architectures can override this definition if memblock isn't used
+> @@ -864,6 +987,14 @@ void * __init __weak early_init_dt_alloc_memory_arch(u64 size, u64 align)
+>  {
+>  	return __va(memblock_alloc(size, align));
+>  }
+> +#else
+> +int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
+> +					phys_addr_t size, bool nomap)
+> +{
+> +	pr_err("Reserved memory not supported, ignoring range 0x%llx - 0x%llx%s\n",
+> +		  base, size, nomap ? " (nomap)" : "");
+> +	return -ENOSYS;
+> +}
+>  #endif
+>  
+>  bool __init early_init_dt_scan(void *params)
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index 2b77058a7335..8610ad8d77d2 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -98,7 +98,10 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+>  				     int depth, void *data);
+>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+>  				     int depth, void *data);
+> +extern void early_init_fdt_scan_reserved_mem(void);
+>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+> +extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
+> +					     bool no_map);
+>  extern void * early_init_dt_alloc_memory_arch(u64 size, u64 align);
+>  extern u64 dt_mem_next_cell(int s, __be32 **cellp);
+>  
+> -- 
+> 1.7.9.5
+> 
