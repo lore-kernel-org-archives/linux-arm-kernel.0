@@ -1,97 +1,157 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 01 Mar 2014 21:13:48 +0000
-Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <530B8B46.6060003@samsung.com>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com> <
- 1392829124-25705-4-git-send-email-s.nawrocki@samsung.com> <20140220140928.
- 27132C4050F@trevor.secretlab.ca> <53072C9D.5040303@samsung.com> <
- 20140224004826.22529.87768@quantum> <530B8B46.6060003@samsung.com>
-Message-ID: <20140301211348.98ECEC40FF7@trevor.secretlab.ca>
+Date: Sun, 02 Mar 2014 13:40:43 +0800
+Subject: [PATCH v6 05/11] drivers: of: add automated assignment of
+ reserved regions to client devices
+In-Reply-To: <1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
+References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
+ 1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140302054043.4F48AC414EF@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Feb 2014 19:11:18 +0100, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> On 24/02/14 01:48, Mike Turquette wrote:
-> > Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
-> >> > On 20/02/14 15:09, Grant Likely wrote:
-> >> > [...]
-> >>>>> > >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >>>>> > >> > index 7c52c29..d618498 100644
-> >>>>> > >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >>>>> > >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >>>>> > >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
-> >>>>> > >> >    ("pll" and "pll-switched").
-> >>>>> > >> >  * The UART has its baud clock connected the external oscillator and its
-> >>>>> > >> >    register clock connected to the PLL clock (the "pll-switched" signal)
-> >>>>> > >> > +
-> >>>>> > >> > +==Static initial configuration of clock parent and clock frequency==
-> >>>>> > >> > +
-> >>>>> > >> > +Some platforms require static configuration of (parts of) the clock controller
-> >>>>> > >> > +often determined by the board design. Such a configuration can be specified in
-> >>>>> > >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
-> >>>>> > >> > +properties. The former should contain phandle and clock specifier of the parent
-> >>>>> > >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
-> >>>>> > >> > +should be listed in the clock-names property and a phandle and a clock specifier
-> >>>>> > >> > +pair corresponding to it should be present in the clocks property.
-> >>>>> > >> > +
-> >>>>> > >> > +    uart at a000 {
-> >>>>> > >> > +        compatible = "fsl,imx-uart";
-> >>>>> > >> > +        reg = <0xa000 0x1000>;
-> >>>>> > >> > +  ...
-> >>>>> > >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
-> >>>>> > >> > +        clock-names = "baud", "mux";
-> >>>>> > >> > +
-> >>>>> > >> > +  mux-clk-parent = <&pll 1>;
-> >>>>> > >> > +  baud-clk-rate = <460800>;
-> >>> > >
-> >>> > > This mixes patterns for references to clocks. Plus it requires composing
-> >>> > > property names which is a little painful. I'd rather see a list of
-> >>> > > tuples to match the existing pattern already in use
-> >>> > > 
-> >>> > >       clocks = <&clkcon 0>, <&clkcon 3>;
-> >>> > >       clock-names = "baud", "mux";
-> >>> > >       clock-parents = <0> <&pll 1>;
-> >>> > >       clock-rates = <0> <460800>;
-> >> > 
-> >> > Thank you for the review. This looks much better to me. My bad, I wasn't 
-> >> > aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
-> >> > to be specifying exact meaning of the 'phandle' property values, except 
-> >> > they be unique. Anyway, it seems to be clearly documented within the
-> >> > __of_parse_phandle_with_args() function. 
-> >> > 
-> >> > I'll try this modified binding instead, presumably it would be useful to 
-> >> > have a variant of __of_parse_phandle_with_args() function which would 
-> >> > accept a context data containing result of previous call within an iteration, 
-> >> > similarly as of_property_next_string() is written. So we don't iterate 
-> >> > from beginning of the list with each __of_parse_phandle_with_args() call. 
-> >> > But it's an optimization issue that could be considered separately I guess.
-> >
-> > I was always partial to the regulator style of blahblah-supply but
-> > Grant's suggestion is much cleaner with respect to the rest of the clock
-> > binding.
+On Fri, 28 Feb 2014 14:42:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> This patch adds code for automated assignment of reserved memory regions
+> to struct device. reserved_mem->ops->device_init()/device_cleanup()
+> callbacks are called to perform reserved memory driver specific
+> initialization and cleanup
 > 
-> I don't have a strong opinion, I'm slightly inclined towards Grant's suggestion,
-> which doesn't have a problem of limiting effective clk name to 21 characters.
+> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 > 
-> Also DT property names with underscores coming from the clock names are a bit
-> incorrect and it might be not immediately obvious which part of name is a 
-> canonical property's name and which is clock's name. Let's consider property 
-> names like:
-> 
-> mux-clk-parent, divider-clk-rate, sclk_mmc0-clk-parent, sclk_uart_baud0-clk-parent,
-> etc.
-> 
-> > I guess it will be a bit ugly if a very long array is needed with a
-> > sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
-> > only a single clock needs to have its parent or rate specified.
-> 
-> It was also concerning me, but this inconvenience could be mitigated by 
-> reordering content of clocks/clock-names properties so that the clocks for
-> which parents and/or rates are being assigned are first on the list.
-> Then number of padding zeros is minimized.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-If the array really gets that long for a device, then groups of clocks
-can also be split off into sub-nodes.
+Hi Marek,
+
+I've not applied this one yet, only because there is still the open
+issue of whether or not these functions should be called from drivers or
+from core code. I don't actually have any problems with the content of
+this patch. Once the user is sorted out I'll merge it.
 
 g.
+
+> ---
+>  drivers/of/of_reserved_mem.c    |   70 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_reserved_mem.h |    7 ++++
+>  2 files changed, 77 insertions(+)
+> 
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index daaaf935911d..5c45016efd31 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -206,8 +206,16 @@ void __init fdt_init_reserved_mem(void)
+>  	for (i = 0; i < reserved_mem_count; i++) {
+>  		struct reserved_mem *rmem = &reserved_mem[i];
+>  		unsigned long node = rmem->fdt_node;
+> +		unsigned long len;
+> +		__be32 *prop;
+>  		int err = 0;
+>  
+> +		prop = of_get_flat_dt_prop(node, "phandle", &len);
+> +		if (!prop)
+> +			prop = of_get_flat_dt_prop(node, "linux,phandle", &len);
+> +		if (prop)
+> +			rmem->phandle = of_read_number(prop, len/4);
+> +
+>  		if (rmem->size == 0)
+>  			err = __reserved_mem_alloc_size(node, rmem->name,
+>  						 &rmem->base, &rmem->size);
+> @@ -215,3 +223,65 @@ void __init fdt_init_reserved_mem(void)
+>  			__reserved_mem_init_node(rmem);
+>  	}
+>  }
+> +
+> +static inline struct reserved_mem *__find_rmem(struct device_node *node)
+> +{
+> +	unsigned int i;
+> +
+> +	if (!node->phandle)
+> +		return NULL;
+> +
+> +	for (i = 0; i < reserved_mem_count; i++)
+> +		if (reserved_mem[i].phandle == node->phandle)
+> +			return &reserved_mem[i];
+> +	return NULL;
+> +}
+> +
+> +/**
+> + * of_reserved_mem_device_init() - assign reserved memory region to given device
+> + *
+> + * This function assign memory region pointed by "memory-region" device tree
+> + * property to the given device.
+> + */
+> +void of_reserved_mem_device_init(struct device *dev)
+> +{
+> +	struct reserved_mem *rmem;
+> +	struct device_node *np;
+> +
+> +	np = of_parse_phandle(dev->of_node, "memory-region", 0);
+> +	if (!np)
+> +		return;
+> +
+> +	rmem = __find_rmem(np);
+> +	of_node_put(np);
+> +
+> +	if (!rmem || !rmem->ops || !rmem->ops->device_init)
+> +		return;
+> +
+> +	rmem->ops->device_init(rmem, dev);
+> +	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+> +}
+> +
+> +/**
+> + * of_reserved_mem_device_release() - release reserved memory device structures
+> + *
+> + * This function releases structures allocated for memory region handling for
+> + * the given device.
+> + */
+> +void of_reserved_mem_device_release(struct device *dev)
+> +{
+> +	struct reserved_mem *rmem;
+> +	struct device_node *np;
+> +
+> +	np = of_parse_phandle(dev->of_node, "memory-region", 0);
+> +	if (!np)
+> +		return;
+> +
+> +	rmem = __find_rmem(np);
+> +	of_node_put(np);
+> +
+> +	if (!rmem || !rmem->ops || !rmem->ops->device_release)
+> +		return;
+> +
+> +	rmem->ops->device_release(rmem, dev);
+> +}
+> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+> index 9b1fbb7f29fc..6a54e6565b89 100644
+> --- a/include/linux/of_reserved_mem.h
+> +++ b/include/linux/of_reserved_mem.h
+> @@ -8,6 +8,7 @@ struct reserved_mem_ops;
+>  struct reserved_mem {
+>  	const char			*name;
+>  	unsigned long			fdt_node;
+> +	unsigned long			phandle;
+>  	const struct reserved_mem_ops	*ops;
+>  	phys_addr_t			base;
+>  	phys_addr_t			size;
+> @@ -25,6 +26,9 @@ typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
+>  				      unsigned long node, const char *uname);
+>  
+>  #ifdef CONFIG_OF_RESERVED_MEM
+> +void of_reserved_mem_device_init(struct device *dev);
+> +void of_reserved_mem_device_release(struct device *dev);
+> +
+>  void fdt_init_reserved_mem(void);
+>  void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+>  			       phys_addr_t base, phys_addr_t size);
+> @@ -37,6 +41,9 @@ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+>  				init : init }
+>  
+>  #else
+> +static inline void of_reserved_mem_device_init(struct device *dev) { }
+> +static inline void of_reserved_mem_device_release(struct device *pdev) { }
+> +
+>  static inline void fdt_init_reserved_mem(void) { }
+>  static inline void fdt_reserved_mem_save_node(unsigned long node,
+>  		const char *uname, phys_addr_t base, phys_addr_t size) { }
+> -- 
+> 1.7.9.5
+> 
