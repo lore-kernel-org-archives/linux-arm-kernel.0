@@ -1,39 +1,35 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 02 Mar 2014 12:25:59 +1100
-Subject: [PATCH v2 4/4] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1393723415.12039.1.camel@pasglop>
-References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
- <1393506402-11474-5-git-send-email-Liviu.Dudau@arm.com>
- <18746655.qWHLpMg2Yy@wuerfel> <1393543924.14012.56.camel@pasglop>
- <20140228095559.GU1692@e106497-lin.cambridge.arm.com>
- <1393723415.12039.1.camel@pasglop>
-Message-ID: <1393723559.12039.3.camel@pasglop>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 2 Mar 2014 07:14:51 +0200
+Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
+In-Reply-To: <52F92524.3080402@ti.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-5-git-send-email-s-anna@ti.com>
+ <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
+ <52F92524.3080402@ti.com>
+Message-ID: <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-03-02 at 12:23 +1100, Benjamin Herrenschmidt wrote:
-> On Fri, 2014-02-28 at 09:55 +0000, Liviu Dudau wrote:
-> > The next phase will be to see how much of the pci_controller structure can move
-> > into the generic code and reduce its size. I do suffer from not having a PowerPC
-> > platform where I can test the changes, but I can produce some compiled code that
-> > someone can test.
-> 
-> Ok, we can probably start from there. I think the right approach is to actually
-> kill pci_controller by merging it with the new host bridge structure.
-> 
-> Most of the resources are there now, we need to move the rest. We probably will
-> need a way to attach platform specific bits to it though, and a few hooks to
-> populate them but that isn't terribly hard.
+On Mon, Feb 10, 2014 at 9:14 PM, Suman Anna <s-anna@ti.com> wrote:
+> On 02/07/2014 04:49 PM, Bjorn Andersson wrote:
+>> It seems to be standard practice to pass the error value back to the
+>> consumer, so you should
+>> return ERR_PTR(ret); here instead of the NULL...
+>
+>
+> I have modelled the return values in this function based on the return
+> values in the existing hwspin_lock_request interfaces. I would need to
+> change those functions as well.
+>
+> Ohad,
+> Do you have any objections to the return code convention change?
 
-Oh and regarding testing...
+Unless strictly needed, I prefer we don't switch to the ERR_PTR code
+convention, as it reduces code readability and increases chances of
+user bugs.
 
-qemu should help. For qemu ppc64, try -M pseries, that's fairly well
-maintained since it's the basis for all our new KVM based products,
-and there's still some (hopefully) working 32-bit mac stuff in there.
+In our case, switching to ERR_PTR and friends seems only to optimize a
+few error paths, and I'm not sure it's a big win over simplicity.
 
-With pseries, I would expect that you can install fedora, debian or
-ubuntu (in fact you can also install SLES11/RHEL6 I believe).
-
-Cheers,
-Ben.
+Thanks,
+Ohad.
