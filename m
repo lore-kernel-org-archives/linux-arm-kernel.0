@@ -1,166 +1,179 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 02 Mar 2014 13:35:18 +0800
-Subject: [PATCH v6 04/11] drivers: of: add support for custom reserved
- memory drivers
-In-Reply-To: <1393594976-16728-5-git-send-email-m.szyprowski@samsung.com>
+Date: Sun, 02 Mar 2014 13:00:12 +0800
+Subject: [PATCH v6 01/11] of: document bindings for reserved-memory nodes
+In-Reply-To: <1393594976-16728-2-git-send-email-m.szyprowski@samsung.com>
 References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com> <
- 1393594976-16728-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140302053518.52719C41382@trevor.secretlab.ca>
+ 1393594976-16728-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140302050012.8F71DC40372@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Feb 2014 14:42:49 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Add support for custom reserved memory drivers. Call their init() function
-> for each reserved region and prepare for using operations provided by them
-> with by the reserved_mem->ops array.
+On Fri, 28 Feb 2014 14:42:46 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> From: Grant Likely <grant.likely@linaro.org>
 > 
-> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+> Reserved memory nodes allow for the reservation of static (fixed
+> address) regions, or dynamically allocated regions for a specific
+> purpose.
 > 
+> Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> [joshc: Based on binding document proposed (in non-patch form) here:
+>  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+>  adapted to support #memory-region-cells]
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> [mszyprow: removed #memory-region-cells property]
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Applied, thanks.
+Merged, thanks.
 
 g.
 
 > ---
->  drivers/of/of_reserved_mem.c      |   29 +++++++++++++++++++++++++++++
->  include/asm-generic/vmlinux.lds.h |   11 +++++++++++
->  include/linux/of_reserved_mem.h   |   32 ++++++++++++++++++++++++++++++++
->  3 files changed, 72 insertions(+)
+>  .../bindings/reserved-memory/reserved-memory.txt   |  136 ++++++++++++++++++++
+>  1 file changed, 136 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 > 
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> index 69b811779585..daaaf935911d 100644
-> --- a/drivers/of/of_reserved_mem.c
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -170,6 +170,33 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
->  	return 0;
->  }
->  
-> +static const struct of_device_id __rmem_of_table_sentinel
-> +	__used __section(__reservedmem_of_table_end);
+> diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> new file mode 100644
+> index 000000000000..8b0d747a38e7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> @@ -0,0 +1,136 @@
+> +*** Reserved memory regions ***
 > +
-> +/**
-> + * res_mem_init_node() - call region specific reserved memory init code
-> + */
-> +static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
-> +{
-> +	extern const struct of_device_id __reservedmem_of_table[];
-> +	const struct of_device_id *i;
+> +Reserved memory is specified as a node under the /reserved-memory node.
+> +The operating system shall exclude reserved memory from normal usage
+> +one can create child nodes describing particular reserved (excluded from
+> +normal use) memory regions. Such memory regions are usually designed for
+> +the special usage by various device drivers.
 > +
-> +	for (i = __reservedmem_of_table; i < &__rmem_of_table_sentinel; i++) {
-> +		reservedmem_of_init_fn initfn = i->data;
-> +		const char *compat = i->compatible;
+> +Parameters for each memory region can be encoded into the device tree
+> +with the following nodes:
 > +
-> +		if (!of_flat_dt_is_compatible(rmem->fdt_node, compat))
-> +			continue;
+> +/reserved-memory node
+> +---------------------
+> +#address-cells, #size-cells (required) - standard definition
+> +    - Should use the same values as the root node
+> +ranges (required) - standard definition
+> +    - Should be empty
 > +
-> +		if (initfn(rmem, rmem->fdt_node, rmem->name) == 0) {
-> +			pr_info("Reserved memory: initialized node %s, compatible id %s\n",
-> +				rmem->name, compat);
-> +			return 0;
-> +		}
-> +	}
-> +	return -ENOENT;
-> +}
+> +/reserved-memory/ child nodes
+> +-----------------------------
+> +Each child of the reserved-memory node specifies one or more regions of
+> +reserved memory. Each child node may either use a 'reg' property to
+> +specify a specific range of reserved memory, or a 'size' property with
+> +optional constraints to request a dynamically allocated block of memory.
 > +
->  /**
->   * fdt_init_reserved_mem - allocate and init all saved reserved memory regions
->   */
-> @@ -184,5 +211,7 @@ void __init fdt_init_reserved_mem(void)
->  		if (rmem->size == 0)
->  			err = __reserved_mem_alloc_size(node, rmem->name,
->  						 &rmem->base, &rmem->size);
-> +		if (err == 0)
-> +			__reserved_mem_init_node(rmem);
->  	}
->  }
-> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> index bc2121fa9132..f10f64fcc815 100644
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -167,6 +167,16 @@
->  #define CLK_OF_TABLES()
->  #endif
->  
-> +#ifdef CONFIG_OF_RESERVED_MEM
-> +#define RESERVEDMEM_OF_TABLES()				\
-> +	. = ALIGN(8);					\
-> +	VMLINUX_SYMBOL(__reservedmem_of_table) = .;	\
-> +	*(__reservedmem_of_table)			\
-> +	*(__reservedmem_of_table_end)
-> +#else
-> +#define RESERVEDMEM_OF_TABLES()
-> +#endif
+> +Following the generic-names recommended practice, node names should
+> +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
+> +address (@<address>) should be appended to the name if the node is a
+> +static allocation.
 > +
->  #define KERNEL_DTB()							\
->  	STRUCT_ALIGN();							\
->  	VMLINUX_SYMBOL(__dtb_start) = .;				\
-> @@ -490,6 +500,7 @@
->  	TRACE_SYSCALLS()						\
->  	MEM_DISCARD(init.rodata)					\
->  	CLK_OF_TABLES()							\
-> +	RESERVEDMEM_OF_TABLES()						\
->  	CLKSRC_OF_TABLES()						\
->  	KERNEL_DTB()							\
->  	IRQCHIP_OF_MATCH_TABLE()
-> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-> index 89226ed7d954..9b1fbb7f29fc 100644
-> --- a/include/linux/of_reserved_mem.h
-> +++ b/include/linux/of_reserved_mem.h
-> @@ -1,21 +1,53 @@
->  #ifndef __OF_RESERVED_MEM_H
->  #define __OF_RESERVED_MEM_H
->  
-> +struct device;
-> +struct of_phandle_args;
-> +struct reserved_mem_ops;
+> +Properties:
+> +Requires either a) or b) below.
+> +a) static allocation
+> +   reg (required) - standard definition
+> +b) dynamic allocation
+> +   size (required) - length based on parent's #size-cells
+> +                   - Size in bytes of memory to reserve.
+> +   alignment (optional) - length based on parent's #size-cells
+> +                        - Address boundary for alignment of allocation.
+> +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
+> +                           - Specifies regions of memory that are
+> +                             acceptable to allocate from.
 > +
->  struct reserved_mem {
->  	const char			*name;
->  	unsigned long			fdt_node;
-> +	const struct reserved_mem_ops	*ops;
->  	phys_addr_t			base;
->  	phys_addr_t			size;
-> +	void				*priv;
+> +If both reg and size are present, then the reg property takes precedence
+> +and size is ignored.
+> +
+> +Additional properties:
+> +compatible (optional) - standard definition
+> +    - may contain the following strings:
+> +        - shared-dma-pool: This indicates a region of memory meant to be
+> +          used as a shared pool of DMA buffers for a set of devices. It can
+> +          be used by an operating system to instanciate the necessary pool
+> +          management subsystem if necessary.
+> +        - vendor specific string in the form <vendor>,[<device>-]<usage>
+> +no-map (optional) - empty property
+> +    - Indicates the operating system must not create a virtual mapping
+> +      of the region as part of its standard mapping of system memory,
+> +      nor permit speculative access to it under any circumstances other
+> +      than under the control of the device driver using the region.
+> +reusable (optional) - empty property
+> +    - The operating system can use the memory in this region with the
+> +      limitation that the device driver(s) owning the region need to be
+> +      able to reclaim it back. Typically that means that the operating
+> +      system can use that region to store volatile or cached data that
+> +      can be otherwise regenerated or migrated elsewhere.
+> +
+> +Linux implementation note:
+> +- If a "linux,cma-default" property is present, then Linux will use the
+> +  region for the default pool of the contiguous memory allocator.
+> +
+> +Device node references to reserved memory
+> +-----------------------------------------
+> +Regions in the /reserved-memory node may be referenced by other device
+> +nodes by adding a memory-region property to the device node.
+> +
+> +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
+> +
+> +Example
+> +-------
+> +This example defines 3 contiguous regions are defined for Linux kernel:
+> +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
+> +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
+> +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
+> +
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		/* global autoconfigured region for contiguous allocations */
+> +		linux,cma {
+> +			compatible = "shared-dma-pool";
+> +			reusable;
+> +			#memory-region-cells = <0>;
+> +			size = <0x4000000>;
+> +			alignment = <0x2000>;
+> +			linux,cma-default;
+> +		};
+> +
+> +		display_reserved: framebuffer at 78000000 {
+> +			#memory-region-cells = <0>;
+> +			reg = <0x78000000 0x800000>;
+> +		};
+> +
+> +		multimedia_reserved: multimedia at 77000000 {
+> +			compatible = "acme,multimedia-memory";
+> +			#memory-region-cells = <1>;
+> +			reg = <0x77000000 0x4000000>;
+> +		};
+> +	};
+> +
+> +	/* ... */
+> +
+> +	fb0: video at 12300000 {
+> +		memory-region = <&display_reserved>;
+> +		/* ... */
+> +	};
+> +
+> +	scaler: scaler at 12500000 {
+> +		memory-region = <&multimedia_reserved 0xdeadbeef>;
+> +		/* ... */
+> +	};
+> +
+> +	codec: codec at 12600000 {
+> +		memory-region = <&multimedia_reserved 0xfeebdaed>;
+> +		/* ... */
+> +	};
 > +};
-> +
-> +struct reserved_mem_ops {
-> +	void	(*device_init)(struct reserved_mem *rmem,
-> +			       struct device *dev);
-> +	void	(*device_release)(struct reserved_mem *rmem,
-> +				  struct device *dev);
->  };
->  
-> +typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
-> +				      unsigned long node, const char *uname);
-> +
->  #ifdef CONFIG_OF_RESERVED_MEM
->  void fdt_init_reserved_mem(void);
->  void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
->  			       phys_addr_t base, phys_addr_t size);
-> +
-> +#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
-> +	static const struct of_device_id __reservedmem_of_table_##name	\
-> +		__used __section(__reservedmem_of_table)		\
-> +		 = { .compatible = compat,				\
-> +		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
-> +				init : init }
-> +
->  #else
->  static inline void fdt_init_reserved_mem(void) { }
->  static inline void fdt_reserved_mem_save_node(unsigned long node,
->  		const char *uname, phys_addr_t base, phys_addr_t size) { }
-> +
-> +#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
-> +	static const struct of_device_id __reservedmem_of_table_##name	\
-> +		__attribute__((unused))					\
-> +		 = { .compatible = compat,				\
-> +		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
-> +				init : init }
-> +
->  #endif
->  
->  #endif /* __OF_RESERVED_MEM_H */
 > -- 
 > 1.7.9.5
 > 
