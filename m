@@ -1,28 +1,39 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 02 Mar 2014 12:23:35 +1100
+Date: Sun, 02 Mar 2014 12:25:59 +1100
 Subject: [PATCH v2 4/4] pci: Add support for creating a generic
  host_bridge from device tree
-In-Reply-To: <20140228095559.GU1692@e106497-lin.cambridge.arm.com>
+In-Reply-To: <1393723415.12039.1.camel@pasglop>
 References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
  <1393506402-11474-5-git-send-email-Liviu.Dudau@arm.com>
  <18746655.qWHLpMg2Yy@wuerfel> <1393543924.14012.56.camel@pasglop>
  <20140228095559.GU1692@e106497-lin.cambridge.arm.com>
-Message-ID: <1393723415.12039.1.camel@pasglop>
+ <1393723415.12039.1.camel@pasglop>
+Message-ID: <1393723559.12039.3.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-28 at 09:55 +0000, Liviu Dudau wrote:
-> The next phase will be to see how much of the pci_controller structure can move
-> into the generic code and reduce its size. I do suffer from not having a PowerPC
-> platform where I can test the changes, but I can produce some compiled code that
-> someone can test.
+On Sun, 2014-03-02 at 12:23 +1100, Benjamin Herrenschmidt wrote:
+> On Fri, 2014-02-28 at 09:55 +0000, Liviu Dudau wrote:
+> > The next phase will be to see how much of the pci_controller structure can move
+> > into the generic code and reduce its size. I do suffer from not having a PowerPC
+> > platform where I can test the changes, but I can produce some compiled code that
+> > someone can test.
+> 
+> Ok, we can probably start from there. I think the right approach is to actually
+> kill pci_controller by merging it with the new host bridge structure.
+> 
+> Most of the resources are there now, we need to move the rest. We probably will
+> need a way to attach platform specific bits to it though, and a few hooks to
+> populate them but that isn't terribly hard.
 
-Ok, we can probably start from there. I think the right approach is to actually
-kill pci_controller by merging it with the new host bridge structure.
+Oh and regarding testing...
 
-Most of the resources are there now, we need to move the rest. We probably will
-need a way to attach platform specific bits to it though, and a few hooks to
-populate them but that isn't terribly hard.
+qemu should help. For qemu ppc64, try -M pseries, that's fairly well
+maintained since it's the basis for all our new KVM based products,
+and there's still some (hopefully) working 32-bit mac stuff in there.
+
+With pseries, I would expect that you can install fedora, debian or
+ubuntu (in fact you can also install SLES11/RHEL6 I believe).
 
 Cheers,
 Ben.
