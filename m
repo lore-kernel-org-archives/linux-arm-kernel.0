@@ -1,51 +1,58 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  2 Mar 2014 11:44:35 +0400
-Subject: [PATCH 4/4] regulator: mc13xxx: Fix probing with DT
-In-Reply-To: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
-References: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1393746275-9253-4-git-send-email-shc_work@mail.ru>
+Date: Sun,  2 Mar 2014 11:44:32 +0400
+Subject: [PATCH 1/4] mfd: mc13xxx: Honor designed SPI mode
+Message-ID: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nodes of regulators should be retrieved from parent device.
-Bug was be introduced by commit (regulator: mc13xxx: Fix NULL
-pointer error in non-DT mode) in conjuction with (mfd: Revert
-"mfd: Always assign of_node in mfd_add_device()").
+Instead of using hard coded SPI mode, use mode described in
+devicetree or defined for the board.
+Additionally, patch updates all users of this PMIC to use
+correct SPI mode.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/regulator/mc13xxx-regulator-core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/mach-mx31lilly.c | 1 +
+ arch/arm/mach-imx/mach-mx31lite.c  | 1 +
+ drivers/mfd/mc13xxx-spi.c          | 2 --
+ 3 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/mc13xxx-regulator-core.c b/drivers/regulator/mc13xxx-regulator-core.c
-index bf75fca..05b9717 100644
---- a/drivers/regulator/mc13xxx-regulator-core.c
-+++ b/drivers/regulator/mc13xxx-regulator-core.c
-@@ -167,10 +167,10 @@ int mc13xxx_get_num_regulators_dt(struct platform_device *pdev)
- 	struct device_node *parent;
- 	int num;
+diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+index 832b1e2..16c688e 100644
+--- a/arch/arm/mach-imx/mach-mx31lilly.c
++++ b/arch/arm/mach-imx/mach-mx31lilly.c
+@@ -231,6 +231,7 @@ static struct spi_board_info mc13783_dev __initdata = {
+ 	.bus_num	= 1,
+ 	.chip_select	= 0,
+ 	.platform_data	= &mc13783_pdata,
++	.mode		= SPI_MODE_0 | SPI_CS_HIGH,
+ 	/* irq number is run-time assigned */
+ };
  
--	if (!pdev->dev.of_node)
-+	if (!pdev->dev.parent->of_node)
- 		return -ENODEV;
+diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
+index bea0729..bf3e61e 100644
+--- a/arch/arm/mach-imx/mach-mx31lite.c
++++ b/arch/arm/mach-imx/mach-mx31lite.c
+@@ -121,6 +121,7 @@ static struct spi_board_info mc13783_spi_dev __initdata = {
+ 	.bus_num	= 1,
+ 	.chip_select    = 0,
+ 	.platform_data  = &mc13783_pdata,
++	.mode		= SPI_MODE_0 | SPI_CS_HIGH,
+ 	/* irq number is run-time assigned */
+ };
  
--	parent = of_get_child_by_name(pdev->dev.of_node, "regulators");
-+	parent = of_get_child_by_name(pdev->dev.parent->of_node, "regulators");
- 	if (!parent)
- 		return -ENODEV;
+diff --git a/drivers/mfd/mc13xxx-spi.c b/drivers/mfd/mc13xxx-spi.c
+index 38ab678..f88087f 100644
+--- a/drivers/mfd/mc13xxx-spi.c
++++ b/drivers/mfd/mc13xxx-spi.c
+@@ -136,8 +136,6 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
  
-@@ -189,10 +189,10 @@ struct mc13xxx_regulator_init_data *mc13xxx_parse_regulators_dt(
- 	struct device_node *parent, *child;
- 	int i, parsed = 0;
+ 	dev_set_drvdata(&spi->dev, mc13xxx);
  
--	if (!pdev->dev.of_node)
-+	if (!pdev->dev.parent->of_node)
- 		return NULL;
+-	spi->mode = SPI_MODE_0 | SPI_CS_HIGH;
+-
+ 	mc13xxx->irq = spi->irq;
  
--	parent = of_get_child_by_name(pdev->dev.of_node, "regulators");
-+	parent = of_get_child_by_name(pdev->dev.parent->of_node, "regulators");
- 	if (!parent)
- 		return NULL;
- 
+ 	mc13xxx->regmap = devm_regmap_init(&spi->dev, &regmap_mc13xxx_bus,
 -- 
 1.8.3.2
