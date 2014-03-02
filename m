@@ -1,42 +1,55 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Sun, 2 Mar 2014 12:19:10 -0800
-Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
-In-Reply-To: <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-5-git-send-email-s-anna@ti.com>
- <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
- <52F92524.3080402@ti.com>
- <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
-Message-ID: <CAJAp7Ohf43hbKatCwS5Y1+OfEkJYWOkuhZhW-E_=t_9mfM+UaA@mail.gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Sun, 2 Mar 2014 21:29:40 +0100
+Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
+In-Reply-To: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20140302202940.GQ3327@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 1, 2014 at 9:14 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Mon, Feb 10, 2014 at 9:14 PM, Suman Anna <s-anna@ti.com> wrote:
->> On 02/07/2014 04:49 PM, Bjorn Andersson wrote:
->>> It seems to be standard practice to pass the error value back to the
->>> consumer, so you should
->>> return ERR_PTR(ret); here instead of the NULL...
->>
->>
->> I have modelled the return values in this function based on the return
->> values in the existing hwspin_lock_request interfaces. I would need to
->> change those functions as well.
->>
->> Ohad,
->> Do you have any objections to the return code convention change?
->
-> Unless strictly needed, I prefer we don't switch to the ERR_PTR code
-> convention, as it reduces code readability and increases chances of
-> user bugs.
->
-> In our case, switching to ERR_PTR and friends seems only to optimize a
-> few error paths, and I'm not sure it's a big win over simplicity.
+On Fri, Feb 28, 2014 at 15:34 -0800, Soren Brinkmann wrote:
+> 
+> [ MMIO registers assumed for clock control modules, but I2C
+> communication may be involved in other hardware, individual for
+> a (set of) clock(s) and not for an architecture or platform ]
+> 
+> Does anybody have a good idea how we could avoid all this code
+> duplication while enabling usage of the clock primitives with different
+> IO accessors?
+> Especially the divider and mux primitive have a lot of code that would
+> be painful to maintain twice.
 
-When introducing the ability to reference a hwspin lock via a phandle
-in device tree it makes a big difference to be able to differ between
-the case of "initialization failed" or "device not yet probed"; so
-that the client knows if it should fail or retry later.
+Hasn't past discussion already reached the point where code
+duplication of the clock control logic was considered
+undesirable, and "low level ops" were outlined?  I.e. extending
+the compile time decision for a specific clk_{read,write}l()
+implementation by another potential redirection that is specific
+to a clock item?
 
-Regards,
-Bjorn
+Re-submitting a series which duplicates complete clock types,
+while the difference is only in how registers get accessed, is
+quite saddening.
+
+
+> In the next step, I encountered a divider clock whose divider is stored
+> in 2 I2C registers. So now, the simple IO access replacement doesn't
+> work anymore either since this clock needs 2 registers to be read and
+> then shifting around the bitfields accordingly.
+
+Are the registers adjacent and contain only bit fields for one
+clock?  Or do registers share parameters for several clocks, or
+are not adjacent?
+
+In the former case you may use a table from "divider value" to
+"bit pattern to read/write".  In the latter case, the clock
+control module is rather special, and may not be easily get
+mapped to the common primitives.  Unless the ll_ops can implement
+the required special handling.
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
