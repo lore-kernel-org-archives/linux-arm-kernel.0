@@ -1,37 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 02 Mar 2014 18:59:27 +0100
-Subject: [PATCH 1/2] iommu/arm-smmu: Replace list walk with platform
- driver data
-In-Reply-To: <20140228163837.GC30996@mudshark.cambridge.arm.com>
-References: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1393601830-4677-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140228163837.GC30996@mudshark.cambridge.arm.com>
-Message-ID: <4440723.cnxQ5HD11R@avalon>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Sun, 2 Mar 2014 12:19:10 -0800
+Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-5-git-send-email-s-anna@ti.com>
+ <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
+ <52F92524.3080402@ti.com>
+ <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
+Message-ID: <CAJAp7Ohf43hbKatCwS5Y1+OfEkJYWOkuhZhW-E_=t_9mfM+UaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Sat, Mar 1, 2014 at 9:14 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Mon, Feb 10, 2014 at 9:14 PM, Suman Anna <s-anna@ti.com> wrote:
+>> On 02/07/2014 04:49 PM, Bjorn Andersson wrote:
+>>> It seems to be standard practice to pass the error value back to the
+>>> consumer, so you should
+>>> return ERR_PTR(ret); here instead of the NULL...
+>>
+>>
+>> I have modelled the return values in this function based on the return
+>> values in the existing hwspin_lock_request interfaces. I would need to
+>> change those functions as well.
+>>
+>> Ohad,
+>> Do you have any objections to the return code convention change?
+>
+> Unless strictly needed, I prefer we don't switch to the ERR_PTR code
+> convention, as it reduces code readability and increases chances of
+> user bugs.
+>
+> In our case, switching to ERR_PTR and friends seems only to optimize a
+> few error paths, and I'm not sure it's a big win over simplicity.
 
-On Friday 28 February 2014 16:38:37 Will Deacon wrote:
-> Hi Laurent,
-> 
-> On Fri, Feb 28, 2014 at 03:37:09PM +0000, Laurent Pinchart wrote:
-> > Instead of walking the list of registered SMMU devices at remove time to
-> > locate the device being removed, set platform driver data at probe time
-> > to point to the SMMU and retrieve the pointer at remove time.
-> 
-> What does this gain us other than a slight code shrinkage?
+When introducing the ability to reference a hwspin lock via a phandle
+in device tree it makes a big difference to be able to differ between
+the case of "initialization failed" or "device not yet probed"; so
+that the client knows if it should fail or retry later.
 
-Just a slight code shrinkage. That's better than nothing, isn't it ? :-)
-
-> If we could get rid of the arm_smmu_devices list, then I'd be more excited
-> by this change!
-
-Associating devices with IOMMUs is something that should be performed by the 
-IOMMU core. I might give this a try, but I'll be busy with other tasks for the 
-next couple of weeks.
-
--- 
 Regards,
-
-Laurent Pinchart
+Bjorn
