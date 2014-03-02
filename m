@@ -1,51 +1,54 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 02 Mar 2014 05:37:13 -0500
-Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <20140228101226.GO21483@n2100.arm.linux.org.uk>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <1392017945-4507-8-git-send-email-dave.long@linaro.org>
- <20140228101226.GO21483@n2100.arm.linux.org.uk>
-Message-ID: <531309D9.6050708@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 02 Mar 2014 12:35:50 +0100
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <20140301135002.GA4307@katana>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
+ <20140301135002.GA4307@katana>
+Message-ID: <3584854.kj2ZbTBvnM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/14 05:12, Russell King - ARM Linux wrote:
-> On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
->> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
->> index 7cd1763..179deac 100644
->> --- a/arch/arm/kernel/probes.c
->> +++ b/arch/arm/kernel/probes.c
->> @@ -12,11 +12,9 @@
->>    */
->>
->>   #include <linux/kernel.h>
->> -#include <linux/kprobes.h>
->>   #include <asm/system_info.h>
->
-> How well has this code been tested?  This file doesn't even build because
-> (I suspect) the above change:
->
-> arch/arm/kernel/probes.c: In function 'test_alu_write_pc_interworking':
-> arch/arm/kernel/probes.c:68:2: error: implicit declaration of function 'BUG_ON' [-Werror=implicit-function-declaration]
-> make[2]: *** [arch/arm/kernel/probes.o] Error 1
->
-> This is because linux/kprobes.h includes linux/bug.h, which would provide
-> the requirements for BUG_ON().
->
+Hi Wolfram,
 
-It was tested by building and running on Panda with all four 
-permutations of uprobes and kprobes enabled/disabled.  x86 was also test 
-built and run to verify no regressions, and other testing was done 
-inside Linaro for arm64 endianess correctness.  Very recently daily 
-build testing has been added and this config problem has shown up, and 
-our test configs adjusted accordingly.  I think the problem was masked 
-on panda by CONFIG_PROFILING being set for that (and many other) 
-platform(s).  On x86 it looks like the problem is avoided by 
-CONFIG_PERF_EVENTS always being set in arch/x86/Kconfig.
+On Saturday 01 March 2014 14:50:03 Wolfram Sang wrote:
+> > +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
+> > +	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
+> > +	if (cpg == NULL || clks == NULL) {
+> > +		/* We're leaking memory on purpose, there's no point in cleaning
+> > +		 * up as the system won't boot anyway.
+> > +		 */
+> > +		pr_err("%s: failed to allocate cpg\n", __func__);
+> > +		return;
+> > +	}
+> 
+> I have problems with this sloppiness. Writing the comment took probably
+> the same time as writing the proper exit path :) On the drawback side,
+> static code checkers will keep reporting this.
 
-I was not aware of the use/requirement (or existence even) of randconfig 
-for validation testing, nor did I know a config dependency issue like 
-this one would be considered a showstopper problem.
+Then static code checkers should be fixed :-) or at least provide an override. 
+Given that the system won't boot if this fails I don't see a point in adding 
+useless code to the kernel that would just result in a larger binary size.
 
--dl
+> > +	cpg->reg = of_iomap(np, 0);
+> > +	if (WARN_ON(cpg->reg == NULL))
+> > +		return;
+> 
+> if (WARN(!cpg->reg, "can't ioremap CPG\n"))
+> 
+> ?
+
+We can probably remove this altogether given that the driver doesn't make use 
+of the ioremap'ed memory.
+
+-- 
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140302/e9607627/attachment.sig>
