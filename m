@@ -1,133 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Mar 2014 12:11:33 +0000
-Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <531309D9.6050708@linaro.org>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <1392017945-4507-8-git-send-email-dave.long@linaro.org>
- <20140228101226.GO21483@n2100.arm.linux.org.uk> <531309D9.6050708@linaro.org>
-Message-ID: <20140302121133.GF21483@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 2 Mar 2014 14:08:56 +0100
+Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
+In-Reply-To: <20140228173636.GG30996@mudshark.cambridge.arm.com>
+References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
+ <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
+ <CAKv+Gu_yMFE7YLKG=KuiW-vCjbjkpWDjyBx+43PW4t32M7P22g@mail.gmail.com>
+ <CALicx6t+V8Vt7u-8saV=e1KzK99D=_O_UsSvPrdMY3j9xR3opw@mail.gmail.com>
+ <CAKv+Gu9-XqLmvZ1HhCKvgM5=BvZWbR8SSnb7oJzMqGja_LHbAw@mail.gmail.com>
+ <CALicx6uRtxhj0+Fj98WtFAXssbV5G6sNQjkWikxaZnbMkBmWhA@mail.gmail.com>
+ <CALicx6v12DWQSqpP=pa_gJmyOqm4LmFHWc_9=n8Rt7M=krB+dQ@mail.gmail.com>
+ <20140228173636.GG30996@mudshark.cambridge.arm.com>
+Message-ID: <CAKv+Gu_yWWSrcuVcnP1NO-_r0orNH0BrS-oNb9kOvpqEJSvtYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 05:37:13AM -0500, David Long wrote:
-> On 02/28/14 05:12, Russell King - ARM Linux wrote:
->> On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
->>> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
->>> index 7cd1763..179deac 100644
->>> --- a/arch/arm/kernel/probes.c
->>> +++ b/arch/arm/kernel/probes.c
->>> @@ -12,11 +12,9 @@
->>>    */
->>>
->>>   #include <linux/kernel.h>
->>> -#include <linux/kprobes.h>
->>>   #include <asm/system_info.h>
+On 28 February 2014 18:36, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 28, 2014 at 11:08:58AM +0000, Vijay Kilari wrote:
+>> On Fri, Nov 29, 2013 at 3:27 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>> >>> KGDB, being kernel debugger it was thought that allow
+>> >>> debugging only if kernel mode is supported.
+>> >>> In fact, I proposed (previous email)  to remove this condition and
+>> >>> allow to reading neon
+>> >>> registers always and allow write only if neon is in kernel mode.
+>> >>>
+>> >>
+>> >> I think KGDB is a special case here and should not considered as a
+>> >> user of kernel mode NEON. So even writing the registers should
+>> >> allowable regardless of this setting imo.
+>> >>
 >>
->> How well has this code been tested?  This file doesn't even build because
->> (I suspect) the above change:
->>
->> arch/arm/kernel/probes.c: In function 'test_alu_write_pc_interworking':
->> arch/arm/kernel/probes.c:68:2: error: implicit declaration of function 'BUG_ON' [-Werror=implicit-function-declaration]
->> make[2]: *** [arch/arm/kernel/probes.o] Error 1
->>
->> This is because linux/kprobes.h includes linux/bug.h, which would provide
->> the requirements for BUG_ON().
->>
+>>  Can we avoid checking on NEON state and allow debugger to
+>> access NEON registers irrespective of state to keep it simple?
+>> and just compile config is enough?
 >
-> It was tested by building and running on Panda with all four  
-> permutations of uprobes and kprobes enabled/disabled.  x86 was also test  
-> built and run to verify no regressions, and other testing was done  
-> inside Linaro for arm64 endianess correctness.  Very recently daily  
-> build testing has been added and this config problem has shown up, and  
-> our test configs adjusted accordingly.  I think the problem was masked  
-> on panda by CONFIG_PROFILING being set for that (and many other)  
-> platform(s).  On x86 it looks like the problem is avoided by  
-> CONFIG_PERF_EVENTS always being set in arch/x86/Kconfig.
->
-> I was not aware of the use/requirement (or existence even) of randconfig  
-> for validation testing, nor did I know a config dependency issue like  
-> this one would be considered a showstopper problem.
+> I'm afraid I don't follow... I think we *do* need to do the relevant
+> flush/sync operations, I just don't think it should be predicated on
+> KERNEL_MODE_NEON.
 
-The point of randconfig is to find those combinations which you haven't
-tested.  For example, you say above that you tested on a Panda board.
-However, there's dependencies in this code for ARMv5, ARMv6 and ARMv7 as
-well, which you haven't tested for by only targetting Panda.
+Could you elaborate a bit on what you consider flush/sync operations?
 
-For example, the failure above is caused if you try and build this code
-with support for ARMv6 enabled.  This causes test_alu_write_pc_interworking()
-to be built, which finds the problem with BUG_ON().
+The point I was making is that, from kgdb's point of view, it is
+irrelevant whether the FPSIMD registers contain current's userland
+FPSIMD state or something else. kgdb should return and/or manipulate
+what the kernel itself sees when it accesses the FPSIMD registers
+directly, regardless of whether those contents belong to current's
+userland or not. (please refer to my pending series on kernel mode
+NEON optimizations)
 
-What the overall requirement here is that we avoid new regressions - in
-this case, it's a missing include file indirectly included via
-linux/kprobes.h.
+CONFIG_KERNEL_MODE_NEON is a 'def_bool y' on arm64, so whether it is
+more correct to depend on it or not is not that relevant.
 
-One of my biggest gripes is that people like reducing the include files
-in their sources to the barest minimum, relying on indirect includes to
-give them what their .c file requires.  This is - as is demonstrated
-above - very fragile, and leads to these kinds of unexpected build failures.
-If people thought about it properly, they'd realise that this is no way to
-behave.  Instead, a .c file should always include the headers that it has
-a direct requirement for.  In this case, that's linux/bug.h.  This problem
-is compounded by ARM having a multitude of configuration options which
-directly affect compiled code.
-
-Again, this is not your fault, but the author of kprobes.c who made a
-rather poor decision in only including (originally) six headers:
-
-+#include <linux/kernel.h>
-+#include <linux/kprobes.h>
-+#include <linux/module.h>
-+#include <linux/stringify.h>
-+#include <asm/traps.h>
-+#include <asm/cacheflush.h>
-
-despite requiring more.
-
-However, this is not the reason I dropped your patch series - I dropped
-them because of the other problem I mailed about, caused by the Kconfig
-dependencies.  That needs fixing first to avoid the problem your changes
-have uncovered - it's no good fixing it afterwards because it can end
-up breaking git bisect.  The precise time where you don't want git bisect
-to break is during a merge window, and that's when this code will be going
-in.
-
-Now that I look closer at this, the UPROBES Kconfig stuff is totally
-insane - this commit:
-
-commit f3f096cfedf8113380c56fc855275cc75cd8cf55
-Author: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
-Date:   Wed Apr 11 16:00:43 2012 +0530
-
-    tracing: Provide trace events interface for uprobes
-
-introduced this madness:
-
-config UPROBES
-        bool "Transparent user-space probes (EXPERIMENTAL)"
-        depends on UPROBE_EVENT && PERF_EVENTS
-        default n
-        select PERCPU_RWSEM
-
-config UPROBE_EVENT
-        bool "Enable uprobes-based dynamic events"
-        depends on ARCH_SUPPORTS_UPROBES
-        depends on MMU
-        select UPROBES
-        select PROBE_EVENTS
-        select TRACING
-
-What this expresses is that UPROBES can't be enabled unless UPROBE_EVENT
-is enabled.  If UPROBE_EVENT is enabled, then UPROBES is force-enabled
-irrespective of its dependencies.  Hence, this forces UPROBES to *always*
-have the same value as UPROBE_EVENT, it can never be anything different.
-
-I'm at a loss to understand why we have these two configuration options.
-The above commit just looks totally wrong from the Kconfig perspective.
-
-Maybe Srikar Dronamraju can comment about what the original intention
-was here - but it looks like one or other should just be killed off.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+Ard.
