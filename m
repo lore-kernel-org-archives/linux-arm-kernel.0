@@ -1,54 +1,42 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  2 Mar 2014 13:18:39 +0400
-Subject: [PATCH 2/2] ARM: dts: imx27-phytec-phycore-som: Enable SSI1
-In-Reply-To: <1393751919-17892-1-git-send-email-shc_work@mail.ru>
-References: <1393751919-17892-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1393751919-17892-2-git-send-email-shc_work@mail.ru>
+Date: Sun,  2 Mar 2014 13:18:38 +0400
+Subject: [PATCH 1/2] ARM: dts: imx27-phytec-phycore-rdk: Add missing pinctrl
+ definition for SPI CS1
+Message-ID: <1393751919-17892-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pin group for Synchronous Serial Interface 1 (SSI1)
-for PCM-038 module and enables this interface. This change do nothing
-at the current stage but helps to continue develop sound support.
+This patch adds missing pinctrl definition for SPI chipselect 1.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index cefaa69..8e10aef 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -251,6 +251,15 @@
- 			>;
- 		};
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index df3b2e7..86510ed 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -15,6 +15,7 @@
+ };
  
-+		pinctrl_ssi1: ssi1grp {
+ &cspi1 {
++	pinctrl-0 = <&pinctrl_cspi1>, <&pinctrl_cspi1cs1>;
+ 	fsl,spi-num-chipselects = <2>;
+ 	cs-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>,
+ 		   <&gpio4 27 GPIO_ACTIVE_LOW>;
+@@ -36,6 +37,12 @@
+ 
+ &iomuxc {
+ 	imx27_phycore_rdk {
++		pinctrl_cspi1cs1: cspi1cs1grp {
 +			fsl,pins = <
-+				MX27_PAD_SSI1_FS__SSI1_FS 0x0
-+				MX27_PAD_SSI1_RXDAT__SSI1_RXDAT 0x0
-+				MX27_PAD_SSI1_TXDAT__SSI1_TXDAT 0x0
-+				MX27_PAD_SSI1_CLK__SSI1_CLK 0x0
++				MX27_PAD_CSPI1_SS1__GPIO4_27 0x0
 +			>;
 +		};
 +
- 		pinctrl_usbotg: usbotggrp {
+ 		pinctrl_i2c1: i2c1grp {
+ 			/* Add pullup to DATA line */
  			fsl,pins = <
- 				MX27_PAD_USBOTG_CLK__USBOTG_CLK 0x0
-@@ -279,6 +288,13 @@
- 	status = "okay";
- };
- 
-+&ssi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ssi1>;
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
- &usbotg {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbotg>;
 -- 
 1.8.3.2
