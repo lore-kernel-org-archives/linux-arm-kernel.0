@@ -1,55 +1,117 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 2 Mar 2014 12:59:56 +0100
-Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <3584854.kj2ZbTBvnM@avalon>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
- <20140301135002.GA4307@katana> <3584854.kj2ZbTBvnM@avalon>
-Message-ID: <20140302115955.GA4021@katana>
+From: dave.long@linaro.org (David Long)
+Date: Sun, 02 Mar 2014 07:02:06 -0500
+Subject: [PATCH v6 00/14] uprobes: Add uprobes support for ARM
+In-Reply-To: <20140301123026.GD21483@n2100.arm.linux.org.uk>
+References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+ <20140301123026.GD21483@n2100.arm.linux.org.uk>
+Message-ID: <53131DBE.7020500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 12:35:50PM +0100, Laurent Pinchart wrote:
-> Hi Wolfram,
-> 
-> On Saturday 01 March 2014 14:50:03 Wolfram Sang wrote:
-> > > +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-> > > +	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
-> > > +	if (cpg == NULL || clks == NULL) {
-> > > +		/* We're leaking memory on purpose, there's no point in cleaning
-> > > +		 * up as the system won't boot anyway.
-> > > +		 */
-> > > +		pr_err("%s: failed to allocate cpg\n", __func__);
-> > > +		return;
-> > > +	}
-> > 
-> > I have problems with this sloppiness. Writing the comment took probably
-> > the same time as writing the proper exit path :) On the drawback side,
-> > static code checkers will keep reporting this.
-> 
-> Then static code checkers should be fixed :-)
+Oleg,
 
-How should they know if you 'return'? :) They will know if you BUG().
-Which might be the better (read: more descriptive) option which would
-save the comment, too.
+I've been looking at arch/Kconfig and kernel/trace/Kconfig where they 
+deal with uprobes.  The relevant items are CONFIG_UPROBES and 
+CONFIG_UPROBE_EVENT.  It just doesn't look right to me.  It looks like 
+"select" is used in part maybe just to avoid the recursive dependency 
+error that would be generated if "depends on" were used in both places. 
+However I don't think UPROBES should be dependent on UPROBE_EVENT, only 
+the other way around.  As RK noted in previous email (copied in part 
+below) the select does not pull in the lower level dependencies.  This 
+all works on x86 only because arch/x86/Kconfig defines CONFIG_PERF_EVENT 
+(which feels like a big hammer).  We don't need to do this on ARM, and 
+we don't do it.  The result is that, unless PERF_EVENT is set 
+separately, uprobes tends not to build.  I was lucking-out in my testing 
+due to other default config items turning on PERF_EVENT.
 
-> > > +	cpg->reg = of_iomap(np, 0);
-> > > +	if (WARN_ON(cpg->reg == NULL))
-> > > +		return;
-> > 
-> > if (WARN(!cpg->reg, "can't ioremap CPG\n"))
-> > 
-> > ?
-> 
-> We can probably remove this altogether given that the driver doesn't make use 
-> of the ioremap'ed memory.
+What do you think about the following patch?:
 
-Okay. Was still a good place to advertise WARN() over WARN_ON ;)
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index 80bbb8c..8793066 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -87,7 +87,8 @@ config KPROBES_ON_FTRACE
+>
+>  config UPROBES
+>  	bool "Transparent user-space probes (EXPERIMENTAL)"
+> -	depends on UPROBE_EVENT && PERF_EVENTS
+> +	depends on ARCH_SUPPORTS_UPROBES
+> +	depends on PERF_EVENTS
+>  	default n
+>  	select PERCPU_RWSEM
+>  	help
+> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+> index 015f85a..7d2647e 100644
+> --- a/kernel/trace/Kconfig
+> +++ b/kernel/trace/Kconfig
+> @@ -422,9 +422,8 @@ config KPROBE_EVENT
+>
+>  config UPROBE_EVENT
+>  	bool "Enable uprobes-based dynamic events"
+> -	depends on ARCH_SUPPORTS_UPROBES
+>  	depends on MMU
+> -	select UPROBES
+> +	depends on UPROBES
+>  	select PROBE_EVENTS
+>  	select TRACING
+>  	default n
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140302/0a181b53/attachment.sig>
+
+This removes the pseudo-recursive dependency.  The downside is that now 
+you have to set PERF_EVENTS to use UPROBES, and UPROBES to use 
+UPROBE_EVENT, whereas before on x86 you only had to set UPROBE_EVENT (as 
+long as PERF_EVENTS stays hardcoded on). I think this could be avoided 
+by making each "depends on" a "selects", since they apply transitively. 
+  I'm sensing this would be an unpopular idea though.
+
+-dl
+
+
+
+On 03/01/14 07:30, Russell King - ARM Linux wrote:
+
+[ ... ]
+
+> Clearly, it doesn't make sense for UPROBES to be enabled with PERF_EVENTS
+> disabled - and indeed the Kconfig ensures that this dependency is properly
+> expressed:
+>
+> 	config UPROBES
+> 	        bool "Transparent user-space probes (EXPERIMENTAL)"
+> 	        depends on UPROBE_EVENT && PERF_EVENTS
+> 	        default n
+> 	        select PERCPU_RWSEM
+>
+> but where this all falls down is here:
+>
+> 	config UPROBE_EVENT
+> 	        bool "Enable uprobes-based dynamic events"
+> 	        depends on ARCH_SUPPORTS_UPROBES
+> 	        depends on MMU
+> 	        select UPROBES
+> 	        select PROBE_EVENTS
+> 	        select TRACING
+> 	        default n
+>
+> Which is yet another brilliant example of why this "select" crap is soo
+> evil.  Yes, the failing configuration has:
+>
+> 	CONFIG_UPROBE_EVENT=y
+>
+> Ineed, there was a Kconfig warning:
+>
+> 	warning: (UPROBE_EVENT) selects UPROBES which has unmet direct dependencies (UPROBE_EVENT && PERF_EVENTS)
+>
+> This is not your fault.  It's the fault of everyone who passed through
+> commit f3f096cfedf8113380c56fc855275cc75cd8cf55 without properly reviewing
+> it and paying attention to that select crap.  Given how evil "select" is,
+> it's something which should always be thoroughly reviewed - with analysis
+> of the dependencies.  I believe commits which introduce new select
+> statements should document an analysis of why those new select statements
+> are appropriate and how they ensure that any dependencies of the selected
+> symbol are not violated.
+>
+> Therefore, I will not take the ARM uprobes code while this kind of
+> select abortion is present - it needs to be fixed first to avoid these
+> build errors.  Sorry.
+>
