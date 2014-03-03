@@ -1,43 +1,36 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 3 Mar 2014 20:20:26 +0530
-Subject: [RESEND Patch 9/9] ARM: DTS: DRA7: Add routable-irqs property for gic
- node
-In-Reply-To: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
-References: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1393858226-32595-11-git-send-email-mugunthanvnm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Mar 2014 15:02:15 +0000
+Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
+In-Reply-To: <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
+References: <20140207180836.GE8533@titan.lakedaemon.net>
+ <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20140303150215.GI21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sricharan R <r.sricharan@ti.com>
+On Mon, Feb 17, 2014 at 08:00:36PM +0000, Jason Cooper wrote:
+> The corresponding driver didn't make it into v3.14, so we need to remove
+> the node.  Dove systems fail to boot with the node present and no
+> driver.
+> 
+> This node will be re-added when the driver makes it to mainline.
 
-There is a IRQ crossbar device in the soc, which maps the
-irq requests from the peripherals to the mpu interrupt
-controller's inputs. The gic provides the support for such
-IPs in the form of routable-irqs. So adding the property
-here to gic node.
+I'm going to stick my oar in on this and ask what is a very fundamental
+question.
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+If we're adding the PMU interrupt controller as a separate "device"
+aren't we describing our implementation rather than the hardware?  It
+isn't a separate device as far as the description of it in the reference
+manuals.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 2bd3a9a..824e316 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -72,6 +72,7 @@
- 		compatible = "arm,cortex-a15-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		arm,routable-irqs = <160>;
- 		reg = <0x48211000 0x1000>,
- 		      <0x48212000 0x1000>,
- 		      <0x48214000 0x2000>,
+Moreover, should the PMU interrupt controller be something which is
+handled by a separate chunk of code to a driver for the PMU as a whole,
+or are we storing up problems with resource clashes?  I can quite see
+a PMU driver coming along in the future offering a pair of generic
+power domains for the GPU and VPU, and such a driver would need to map
+all the PMU registers so it can access the power control, reset and
+isolator registers.
+
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
