@@ -1,36 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Mar 2014 15:02:15 +0000
-Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
-In-Reply-To: <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
-References: <20140207180836.GE8533@titan.lakedaemon.net>
- <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20140303150215.GI21483@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 03 Mar 2014 16:06:57 +0100
+Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
+In-Reply-To: <530656D3.7010709@gmail.com>
+References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+ <52F4AE40.9050907@gmail.com> <530656D3.7010709@gmail.com>
+Message-ID: <53149A91.4030509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 08:00:36PM +0000, Jason Cooper wrote:
-> The corresponding driver didn't make it into v3.14, so we need to remove
-> the node.  Dove systems fail to boot with the node present and no
-> driver.
-> 
-> This node will be re-added when the driver makes it to mainline.
+On 20.02.2014 20:26, Tomasz Figa wrote:
+> Hi Chris,
+>
+> On 07.02.2014 10:58, Tomasz Figa wrote:
+>> Hi Chris,
+>>
+>> On 11.01.2014 22:39, Tomasz Figa wrote:
+>>> On platforms prior to Exynos the SDHCI block used internal clock
+>>> divider controlled by SELFREQ field of CLKCON register to divide base
+>>> clock selected from several external clocks fed to the block by
+>>> SELBASECLK bitfield of CONTROL2 register. Depending on wanted clock
+>>> frequency, different external clock may be the best choice and so
+>>> the driver needs to switch the SELBASECLK mux on the fly.
+>>>
+>>> However the selection logic has been broken for quite some time leaving
+>>> the controller using always clock 0, which is not always the right
+>>> source and leading to suboptimal performance of the SDHCI block on
+>>> affected platforms.
+>>>
+>>> This series intends to fix the problems mentioned above and also
+>>> clean-up
+>>> clock management code slightly.
+>>>
+>>> Tested on S3C6410-based Mini6410 board, with following performance
+>>> figures:
+>>>
+>>> * Before this series (133 MHz HCLK always selected, leading to at most
+>>>    33 MHz card clock):
+>>>
+>>> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>>>
+>>> /dev/mmcblk0:
+>>>   Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
+>>> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>>>
+>>> /dev/mmcblk0:
+>>>   Timing buffered disk reads:  44 MB in  3.11 seconds =  14.14 MB/sec
+>>> root at tiny6410:~#
+>>>
+>>> * After this series (48 MHz EPLL clock selected, leading to 48 MHz card
+>>>    clock):
+>>>
+>>> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>>>
+>>> /dev/mmcblk0:
+>>>   Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
+>>> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>>>
+>>> /dev/mmcblk0:
+>>>   Timing buffered disk reads:  60 MB in  3.06 seconds =  19.63 MB/sec
+>>> root at tiny6410:~#
+>>>
+>>> Tomasz Figa (6):
+>>>    mmc: sdhci-s3c: Use shifts to divide by powers of two
+>>>    mmc: sdhci-s3c: Cache bus clock rates
+>>>    mmc: sdhci-s3c: Use correct condition to check for clock presence
+>>>    mmc: sdhci-s3c: Simplify min/max clock calculation
+>>>    mmc: sdhci-s3c: Fix handling of bus clock switching
+>>>    mmc: sdhci-s3c: Do not allow frequencies higher than requested
+>>>
+>>>   drivers/mmc/host/sdhci-s3c.c | 170
+>>> ++++++++++++++++++++-----------------------
+>>>   1 file changed, 77 insertions(+), 93 deletions(-)
+>>>
+>>
+>> What do you think about this series?
+>
+> Could you take this series for 3.15?
 
-I'm going to stick my oar in on this and ask what is a very fundamental
-question.
+Ping.
 
-If we're adding the PMU interrupt controller as a separate "device"
-aren't we describing our implementation rather than the hardware?  It
-isn't a separate device as far as the description of it in the reference
-manuals.
+It's been almost two months since I posted this series, it's been 
+already ACKed and it would be nice to have it applied for upcoming release.
 
-Moreover, should the PMU interrupt controller be something which is
-handled by a separate chunk of code to a driver for the PMU as a whole,
-or are we storing up problems with resource clashes?  I can quite see
-a PMU driver coming along in the future offering a pair of generic
-power domains for the GPU and VPU, and such a driver would need to map
-all the PMU registers so it can access the power control, reset and
-isolator registers.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,
+Tomasz
