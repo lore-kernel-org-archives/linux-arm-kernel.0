@@ -1,74 +1,31 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 03 Mar 2014 16:53:39 +0900
-Subject: [PATCH 4/7] ARM: dts: exynos5440: fix PCIe interrupt mapping
-In-Reply-To: <000401cf36b3$e4aa0fb0$adfe2f10$%han@samsung.com>
-References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
- <1393608523-17509-5-git-send-email-l.stach@pengutronix.de>
- <000401cf36b3$e4aa0fb0$adfe2f10$%han@samsung.com>
-Message-ID: <000501cf36b5$b0a27110$11e75330$%han@samsung.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 03 Mar 2014 11:55:57 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzRdIG1mZDogbWMxM3h4eDogSG9ub3IgZGVzaWduZWQg?=
+ =?UTF-8?B?U1BJIG1vZGU=?=
+In-Reply-To: <20140303073524.GD4674@lee--X1>
+References: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
+ <20140303073524.GD4674@lee--X1>
+Message-ID: <1393833357.545249459@f190.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 03, 2014 4:41 PM, Jingoo Han wrote:
-> On Saturday, March 01, 2014 2:29 AM, Lucas Stach wrote:
-> >
-> > So it actually works.
-> >
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+???????????,  3 ????? 2014, 15:35 +08:00 ?? Lee Jones <lee.jones@linaro.org>:
+> > Instead of using hard coded SPI mode, use mode described in
+> > devicetree or defined for the board.
+> > Additionally, patch updates all users of this PMIC to use
+> > correct SPI mode.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > > ---
-> >  arch/arm/boot/dts/exynos5440.dtsi | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-> > index 02a0a1226cef..65d425d9ec27 100644
-> > --- a/arch/arm/boot/dts/exynos5440.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> > @@ -274,7 +274,7 @@
-> >  			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
-> >  		#interrupt-cells = <1>;
-> >  		interrupt-map-mask = <0 0 0 0>;
-> > -		interrupt-map = <0x0 0 &gic 53>;
-> > +		interrupt-map = <0 0 0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> >  arch/arm/mach-imx/mach-mx31lilly.c | 1 +
+> >  arch/arm/mach-imx/mach-mx31lite.c  | 1 +
+> >  drivers/mfd/mc13xxx-spi.c          | 2 --
 > 
-> It makes build errors as below:
+> There's no reason for these changes to be in the same patch.
 > 
-> DTC     arch/arm/boot/dts/exynos5440-ssdk5440.dtb
-> Error: arch/arm/boot/dts/exynos5440.dtsi:289.33-34 syntax error
-> FATAL ERROR: Unable to parse input tree
-> make[1]: *** [arch/arm/boot/dts/exynos5440-ssdk5440.dtb] Error 1
-> make: *** [exynos5440-ssdk5440.dtb] Error 2
-> 
-> Would you fix it?
+> Please split them up by subsystem and resubmit.
 
-I fixed build errors after including 'arm-gic.h' as below:
+This should be in one patch, since it cause to break functionality of these
+boards due missing SPI_CS_HIGH property in the spi_board_info.
 
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -9,6 +9,8 @@
-  * published by the Free Software Foundation.
- */
-
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
- #include "skeleton.dtsi"
-
-Would you confirm this?
-
-Best regards,
-Jingoo Han
-
-> 
-> >  		num-lanes = <4>;
-> >  		status = "disabled";
-> >  	};
-> > @@ -295,7 +295,7 @@
-> >  			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
-> >  		#interrupt-cells = <1>;
-> >  		interrupt-map-mask = <0 0 0 0>;
-> > -		interrupt-map = <0x0 0 &gic 56>;
-> > +		interrupt-map = <0 0 0 0 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-> >  		num-lanes = <4>;
-> >  		status = "disabled";
-> >  	};
-> > --
-> > 1.8.5.3
+---
