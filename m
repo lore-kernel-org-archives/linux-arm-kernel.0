@@ -1,61 +1,47 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 3 Mar 2014 09:35:43 -0800
-Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
-In-Reply-To: <20140302202940.GQ3327@book.gsilab.sittig.org>
-References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
- <20140302202940.GQ3327@book.gsilab.sittig.org>
-Message-ID: <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 3 Mar 2014 18:37:40 +0100
+Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
+In-Reply-To: <20140303150215.GI21483@n2100.arm.linux.org.uk>
+References: <20140207180836.GE8533@titan.lakedaemon.net>
+ <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
+ <20140303150215.GI21483@n2100.arm.linux.org.uk>
+Message-ID: <20140303173740.GC16655@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-03-02 at 09:29PM +0100, Gerhard Sittig wrote:
-> On Fri, Feb 28, 2014 at 15:34 -0800, Soren Brinkmann wrote:
+On Mon, Mar 03, 2014 at 03:02:15PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 17, 2014 at 08:00:36PM +0000, Jason Cooper wrote:
+> > The corresponding driver didn't make it into v3.14, so we need to remove
+> > the node.  Dove systems fail to boot with the node present and no
+> > driver.
 > > 
-> > [ MMIO registers assumed for clock control modules, but I2C
-> > communication may be involved in other hardware, individual for
-> > a (set of) clock(s) and not for an architecture or platform ]
-> > 
-> > Does anybody have a good idea how we could avoid all this code
-> > duplication while enabling usage of the clock primitives with different
-> > IO accessors?
-> > Especially the divider and mux primitive have a lot of code that would
-> > be painful to maintain twice.
+> > This node will be re-added when the driver makes it to mainline.
 > 
-> Hasn't past discussion already reached the point where code
-> duplication of the clock control logic was considered
-> undesirable, and "low level ops" were outlined?  I.e. extending
-> the compile time decision for a specific clk_{read,write}l()
-> implementation by another potential redirection that is specific
-> to a clock item?
+> I'm going to stick my oar in on this and ask what is a very fundamental
+> question.
 > 
-> Re-submitting a series which duplicates complete clock types,
-> while the difference is only in how registers get accessed, is
-> quite saddening.
-I'm not really planning to submit this as is. I'm hoping to get some
-input on how to resolve this properly. I know this is a big mess, but I
-also don't see the way out (yet).
+> If we're adding the PMU interrupt controller as a separate "device"
+> aren't we describing our implementation rather than the hardware?  It
+> isn't a separate device as far as the description of it in the reference
+> manuals.
+> 
+> Moreover, should the PMU interrupt controller be something which is
+> handled by a separate chunk of code to a driver for the PMU as a whole,
+> or are we storing up problems with resource clashes?  I can quite see
+> a PMU driver coming along in the future offering a pair of generic
+> power domains for the GPU and VPU, and such a driver would need to map
+> all the PMU registers so it can access the power control, reset and
+> isolator registers.
 
-> 
-> 
-> > In the next step, I encountered a divider clock whose divider is stored
-> > in 2 I2C registers. So now, the simple IO access replacement doesn't
-> > work anymore either since this clock needs 2 registers to be read and
-> > then shifting around the bitfields accordingly.
-> 
-> Are the registers adjacent and contain only bit fields for one
-> clock?  Or do registers share parameters for several clocks, or
-> are not adjacent?
-> 
-> In the former case you may use a table from "divider value" to
-> "bit pattern to read/write".  In the latter case, the clock
-> control module is rather special, and may not be easily get
-> mapped to the common primitives.  Unless the ll_ops can implement
-> the required special handling.
-It would be nice if we could use the logic provided in the mux, div etc
-primitives independently of how the HW is accessed and what is
-necessary to shift and mask those register values around, right? I
-mean, at then end we want to model a clk-(div|mux) and not a
-clk-(div|mux) which has only a single, memory-mapped control register,
-that does not overlap with other things, ...
+Hi Russell
 
-	S?ren
+I suspect you are right, we are storing up problems.
+
+During the 4 months between submitting this driver and actually
+getting it accepted, i've learned quite a bit. I tried to implement
+cpufreq for Dove and ran into the problems you mention. The registers
+in the PMU are interleaved so that you cannot cleanly separate out the
+range needed for cpufreq. We probably need a PMU device, which exports
+a register syscon and have the interrupt controller make use of it.
+
+	Andrew
