@@ -1,113 +1,107 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon,  3 Mar 2014 10:02:56 +0100
-Subject: [PATCHv2] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
- EV-MSK
-Message-ID: <1393837376-25779-1-git-send-email-kaloz@openwrt.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 3 Mar 2014 10:19:04 +0100
+Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <1569751.q5lJmQcb3K@avalon>
+References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+ <1393621768-12568-4-git-send-email-wsa@the-dreams.de>
+ <1569751.q5lJmQcb3K@avalon>
+Message-ID: <20140303091903.GA6531@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the WiLink6 connected to mmc2.
 
-Signed-off-by: Imre Kaloz <kaloz at openwrt.org
----
-Changes since v1: use the right refclock
+> >  drivers/clk/shmobile/Makefile |   1 +
+> >  drivers/clk/shmobile/clk-rz.c | 112 +++++++++++++++++++++++++++++++++++++++
+> 
+> There's one large missing piece here: the DT bindings documentation.
 
- arch/arm/boot/dts/am335x-evmsk.dts |   40 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/pdata-quirks.c |   10 +++++++++
- 2 files changed, 50 insertions(+)
+Yes, noticed that, too. Added already.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 4718ec4..a544fc4 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -45,6 +45,18 @@
- 		regulator-boot-on;
- 	};
- 
-+	wl12xx_vmmc: fixedregulator@2 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl12xx_gpio>;
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwl1271";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpio1 29 0>;
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
- 	leds {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&user_leds_s0>;
-@@ -264,6 +276,24 @@
- 			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE4) /* rmii1_ref_clk.mcasp1_axr3 */
- 		>;
- 	};
-+
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			0x74 (PIN_INPUT_PULLUP | MUX_MODE7) /* gpmc_wpn.gpio0_31 */
-+			0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
-+			0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
-+			0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
-+			0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
-+			0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
-+			0x0c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad3.mmc1_dat3 */
-+		>;
-+	};
-+
-+	wl12xx_gpio: pinmux_wl12xx_gpio {
-+		pinctrl-single,pins = <
-+			0x7c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpmc_csn0.gpio1_29 */
-+		>;
-+	};
- };
- 
- &uart0 {
-@@ -470,6 +500,16 @@
- 	ti,no-reset-on-init;
- };
- 
-+&mmc2 {
-+	status = "okay";
-+	vmmc-supply = <&wl12xx_vmmc>;
-+	ti,non-removable;
-+	bus-width = <4>;
-+	cap-power-off-card;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+};
-+
- &mcasp1 {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&mcasp1_pins>;
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 3d5b24d..a92acdb 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -187,6 +187,13 @@ static void __init omap4_panda_legacy_init(void)
- }
- #endif
- 
-+#ifdef CONFIG_SOC_AM33XX
-+static void __init am335x_evmsk_legacy_init(void)
-+{
-+	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 31);
-+}
-+#endif
-+
- #ifdef CONFIG_SOC_OMAP5
- static void __init omap5_uevm_legacy_init(void)
- {
-@@ -271,6 +278,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
- 	{ "ti,omap4-panda", omap4_panda_legacy_init, },
- #endif
-+#ifdef CONFIG_SOC_AM33XX
-+	{ "ti,am335x-evmsk", am335x_evmsk_legacy_init, },
-+#endif
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
- #endif
--- 
-1.7.10.4
+> > +	u32 val;
+> > +	unsigned mult, frqcr_tab[4] = { 3, 2, 0, 1 };
+> 
+> I would declare the table as static const outside of this function.
+
+Yup.
+
+> > +	if (strcmp(name, "pll") == 0) {
+> > +		/* FIXME: cpg_mode should be read from GPIO. But no GPIO support yet 
+> */
+> > +		unsigned cpg_mode = 0; /* hardcoded to EXTAL for now */
+> 
+> It won't make a difference yet, but shouldn't this be moved to 
+> rz_cpg_clocks_init() ?
+
+This is going to be a gpio_get_value() later and I'd prefer it in the
+place where the value is needed.
+
+> 
+> > +		const char *parent_name = of_clk_get_parent_name(np, 0);
+> 
+> You should select the parent depending on the mode (again it won't make any 
+> difference yet, but the code will be ready, and DT bindings should document 
+> two parents).
+
+Two parents? Yet, CPG only needs one as input. Either XTAL or USB_X1
+which is board dependent. What I should do IMO is to put the parent
+property for CPG from the dtsi to the board dts. Because this is
+describing hardware. And from that parent, I can simply get its name
+like above.
+
+> > +	int num_clks;
+> > +
+> > +	num_clks = of_property_count_strings(np, "clock-output-names");
+> > +	if (WARN(num_clks < 0, "can't count CPG clocks\n"))
+> 
+> Do such failures really deserve a WARN ? Isn't a pr_err() enough ?
+
+Since the system won't probably boot, I'd think so. Also, it makes the
+code more concise, no?
+
+> What if num_clks == 0 ?
+
+Good question.
+
+> 
+> > +		goto out;
+> > +
+> > +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
+> > +	if (WARN(!cpg, "out of memory!\n"))
+> > +		goto out;
+> > +
+> > +	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
+> > +	if (WARN(!clks, "out of memory!\n"))
+> > +		goto free_cpg;
+> 
+> Does kzalloc alloc warn internally when it fails to allocate memory ?
+
+Ehrm, why don't you simply look this up instead of asking me? :)
+
+> you could remove the error message. You could also perform the two allocations 
+> and check the result once only.
+
+What is the gain? Code savings?
+
+> > +free_clks:
+> > +	kfree(clks);
+> > +free_cpg:
+> > +	kfree(cpg);
+> 
+> I would remove that as done in the other CPG drivers, given that a small 
+> memory leak when the system will anyway fail to boot isn't really an issue.
+
+Again, now that I already coded it, what is the gain to remove it? The
+drawback is that other people might get encouraged to find reasons to
+allow them sloppy practices.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/aee9a2b4/attachment.sig>
