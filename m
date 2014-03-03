@@ -1,30 +1,33 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 03 Mar 2014 13:51:05 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzRdIG1mZDogbWMxM3h4eDogSG9ub3IgZGVzaWduZWQg?=
- =?UTF-8?B?U1BJIG1vZGU=?=
-In-Reply-To: <20140303094121.GM24917@pengutronix.de>
-References: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
- <20140303094121.GM24917@pengutronix.de>
-Message-ID: <1393840265.156525459@f373.i.mail.ru>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 03 Mar 2014 09:51:53 +0000 (GMT)
+Subject: [GIT PULL 2/6] Samsung drivers for v3.15
+Message-ID: <15399641.260291393840311352.JavaMail.weblogic@epml16>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????????,  3 ????? 2014, 10:41 +01:00 ?? Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sun, Mar 02, 2014 at 11:44:32AM +0400, Alexander Shiyan wrote:
-> > Instead of using hard coded SPI mode, use mode described in
-> > devicetree or defined for the board.
-> > Additionally, patch updates all users of this PMIC to use
-> > correct SPI mode.
-> 
-> What's the reason for this change? Without it the driver just does the
-> correct thing, this only adds a chance for boards do get it wrong. This
-> for example happens with the i.MX27 phyCORE in this patch, see
-> happens with arch/arm/boot/dts/imx27-phytec-phycore-som.dts whih doesn't
-> have the spi-cs-high property.
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-How specify proper functionality if chipselect connected through inverter?
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-For i.MX27 phyCORE:
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi?id=986cc4920412d8a7b5c9dba85601651f6373f45e
+are available in the git repository at:
 
----
+  http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-drivers
+
+for you to fetch changes up to a83784859ccde07ebdc3a7acfbb2f74cb6c75a80:
+
+  irqchip: exynos-combiner: call handle_bad_irq directly (2014-02-14 07:27:40 +0900)
+
+----------------------------------------------------------------
+Samsung drivers update for v3.15
+- remove inclusion from exynos_mct.c
+- remove inclusion from exynos-combiner.c
+  and use calling handle_bad_irq() instead of do_bad_IRQ()
+
+----------------------------------------------------------------
+Pankaj Dubey (2):
+      clocksource: exynos_mct: remove unwanted header file inclusion
+      irqchip: exynos-combiner: call handle_bad_irq directly
+
+drivers/clocksource/exynos_mct.c  |    2 --
+drivers/irqchip/exynos-combiner.c |    3 +--
+2 files changed, 1 insertion(+), 4 deletions(-) 
