@@ -1,44 +1,50 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Mar 2014 09:55:03 +0000 (GMT)
-Subject: [GIT PULL 4/6] Samsung clk-exynos updates for v3.15
-Message-ID: <11757345.260501393840501095.JavaMail.weblogic@epml16>
+Date: Mon, 03 Mar 2014 09:56:12 +0000 (GMT)
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+Message-ID: <8259832.260591393840570438.JavaMail.weblogic@epml16>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d726ca2d3316743841063a98fb113ff22a236e63:
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-  ARM: dts: Add vmmc-supply to MMC on arndale-octa board (2014-02-24 08:56:46 +0900)
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
 are available in the git repository at:
 
-  http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/exynos-clk
+  http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-pm-1
 
-for you to fetch changes up to 86feafebbec2b510daf36ffbdbe10228ed890b00:
+for you to fetch changes up to e11d919e4aa2009077e3e4f829ff991d37adca61:
 
-  ARM: dts: use macros in clock bindings for exynos5440 (2014-02-26 09:53:31 +0900)
-
-----------------------------------------------------------------
-Samsung exynos clock related DT updates for v3.15
-
-- use macros instead of hard coded numbers for clock bindings
-
-NOTE: this is based on v3.15-next/dt-samsung
+  ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code (2014-02-14 08:16:01 +0900)
 
 ----------------------------------------------------------------
-Andrzej Hajda (4):
-      ARM: dts: use macros in clock bindings for exynos4
-      ARM: dts: use macros in clock bindings for exynos5250
-      ARM: dts: use macros in clock bindings for exynos5420
-      ARM: dts: use macros in clock bindings for exynos5440
+Samsung S2R PM updates for v3.15
 
- .../devicetree/bindings/clock/exynos4-clock.txt    |  259 +-------------------
- .../devicetree/bindings/clock/exynos5250-clock.txt |  163 +-----------
- .../devicetree/bindings/clock/exynos5420-clock.txt |  184 +-------------
- .../devicetree/bindings/clock/exynos5440-clock.txt |   45 +---
- arch/arm/boot/dts/exynos4.dtsi                     |   73 +++---
- arch/arm/boot/dts/exynos4210.dtsi                  |    9 +-
- arch/arm/boot/dts/exynos4x12.dtsi                  |   34 ++-
- arch/arm/boot/dts/exynos5250.dtsi                  |  105 ++++----
- arch/arm/boot/dts/exynos5420.dtsi                  |   95 +++----
- arch/arm/boot/dts/exynos5440.dtsi                  |   33 +--
- 10 files changed, 207 insertions(+), 793 deletions(-)
+>From Tomasz Figa:
+This series reworks suspend/resume handling of Samsung clock drivers
+to cover more SoC specific aspects that are beyond simple register
+save and restore. The goal is to have all the suspend/resume code
+that touches the clock controller in single place, which is the clock
+driver.
+
+----------------------------------------------------------------
+Tomasz Figa (9):
+      clk: exynos4: Remove remnants of non-DT support
+      clk: samsung: Provide common helpers for register save/restore
+      clk: samsung: exynos4: Move suspend/resume handling to SoC driver
+      clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
+      clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
+      clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
+      clk: samsung: Drop old suspend/resume code
+      clk: samsung: exynos4: Add remaining suspend/resume handling
+      ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code
+
+ arch/arm/mach-exynos/pm.c            |  148 +----------------------------
+ drivers/clk/samsung/clk-exynos4.c    |  172 ++++++++++++++++++++++++++++++----
+ drivers/clk/samsung/clk-exynos5250.c |   49 +++++++++-
+ drivers/clk/samsung/clk-exynos5420.c |   49 +++++++++-
+ drivers/clk/samsung/clk-exynos5440.c |    2 +-
+ drivers/clk/samsung/clk-s3c64xx.c    |   79 +++++++++++++---
+ drivers/clk/samsung/clk.c            |   71 +++++---------
+ drivers/clk/samsung/clk.h            |   14 ++-
+ 8 files changed, 348 insertions(+), 236 deletions(-)
