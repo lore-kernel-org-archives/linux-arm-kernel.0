@@ -1,53 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  3 Mar 2014 17:48:34 +0100
-Subject: [PATCH v2] usb: gadget: atmel_usba: Fix crashed during stopping when
- DEBUG is enabled
-Message-ID: <1393865324-27309-1-git-send-email-gregory.clement@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 3 Mar 2014 10:47:29 -0600
+Subject: [PATCH] usb: gadget: atmel_usba: fix crash when no endpoint are
+ specified
+In-Reply-To: <20140303164633.GB3155@piout.net>
+References: <1393515733-15764-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <53109EBE.4020900@atmel.com> <20140303164633.GB3155@piout.net>
+Message-ID: <20140303164729.GE10987@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug trace in the atmel_usba_stop function made the assumption
-that the driver pointer passed in parameter was not NULL. Since the
-commit "usb: gadget: udc-core: fix a regression during gadget driver
-unbinding", it was no more always true. This lead to a kernel crash.
+On Mon, Mar 03, 2014 at 05:46:34PM +0100, Alexandre Belloni wrote:
+> Hi Felipe,
+> 
+> On 28/02/2014 at 15:35:42 +0100, Nicolas Ferre wrote :
+> > On 27/02/2014 16:42, Alexandre Belloni :
+> > > If no endpoints are present in the device tree, the kernel will cras hwith the
+> > 
+> > s/cras hwith/crash with/
+> > 
+> 
+> Do you want me to send a v2 with that typo corrected or could you
+> correct it when applying ?
 
-This commit now use the driver pointer stored in udc which fixes this
-issue.
+I'll fix it up, don't worry.
 
-Since the commit which have triggered this issue was backported to the
-3.2 stable branch, then this one should also be backported to the same
-kernel.
-
-Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
-Cc: stable at vger.kernel.org # v3.2+
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Changelog:
-v1 -> v2
-Fixed the signature block in the commit log
-
- drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 52771d4c44bc..167843de2d8a 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
- 	toggle_bias(0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 
--	udc->driver = NULL;
--
- 	clk_disable_unprepare(udc->hclk);
- 	clk_disable_unprepare(udc->pclk);
- 
--	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
-+	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
-+
-+	udc->driver = NULL;
- 
- 	return 0;
- }
 -- 
-1.8.1.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/cf825cde/attachment.sig>
