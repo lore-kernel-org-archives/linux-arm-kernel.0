@@ -1,60 +1,46 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 03 Mar 2014 17:11:37 +0900
-Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
-In-Reply-To: <20140301183059.GA6315@obsidianresearch.com>
-References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
- <CAJ+vNU2VN5haOU2GN5o7UUg9vgYh06pAhvDaoGw6EzTBEbD0mg@mail.gmail.com>
- <20140301183059.GA6315@obsidianresearch.com>
-Message-ID: <000601cf36b8$330b3a90$9921afb0$%han@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 3 Mar 2014 10:16:58 +0200
+Subject: [PATCH 00/12] ARM: OMAP2 DT clock conversion
+In-Reply-To: <20140228183313.GD15399@atomide.com>
+References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
+ <5310B271.5040708@ti.com> <20140228180112.GC15399@atomide.com>
+ <5310D2FE.5090209@ti.com> <20140228183313.GD15399@atomide.com>
+Message-ID: <53143A7A.9020703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, March 02, 2014 3:31 AM, Jason Gunthorpe wrote:
-> On Fri, Feb 28, 2014 at 04:53:33PM -0800, Tim Harvey wrote:
-> 
-> > In testing this on IMX6 I'm finding that 'of_irq_parse_and_map_pci()'
-> > always returns -EINVAL because it can't find a dt node for the host
-> > bridge:
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/of/of_pci_irq.c#n60.
-> 
-> There may be some kind of issue in the pcie-designware.c:
-> 
-> static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> {
->         struct pci_bus *bus;
->         struct pcie_port *pp = sys_to_pcie(sys);
-> 
->         if (pp) {
->                 pp->root_bus_nr = sys->busnr;
->                 bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
->                                      ^^^^^^^^^^^
->                                      Shouldn't be null for DT cases.
-> 
-> Perhaps since the driver doesn't pass in a parent pointer, no parent
-> device is associated with the struct pci_bus that gets created, so
-> pci_bus_to_OF_node will always fail and the DT PCI mechanisms become
-> broken.
+On 02/28/2014 08:33 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [140228 10:21]:
+>>
+>> Hmm, some clock node is broken, might be missing a name or parent
+>> name for some reason. Can you try to boot with DEBUG enabled so you
+>> get pr_debug:s out and see which clock is being initialized during
+>> the crash?
+>
+> ...
+> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: core_d18_ck
+> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_mux_fck
+> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_fck
+> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> ...
+>
+> We really should be registering the clocks lazily as needed BTW. That
+> leaves out the dependency to DEBUG_LL for seeing any kind of decent
+> error messages during the booting.
+>
+> Regards,
+>
+> Tony
+>
 
-Jason,
-Thank you for your advice. :-)
+Hey Tony,
 
-Tim,
-I tested the following as Jason guided.
-You can test i.MX PCIe with this.
+Can you retry with the branch? I just pushed one patch there, seems the 
+parents for the vlynq_mux_fck were somewhat broken (there are holes in 
+the valid mux values list, which hasn't happened with any other 
+mux-clock so far.)
 
-./drivers/pci/host/pcie-designware.c
-@@ -726,7 +727,7 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+If this works, I will rework the series a bit and send v2 out. 
+Alternatively I need to add extra debug info.
 
-        if (pp) {
-                pp->root_bus_nr = sys->busnr;
--               bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
-+               bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
-                                        sys, &sys->resources);
-        } else {
-                bus = NULL;
-
-However, I think that we may need to replace 'pci_common_init()'
-with 'pci_common_init_dev()'.
-
-Best regards,
-Jingoo Han
+-Tero
