@@ -1,41 +1,81 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 3 Mar 2014 10:22:00 +0100
-Subject: [PATCH 4/4] ARM: shmobile: r7s72100: use workaround for non
- DT-clocks
-In-Reply-To: <1712106.fu6iC2mT2W@avalon>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <1393621768-12568-5-git-send-email-wsa@the-dreams.de>
- <1712106.fu6iC2mT2W@avalon>
-Message-ID: <20140303092200.GB6531@katana>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 3 Mar 2014 10:22:31 +0100
+Subject: [PATCH 2/3] dts: mpc512x: adjust clock specs for FEC nodes
+In-Reply-To: <1393237557-31406-2-git-send-email-gsi@denx.de>
+References: <1393237557-31406-1-git-send-email-gsi@denx.de>
+ <1393237557-31406-2-git-send-email-gsi@denx.de>
+Message-ID: <20140303092231.GS3327@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 11:21:40PM +0100, Laurent Pinchart wrote:
-> Hi Wolfram,
+On Mon, Feb 24, 2014 at 11:25 +0100, Gerhard Sittig wrote:
 > 
-> Thank you for the patch.
+> a recent FEC binding document update that was motivated by i.MX
+> development revealed that ARM and PowerPC implementations in Linux
+> did not agree on the clock names to use for the FEC nodes
 > 
-> On Friday 28 February 2014 22:09:28 Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa@sang-engineering.com>
-> > 
-> > SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
-> > workaround via clkdev for now.
+> change clock names from "per" to "ipg" in the FEC nodes of the
+> mpc5121.dtsi include file such that the .dts specs comply with
+> the common FEC binding
 > 
-> What about adding a DT node for the serial port instead ? :-)
+> this "incompatible" change does not break operation, because
+> - COMMON_CLK support for MPC5121/23/25 and adjusted .dts files
+>   were only introduced in Linux v3.14-rc1, no mainline release
+>   provided these specs before
+> - if this change won't make it for v3.14, the MPC512x CCF support
+>   provides full backwards compability, and keeps operating with
+>   device trees which lack clock specs or don't match in the names
+> 
+> Signed-off-by: Gerhard Sittig <gsi@denx.de>
 
-Yes, done in V2 already. Yet, I'd like to keep SCIF in here because it
-is the least intrusive way to get the system to boot. When the SCIF
-nodes are added later incrementally, I remove the sh-sci.2 workaround,
-but the whole mechanism is still needed for MTU2 anyhow.
+ping
 
-Thanks,
+Are there opinions about making PowerPC users of FEC use the same
+clock names as ARM users do, to re-use (actually: keep sharing)
+the FEC binding?  The alternative would be to fragment the FEC
+binding into several bindings for ARM and PowerPC, which I feel
+would be undesirable, and is not necessary.
 
-   Wolfram
+It would be nice to ship v3.14 (the first release with proper CCF
+support for MPC512x) in a shape that is consistent with other FEC
+users (ARM i.MX).  We are lucky to have noticed the difference
+before the release, and need not introduce the incompatibility,
+and need not document and support obsolete conditions but can fix
+them instead.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/2e375263/attachment.sig>
+> ---
+>  arch/powerpc/boot/dts/mpc5121.dtsi |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+> index 2c0e1552d20b..a5a375598ed8 100644
+> --- a/arch/powerpc/boot/dts/mpc5121.dtsi
+> +++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+> @@ -281,7 +281,7 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			clocks = <&clks MPC512x_CLK_FEC>;
+> -			clock-names = "per";
+> +			clock-names = "ipg";
+>  		};
+>  
+>  		eth0: ethernet at 2800 {
+> @@ -291,7 +291,7 @@
+>  			local-mac-address = [ 00 00 00 00 00 00 ];
+>  			interrupts = <4 0x8>;
+>  			clocks = <&clks MPC512x_CLK_FEC>;
+> -			clock-names = "per";
+> +			clock-names = "ipg";
+>  		};
+>  
+>  		/* USB1 using external ULPI PHY */
+> -- 
+> 1.7.10.4
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
