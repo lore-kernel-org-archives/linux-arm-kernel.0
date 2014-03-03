@@ -1,46 +1,29 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 3 Mar 2014 10:16:58 +0200
-Subject: [PATCH 00/12] ARM: OMAP2 DT clock conversion
-In-Reply-To: <20140228183313.GD15399@atomide.com>
-References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
- <5310B271.5040708@ti.com> <20140228180112.GC15399@atomide.com>
- <5310D2FE.5090209@ti.com> <20140228183313.GD15399@atomide.com>
-Message-ID: <53143A7A.9020703@ti.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Mon, 03 Mar 2014 09:46:45 +0100
+Subject: [PATCH] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
+ EV-MSK
+In-Reply-To: <20140228231106.GX13624@atomide.com>
+References: <1392806495-4874-1-git-send-email-kaloz@openwrt.org>
+ <20140228225427.GT13624@atomide.com> <20140228231106.GX13624@atomide.com>
+Message-ID: <op.xb41b7rc2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2014 08:33 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [140228 10:21]:
+On Sat, 01 Mar 2014 00:11:07 +0100, Tony Lindgren <tony@atomide.com> wrote:
+
+> * Tony Lindgren <tony@atomide.com> [140228 14:54]:
+>> * Imre Kaloz <kaloz@openwrt.org> [140219 02:44]:
+>> > Enable the WiLink6 connected to mmc2.
+>> >
+>> > Signed-off-by: Imre Kaloz <kaloz@openwrt.org
 >>
->> Hmm, some clock node is broken, might be missing a name or parent
->> name for some reason. Can you try to boot with DEBUG enabled so you
->> get pr_debug:s out and see which clock is being initialized during
->> the crash?
+>> Thanks applying into omap-for-v3.15/dt.
 >
-> ...
-> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: core_d18_ck
-> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_mux_fck
-> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_fck
-> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> ...
->
-> We really should be registering the clocks lazily as needed BTW. That
-> leaves out the dependency to DEBUG_LL for seeing any kind of decent
-> error messages during the booting.
->
-> Regards,
->
-> Tony
->
+> Oops, this breaks the build as WL12XX_REFCLOCK_24 is not defined
+> and I could not figure out what value it needs to be. Care to
+> repost this patch with WL12XX_REFCLOCK_24 also defined?
 
-Hey Tony,
+Actually that's a typo :) Posting v2 in a few mins.
 
-Can you retry with the branch? I just pushed one patch there, seems the 
-parents for the vlynq_mux_fck were somewhat broken (there are holes in 
-the valid mux values list, which hasn't happened with any other 
-mux-clock so far.)
 
-If this works, I will rework the series a bit and send v2 out. 
-Alternatively I need to add extra debug info.
-
--Tero
+Imre
