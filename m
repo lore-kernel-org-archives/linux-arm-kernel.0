@@ -1,69 +1,61 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon,  3 Mar 2014 17:33:32 +0000
-Subject: [PATCH v4 2/3] arm64: Extend the PCI I/O space to 16MB
-In-Reply-To: <1393868013-32345-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1393868013-32345-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1393868013-32345-3-git-send-email-Liviu.Dudau@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 3 Mar 2014 09:35:43 -0800
+Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
+In-Reply-To: <20140302202940.GQ3327@book.gsilab.sittig.org>
+References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20140302202940.GQ3327@book.gsilab.sittig.org>
+Message-ID: <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+On Sun, 2014-03-02 at 09:29PM +0100, Gerhard Sittig wrote:
+> On Fri, Feb 28, 2014 at 15:34 -0800, Soren Brinkmann wrote:
+> > 
+> > [ MMIO registers assumed for clock control modules, but I2C
+> > communication may be involved in other hardware, individual for
+> > a (set of) clock(s) and not for an architecture or platform ]
+> > 
+> > Does anybody have a good idea how we could avoid all this code
+> > duplication while enabling usage of the clock primitives with different
+> > IO accessors?
+> > Especially the divider and mux primitive have a lot of code that would
+> > be painful to maintain twice.
+> 
+> Hasn't past discussion already reached the point where code
+> duplication of the clock control logic was considered
+> undesirable, and "low level ops" were outlined?  I.e. extending
+> the compile time decision for a specific clk_{read,write}l()
+> implementation by another potential redirection that is specific
+> to a clock item?
+> 
+> Re-submitting a series which duplicates complete clock types,
+> while the difference is only in how registers get accessed, is
+> quite saddening.
+I'm not really planning to submit this as is. I'm hoping to get some
+input on how to resolve this properly. I know this is a big mess, but I
+also don't see the way out (yet).
 
-The patch moves the PCI I/O space (currently at 64K) before the
-earlyprintk mapping and extends it to 16MB.
+> 
+> 
+> > In the next step, I encountered a divider clock whose divider is stored
+> > in 2 I2C registers. So now, the simple IO access replacement doesn't
+> > work anymore either since this clock needs 2 registers to be read and
+> > then shifting around the bitfields accordingly.
+> 
+> Are the registers adjacent and contain only bit fields for one
+> clock?  Or do registers share parameters for several clocks, or
+> are not adjacent?
+> 
+> In the former case you may use a table from "divider value" to
+> "bit pattern to read/write".  In the latter case, the clock
+> control module is rather special, and may not be easily get
+> mapped to the common primitives.  Unless the ll_ops can implement
+> the required special handling.
+It would be nice if we could use the logic provided in the mux, div etc
+primitives independently of how the HW is accessed and what is
+necessary to shift and mask those register values around, right? I
+mean, at then end we want to model a clk-(div|mux) and not a
+clk-(div|mux) which has only a single, memory-mapped control register,
+that does not overlap with other things, ...
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 5e054bf..85e24c4 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -35,11 +35,13 @@ ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
- 
- ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
-+ffffffbffa000000	ffffffbffaffffff	  16MB		PCI I/O space
-+
-+ffffffbffb000000	ffffffbffbbfffff	  12MB		[guard]
- 
--ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
-+ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
- 
--ffffffbffbe10000	ffffffbcffffffff	  ~2MB		[guard]
-+ffffffbffbe00000	ffffffbffbffffff	   2MB		[guard]
- 
- ffffffbffc000000	ffffffbfffffffff	  64MB		modules
- 
-@@ -60,11 +62,13 @@ fffffdfc00000000	fffffdfdffffffff	   8GB		vmemmap
- 
- fffffdfe00000000	fffffdfffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
-+fffffdfffa000000	fffffdfffaffffff	  16MB		PCI I/O space
-+
-+fffffdfffb000000	fffffdfffbbfffff	  12MB		[guard]
- 
--fffffdfffbe00000	fffffdfffbe0ffff	  64KB		PCI I/O space
-+fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
- 
--fffffdfffbe10000	fffffdfffbffffff	  ~2MB		[guard]
-+fffffdfffbe00000	fffffdfffbffffff	   2MB		[guard]
- 
- fffffdfffc000000	fffffdffffffffff	  64MB		modules
- 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 4cc813e..7846a6b 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -121,7 +121,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-  *  I/O port access primitives.
-  */
- #define IO_SPACE_LIMIT		0xffff
--#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_2M))
-+#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
- {
--- 
-1.9.0
+	S?ren
