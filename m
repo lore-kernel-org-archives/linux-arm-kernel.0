@@ -1,86 +1,72 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 03 Mar 2014 16:06:57 +0100
-Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
-In-Reply-To: <530656D3.7010709@gmail.com>
-References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
- <52F4AE40.9050907@gmail.com> <530656D3.7010709@gmail.com>
-Message-ID: <53149A91.4030509@gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 3 Mar 2014 17:07:22 +0200
+Subject: [PATCH 00/12] ARM: OMAP: SATA support for OMAP5 & DRA7
+Message-ID: <1393859254-10937-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.02.2014 20:26, Tomasz Figa wrote:
-> Hi Chris,
->
-> On 07.02.2014 10:58, Tomasz Figa wrote:
->> Hi Chris,
->>
->> On 11.01.2014 22:39, Tomasz Figa wrote:
->>> On platforms prior to Exynos the SDHCI block used internal clock
->>> divider controlled by SELFREQ field of CLKCON register to divide base
->>> clock selected from several external clocks fed to the block by
->>> SELBASECLK bitfield of CONTROL2 register. Depending on wanted clock
->>> frequency, different external clock may be the best choice and so
->>> the driver needs to switch the SELBASECLK mux on the fly.
->>>
->>> However the selection logic has been broken for quite some time leaving
->>> the controller using always clock 0, which is not always the right
->>> source and leading to suboptimal performance of the SDHCI block on
->>> affected platforms.
->>>
->>> This series intends to fix the problems mentioned above and also
->>> clean-up
->>> clock management code slightly.
->>>
->>> Tested on S3C6410-based Mini6410 board, with following performance
->>> figures:
->>>
->>> * Before this series (133 MHz HCLK always selected, leading to at most
->>>    33 MHz card clock):
->>>
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  44 MB in  3.11 seconds =  14.14 MB/sec
->>> root at tiny6410:~#
->>>
->>> * After this series (48 MHz EPLL clock selected, leading to 48 MHz card
->>>    clock):
->>>
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  60 MB in  3.06 seconds =  19.63 MB/sec
->>> root at tiny6410:~#
->>>
->>> Tomasz Figa (6):
->>>    mmc: sdhci-s3c: Use shifts to divide by powers of two
->>>    mmc: sdhci-s3c: Cache bus clock rates
->>>    mmc: sdhci-s3c: Use correct condition to check for clock presence
->>>    mmc: sdhci-s3c: Simplify min/max clock calculation
->>>    mmc: sdhci-s3c: Fix handling of bus clock switching
->>>    mmc: sdhci-s3c: Do not allow frequencies higher than requested
->>>
->>>   drivers/mmc/host/sdhci-s3c.c | 170
->>> ++++++++++++++++++++-----------------------
->>>   1 file changed, 77 insertions(+), 93 deletions(-)
->>>
->>
->> What do you think about this series?
->
-> Could you take this series for 3.15?
+Hi,
 
-Ping.
+This series adds SATA support for OMAP5 uevm and DRA7-evm boards.
 
-It's been almost two months since I posted this series, it's been 
-already ACKed and it would be nice to have it applied for upcoming release.
+- Cleans up the ti-pipe3 PHY driver
+- Adds SATA DPLL support to ti-pipe3 PHY driver
+- Adds SATA nodes to hwmod and SoC DT data
 
-Best regards,
-Tomasz
+Patches are based on [1].
+To test SATA you will also need [2].
+
+[1] - http://article.gmane.org/gmane.linux.kernel/1658825
+[2] - http://article.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7285
+
+cheers,
+-roger
+
+---
+Balaji T K (2):
+  ARM: dts: omap5: add sata node
+  ARM: dts: dra7: add OCP2SCP3 and SATA nodes
+
+Keshava Munegowda (1):
+  ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
+
+Kishon Vijay Abraham I (1):
+  phy: rename struct omap_control_usb to struct omap_control_phy
+
+Nikhil Devshatwar (1):
+  ARM: DRA7: hwmod: Add ocp2scp3 and sata hwmods
+
+Roger Quadros (7):
+  phy: omap-control: Update DT binding information
+  phy: ti-pipe3: cleanup clock handling
+  ARM: dts: omap5: Add clocks to usb3_phy node
+  phy: ti-pipe3: Add SATA DPLL support
+  phy: omap: Select OMAP_OCP2SCP bus driver
+  phy: ti-pipe3: streamline PHY operations
+  phy: ti-pipe3: Fix suspend/resume and module reload
+
+ Documentation/devicetree/bindings/phy/ti-phy.txt   |  28 +-
+ Documentation/devicetree/bindings/usb/omap-usb.txt |  24 --
+ arch/arm/boot/dts/dra7.dtsi                        |  39 +++
+ arch/arm/boot/dts/omap5.dtsi                       |  42 +++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  73 +++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  41 ++-
+ drivers/phy/Kconfig                                |  16 +-
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-omap-control.c                     | 320 +++++++++++++++++++++
+ drivers/phy/phy-omap-usb2.c                        |   8 +-
+ drivers/phy/phy-ti-pipe3.c                         | 257 ++++++++++-------
+ drivers/usb/musb/omap2430.c                        |   2 +-
+ drivers/usb/phy/Kconfig                            |  10 -
+ drivers/usb/phy/Makefile                           |   1 -
+ drivers/usb/phy/phy-omap-control.c                 | 319 --------------------
+ include/linux/phy/omap_control_phy.h               |  89 ++++++
+ include/linux/usb/omap_control_usb.h               |  89 ------
+ 17 files changed, 798 insertions(+), 561 deletions(-)
+ create mode 100644 drivers/phy/phy-omap-control.c
+ delete mode 100644 drivers/usb/phy/phy-omap-control.c
+ create mode 100644 include/linux/phy/omap_control_phy.h
+ delete mode 100644 include/linux/usb/omap_control_usb.h
+
+-- 
+1.8.3.2
