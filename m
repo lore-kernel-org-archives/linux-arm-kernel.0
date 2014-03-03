@@ -1,55 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 3 Mar 2014 08:29:17 +0100
-Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
- suspend
-In-Reply-To: <7021741.2WcVMr4q95@vostro.rjw.lan>
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
- <7021741.2WcVMr4q95@vostro.rjw.lan>
-Message-ID: <CAPDyKFq5=Zdexm_YdBSmqvPhtAi3pUktqUWU7vc4NzrawDZSXA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Mar 2014 15:35:24 +0800
+Subject: [PATCH 1/4] mfd: mc13xxx: Honor designed SPI mode
+In-Reply-To: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
+References: <1393746275-9253-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140303073524.GD4674@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2014 00:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Saturday, March 01, 2014 11:56:03 AM Ulf Hansson wrote:
->> Patch 1 -> 2:
->> These patches provides two new runtime PM helper functions which intend to be
->> used from system suspend/resume callbacks, to make sure devices are put into low
->> power state during system suspend and brought back to full power at system
->> resume.
->>
->> The prerequisite is to have all levels of a device's runtime PM callbacks to be
->> defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
->> for CONFIG_PM.
->>
->> By using the new runtime PM helper functions especially the two scenarios below
->> will be addressed.
->>
->> 1) The PM core prevents .runtime_suspend callbacks from being invoked during
->> system suspend. That means even for a runtime PM centric subsystem and driver,
->> the device needs to be put into low power state from a system suspend callback.
->> Otherwise it may very well be left in full power state (runtime resumed) while
->> the system is suspended. By using the new helper functions, we make sure to walk
->> the hierarchy of a device's power domain, subsystem and driver.
->>
->> 2) Subsystems and drivers need to cope with all the combinations of
->> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
->> addresses this.
->
-> OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
-> and I think it'd be better to push them through the respective subsystem trees
-> later anyway.
+> Instead of using hard coded SPI mode, use mode described in
+> devicetree or defined for the board.
+> Additionally, patch updates all users of this PMIC to use
+> correct SPI mode.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/mach-mx31lilly.c | 1 +
+>  arch/arm/mach-imx/mach-mx31lite.c  | 1 +
+>  drivers/mfd/mc13xxx-spi.c          | 2 --
 
-Thanks Rafael!
+There's no reason for these changes to be in the same patch.
 
-Agree, regarding 3->8, they were at this point mostly included for
-your reference.
+Please split them up by subsystem and resubmit.
 
-Kind regards
-Uffe
-
->
-> Thanks!
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
