@@ -1,163 +1,78 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 3 Mar 2014 13:03:02 +0200
-Subject: [PATCH v3 4/7] ARM: dts: omap3-overo: Add HSUSB PHY
-In-Reply-To: <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
-References: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
- <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <53146166.4050906@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Mar 2014 12:02:40 +0100
+Subject: [PATCH v4 3/3] ARM: sun7i/sun6i: irqchip: Update the documentation
+In-Reply-To: <1393529662-8663-4-git-send-email-carlo@caione.org>
+References: <1393529662-8663-1-git-send-email-carlo@caione.org>
+ <1393529662-8663-4-git-send-email-carlo@caione.org>
+Message-ID: <20140303110240.GW607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi,
 
-
-On 03/03/2014 11:34 AM, Florian Vaussard wrote:
-> Add the High-Speed USB PHY.
+On Thu, Feb 27, 2014 at 08:34:22PM +0100, Carlo Caione wrote:
+> Added documentation for NMI irqchip.
 > 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 > ---
->  arch/arm/boot/dts/omap3-overo-storm-tobi.dts | 16 ++++++++++
->  arch/arm/boot/dts/omap3-overo-tobi.dts       | 16 ++++++++++
->  arch/arm/boot/dts/omap3-overo.dtsi           | 44 ++++++++++++++++++++++++++++
->  3 files changed, 76 insertions(+)
+>  .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
 > 
-> diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-> index 2033b52..eb93e3a 100644
-> --- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-> +++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-> @@ -21,6 +21,22 @@
->  };
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+> new file mode 100644
+> index 0000000..ac31487
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+> @@ -0,0 +1,27 @@
+> +Allwinner Sunxi NMI Controller
+> +==============================
 > +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +		>;
-> +	};
+> +Required properties:
 > +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> index 21de31d..e77be26 100644
-> --- a/arch/arm/boot/dts/omap3-overo-tobi.dts
-> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> @@ -21,6 +21,22 @@
->  };
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
-> +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +		>;
-> +	};
-> +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index 07467cc..8f810db 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -30,6 +30,24 @@
->  		ti,codec = <&twl_audio>;
->  	};
->  
-> +	/* HS USB Port 2 Power */
-> +	hsusb2_power: hsusb2_power_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
-> +		vcc-supply = <&hsusb2_power>;
-> +	};
-> +
->  	/* Regulator to trigger the nPoweron signal of the Wifi module */
->  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
->  		compatible = "regulator-fixed";
-> @@ -64,6 +82,11 @@
->  };
->  
->  &omap3_pmx_core {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_pins
-> +	>;
-> +
->  	uart3_pins: pinmux_uart3_pins {
->  		pinctrl-single,pins = <
->  			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-> @@ -107,6 +130,19 @@
->  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
->  		>;
->  	};
-> +
-> +	hsusb2_pins: pinmux_hsusb2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
-> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
-> +		>;
-> +	};
+> +- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
+> +  "allwinner,sun6i-a31-sc-nmi"
+> +- reg : Specifies base physical address and size of the registers.
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 2. The first cell is the IRQ number, the
+> +  second cell the trigger type.
 
-Does this mean all overo variants use the USB host feature on hsusb2 pins? If not then this can't be here.
+What values correspond to what trigger type? What are the accepted values?
 
-If yes then I didn't understand why the hsusb2 pinmux is split up half here and half in "omap3-overo-tobi.dts"
-and "omap3-overo-storm-tobi.dts"
+> +- interrupt-parent: Specifies the parent interrupt controller.
+> +- interrupts: Specifies the list of interrupt lines which are handled by
+> +  the interrupt controller in the parent controller's notation. This value
+> +  shall be the NMI.
 
->  };
->  
->  &i2c1 {
-> @@ -168,6 +204,14 @@
->  	power = <50>;
->  };
->  
-> +&usbhshost {
-> +	port2-mode = "ehci-phy";
+Hmmm, there's only one interrupt, not a list of them.
+
+> +
+> +Example:
+> +
+> +sc-nmi-intc at 01c00030 {
+> +	compatible = "allwinner,sun7i-a20-sc-nmi";
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	reg = <0x01c00030 0x0c>;
+> +	interrupt-parent = <&gic>;
+> +	interrupts = <0 0 4>;
 > +};
-> +
-> +&usbhsehci {
-> +	phys = <0 &hsusb2_phy>;
-> +};
-> +
->  &uart3 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart3_pins>;
+> -- 
+> 1.8.3.2
 > 
 
-cheers,
--roger
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/96759468/attachment.sig>
