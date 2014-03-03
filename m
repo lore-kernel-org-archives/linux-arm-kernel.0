@@ -1,106 +1,116 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon,  3 Mar 2014 17:33:13 +0000
-Subject: [PATCH v4 3/6] pci: Create pci_host_bridge before its associated bus
- in pci_create_root_bus.
-In-Reply-To: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1393867996-32299-4-git-send-email-Liviu.Dudau@arm.com>
+Date: Mon,  3 Mar 2014 17:33:30 +0000
+Subject: [PATCH v4 0/3] [RFC] Add support for PCI in AArch64
+Message-ID: <1393868013-32345-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
-As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
-the creation order has been changed for no good reason. Revert the order of
-creation as we are going to depend on the pci_host_bridge structure to retrieve the
-domain number of the root bus.
+Hi,
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+This patch adds support for PCI to AArch64. It is based on my v4 patch
+that adds support for creating generic host bridge structure from
+device tree. With that in place, I was able to boot a platform that
+has PCIe host bridge support and use a PCIe network card.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 6e34498..78ccba0 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -505,7 +505,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	kfree(bridge);
- }
- 
--static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-+static struct pci_host_bridge *pci_alloc_host_bridge(void)
- {
- 	struct pci_host_bridge *bridge;
- 
-@@ -514,7 +514,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&bridge->windows);
--	bridge->bus = b;
- 	return bridge;
- }
- 
-@@ -1727,9 +1726,21 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	char bus_addr[64];
- 	char *fmt;
- 
-+	bridge = pci_alloc_host_bridge();
-+	if (!bridge)
-+		return NULL;
-+
-+	bridge->dev.parent = parent;
-+	bridge->dev.release = pci_release_host_bridge_dev;
-+	error = pcibios_root_bridge_prepare(bridge);
-+	if (error) {
-+		kfree(bridge);
-+		return NULL;
-+	}
-+
- 	b = pci_alloc_bus();
- 	if (!b)
--		return NULL;
-+		goto err_out;
- 
- 	b->sysdata = sysdata;
- 	b->ops = ops;
-@@ -1738,26 +1749,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 
--	bridge = pci_alloc_host_bridge(b);
--	if (!bridge)
--		goto err_out;
--
--	bridge->dev.parent = parent;
--	bridge->dev.release = pci_release_host_bridge_dev;
-+	bridge->bus = b;
- 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
--	error = pcibios_root_bridge_prepare(bridge);
--	if (error) {
--		kfree(bridge);
--		goto err_out;
--	}
--
- 	error = device_register(&bridge->dev);
- 	if (error) {
- 		put_device(&bridge->dev);
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
-@@ -1814,8 +1814,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- class_dev_reg_err:
- 	put_device(&bridge->dev);
- 	device_unregister(&bridge->dev);
--err_out:
-+err_bus_out:
- 	kfree(b);
-+err_out:
-+	kfree(bridge);
- 	return NULL;
- }
- 
+Changes from v3:
+  - Added Acks accumulated so far ;)
+  - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
+    lands in linux-next or mainline, in order to ease applying the series
+
+Changes from v2:
+  - Implement an arch specific version of pci_register_io_range() and
+    pci_address_to_pio().
+  - Return 1 from pci_proc_domain().
+
+Changes from v1:
+  - Added Catalin's patch for moving the PCI_IO_BASE location and extend
+    its size to 16MB
+  - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
+    keeping track of assigned IO space and returns an io_offset. At the
+    moment the code is added in arch/arm64 but it can be moved in drivers/pci.
+  - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
+    as suggested by Arnd.
+
+The API used is different from the one used by ARM architecture. There is
+no pci_common_init_dev() function and no hw_pci structure, as that is no
+longer needed. Once the last signature is added to the legal agreement, I
+will post the host bridge driver code that I am using. Meanwhile, here
+is an example of what the probe function looks like, posted as an example:
+
+static int myhostbridge_probe(struct platform_device *pdev)
+{
+	int err;
+	struct device_node *dev;
+	struct pci_host_bridge *bridge;
+	struct myhostbridge_port *pp;
+	resource_size_t lastbus;
+
+	dev = pdev->dev.of_node;
+
+	if (!of_device_is_available(dev)) {
+		pr_warn("%s: disabled\n", dev->full_name);
+		return -ENODEV;
+	}
+
+	pp = kzalloc(sizeof(struct myhostbridge_port), GFP_KERNEL);
+	if (!pp)
+		return -ENOMEM;
+
+	bridge = of_create_pci_host_bridge(&pdev->dev, &myhostbridge_ops, pp);
+	if (IS_ERR(bridge)) {
+		err = PTR_ERR(bridge);
+		goto bridge_create_fail;
+	}
+
+	err = myhostbridge_setup(bridge->bus);
+	if (err)
+		goto bridge_setup_fail;
+
+	/* We always enable PCI domains and we keep domain 0 backward
+	 * compatible in /proc for video cards
+	 */
+	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
+
+	lastbus = pci_scan_child_bus(bridge->bus);
+	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+
+	pci_assign_unassigned_bus_resources(bridge->bus);
+
+	pci_bus_add_devices(bridge->bus);
+
+	return 0;
+
+bridge_setup_fail:
+	put_device(&bridge->dev);
+	device_unregister(&bridge->dev);
+bridge_create_fail:
+	kfree(pp);
+	return err;
+}
+
+Best regards,
+Liviu
+
+
+Catalin Marinas (1):
+  arm64: Extend the PCI I/O space to 16MB
+
+Liviu Dudau (2):
+  Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+  arm64: Add architecture support for PCI
+
+ Documentation/arm64/memory.txt |  16 ++--
+ arch/arm64/Kconfig             |  19 ++++-
+ arch/arm64/include/asm/Kbuild  |   1 +
+ arch/arm64/include/asm/io.h    |   5 +-
+ arch/arm64/include/asm/pci.h   |  47 +++++++++++
+ arch/arm64/kernel/Makefile     |   1 +
+ arch/arm64/kernel/pci.c        | 178 +++++++++++++++++++++++++++++++++++++++++
+ include/asm-generic/io.h       |   2 +-
+ 8 files changed, 259 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/pci.c
+
 -- 
 1.9.0
