@@ -1,51 +1,45 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 03 Mar 2014 00:30:00 -0800
-Subject: [PATCH V3 2/8] PM / Sleep / Runtime: Add
- pm_runtime_suspend|resume_force functions
-In-Reply-To: <1393671371-2398-3-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Sat, 1 Mar 2014 11:56:05 +0100")
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
- <1393671371-2398-3-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7hppm3sn07.fsf@paris.lan>
+From: jjhiblot@gmail.com (Jean-Jacques Hiblot)
+Date: Mon, 03 Mar 2014 09:55:58 +0100
+Subject: [PATCH] irq: Changed the return type of irq_chip.irq_startup()
+ from unsigned int to int
+In-Reply-To: <20140301160114.GE21483@n2100.arm.linux.org.uk>
+References: <CACh+v5Nkuct0J65OHcnSd6Dfq4EyfafY8RpTvdwKXUA7A8_+Xw@mail.gmail.com>
+ <1393521679-32331-1-git-send-email-jjhiblot@traphandler.com>
+ <7150036.UpHTd1PK1K@radagast>
+ <alpine.DEB.2.02.1403011629540.18573@ionos.tec.linutronix.de>
+ <20140301160114.GE21483@n2100.arm.linux.org.uk>
+Message-ID: <5314439E.6070908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> This patch provides two new runtime PM helper functions which intend to
-> be used from system suspend/resume callbacks, to make sure devices are
-> put into low power state during system suspend and brought back to full
-> power at system resume.
->
-> The prerequisite is to have all levels of a device's runtime PM
-> callbacks to be defined through the SET_PM_RUNTIME_PM_OPS macro, which
-> means these are available for CONFIG_PM.
->
-> By using the new runtime PM helper functions especially the two
-> scenarios below will be addressed.
->
-> 1) The PM core prevents .runtime_suspend callbacks from being invoked
-> during system suspend. That means even for a runtime PM centric
-> subsystem and driver, the device needs to be put into low power state
-> from a system suspend callback. Otherwise it may very well be left in
-> full power state (runtime resumed) while the system is suspended. By
-> using the new helper functions, we make sure to walk the hierarchy of
-> a device's power domain, subsystem and driver.
->
-> 2) Subsystems and drivers need to cope with all the combinations of
-> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions
-> smothly addresses this.
->
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-FWIW
+Le 01/03/2014 17:01, Russell King - ARM Linux a ?crit :
+> On Sat, Mar 01, 2014 at 04:31:13PM +0100, Thomas Gleixner wrote:
+>> On Fri, 28 Feb 2014, James Hogan wrote:
+>>> On Thursday 27 February 2014 18:21:19 Jean-Jacques Hiblot wrote:
+>>>>   drivers/irqchip/irq-metag.c               | 4 ++--
+>>>
+>>> I think you've missed out drivers/irqchip/irq-metag-ext.c
+>>
+>> There is a good reason why I asked to do this with coccinelle.
+>
+> Go easy, not everyone understands that complex tool - I certainly don't.
+> I ended up deleting it from my system after several failed attempts, and
+> I came to the conclusion that to use it properly, you also needed a Julia
+> installed along side you to learn how to write its scripts.
+>
+> The big problem is it /doesn't/ do what it advertises to - I ended up
+> writing expression after expression to make it detect all the various
+> forms of what I wanted it to, which as I understand the tool is precisely
+> the opposite of what you're supposed to do with it.
+>
+> I ended up coming to the conclusion that a well formed sed and/or grep
+> expression was far more useful and effective than trying to figure out
+> coccinelle.
+>
+Actually I tried to use coccinelle for this, but to paraphrase Thomas: 
+it was a failure on its own. The tool is complex.
+I'll send shortly a second version of the patch with the missing change(s).
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+Jean-Jacques
