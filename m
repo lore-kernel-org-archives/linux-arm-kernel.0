@@ -1,76 +1,36 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 3 Mar 2014 17:07:30 +0200
-Subject: [PATCH 08/12] ARM: dts: omap5: add sata node
+Date: Mon, 3 Mar 2014 17:07:32 +0200
+Subject: [PATCH 10/12] phy: ti-pipe3: Fix suspend/resume and module reload
 In-Reply-To: <1393859254-10937-1-git-send-email-rogerq@ti.com>
 References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
-Message-ID: <1393859254-10937-9-git-send-email-rogerq@ti.com>
+Message-ID: <1393859254-10937-11-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
+Due to Errata i783, SATA breaks if its DPLL is idled. The recommeded
+workaround to issue a softreset to the SATA controller doesn't seem to
+work. Here we just prevent SATA DPLL from Idling and hence avoid
+the issue altogether.
 
-Add support for sata.
-
-[Roger Q] Clean up.
-
-CC: Benoit Cousson <bcousson@baylibre.com>
-CC: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/phy/phy-ti-pipe3.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index a7f5930..8e55e97 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -806,6 +806,46 @@
+diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+index d3c085a..611f7c3 100644
+--- a/drivers/phy/phy-ti-pipe3.c
++++ b/drivers/phy/phy-ti-pipe3.c
+@@ -238,6 +238,10 @@ static int ti_pipe3_exit(struct phy *x)
+ 	u32 val;
+ 	unsigned long timeout;
  
- 			#thermal-sensor-cells = <1>;
- 		};
++	/* SATA DPLL can't be powered down due to Errata i783 */
++	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata"))
++		return 0;
 +
-+		omap_control_sata: control-phy at 4a002374 {
-+			compatible = "ti,control-phy-pipe3";
-+			reg = <0x4a002374 0x4>;
-+			reg-names = "power";
-+			clocks = <&sys_clkin>;
-+			clock-names = "sysclk";
-+		};
-+
-+		/* OCP2SCP3 */
-+		ocp2scp at 4a090000 {
-+			compatible = "ti,omap-ocp2scp";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x4a090000 0x20>;
-+			ranges;
-+			ti,hwmods = "ocp2scp3";
-+			sata_phy: phy at 4a096000 {
-+				compatible = "ti,phy-pipe3-sata";
-+				reg = <0x4A096000 0x80>, /* phy_rx */
-+				      <0x4A096400 0x64>, /* phy_tx */
-+				      <0x4A096800 0x40>; /* pll_ctrl */
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_sata>;
-+				clocks = <&sys_clkin>;
-+				clock-names = "sysclk";
-+				#phy-cells = <0>;
-+			};
-+		};
-+
-+		sata: sata at 4a141100 {
-+			compatible = "snps,dwc-ahci";
-+			reg = <0x4a140000 0x1100>, <0x4a141100 0x7>;
-+			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&sata_phy>;
-+			phy-names = "sata-phy";
-+			clocks = <&sata_ref_clk>;
-+			ti,hwmods = "sata";
-+		};
-+
- 	};
- };
- 
+ 	/* Put DPLL in IDLE mode */
+ 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+ 	val |= PLL_IDLE;
 -- 
 1.8.3.2
