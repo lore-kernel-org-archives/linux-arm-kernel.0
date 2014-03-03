@@ -1,65 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 3 Mar 2014 18:10:14 +0100
-Subject: [PATCH v2] usb: gadget: atmel_usba: Fix crashed during stopping
- when DEBUG is enabled
-In-Reply-To: <1393865324-27309-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1393865324-27309-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140303171014.GC3155@piout.net>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon,  3 Mar 2014 17:33:11 +0000
+Subject: [PATCH v4 1/6] pci: Introduce pci_register_io_range() helper function.
+In-Reply-To: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1393867996-32299-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2014 at 17:48:34 +0100, Gregory CLEMENT wrote :
-> The debug trace in the atmel_usba_stop function made the assumption
-> that the driver pointer passed in parameter was not NULL. Since the
-> commit "usb: gadget: udc-core: fix a regression during gadget driver
-> unbinding", it was no more always true. This lead to a kernel crash.
-> 
-> This commit now use the driver pointer stored in udc which fixes this
-> issue.
-> 
-> Since the commit which have triggered this issue was backported to the
-> 3.2 stable branch, then this one should also be backported to the same
-> kernel.
-> 
-> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
-> Cc: stable at vger.kernel.org # v3.2+
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Some architectures do not share x86 simple view of the I/O space and
+instead use a range of addresses that map to external devices. For PCI,
+these ranges can be expressed by OF bindings in a device tree file.
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Introduce a pci_register_io_range() helper function that can be used
+by the architecture code to keep track of the io ranges described by the
+PCI bindings.
 
-> ---
-> Changelog:
-> v1 -> v2
-> Fixed the signature block in the commit log
-> 
->  drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> index 52771d4c44bc..167843de2d8a 100644
-> --- a/drivers/usb/gadget/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/atmel_usba_udc.c
-> @@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
->  	toggle_bias(0);
->  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
->  
-> -	udc->driver = NULL;
-> -
->  	clk_disable_unprepare(udc->hclk);
->  	clk_disable_unprepare(udc->pclk);
->  
-> -	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
-> +	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
-> +
-> +	udc->driver = NULL;
->  
->  	return 0;
->  }
-> -- 
-> 1.8.1.2
-> 
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 1a54f1f..d1bb30f 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -619,6 +619,11 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+ }
+ EXPORT_SYMBOL(of_get_address);
+ 
++int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
++{
++	return 0;
++}
++
+ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+ {
+ 	if (address > IO_SPACE_LIMIT)
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 5f6ed6b..40c418d 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -56,6 +56,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+ extern const __be32 *of_get_address(struct device_node *dev, int index,
+ 			   u64 *size, unsigned int *flags);
+ 
++extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+ extern unsigned long pci_address_to_pio(phys_addr_t addr);
+ 
+ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.0
