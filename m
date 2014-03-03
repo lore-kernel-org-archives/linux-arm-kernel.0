@@ -1,128 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Mar 2014 14:26:22 +0100
-Subject: [linux-sunxi] [PATCH v2 2/5] clk: sun6i: Reparent AHB clock on
- PLL6
-In-Reply-To: <53120BA8.3000508@redhat.com>
-References: <1393605440-14643-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393605440-14643-3-git-send-email-maxime.ripard@free-electrons.com>
- <53120BA8.3000508@redhat.com>
-Message-ID: <20140303132622.GY607@lukather>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 3 Mar 2014 14:37:30 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 3/3] ARM: sun7i/sun6i: irqchip:
+ Update the documentation
+In-Reply-To: <20140303110240.GW607@lukather>
+References: <1393529662-8663-1-git-send-email-carlo@caione.org>
+ <1393529662-8663-4-git-send-email-carlo@caione.org>
+ <20140303110240.GW607@lukather>
+Message-ID: <CAOQ7t2Z6UuKNfUDUYC1oaZAHKQ-3Sjffe-M2h1GACsERbV9_jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Mon, Mar 3, 2014 at 12:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Feb 27, 2014 at 08:34:22PM +0100, Carlo Caione wrote:
+>> Added documentation for NMI irqchip.
+>>
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> ---
+>>  .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+>> new file mode 100644
+>> index 0000000..ac31487
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+>> @@ -0,0 +1,27 @@
+>> +Allwinner Sunxi NMI Controller
+>> +==============================
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
+>> +  "allwinner,sun6i-a31-sc-nmi"
+>> +- reg : Specifies base physical address and size of the registers.
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. The value shall be 2. The first cell is the IRQ number, the
+>> +  second cell the trigger type.
+>
+> What values correspond to what trigger type? What are the accepted values?
+>
+>> +- interrupt-parent: Specifies the parent interrupt controller.
+>> +- interrupts: Specifies the list of interrupt lines which are handled by
+>> +  the interrupt controller in the parent controller's notation. This value
+>> +  shall be the NMI.
+>
+> Hmmm, there's only one interrupt, not a list of them.
 
-On Sat, Mar 01, 2014 at 05:32:40PM +0100, Hans de Goede wrote:
-> On 02/28/2014 05:37 PM, Maxime Ripard wrote:
-> > In order for the DMA controller to work for SDRAM to devices transfers, the AHB
-> > clock should be reparented on the PLL6.
-> > 
-> > Force that parenting in the clock driver.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi/clk-sunxi.c | 18 +++++++++++++++++-
-> >  1 file changed, 17 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> > index f6f61cc..a5c5882 100644
-> > --- a/drivers/clk/sunxi/clk-sunxi.c
-> > +++ b/drivers/clk/sunxi/clk-sunxi.c
-> > @@ -1286,7 +1286,7 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
-> >   */
-> >  static void __init sunxi_clock_protect(void)
-> >  {
-> > -	struct clk *clk;
-> > +	struct clk *clk, *parent;
-> >  
-> >  	/* memory bus clock - sun5i+ */
-> >  	clk = clk_get(NULL, "mbus");
-> > @@ -1307,6 +1307,22 @@ static void __init sunxi_clock_protect(void)
-> >  	if (!IS_ERR(clk))
-> >  		clk_prepare_enable(clk);
-> >  
-> > +	clk = clk_get(NULL, "ahb1_mux");
-> > +	if (IS_ERR(clk)) {
-> > +		pr_err("Couldn't get AHB1 Mux\n");
-> > +		return;
-> > +	}
-> 
-> I think Emilio already made a similar remark for v1, but since this
-> is still here in v2, ahb1_mux is only available on sun6i, so
-> at a minimum the pr_err should be dropped. Preferably I would like
-> to see this changed to something like:
-> 
-> 	clk = clk_get(NULL, "ahb1_mux");
-> 	parent = clk_get(NULL, "pll6");
-> 	if (!IS_ERR(clk) && !IS_ERR(parent))
-> 		clk_set_parent(clk, parent);
-> 	if (!IS_ERR(parent))
-> 		clk_put(parent);
-> 	if (!IS_ERR(clk))
-> 		clk_put(clk);
+Fix for both in v5.
 
-Still. The DMA doesn't work at all if the parenting is not set, so
-having an error if it fails is mandatory.
-
-And the statement that you made can also apply to any clock we enable
-here, that might or might not be present in all the SoCs.
-
-I guess we can solve this in two steps:
-  - split out the reparenting, and move this into the DMA driver. That
-    would isolate things in the driver itself, and prevent a
-    reparenting attempt on every SoCs.
-  - Split this function into several functions, one for each SoC. That
-    would allow to do pretty much anything we want without having to
-    care about wether it applies to other platforms.
-
-> > +	parent = clk_get(NULL, "pll6");
-> > +	if (IS_ERR(clk)) {
-> 
-> Copy paste error should be IS_ERR(parent).
-
-Ah, yep, thanks!
-
-> 
-> > +		pr_err("Couldn't get PLL6\n");
-> 
-> If we keep things this way this error path should do a clk_put(clk);
-
-Good catch too.
-
-> > +		return;
-> > +	}
-> > +
-> > +	clk_set_parent(clk, parent);
-> > +
-> > +	clk_put(clk);
-> > +	clk_put(parent);
-> >  }
-> >  
-> >  static void __init sunxi_init_clocks(void)
-> > 
-> 
-> Regards,
-> 
-> Hans
-> 
-> p.s.
-> 
-> Given Russell's remarks it would also be good to have a
-> patch in this set dropping the clk_put calls of the existing
-> enables / protections.
-
-Yes, I'll do it in the v3.
-
-Maxime
+Thank you,
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/34d5c39f/attachment.sig>
+Carlo Caione
