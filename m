@@ -1,45 +1,93 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 3 Mar 2014 18:13:37 +1100
-Subject: linux-next: manual merge of the usb tree with the arm-soc tree
-Message-ID: <20140303181337.186b799feeb9ca132a7579a1@canb.auug.org.au>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 3 Mar 2014 09:15:46 +0200
+Subject: [RFC PATCH v1 1/2] ARM: dts: AM43xx-clocks: Entries added for
+ ti-usim
+In-Reply-To: <1389010351-17320-2-git-send-email-satish.patel@ti.com>
+References: <1389010351-17320-1-git-send-email-satish.patel@ti.com>
+ <1389010351-17320-2-git-send-email-satish.patel@ti.com>
+Message-ID: <53142C22.4020700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On 01/06/2014 02:12 PM, Satish Patel wrote:
+> Clock  entries support for TI's USIM - Smart card controller of AM43xx platform
+> USIM controller has multiple sources for debounce and functional clock.Entry
+> for each source has been added.
 
-Today's linux-next merge of the usb tree got a conflict in
-arch/arm/mach-tegra/Kconfig between commit ddb902cc3459 ("ARM: centralize
-common multi-platform kconfig options") from the arm-soc tree and commit
-f6723b569a67 ("usb: host: remove selects of USB_ARCH_HAS_?HCI") from the
-usb tree.
+This patch is using unsupported/old version of DT data layout for mux 
+and gate clocks, and as such does not work at all (probably causes a 
+hang during boot.) Please update against latest kernel.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+>
+> Signed-off-by: Satish Patel <satish.patel@ti.com>
+> ---
+>   arch/arm/boot/dts/am43xx-clocks.dtsi |   34 ++++++++++++++++++++++++++++++++++
+>   drivers/clk/ti/clk-43xx.c            |    4 ++++
+>   2 files changed, 38 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+> index c127e7b..7ccfa75 100644
+> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+> @@ -420,6 +420,40 @@ wdt1_fck: wdt1_fck at 44df422c {
+>   	bit-mask = <0x1>;
+>   };
+>
+> +usim0_fck: usim0_fck at 44df4254 {
+> +	#clock-cells = <0>;
+> +	compatible = "mux-clock";
+> +	clocks = <&sys_clkin_ck>, <&dpll_core_m4_ck>;
+> +	reg = <0x44df4254 0x4>;
+> +	bit-mask = <0x1>;
+> +};
+> +
+> +usim_dbck: usim_dbck at 44df425c {
+> +	#clock-cells = <0>;
+> +	compatible = "mux-clock";
+> +	clocks = <&clk_rc32k_ck>, <&clk_32k_mosc_ck>, <&clkdiv32k_ick>;
+> +	reg = <0x44df425c 0x4>;
+> +	bit-mask = <0x3>;
+> +};
+> +
+> +usim0_opt_fck: usim0_opt_fck at 44df8da8 {
+> +	#clock-cells = <0>;
+> +	compatible = "gate-clock";
+> +	clocks = <&usim0_fck>;
+> +	reg = <0x44df8da8 0x4>;
+> +	bit-shift = <8>;
+> +	bit-mask = <0x1>;
+> +};
+> +
+> +usim0_opt_fck32: usim0_opt_fck32 at 44df8da8 {
+> +	#clock-cells = <0>;
+> +	compatible = "gate-clock";
+> +	clocks = <&usim_dbck>;
+> +	bit-shift = <9>;
+> +	bit-mask = <0x1>;
+> +	reg = <0x44df8da8 0x4>;
+> +};
+> +
+>   l3_gclk: l3_gclk {
+>   	#clock-cells = <0>;
+>   	compatible = "fixed-factor-clock";
+> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+> index ff3ad1b..8ed05f2 100644
+> --- a/drivers/clk/ti/clk-43xx.c
+> +++ b/drivers/clk/ti/clk-43xx.c
+> @@ -66,6 +66,10 @@ static struct omap_dt_clk am43xx_clks[] = {
+>   	DT_CLK(NULL, "timer6_fck", "timer6_fck"),
+>   	DT_CLK(NULL, "timer7_fck", "timer7_fck"),
+>   	DT_CLK(NULL, "wdt1_fck", "wdt1_fck"),
+> +	DT_CLK(NULL, "usim0_fck", "usim0_fck"),
+> +	DT_CLK(NULL, "usim_dbck", "usim_dbck"),
+> +	DT_CLK(NULL, "usim0_opt_fck", "usim0_opt_fck"),
+> +	DT_CLK(NULL, "usim0_opt_fck32", "usim0_opt_fck32"),
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Do you need to add these aliases? Please avoid if possible.
 
-diff --cc arch/arm/mach-tegra/Kconfig
-index f61cd5b9f103,4926bd11f190..000000000000
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@@ -12,9 -18,10 +12,8 @@@ config ARCH_TEGR
-  	select ARCH_HAS_RESET_CONTROLLER
-  	select RESET_CONTROLLER
-  	select SOC_BUS
-- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- -	select SPARSE_IRQ
-  	select USB_ULPI if USB_PHY
-  	select USB_ULPI_VIEWPORT if USB_PHY
- -	select USE_OF
-  	help
-  	  This enables support for NVIDIA Tegra based systems.
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/c62d0b98/attachment.sig>
+-Tero
+
+>   	DT_CLK(NULL, "l3_gclk", "l3_gclk"),
+>   	DT_CLK(NULL, "dpll_core_m4_div2_ck", "dpll_core_m4_div2_ck"),
+>   	DT_CLK(NULL, "l4hs_gclk", "l4hs_gclk"),
+>
