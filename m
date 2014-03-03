@@ -1,39 +1,25 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Mon, 3 Mar 2014 12:45:21 +0800
-Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
-In-Reply-To: <7430033.eK9aHCDe8b@wuerfel>
-References: <cover.1393568715.git.mohit.kumar@st.com>
- <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
- <7430033.eK9aHCDe8b@wuerfel>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 02 Mar 2014 22:21:02 -0700
+Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
+In-Reply-To: <20140303120241.11066f951d53c50fb14faf47@canb.auug.org.au>
+References: <20140303120241.11066f951d53c50fb14faf47@canb.auug.org.au>
+Message-ID: <5314113E.1030106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On 03/02/2014 06:02 PM, Stephen Rothwell wrote:
+> Hi Stephen,
+> 
+> Today's linux-next merge of the bcm2835 tree got a conflict in 
+> arch/arm/mach-bcm2835/Kconfig between commits ddb902cc3459 ("ARM: 
+> centralize common multi-platform kconfig options") and
+> 0676b21fffd1 ("ARM: bcm2835: enable V6K instead of plain V6") from
+> the arm-soc tree and commit d30fe6272183 ("ARM: bcm2835: Move to
+> mach-bcm directory") from the bcm2835 tree.
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, February 28, 2014 5:28 PM
-> To: Mohit KUMAR DCG
-> Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
-> 
-> On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
-> > +                       interrupts = <0 68 0x4>;
-> > +                       interrupt-map-mask = <0 0 0 0>;
-> > +                       interrupt-map = <0x0 0 &gic 68>;
-> >
-> 
-> From the discussion we just had on the imx version of this driver, I suspect
-> what you want instead is to drop the interrupts property and fix the interrupt
-> map to be
-> 
-> interrupt-map = <0x0 0 &gic 0 68 0x4>;
-> 
+Olof, Arnd, Kevin,
 
-- yes, I should have fix interrupt map. Pls let us know if any other point needs to be
-Incorporated in this series.
-
-Regards
-Mohit
+Do you want me to rebase the patch that moves
+arch/arm/mach-bcm2835/Kconfig into arch/arm/mach-bcm/Kconfig, or even
+drop it and take it through arm-soc directly? Or, will you just handle
+this when you merge the pull request?
