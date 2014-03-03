@@ -1,37 +1,126 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 16:41:44 +0800
-Subject: [PATCH v12 01/15] usb: doc: phy-mxs: Add more compatible strings
+Date: Mon, 3 Mar 2014 16:41:45 +0800
+Subject: [PATCH v12 02/15] usb: phy-mxs: Add platform judgement code
 In-Reply-To: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
 References: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393836118-4265-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393836118-4265-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-"fsl,imx6sl-usbphy" for imx6sl, and "fsl,imx23-usbphy"
-is still a fallback for other strings.
+The mxs-phy has several bugs and features at different
+versions, the driver code can get it through of_device_id.data.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
+ 1 files changed, 49 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index 5835b27..ea5134a 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -1,7 +1,11 @@
- * Freescale MXS USB Phy Device
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index b42897b..cf58d8e 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012-2013 Freescale Semiconductor, Inc.
+  * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+  * on behalf of DENX Software Engineering GmbH
+  *
+@@ -20,6 +20,7 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/of_device.h>
  
- Required properties:
--- compatible: Should be "fsl,imx23-usbphy"
-+- compatible: should contain:
-+	* "fsl,imx23-usbphy" for imx23 and imx28
-+	* "fsl,imx6q-usbphy" for imx6dq and imx6dl
-+	* "fsl,imx6sl-usbphy" for imx6sl
-+  "fsl,imx23-usbphy" is still a fallback for other strings
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
+ #define DRIVER_NAME "mxs_phy"
  
+@@ -34,13 +35,55 @@
+ #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+ #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+ 
++#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
++
++/* Do disconnection between PHY and controller without vbus */
++#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
++
++/*
++ * The PHY will be in messy if there is a wakeup after putting
++ * bus to suspend (set portsc.suspendM) but before setting PHY to low
++ * power mode (set portsc.phcd).
++ */
++#define MXS_PHY_ABNORMAL_IN_SUSPEND		BIT(1)
++
++/*
++ * The SOF sends too fast after resuming, it will cause disconnection
++ * between host and high speed device.
++ */
++#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
++
++struct mxs_phy_data {
++	unsigned int flags;
++};
++
++static const struct mxs_phy_data imx23_phy_data = {
++	.flags = MXS_PHY_ABNORMAL_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
++};
++
++static const struct mxs_phy_data imx6q_phy_data = {
++	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
++		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++};
++
++static const struct mxs_phy_data imx6sl_phy_data = {
++	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++};
++
++static const struct of_device_id mxs_phy_dt_ids[] = {
++	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
++	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
++	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
++
+ struct mxs_phy {
+ 	struct usb_phy phy;
+ 	struct clk *clk;
++	const struct mxs_phy_data *data;
+ };
+ 
+-#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+-
+ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ {
+ 	int ret;
+@@ -138,6 +181,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	struct clk *clk;
+ 	struct mxs_phy *mxs_phy;
+ 	int ret;
++	const struct of_device_id *of_id =
++			of_match_device(mxs_phy_dt_ids, &pdev->dev);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+@@ -168,6 +213,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	mxs_phy->phy.type		= USB_PHY_TYPE_USB2;
+ 
+ 	mxs_phy->clk = clk;
++	mxs_phy->data = of_id->data;
+ 
+ 	platform_set_drvdata(pdev, mxs_phy);
+ 
+@@ -187,12 +233,6 @@ static int mxs_phy_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id mxs_phy_dt_ids[] = {
+-	{ .compatible = "fsl,imx23-usbphy", },
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+-
+ static struct platform_driver mxs_phy_driver = {
+ 	.probe = mxs_phy_probe,
+ 	.remove = mxs_phy_remove,
 -- 
 1.7.8
