@@ -1,91 +1,71 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon,  3 Mar 2014 10:53:23 +0100
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for ARM
-In-Reply-To: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
-References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1393840403-26639-4-git-send-email-jean.pihet@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 03 Mar 2014 09:53:57 +0000 (GMT)
+Subject: [GIT PULL 3/6] Samsung DT updates for v3.15
+Message-ID: <23081058.260441393840435413.JavaMail.weblogic@epml16>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-The new code is contained in unwin-libdw.c object, and
-implements unwind__get_entries unwind interface function.
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-Cc: David Ahern <dsahern@gmail.com>
----
- tools/perf/arch/arm/Makefile            |  5 +++++
- tools/perf/arch/arm/util/unwind-libdw.c | 36 +++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
- create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
+are available in the git repository at:
 
-diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 221f21d..09d6215 100644
---- a/tools/perf/arch/arm/Makefile
-+++ b/tools/perf/arch/arm/Makefile
-@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+endif
-+ifndef NO_LIBDW_DWARF_UNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
-+endif
-+ifndef NO_DWARF_UNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
- endif
-diff --git a/tools/perf/arch/arm/util/unwind-libdw.c b/tools/perf/arch/arm/util/unwind-libdw.c
-new file mode 100644
-index 0000000..b4176c6
---- /dev/null
-+++ b/tools/perf/arch/arm/util/unwind-libdw.c
-@@ -0,0 +1,36 @@
-+#include <elfutils/libdwfl.h>
-+#include "../../util/unwind-libdw.h"
-+#include "../../util/perf_regs.h"
-+
-+bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
-+{
-+	struct unwind_info *ui = arg;
-+	struct regs_dump *user_regs = &ui->sample->user_regs;
-+	Dwarf_Word dwarf_regs[PERF_REG_ARM_MAX];
-+
-+#define REG(r) ({						\
-+	Dwarf_Word val = 0;					\
-+	perf_reg_value(&val, user_regs, PERF_REG_ARM_##r);	\
-+	val;							\
-+})
-+
-+	dwarf_regs[0]  = REG(R0);
-+	dwarf_regs[1]  = REG(R1);
-+	dwarf_regs[2]  = REG(R2);
-+	dwarf_regs[3]  = REG(R3);
-+	dwarf_regs[4]  = REG(R4);
-+	dwarf_regs[5]  = REG(R5);
-+	dwarf_regs[6]  = REG(R6);
-+	dwarf_regs[7]  = REG(R7);
-+	dwarf_regs[8]  = REG(R8);
-+	dwarf_regs[9]  = REG(R9);
-+	dwarf_regs[10] = REG(R10);
-+	dwarf_regs[11] = REG(FP);
-+	dwarf_regs[12] = REG(IP);
-+	dwarf_regs[13] = REG(SP);
-+	dwarf_regs[14] = REG(LR);
-+	dwarf_regs[15] = REG(PC);
-+
-+	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM_MAX,
-+					   dwarf_regs);
-+}
--- 
-1.7.11.7
+  http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-dt
+
+for you to fetch changes up to d726ca2d3316743841063a98fb113ff22a236e63:
+
+  ARM: dts: Add vmmc-supply to MMC on arndale-octa board (2014-02-24 08:56:46 +0900)
+
+----------------------------------------------------------------
+Samsung DT updates for v3.15
+
+For exynos4412
+- update vdd_arm voltage range for odroidx board
+
+For exynos5250
+- add PMU sysreg node and update watchdog node
+- re-organize RTC status
+- add max77686 pmic node for smdk5250
+
+For exynos5420
+- add PMU sysreg, i2s, adma and watchdog nodes
+- re-organize RTC status
+- add fixed voltage regulators and regulator nodes
+  for smdk5420
+- add PMIC, GPIO based wake up key and vmmc-supply
+  support for arndale-octa board
+
+----------------------------------------------------------------
+Leela Krishna Amudala (2):
+      ARM: dts: Add pmu sysreg node to exynos5250 and exynos5420
+      ARM: dts: update watchdog device nodes for exynos5250 and exynos5420
+
+Sachin Kamat (9):
+      ARM: dts: Add regulator entries to smdk5420
+      ARM: dts: Re-organize RTC status for exynos5420
+      ARM: dts: Re-organize RTC status for exynos5250
+      ARM: dts: Add ADMA node to exynos5420
+      ARM: dts: Add I2S nodes to exynos5420
+      ARM: dts: Add fixed voltage regulators to smdk5420
+      ARM: dts: Add PMIC support to arndale-octa board
+      ARM: dts: Add wake up key to arndale-octa board
+      ARM: dts: Add vmmc-supply to MMC on arndale-octa board
+
+Thomas Abraham (2):
+      ARM: dts: update vdd_arm voltage range for exynos4412 based boards
+      ARM: dts: add max77686 pmic node for smdk5250
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |   15 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |    4 +-
+ arch/arm/boot/dts/exynos5.dtsi                     |    7 -
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    4 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |  146 ++++++++++
+ arch/arm/boot/dts/exynos5250-snow.dts              |    4 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   13 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  298 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |  253 +++++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi                  |   70 ++++-
+ 11 files changed, 803 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/pmu.txt
