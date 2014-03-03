@@ -1,50 +1,186 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 04 Mar 2014 08:49:26 +0900
-Subject: [PATCH V9 2/2] ARM: dts: Enable ahci sata and sata phy
-In-Reply-To: <C12D2EA6-2766-4C9A-8746-9B8E1A5844CD@codeaurora.org>
-References: <1393824160-27040-1-git-send-email-yuvaraj.cd@samsung.com>
- <1393824160-27040-3-git-send-email-yuvaraj.cd@samsung.com>
- <53146E84.7060508@ti.com>
- <C12D2EA6-2766-4C9A-8746-9B8E1A5844CD@codeaurora.org>
-Message-ID: <000301cf373b$36314330$a293c990$%han@samsung.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Mon, 3 Mar 2014 23:51:32 +0000
+Subject: [PATCH v4 5/6] pci: Use parent domain number when allocating
+ child busses.
+In-Reply-To: <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
+References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393867996-32299-6-git-send-email-Liviu.Dudau@arm.com>
+ <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
+Message-ID: <20140303235132.GA13582@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 04, 2014 1:02 AM, Kumar Gala wrote:
-> On Mar 3, 2014, at 5:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+On Mon, Mar 03, 2014 at 03:14:47PM -0800, Tanmay Inamdar wrote:
+> Hello Liviu,
 > 
-> >
-> >
-> > On Monday 03 March 2014 10:52 AM, Yuvaraj Kumar C D wrote:
-> >> This patch adds dt entry for ahci sata controller and its
-> >> corresponding phy controller.phy node has been added w.r.t
-> >> new generic phy framework.
-> >>
-> >> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> >
-> > This should go via exynos dt tree.
-> >
-> > FWIW
-> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >> -
+> Thanks for fixing up domain_nr. Now I have moved on further to a new
+> domain_nr related warning dump :-)
 > 
-> Its a nit, but the subject really should have 'exynos' or some related qualifier. 
-> We aren't enabling ahci sata & phy for all of ARM
+> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
+> pci_bus 0001:00: scanning bus
+> pci_setup_device:1101 domain_nr = 1
+> pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
+> pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
+> pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
+> pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
+> pci 0001:00:00.0: supports D1 D2
+> pci_bus 0001:00: fixups for bus
+> pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
+> pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
+> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> ** pci_scan_bridge:855  pci_domain_nr(bus) = 1
+> ** pci_alloc_child_bus:681  pci_domain_nr(bus) = 1
+> pci_bus 0001:01: scanning bus
+> pci_setup_device:1101 domain_nr = 0
 
-I agree with your opinion.
-The subject should be fixed in order to get rid of confusion.
+Why does the domain_nr change here?
 
-For example, one of the followings looks good.
+> pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
+> pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
+> pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
+> pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at
+> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
+> sysfs_warn_dup+0x80/0xc0()
+> sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #40
+> Call trace:
+> [<ffffffc000088180>] dump_backtrace+0x0/0x140
+> [<ffffffc0000882d0>] show_stack+0x10/0x20
+> [<ffffffc0004f65ac>] dump_stack+0x74/0xc4
+> [<ffffffc000096e04>] warn_slowpath_common+0x84/0xc0
+> [<ffffffc000096e8c>] warn_slowpath_fmt+0x4c/0x60
+> [<ffffffc0001b83dc>] sysfs_warn_dup+0x7c/0xc0
+> [<ffffffc0001b8894>] sysfs_do_create_link_sd.isra.2+0xf4/0x100
+> [<ffffffc0001b88bc>] sysfs_create_link+0x1c/0x40
+> [<ffffffc0003250b0>] bus_add_device+0x110/0x1c0
+> [<ffffffc000322f1c>] device_add+0x31c/0x520
+> [<ffffffc0002c444c>] pci_device_add+0xec/0x140
+> [<ffffffc0004f1758>] pci_scan_single_device+0x98/0xe0
+> [<ffffffc0002c44e8>] pci_scan_slot+0x48/0x120
+> [<ffffffc0002c5368>] pci_scan_child_bus+0x48/0x140
+> [<ffffffc0002c522c>] pci_scan_bridge+0x4ec/0x5e0
+> [<ffffffc0002c53c8>] pci_scan_child_bus+0xa8/0x140
+> [<ffffffc0004f1b30>] pci_rescan_bus+0x10/0x40
+> [<ffffffc0006a12ac>] xgene_pcie_probe_bridge+0x660/0x72c
+> [<ffffffc000327d20>] platform_drv_probe+0x20/0x60
+> [<ffffffc000325e30>] really_probe+0xf0/0x220
+> [<ffffffc000326080>] __driver_attach+0xa0/0xc0
+> [<ffffffc000323ed4>] bus_for_each_dev+0x54/0xa0
+> [<ffffffc0003258bc>] driver_attach+0x1c/0x40
+> [<ffffffc00032548c>] bus_add_driver+0x14c/0x220
+> [<ffffffc00032683c>] driver_register+0x5c/0x120
+> [<ffffffc000327cdc>] __platform_driver_register+0x5c/0x80
+> [<ffffffc0006a0c40>] xgene_pcie_driver_init+0x14/0x20
+> [<ffffffc0000814c0>] do_one_initcall+0xe0/0x160
+> [<ffffffc00068c934>] kernel_init_freeable+0x134/0x1d8
+> [<ffffffc0004f07ac>] kernel_init+0xc/0xe0
+> ---[ end trace 3ee052d463aab7f3 ]---
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at
+> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:1380
+> pci_device_add+0x128/0x140()
+> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> 
+> I have made a small fix above your patch. After the fix is applied,
+> dumps are gone and the enumeration finishes up smoothly for all the
+> ports.
+> Since the change is small, just pasting it here. Please review and
+> apply if it's clean.
 
-  ARM: dts: exynos5250: Enable ahci sata and sata phy
-  ARM: dts: Enable ahci sata and sata phy for exynos5250
+Honestly, I have no idea. I kept staring at the code for a better part of an hour
+trying to decipher what the intent of the code was, without too much progress. I
+still don't understand why the code in pci_alloc_child_bus() takes a shortcut when
+the bridge argument is NULL when in my opinion it should use parent->bridge instead
+and continue as normal.
+
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index a12cda5..aac8366 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -693,7 +693,7 @@ static struct pci_bus *pci_alloc_child_bus(struct
+> pci_bus *parent,
+>         }
+> 
+>         child->self = bridge;
+> -       child->bridge = get_device(&bridge->dev);
+> +       child->bridge = get_device(parent->bridge);
+>         child->dev.parent = child->bridge;
+
+Hmm, not sure why this is needed. What does get_device(&bridge->dev)
+return for you? The next line sets child->dev.parent to child->bridge,
+but with your change I'm not sure we end up using the correct parent.
+
+Can you try to revert your change and modify the implementation of pci_domain_nr() in arm64
+to look like this:
+
+static inline int pci_domain_nr(struct pci_bus *bus)
+{
+	struct pci_host_bridge *bridge;
+
+	while (bus->parent)
+		bus = bus->parent;
+
+	bridge = to_pci_host_bridge(bus->bridge);
+	if (bridge)
+		return bridge->domain_nr;
+
+	return 0;
+}
+
+Please let me know what results you get.
 
 Best regards,
-Jingoo Han
+Liviu
 
+
+>         pci_set_bus_of_node(child);
+>         pci_set_bus_speed(child);
 > 
-> - k
+> Thanks,
+> Tanmay
 > 
+> On Mon, Mar 3, 2014 at 9:33 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > pci_alloc_child_bus() uses the newly allocated child bus to figure
+> > out the domain number that is going to use for setting the device
+> > name. A better option is to use the parent bus domain number.
+> >
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 26237a0..a12cda5 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+> >          * now as the parent is not properly set up yet.
+> >          */
+> >         child->dev.class = &pcibus_class;
+> > -       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
+> > +       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
+> >
+> >         /*
+> >          * Set up the primary, secondary and subordinate
+> > --
+> > 1.9.0
+> >
 > --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
