@@ -1,23 +1,47 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 3 Mar 2014 11:01:43 -0700
-Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
-In-Reply-To: <CAJ+vNU3UL+LTWnoxW7scAig19=z2xoYCA-HZ6a7GUyGEXtKK9Q@mail.gmail.com>
-References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
- <CAJ+vNU2VN5haOU2GN5o7UUg9vgYh06pAhvDaoGw6EzTBEbD0mg@mail.gmail.com>
- <20140301183059.GA6315@obsidianresearch.com>
- <000601cf36b8$330b3a90$9921afb0$%han@samsung.com>
- <CAJ+vNU3UL+LTWnoxW7scAig19=z2xoYCA-HZ6a7GUyGEXtKK9Q@mail.gmail.com>
-Message-ID: <20140303180143.GC31062@obsidianresearch.com>
+From: n-horiguchi@ah.jp.nec.com (Naoya Horiguchi)
+Date: Mon, 03 Mar 2014 13:07:07 -0500
+Subject: [PATCH 1/5] mm: hugetlb: Introduce huge_pte_{page,present,young}
+In-Reply-To: <1392737235-27286-2-git-send-email-steve.capper@linaro.org>
+References: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+ <1392737235-27286-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <1393870027-m2eus9p4@n-horiguchi@ah.jp.nec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 09:49:52AM -0800, Tim Harvey wrote:
+Hi Steve,
 
-> I'm not clear why irq 20 is getting returned for all the slots with
-> (slot%4)=0 and func=0.  If I start debugging of_irq_parse_pci() I see
-> that it walks up the tree until it gets to the pcie host controller
-> then calls of_irq_parse_raw() which is returning irq20 or -EINVAL.
+On Tue, Feb 18, 2014 at 03:27:11PM +0000, Steve Capper wrote:
+> Introduce huge pte versions of pte_page, pte_present and pte_young.
+> This allows ARM (without LPAE) to use alternative pte processing logic
+> for huge ptes.
+> 
+> Where these functions are not defined by architectural code they
+> fallback to the standard functions.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  include/linux/hugetlb.h | 12 ++++++++++++
+>  mm/hugetlb.c            | 22 +++++++++++-----------
+>  2 files changed, 23 insertions(+), 11 deletions(-)
 
-Can you share your DT as well?
+How about replacing other archs' arch-dependent code with new functions?
 
-Jason
+  [~/dev]$ find arch/ -name "hugetlbpage.c" | xargs grep pte_page
+  arch/s390/mm/hugetlbpage.c:             pmd_val(pmd) |= pte_page(pte)[1].index;
+  arch/powerpc/mm/hugetlbpage.c:  page = pte_page(*ptep);
+  arch/powerpc/mm/hugetlbpage.c:  head = pte_page(pte);
+  arch/x86/mm/hugetlbpage.c:      page = &pte_page(*pte)[vpfn % (HPAGE_SIZE/PAGE_SIZE)];
+  arch/ia64/mm/hugetlbpage.c:     page = pte_page(*ptep);
+  arch/mips/mm/hugetlbpage.c:     page = pte_page(*(pte_t *)pmd);
+  arch/tile/mm/hugetlbpage.c:     page = pte_page(*(pte_t *)pmd);
+  arch/tile/mm/hugetlbpage.c:     page = pte_page(*(pte_t *)pud);
+  [~/dev]$ find arch/ -name "hugetlbpage.c" | xargs grep pte_present
+  arch/s390/mm/hugetlbpage.c:     if (pte_present(pte)) {
+  arch/sparc/mm/hugetlbpage.c:    if (!pte_present(*ptep) && pte_present(entry))
+  arch/sparc/mm/hugetlbpage.c:    if (pte_present(entry))
+  arch/tile/mm/hugetlbpage.c:     if (!pte_present(*ptep) && huge_shift[level] != 0) {
+  arch/tile/mm/hugetlbpage.c:             if (pte_present(pte) && pte_super(pte))
+  arch/tile/mm/hugetlbpage.c:     if (!pte_present(*pte))
+
+Thanks,
+Naoya Horiguchi
