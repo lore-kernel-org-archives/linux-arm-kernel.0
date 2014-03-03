@@ -1,62 +1,72 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 3 Mar 2014 17:08:09 +0530
-Subject: [PATCH v5 0/6] Make dwc3 use Generic PHY Framework
-Message-ID: <1393846695-14644-1-git-send-email-kishon@ti.com>
+Date: Mon, 3 Mar 2014 17:08:13 +0530
+Subject: [PATCH v5 4/6] usb: phy: omap-usb2: remove *set_suspend* callback
+ from omap-usb2
+In-Reply-To: <1393846695-14644-1-git-send-email-kishon@ti.com>
+References: <1393846695-14644-1-git-send-email-kishon@ti.com>
+Message-ID: <1393846695-14644-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added support for optional PHY in dwc3 as not all SoCs having PHYs for DWC3
-should be programmed. While this can be considered as a temporary fix,
-a long term solution would be to add 'nop' PHY for platforms that does
-not have programmable PHY.
-Adapted DWC3 and USB3 PHY to use Generic PHY framework. Also changed the
-name of USB3 PHY driver to PIPE3 PHY driver since the same driver has to
-be used for SATA and PCIE too.
+Now that omap-usb2 is adapted to the new generic PHY framework,
+*set_suspend* ops can be removed from omap-usb2 driver.
 
-Changes from v4: (sending the entire patch series again)
-* check the return values of phy_init and phy_power_on
-* print errors if power_on or power_off of PHY fails.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/phy/phy-omap-usb2.c |   25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-Changes from v3: (Sent only adapt dwc3 core to use Generic PHY Framework) 
-* avoided using quirks and rely on the return values of PHY APIs to find the
-presence of PHY.
-
-Changes from v2:
-* added a couple of fixes. One is invoking phy_resume after phy_init and the
-other is power off phy in error patch
-* used quirks to identify if a particular platform does not have PHYs
-* removed using separate header for pipe3 driver and also removed all referencs
-to SATA and PCIe in pipe3 driver since it's not yet adapted for those drivers.
-
-Changes from v1:
-* The logic in which the driver detects the presence of PHYs has changed.
-* patch ordering has changed
-* udelay is replaced with usleep_range
-* A patch to remove set_suspend callback which was deferred from Generic
-PHY Framework series has been included.
-
-Kishon Vijay Abraham I (6):
-  usb: dwc3: core: support optional PHYs
-  usb: dwc3: adapt dwc3 core to use Generic PHY Framework
-  drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY Framework
-  usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
-  phy: omap-usb2: move omap_usb.h from linux/usb/ to linux/phy/
-  arm/dts: added dt properties to adapt to the new phy framwork
-
- Documentation/devicetree/bindings/usb/dwc3.txt     |    6 +-
- arch/arm/boot/dts/omap5.dtsi                       |    5 +-
- drivers/phy/Kconfig                                |   11 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-omap-usb2.c                        |   27 +--
- .../phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c}     |  240 ++++++++++++--------
- drivers/usb/dwc3/core.c                            |  116 +++++++---
- drivers/usb/dwc3/core.h                            |    7 +
- drivers/usb/phy/Kconfig                            |   11 -
- drivers/usb/phy/Makefile                           |    1 -
- include/linux/{usb => phy}/omap_usb.h              |    3 -
- 11 files changed, 264 insertions(+), 164 deletions(-)
- rename drivers/{usb/phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c} (54%)
- rename include/linux/{usb => phy}/omap_usb.h (95%)
-
+diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
+index 7699752..705af5a 100644
+--- a/drivers/phy/phy-omap-usb2.c
++++ b/drivers/phy/phy-omap-usb2.c
+@@ -98,28 +98,6 @@ static int omap_usb_set_peripheral(struct usb_otg *otg,
+ 	return 0;
+ }
+ 
+-static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+-{
+-	struct omap_usb *phy = phy_to_omapusb(x);
+-	int ret;
+-
+-	if (suspend && !phy->is_suspended) {
+-		omap_control_usb_phy_power(phy->control_dev, 0);
+-		pm_runtime_put_sync(phy->dev);
+-		phy->is_suspended = 1;
+-	} else if (!suspend && phy->is_suspended) {
+-		ret = pm_runtime_get_sync(phy->dev);
+-		if (ret < 0) {
+-			dev_err(phy->dev, "get_sync failed with err %d\n", ret);
+-			return ret;
+-		}
+-		omap_control_usb_phy_power(phy->control_dev, 1);
+-		phy->is_suspended = 0;
+-	}
+-
+-	return 0;
+-}
+-
+ static int omap_usb_power_off(struct phy *x)
+ {
+ 	struct omap_usb *phy = phy_get_drvdata(x);
+@@ -173,7 +151,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 
+ 	phy->phy.dev		= phy->dev;
+ 	phy->phy.label		= "omap-usb2";
+-	phy->phy.set_suspend	= omap_usb2_suspend;
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
+ 
+@@ -190,8 +167,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	phy->control_dev = &control_pdev->dev;
+-
+-	phy->is_suspended	= 1;
+ 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 
+ 	otg->set_host		= omap_usb_set_host;
 -- 
 1.7.9.5
