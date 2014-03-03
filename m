@@ -1,49 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 3 Mar 2014 11:54:26 +0800
-Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
- driver support
-In-Reply-To: <530B594F.2030500@ti.com>
-References: <1392755543-28335-1-git-send-email-nm@ti.com>
- <1392755543-28335-4-git-send-email-nm@ti.com>
- <20140224015826.GU25940@sirena.org.uk> <530B594F.2030500@ti.com>
-Message-ID: <20140303035426.GC2411@sirena.org.uk>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Mon, 3 Mar 2014 12:45:21 +0800
+Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+In-Reply-To: <7430033.eK9aHCDe8b@wuerfel>
+References: <cover.1393568715.git.mohit.kumar@st.com>
+ <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
+ <7430033.eK9aHCDe8b@wuerfel>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 08:38:07AM -0600, Nishanth Menon wrote:
+Hello Arnd,
 
-> Intent here is to allow drivers such as cpufreq-cpu0 to be reused on
-> platforms such as TI's OMAP derivatives, and other SoCs which differ
-> only by the sequence involved in voltage scale operations. So, this
-> patch provides a framework for registering the underlying
-> implementation of the SoC specific voltage change methodology.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, February 28, 2014 5:28 PM
+> To: Mohit KUMAR DCG
+> Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+> 
+> On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
+> > +                       interrupts = <0 68 0x4>;
+> > +                       interrupt-map-mask = <0 0 0 0>;
+> > +                       interrupt-map = <0x0 0 &gic 68>;
+> >
+> 
+> From the discussion we just had on the imx version of this driver, I suspect
+> what you want instead is to drop the interrupts property and fix the interrupt
+> map to be
+> 
+> interrupt-map = <0x0 0 &gic 0 68 0x4>;
+> 
 
-That bit is clear, what's very opaque from the code is how this is going
-to be accomplished.
+- yes, I should have fix interrupt map. Pls let us know if any other point needs to be
+Incorporated in this series.
 
-> Overall the sequence takes place after this patch is as follows:
-> a) voltage domain drivers such as those of TI or others register with
-> voltage domain with devm_voltdm_register.
-> b) cpufreq-cpu0/devfreq drivers:
-> of_pm_voltdm_notifier_register(introduced as part of patch #1) to
-> register notifiers around clk of interest. This request is linked to
-> the specific voltage domain using phandle in device tree.
-> c) when cpufreq-cpu0/devfreq does a clk_set_rate, the common clock
-> framework triggers notifiers in voltage domain core which in turn,
-> invokes the corresponding handlers for the voltage domain driver
-> ensuring the right dvfs sequence specific to the SoC is triggered.
-
-So the first question I have here is what happens if multiple clocks
-need to be updated in lock step - if we're only triggering off clock
-notifiers that seems tricky.  The other thing here is that the fact that
-your API is "of_" suggests that it is in fact linked very srongly to DT
-- it'd be good to split out the layers to make sure things make sense
-standalone, the DT helpers are obviously good but the API should be able
-to stand separately.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/73db7b2b/attachment.sig>
+Regards
+Mohit
