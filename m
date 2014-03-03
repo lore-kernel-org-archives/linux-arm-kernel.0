@@ -1,71 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon,  3 Mar 2014 17:02:16 +0100
-Subject: [PATCH v2 11/11] ARM: dts: s3c6410-mini6410: Add support for LCD
- screen
-In-Reply-To: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1393862536-9842-12-git-send-email-tomasz.figa@gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 3 Mar 2014 10:07:24 -0600
+Subject: [PATCH v2 1/1] arm64: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <1393831142-27952-2-git-send-email-mohun106@gmail.com>
+References: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
+ <1393831142-27952-2-git-send-email-mohun106@gmail.com>
+Message-ID: <D69CC7F2-C9AC-45CE-AFD1-56CE4441F822@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds necessary device tree nodes and properties to enable LCD
-screen on mini6410 board.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/boot/dts/s3c6410-mini6410.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+On Mar 3, 2014, at 1:19 AM, mohun106 at gmail.com wrote:
 
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-index 57e00f9..97f6353 100644
---- a/arch/arm/boot/dts/s3c6410-mini6410.dts
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -167,6 +167,33 @@
- 	};
- };
- 
-+&fimd {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_data24>, <&lcd_power>;
-+
-+	display-timings {
-+		native-mode = <&timing0>;
-+
-+		timing0: timing at 0 {
-+			/* 480x272 at 60Hz */
-+			clock-frequency = <10000000>;
-+			hactive = <480>;
-+			vactive = <272>;
-+			hfront-porch = <4>;
-+			hback-porch = <45>;
-+			hsync-len = <40>;
-+			vback-porch = <3>;
-+			vfront-porch = <2>;
-+			vsync-len = <6>;
-+			vsync-active = <1>;
-+			hsync-active = <1>;
-+			de-active = <1>;
-+			pixelclk-active = <0>;
-+		};
-+	};
-+};
-+
- &sdhci0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
-@@ -213,6 +240,12 @@
- 				"gpn-4", "gpn-5", "gpl-11", "gpl-12";
- 		samsung,pin-pud = <PIN_PULL_NONE>;
- 	};
-+
-+	lcd_power: lcd-power {
-+		samsung,pins = "gpe-0";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <PIN_PULL_UP>;
-+	};
- };
- 
- &i2c0 {
+> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> 
+> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> ---
+> arch/arm64/boot/dts/Makefile    |    1 +
+> arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
+> 2 files changed, 159 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index c52bdb0..d339343 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,5 +1,6 @@
+> dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+> dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
+
+Where is the Kconfig associated with CONFIG_ARCH_THUNDER?  Also, I know on arch/arm we are moving to CONFIG_SOC_ instead of CONFIG_ARCH_, I assume the same is true for arm64.
+
+- k
+
 -- 
-1.9.0
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
