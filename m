@@ -1,42 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 3 Mar 2014 17:27:31 +0100
-Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
-In-Reply-To: <1722697.3h0GnbWuD3@avalon>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <1569751.q5lJmQcb3K@avalon> <20140303091903.GA6531@katana>
- <1722697.3h0GnbWuD3@avalon>
-Message-ID: <20140303162731.GA3732@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Mar 2014 16:31:39 +0000
+Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings
+ 0 failures (next/next-20140228))
+In-Reply-To: <20140303161217.GK7308@joshc.qualcomm.com>
+References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
+ <5311449E.90902@codeaurora.org> <20140301161258.GN12219@tassilo.jf.intel.com>
+ <20140303161217.GK7308@joshc.qualcomm.com>
+Message-ID: <20140303163139.GJ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> While the parent is indeed selected at boot time only, and only one parent is 
-> thus needed, parent selection could be performed by a DIP switch connected to 
-> MD_CLK on the board for instance. In that case both parents should be 
-> available in DT, as selection will be done by the kernel at boot time, not at 
-> DT compile time.
-
-OK, I understand the case. I still wonder about specifying two parents,
-though. If a board uses USB_X1, it then has to spefify a dummy EXTAL
-clock (or an empty one), just because USB_X1 is enumerated as second
-entry?
-
-> > Again, now that I already coded it, what is the gain to remove it? The
-> > drawback is that other people might get encouraged to find reasons to
-> > allow them sloppy practices.
+On Mon, Mar 03, 2014 at 10:12:17AM -0600, Josh Cartwright wrote:
+> On Sat, Mar 01, 2014 at 08:12:58AM -0800, Andi Kleen wrote:
+> > > These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
+> > > 2014-02-08). Before that change asmlinkage was defined to nothing on
+> > > ARM, but now it's __visible. Should we just drop asmlinkage here?
+> >
+> > These functions are just called by the generic C interrupt layer right?
+> > Yes should just drop asmlinkage. It doesn't make any sense to mark
+> > functions that only called from C asmlinkage.
 > 
-> It will make the kernel binary smaller by removing code that is not needed in 
-> practice.
+> On ARM[64], these functions are called from assembly indirectly through
+> the 'handle_arch_irq' function pointer, so I don't think it makes sense
+> to drop 'asmlinkage'.
 
-Sounds like a micro-optimazation to me. If you insist, we should BUG()
-right away in that case, to make the code comprehensible. Returning with
-a leak and saying "we will probably fail somewhere" should really be
-avoided IMO.
+If building with a C++ compiler:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/059fadbc/attachment-0001.sig>
+	asmlinkage = extern "C"
+
+	static asmlinkage = static extern "C"
+
+That doesn't quite make much sense when you think about it - even with
+the existing definition in current mainline kernels.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
