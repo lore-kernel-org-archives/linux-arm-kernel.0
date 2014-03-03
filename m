@@ -1,117 +1,205 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 3 Mar 2014 17:07:29 +0200
-Subject: [PATCH 07/12] ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
+Date: Mon, 3 Mar 2014 17:07:31 +0200
+Subject: [PATCH 09/12] phy: ti-pipe3: streamline PHY operations
 In-Reply-To: <1393859254-10937-1-git-send-email-rogerq@ti.com>
 References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
-Message-ID: <1393859254-10937-8-git-send-email-rogerq@ti.com>
+Message-ID: <1393859254-10937-10-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keshava Munegowda <keshava_mgowda@ti.com>
+Limit .power_on() and .power_off() to just control the
+PHY power and not the DPLL. The DPLL will be enabled
+in .init() and idled in .exit().
 
-Create hwmods for ocp2scp3 and sata modules.
+Don't reprogram the DPLL if it has been already locked
+by the bootloader. This fixes a problem with SATA, where
+it fails if SATA was used by the bootloader.
 
-[Roger Q] Clean up.
-
-CC: Benoit Cousson <bcousson@baylibre.com>
-CC: Paul Walmsley <paul@pwsan.com>
-CC: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
+ drivers/phy/phy-ti-pipe3.c | 114 +++++++++++++++++++++++++--------------------
+ 1 file changed, 63 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index e297d62..227a69f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1726,6 +1726,77 @@ static struct omap_hwmod omap54xx_wd_timer2_hwmod = {
- 	},
- };
+diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+index ee8871d..d3c085a 100644
+--- a/drivers/phy/phy-ti-pipe3.c
++++ b/drivers/phy/phy-ti-pipe3.c
+@@ -47,7 +47,8 @@
+ #define	PLL_SD_MASK		0x0003FC00
+ #define	PLL_SD_SHIFT		10
+ #define	SET_PLL_GO		0x1
+-#define	PLL_TICOPWDN		0x10000
++#define PLL_LDOPWDN		BIT(15)
++#define PLL_TICOPWDN		BIT(16)
+ #define	PLL_LOCK		0x2
+ #define	PLL_IDLE		0x1
  
-+/*
-+ * 'ocp2scp' class
-+ * bridge to transform ocp interface protocol to scp (serial control port)
-+ * protocol
-+ */
-+/* ocp2scp3 */
-+static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
-+/* l4_cfg -> ocp2scp3 */
-+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp3 = {
-+	.master		= &omap54xx_l4_cfg_hwmod,
-+	.slave		= &omap54xx_ocp2scp3_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
-+	.name		= "ocp2scp3",
-+	.class		= &omap54xx_ocp2scp_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-+ * 'sata' class
-+ * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_sata_sysc = {
-+	.sysc_offs	= 0x0000,
-+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
-+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class omap54xx_sata_hwmod_class = {
-+	.name	= "sata",
-+	.sysc	= &omap54xx_sata_sysc,
-+};
-+
-+/* sata */
-+static struct omap_hwmod omap54xx_sata_hwmod = {
-+	.name		= "sata",
-+	.class		= &omap54xx_sata_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
-+	.main_clk	= "func_48m_fclk",
-+	.mpu_rt_idx	= 1,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_L3INIT_SATA_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_L3INIT_SATA_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/* l4_cfg -> sata */
-+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__sata = {
-+	.master		= &omap54xx_l4_cfg_hwmod,
-+	.slave		= &omap54xx_sata_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
+@@ -56,7 +57,8 @@
+  * value required for the PIPE3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+  * to be correctly reflected in the PIPE3PHY_PLL_STATUS register.
+  */
+-# define PLL_IDLE_TIME  100;
++#define PLL_IDLE_TIME	100	/* in milliseconds */
++#define PLL_LOCK_TIME	100	/* in milliseconds */
  
- /*
-  * Interfaces
-@@ -2399,6 +2470,8 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_cfg__usb_tll_hs,
- 	&omap54xx_l4_cfg__usb_otg_ss,
- 	&omap54xx_l4_wkup__wd_timer2,
-+	&omap54xx_l4_cfg__ocp2scp3,
-+	&omap54xx_l4_cfg__sata,
- 	NULL,
- };
+ struct pipe3_dpll_params {
+ 	u16	m;
+@@ -132,24 +134,6 @@ static struct pipe3_dpll_params *ti_pipe3_get_dpll_params(struct ti_pipe3 *phy)
+ static int ti_pipe3_power_off(struct phy *x)
+ {
+ 	struct ti_pipe3 *phy = phy_get_drvdata(x);
+-	int val;
+-	int timeout = PLL_IDLE_TIME;
+-
+-	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+-	val |= PLL_IDLE;
+-	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+-
+-	do {
+-		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+-		if (val & PLL_TICOPWDN)
+-			break;
+-		udelay(5);
+-	} while (--timeout);
+-
+-	if (!timeout) {
+-		dev_err(phy->dev, "power off failed\n");
+-		return -EBUSY;
+-	}
  
+ 	omap_control_phy_power(phy->control_dev, 0);
+ 
+@@ -159,44 +143,34 @@ static int ti_pipe3_power_off(struct phy *x)
+ static int ti_pipe3_power_on(struct phy *x)
+ {
+ 	struct ti_pipe3 *phy = phy_get_drvdata(x);
+-	int val;
+-	int timeout = PLL_IDLE_TIME;
+-
+-	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+-	val &= ~PLL_IDLE;
+-	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
+ 
+-	do {
+-		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+-		if (!(val & PLL_TICOPWDN))
+-			break;
+-		udelay(5);
+-	} while (--timeout);
+-
+-	if (!timeout) {
+-		dev_err(phy->dev, "power on failed\n");
+-		return -EBUSY;
+-	}
++	omap_control_phy_power(phy->control_dev, 1);
+ 
+ 	return 0;
+ }
+ 
+-static void ti_pipe3_dpll_relock(struct ti_pipe3 *phy)
++static int ti_pipe3_dpll_wait_lock(struct ti_pipe3 *phy)
+ {
+ 	u32		val;
+ 	unsigned long	timeout;
+ 
+-	ti_pipe3_writel(phy->pll_ctrl_base, PLL_GO, SET_PLL_GO);
+-
+-	timeout = jiffies + msecs_to_jiffies(20);
++	timeout = jiffies + msecs_to_jiffies(PLL_LOCK_TIME);
+ 	do {
++		cpu_relax();
+ 		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
+ 		if (val & PLL_LOCK)
+ 			break;
+-	} while (!WARN_ON(time_after(jiffies, timeout)));
++	} while (!time_after(jiffies, timeout));
++
++	if (!(val & PLL_LOCK)) {
++		dev_err(phy->dev, "DPLL failed to lock\n");
++		return -EBUSY;
++	}
++
++	return 0;
+ }
+ 
+-static int ti_pipe3_dpll_lock(struct ti_pipe3 *phy)
++static int ti_pipe3_dpll_program(struct ti_pipe3 *phy)
+ {
+ 	u32			val;
+ 	struct pipe3_dpll_params *dpll_params;
+@@ -230,27 +204,65 @@ static int ti_pipe3_dpll_lock(struct ti_pipe3 *phy)
+ 	val |= dpll_params->sd << PLL_SD_SHIFT;
+ 	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION3, val);
+ 
+-	ti_pipe3_dpll_relock(phy);
++	ti_pipe3_writel(phy->pll_ctrl_base, PLL_GO, SET_PLL_GO);
+ 
+-	return 0;
++	return ti_pipe3_dpll_wait_lock(phy);
+ }
+ 
+ static int ti_pipe3_init(struct phy *x)
+ {
+ 	struct ti_pipe3 *phy = phy_get_drvdata(x);
+-	int ret;
++	u32 val;
++	int ret = 0;
+ 
+-	ret = ti_pipe3_dpll_lock(phy);
+-	if (ret)
+-		return ret;
++	/* Bring it out of IDLE if it is IDLE */
++	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
++	if (val & PLL_IDLE) {
++		val &= ~PLL_IDLE;
++		ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
++		ret = ti_pipe3_dpll_wait_lock(phy);
++	}
+ 
+-	omap_control_phy_power(phy->control_dev, 1);
++	/* Program the DPLL only if not locked */
++	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
++	if (!(val & PLL_LOCK))
++		if (ti_pipe3_dpll_program(phy))
++			return -EINVAL;
+ 
+-	return 0;
++	return ret;
+ }
+ 
++static int ti_pipe3_exit(struct phy *x)
++{
++	struct ti_pipe3 *phy = phy_get_drvdata(x);
++	u32 val;
++	unsigned long timeout;
++
++	/* Put DPLL in IDLE mode */
++	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
++	val |= PLL_IDLE;
++	ti_pipe3_writel(phy->pll_ctrl_base, PLL_CONFIGURATION2, val);
++
++	/* wait for LDO and Oscillator to power down */
++	timeout = jiffies + msecs_to_jiffies(PLL_IDLE_TIME);
++	do {
++		cpu_relax();
++		val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_STATUS);
++		if ((val & PLL_TICOPWDN) && (val & PLL_LDOPWDN))
++			break;
++	} while (!time_after(jiffies, timeout));
++
++	if (!(val & PLL_TICOPWDN) || !(val & PLL_LDOPWDN)) {
++		dev_err(phy->dev, "Failed to power down: PLL_STATUS 0x%x\n",
++			val);
++		return -EBUSY;
++	}
++
++	return 0;
++}
+ static struct phy_ops ops = {
+ 	.init		= ti_pipe3_init,
++	.exit		= ti_pipe3_exit,
+ 	.power_on	= ti_pipe3_power_on,
+ 	.power_off	= ti_pipe3_power_off,
+ 	.owner		= THIS_MODULE,
 -- 
 1.8.3.2
