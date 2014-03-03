@@ -1,45 +1,42 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Mon, 3 Mar 2014 21:56:47 +0530
-Subject: [PATCH v2 1/1] arm64: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <D69CC7F2-C9AC-45CE-AFD1-56CE4441F822@codeaurora.org>
-References: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
- <1393831142-27952-2-git-send-email-mohun106@gmail.com>
- <D69CC7F2-C9AC-45CE-AFD1-56CE4441F822@codeaurora.org>
-Message-ID: <CAC8NTUViSfXoA5B3dU9=mTr-W9x=Wmd=ubVLvabkn28k_0JEYg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 3 Mar 2014 17:27:31 +0100
+Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <1722697.3h0GnbWuD3@avalon>
+References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+ <1569751.q5lJmQcb3K@avalon> <20140303091903.GA6531@katana>
+ <1722697.3h0GnbWuD3@avalon>
+Message-ID: <20140303162731.GA3732@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 3, 2014 at 9:37 PM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Mar 3, 2014, at 1:19 AM, mohun106 at gmail.com wrote:
->
->> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>
->> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> ---
->> arch/arm64/boot/dts/Makefile    |    1 +
->> arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
->> 2 files changed, 159 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index c52bdb0..d339343 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,5 +1,6 @@
->> dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->> dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
->
-> Where is the Kconfig associated with CONFIG_ARCH_THUNDER?  Also, I know on arch/arm we are moving to CONFIG_SOC_ instead of CONFIG_ARCH_, I assume the same is true for arm64.
 
-Yes, I deliberately removed it as I thought we are trying to get rid
-of CONFIG_ARCH_ and have a single image boot on all platforms.
+> While the parent is indeed selected at boot time only, and only one parent is 
+> thus needed, parent selection could be performed by a DIP switch connected to 
+> MD_CLK on the board for instance. In that case both parents should be 
+> available in DT, as selection will be done by the kernel at boot time, not at 
+> DT compile time.
 
+OK, I understand the case. I still wonder about specifying two parents,
+though. If a board uses USB_X1, it then has to spefify a dummy EXTAL
+clock (or an empty one), just because USB_X1 is enumerated as second
+entry?
 
->
-> - k
->
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->
+> > Again, now that I already coded it, what is the gain to remove it? The
+> > drawback is that other people might get encouraged to find reasons to
+> > allow them sloppy practices.
+> 
+> It will make the kernel binary smaller by removing code that is not needed in 
+> practice.
+
+Sounds like a micro-optimazation to me. If you insist, we should BUG()
+right away in that case, to make the code comprehensible. Returning with
+a leak and saying "we will probably fail somewhere" should really be
+avoided IMO.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/059fadbc/attachment-0001.sig>
