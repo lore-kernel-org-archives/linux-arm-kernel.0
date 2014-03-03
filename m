@@ -1,56 +1,68 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 3 Mar 2014 08:25:43 +0200
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <1393595008.3802.35.camel@paszta.hi.pengutronix.de>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <1393595008.3802.35.camel@paszta.hi.pengutronix.de>
-Message-ID: <53142067.2000208@ti.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon,  3 Mar 2014 00:30:44 -0600
+Subject: [Patch v8 1/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <1393828245-18766-1-git-send-email-agross@codeaurora.org>
+References: <1393828245-18766-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1393828245-18766-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 15:43, Philipp Zabel wrote:
-> Hi Tomi,
-> 
-> Am Freitag, den 28.02.2014, 14:20 +0200 schrieb Tomi Valkeinen:
->> Add DT binding documentation for DVI Connector.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Reviewed-by: Archit Taneja <archit@ti.com>
->> ---
->>  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
->>
->> diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
->> new file mode 100644
->> index 000000000000..6a0aff866c78
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
->> @@ -0,0 +1,26 @@
->> +DVI Connector
->> +==============
->> +
->> +Required properties:
->> +- compatible: "dvi-connector"
->> +
->> +Optional properties:
->> +- label: a symbolic name for the connector
->> +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-> 
-> For the i.MX bindings I had called this property 'ddc', but
-> Documentation/devicetree/bindings/panel/simple-panel.txt already
-> uses 'ddc-i2c-bus'. We should definitely standardize this.
+Add device tree binding support for the QCOM BAM DMA driver.
 
-I like 'ddc-i2c-bus'.
+Acked-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |   41 ++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/3f2b2a36/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+new file mode 100644
+index 0000000..d75a9d7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+@@ -0,0 +1,41 @@
++QCOM BAM DMA controller
++
++Required properties:
++- compatible: must contain "qcom,bam-v1.4.0" for MSM8974
++- reg: Address range for DMA registers
++- interrupts: Should contain the one interrupt shared by all channels
++- #dma-cells: must be <1>, the cell in the dmas property of the client device
++  represents the channel number
++- clocks: required clock
++- clock-names: must contain "bam_clk" entry
++- qcom,ee : indicates the active Execution Environment identifier (0-7) used in
++  the secure world.
++
++Example:
++
++	uart-bam: dma at f9984000 = {
++		compatible = "qcom,bam-v1.4.0";
++		reg = <0xf9984000 0x15000>;
++		interrupts = <0 94 0>;
++		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
++		clock-names = "bam_clk";
++		#dma-cells = <1>;
++		qcom,ee = <0>;
++	};
++
++DMA clients must use the format described in the dma.txt file, using a two cell
++specifier for each channel.
++
++Example:
++	serial at f991e000 {
++		compatible = "qcom,msm-uart";
++		reg = <0xf991e000 0x1000>
++			<0xf9944000 0x19000>;
++		interrupts = <0 108 0>;
++		clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>,
++			<&gcc GCC_BLSP1_AHB_CLK>;
++		clock-names = "core", "iface";
++
++		dmas = <&uart-bam 0>, <&uart-bam 1>;
++		dma-names = "rx", "tx";
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
