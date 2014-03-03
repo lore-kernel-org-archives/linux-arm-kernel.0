@@ -1,56 +1,44 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 3 Mar 2014 12:02:41 +1100
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-Message-ID: <20140303120241.11066f951d53c50fb14faf47@canb.auug.org.au>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 2 Mar 2014 17:13:00 -0800
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140301152756.67A02C40238@trevor.secretlab.ca>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor.secretlab.ca>
+Message-ID: <20140303011300.GB12962@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
+> Hi Christoffer. I've got another comment on the text, this time about the format of the ESP:
+> 
+> On Wed, 26 Feb 2014 10:34:54 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> [...]
+> > Image format
+> > ------------
+> > The image format, as presented to the VM, needs to be well-defined in
+> > order for prepared disk images to be bootable across various
+> > virtualization implementations.
+> > 
+> > The raw disk format as presented to the VM must be partitioned with a
+> > GUID Partition Table (GPT).  The bootable software must be placed in the
+> > EFI System Partition (ESP), using the UEFI removable media path, and
+> > must be an EFI application complying to the UEFI Specification 2.4
+> > Revision A [6].
+> > 
+> > The ESP partition's GPT entry's partition type GUID must be
+> > C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+> > formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+> > 
+> > The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+> > execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+> > state.
+> 
+> I would also reference section 3.3 (Boot Option Variables Default Boot
+> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
+> restate the meaning of the requirement in this spec, but the UEFI spec
+> is the authoritative source. Distributed VM disk images fall under the
+> same scenario as the firmware not having any valid boot variables.
+> 
+ack, thanks.
 
-Today's linux-next merge of the bcm2835 tree got a conflict in
-arch/arm/mach-bcm2835/Kconfig between commits ddb902cc3459 ("ARM:
-centralize common multi-platform kconfig options") and 0676b21fffd1
-("ARM: bcm2835: enable V6K instead of plain V6") from the arm-soc tree
-and commit d30fe6272183 ("ARM: bcm2835: Move to mach-bcm directory") from
-the bcm2835 tree.
-
-I fixed it up (I applied the below merge fix patch) and can carry the fix
-as necessary (no action is required).
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Mon, 3 Mar 2014 12:00:40 +1100
-Subject: [PATCH] ARM: bcm2835: merge fix for movement to mach-bcm directory
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-bcm/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 396d05c8b570..7de3282a8613 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -33,10 +33,6 @@ config ARCH_BCM2835
- 	select ARM_AMBA
- 	select ARM_ERRATA_411920
- 	select ARM_TIMER_SP804
--	select CLKDEV_LOOKUP
--	select CLKSRC_OF
--	select CPU_V6
--	select GENERIC_CLOCKEVENTS
- 	select PINCTRL
- 	select PINCTRL_BCM2835
- 	help
--- 
-1.9.0
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/5010523f/attachment.sig>
+-Christoffer
