@@ -1,460 +1,108 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Sun, 02 Mar 2014 23:44:10 +0000
-Subject: Device Tree file for Zyxel NSA320
-In-Reply-To: <20140301103417.GK27832@lunn.ch>
-References: <53112C83.9010700@baker-net.org.uk>
- <20140301103417.GK27832@lunn.ch>
-Message-ID: <5313C24A.9070306@baker-net.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 2 Mar 2014 16:10:49 -0800
+Subject: [GIT PULL 3/4] omap device tree changes for v3.15
+References: <pull-1393802089-910509>
+Message-ID: <20140303001045.GC5000@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/14 10:34, Andrew Lunn wrote:
-> On Sat, Mar 01, 2014 at 12:40:35AM +0000, Adam Baker wrote:
->> Hi,
->>
->> I've been trying to get my Zyxel NSA320 working with kernel 3.14-rc1
->> and device tree. I've included on CC the two developers who produced
->> old style board files for the NSA310 / 320 in case you've already
->> looked at this.
->
-> Hi Adam
->
-> It is good to also CC the Marvell maintainers. I added them.
->
+* Tony Lindgren <tony@atomide.com> [140302 15:55]:
+> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+> 
+>   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-signed
+> 
+> for you to fetch changes up to f777ba1780584b100ab9664cc06d04f3bb273a84:
+> 
+>   Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
+> 
+> ----------------------------------------------------------------
+> 
+> Device tree related changes for omaps with minor code
+> changes also to platform data quirks that are still needed
+> for some features.
 
-Thanks for that.
+FYI, this probably causes a minor overlapping additions conflict
+with the recently merged fixes. My resolve below for reference.
 
-> First off, thanks for working on a new board.
->
->> I've developed a file (below) which is enough to get it to boot but
->> I've got a couple of outstanding issues that I'd appreciate some
->> advice on.
->
-> Great. I will review it and try to help with your issues.
->
->> First, the USB ports aren't working. I presume this is because on
->> this board mpp21, instead of taking it's usual role as
->> MPP21_SATA0_ACTn is used as a control line for power to the USB
->> ports. My dmesg contains
->>
-snip
->> so I suspect it has defaulted to the right mode but
->> /sys/kernel/debug/gpio says
->>
->>   gpio-21  (USB Power Off       ) out lo
->
-> What is interesting is that it has the name. Some something is working
-> here. What might help is turning on REGULATOR_DEBUG.
+Regards,
 
-I'm now suspicious as to whether this actually works on NSA310. The 
-regulator was named USB Power Off and was set to always-on. Hence USB 
-Power Off was always enabled, i.e. USB was off. Changing the name 
-(because having the word off in the name of a regulator doesn't make 
-sense) and making it an active high regulator brings the USB to life.
-
-Whilst debugging this issue I thought it would be helpful to be able to 
-access the GPIO and pin multiplexing state from user space. I've 
-therefore attached a small program I wrote to do that in case it is of 
-use to others. It assumes the normal mapping of the processor I/O block 
-to 0xf1000000.
-
->
->> The other issue I've found is that the Ethernet only works if I have
->> booted the original kernel at least once since the unit was powered
->> on. It does get the correct MAC address when it doesn't work. I'm
->> not sure what might be causing that other than that Ethernet from
->> uboot apparently only works if connected to a 1G switch.
->
-> This sounds like a phy issue. You have it at address one. Does your
-> u-boot have the commands:
->
-> Marvell>> help phyRead
-> phyRead  Phy_address Phy_offset.
->          Read the Phy register.
->
-> What do you get with:
->
-> phyRead 1 0
->
-
-Yes, uboot does have that command but I can no longer reproduce the 
-failure. I'll keep watching this in case it fails again.
-
->> Whilst writing this device tree file I have noticed that the
->> Ethernet node is missing from the NSA310 files. Unfortunately there
->> are 2 variants of the 310 and I've only ever seen one board setup
->> file that specifies the phy number and as that doesn't match the 320
->> I don't feel able to fix that without someone to test it.
->
-> We can probably get somebody to test, if you can provide a patch.
-
-Once I'm happy with the rest of the changes I'll add the Ethernet node 
-to the nsa310 files and assume the phy number is 0 for both as that is 
-the only value I can find in board setup files for the 310.
-
->
->> I do realise that when sending this as a proper patch you will need
->> a signed off by and you will need it sent via something other than
->> Thunderbird that can be relied upon not to mangle the patch.
->
-> git send-email is the preferred method.
->
-
-I'll use that once I get something that is fit to submit then
-
-For now I'll answer your comments then attach the latest diff
+Tony
 
 
->
-> You have a mixture of tabs and space in this file. Please use tabs.
->
-I'd fixed that then forgot to stage the change - sorry.
-
-
->> +			pmx_unknown: pmx-unknown {
->> +				marvell,pins = "mpp44";
->> +				marvell,function = "gpio";
->> +			};
->> +
->> +			pmx_btn_power: pmx-btn-power {
->> +				marvell,pins = "mpp46";
->> +				marvell,function = "gpio";
->> +			};
->> +		};
->
-> These all look identical to nsa310. Maybe it makes sense to refactor
-> kirkwood-nsa310.dts and place the common parts into a .dtsi file?
->
-They were copy / pasted with just the one change I'd spotted at the time 
-(esata is now hdd2) but I've since found some more differences. I'll 
-refactor once I get to the bottom of what really is common.
-
->> +			pcf8563: pcf8563 at 51 {
->> +				compatible = "pcf8563";
->
-> Please put a vendor name in the compatible string. So it should be
-> "nxp,pcf8563". We have only just started to enforce this, and lots of
-> existing files need fixing.
->
-done
-
-My biggest outstanding issue is now with the GPIO pins that are not used 
-in any of the setup files I have seen. Running my pin state monitor with 
-the vendor kernel I can see that that configures some of the unused 
-pins, 43, 45 and 49 as GPIO inputs. Currently 43 ends up configured as a 
-TDM input which isn't too bad, 45 ends up configured as TDM I/O and 49 
-ends up configured as GPIO output which ought to be fixed as it will 
-increase power consumption if nothing else. It seems the 
-marvell,function in the pinctrl is ignored if the pin isn't used. Is 
-there a good way to fix that?
-
-I've located a driver at http://pastebin.com/3LNtYZSD that claims to be 
-able to use some of the other unused pins to talk to a temperature 
-sensor and also uses these pins to configure the response to power on 
-after a power failure so I guess that needs adding eventually too.
-
-
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi 
-b/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-index aa78c2d..63e1b6f 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-@@ -7,7 +7,7 @@
-  	ocp at f1000000 {
-  		pinctrl: pinctrl at 10000 {
-
--			pmx_usb_power_off: pmx-usb-power-off {
-+			pmx_usb_power: pmx-usb-power {
-  				marvell,pins = "mpp21";
-  				marvell,function = "gpio";
-  			};
-@@ -47,17 +47,18 @@
-  		compatible = "simple-bus";
-  		#address-cells = <1>;
-  		#size-cells = <0>;
--		pinctrl-0 = <&pmx_usb_power_off>;
-+		pinctrl-0 = <&pmx_usb_power>;
-  		pinctrl-names = "default";
-
--		usb0_power_off: regulator at 1 {
-+		usb0_power: regulator at 1 {
-  			compatible = "regulator-fixed";
-  			reg = <1>;
--			regulator-name = "USB Power Off";
-+			regulator-name = "USB Power";
-  			regulator-min-microvolt = <5000000>;
-  			regulator-max-microvolt = <5000000>;
-  			regulator-always-on;
-  			regulator-boot-on;
-+			enable-active-high;
-  			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-  		};
-  	};
-diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts 
-b/arch/arm/boot/dts/kirkwood-nsa320.dts
-new file mode 100644
-index 0000000..43f1e1d
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -0,0 +1,252 @@
-+/dts-v1/;
-+
-+/* Device tree file for the Zyxel NSA 320 NAS box.
-+   Based upon the board setup file created by Peter Schildmann */
-+
-+#include "kirkwood-nsa310-common.dtsi"
-+
-+/ {
-+	model = "Zyxel NSA320";
-+	compatible = "zyxel,nsa320", "marvell,kirkwood-88f6281", 
-"marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pinctrl-names = "default";
-+
-+			/* SATA Activity and Present pins are not connected */
-+			pmx_sata0: pmx-sata0 {
-+				marvell,pins ;
-+				marvell,function = "sata0";
-+			};
-+
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins ;
-+				marvell,function = "sata1";
-+			};
-+
-+			pmx_led_hdd2_green: pmx-led-hdd2-green {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd2_red: pmx-led-hdd2-red {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_data: pmx-mcu-data {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_green: pmx-led-usb-green {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_clk: pmx-mcu-clk {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_act: pmx-mcu-act {
-+				marvell,pins = "mpp17";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_green: pmx-led-sys-green {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_orange: pmx-led-sys-orange {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_copy: pmx-btn-copy {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_green: pmx-led-copy-green {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_red: pmx-led-copy-red {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_green: pmx-led-hdd1-green {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_red: pmx-led-hdd1-red {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_htp: pmx-htp {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_buzzer: pmx-buzzer {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_vid_b1: pmx-vid-b1 {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_power: pmx-btn-power {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_power_resume_data: pmx-power-resume-data {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_power_resume_clk: pmx-power-resume-clk {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			pcf8563: pcf8563 at 51 {
-+				compatible = "nxp,pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2 {
-+			label = "Copy Button";
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-+		};
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_hdd2_green &pmx_led_hdd2_red
-+			     &pmx_led_usb_green
-+			     &pmx_led_sys_green &pmx_led_sys_orange
-+			     &pmx_led_copy_green &pmx_led_copy_red
-+			     &pmx_led_hdd1_green &pmx_led_hdd1_red
-+			     &pmx_buzzer>;
-+		pinctrl-names = "default";
-+
-+		green-sys {
-+			label = "nsa320:green:sys";
-+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-+		};
-+		orange-sys {
-+			label = "nsa320:orange:sys";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd1 {
-+			label = "nsa320:green:hdd1";
-+			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd1 {
-+			label = "nsa320:red:hdd1";
-+			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd2 {
-+			label = "nsa320:green:hdd2";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd2 {
-+			label = "nsa320:red:hdd2";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-usb {
-+			label = "nsa320:green:usb";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-copy {
-+			label = "nsa320:green:copy";
-+			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-copy {
-+			label = "nsa320:red:copy";
-+			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+	beeper: beeper {
-+		compatible = "gpio-beeper";
-+		gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	/* The following pins are currently not assigned to a driver,
-+	   some of them should be configured as inputs.
-+	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
-+		     &pmx_htp &pmx_vid_b1
-+		     &pmx_power_resume_data &pmx_power_resume_clk>; */
-+};
-+
-+&mdio {
-+	status = "okay";
-+	ethphy0: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kw-gpio.c
-Type: text/x-csrc
-Size: 2035 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140302/cf487a73/attachment.bin>
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@@ -172,21 -194,42 +196,58 @@@ static void __init am35xx_emac_reset(vo
+  	omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET); /* OCP barrier */
+  }
+  
+ +static void __init nokia_n900_legacy_init(void)
+ +{
+ +	hsmmc2_internal_input_clk();
+ +
+ +	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+ +		if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
+ +			pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
+ +			/* set IBE to 1 */
+ +			rx51_secure_update_aux_cr(BIT(6), 0);
+ +		} else {
+ +			pr_warning("RX-51: Not enabling ARM errata 430973 workaround\n");
+ +			pr_warning("Thumb binaries may crash randomly without this workaround\n");
+ +		}
+ +	}
+ +}
+++
++ static struct gpio cm_t3517_wlan_gpios[] __initdata = {
++ 	{ 56,	GPIOF_OUT_INIT_HIGH,	"wlan pwr" },
++ 	{ 4,	GPIOF_OUT_INIT_HIGH,	"xcvr noe" },
++ };
++ 
++ static void __init omap3_sbc_t3517_wifi_init(void)
++ {
++ 	int err = gpio_request_array(cm_t3517_wlan_gpios,
++ 				ARRAY_SIZE(cm_t3517_wlan_gpios));
++ 	if (err) {
++ 		pr_err("SBC-T3517: wl12xx gpios request failed: %d\n", err);
++ 		return;
++ 	}
++ 
++ 	gpio_export(cm_t3517_wlan_gpios[0].gpio, 0);
++ 	gpio_export(cm_t3517_wlan_gpios[1].gpio, 0);
++ 
++ 	msleep(100);
++ 	gpio_set_value(cm_t3517_wlan_gpios[1].gpio, 0);
++ }
++ 
++ static void __init omap3_sbc_t3517_legacy_init(void)
++ {
++ 	omap3_sbc_t3x_usb_hub_init(152, "cm-t3517 usb hub");
++ 	omap3_sbc_t3x_usb_hub_init(98, "sb-t35 usb hub");
++ 	am35xx_emac_reset();
++ 	hsmmc2_internal_input_clk();
++ 	omap3_sbc_t3517_wifi_init();
++ 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 145);
++ 	omap_ads7846_init(1, 57, 0, NULL);
++ }
++ 
++ static void __init am3517_evm_legacy_init(void)
++ {
++ 	am35xx_emac_reset();
++ }
+  #endif /* CONFIG_ARCH_OMAP3 */
+  
+  #ifdef CONFIG_ARCH_OMAP4
+@@@ -277,8 -319,10 +338,10 @@@ struct of_dev_auxdata omap_auxdata_look
+   */
+  static struct pdata_init pdata_quirks[] __initdata = {
+  #ifdef CONFIG_ARCH_OMAP3
++ 	{ "compulab,omap3-sbc-t3517", omap3_sbc_t3517_legacy_init, },
++ 	{ "compulab,omap3-sbc-t3530", omap3_sbc_t3530_legacy_init, },
+  	{ "compulab,omap3-sbc-t3730", omap3_sbc_t3730_legacy_init, },
+ -	{ "nokia,omap3-n900", hsmmc2_internal_input_clk, },
+ +	{ "nokia,omap3-n900", nokia_n900_legacy_init, },
+  	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
+  	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
+  	{ "isee,omap3-igep0020", omap3_igep0020_legacy_init, },
