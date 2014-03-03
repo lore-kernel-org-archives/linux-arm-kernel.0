@@ -1,79 +1,52 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  3 Mar 2014 12:51:37 -0700
-Subject: [PATCH V3 2/5] dt: define IRQ flags bit 4 as src/dst inversion
+Date: Mon,  3 Mar 2014 12:51:39 -0700
+Subject: [PATCH V3 4/5] mfd: palmas: support IRQ inversion at the board level
 In-Reply-To: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
 References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1393876300-3061-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1393876300-3061-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Some devices have configurable IRQ output polarities. Software might
-use IRQ specifier flag bits[3:0] to determine how to configure such a
-device's IRQ output polarity in order to match how the IRQ controller
-input is configured. If the board or SoC inverts the signal between the
-device's IRQ output and controller's IRQ output, software must be
-aware of this fact, in order to program the IRQ output to the correct
-(i.e. opposite) polarity. This flag provides that information.
+Implement the new DT property ti,irq-externally-inverted, and add an
+equivalent platform data field to match. This allows the driver to
+correctly automatically configure the IRQ output polarity when the board
+or SoC contains an inverter between the Palmas IRQ output and IRQ
+controller input.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v3: New patch.
+v3:
+* Use an IRQD flag to represent the data, rather than a custom DT property.
+v2:
+* Split V1's patch 1/2 into separate patches 1/3 and 2/3.
 ---
- Documentation/devicetree/bindings/arm/gic.txt                     | 8 ++++++++
- .../devicetree/bindings/interrupt-controller/interrupts.txt       | 8 ++++++++
- include/dt-bindings/interrupt-controller/irq.h                    | 1 +
- 3 files changed, 17 insertions(+)
+ drivers/mfd/palmas.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index bae0d87a38b2..b0b65a440239 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -33,6 +33,14 @@ Main node required properties:
- 		2 = high-to-low edge triggered
- 		4 = active high level-sensitive
- 		8 = active low level-sensitive
-+	bit[4] IRQ is inverted between source and sink.
-+	Some devices have configurable IRQ output polarities. Software might
-+	use flag bits[3:0] to determine how to configure such a device's IRQ
-+	output polarity in order to match how the IRQ controller input is
-+	configured. If the board or SoC inverts the signal between the
-+	device's IRQ output and controller's IRQ output, software must be
-+	aware of this fact, in order to program the IRQ output to the correct
-+	(i.e. opposite) polarity. This flag provides that information.
- 	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
- 	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
- 	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-index 1486497a24c1..636eb0f478bf 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-@@ -76,6 +76,14 @@ commonly used:
-         2 = high-to-low edge triggered
-         4 = active high level-sensitive
-         8 = active low level-sensitive
-+    - bit[4] IRQ is inverted between source and sink
-+        Some devices have configurable IRQ output polarities. Software might
-+        use flag bits[3:0] to determine how to configure such a device's IRQ
-+        output polarity in order to match how the IRQ controller input is
-+        configured. If the board or SoC inverts the signal between the
-+        device's IRQ output and controller's IRQ output, software must be
-+        aware of this fact, in order to program the IRQ output to the correct
-+        (i.e. opposite) polarity. This flag provides that information.
+diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
+index d280d789e55a..3281d4103e9d 100644
+--- a/drivers/mfd/palmas.c
++++ b/drivers/mfd/palmas.c
+@@ -292,7 +292,8 @@ static int palmas_set_pdata_irq_flag(struct i2c_client *i2c,
+ 		return -EINVAL;
+ 	}
  
-   Example:
- 
-diff --git a/include/dt-bindings/interrupt-controller/irq.h b/include/dt-bindings/interrupt-controller/irq.h
-index 33a1003c55aa..5b04918c5c72 100644
---- a/include/dt-bindings/interrupt-controller/irq.h
-+++ b/include/dt-bindings/interrupt-controller/irq.h
-@@ -15,5 +15,6 @@
- #define IRQ_TYPE_EDGE_BOTH	(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
- #define IRQ_TYPE_LEVEL_HIGH	4
- #define IRQ_TYPE_LEVEL_LOW	8
-+#define IRQ_SRC_DST_INVERTED	16
- 
- #endif
+-	pdata->irq_flags = irqd_get_trigger_type(irq_data);
++	pdata->irq_flags = irqd_get_trigger_type(irq_data) |
++			   irqd_get_src_dst_inverted(irq_data);
+ 	dev_info(&i2c->dev, "Irq flag is 0x%08x\n", pdata->irq_flags);
+ 	return 0;
+ }
+@@ -447,6 +448,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+ 		reg = PALMAS_POLARITY_CTRL_INT_POLARITY;
+ 	else
+ 		reg = 0;
++	if (pdata->irq_flags & IRQ_SRC_DST_INVERTED)
++		reg ^= PALMAS_POLARITY_CTRL_INT_POLARITY;
+ 	ret = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
+ 			PALMAS_POLARITY_CTRL, PALMAS_POLARITY_CTRL_INT_POLARITY,
+ 			reg);
 -- 
 1.8.1.5
