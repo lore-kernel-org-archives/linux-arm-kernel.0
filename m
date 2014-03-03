@@ -1,55 +1,281 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Mar 2014 11:43:57 +0000
-Subject: [RFC v2 PATCH 1/1] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <CAKv+Gu_yWWSrcuVcnP1NO-_r0orNH0BrS-oNb9kOvpqEJSvtYg@mail.gmail.com>
-References: <1384776417-29076-1-git-send-email-vijay.kilari@gmail.com>
- <1384776417-29076-2-git-send-email-vijay.kilari@gmail.com>
- <CAKv+Gu_yMFE7YLKG=KuiW-vCjbjkpWDjyBx+43PW4t32M7P22g@mail.gmail.com>
- <CALicx6t+V8Vt7u-8saV=e1KzK99D=_O_UsSvPrdMY3j9xR3opw@mail.gmail.com>
- <CAKv+Gu9-XqLmvZ1HhCKvgM5=BvZWbR8SSnb7oJzMqGja_LHbAw@mail.gmail.com>
- <CALicx6uRtxhj0+Fj98WtFAXssbV5G6sNQjkWikxaZnbMkBmWhA@mail.gmail.com>
- <CALicx6v12DWQSqpP=pa_gJmyOqm4LmFHWc_9=n8Rt7M=krB+dQ@mail.gmail.com>
- <20140228173636.GG30996@mudshark.cambridge.arm.com>
- <CAKv+Gu_yWWSrcuVcnP1NO-_r0orNH0BrS-oNb9kOvpqEJSvtYg@mail.gmail.com>
-Message-ID: <20140303114356.GC8554@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 3 Mar 2014 17:29:00 +0530
+Subject: [PATCH V9 2/2] ARM: dts: Enable ahci sata and sata phy
+In-Reply-To: <1393824160-27040-3-git-send-email-yuvaraj.cd@samsung.com>
+References: <1393824160-27040-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1393824160-27040-3-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <53146E84.7060508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 01:08:56PM +0000, Ard Biesheuvel wrote:
-> On 28 February 2014 18:36, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Feb 28, 2014 at 11:08:58AM +0000, Vijay Kilari wrote:
-> >> On Fri, Nov 29, 2013 at 3:27 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> >> >>> KGDB, being kernel debugger it was thought that allow
-> >> >>> debugging only if kernel mode is supported.
-> >> >>> In fact, I proposed (previous email)  to remove this condition and
-> >> >>> allow to reading neon
-> >> >>> registers always and allow write only if neon is in kernel mode.
-> >> >>>
-> >> >>
-> >> >> I think KGDB is a special case here and should not considered as a
-> >> >> user of kernel mode NEON. So even writing the registers should
-> >> >> allowable regardless of this setting imo.
-> >> >>
-> >>
-> >>  Can we avoid checking on NEON state and allow debugger to
-> >> access NEON registers irrespective of state to keep it simple?
-> >> and just compile config is enough?
-> >
-> > I'm afraid I don't follow... I think we *do* need to do the relevant
-> > flush/sync operations, I just don't think it should be predicated on
-> > KERNEL_MODE_NEON.
-> 
-> Could you elaborate a bit on what you consider flush/sync operations?
-> 
-> The point I was making is that, from kgdb's point of view, it is
-> irrelevant whether the FPSIMD registers contain current's userland
-> FPSIMD state or something else. kgdb should return and/or manipulate
-> what the kernel itself sees when it accesses the FPSIMD registers
-> directly, regardless of whether those contents belong to current's
-> userland or not. (please refer to my pending series on kernel mode
-> NEON optimizations)
 
-Ok, point taken. So we just allow KGDB to access the hardware directly,
-without any saving/restoring of state.
 
-Will
+On Monday 03 March 2014 10:52 AM, Yuvaraj Kumar C D wrote:
+> This patch adds dt entry for ahci sata controller and its
+> corresponding phy controller.phy node has been added w.r.t
+> new generic phy framework.
+>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+
+This should go via exynos dt tree.
+
+FWIW
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Changes since V8:
+> 	1.sata at 122f0000 and sata_phy at 12170000 disabled by default in
+> 	  SOC specific dts file and enabled the same in board dts file.
+>
+> Changes since V7:
+> 	1.syscon-phandle name updated.
+>
+> Changes since V6:none
+>
+> Changes since V5:none
+>
+> Changes since V4:
+> 	1.Used the new phandle "sata_phy_i2c" in the DT entry.
+> 	2.Updated binding document.
+>
+> Changes since V3:
+> 	1.Moved the binding info to the /bindings/phy/
+>
+> Changes since V2:
+> 	1.Used syscon interface to PMU handling.
+> 	2.Changed "sata-phy-i2c" to "exynos-sataphy-i2c".
+>
+> Changes since V1:
+> 	1.Minor changes to node name convention.
+> 	2.Updated binding document.
+>
+>
+>   .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --------
+>   .../devicetree/bindings/ata/exynos-sata.txt        |   25 +++++++++-----
+>   .../devicetree/bindings/phy/samsung-phy.txt        |   36 ++++++++++++++++++++
+>   arch/arm/boot/dts/exynos5250-arndale.dts           |   21 ++++++++++++
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts          |   17 +++++----
+>   arch/arm/boot/dts/exynos5250.dtsi                  |   18 +++++++---
+>   6 files changed, 98 insertions(+), 33 deletions(-)
+>   delete mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+>
+> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+> deleted file mode 100644
+> index 37824fa..0000000
+> --- a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+> +++ /dev/null
+> @@ -1,14 +0,0 @@
+> -* Samsung SATA PHY Controller
+> -
+> -SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
+> -Each SATA PHY controller should have its own node.
+> -
+> -Required properties:
+> -- compatible        : compatible list, contains "samsung,exynos5-sata-phy"
+> -- reg               : <registers mapping>
+> -
+> -Example:
+> -        sata at ffe07000 {
+> -                compatible = "samsung,exynos5-sata-phy";
+> -                reg = <0xffe07000 0x1000>;
+> -        };
+> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt b/Documentation/devicetree/bindings/ata/exynos-sata.txt
+> index 0849f10..b2adb1f 100644
+> --- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
+> +++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
+> @@ -4,14 +4,21 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
+>   Each SATA controller should have its own node.
+>
+>   Required properties:
+> -- compatible        : compatible list, contains "samsung,exynos5-sata"
+> -- interrupts        : <interrupt mapping for SATA IRQ>
+> -- reg               : <registers mapping>
+> -- samsung,sata-freq : <frequency in MHz>
+> +- compatible		: compatible list, contains "samsung,exynos5-sata"
+> +- interrupts		: <interrupt mapping for SATA IRQ>
+> +- reg			: <registers mapping>
+> +- samsung,sata-freq	: <frequency in MHz>
+> +- phys			: as mentioned in phy-bindings.txt
+> +- phy-names		: as mentioned in phy-bindings.txt
+>
+>   Example:
+> -        sata at ffe08000 {
+> -                compatible = "samsung,exynos5-sata";
+> -                reg = <0xffe08000 0x1000>;
+> -                interrupts = <115>;
+> -        };
+> +	sata at 122f0000 {
+> +		compatible = "snps,dwc-ahci";
+> +		samsung,sata-freq = <66>;
+> +		reg = <0x122f0000 0x1ff>;
+> +		interrupts = <0 115 0>;
+> +		clocks = <&clock 277>, <&clock 143>;
+> +		clock-names = "sata", "sclk_sata";
+> +		phys = <&sata_phy>;
+> +		phy-names = "sata-phy";
+> +	};
+> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> index c0fccaa..a937f75 100644
+> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> @@ -20,3 +20,39 @@ Required properties:
+>   - compatible : should be "samsung,exynos5250-dp-video-phy";
+>   - reg : offset and length of the Display Port PHY register set;
+>   - #phy-cells : from the generic PHY bindings, must be 0;
+> +
+> +Samsung SATA PHY Controller
+> +---------------------------
+> +
+> +SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
+> +Each SATA PHY controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains "samsung,exynos5250-sata-phy"
+> +- reg : offset and length of the SATA PHY register set;
+> +- #phy-cells : from the generic phy bindings;
+> +
+> +Example:
+> +	sata_phy: sata-phy at 12170000 {
+> +		compatible = "samsung,exynos5250-sata-phy";
+> +		reg = <0x12170000 0x1ff>;
+> +		clocks = <&clock 287>;
+> +		clock-names = "sata_phyctrl";
+> +		#phy-cells = <0>;
+> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
+> +		samsung,syscon-phandle = <&pmu_syscon>;
+> +	};
+> +
+> +Device-Tree bindings for sataphy i2c client driver
+> +--------------------------------------------------
+> +
+> +Required properties:
+> +compatible: Should be "samsung,exynos-sataphy-i2c"
+> +- reg: I2C address of the sataphy i2c device.
+> +
+> +Example:
+> +
+> +	sata_phy_i2c:sata-phy at 38 {
+> +		compatible = "samsung,exynos-sataphy-i2c";
+> +		reg = <0x38>;
+> +	};
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index 38b96a4..97eef40 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -375,6 +375,27 @@
+>   		};
+>   	};
+>
+> +	i2c at 121D0000 {
+> +		status = "okay";
+> +		samsung,i2c-sda-delay = <100>;
+> +		samsung,i2c-max-bus-freq = <40000>;
+> +		samsung,i2c-slave-addr = <0x38>;
+> +
+> +		sata_phy_i2c:sata-phy at 38 {
+> +			compatible = "samsung,exynos-sataphy-i2c";
+> +			reg = <0x38>;
+> +		};
+> +	};
+> +
+> +	sata at 122F0000 {
+> +		status = "okay";
+> +	};
+> +
+> +	sata-phy at 12170000 {
+> +		status = "okay";
+> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
+> +	};
+> +
+>   	mmc_0: mmc at 12200000 {
+>   		status = "okay";
+>   		num-slots = <1>;
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 0837dd8..e0da05b 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -100,16 +100,12 @@
+>   		samsung,i2c-slave-addr = <0x38>;
+>   		status = "okay";
+>
+> -		sata-phy {
+> -			compatible = "samsung,sata-phy";
+> +		sata_phy_i2c:sata-phy at 38 {
+> +			compatible = "samsung,exynos-sataphy-i2c";
+>   			reg = <0x38>;
+>   		};
+>   	};
+>
+> -	sata at 122F0000 {
+> -		samsung,sata-freq = <66>;
+> -	};
+> -
+>   	i2c at 12C80000 {
+>   		samsung,i2c-sda-delay = <100>;
+>   		samsung,i2c-max-bus-freq = <66000>;
+> @@ -132,6 +128,15 @@
+>   		};
+>   	};
+>
+> +	sata at 122F0000 {
+> +		status = "okay";
+> +	};
+> +
+> +	sata-phy at 12170000 {
+> +		status = "okay";
+> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
+> +	};
+> +
+>   	mmc at 12200000 {
+>   		status = "okay";
+>   		num-slots = <1>;
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 8f6300f..31f7cab 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -46,6 +46,7 @@
+>   		i2c6 = &i2c_6;
+>   		i2c7 = &i2c_7;
+>   		i2c8 = &i2c_8;
+> +		i2c9 = &i2c_9;
+>   		pinctrl0 = &pinctrl_0;
+>   		pinctrl1 = &pinctrl_1;
+>   		pinctrl2 = &pinctrl_2;
+> @@ -233,16 +234,25 @@
+>   	};
+>
+>   	sata at 122F0000 {
+> -		compatible = "samsung,exynos5-sata-ahci";
+> +		compatible = "snps,dwc-ahci";
+> +		samsung,sata-freq = <66>;
+>   		reg = <0x122F0000 0x1ff>;
+>   		interrupts = <0 115 0>;
+>   		clocks = <&clock 277>, <&clock 143>;
+>   		clock-names = "sata", "sclk_sata";
+> +		phys = <&sata_phy>;
+> +		phy-names = "sata-phy";
+> +		status = "disabled";
+>   	};
+>
+> -	sata-phy at 12170000 {
+> -		compatible = "samsung,exynos5-sata-phy";
+> +	sata_phy: sata-phy at 12170000 {
+> +		compatible = "samsung,exynos5250-sata-phy";
+>   		reg = <0x12170000 0x1ff>;
+> +		clocks = <&clock 287>;
+> +		clock-names = "sata_phyctrl";
+> +		#phy-cells = <0>;
+> +		samsung,syscon-phandle = <&pmu_system_controller>;
+> +		status = "disabled";
+>   	};
+>
+>   	i2c_0: i2c at 12C60000 {
+> @@ -360,7 +370,7 @@
+>   		status = "disabled";
+>   	};
+>
+> -	i2c at 121D0000 {
+> +	i2c_9: i2c at 121D0000 {
+>                   compatible = "samsung,exynos5-sata-phy-i2c";
+>                   reg = <0x121D0000 0x100>;
+>                   #address-cells = <1>;
+>
