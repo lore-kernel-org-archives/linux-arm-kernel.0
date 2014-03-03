@@ -1,39 +1,97 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 3 Mar 2014 20:07:36 +0100
-Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
-In-Reply-To: <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
-References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
- <20140302202940.GQ3327@book.gsilab.sittig.org>
- <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
-Message-ID: <20140303190736.GU3327@book.gsilab.sittig.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 3 Mar 2014 12:09:46 -0700
+Subject: [PATCH v2] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <CA+mB=1JmRVzpz=32AbdN8W+2RrsxkPUb+s0zLUQXBrsj2Cdiwg@mail.gmail.com>
+References: <1393854036-5244-1-git-send-email-sthokal@xilinx.com>
+ <20140303174325.GB31062@obsidianresearch.com>
+ <CA+mB=1JmRVzpz=32AbdN8W+2RrsxkPUb+s0zLUQXBrsj2Cdiwg@mail.gmail.com>
+Message-ID: <20140303190946.GA28341@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 09:35 -0800, S?ren Brinkmann wrote:
+On Tue, Mar 04, 2014 at 12:21:55AM +0530, Srikanth Thokala wrote:
+
+> >> +     pci_express: axi-pcie at 50000000 {
+> >> +             #address-cells = <3>;
+> >> +             #size-cells = <2>;
+> >> +             compatible = "xlnx,axi-pcie-host-1.00.a";
+> >> +             reg = < 0x50000000 0x10000000 >;
+> >> +             interrupts = < 0 52 4 >;
+> >> +             ranges = < 0x02000000 0 0x60000000 0x60000000 0 0x10000000 >;
+> >> +     };
+
+> >  - How are INTA/B/C/D handled? Typically I'd like to see an
+> >    interrupt-mapping block describing them.
+> >
+> >    There are a few options here, if the HW can decode A/B/C/D then
+> >    it probably needs another irq_domain for INTx, and have the IRQ
+> >    handler decode like it does for MSI.
 > 
-> It would be nice if we could use the logic provided in the mux, div etc
-> primitives independently of how the HW is accessed and what is
-> necessary to shift and mask those register values around, right? I
-> mean, at then end we want to model a clk-(div|mux) and not a
-> clk-(div|mux) which has only a single, memory-mapped control register,
-> that does not overlap with other things, ...
+> The core provides a single interrupt for both INTx/MSI messages.  The
+> core decodes the TLP messages and accordingly assert the INTx/MSI
+> bits.  It provides two registers Interrupt FIFO Read 1 and Read 2 to get
+> more information of these.
+> 
+>    | CPU |  <------  | PCIe IP |   <--  MSI/INTx Message (INTA, INTB,
+> INTC, INTD)
+> 
+>    Reading Interrupt Status Reg -> MSI/INTx bit set/not set
+>    Reading Root Port FIFO Read Register1 -> Mentions which interrupt
+> (INTx) is received
+>    Reading Root Port FIFO Read Register2 -> MSI Data
 
-Did you lookup the ll_ops discussion in the thread that
-originated from
-http://article.gmane.org/gmane.linux.ports.arm.kernel/289895 and
-did you see the outlined logic in
-http://article.gmane.org/gmane.linux.ports.arm.omap/109233 and
-http://article.gmane.org/gmane.linux.ports.arm.omap/109381 ?
+Okay, that matches my guess based on the code.
 
-Support for regmap access instead of mere MMIO was one of the
-things you could do with this approach.  You appear to be in the
-situation where you need such an extension (or something similar,
-but you really should look into the ll_ops thing).
+You probably want to do something like this:
 
+     pci_express: axi-pcie at 50000000 {
+             #address-cells = <3>;
+             #size-cells = <2>;
+	     device_type ="pci";
+             compatible = "xlnx,axi-pcie-host-1.00.a";
+             reg = < 0x50000000 0x10000000 >;
+             interrupts = < 0 52 4 >;
+             ranges = < 0x02000000 0 0x60000000 0x60000000 0 0x10000000 >;
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+	     pcie_intc: interrupt-controller {
+    		interrupt-controller;
+		#address-cells = <0>;
+		#interrupt-cells = <1>;
+	     }
+
+	     interrupt-map-mask = <0 0 0 7>;
+	     interrupt-map = <0 0 0 1 &pcie_intc 0>, // INT A
+	                     <0 0 0 2 &pcie_intc 2>, // INT B
+	                     <0 0 0 3 &pcie_intc 3>, // INT C
+	                     <0 0 0 4 &pcie_intc 4>; // INT D
+     };
+
+(similar to what ralink,rt3883 does for their binding)
+
+Setup a interrupt domain like for MSI, except attach it to the
+nested interrupt-controller DT node. Decode the 4 interrutps from
+the core in the ISR and route them into the domain.
+
+The generic code will take care of the rest.
+
+This way all the interrupts are decoded and the interrupt-map DT
+functionality is supported, which is important in a number of
+board-specific corner cases.
+
+> > You may want to work with Liviu to use his patch set which provides
+> > more generic support. Also, the driver needs to put every one of these
+> > ports in a PCI domain, Liviu is working on generic support for that
+> > too.
+> 
+> I will check and come back to you.
+
+Will's latest patch that was just posted is a very good example of how
+the resource stuff should work correctly.
+
+> > Don't forget to think about hot plug
+> 
+> Did you mean using 'rescan' (from sysfs), correct?
+
+Yes
+
+Jason
