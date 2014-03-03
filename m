@@ -1,31 +1,260 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Mon,  3 Mar 2014 11:06:00 +0100
-Subject: [PATCH v5 7/9] at91: updated the at91_dt_defconfig with support for
- the ADS7846
+Date: Mon,  3 Mar 2014 11:05:59 +0100
+Subject: [PATCH v5 6/9] at91: dt: sam9261: Device Tree support for the
+ at91sam9261ek
 In-Reply-To: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
 References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1393841162-25339-8-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1393841162-25339-7-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This provides touchscreen support to the at91sam9261ek
+This patch implements a DTS to boot a at91sam9261ek with a dt-enabled
+kernel (at91_dt_defconfig).
+supported features are:
+* dbgu
+* lcdc
+* usb host
+* usb gadget,
+* spi dataflash
+* nand flash
+* touchscreen
+* leds
+* user buttons
+
+In the TODO list:
+* dm9000 (ethernet)
+* audio
+* mmc
 
 Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/Makefile          |   2 +
+ arch/arm/boot/dts/at91sam9261ek.dts | 204 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 206 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 3c6905d..aaa322d 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -120,6 +120,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ADS7846=y
- # CONFIG_SERIO is not set
- CONFIG_LEGACY_PTY_COUNT=4
- CONFIG_SERIAL_ATMEL=y
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0320303..f496473 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -12,6 +12,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+ dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
+ dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
++# sam9261
++dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
+ # sam9263
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+new file mode 100644
+index 0000000..03adb7f
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -0,0 +1,204 @@
++/*
++ * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
++ *
++ *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
++ *
++ * Licensed under GPLv2 only.
++ */
++/dts-v1/;
++#include "at91sam9261.dtsi"
++
++/ {
++	model = "Atmel at91sam9261ek";
++	compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 rootfstype=ubifs ubi.mtd=5 root=ubi0:rootfs rw";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <18432000>;
++		};
++	};
++
++	ahb {
++		usb0: ohci at 00500000 {
++			status = "okay";
++		};
++
++		fb0: fb at 0x00600000 {
++			display = <&display0>;
++			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
++			status = "okay";
++
++			display0: display {
++				bits-per-pixel = <16>;
++				atmel,lcdcon-backlight;
++				atmel,dmacon = <0x1>;
++				atmel,lcdcon2 = <0x80008002>;
++				atmel,guard-time = <1>;
++				atmel,lcd-wiring-mode = "BRG";
++
++				display-timings {
++					native-mode = <&timing0>;
++					timing0: timing0 {
++						clock-frequency = <4965000>;
++						hactive = <240>;
++						vactive = <320>;
++						hback-porch = <1>;
++						hfront-porch = <33>;
++						vback-porch = <1>;
++						vfront-porch = <0>;
++						hsync-len = <5>;
++						vsync-len = <1>;
++						hsync-active = <1>;
++						vsync-active = <1>;
++					};
++				};
++			};
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x40000>;
++			};
++
++			bootloader at 40000 {
++				label = "bootloader";
++				reg = <0x40000 0x80000>;
++			};
++
++			bootloaderenv at c0000 {
++				label = "bootloader env";
++				reg = <0xc0000 0xc0000>;
++			};
++
++			dtb at 180000 {
++				label = "device tree";
++				reg = <0x180000 0x80000>;
++			};
++
++			kernel at 200000 {
++				label = "kernel";
++				reg = <0x200000 0x600000>;
++			};
++
++			rootfs at 800000 {
++				label = "rootfs";
++				reg = <0x800000 0x0f800000>;
++			};
++		};
++
++		apb {
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioB 29 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++			spi0: spi at fffc8000 {
++				cs-gpios = <&pioA 3 0>, <0>, <&pioA 28 0>, <0>;
++				status = "okay";
++
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					reg = <0>;
++					spi-max-frequency = <15000000>;
++				};
++				tsc2046 at 0 {
++					reg = <2>;
++					compatible = "ti,ads7843";
++					interrupts-extended = <&pioC 2 IRQ_TYPE_EDGE_BOTH>;
++					spi-max-frequency = <3000000>;
++					pendown-gpio = <&pioC 2 GPIO_ACTIVE_HIGH>;
++
++					ti,x-min = /bits/ 16 <150>;
++					ti,x-max = /bits/ 16 <3830>;
++					ti,y-min = /bits/ 16 <190>;
++					ti,y-max = /bits/ 16 <3830>;
++					ti,vref-delay-usecs = /bits/ 16 <450>;
++					ti,x-plate-ohms = /bits/ 16 <450>;
++					ti,y-plate-ohms = /bits/ 16 <250>;
++					ti,pressure-max = /bits/ 16 <15000>;
++					ti,debounce-rep = /bits/ 16 <0>;
++					ti,debounce-tol = /bits/ 16 <65535>;
++					ti,debounce-max = /bits/ 16 <1>;
++
++					linux,wakeup;
++				};
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			watchdog at fffffd40 {
++				status = "okay";
++			};
++
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		ds8 {
++			label = "ds8";
++			gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++		ds7 {
++			label = "ds7";
++			gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "nand-disk";
++		};
++		ds1 {
++			label = "ds1";
++			gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		button_0 {
++			label = "button_0";
++			gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
++			linux,code = <256>;
++			gpio-key,wakeup;
++		};
++		button_1 {
++			label = "button_1";
++			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
++			linux,code = <257>;
++			gpio-key,wakeup;
++		};
++		button_2 {
++			label = "button_2";
++			gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
++			linux,code = <258>;
++			gpio-key,wakeup;
++		};
++		button_3 {
++			label = "button_3";
++			gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
++			linux,code = <259>;
++			gpio-key,wakeup;
++		};
++	};
++};
 -- 
 1.9.0
