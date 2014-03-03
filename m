@@ -1,70 +1,124 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Mar 2014 01:49:01 +0000
-Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
-In-Reply-To: <53109A64.9030701@ti.com>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
- <1393535872-20915-5-git-send-email-santosh.shilimkar@ti.com>
- <10040083.PbPEQQPCjl@wuerfel> <53109A64.9030701@ti.com>
-Message-ID: <20140303014901.GA18773@localhost>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 3 Mar 2014 09:55:15 +0800
+Subject: change kmalloc into vmalloc for large memory allocations
+In-Reply-To: <s5hlhwvb9q8.wl%tiwai@suse.de>
+References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
+ <s5hlhwvb9q8.wl%tiwai@suse.de>
+Message-ID: <35FD53F367049845BC99AC72306C23D102844605F38E@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 09:17:08AM -0500, Santosh Shilimkar wrote:
-> On Friday 28 February 2014 04:39 AM, Arnd Bergmann wrote:
-> > On Thursday 27 February 2014 16:17:49 Santosh Shilimkar wrote:
-> >> +
-> >> +/**
-> >> + * of_dma_is_coherent - Check if device is coherent
-> >> + * @np:        device node
-> >> + *
-> >> + * It returns true if "dma-coherent" property was found
-> >> + * for this device in DT.
-> >> + */
-> >> +bool of_dma_is_coherent(struct device_node *np)
-> >> +{
-> >> +       struct device_node *node = np;
-> >> +
-> >> +       while (node) {
-> >> +               if (of_property_read_bool(node, "dma-coherent")) {
-> >> +                       of_node_put(node);
-> >> +                       return true;
-> >> +               }
-> >> +               node = of_get_next_parent(node);
-> >> +       }
-> >> +       return false;
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-> >>
-> > 
-> > This won't work on architectures that are always coherent and
-> > did not need 'dma-coherent' properties before, such as IBM
-> > Power servers.
-> > 
-> > That said, I think the property makes sense, and we already have
-> > platforms using it (highbank is the one I'm aware of).
-> > 
-> > We probably need ways to override this function in both ways:
-> > "always coherent" (powerpc, x86), and "never coherent" (keystone
-> > without LPAE) from platform code, and it would be nice to put
-> > either option into DT in a global location as well. We may have
-> > to go through a few iterations of this patch to get the best
-> > algorithm, but I think the interface is good at least.
-> 
-> Probably we should discuss bit more next week at connect. The
-> current 'dma-coherent' is a per device property. For arch's
-> which are always coherent, the per device property doesn't make
-> sense.
-> 
-> BTW, the current users of this API is only ARM32 bit port
-> and if this satisfies the ARM platforms, we should get
-> this in kernel and then address other cases on need
-> basis.
+Hi  Takashi,
 
-I have a suspicion that we'll need this API on arm64 at some point as
-well. I get regular questions about DMA cache maintenance for arm64 and
-I carried a patch in my tree for a long time (now in -next). While full
-coherency is nice, there are some devices on certain SoCs that are more
-efficient (power, speed) when they don't have to snoop the CPU caches.
+For this one:
+https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/sound/soc/soc-core.c?h=master#n3772
 
--- 
-Catalin
+in my kernel log,
+the allocation size 62496,
+about 62KB,
+I think need to  change to vmalloc .
+How do you think of it ?
+
+Logs:
+<4>[   11.469789] ------------[ cut here ]------------
+<4>[   11.469803] WARNING: at /media/00DE7FE2DE7FCE82/jb-mr2-yukon/kernel/include/linux/slub_def.h:265 __kmalloc+0x38/0x29c()
+<4>[   11.469811] size=62496 flags=80d0
+<4>[   11.469815] Modules linked in:
+<4>[   11.469835] [<c010c534>] (unwind_backtrace+0x0/0x11c) from [<c018ab04>] (warn_slowpath_common+0x4c/0x64)
+<4>[   11.469850] [<c018ab04>] (warn_slowpath_common+0x4c/0x64) from [<c018ab9c>] (warn_slowpath_fmt+0x2c/0x3c)
+<4>[   11.469864] [<c018ab9c>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0249ab4>] (__kmalloc+0x38/0x29c)
+<4>[   11.469879] [<c0249ab4>] (__kmalloc+0x38/0x29c) from [<c06a0124>] (snd_soc_register_card+0x184/0x104c)
+<4>[   11.469896] [<c06a0124>] (snd_soc_register_card+0x184/0x104c) from [<c088183c>] (msm8226_asoc_machine_probe+0x298/0x7f0)
+<4>[   11.469913] [<c088183c>] (msm8226_asoc_machine_probe+0x298/0x7f0) from [<c044b1fc>] (platform_drv_probe+0x14/0x18)
+<4>[   11.469927] [<c044b1fc>] (platform_drv_probe+0x14/0x18) from [<c0449f2c>] (driver_probe_device+0x134/0x334)
+<4>[   11.469940] [<c0449f2c>] (driver_probe_device+0x134/0x334) from [<c044a194>] (__driver_attach+0x68/0x8c)
+<4>[   11.469953] [<c044a194>] (__driver_attach+0x68/0x8c) from [<c044849c>] (bus_for_each_dev+0x48/0x80)
+<4>[   11.469965] [<c044849c>] (bus_for_each_dev+0x48/0x80) from [<c0449528>] (bus_add_driver+0x100/0x26c)
+<4>[   11.469978] [<c0449528>] (bus_add_driver+0x100/0x26c) from [<c044a66c>] (driver_register+0x9c/0x120)
+<4>[   11.469992] [<c044a66c>] (driver_register+0x9c/0x120) from [<c010052c>] (do_one_initcall+0x90/0x160)
+<4>[   11.470007] [<c010052c>] (do_one_initcall+0x90/0x160) from [<c0d00b74>] (kernel_init+0xec/0x1a8)
+<4>[   11.470022] [<c0d00b74>] (kernel_init+0xec/0x1a8) from [<c0106aec>] (kernel_thread_exit+0x0/0x8)
+<4>[   11.470030] ---[ end trace 1b75b31a2719ed4d ]---
+
+BRs/ Yalin
+-----Original Message-----
+From: Takashi Iwai [mailto:tiwai at suse.de] 
+Sent: Friday, February 28, 2014 10:20 PM
+To: Wang, Yalin
+Cc: 'linux-kernel at vger.kernel.org'; 'linux-arm-msm at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-input at vger.kernel.org'; 'balbi at ti.com'; 'gregkh at linuxfoundation.org'; 'lrg at ti.com'; 'broonie at opensource.wolfsonmicro.com'; 'perex at perex.cz'; 'pablo at netfilter.org'; 'kaber at trash.net'; 'davem at davemloft.net'; 'rostedt at goodmis.org'; 'fweisbec at gmail.com'; 'mingo at redhat.com'; 'dmitry.torokhov at gmail.com'; 'rydberg at euromail.se'; 'linux-usb at vger.kernel.org'; 'alsa-devel at alsa-project.org'; 'netfilter-devel at vger.kernel.org'; 'netfilter at vger.kernel.org'; 'coreteam at netfilter.org'; 'netdev at vger.kernel.org'
+Subject: Re: change kmalloc into vmalloc for large memory allocations
+
+At Fri, 28 Feb 2014 16:15:23 +0800,
+Wang, Yalin wrote:
+> 
+> Hi
+> 
+> 
+> I find there is some drivers use kmalloc to allocate large Memorys 
+> during module_init,  some can be changed to use vmalloc To save some 
+> low mem, I add log in kernel to track , And list them here:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drive
+> rs/usb/gadget/f_mass_storage.c?h=master#n2724
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/sound
+> /soc/soc-core.c?h=master#n3772
+
+At least the ASoC runtime case doesn't use the allocated memory as buffer, and they are allocated only once per device, thus it shouldn't be the problem you stated.  If it really consumes so much memory, we need to rethink, instead of allocating an array but allocate each object, for example.
+
+
+thanks,
+
+Takashi
+
+
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/n
+> etfilter/nf_conntrack_ftp.c?h=master#n603
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/n
+> etfilter/nf_conntrack_h323_main.c?h=master#n1849
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/n
+> etfilter/nf_conntrack_irc.c?h=master#n247
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/n
+> etfilter/nf_conntrack_sane.c?h=master#n195
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drive
+> rs/input/evdev.c?h=master#n403
+> 
+> 
+> they allocate large memory from 10k~64K , this will use lots of low 
+> mem, instead if we use vmalloc for these drivers , it will be good for 
+> some devices like smart phone, we often encounter some errors like 
+> kmalloc failed because there is not enough low mem , especially when 
+> the device has physical memory less than 1GB .
+> 
+> 
+> could this module change the memory allocation into vmalloc ?
+> 
+> I was thinking that if we can introduce a helper function in kmalloc.h like this :
+> 
+> Kmalloc(size, flags)
+> {
+> 	If (size > PAGE_SIZE && flags&CAN_USE_VMALLOC_FLAG)
+> 		return vmalloc(size);
+> 	Else
+> 		return real_kmalloc(size);
+> }
+> 
+> Kfree(ptr)
+> {
+> 	If (is_vmalloc_addr(ptr))
+> 		Vfree(ptr);
+> 	Else
+> 		Kfree(ptr);
+> }
+> 
+> 
+> But we need add some flags to ensure always use kmalloc for Some 
+> special use (dma etc..)
+> 
+> How do you think of it ?
+> 
+> Thanks
+> 
+> 
+> 
