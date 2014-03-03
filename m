@@ -1,29 +1,34 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon, 03 Mar 2014 09:46:45 +0100
-Subject: [PATCH] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
- EV-MSK
-In-Reply-To: <20140228231106.GX13624@atomide.com>
-References: <1392806495-4874-1-git-send-email-kaloz@openwrt.org>
- <20140228225427.GT13624@atomide.com> <20140228231106.GX13624@atomide.com>
-Message-ID: <op.xb41b7rc2s3iss@ecaz>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 3 Mar 2014 09:54:41 +0100
+Subject: linux-next: manual merge of the akpm-current tree with the
+ arm-soc tree
+In-Reply-To: <20140303190152.8b87330c0d83679b10c5ca5a@canb.auug.org.au>
+References: <20140303190152.8b87330c0d83679b10c5ca5a@canb.auug.org.au>
+Message-ID: <20140303085441.GW6865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 01 Mar 2014 00:11:07 +0100, Tony Lindgren <tony@atomide.com> wrote:
+On Mon, Mar 03, 2014 at 07:01:52PM +1100, Stephen Rothwell wrote:
+> Hi Andrew,
+> 
+> Today's linux-next merge of the akpm-current tree got a conflict in
+> arch/arm/mach-vexpress/Kconfig between commit 9352b05b6e4e ("ARM: select
+> MIGHT_HAVE_CACHE_L2X0 for V6 and V7 multi-platform") from the arm-soc
+> tree and commit b096b0b50c4b ("Kconfig: rename HAS_IOPORT to
+> HAS_IOPORT_MAP") from the akpm-current tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+your resolution and the two earlier ones from today[1] all look right
 
-> * Tony Lindgren <tony@atomide.com> [140228 14:54]:
->> * Imre Kaloz <kaloz@openwrt.org> [140219 02:44]:
->> > Enable the WiLink6 connected to mmc2.
->> >
->> > Signed-off-by: Imre Kaloz <kaloz@openwrt.org
->>
->> Thanks applying into omap-for-v3.15/dt.
->
-> Oops, this breaks the build as WL12XX_REFCLOCK_24 is not defined
-> and I could not figure out what value it needs to be. Care to
-> repost this patch with WL12XX_REFCLOCK_24 also defined?
+Best regards
+Uwe
 
-Actually that's a typo :) Posting v2 in a few mins.
+[1] The conflicts with
 
+	ddb902cc3459 ("ARM: centralize common multi-platform kconfig options")
+	9352b05b6e4e ("ARM: select MIGHT_HAVE_CACHE_L2X0 for V6 and V7 multi-platform")
 
-Imre
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
