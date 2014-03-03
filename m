@@ -1,74 +1,79 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 3 Mar 2014 08:42:35 +0200
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <20140228162327.GT21483@n2100.arm.linux.org.uk>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk> <5310B567.7040605@ti.com>
- <20140228162327.GT21483@n2100.arm.linux.org.uk>
-Message-ID: <5314245B.803@ti.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 02 Mar 2014 22:49:12 -0800
+Subject: [Patch v8 2/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <1393828245-18766-3-git-send-email-agross@codeaurora.org>
+References: <1393828245-18766-1-git-send-email-agross@codeaurora.org>
+ <1393828245-18766-3-git-send-email-agross@codeaurora.org>
+Message-ID: <1393829352.13719.73.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 18:23, Russell King - ARM Linux wrote:
-
->> I guess the compatible string is the easiest way for differentation, at
->> least for the three main types, i.e. "dvi-d-connector" etc.
->>
->> "dvi-d-1l-connector" and "dvi-d-2l-connector" for the single/dual link?
->> That looks a bit funny.
+On Mon, 2014-03-03 at 00:30 -0600, Andy Gross wrote:
+> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
+> found in the MSM 8x74 platforms.
 > 
-> I think that starts getting a tad messy:
-> 
-> 	dvi-a-connector
-> 	dvi-d-1l-connector
-> 	dvi-d-2l-connector
-> 	dvi-i-1l-connector
-> 	dvi-i-2l-connector
+> Each BAM DMA device is associated with a specific on-chip peripheral.  Each
+> channel provides a uni-directional data transfer engine that is capable of
+> transferring data between the peripheral and system memory (System mode), or
+> between two peripherals (BAM2BAM).
+[]
 
-Yes, it's messy. Pondering this over the weekend, I think it makes sense
-to have just one compatible string, as all those connectors are still
-the same DVI connector, just different variations of the same.
+trivia:
 
-> That's rather a lot of compatible strings.  Another possibility is:
-> 
-> 	compatible = "dvi-connector";
-> 	analog;
-> 	digital;
-> 	single-link;
-> 	dual-link;
-> 
-> I'm debating whether "-signalling" should be on the 2nd and 3rd (or...
-> -signaling depending on how you prefer to spell that word.)  At least
-> one of "analog" and/or "digital" must be specified, and if "digital"
-> is specified, then exactly one of "single-link" or "dual-link" should
-> be specified.
-> 
-> So, this would mean we end up with:
-> 
-> 	compatible = "dvi-connector";
-> 	analog;
-> 	digital;
-> 	dual-link;
-> 
-> for a DVI-I dual-link connector.
+> +static u32 process_channel_irqs(struct bam_device *bdev)
+> +{
+[]
+> +	for (i = 0; i < bdev->num_channels; i++) {
+> +		struct bam_chan *bchan = &bdev->channels[i];
+> +		if (srcs & BIT(i)) {
+> +			/* clear pipe irq */
+> +			pipe_stts = readl_relaxed(bdev->regs +
+> +				BAM_P_IRQ_STTS(i));
+> +
+> +			writel_relaxed(pipe_stts, bdev->regs +
+> +					BAM_P_IRQ_CLR(i));
+> +
+> +			spin_lock_irqsave(&bchan->vc.lock, flags);
+> +			async_desc = bchan->curr_txd;
+> +
+> +			if (async_desc) {
+> +				async_desc->num_desc -= async_desc->xfer_len;
+> +				async_desc->curr_desc += async_desc->xfer_len;
+> +				bchan->curr_txd = NULL;
+> +
+> +				/* manage FIFO */
+> +				bchan->head += async_desc->xfer_len;
+> +				bchan->head %= MAX_DESCRIPTORS;
+> +
+> +				/*
+> +				 * if complete, process cookie.  Otherwise
+> +				 * push back to front of desc_issued so that
+> +				 * it gets restarted by the tasklet
+> +				 */
+> +				if (!async_desc->num_desc)
+> +					vchan_cookie_complete(&async_desc->vd);
+> +				else
+> +					list_add(&async_desc->vd.node,
+> +						&bchan->vc.desc_issued);
+> +			}
+> +
+> +			spin_unlock_irqrestore(&bchan->vc.lock, flags);
+> +		}
+> +	}
 
-Another option would be:
+This could be written with fewer indents using continue
+(and maybe faster using ffs too)
 
-num-links = 2;
+	for (i = 0; i < bdev->num_channels; i++) {
+		struct bam_chan *bchan;
 
-But I like your suggestion more. We could also optimize it, "digital" is
-extra as both "single-link" and "dual-link" mean also digital. But... I
-don't see much point in optimizing that way. So I agree with your
-suggestion as is.
+		if (!(srcs & BIT(i)))
+			continue;
 
- Tomi
+		bchan = &bdev->channels[i];
 
+		/* clear pipe irq */
+		pipe_stts = readl_relaxed(bdev->regs + BAM_P_IRQ_STTS(i));
+		writel_relaxed(pipe_stts, bdev->regs + BAM_P_IRQ_CLR(i));
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/8ac18169/attachment.sig>
+		etc...
