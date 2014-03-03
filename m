@@ -1,108 +1,166 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  3 Mar 2014 13:40:30 +0100
-Subject: [PATCH] crypto: mxs-dcp: Optimize hashing
-Message-ID: <1393850430-5855-1-git-send-email-marex@denx.de>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 03 Mar 2014 13:48:25 +0100
+Subject: [PATCH v3 4/7] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <53146166.4050906@ti.com>
+References: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
+ <53146166.4050906@ti.com>
+Message-ID: <53147A19.5070009@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimize the hashing operation in the MXS-DCP by doing two adjustments:
-1) Given that the output buffer for the hash is now always correctly aligned,
-   we can just use the buffer for the DCP DMA to store the resulting hash.
-   We thus get rid of one copying of data. Moreover, we remove an entry from
-   dcp_coherent_block{} and thus lower the memory footprint of the driver.
-2) We map the output buffer for the hash for DMA only in case we will output
-   the hash, not always, as it was now.
+Hi Roger,
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Tom Lendacky <thomas.lendacky@amd.com>
----
- drivers/crypto/mxs-dcp.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+On 03/03/2014 12:03 PM, Roger Quadros wrote:
+> Hi Florian,
+> 
+> 
+> On 03/03/2014 11:34 AM, Florian Vaussard wrote:
+>> Add the High-Speed USB PHY.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  arch/arm/boot/dts/omap3-overo-storm-tobi.dts | 16 ++++++++++
+>>  arch/arm/boot/dts/omap3-overo-tobi.dts       | 16 ++++++++++
+>>  arch/arm/boot/dts/omap3-overo.dtsi           | 44 ++++++++++++++++++++++++++++
+>>  3 files changed, 76 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+>> index 2033b52..eb93e3a 100644
+>> --- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+>> +++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+>> @@ -21,6 +21,22 @@
+>>  };
+>>  
+>>  &omap3_pmx_core2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusb2_2_pins
+>> +	>;
+>> +
+>> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+>> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+>> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+>> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+>> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+>> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+>> +		>;
+>> +	};
+>> +
+>>  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
+>>  		pinctrl-single,pins = <
+>>  			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
+>> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+>> index 21de31d..e77be26 100644
+>> --- a/arch/arm/boot/dts/omap3-overo-tobi.dts
+>> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+>> @@ -21,6 +21,22 @@
+>>  };
+>>  
+>>  &omap3_pmx_core2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusb2_2_pins
+>> +	>;
+>> +
+>> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+>> +			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+>> +			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+>> +			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+>> +			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+>> +			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+>> +		>;
+>> +	};
+>> +
+>>  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
+>>  		pinctrl-single,pins = <
+>>  			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
+>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+>> index 07467cc..8f810db 100644
+>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+>> @@ -30,6 +30,24 @@
+>>  		ti,codec = <&twl_audio>;
+>>  	};
+>>  
+>> +	/* HS USB Port 2 Power */
+>> +	hsusb2_power: hsusb2_power_reg {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "hsusb2_vbus";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
+>> +		startup-delay-us = <70000>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>> +	/* HS USB Host PHY on PORT 2 */
+>> +	hsusb2_phy: hsusb2_phy {
+>> +		compatible = "usb-nop-xceiv";
+>> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
+>> +		vcc-supply = <&hsusb2_power>;
+>> +	};
+>> +
+>>  	/* Regulator to trigger the nPoweron signal of the Wifi module */
+>>  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
+>>  		compatible = "regulator-fixed";
+>> @@ -64,6 +82,11 @@
+>>  };
+>>  
+>>  &omap3_pmx_core {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusb2_pins
+>> +	>;
+>> +
+>>  	uart3_pins: pinmux_uart3_pins {
+>>  		pinctrl-single,pins = <
+>>  			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
+>> @@ -107,6 +130,19 @@
+>>  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
+>>  		>;
+>>  	};
+>> +
+>> +	hsusb2_pins: pinmux_hsusb2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
+>> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
+>> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
+>> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
+>> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
+>> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+>> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
+>> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
+>> +		>;
+>> +	};
+> 
+> Does this mean all overo variants use the USB host feature on hsusb2 pins? If not then this can't be here.
+> 
 
-diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
-index c7400fe..7bbe0ab 100644
---- a/drivers/crypto/mxs-dcp.c
-+++ b/drivers/crypto/mxs-dcp.c
-@@ -50,7 +50,6 @@ struct dcp_coherent_block {
- 	uint8_t			sha_in_buf[DCP_BUF_SZ];
- 
- 	uint8_t			aes_key[2 * AES_KEYSIZE_128];
--	uint8_t			sha_digest[SHA256_DIGEST_SIZE];
- 
- 	struct dcp_dma_desc	desc[DCP_MAX_CHANS];
- };
-@@ -516,13 +515,11 @@ static int mxs_dcp_run_sha(struct ahash_request *req)
- 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
- 	struct dcp_async_ctx *actx = crypto_ahash_ctx(tfm);
- 	struct dcp_sha_req_ctx *rctx = ahash_request_ctx(req);
-+	struct hash_alg_common *halg = crypto_hash_alg_common(tfm);
- 
- 	struct dcp_dma_desc *desc = &sdcp->coh->desc[actx->chan];
--	dma_addr_t digest_phys = dma_map_single(sdcp->dev,
--						sdcp->coh->sha_digest,
--						SHA256_DIGEST_SIZE,
--						DMA_FROM_DEVICE);
- 
-+	dma_addr_t digest_phys = 0;
- 	dma_addr_t buf_phys = dma_map_single(sdcp->dev, sdcp->coh->sha_in_buf,
- 					     DCP_BUF_SZ, DMA_TO_DEVICE);
- 
-@@ -543,14 +540,18 @@ static int mxs_dcp_run_sha(struct ahash_request *req)
- 
- 	/* Set HASH_TERM bit for last transfer block. */
- 	if (rctx->fini) {
-+		digest_phys = dma_map_single(sdcp->dev, req->result,
-+					     halg->digestsize, DMA_FROM_DEVICE);
- 		desc->control0 |= MXS_DCP_CONTROL0_HASH_TERM;
- 		desc->payload = digest_phys;
- 	}
- 
- 	ret = mxs_dcp_start_dma(actx);
- 
--	dma_unmap_single(sdcp->dev, digest_phys, SHA256_DIGEST_SIZE,
--			 DMA_FROM_DEVICE);
-+	if (rctx->fini)
-+		dma_unmap_single(sdcp->dev, digest_phys, halg->digestsize,
-+				 DMA_FROM_DEVICE);
-+
- 	dma_unmap_single(sdcp->dev, buf_phys, DCP_BUF_SZ, DMA_TO_DEVICE);
- 
- 	return ret;
-@@ -567,7 +568,6 @@ static int dcp_sha_req_to_buf(struct crypto_async_request *arq)
- 	struct hash_alg_common *halg = crypto_hash_alg_common(tfm);
- 	const int nents = sg_nents(req->src);
- 
--	uint8_t *digest = sdcp->coh->sha_digest;
- 	uint8_t *in_buf = sdcp->coh->sha_in_buf;
- 
- 	uint8_t *src_buf;
-@@ -614,14 +614,20 @@ static int dcp_sha_req_to_buf(struct crypto_async_request *arq)
- 		rctx->fini = 1;
- 
- 		/* Submit whatever is left. */
-+		if (!req->result)
-+			return -EINVAL;
-+
- 		ret = mxs_dcp_run_sha(req);
--		if (ret || !req->result)
-+		if (ret)
- 			return ret;
-+
- 		actx->fill = 0;
- 
- 		/* For some reason, the result is flipped. */
--		for (i = 0; i < halg->digestsize; i++)
--			req->result[i] = digest[halg->digestsize - i - 1];
-+		for (i = 0; i < halg->digestsize / 2; i++) {
-+			swap(req->result[i],
-+			     req->result[halg->digestsize - i - 1]);
-+		}
- 	}
- 
- 	return 0;
--- 
-1.8.5.2
+Yes, they all does have USB host on hsusb2.
+
+> If yes then I didn't understand why the hsusb2 pinmux is split up half here and half in "omap3-overo-tobi.dts"
+> and "omap3-overo-storm-tobi.dts"
+> 
+
+Some of the pads are in the omap3_pmx_core2 domain. The exact offset of
+the pin inside the pinctrl domain depends on the OMAP3 version, hence
+the use of OMAP3430_CORE2_IOPAD and OMAP3630_CORE2_IOPAD macros.
+
+Now some Overo depends on omap34xx (regular overo), others on omap36xx
+(overo-storm). Commit f03ef09 "ARM: dts: Add support for both OMAP35xx
+and OMAP36xx Overo/Tobi" made omap3-overo.dtsi independent from the
+OMAP3 revision, and pushed these details down to the Tobi board files.
+This is why the pinmux related to the omap3_pmx_core2 domain is there.
+
+As long as we have only one expansion board, I think that this is ok. I
+wanted to avoid an excessive fragmentation of the DTSI files. But when
+adding new expansion boards, it will be necessary to create yet another
+indirection layer to address this issue and avoid duplicated DT data.
+
+Regards,
+Florian
