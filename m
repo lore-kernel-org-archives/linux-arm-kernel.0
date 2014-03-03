@@ -1,21 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Mar 2014 12:20:05 +0100
-Subject: [RFC PATCH] i2c: new bus driver for efm32
-In-Reply-To: <1392027598-29015-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1392027598-29015-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140303112005.GC17249@pengutronix.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 03 Mar 2014 15:22:43 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NSAyLzNdIHR0eS9zZXJpYWw6IGF0OTE6IHVzZSBtY3Ry?=
+ =?UTF-8?B?bF9ncGlvIGhlbHBlcnM=?=
+In-Reply-To: <1393845120-6340-3-git-send-email-richard.genoud@gmail.com>
+References: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
+ <1393845120-6340-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1393845763.742672413@f113.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 11:19:58AM +0100, Uwe Kleine-K?nig wrote:
-> This was tested on a EFM32GG-DK3750 devboard that has a temperature
-> sensor and an eeprom on its i2c bus.
+Hello.
+
+???????????,  3 ????? 2014, 12:11 +01:00 ?? Richard Genoud <noreply.rgenoud@gmail.com>:
+> On sam9x5, dedicated CTS (and RTS) pins are unusable together with the
+> LCDC, the EMAC, or the MMC because they share the same line.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-still no reply :-(
+> Moreover, the USART controller doesn't handle DTR/DSR/DCD/RI signals,
+> so we have to control them via GPIO.
+> 
+> This patch permits to use GPIOs to control the CTS/RTS/DTR/DSR/DCD/RI
+> signals.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Uwe
+...
+> +static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
+> +{
+> +	int err = 0;
+> +
+> +	p->gpios = mctrl_gpio_init(dev, 0);
+> +	if (IS_ERR_OR_NULL(p->gpios))
+> +		err = PTR_ERR(p->gpios);
+> +
+> +	return err;
+> +}
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+So what happen if mctrl_gpio_init() returns NULL?
+Your function return 0, ie not an error.
+Just use IS_ERR() macro here.
+
+Thanks.
+---
