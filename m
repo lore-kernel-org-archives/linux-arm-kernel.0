@@ -1,81 +1,45 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 3 Mar 2014 10:16:00 -0600
-Subject: [PATCH 1/3] soc: Introduce drivers/soc place-holder for SOC
- specific drivers
-In-Reply-To: <1393629520-12713-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
- <1393629520-12713-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <15AC514D-6D59-4209-9365-BACDD388ABA1@codeaurora.org>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Mon, 3 Mar 2014 21:56:47 +0530
+Subject: [PATCH v2 1/1] arm64: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <D69CC7F2-C9AC-45CE-AFD1-56CE4441F822@codeaurora.org>
+References: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
+ <1393831142-27952-2-git-send-email-mohun106@gmail.com>
+ <D69CC7F2-C9AC-45CE-AFD1-56CE4441F822@codeaurora.org>
+Message-ID: <CAC8NTUViSfXoA5B3dU9=mTr-W9x=Wmd=ubVLvabkn28k_0JEYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 3, 2014 at 9:37 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Mar 3, 2014, at 1:19 AM, mohun106 at gmail.com wrote:
+>
+>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>>
+>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>> ---
+>> arch/arm64/boot/dts/Makefile    |    1 +
+>> arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
+>> 2 files changed, 159 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>> index c52bdb0..d339343 100644
+>> --- a/arch/arm64/boot/dts/Makefile
+>> +++ b/arch/arm64/boot/dts/Makefile
+>> @@ -1,5 +1,6 @@
+>> dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>> dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
+>
+> Where is the Kconfig associated with CONFIG_ARCH_THUNDER?  Also, I know on arch/arm we are moving to CONFIG_SOC_ instead of CONFIG_ARCH_, I assume the same is true for arm64.
 
-On Feb 28, 2014, at 5:18 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Yes, I deliberately removed it as I thought we are trying to get rid
+of CONFIG_ARCH_ and have a single image boot on all platforms.
 
-> Based on earlier thread "https://lkml.org/lkml/2013/10/7/662" and
-> further discussion at Kernel Summit'2013, it was agreed to create
-> 'driver/soc' for drivers which are quite SOC specific.
-> 
-> Lets take the discussion forward with this patch.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> drivers/Kconfig     |    2 ++
-> drivers/Makefile    |    4 ++++
-> drivers/soc/Kconfig |    3 +++
-> 3 files changed, 9 insertions(+)
-> create mode 100644 drivers/soc/Kconfig
-> 
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index b3138fb..37f955f 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -130,6 +130,8 @@ source "drivers/staging/Kconfig"
-> 
-> source "drivers/platform/Kconfig"
-> 
-> +source "drivers/soc/Kconfig"
-> +
-> source "drivers/clk/Kconfig"
-> 
-> source "drivers/hwspinlock/Kconfig"
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index 8e3b8b0..0d8e2a4 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -132,6 +132,10 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
-> obj-$(CONFIG_VLYNQ)		+= vlynq/
-> obj-$(CONFIG_STAGING)		+= staging/
-> obj-y				+= platform/
-> +
-> +# SOC specific drivers
-> +obj-y				+= soc/
-> +
-> #common clk code
-> obj-y				+= clk/
-> 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> new file mode 100644
-> index 0000000..2f9d7d0
-> --- /dev/null
-> +++ b/drivers/soc/Kconfig
-> @@ -0,0 +1,3 @@
-> +menu "SOC specific Drivers"
-> +
-> +endmenu
-> -- 
-> 1.7.9.5
 
-Is there a follow up patch that populates this with something real?
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
+> - k
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
