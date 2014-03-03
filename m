@@ -1,38 +1,114 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon,  3 Mar 2014 10:53:20 +0100
-Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for ARM
-Message-ID: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
+Date: Mon,  3 Mar 2014 10:53:21 +0100
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM
+In-Reply-To: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
+References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+Introducing perf_regs_load function, which is going
+to be used for dwarf unwind test in following patches.
 
-Also includes the test suite for dwarf unwinding, by adding the
-arch specific test code and the perf_regs_load function.
+It takes single argument as a pointer to the regs dump
+buffer and populates it with current registers values.
 
-Jean Pihet (3):
-  perf tests: Introduce perf_regs_load function on ARM
-  perf tests: Add dwarf unwind test on ARM
-  perf tools: Add libdw DWARF post unwind support for ARM
-
- tools/perf/Makefile.perf                 |  2 +-
- tools/perf/arch/arm/Makefile             |  7 ++++
- tools/perf/arch/arm/include/perf_regs.h  |  5 +++
- tools/perf/arch/arm/tests/dwarf-unwind.c | 59 ++++++++++++++++++++++++++++++++
- tools/perf/arch/arm/tests/regs_load.S    | 51 +++++++++++++++++++++++++++
- tools/perf/arch/arm/util/unwind-libdw.c  | 36 +++++++++++++++++++
- tools/perf/tests/builtin-test.c          |  2 +-
- tools/perf/tests/tests.h                 |  2 +-
- 8 files changed, 161 insertions(+), 3 deletions(-)
- create mode 100644 tools/perf/arch/arm/tests/dwarf-unwind.c
- create mode 100644 tools/perf/arch/arm/tests/regs_load.S
- create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
-
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
 ---
+ tools/perf/arch/arm/Makefile            |  1 +
+ tools/perf/arch/arm/include/perf_regs.h |  2 ++
+ tools/perf/arch/arm/tests/regs_load.S   | 51 +++++++++++++++++++++++++++++++++
+ 3 files changed, 54 insertions(+)
+ create mode 100644 tools/perf/arch/arm/tests/regs_load.S
 
-- Rebased on latest acme/perf/core git tree,
-- Tested on quad-core ARMv7 machine
-
+diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
+index 67e9b3d..9b8f87e 100644
+--- a/tools/perf/arch/arm/Makefile
++++ b/tools/perf/arch/arm/Makefile
+@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+ endif
+ ifndef NO_LIBUNWIND
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+ endif
+diff --git a/tools/perf/arch/arm/include/perf_regs.h b/tools/perf/arch/arm/include/perf_regs.h
+index 2a1cfde..1476ae7 100644
+--- a/tools/perf/arch/arm/include/perf_regs.h
++++ b/tools/perf/arch/arm/include/perf_regs.h
+@@ -5,6 +5,8 @@
+ #include "../../util/types.h"
+ #include <asm/perf_regs.h>
+ 
++void perf_regs_load(u64 *regs);
++
+ #define PERF_REGS_MASK	((1ULL << PERF_REG_ARM_MAX) - 1)
+ #define PERF_REG_IP	PERF_REG_ARM_PC
+ #define PERF_REG_SP	PERF_REG_ARM_SP
+diff --git a/tools/perf/arch/arm/tests/regs_load.S b/tools/perf/arch/arm/tests/regs_load.S
+new file mode 100644
+index 0000000..241c6df
+--- /dev/null
++++ b/tools/perf/arch/arm/tests/regs_load.S
+@@ -0,0 +1,51 @@
++#include <linux/linkage.h>
++
++#define R0 0x00
++#define R1 0x08
++#define R2 0x10
++#define R3 0x18
++#define R4 0x20
++#define R5 0x28
++#define R6 0x30
++#define R7 0x38
++#define R8 0x40
++#define R9 0x48
++#define SL 0x50
++#define FP 0x58
++#define IP 0x60
++#define SP 0x68
++#define LR 0x70
++#define PC 0x78
++
++@ Implementation of void perf_regs_load(u64 *regs);
++@
++@ This functions fills in the 'regs' buffer from the actual registers values.
++@ Note that the return values (i.e. caller values) of sp and lr
++@ are retrieved and stored, in order to skip the call to this function.
++
++.text
++.type perf_regs_load,%function
++ENTRY(perf_regs_load)
++	push {r1}
++
++	str r0, [r0, #R0]
++	str r1, [r0, #R1]
++	str r2, [r0, #R2]
++	str r3, [r0, #R3]
++	str r4, [r0, #R4]
++	str r5, [r0, #R5]
++	str r6, [r0, #R6]
++	str r7, [r0, #R7]
++	str r8, [r0, #R8]
++	str r9, [r0, #R9]
++	str sl, [r0, #SL]
++	str fp, [r0, #FP]
++	str ip, [r0, #IP]
++	add r1, sp, #4		@ Retrieve and save sp at entry time
++	str r1, [r0, #SP]
++	str lr, [r0, #LR]
++	str lr, [r0, #PC]	@ Save caller PC
++
++	pop {r1}
++	bx lr
++ENDPROC(perf_regs_load)
 -- 
 1.7.11.7
