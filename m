@@ -1,231 +1,271 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon,  3 Mar 2014 22:37:44 +0400
-Subject: [PATCH] ARM: i.MX: mx21ads: Replace direct handling of peripheral
- bits with GPIOs
-Message-ID: <1393871864-25223-1-git-send-email-shc_work@mail.ru>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 3 Mar 2014 19:38:00 +0100
+Subject: [PATCH v5 6/9] at91: dt: sam9261: Device Tree support for the
+ at91sam9261ek
+In-Reply-To: <1393841162-25339-7-git-send-email-jjhiblot@traphandler.com>
+References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
+ <1393841162-25339-7-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140303183800.GF3155@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces direct handling of peripheral bits with GPIOs by
-using basic-mmio-gpio driver. As a result this change eliminate some
-low-level code and removes custom io_map() from the board.
+On 03/03/2014 at 11:05:59 +0100, Jean-Jacques Hiblot wrote :
+> This patch implements a DTS to boot a at91sam9261ek with a dt-enabled
+> kernel (at91_dt_defconfig).
+> supported features are:
+> * dbgu
+> * lcdc
+> * usb host
+> * usb gadget,
+> * spi dataflash
+> * nand flash
+> * touchscreen
+> * leds
+> * user buttons
+> 
+> In the TODO list:
+> * dm9000 (ethernet)
+> * audio
+> * mmc
+> 
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  arch/arm/boot/dts/Makefile          |   2 +
+>  arch/arm/boot/dts/at91sam9261ek.dts | 204 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 206 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 0320303..f496473 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -12,6 +12,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
+> +# sam9261
+> +dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
+>  # sam9263
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+> new file mode 100644
+> index 0000000..03adb7f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+> @@ -0,0 +1,204 @@
+> +/*
+> + * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
+> + *
+> + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> + *
+> + * Licensed under GPLv2 only.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9261.dtsi"
+> +
+> +/ {
+> +	model = "Atmel at91sam9261ek";
+> +	compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 rootfstype=ubifs ubi.mtd=5 root=ubi0:rootfs rw";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <18432000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		usb0: ohci at 00500000 {
+> +			status = "okay";
+> +		};
+> +
+> +		fb0: fb at 0x00600000 {
+> +			display = <&display0>;
+> +			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
+> +			status = "okay";
+> +
+> +			display0: display {
+> +				bits-per-pixel = <16>;
+> +				atmel,lcdcon-backlight;
+> +				atmel,dmacon = <0x1>;
+> +				atmel,lcdcon2 = <0x80008002>;
+> +				atmel,guard-time = <1>;
+> +				atmel,lcd-wiring-mode = "BRG";
+> +
+> +				display-timings {
+> +					native-mode = <&timing0>;
+> +					timing0: timing0 {
+> +						clock-frequency = <4965000>;
+> +						hactive = <240>;
+> +						vactive = <320>;
+> +						hback-porch = <1>;
+> +						hfront-porch = <33>;
+> +						vback-porch = <1>;
+> +						vfront-porch = <0>;
+> +						hsync-len = <5>;
+> +						vsync-len = <1>;
+> +						hsync-active = <1>;
+> +						vsync-active = <1>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			at91bootstrap at 0 {
+> +				label = "at91bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			bootloader at 40000 {
+> +				label = "bootloader";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +
+> +			bootloaderenv at c0000 {
+> +				label = "bootloader env";
+> +				reg = <0xc0000 0xc0000>;
+> +			};
+> +
+> +			dtb at 180000 {
+> +				label = "device tree";
+> +				reg = <0x180000 0x80000>;
+> +			};
+> +
+> +			kernel at 200000 {
+> +				label = "kernel";
+> +				reg = <0x200000 0x600000>;
+> +			};
+> +
+> +			rootfs at 800000 {
+> +				label = "rootfs";
+> +				reg = <0x800000 0x0f800000>;
+> +			};
+> +		};
+> +
+> +		apb {
+> +			usb1: gadget at fffa4000 {
+> +				atmel,vbus-gpio = <&pioB 29 GPIO_ACTIVE_HIGH>;
+> +				status = "okay";
+> +			};
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/mach-mx21ads.c | 136 +++++++++++++++++++--------------------
- 1 file changed, 66 insertions(+), 70 deletions(-)
+Nit: add a white line between nodes please, same for a few nodes below.
 
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index a06aa4d..8742594 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -17,51 +17,45 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/basic_mmio_gpio.h>
- #include <linux/gpio.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
--#include <asm/mach/map.h>
- 
- #include "common.h"
- #include "devices-imx21.h"
- #include "hardware.h"
- #include "iomux-mx21.h"
- 
--/*
-- * Memory-mapped I/O on MX21ADS base board
-- */
--#define MX21ADS_MMIO_BASE_ADDR   0xf5000000
--#define MX21ADS_MMIO_SIZE        0xc00000
--
--#define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
--		(MX21ADS_MMIO_BASE_ADDR + (offset))
-+#define MX21ADS_CS8900A_REG		(MX21_CS1_BASE_ADDR + 0x000000)
-+#define MX21ADS_ST16C255_IOBASE_REG	(MX21_CS1_BASE_ADDR + 0x200000)
-+#define MX21ADS_VERSION_REG		(MX21_CS1_BASE_ADDR + 0x400000)
-+#define MX21ADS_IO_REG			(MX21_CS1_BASE_ADDR + 0x800000)
- 
--#define MX21ADS_CS8900A_MMIO_SIZE   0x200000
--#define MX21ADS_CS8900A_IRQ_GPIO    IMX_GPIO_NR(5, 11)
--#define MX21ADS_ST16C255_IOBASE_REG MX21ADS_REG_ADDR(0x200000)
--#define MX21ADS_VERSION_REG         MX21ADS_REG_ADDR(0x400000)
--#define MX21ADS_IO_REG              MX21ADS_REG_ADDR(0x800000)
-+#define MX21ADS_MMC_CD			IMX_GPIO_NR(4, 25)
-+#define MX21ADS_CS8900A_IRQ_GPIO	IMX_GPIO_NR(5, 11)
-+#define MX21ADS_MMGPIO_BASE		(6 * 32)
- 
- /* MX21ADS_IO_REG bit definitions */
--#define MX21ADS_IO_SD_WP        0x0001 /* read */
--#define MX21ADS_IO_TP6          0x0001 /* write */
--#define MX21ADS_IO_SW_SEL       0x0002 /* read */
--#define MX21ADS_IO_TP7          0x0002 /* write */
--#define MX21ADS_IO_RESET_E_UART 0x0004
--#define MX21ADS_IO_RESET_BASE   0x0008
--#define MX21ADS_IO_CSI_CTL2     0x0010
--#define MX21ADS_IO_CSI_CTL1     0x0020
--#define MX21ADS_IO_CSI_CTL0     0x0040
--#define MX21ADS_IO_UART1_EN     0x0080
--#define MX21ADS_IO_UART4_EN     0x0100
--#define MX21ADS_IO_LCDON        0x0200
--#define MX21ADS_IO_IRDA_EN      0x0400
--#define MX21ADS_IO_IRDA_FIR_SEL 0x0800
--#define MX21ADS_IO_IRDA_MD0_B   0x1000
--#define MX21ADS_IO_IRDA_MD1     0x2000
--#define MX21ADS_IO_LED4_ON      0x4000
--#define MX21ADS_IO_LED3_ON      0x8000
-+#define MX21ADS_IO_SD_WP		(MX21ADS_MMGPIO_BASE + 0)
-+#define MX21ADS_IO_TP6			(MX21ADS_IO_SD_WP)
-+#define MX21ADS_IO_SW_SEL		(MX21ADS_MMGPIO_BASE + 1)
-+#define MX21ADS_IO_TP7			(MX21ADS_IO_SW_SEL)
-+#define MX21ADS_IO_RESET_E_UART		(MX21ADS_MMGPIO_BASE + 2)
-+#define MX21ADS_IO_RESET_BASE		(MX21ADS_MMGPIO_BASE + 3)
-+#define MX21ADS_IO_CSI_CTL2		(MX21ADS_MMGPIO_BASE + 4)
-+#define MX21ADS_IO_CSI_CTL1		(MX21ADS_MMGPIO_BASE + 5)
-+#define MX21ADS_IO_CSI_CTL0		(MX21ADS_MMGPIO_BASE + 6)
-+#define MX21ADS_IO_UART1_EN		(MX21ADS_MMGPIO_BASE + 7)
-+#define MX21ADS_IO_UART4_EN		(MX21ADS_MMGPIO_BASE + 8)
-+#define MX21ADS_IO_LCDON		(MX21ADS_MMGPIO_BASE + 9)
-+#define MX21ADS_IO_IRDA_EN		(MX21ADS_MMGPIO_BASE + 10)
-+#define MX21ADS_IO_IRDA_FIR_SEL		(MX21ADS_MMGPIO_BASE + 11)
-+#define MX21ADS_IO_IRDA_MD0_B		(MX21ADS_MMGPIO_BASE + 12)
-+#define MX21ADS_IO_IRDA_MD1		(MX21ADS_MMGPIO_BASE + 13)
-+#define MX21ADS_IO_LED4_ON		(MX21ADS_MMGPIO_BASE + 14)
-+#define MX21ADS_IO_LED3_ON		(MX21ADS_MMGPIO_BASE + 15)
- 
- static const int mx21ads_pins[] __initconst = {
- 
-@@ -160,7 +154,7 @@ static struct platform_device mx21ads_nor_mtd_device = {
- };
- 
- static struct resource mx21ads_cs8900_resources[] __initdata = {
--	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, MX21ADS_CS8900A_MMIO_SIZE),
-+	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, SZ_1K),
- 	/* irq number is run-time assigned */
- 	DEFINE_RES_IRQ(-1),
- };
-@@ -179,23 +173,39 @@ static const struct imxuart_platform_data uart_pdata_rts __initconst = {
- static const struct imxuart_platform_data uart_pdata_norts __initconst = {
- };
- 
-+static struct resource mx21ads_mmgpio_resource =
-+	DEFINE_RES_MEM_NAMED(MX21ADS_IO_REG, SZ_2, "dat");
-+
-+static struct bgpio_pdata mx21ads_mmgpio_pdata = {
-+	.base	= MX21ADS_MMGPIO_BASE,
-+	.ngpio	= 16,
-+};
-+
-+static struct platform_device mx21ads_mmgpio = {
-+	.name = "basic-mmio-gpio",
-+	.id = PLATFORM_DEVID_AUTO,
-+	.resource = &mx21ads_mmgpio_resource,
-+	.num_resources = 1,
-+	.dev = {
-+		.platform_data = &mx21ads_mmgpio_pdata,
-+	},
-+};
-+
- static int mx21ads_fb_init(struct platform_device *pdev)
- {
--	u16 tmp;
-+	int ret;
- 
--	tmp = __raw_readw(MX21ADS_IO_REG);
--	tmp |= MX21ADS_IO_LCDON;
--	__raw_writew(tmp, MX21ADS_IO_REG);
--	return 0;
-+	ret = gpio_request(MX21ADS_IO_LCDON, "fb-lcdon");
-+	if (ret)
-+		return ret;
-+
-+	return gpio_direction_output(MX21ADS_IO_LCDON, 1);
- }
- 
- static void mx21ads_fb_exit(struct platform_device *pdev)
- {
--	u16 tmp;
--
--	tmp = __raw_readw(MX21ADS_IO_REG);
--	tmp &= ~MX21ADS_IO_LCDON;
--	__raw_writew(tmp, MX21ADS_IO_REG);
-+	gpio_set_value(MX21ADS_IO_LCDON, 0);
-+	gpio_free(MX21ADS_IO_LCDON);
- }
- 
- /*
-@@ -236,19 +246,26 @@ static const struct imx_fb_platform_data mx21ads_fb_data __initconst = {
- 
- static int mx21ads_sdhc_get_ro(struct device *dev)
- {
--	return (__raw_readw(MX21ADS_IO_REG) & MX21ADS_IO_SD_WP) ? 1 : 0;
-+	return gpio_get_value(MX21ADS_IO_SD_WP);
- }
- 
- static int mx21ads_sdhc_init(struct device *dev, irq_handler_t detect_irq,
- 	void *data)
- {
--	return request_irq(gpio_to_irq(IMX_GPIO_NR(4, 25)), detect_irq,
--		IRQF_TRIGGER_FALLING, "mmc-detect", data);
-+	int ret;
-+
-+	ret = gpio_request(MX21ADS_IO_SD_WP, "mmc-ro");
-+	if (ret)
-+		return ret;
-+
-+	return request_irq(gpio_to_irq(MX21ADS_MMC_CD), detect_irq,
-+			   IRQF_TRIGGER_FALLING, "mmc-detect", data);
- }
- 
- static void mx21ads_sdhc_exit(struct device *dev, void *data)
- {
--	free_irq(gpio_to_irq(IMX_GPIO_NR(4, 25)), data);
-+	free_irq(gpio_to_irq(MX21ADS_MMC_CD), data);
-+	gpio_free(MX21ADS_IO_SD_WP);
- }
- 
- static const struct imxmmc_platform_data mx21ads_sdhc_pdata __initconst = {
-@@ -264,29 +281,8 @@ mx21ads_nand_board_info __initconst = {
- 	.hw_ecc = 1,
- };
- 
--static struct map_desc mx21ads_io_desc[] __initdata = {
--	/*
--	 * Memory-mapped I/O on MX21ADS Base board:
--	 *   - CS8900A Ethernet controller
--	 *   - ST16C2552CJ UART
--	 *   - CPU and Base board version
--	 *   - Base board I/O register
--	 */
--	{
--		.virtual = MX21ADS_MMIO_BASE_ADDR,
--		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
--		.length = MX21ADS_MMIO_SIZE,
--		.type = MT_DEVICE,
--	},
--};
--
--static void __init mx21ads_map_io(void)
--{
--	mx21_map_io();
--	iotable_init(mx21ads_io_desc, ARRAY_SIZE(mx21ads_io_desc));
--}
--
- static struct platform_device *platform_devices[] __initdata = {
-+	&mx21ads_mmgpio,
- 	&mx21ads_nor_mtd_device,
- };
- 
-@@ -321,7 +317,7 @@ static void __init mx21ads_timer_init(void)
- MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
- 	/* maintainer: Freescale Semiconductor, Inc. */
- 	.atag_offset = 0x100,
--	.map_io = mx21ads_map_io,
-+	.map_io		= mx21_map_io,
- 	.init_early = imx21_init_early,
- 	.init_irq = mx21_init_irq,
- 	.handle_irq = imx21_handle_irq,
+> +			spi0: spi at fffc8000 {
+> +				cs-gpios = <&pioA 3 0>, <0>, <&pioA 28 0>, <0>;
+> +				status = "okay";
+> +
+> +				mtd_dataflash at 0 {
+> +					compatible = "atmel,at45", "atmel,dataflash";
+> +					reg = <0>;
+> +					spi-max-frequency = <15000000>;
+> +				};
+> +				tsc2046 at 0 {
+> +					reg = <2>;
+> +					compatible = "ti,ads7843";
+> +					interrupts-extended = <&pioC 2 IRQ_TYPE_EDGE_BOTH>;
+> +					spi-max-frequency = <3000000>;
+> +					pendown-gpio = <&pioC 2 GPIO_ACTIVE_HIGH>;
+> +
+> +					ti,x-min = /bits/ 16 <150>;
+> +					ti,x-max = /bits/ 16 <3830>;
+> +					ti,y-min = /bits/ 16 <190>;
+> +					ti,y-max = /bits/ 16 <3830>;
+> +					ti,vref-delay-usecs = /bits/ 16 <450>;
+> +					ti,x-plate-ohms = /bits/ 16 <450>;
+> +					ti,y-plate-ohms = /bits/ 16 <250>;
+> +					ti,pressure-max = /bits/ 16 <15000>;
+> +					ti,debounce-rep = /bits/ 16 <0>;
+> +					ti,debounce-tol = /bits/ 16 <65535>;
+> +					ti,debounce-max = /bits/ 16 <1>;
+> +
+> +					linux,wakeup;
+> +				};
+> +			};
+> +
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			watchdog at fffffd40 {
+> +				status = "okay";
+> +			};
+> +
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		ds8 {
+> +			label = "ds8";
+> +			gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "none";
+> +		};
+> +		ds7 {
+> +			label = "ds7";
+> +			gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "nand-disk";
+> +		};
+> +		ds1 {
+> +			label = "ds1";
+> +			gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +
+> +		button_0 {
+> +			label = "button_0";
+> +			gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
+> +			linux,code = <256>;
+> +			gpio-key,wakeup;
+> +		};
+> +		button_1 {
+> +			label = "button_1";
+> +			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+> +			linux,code = <257>;
+> +			gpio-key,wakeup;
+> +		};
+> +		button_2 {
+> +			label = "button_2";
+> +			gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
+> +			linux,code = <258>;
+> +			gpio-key,wakeup;
+> +		};
+> +		button_3 {
+> +			label = "button_3";
+> +			gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
+> +			linux,code = <259>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.0
+> 
+
 -- 
-1.8.3.2
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
