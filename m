@@ -1,70 +1,110 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 01:58:21 +0000
-Subject: [PATCH] ARM: i.MX6: clk: Remove usbphy clock hacks
-In-Reply-To: <20140228101246.GA17250@pengutronix.de>
-References: <1393489138-24406-1-git-send-email-s.hauer@pengutronix.de>
- <20140227120616.GA27749@shlinux1.ap.freescale.net>
- <20140227144744.GN17250@pengutronix.de>
- <20140228004050.GA23189@shlinux1.ap.freescale.net>
- <20140228101246.GA17250@pengutronix.de>
-Message-ID: <b74eaca0df8144939f5d000addbc6666@BN1PR03MB235.namprd03.prod.outlook.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 3 Mar 2014 12:58:52 +1100
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20140303125852.f0f4ebf5af79627aaa3baf5d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> On Fri, Feb 28, 2014 at 08:40:51AM +0800, Peter Chen wrote:
-> > On Thu, Feb 27, 2014 at 03:47:45PM +0100, Sascha Hauer wrote:
-> > > >  		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
-> > > >  		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
-> > > >  		break;
-> > > >  	case USBPHY_INTERFACE_MODE_ULPI:
-> > > >  		portsc = PORTSC_PTS(PTS_ULPI);
-> > > >  		lpm = DEVLC_PTS(PTS_ULPI);
-> > > > +		ret = usb_phy_init(ci->transceiver);
-> > > > +		if (ret)
-> > > > +			return ret;
-> > > >  		break;
-> > > >  	case USBPHY_INTERFACE_MODE_SERIAL:
-> > > >  		portsc = PORTSC_PTS(PTS_SERIAL);
-> > > >  		lpm = DEVLC_PTS(PTS_SERIAL);
-> > > >  		sts = 1;
-> > > > +		ret = usb_phy_init(ci->transceiver);
-> > > > +		if (ret)
-> > > > +			return ret;
-> > > >  		break;
-> > > >  	case USBPHY_INTERFACE_MODE_HSIC:
-> > > > +		ret = usb_phy_init(ci->transceiver);
-> > > > +		if (ret)
-> > > > +			return ret;
-> > > >  		portsc = PORTSC_PTS(PTS_HSIC);
-> > > >  		lpm = DEVLC_PTS(PTS_HSIC);
-> > >
-> > > It seems you try to adjust the order in which PORTSC is configured
-> > > and the phy is initialized. Instead of ordering the phy setup and
-> > > register writes you just reorder some variable initializations.
-> > >
-> > > We discussed this back and forth here and think that the phy clock
-> > > should be enabled/disabled via runtime pm ops as needed by the
-> > > chipidea driver. Hacking the init order depending on the phy type
-> > > like you did above doesn't sound like a good plan.
-> > >
-> >
-> > The portsc.pts is only need to be set only time, at initialization
-> > routine, the same for phy init.
-> >
-> > After init finishes, we can control phy clock by runtime pm, it was
-> > what I did for PM patchset for chipidea driver.
-> 
-> I'm talking about runtime pm for the phy, not for the chipidea driver.
-> 
- 
-The phy already has its APIs, .init, and .suspend, which can be called
-at controller's driver, I don't see much benefits to call runtime pm API
-to instead of them.
+Hi Shawn,
 
-Besides, except we can access controller's register (like portsc.pts) at
-phy driver, I don't know how we can unify the same phy APIs for different
-phy drivers to finish initialization.
+Today's linux-next merge of the imx-mxs tree got a conflict in
+arch/arm/mach-imx/Kconfig between commits ddb902cc3459 ("ARM: centralize
+common multi-platform kconfig options") and 37dff0825611 ("ARM: imx6:
+introduce CONFIG_SOC_IMX6 for i.MX6 common stuff") from the arm-soc tree
+and commit f702c0213144 ("ARM: mach-imx: Select CONFIG_SRAM at ARCH_MXC
+level") from the imx-mxs tree.
 
-Peter
+I fixed it up (I think - see below) and can carry the fix as necessary
+(no action is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-imx/Kconfig
+index 41ffd433f709,e45062d41fcb..000000000000
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@@ -1,12 -1,22 +1,15 @@@
+  config ARCH_MXC
+  	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
++ 	select ARCH_HAS_CPUFREQ
++ 	select ARCH_HAS_OPP
+  	select ARCH_REQUIRE_GPIOLIB
+  	select ARM_CPU_SUSPEND if PM
+ -	select ARM_PATCH_PHYS_VIRT
+  	select CLKSRC_MMIO
+- 	select GENERIC_ALLOCATOR
+ -	select COMMON_CLK
+ -	select GENERIC_CLOCKEVENTS
+  	select GENERIC_IRQ_CHIP
+ -	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+ -	select MULTI_IRQ_HANDLER
+  	select PINCTRL
++ 	select PM_OPP if PM
+  	select SOC_BUS
+ -	select SPARSE_IRQ
++ 	select SRAM
+ -	select USE_OF
+  	help
+  	  Support for Freescale MXC/iMX-based family of processors
+  
+@@@ -114,10 -124,11 +117,10 @@@ config SOC_IMX3
+  config SOC_IMX35
+  	bool
+  	select ARCH_MXC_IOMUX_V3
+ -	select CPU_V6K
+  	select HAVE_EPIT
+  	select MXC_AVIC
++ 	select PINCTRL_IMX35
+  	select SMP_ON_UP if SMP
+- 	select PINCTRL
+  
+  config SOC_IMX5
+  	bool
+@@@ -775,16 -786,12 +777,11 @@@ config	SOC_IMX5
+  	help
+  	  This enables support for Freescale i.MX53 processor.
+  
+- config SOC_IMX6Q
+- 	bool "i.MX6 Quad/DualLite support"
+- 	select ARCH_HAS_CPUFREQ
+- 	select ARCH_HAS_OPP
++ config SOC_IMX6
++ 	bool
+  	select ARM_ERRATA_754322
+- 	select ARM_ERRATA_764369 if SMP
+  	select ARM_ERRATA_775420
+  	select ARM_GIC
+- 	select HAVE_ARM_SCU if SMP
+- 	select HAVE_ARM_TWD if SMP
+ -	select CPU_V7
+  	select HAVE_IMX_ANATOP
+  	select HAVE_IMX_GPC
+  	select HAVE_IMX_MMDC
+@@@ -793,10 -800,17 +790,16 @@@
+  	select PL310_ERRATA_588369 if CACHE_PL310
+  	select PL310_ERRATA_727915 if CACHE_PL310
+  	select PL310_ERRATA_769419 if CACHE_PL310
+- 	select PM_OPP if PM
++ 
++ config SOC_IMX6Q
++ 	bool "i.MX6 Quad/DualLite support"
++ 	select ARM_ERRATA_764369 if SMP
++ 	select HAVE_ARM_SCU if SMP
++ 	select HAVE_ARM_TWD if SMP
+ -	select HAVE_SMP
++ 	select MIGHT_HAVE_PCI
++ 	select PCI_DOMAINS if PCI
++ 	select PINCTRL_IMX6Q
++ 	select SOC_IMX6
+  
+  	help
+  	  This enables support for Freescale i.MX6 Quad processor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/91771b76/attachment.sig>
