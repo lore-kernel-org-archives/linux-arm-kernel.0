@@ -1,48 +1,49 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon,  3 Mar 2014 10:34:01 +0100
-Subject: [PATCH v3 1/7] ARM: dts: omap3-tobi: Add missing pinctrl
-In-Reply-To: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1393839247-6516-2-git-send-email-florian.vaussard@epfl.ch>
+Date: Mon,  3 Mar 2014 10:34:00 +0100
+Subject: [PATCH v3 0/7] ARM: dts: Better support for Gumstix Overo (for 3.15?)
+Message-ID: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pinctrl entries:
-- i2c3
+Hello Tony, Benoit,
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This is the third version of my Overo series. No major changes since v2,
+I just dropped the patch related to the "ti,use_poweroff" binding, and
+will address this issue later.
 
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-index 4edc013..da7d85b 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-@@ -35,6 +35,15 @@
- 	};
- };
- 
-+&omap3_pmx_core {
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl.i2c3_scl */
-+			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda.i2c3_sda */
-+		>;
-+	};
-+};
-+
- &gpmc {
- 	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
- 
-@@ -72,6 +81,8 @@
- };
- 
- &i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
- 	clock-frequency = <100000>;
- };
- 
+Most patches are pretty obvious. Patch 5 adds some specific timings for
+LAN9221 into a generic file. By using shorter timing, it is possible to
+double the Ethernet bandwidth. Thus is may interest people using a similar
+chip.
+
+I tested this series with both the OMAP35xx Overo and the OMAP36xx Overo.
+Wifi is functional, HSUSB works.
+
+Note: I hope that this can go into 3.15, since the patches were first
+posted before the 3.14 merge window. They add a number of useful peripherals,
+so this would be much appreciated.
+
+
+Regards,
+Florian
+
+
+Florian Vaussard (7):
+  ARM: dts: omap3-tobi: Add missing pinctrl
+  ARM: dts: omap3-overo: Add missing pinctrl
+  ARM: dts: omap3-overo: Enable WiFi/BT combo
+  ARM: dts: omap3-overo: Add HSUSB PHY
+  ARM: dts: omap: Add common file for SMSC9221
+  ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
+  ARM: dts: omap3-tobi: Add AT24C01 EEPROM
+
+ arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi      |  58 +++++++++++
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts   |  24 +++++
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi |  48 ++++-----
+ arch/arm/boot/dts/omap3-overo-tobi.dts         |  24 +++++
+ arch/arm/boot/dts/omap3-overo.dtsi             | 138 +++++++++++++++++++++++--
+ 5 files changed, 258 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
+
 -- 
 1.8.3.2
