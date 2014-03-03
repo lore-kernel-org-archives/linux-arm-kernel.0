@@ -1,28 +1,81 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 3 Mar 2014 10:12:17 -0600
-Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings 0
- failures (next/next-20140228))
-In-Reply-To: <20140301161258.GN12219@tassilo.jf.intel.com>
-References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
- <5311449E.90902@codeaurora.org>
- <20140301161258.GN12219@tassilo.jf.intel.com>
-Message-ID: <20140303161217.GK7308@joshc.qualcomm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 3 Mar 2014 10:16:00 -0600
+Subject: [PATCH 1/3] soc: Introduce drivers/soc place-holder for SOC
+ specific drivers
+In-Reply-To: <1393629520-12713-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393629520-12713-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <15AC514D-6D59-4209-9365-BACDD388ABA1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 08:12:58AM -0800, Andi Kleen wrote:
-> > These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
-> > 2014-02-08). Before that change asmlinkage was defined to nothing on
-> > ARM, but now it's __visible. Should we just drop asmlinkage here?
->
-> These functions are just called by the generic C interrupt layer right?
-> Yes should just drop asmlinkage. It doesn't make any sense to mark
-> functions that only called from C asmlinkage.
 
-On ARM[64], these functions are called from assembly indirectly through
-the 'handle_arch_irq' function pointer, so I don't think it makes sense
-to drop 'asmlinkage'.
+On Feb 28, 2014, at 5:18 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+
+> Based on earlier thread "https://lkml.org/lkml/2013/10/7/662" and
+> further discussion at Kernel Summit'2013, it was agreed to create
+> 'driver/soc' for drivers which are quite SOC specific.
+> 
+> Lets take the discussion forward with this patch.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> drivers/Kconfig     |    2 ++
+> drivers/Makefile    |    4 ++++
+> drivers/soc/Kconfig |    3 +++
+> 3 files changed, 9 insertions(+)
+> create mode 100644 drivers/soc/Kconfig
+> 
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index b3138fb..37f955f 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -130,6 +130,8 @@ source "drivers/staging/Kconfig"
+> 
+> source "drivers/platform/Kconfig"
+> 
+> +source "drivers/soc/Kconfig"
+> +
+> source "drivers/clk/Kconfig"
+> 
+> source "drivers/hwspinlock/Kconfig"
+> diff --git a/drivers/Makefile b/drivers/Makefile
+> index 8e3b8b0..0d8e2a4 100644
+> --- a/drivers/Makefile
+> +++ b/drivers/Makefile
+> @@ -132,6 +132,10 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
+> obj-$(CONFIG_VLYNQ)		+= vlynq/
+> obj-$(CONFIG_STAGING)		+= staging/
+> obj-y				+= platform/
+> +
+> +# SOC specific drivers
+> +obj-y				+= soc/
+> +
+> #common clk code
+> obj-y				+= clk/
+> 
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> new file mode 100644
+> index 0000000..2f9d7d0
+> --- /dev/null
+> +++ b/drivers/soc/Kconfig
+> @@ -0,0 +1,3 @@
+> +menu "SOC specific Drivers"
+> +
+> +endmenu
+> -- 
+> 1.7.9.5
+
+Is there a follow up patch that populates this with something real?
+
+- k
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
