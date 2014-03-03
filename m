@@ -1,62 +1,163 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Mar 2014 11:00:02 +0000
-Subject: [PATCH v3] ARM: vDSO gettimeofday using generic timer architecture
-In-Reply-To: <1393813295-27376-1-git-send-email-nathan_lynch@mentor.com>
-References: <1393813295-27376-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140303110001.GB8554@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 3 Mar 2014 13:03:02 +0200
+Subject: [PATCH v3 4/7] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
+References: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <53146166.4050906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nathan,
+Hi Florian,
 
-On Mon, Mar 03, 2014 at 02:21:35AM +0000, Nathan Lynch wrote:
-> Provide fast userspace implementations of gettimeofday and
-> clock_gettime on systems that implement the generic timers extension
-> defined in ARMv7.  This follows the example of arm64 in conception but
-> significantly differs in some aspects of the implementation (C vs
-> assembly, mainly).
+
+On 03/03/2014 11:34 AM, Florian Vaussard wrote:
+> Add the High-Speed USB PHY.
 > 
-> Clocks supported:
-> - CLOCK_REALTIME
-> - CLOCK_MONOTONIC
-> - CLOCK_REALTIME_COARSE
-> - CLOCK_MONOTONIC_COARSE
-> 
-> This also provides clock_getres (as arm64 does).
-> 
-> Note that while the high-precision realtime and monotonic clock
-> support depends on the generic timers extension, support for
-> clock_getres and coarse clocks is independent of the timer
-> implementation and is provided unconditionally.
-> 
-> Run-time tested on OMAP5 and i.MX6 using a patched glibc[1], verifying
-> that results from the vDSO are consistent with results from the
-> kernel.  Build-tested against arch/arm/configs/*_defconfig with GCC
-> 4.4 and 4.8.  Build-tested with multi_v7_defconfig with GCC 4.[4-8].
-> 
-> [1] RFC glibc patch here:
-> https://www.sourceware.org/ml/libc-alpha/2014-02/msg00680.html
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 > ---
+>  arch/arm/boot/dts/omap3-overo-storm-tobi.dts | 16 ++++++++++
+>  arch/arm/boot/dts/omap3-overo-tobi.dts       | 16 ++++++++++
+>  arch/arm/boot/dts/omap3-overo.dtsi           | 44 ++++++++++++++++++++++++++++
+>  3 files changed, 76 insertions(+)
 > 
-> Changes since v2:
-> - Update to 3.14-rc4.
-> - Make vDSO configurable, depending on AEABI and MMU.
-> - Defer shifting of nanosecond component of timespec: fixes observed
->   1ns inconsistencies for CLOCK_REALTIME, CLOCK_MONOTONIC (see
->   45a7905fc48f for arm64 equivalent).
-> - Force reload of seq_count when spinning: without a memory clobber
->   after the load of vdata->seq_count, GCC can generate code like this:
->     2f8:   e59c9020        ldr     r9, [ip, #32]
->     2fc:   e3190001        tst     r9, #1
->     300:   1a000033        bne     3d4 <do_realtime+0x104>
->     304:   f57ff05b        dmb     ish
->     308:   e59c3034        ldr     r3, [ip, #52]   ; 0x34
->     ...
->     3d4:   eafffffe        b       3d4 <do_realtime+0x104>
+> diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+> index 2033b52..eb93e3a 100644
+> --- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+> +++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+> @@ -21,6 +21,22 @@
+>  };
+>  
+>  &omap3_pmx_core2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +			&hsusb2_2_pins
+> +	>;
+> +
+> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+> +		>;
+> +	};
+> +
+>  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
+>  		pinctrl-single,pins = <
+>  			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
+> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> index 21de31d..e77be26 100644
+> --- a/arch/arm/boot/dts/omap3-overo-tobi.dts
+> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> @@ -21,6 +21,22 @@
+>  };
+>  
+>  &omap3_pmx_core2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +			&hsusb2_2_pins
+> +	>;
+> +
+> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+> +			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+> +			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+> +			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+> +			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+> +			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+> +		>;
+> +	};
+> +
+>  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
+>  		pinctrl-single,pins = <
+>  			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
+> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+> index 07467cc..8f810db 100644
+> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+> @@ -30,6 +30,24 @@
+>  		ti,codec = <&twl_audio>;
+>  	};
+>  
+> +	/* HS USB Port 2 Power */
+> +	hsusb2_power: hsusb2_power_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb2_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 2 */
+> +	hsusb2_phy: hsusb2_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
+> +		vcc-supply = <&hsusb2_power>;
+> +	};
+> +
+>  	/* Regulator to trigger the nPoweron signal of the Wifi module */
+>  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
+>  		compatible = "regulator-fixed";
+> @@ -64,6 +82,11 @@
+>  };
+>  
+>  &omap3_pmx_core {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +			&hsusb2_pins
+> +	>;
+> +
+>  	uart3_pins: pinmux_uart3_pins {
+>  		pinctrl-single,pins = <
+>  			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
+> @@ -107,6 +130,19 @@
+>  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
+>  		>;
+>  	};
+> +
+> +	hsusb2_pins: pinmux_hsusb2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
+> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
+> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
+> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
+> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
+> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
+> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
+> +		>;
+> +	};
 
-Have you thought about using a seqlock instead? It looks like a drop-in
-replacement for your seqcnt_* stuff.
+Does this mean all overo variants use the USB host feature on hsusb2 pins? If not then this can't be here.
 
-Will
+If yes then I didn't understand why the hsusb2 pinmux is split up half here and half in "omap3-overo-tobi.dts"
+and "omap3-overo-storm-tobi.dts"
+
+>  };
+>  
+>  &i2c1 {
+> @@ -168,6 +204,14 @@
+>  	power = <50>;
+>  };
+>  
+> +&usbhshost {
+> +	port2-mode = "ehci-phy";
+> +};
+> +
+> +&usbhsehci {
+> +	phys = <0 &hsusb2_phy>;
+> +};
+> +
+>  &uart3 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart3_pins>;
+> 
+
+cheers,
+-roger
