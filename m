@@ -1,25 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 02 Mar 2014 22:21:02 -0700
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-In-Reply-To: <20140303120241.11066f951d53c50fb14faf47@canb.auug.org.au>
-References: <20140303120241.11066f951d53c50fb14faf47@canb.auug.org.au>
-Message-ID: <5314113E.1030106@wwwdotorg.org>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Mon,  3 Mar 2014 10:52:38 +0530
+Subject: [PATCH V9 0/2] Exynos5250 SATA Support
+Message-ID: <1393824160-27040-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2014 06:02 PM, Stephen Rothwell wrote:
-> Hi Stephen,
-> 
-> Today's linux-next merge of the bcm2835 tree got a conflict in 
-> arch/arm/mach-bcm2835/Kconfig between commits ddb902cc3459 ("ARM: 
-> centralize common multi-platform kconfig options") and
-> 0676b21fffd1 ("ARM: bcm2835: enable V6K instead of plain V6") from
-> the arm-soc tree and commit d30fe6272183 ("ARM: bcm2835: Move to
-> mach-bcm directory") from the bcm2835 tree.
+This patch series enable the SATA support on Exynos5250 based boards.
+It incorporates the generic phy framework to deal with sata phy.
 
-Olof, Arnd, Kevin,
+Yuvaraj Kumar C D (2):
+  PHY: Exynos: Add Exynos5250 SATA PHY driver
+  ARM: dts: Enable ahci sata and sata phy
 
-Do you want me to rebase the patch that moves
-arch/arm/mach-bcm2835/Kconfig into arch/arm/mach-bcm/Kconfig, or even
-drop it and take it through arm-soc directly? Or, will you just handle
-this when you merge the pull request?
+ .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --
+ .../devicetree/bindings/ata/exynos-sata.txt        |   25 +-
+ .../devicetree/bindings/phy/samsung-phy.txt        |   36 +++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |   21 ++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   17 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   18 +-
+ drivers/phy/Kconfig                                |   15 ++
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-exynos5250-sata.c                  |  251 ++++++++++++++++++++
+ 9 files changed, 365 insertions(+), 33 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+ create mode 100644 drivers/phy/phy-exynos5250-sata.c
+
+-- 
+1.7.10.4
