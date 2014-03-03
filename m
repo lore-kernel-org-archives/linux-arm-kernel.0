@@ -1,49 +1,51 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Mon, 3 Mar 2014 10:23:33 +0000
-Subject: [PATCH 1/3] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <201402272139.36076.marex@denx.de>
-References: <1393481115-22136-1-git-send-email-yao.yuan@freescale.com>
- <1393481115-22136-2-git-send-email-yao.yuan@freescale.com>
- <201402272139.36076.marex@denx.de>
-Message-ID: <3bbad0af0bc74f04bc386b141dadedb3@BL2PR03MB338.namprd03.prod.outlook.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 03 Mar 2014 11:26:48 +0100
+Subject: [GIT PULL] Reset controller fixes and updates
+In-Reply-To: <1392731862.3606.42.camel@pizza.hi.pengutronix.de>
+References: <1392731862.3606.42.camel@pizza.hi.pengutronix.de>
+Message-ID: <1393842408.3323.28.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Marek
+Hi Olof, Arnd,
 
-Marek Vasut wrote:
-> On Thursday, February 27, 2014 at 07:05:14 AM, Yuan Yao wrote:
+could you please have a look at those changes?
+
+Am Dienstag, den 18.02.2014, 14:57 +0100 schrieb Philipp Zabel:
+> Hi Olof, Arnd,
 > 
-> [...]
+> since I didn't get any more feedback on the GPIO reset patch, and I
+> don't want to risk postponing the following changes (again), I've left
+> it out of this pull request. Please consider merging the following fixes
+> and updates. The changes since commit
+> 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
-> > +static void i2c_imx_dma_free(struct imx_i2c_struct *i2c_imx) {
-> > +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> > +	struct dma_chan *dma_chan;
-> > +
-> > +	dma_chan = dma->chan_tx;
-> > +	dma->chan_tx = NULL;
-> > +	dma->buf_tx = 0;
-> > +	dma->len_tx = 0;
-> > +	dma_release_channel(dma_chan);
-> > +
-> > +	dma_chan = dma->chan_rx;
-> > +	dma->chan_tx = NULL;
-> > +	dma->buf_rx = 0;
-> > +	dma->len_rx = 0;
-> > +	dma_release_channel(dma_chan);
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > 
-> You must make _DEAD_ _SURE_ this function is not ever called while the
-> DMA is still active. In your case, I have a feeling that's not handled.
->
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.15
 
-Thanks for your attention.
-This few days I look up the code for the realization of dma_release_channel(). 
-I found that it will disable the dma request first. So it's may safe. 
-And drivers hadn't check whether dma is still active before dma_release_channel() as a usually usage.
-Because it will be disabled automatic.
+http://git.pengutronix.de/?p=pza/linux.git;a=shortlog;h=refs/heads/reset/for_v3.15
 
-The only problem is that, it will be forced to cancel the transfer which was not yet completed.
-Looking forward to hearing from you.
+> for you to fetch changes up to fc0a5921561c71be2c334a335c1680f7930434d7:
+> 
+>   reset: Add of_reset_control_get (2014-02-03 10:19:40 +0100)
+> 
+> ----------------------------------------------------------------
+> Maxime Ripard (1):
+>       reset: Add of_reset_control_get
+> 
+> Philipp Zabel (1):
+>       reset: allow drivers to request probe deferral
+> 
+> Rashika Kheria (1):
+>       reset: Mark function as static and remove unused function in core.c
+> 
+>  drivers/reset/core.c  | 71
+> +++++++++++++++++++++++----------------------------
+>  include/linux/reset.h |  4 +++
+>  2 files changed, 36 insertions(+), 39 deletions(-)
 
-Best regards,
-Yuan Yao
+regards
+Philipp
