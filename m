@@ -1,83 +1,108 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 3 Mar 2014 18:06:56 +0530
-Subject: [PATCH v5 0/6] Make dwc3 use Generic PHY Framework
-In-Reply-To: <531473D0.6050601@ti.com>
-References: <1393846695-14644-1-git-send-email-kishon@ti.com>
- <531473D0.6050601@ti.com>
-Message-ID: <53147768.3030106@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon,  3 Mar 2014 13:40:30 +0100
+Subject: [PATCH] crypto: mxs-dcp: Optimize hashing
+Message-ID: <1393850430-5855-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roger,
+Optimize the hashing operation in the MXS-DCP by doing two adjustments:
+1) Given that the output buffer for the hash is now always correctly aligned,
+   we can just use the buffer for the DCP DMA to store the resulting hash.
+   We thus get rid of one copying of data. Moreover, we remove an entry from
+   dcp_coherent_block{} and thus lower the memory footprint of the driver.
+2) We map the output buffer for the hash for DMA only in case we will output
+   the hash, not always, as it was now.
 
-On Monday 03 March 2014 05:51 PM, Roger Quadros wrote:
-> Hi Kishon,
->
-> Which tree are these patches based on?
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tom Lendacky <thomas.lendacky@amd.com>
+---
+ drivers/crypto/mxs-dcp.c | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
 
-mainline + Felipe's testing/next + Revert "usb: dwc3: core: enable 
-Suspend bit for USB2/3 PHYs" + Revert "usb: dwc3: preparation for 
-adapting dwc3 to generic phy framework"
-
-Thanks
-Kishon
-
->
-> cheers,
-> -roger
->
-> On 03/03/2014 01:38 PM, Kishon Vijay Abraham I wrote:
->> Added support for optional PHY in dwc3 as not all SoCs having PHYs for DWC3
->> should be programmed. While this can be considered as a temporary fix,
->> a long term solution would be to add 'nop' PHY for platforms that does
->> not have programmable PHY.
->> Adapted DWC3 and USB3 PHY to use Generic PHY framework. Also changed the
->> name of USB3 PHY driver to PIPE3 PHY driver since the same driver has to
->> be used for SATA and PCIE too.
->>
->> Changes from v4: (sending the entire patch series again)
->> * check the return values of phy_init and phy_power_on
->> * print errors if power_on or power_off of PHY fails.
->>
->> Changes from v3: (Sent only adapt dwc3 core to use Generic PHY Framework)
->> * avoided using quirks and rely on the return values of PHY APIs to find the
->> presence of PHY.
->>
->> Changes from v2:
->> * added a couple of fixes. One is invoking phy_resume after phy_init and the
->> other is power off phy in error patch
->> * used quirks to identify if a particular platform does not have PHYs
->> * removed using separate header for pipe3 driver and also removed all referencs
->> to SATA and PCIe in pipe3 driver since it's not yet adapted for those drivers.
->>
->> Changes from v1:
->> * The logic in which the driver detects the presence of PHYs has changed.
->> * patch ordering has changed
->> * udelay is replaced with usleep_range
->> * A patch to remove set_suspend callback which was deferred from Generic
->> PHY Framework series has been included.
->>
->> Kishon Vijay Abraham I (6):
->>    usb: dwc3: core: support optional PHYs
->>    usb: dwc3: adapt dwc3 core to use Generic PHY Framework
->>    drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY Framework
->>    usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
->>    phy: omap-usb2: move omap_usb.h from linux/usb/ to linux/phy/
->>    arm/dts: added dt properties to adapt to the new phy framwork
->>
->>   Documentation/devicetree/bindings/usb/dwc3.txt     |    6 +-
->>   arch/arm/boot/dts/omap5.dtsi                       |    5 +-
->>   drivers/phy/Kconfig                                |   11 +
->>   drivers/phy/Makefile                               |    1 +
->>   drivers/phy/phy-omap-usb2.c                        |   27 +--
->>   .../phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c}     |  240 ++++++++++++--------
->>   drivers/usb/dwc3/core.c                            |  116 +++++++---
->>   drivers/usb/dwc3/core.h                            |    7 +
->>   drivers/usb/phy/Kconfig                            |   11 -
->>   drivers/usb/phy/Makefile                           |    1 -
->>   include/linux/{usb => phy}/omap_usb.h              |    3 -
->>   11 files changed, 264 insertions(+), 164 deletions(-)
->>   rename drivers/{usb/phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c} (54%)
->>   rename include/linux/{usb => phy}/omap_usb.h (95%)
->>
->
+diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
+index c7400fe..7bbe0ab 100644
+--- a/drivers/crypto/mxs-dcp.c
++++ b/drivers/crypto/mxs-dcp.c
+@@ -50,7 +50,6 @@ struct dcp_coherent_block {
+ 	uint8_t			sha_in_buf[DCP_BUF_SZ];
+ 
+ 	uint8_t			aes_key[2 * AES_KEYSIZE_128];
+-	uint8_t			sha_digest[SHA256_DIGEST_SIZE];
+ 
+ 	struct dcp_dma_desc	desc[DCP_MAX_CHANS];
+ };
+@@ -516,13 +515,11 @@ static int mxs_dcp_run_sha(struct ahash_request *req)
+ 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+ 	struct dcp_async_ctx *actx = crypto_ahash_ctx(tfm);
+ 	struct dcp_sha_req_ctx *rctx = ahash_request_ctx(req);
++	struct hash_alg_common *halg = crypto_hash_alg_common(tfm);
+ 
+ 	struct dcp_dma_desc *desc = &sdcp->coh->desc[actx->chan];
+-	dma_addr_t digest_phys = dma_map_single(sdcp->dev,
+-						sdcp->coh->sha_digest,
+-						SHA256_DIGEST_SIZE,
+-						DMA_FROM_DEVICE);
+ 
++	dma_addr_t digest_phys = 0;
+ 	dma_addr_t buf_phys = dma_map_single(sdcp->dev, sdcp->coh->sha_in_buf,
+ 					     DCP_BUF_SZ, DMA_TO_DEVICE);
+ 
+@@ -543,14 +540,18 @@ static int mxs_dcp_run_sha(struct ahash_request *req)
+ 
+ 	/* Set HASH_TERM bit for last transfer block. */
+ 	if (rctx->fini) {
++		digest_phys = dma_map_single(sdcp->dev, req->result,
++					     halg->digestsize, DMA_FROM_DEVICE);
+ 		desc->control0 |= MXS_DCP_CONTROL0_HASH_TERM;
+ 		desc->payload = digest_phys;
+ 	}
+ 
+ 	ret = mxs_dcp_start_dma(actx);
+ 
+-	dma_unmap_single(sdcp->dev, digest_phys, SHA256_DIGEST_SIZE,
+-			 DMA_FROM_DEVICE);
++	if (rctx->fini)
++		dma_unmap_single(sdcp->dev, digest_phys, halg->digestsize,
++				 DMA_FROM_DEVICE);
++
+ 	dma_unmap_single(sdcp->dev, buf_phys, DCP_BUF_SZ, DMA_TO_DEVICE);
+ 
+ 	return ret;
+@@ -567,7 +568,6 @@ static int dcp_sha_req_to_buf(struct crypto_async_request *arq)
+ 	struct hash_alg_common *halg = crypto_hash_alg_common(tfm);
+ 	const int nents = sg_nents(req->src);
+ 
+-	uint8_t *digest = sdcp->coh->sha_digest;
+ 	uint8_t *in_buf = sdcp->coh->sha_in_buf;
+ 
+ 	uint8_t *src_buf;
+@@ -614,14 +614,20 @@ static int dcp_sha_req_to_buf(struct crypto_async_request *arq)
+ 		rctx->fini = 1;
+ 
+ 		/* Submit whatever is left. */
++		if (!req->result)
++			return -EINVAL;
++
+ 		ret = mxs_dcp_run_sha(req);
+-		if (ret || !req->result)
++		if (ret)
+ 			return ret;
++
+ 		actx->fill = 0;
+ 
+ 		/* For some reason, the result is flipped. */
+-		for (i = 0; i < halg->digestsize; i++)
+-			req->result[i] = digest[halg->digestsize - i - 1];
++		for (i = 0; i < halg->digestsize / 2; i++) {
++			swap(req->result[i],
++			     req->result[halg->digestsize - i - 1]);
++		}
+ 	}
+ 
+ 	return 0;
+-- 
+1.8.5.2
