@@ -1,43 +1,43 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Sun, 2 Mar 2014 23:35:30 -0600
-Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
-In-Reply-To: <20140228230000.GW13624@atomide.com>
-References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
- <20140228230000.GW13624@atomide.com>
-Message-ID: <531414A2.8040100@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 3 Mar 2014 16:38:35 +1100
+Subject: linux-next: manual merge of the watchdog tree with the arm-soc tree
+Message-ID: <20140303163835.303fbfd4fa64507e0e3db33c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Wim,
 
-On 02/28/2014 05:00 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [140228 12:46]:
->> Hi Joerg, Tony,
->>
->> This is an updated series of the OMAP IOMMU DT adaptation intended
->> for 3.15 merge window, addressing the comments from the v2 series.
->> This series is rebased onto 3.14-rc4, and the only change to bindings
->> is to drop the dma-window property.
->>
->> The first 7 patches in the series are in drivers/iommu, with the first
->> 3 patches performing some cleanup. The DT bindings and adaptation are
->> done in patches 4 and 5.
->>
->> Tony,
->> Patches 8 through 13 are in arch/arm/mach-omap2 layer, so I am guessing
->> these would have to go through your tree. Of these, patches 8 and 9 are
->> cleanup fixes to get OMAP3 IVA MMU working, patches 10 & 11 are fixes
->> required with DT-boot for OMAP3/4, patches 12 & 13 add the OMAP5 support.
->
-> Are patches 8 to 13 OK to apply separately from the iommu patches or
-> do they need to wait for the iommu patches to get merged first?
->
+Today's linux-next merge of the watchdog tree got a conflict in
+drivers/watchdog/Kconfig between commit 59416745bb8c ("watchdog: orion:
+Enable the build on ARCH_MVEBU") from the arm-soc tree and commit
+db5dd336cb23 ("watchdog: orion: prepare new Dove DT Kconfig variable")
+from the watchdog tree.
 
-Yeah, they don't have any direct dependencies. Patches 8, 9 and 12 are 
-totally independent. Patches 10, 11 and 13 add the needed platform data 
-or archdata to get the corresponding DT iommu devices functional by any 
-users (OMAP3 ISP is the only user in kernel). The only remote dependency 
-is the compatible string names used in the pdata-quirks.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-regards
-Suman
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/watchdog/Kconfig
+index f1ff408c4b17,90f950d039c4..000000000000
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@@ -292,7 -301,7 +301,7 @@@ config DAVINCI_WATCHDO
+  
+  config ORION_WATCHDOG
+  	tristate "Orion watchdog"
+- 	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
+ -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || MACH_DOVE
+++	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || MACH_DOVE
+  	select WATCHDOG_CORE
+  	help
+  	  Say Y here if to include support for the watchdog timer
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/92b00333/attachment.sig>
