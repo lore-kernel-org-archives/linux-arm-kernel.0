@@ -1,271 +1,200 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 3 Mar 2014 19:38:00 +0100
-Subject: [PATCH v5 6/9] at91: dt: sam9261: Device Tree support for the
- at91sam9261ek
-In-Reply-To: <1393841162-25339-7-git-send-email-jjhiblot@traphandler.com>
-References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
- <1393841162-25339-7-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140303183800.GF3155@piout.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 03 Mar 2014 19:38:46 +0100
+Subject: [PATCH v7 05/15] ahci-platform: "Library-ise" ahci_probe
+ functionality
+In-Reply-To: <1393084424-31099-6-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+ <1393084424-31099-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <5595487.lrvcOAaluO@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2014 at 11:05:59 +0100, Jean-Jacques Hiblot wrote :
-> This patch implements a DTS to boot a at91sam9261ek with a dt-enabled
-> kernel (at91_dt_defconfig).
-> supported features are:
-> * dbgu
-> * lcdc
-> * usb host
-> * usb gadget,
-> * spi dataflash
-> * nand flash
-> * touchscreen
-> * leds
-> * user buttons
+
+Hi,
+
+On Saturday, February 22, 2014 04:53:34 PM Hans de Goede wrote:
+> ahci_probe consists of 3 steps:
+> 1) Get resources (get mmio, clks, regulator)
+> 2) Enable resources, handled by ahci_platform_enable_resouces
+> 3) The more or less standard ahci-host controller init sequence
 > 
-> In the TODO list:
-> * dm9000 (ethernet)
-> * audio
-> * mmc
+> This commit refactors step 1 and 3 into separate functions, so the platform
+> drivers for AHCI implementations which need a specific order in step 2,
+> and / or need to do some custom register poking at some time, can re-use
+> ahci-platform.c code without needing to copy and paste it.
 > 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> Note that ahci_platform_init_host's prototype takes the 3 non function
+> members of ahci_platform_data as arguments, the idea is that drivers using
+> the new exported utility functions will not use ahci_platform_data at all,
+> and hopefully in the future ahci_platform_data can go away entirely.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  arch/arm/boot/dts/Makefile          |   2 +
->  arch/arm/boot/dts/at91sam9261ek.dts | 204 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 206 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
+>  drivers/ata/ahci_platform.c   | 195 ++++++++++++++++++++++++++++--------------
+>  include/linux/ahci_platform.h |  14 +++
+>  2 files changed, 144 insertions(+), 65 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 0320303..f496473 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -12,6 +12,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
->  dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
->  dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
->  dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
-> +# sam9261
-> +dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
->  # sam9263
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
->  dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
-> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-> new file mode 100644
-> index 0000000..03adb7f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
-> @@ -0,0 +1,204 @@
-> +/*
-> + * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 6ebbc17..7f3f2ac 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -201,64 +201,64 @@ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
+>  }
+>  EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
+>  
+> -static void ahci_put_clks(struct ahci_host_priv *hpriv)
+> +static void ahci_platform_put_resources(struct device *dev, void *res)
+>  {
+> +	struct ahci_host_priv *hpriv = res;
+>  	int c;
+>  
+>  	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
+>  		clk_put(hpriv->clks[c]);
+>  }
+>  
+> -static int ahci_probe(struct platform_device *pdev)
+> +/**
+> + *	ahci_platform_get_resources - Get platform resources
+> + *	@pdev: platform device to get resources for
 > + *
-> + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> + *	This function allocates an ahci_host_priv struct, and gets the
+> + *	following resources, storing a reference to them inside the returned
+> + *	struct:
 > + *
-> + * Licensed under GPLv2 only.
+> + *	1) mmio registers (IORESOURCE_MEM 0, mandatory)
+> + *	2) regulator for controlling the targets power (optional)
+> + *	3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
+> + *	   or for non devicetree enabled platforms a single clock
+> + *
+> + *	LOCKING:
+> + *	None.
+> + *
+> + *	RETURNS:
+> + *	The allocated ahci_host_priv on success, otherwise an ERR_PTR value
 > + */
-> +/dts-v1/;
-> +#include "at91sam9261.dtsi"
-> +
-> +/ {
-> +	model = "Atmel at91sam9261ek";
-> +	compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 rootfstype=ubifs ubi.mtd=5 root=ubi0:rootfs rw";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x4000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		main_clock: clock at 0 {
-> +			compatible = "atmel,osc", "fixed-clock";
-> +			clock-frequency = <18432000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		usb0: ohci at 00500000 {
-> +			status = "okay";
-> +		};
-> +
-> +		fb0: fb at 0x00600000 {
-> +			display = <&display0>;
-> +			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
-> +			status = "okay";
-> +
-> +			display0: display {
-> +				bits-per-pixel = <16>;
-> +				atmel,lcdcon-backlight;
-> +				atmel,dmacon = <0x1>;
-> +				atmel,lcdcon2 = <0x80008002>;
-> +				atmel,guard-time = <1>;
-> +				atmel,lcd-wiring-mode = "BRG";
-> +
-> +				display-timings {
-> +					native-mode = <&timing0>;
-> +					timing0: timing0 {
-> +						clock-frequency = <4965000>;
-> +						hactive = <240>;
-> +						vactive = <320>;
-> +						hback-porch = <1>;
-> +						hfront-porch = <33>;
-> +						vback-porch = <1>;
-> +						vfront-porch = <0>;
-> +						hsync-len = <5>;
-> +						vsync-len = <1>;
-> +						hsync-active = <1>;
-> +						vsync-active = <1>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		nand0: nand at 40000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "soft";
-> +			nand-on-flash-bbt;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +
-> +		apb {
-> +			usb1: gadget at fffa4000 {
-> +				atmel,vbus-gpio = <&pioB 29 GPIO_ACTIVE_HIGH>;
-> +				status = "okay";
-> +			};
+> +struct ahci_host_priv *ahci_platform_get_resources(
+> +	struct platform_device *pdev)
 
-Nit: add a white line between nodes please, same for a few nodes below.
+It would be better if these two lines were merged:
 
-> +			spi0: spi at fffc8000 {
-> +				cs-gpios = <&pioA 3 0>, <0>, <&pioA 28 0>, <0>;
-> +				status = "okay";
-> +
-> +				mtd_dataflash at 0 {
-> +					compatible = "atmel,at45", "atmel,dataflash";
-> +					reg = <0>;
-> +					spi-max-frequency = <15000000>;
-> +				};
-> +				tsc2046 at 0 {
-> +					reg = <2>;
-> +					compatible = "ti,ads7843";
-> +					interrupts-extended = <&pioC 2 IRQ_TYPE_EDGE_BOTH>;
-> +					spi-max-frequency = <3000000>;
-> +					pendown-gpio = <&pioC 2 GPIO_ACTIVE_HIGH>;
-> +
-> +					ti,x-min = /bits/ 16 <150>;
-> +					ti,x-max = /bits/ 16 <3830>;
-> +					ti,y-min = /bits/ 16 <190>;
-> +					ti,y-max = /bits/ 16 <3830>;
-> +					ti,vref-delay-usecs = /bits/ 16 <450>;
-> +					ti,x-plate-ohms = /bits/ 16 <450>;
-> +					ti,y-plate-ohms = /bits/ 16 <250>;
-> +					ti,pressure-max = /bits/ 16 <15000>;
-> +					ti,debounce-rep = /bits/ 16 <0>;
-> +					ti,debounce-tol = /bits/ 16 <65535>;
-> +					ti,debounce-max = /bits/ 16 <1>;
-> +
-> +					linux,wakeup;
-> +				};
-> +			};
-> +
-> +			dbgu: serial at fffff200 {
-> +				status = "okay";
-> +			};
-> +
-> +			watchdog at fffffd40 {
-> +				status = "okay";
-> +			};
-> +
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		ds8 {
-> +			label = "ds8";
-> +			gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "none";
-> +		};
-> +		ds7 {
-> +			label = "ds7";
-> +			gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "nand-disk";
-> +		};
-> +		ds1 {
-> +			label = "ds1";
-> +			gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +
-> +		button_0 {
-> +			label = "button_0";
-> +			gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
-> +			linux,code = <256>;
-> +			gpio-key,wakeup;
-> +		};
-> +		button_1 {
-> +			label = "button_1";
-> +			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
-> +			linux,code = <257>;
-> +			gpio-key,wakeup;
-> +		};
-> +		button_2 {
-> +			label = "button_2";
-> +			gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
-> +			linux,code = <258>;
-> +			gpio-key,wakeup;
-> +		};
-> +		button_3 {
-> +			label = "button_3";
-> +			gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
-> +			linux,code = <259>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.0
-> 
+struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>  {
+>  	struct device *dev = &pdev->dev;
+> -	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+> -	const struct platform_device_id *id = platform_get_device_id(pdev);
+> -	struct ata_port_info pi = ahci_port_info[id ? id->driver_data : 0];
+> -	const struct ata_port_info *ppi[] = { &pi, NULL };
+>  	struct ahci_host_priv *hpriv;
+> -	struct ata_host *host;
+> -	struct resource *mem;
+>  	struct clk *clk;
+> -	int irq;
+> -	int n_ports;
+> -	int i;
+> -	int rc;
+> +	int i, rc = -ENOMEM;
+>  
+> -	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!mem) {
+> -		dev_err(dev, "no mmio space\n");
+> -		return -EINVAL;
+> -	}
+> +	if (!devres_open_group(dev, NULL, GFP_KERNEL))
+> +		return ERR_PTR(-ENOMEM);
+>  
+> -	irq = platform_get_irq(pdev, 0);
+> -	if (irq <= 0) {
+> -		dev_err(dev, "no irq\n");
+> -		return -EINVAL;
+> -	}
+> +	hpriv = devres_alloc(ahci_platform_put_resources, sizeof(*hpriv),
+> +			     GFP_KERNEL);
+> +	if (!hpriv)
+> +		goto err_out;
+>  
+> -	if (pdata && pdata->ata_port_info)
+> -		pi = *pdata->ata_port_info;
+> +	devres_add(dev, hpriv);
+>  
+> -	hpriv = devm_kzalloc(dev, sizeof(*hpriv), GFP_KERNEL);
+> -	if (!hpriv) {
+> -		dev_err(dev, "can't alloc ahci_host_priv\n");
+> -		return -ENOMEM;
+> -	}
+> -
+> -	hpriv->flags |= (unsigned long)pi.private_data;
+> -
+> -	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
+> +	hpriv->mmio = devm_ioremap_resource(dev,
+> +			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
+>  	if (!hpriv->mmio) {
+
+This should use IS_ERR() as devm_ioremap_resource() returns a pointer
+to the remapped memory or an ERR_PTR() encoded error code on failure.
+
+> -		dev_err(dev, "can't map %pR\n", mem);
+> -		return -ENOMEM;
+> +		dev_err(dev, "no mmio space\n");
+
+Not needed, devm_ioremap_resource() prints an error message on error.
+
+> +		goto err_out;
+
+This should set rc to an error value from devm_ioremap_resource()
+instead of returning -ENOMEM.
+
+>  	}
+>  
+>  	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
+>  	if (IS_ERR(hpriv->target_pwr)) {
+>  		rc = PTR_ERR(hpriv->target_pwr);
+>  		if (rc == -EPROBE_DEFER)
+> -			return -EPROBE_DEFER;
+> +			goto err_out;
+>  		hpriv->target_pwr = NULL;
+>  	}
+>  
+> @@ -277,33 +277,62 @@ static int ahci_probe(struct platform_device *pdev)
+>  		if (IS_ERR(clk)) {
+>  			rc = PTR_ERR(clk);
+>  			if (rc == -EPROBE_DEFER)
+> -				goto free_clk;
+> +				goto err_out;
+>  			break;
+>  		}
+>  		hpriv->clks[i] = clk;
+>  	}
+>  
+> -	rc = ahci_platform_enable_resources(hpriv);
+> -	if (rc)
+> -		goto free_clk;
+> +	devres_remove_group(dev, NULL);
+> +	return hpriv;
+>  
+> -	/*
+> -	 * Some platforms might need to prepare for mmio region access,
+> -	 * which could be done in the following init call. So, the mmio
+> -	 * region shouldn't be accessed before init (if provided) has
+> -	 * returned successfully.
+> -	 */
+> -	if (pdata && pdata->init) {
+> -		rc = pdata->init(dev, hpriv->mmio);
+> -		if (rc)
+> -			goto disable_resources;
+> -	}
+> +err_out:
+> +	devres_release_group(dev, NULL);
+> +	return ERR_PTR(rc);
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
+
+[...]
+
+The rest of the patch looks OK.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
