@@ -1,19 +1,13 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon,  3 Mar 2014 01:21:48 +0100
-Subject: [PATCH 3/3 V2] crypto: Simplify the ahash_finup implementation
-In-Reply-To: <1393806108-6374-1-git-send-email-marex@denx.de>
-References: <1389720829-5963-1-git-send-email-marex@denx.de>
- <1393806108-6374-1-git-send-email-marex@denx.de>
-Message-ID: <1393806108-6374-3-git-send-email-marex@denx.de>
+Date: Mon,  3 Mar 2014 01:23:15 +0100
+Subject: [PATCH] crypto: mxs-dcp: Align the bounce buffers
+Message-ID: <1393806195-6415-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahash_def_finup() can make use of the request save/restore functions,
-thus make it so. This simplifies the code a little and unifies the code
-paths.
-
-Note that the same remark about free()ing the req->priv applies here, the
-req->priv can only be free()'d after the original request was restored.
+The DCP needs the bounce buffers, DMA descriptors and result buffers aligned
+to 64 bytes (yet another hardware limitation). Make sure they are aligned by
+properly aligning the structure which contains them during allocation.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: David S. Miller <davem@davemloft.net>
@@ -22,96 +16,39 @@ Cc: Herbert Xu <herbert@gondor.apana.org.au>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Tom Lendacky <thomas.lendacky@amd.com>
 ---
- crypto/ahash.c | 52 +++++++++++++++++++---------------------------------
- 1 file changed, 19 insertions(+), 33 deletions(-)
+ drivers/crypto/mxs-dcp.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-V2: Same as with 1/3 V2, move the restoration and freeing of the private
-    data right past memcpy() of the buffer.
-
-diff --git a/crypto/ahash.c b/crypto/ahash.c
-index 4faa50e..6f6d652 100644
---- a/crypto/ahash.c
-+++ b/crypto/ahash.c
-@@ -347,19 +347,18 @@ static void ahash_def_finup_finish2(struct ahash_request *req, int err)
- 		memcpy(priv->result, req->result,
- 		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
+diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
+index 08761d6..c7400fe 100644
+--- a/drivers/crypto/mxs-dcp.c
++++ b/drivers/crypto/mxs-dcp.c
+@@ -29,6 +29,8 @@
+ #define DCP_MAX_CHANS	4
+ #define DCP_BUF_SZ	PAGE_SIZE
  
--	kzfree(priv);
-+	ahash_restore_req(req);
- }
++#define DCP_ALIGNMENT	64
++
+ /* DCP DMA descriptor. */
+ struct dcp_dma_desc {
+ 	uint32_t	next_cmd_addr;
+@@ -947,12 +949,16 @@ static int mxs_dcp_probe(struct platform_device *pdev)
+ 	}
  
--static void ahash_def_finup_done2(struct crypto_async_request *req, int err)
-+static void ahash_def_finup_done2(struct crypto_async_request *areq, int err)
- {
--	struct ahash_request *areq = req->data;
--	struct ahash_request_priv *priv = areq->priv;
--	crypto_completion_t complete = priv->complete;
--	void *data = priv->data;
-+	struct ahash_request *req = areq->data;
-+	struct crypto_async_request *data;
+ 	/* Allocate coherent helper block. */
+-	sdcp->coh = devm_kzalloc(dev, sizeof(*sdcp->coh), GFP_KERNEL);
++	sdcp->coh = devm_kzalloc(dev, sizeof(*sdcp->coh) + DCP_ALIGNMENT,
++				   GFP_KERNEL);
+ 	if (!sdcp->coh) {
+ 		ret = -ENOMEM;
+ 		goto err_mutex;
+ 	}
  
--	ahash_def_finup_finish2(areq, err);
-+	ahash_def_finup_finish2(req, err);
- 
--	complete(data, err);
-+	data = req->base.data;
-+	req->base.complete(data, err);
- }
- 
- static int ahash_def_finup_finish1(struct ahash_request *req, int err)
-@@ -376,41 +375,28 @@ out:
- 	return err;
- }
- 
--static void ahash_def_finup_done1(struct crypto_async_request *req, int err)
-+static void ahash_def_finup_done1(struct crypto_async_request *areq, int err)
- {
--	struct ahash_request *areq = req->data;
--	struct ahash_request_priv *priv = areq->priv;
--	crypto_completion_t complete = priv->complete;
--	void *data = priv->data;
-+	struct ahash_request *req = areq->data;
-+	struct crypto_async_request *data;
- 
--	err = ahash_def_finup_finish1(areq, err);
-+	err = ahash_def_finup_finish1(req, err);
- 
--	complete(data, err);
-+	data = req->base.data;
-+	req->base.complete(data, err);
- }
- 
- static int ahash_def_finup(struct ahash_request *req)
- {
- 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
--	unsigned long alignmask = crypto_ahash_alignmask(tfm);
--	unsigned int ds = crypto_ahash_digestsize(tfm);
--	struct ahash_request_priv *priv;
--
--	priv = kmalloc(sizeof(*priv) + ahash_align_buffer_size(ds, alignmask),
--		       (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
--		       GFP_KERNEL : GFP_ATOMIC);
--	if (!priv)
--		return -ENOMEM;
--
--	priv->result = req->result;
--	priv->complete = req->base.complete;
--	priv->data = req->base.data;
-+	int err;
- 
--	req->result = PTR_ALIGN((u8 *)priv->ubuf, alignmask + 1);
--	req->base.complete = ahash_def_finup_done1;
--	req->base.data = req;
--	req->priv = priv;
-+	err = ahash_save_req(req, ahash_def_finup_done1);
-+	if (err)
-+		return err;
- 
--	return ahash_def_finup_finish1(req, tfm->update(req));
-+	err = tfm->update(req);
-+	return ahash_def_finup_finish1(req, err);
- }
- 
- static int ahash_no_export(struct ahash_request *req, void *out)
++	/* Re-align the structure so it fits the DCP constraints. */
++	sdcp->coh = PTR_ALIGN(sdcp->coh, DCP_ALIGNMENT);
++
+ 	/* Restart the DCP block. */
+ 	ret = stmp_reset_block(sdcp->base);
+ 	if (ret)
 -- 
 1.8.5.2
