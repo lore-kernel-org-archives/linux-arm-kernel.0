@@ -1,90 +1,192 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 03 Mar 2014 15:27:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NSAxLzNdIHR0eS9zZXJpYWw6IEFkZCBHUElPTElCIGhl?=
- =?UTF-8?B?bHBlcnMgZm9yIGNvbnRyb2xsaW5nIG1vZGVtIGxpbmVz?=
-In-Reply-To: <1393845120-6340-2-git-send-email-richard.genoud@gmail.com>
-References: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
- <1393845120-6340-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1393846030.273217958@f113.i.mail.ru>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 03 Mar 2014 12:29:47 +0100
+Subject: [PATCH v8 2/6] misc: sram: implement reserved sram areas
+In-Reply-To: <8769537.NUv9SMRkyo@phil>
+References: <21117503.1c6iOkvYSr@phil> <8769537.NUv9SMRkyo@phil>
+Message-ID: <1393846187.3369.0.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Heiko,
 
-???????????,  3 ????? 2014, 12:11 +01:00 ?? Richard Genoud <noreply.rgenoud@gmail.com>:
-> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> GPIO.
-> This will be useful for many boards which have a serial controller that
-> only handle CTS/RTS pins (or even just RX/TX).
+Am Dienstag, den 25.02.2014, 12:46 +0100 schrieb Heiko St?bner:
+> This implements support for defining reserved areas as subnodes,
+> to keep the genpool from using these.
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-...
-> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> Suggested-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+> ---
+>  drivers/misc/sram.c | 125 +++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 118 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index afe66571..674b0cd 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -24,6 +24,9 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/list.h>
+> +#include <linux/list_sort.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+> @@ -36,14 +39,35 @@ struct sram_dev {
+>  	struct clk *clk;
+>  };
+>  
+> +struct sram_reserve {
+> +	struct list_head list;
+> +	u32 start;
+> +	u32 size;
+> +};
+> +
+> +static int sram_reserve_cmp(void *priv, struct list_head *a,
+> +					struct list_head *b)
 > +{
-> +	struct mctrl_gpios *gpios;
-> +	enum mctrl_gpio_idx i;
-> +	int err;
+> +	struct sram_reserve *ra = list_entry(a, struct sram_reserve, list);
+> +	struct sram_reserve *rb = list_entry(b, struct sram_reserve, list);
 > +
-> +	gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
-> +	if (!gpios)
-> +		goto out;
-
-if (!gpios)
-  return ERR_PTR(-ENOMEM);
-
-
-> +	for (i = 0; i < UART_GPIO_MAX; i++) {
-> +		gpios->gpio[i] = devm_gpiod_get_index(dev,
-> +						      mctrl_gpios_desc[i].name,
-> +						      idx);
+> +	return ra->start - rb->start;
+> +}
 > +
-> +		/*
-> +		 * The GPIOs are maybe not all filled,
-> +		 * this is not an error.
-> +		 */
-> +		if (IS_ERR_OR_NULL(gpios->gpio[i]))
-> +			continue;
+>  static int sram_probe(struct platform_device *pdev)
+>  {
+>  	void __iomem *virt_base;
+>  	struct sram_dev *sram;
+>  	struct resource *res;
+> -	unsigned long size;
+> +	struct device_node *np = pdev->dev.of_node, *child;
+> +	unsigned long size, cur_start, cur_size;
+> +	struct sram_reserve *rblocks, *block;
+> +	struct list_head reserve_list;
+> +	unsigned int nblocks;
+>  	int ret;
+>  
+> +	INIT_LIST_HEAD(&reserve_list);
 > +
-> +		if (mctrl_gpios_desc[i].dir_out)
-> +			err = gpiod_direction_output(gpios->gpio[i], 0);
-> +		else
-> +			err = gpiod_direction_input(gpios->gpio[i]);
-> +		if (err) {
-> +			dev_warn(dev, "Unable to set direction for %s GPIO",
-> +				 mctrl_gpios_desc[i].name);
-> +			devm_gpiod_put(dev, gpios->gpio[i]);
-> +			gpios->gpio[i] = NULL;
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	virt_base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(virt_base))
+> @@ -65,19 +89,106 @@ static int sram_probe(struct platform_device *pdev)
+>  	if (!sram->pool)
+>  		return -ENOMEM;
+>  
+> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+> -				res->start, size, -1);
+> -	if (ret < 0) {
+> -		if (sram->clk)
+> -			clk_disable_unprepare(sram->clk);
+> -		return ret;
+> +	/*
+> +	 * We need an additional block to mark the end of the memory region
+> +	 * after the reserved blocks from the dt are processed.
+> +	 */
+> +	nblocks = (np) ? of_get_available_child_count(np) + 1 : 1;
+> +	rblocks = kmalloc((nblocks) * sizeof(*rblocks), GFP_KERNEL);
+> +	if (!rblocks) {
+> +		ret = -ENOMEM;
+> +		goto err_alloc;
+>  	}
+>  
+> +	block = &rblocks[0];
+> +	for_each_available_child_of_node(np, child) {
+> +		struct resource child_res;
+> +
+> +		ret = of_address_to_resource(child, 0, &child_res);
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev,
+> +				"could not get address for node %s\n",
+> +				child->full_name);
+> +			goto err_chunks;
 > +		}
+> +
+> +		if (child_res.start < res->start || child_res.end > res->end) {
+> +			dev_err(&pdev->dev,
+> +				"reserved block %s outside the sram area\n",
+> +				child->full_name);
+> +			ret = -EINVAL;
+> +			goto err_chunks;
+> +		}
+> +
+> +		block->start = child_res.start - res->start;
+> +		block->size = resource_size(&child_res);
+> +		list_add_tail(&block->list, &reserve_list);
+> +
+> +		dev_dbg(&pdev->dev, "found reserved block 0x%x-0x%x\n",
+> +			block->start,
+> +			block->start + block->size);
+> +
+> +		block++;
 > +	}
 > +
-> +out:
-> +	return gpios;
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_init);
+> +	/* the last chunk marks the end of the region */
+> +	rblocks[nblocks - 1].start = size;
+> +	rblocks[nblocks - 1].size = 0;
+> +	list_add_tail(&rblocks[nblocks - 1].list, &reserve_list);
 > +
-> +void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
-> +{
-> +	enum mctrl_gpio_idx i;
+> +	list_sort(NULL, &reserve_list, sram_reserve_cmp);
 > +
-> +	if (!gpios)
-> +		return;
+> +	cur_start = 0;
 > +
-> +	for (i = 0; i < UART_GPIO_MAX; i++)
-> +		if (!IS_ERR_OR_NULL(gpios->gpio[i])) {
-> +			devm_gpiod_put(dev, gpios->gpio[i]);
-> +			gpios->gpio[i] = NULL;
-
-No need to NULL this variable. Instead, you should NULL
-"gpios" entirely at the end of this function.
-
+> +	list_for_each_entry(block, &reserve_list, list) {
+> +		/* can only happen if sections overlap */
+> +		if (block->start < cur_start) {
+> +			dev_err(&pdev->dev,
+> +				"block at 0x%x starts after current offset 0x%lx\n",
+> +				block->start, cur_start);
+> +			ret = -EINVAL;
+> +			goto err_chunks;
 > +		}
-> +	devm_kfree(dev, gpios);
+> +
+> +		/* current start is in a reserved block, so continue after it */
+> +		if (block->start == cur_start) {
+> +			cur_start = block->start + block->size;
+> +			continue;
+> +		}
+> +
+> +		/*
+> +		 * allocate the space between the current starting
+> +		 * address and the following reserved block, or the
+> +		 * end of the region.
+> +		 */
+> +		cur_size = block->start - cur_start;
+> +
+> +		dev_dbg(&pdev->dev, "adding chunk 0x%lx-0x%lx\n",
+> +			cur_start, cur_start + cur_size);
+> +		ret = gen_pool_add_virt(sram->pool,
+> +				(unsigned long)virt_base + cur_start,
+> +				res->start + cur_start, cur_size, -1);
+> +		if (ret < 0)
+> +			goto err_chunks;
+> +
+> +		/* next allocation after this reserved block */
+> +		cur_start = block->start + block->size;
+> +	}
+> +
+> +	kfree(rblocks);
+> +
+>  	platform_set_drvdata(pdev, sram);
+>  
+>  	dev_dbg(&pdev->dev, "SRAM pool: %ld KiB @ 0x%p\n", size / 1024, virt_base);
+>  
+>  	return 0;
+> +
+> +err_chunks:
+> +	kfree(rblocks);
+> +err_alloc:
+> +	if (sram->clk)
+> +		clk_disable_unprepare(sram->clk);
+> +	return ret;
+>  }
+>  
+>  static int sram_remove(struct platform_device *pdev)
 
-gpios = NULL;
-So this will indicate that its no more valid.
-
-> +}
-...
-
-Thanks.
----
+regards
+Philipp
