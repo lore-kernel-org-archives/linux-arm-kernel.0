@@ -1,65 +1,48 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 16:41:48 +0800
-Subject: [PATCH v12 05/15] usb: phy-mxs: Add anatop regmap
+Date: Mon, 3 Mar 2014 16:41:49 +0800
+Subject: [PATCH v12 06/15] usb: phy-mxs: change description of usb device speed
 In-Reply-To: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
 References: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393836118-4265-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393836118-4265-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is needed by imx6 SoC series, but not for imx23 and imx28.
+Change "high speed" to "HS"
+Change "non-high speed" to "FS/LS"
+
+Implementation of notify_suspend and notify_resume will be different
+according to mxs_phy_data->flags.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index d7adca3..2411e05 100644
+index 2411e05..1663a66 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -21,6 +21,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+@@ -168,8 +168,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
+ static int mxs_phy_on_connect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+-	dev_dbg(phy->dev, "%s speed device has connected\n",
+-		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++	dev_dbg(phy->dev, "%s device has connected\n",
++		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
  
- #define DRIVER_NAME "mxs_phy"
+ 	if (speed == USB_SPEED_HIGH)
+ 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+@@ -181,8 +181,8 @@ static int mxs_phy_on_connect(struct usb_phy *phy,
+ static int mxs_phy_on_disconnect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+-	dev_dbg(phy->dev, "%s speed device has disconnected\n",
+-		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++	dev_dbg(phy->dev, "%s device has disconnected\n",
++		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
  
-@@ -87,6 +89,7 @@ struct mxs_phy {
- 	struct usb_phy phy;
- 	struct clk *clk;
- 	const struct mxs_phy_data *data;
-+	struct regmap *regmap_anatop;
- };
- 
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-@@ -197,6 +200,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	int ret;
- 	const struct of_device_id *of_id =
- 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -216,6 +220,17 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	/* Some SoCs don't have anatop registers */
-+	if (of_get_property(np, "fsl,anatop", NULL)) {
-+		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-+			(np, "fsl,anatop");
-+		if (IS_ERR(mxs_phy->regmap_anatop)) {
-+			dev_dbg(&pdev->dev,
-+				"failed to find regmap for anatop\n");
-+			return PTR_ERR(mxs_phy->regmap_anatop);
-+		}
-+	}
-+
- 	mxs_phy->phy.io_priv		= base;
- 	mxs_phy->phy.dev		= &pdev->dev;
- 	mxs_phy->phy.label		= DRIVER_NAME;
+ 	if (speed == USB_SPEED_HIGH)
+ 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
 -- 
 1.7.8
