@@ -1,56 +1,41 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Mon,  3 Mar 2014 11:05:54 +0100
-Subject: [PATCH v5 1/9] at91: dt: Adds support for the bus matrix declaration
- in the DT
+Date: Mon,  3 Mar 2014 11:05:55 +0100
+Subject: [PATCH v5 2/9] dt: bindings: at91: Add a new binding for the bus
+ matrix
 In-Reply-To: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
 References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1393841162-25339-2-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1393841162-25339-3-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This binding is used to initialize the bus matrix base address.
+
 Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- arch/arm/mach-at91/setup.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index f7ca97b..6a4e07e 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -487,6 +487,26 @@ end:
- 	of_node_put(np);
- }
- 
-+static struct of_device_id matrix_ids[] = {
-+	{ .compatible = "atmel,at91sam9260-bus-matrix", },
-+	{ /*sentinel*/ }
-+};
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 16f60b4..bf9cb13 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -105,3 +105,17 @@ Example:
+ 		compatible = "atmel,at91sam9260-rstc";
+ 		reg = <0xfffffd00 0x10>;
+ 	};
 +
-+static void at91_dt_matrix(void)
-+{
-+	struct device_node *np;
++Bus Matrix controller
 +
-+	np = of_find_matching_node(NULL, matrix_ids);
-+	if (!np)
-+		panic("AT91: unable to find compatible bus matrix controller node in dtb\n");
++required properties:
++- compatible: Should be "atmel,<chip>-bus-matrix".
++  <chip> can be "at91sam9260".
++- reg: Should contain registers location and length
 +
-+	at91_matrix_base = of_iomap(np, 0);
-+	if (!at91_matrix_base)
-+		panic("Impossible to ioremap at91_matrix_base\n");
++Example:
 +
-+	of_node_put(np);
-+}
-+
- void __init at91rm9200_dt_initialize(void)
- {
- 	at91_dt_ramc();
-@@ -506,6 +526,7 @@ void __init at91_dt_initialize(void)
- 	at91_dt_rstc();
- 	at91_dt_ramc();
- 	at91_dt_shdwc();
-+	at91_dt_matrix();
- 
- 	/* Init clock subsystem */
- 	at91_dt_clock_init();
++	matrix: matrix at ffffee00 {
++		compatible = "atmel,at91sam9260-bus-matrix";
++		reg = <0xffffee00 0x200>;
++	};
 -- 
 1.9.0
