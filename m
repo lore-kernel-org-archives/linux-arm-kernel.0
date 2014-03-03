@@ -1,54 +1,81 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  3 Mar 2014 01:23:15 +0100
-Subject: [PATCH] crypto: mxs-dcp: Align the bounce buffers
-Message-ID: <1393806195-6415-1-git-send-email-marex@denx.de>
+From: graeme@xora.org.uk (Graeme Gregory)
+Date: Mon, 3 Mar 2014 08:52:46 +0800
+Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
+ level
+In-Reply-To: <5310BA99.4050203@wwwdotorg.org>
+References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
+ <20140227210227.GE2931@xora-haswell>
+ <530FAFAE.5050800@wwwdotorg.org>
+ <20140228055818.GA29849@sirena.org.uk>
+ <5310BA99.4050203@wwwdotorg.org>
+Message-ID: <20140303005246.GA22047@xora-yoga13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCP needs the bounce buffers, DMA descriptors and result buffers aligned
-to 64 bytes (yet another hardware limitation). Make sure they are aligned by
-properly aligning the structure which contains them during allocation.
+On Fri, Feb 28, 2014 at 09:34:33AM -0700, Stephen Warren wrote:
+> On 02/27/2014 10:58 PM, Mark Brown wrote:
+> > On Thu, Feb 27, 2014 at 02:35:42PM -0700, Stephen Warren wrote:
+> >> On 02/27/2014 02:02 PM, Graeme Gregory wrote:
+> > 
+> >>>> +- ti,irq-externally-inverted : If missing, the polarity of the Palmas IRQ
+> >>>> +  output should be set to the opposite of the polarity indicated by the IRQ
+> >>>> +  specifier in the interrupts property. If absent, the polarity should be
+> >>>> +  configured to match. This allows the representation of an inverter between
+> >>>> +  the Palmas IRQ output and the interrupt parent's IRQ input.
+> > 
+> >>> This has got to be the wrong way to do things, all this leads to is every
+> >>> device doing this property in its own way and having totally inconsistent
+> >>> properties all meaning the same thing.
+> > 
+> >>> If there is some other hardware inverting lines then there should be
+> >>> a generic binding for this in DT. This is not describing the palmas hardware
+> >>> but some external object to the palmas.
+> > 
+> >> I'd be fine with removing the "ti," vendor prefix from the property
+> >> name, and promoting it to be a cross-device standard.
+> > 
+> >> I'm not sure that many devices will need this though; most don't have
+> >> configurable output polarity. Still, I guess that shouldn't stop us from
+> >> creating standards for the cases where it is needed.
+> > 
+> > It's really common for PMICs and CODECs to be able to set any interrupt
+> > polarity at least.
+> > 
+> >> If the DT reviewers can ack the concept, I'm happy to respin the patch
+> >> with the more generic property name.
+> > 
+> > I'm not sure that renaming the property really deals with the concerns
+> > though since drivers still all need to manually add support for this,
+> > shouldn't there be an interrupt controller described in the DT which
+> > just chains on to the parent with the polarity inverted to do the
+> > impedence match?
+> 
+> I had thought of that when first dealing with this a couple years ago,
+> but Olof suggested that was too complicated.
+> 
+> Certainly, adding an "inverting" interrupt controller into the path
+> would solve the problem without inventing any new concept in DT.
+> However, the inverter really isn't an interrupt controller in any
+> meaningful fashion. It has no status/mask/enable/... registers at all;
+> it's nothing more than an inverter gate, at least in my case. Hence, I'm
+> actually not convinced that adding an extra interrupt controller into
+> the path is correct here.
+> 
+A interupt controller inline that does the inversion was my first thought
+but I think that is probably overkill unless there is a whole range
+of different interupt filtering operations.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Tom Lendacky <thomas.lendacky@amd.com>
----
- drivers/crypto/mxs-dcp.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> Another alternative might be to add an extra IRQ bit in the IRQ
+> specifier (and something similar would be needed for GPIO specifiers)
+> that indicates "inversion between source and destination". This could be
+> queried by drivers in exactly the same way as the existing polarity/type
+> IRQ flags. We'd need to update each individual IRQ controller binding to
+> enable that flag, since each binding defines its own definition of such
+> flags. (although in practice since most use the same centrally suggested
+> flags, this wouldn't be any more than just saying yes, this binding
+> allows that new flag to be used).
+> 
+A new flag would meet my concerns of every chip doing basic inversion
+in different ways.
 
-diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
-index 08761d6..c7400fe 100644
---- a/drivers/crypto/mxs-dcp.c
-+++ b/drivers/crypto/mxs-dcp.c
-@@ -29,6 +29,8 @@
- #define DCP_MAX_CHANS	4
- #define DCP_BUF_SZ	PAGE_SIZE
- 
-+#define DCP_ALIGNMENT	64
-+
- /* DCP DMA descriptor. */
- struct dcp_dma_desc {
- 	uint32_t	next_cmd_addr;
-@@ -947,12 +949,16 @@ static int mxs_dcp_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Allocate coherent helper block. */
--	sdcp->coh = devm_kzalloc(dev, sizeof(*sdcp->coh), GFP_KERNEL);
-+	sdcp->coh = devm_kzalloc(dev, sizeof(*sdcp->coh) + DCP_ALIGNMENT,
-+				   GFP_KERNEL);
- 	if (!sdcp->coh) {
- 		ret = -ENOMEM;
- 		goto err_mutex;
- 	}
- 
-+	/* Re-align the structure so it fits the DCP constraints. */
-+	sdcp->coh = PTR_ALIGN(sdcp->coh, DCP_ALIGNMENT);
-+
- 	/* Restart the DCP block. */
- 	ret = stmp_reset_block(sdcp->base);
- 	if (ret)
--- 
-1.8.5.2
+Graeme
