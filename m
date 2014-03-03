@@ -1,51 +1,60 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 3 Mar 2014 10:04:38 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <20140228165628.GX21483@n2100.arm.linux.org.uk>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <20140228162752.GU21483@n2100.arm.linux.org.uk> <5310BDE3.60603@ti.com>
- <20140228165628.GX21483@n2100.arm.linux.org.uk>
-Message-ID: <53143796.2050309@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 03 Mar 2014 17:11:37 +0900
+Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
+In-Reply-To: <20140301183059.GA6315@obsidianresearch.com>
+References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
+ <CAJ+vNU2VN5haOU2GN5o7UUg9vgYh06pAhvDaoGw6EzTBEbD0mg@mail.gmail.com>
+ <20140301183059.GA6315@obsidianresearch.com>
+Message-ID: <000601cf36b8$330b3a90$9921afb0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Pawel, Mark, Ian, Kumar,
-
-On 28/02/14 18:56, Russell King - ARM Linux wrote:
-> On Fri, Feb 28, 2014 at 06:48:35PM +0200, Tomi Valkeinen wrote:
->> This is totally unclear to me. How does it become a public standard?
->> What's the forum for this?
+On Sunday, March 02, 2014 3:31 AM, Jason Gunthorpe wrote:
+> On Fri, Feb 28, 2014 at 04:53:33PM -0800, Tim Harvey wrote:
 > 
-> Me too.  That's where I'd hope someone on devicetree-discuss will be
-> able to help us work out what's the right approach here. :)
+> > In testing this on IMX6 I'm finding that 'of_irq_parse_and_map_pci()'
+> > always returns -EINVAL because it can't find a dt node for the host
+> > bridge:
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/of/of_pci_irq.c#n60.
+> 
+> There may be some kind of issue in the pcie-designware.c:
+> 
+> static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> {
+>         struct pci_bus *bus;
+>         struct pcie_port *pp = sys_to_pcie(sys);
+> 
+>         if (pp) {
+>                 pp->root_bus_nr = sys->busnr;
+>                 bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
+>                                      ^^^^^^^^^^^
+>                                      Shouldn't be null for DT cases.
+> 
+> Perhaps since the driver doesn't pass in a parent pointer, no parent
+> device is associated with the struct pci_bus that gets created, so
+> pci_bus_to_OF_node will always fail and the DT PCI mechanisms become
+> broken.
 
-The story briefly so far: I've implemented DT support for OMAP display,
-and created bindings for various (non-OMAP) display components,
-including generic connector bindings for DVI, HDMI and analog-tv.
+Jason,
+Thank you for your advice. :-)
 
-Russell's point was that these connector bindings are very generic, i.e.
-they are not for any particular chip from a particular vendor, but for
-any connector for DVI, HDMI or analog-tv. And he's worried that maybe we
-shouldn't define such generic bindings without consulting the whole
-device-tree community (i.e including non-linux users).
+Tim,
+I tested the following as Jason guided.
+You can test i.MX PCIe with this.
 
-So the question is, is there such a community and a forum to bring up
-this kind of things? If yes, should we bring this up there? If yes, what
-kind of things in general should be brought into the attention of
-non-linux users?
+./drivers/pci/host/pcie-designware.c
+@@ -726,7 +727,7 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 
-What I wonder here is that while a thing like DVI connector is, of
-course, more generic than, say, "ti,tfp410" encoder chip, but isn't the
-case still the same: we're defining global bindings for hardware that
-should work for everyone, not only Linux users?
+        if (pp) {
+                pp->root_bus_nr = sys->busnr;
+-               bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
++               bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
+                                        sys, &sys->resources);
+        } else {
+                bus = NULL;
 
- Tomi
+However, I think that we may need to replace 'pci_common_init()'
+with 'pci_common_init_dev()'.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/e40abbd0/attachment-0001.sig>
+Best regards,
+Jingoo Han
