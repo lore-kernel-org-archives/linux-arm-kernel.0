@@ -1,46 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 16:41:56 +0800
-Subject: [PATCH v12 13/15] ARM: dts: mxs: add mxs phy controller id
+Date: Mon, 3 Mar 2014 16:41:57 +0800
+Subject: [PATCH v12 14/15] ARM: dts: imx6: add anatop phandle for usbphy
 In-Reply-To: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
 References: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393836118-4265-14-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393836118-4265-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to use controller id to access different register regions
-for mxs phy.
+Add anatop phandle for usbphy
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx23.dtsi |    1 +
- arch/arm/boot/dts/imx28.dtsi |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 581b754..8a99a64 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -23,6 +23,7 @@
- 		serial1 = &auart1;
- 		spi0 = &ssp0;
- 		spi1 = &ssp1;
-+		usbphy0 = &usbphy0;
- 	};
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index fb28b2e..047b147 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -557,6 +557,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
++				fsl,anatop = <&anatop>;
+ 			};
  
- 	cpus {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index f8e9b20..7da22b3 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -32,6 +32,8 @@
- 		serial4 = &auart4;
- 		spi0 = &ssp1;
- 		spi1 = &ssp2;
-+		usbphy0 = &usbphy0;
-+		usbphy1 = &usbphy1;
- 	};
+ 			usbphy2: usbphy at 020ca000 {
+@@ -564,6 +565,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks 183>;
++				fsl,anatop = <&anatop>;
+ 			};
  
- 	cpus {
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..30322b5 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -489,6 +489,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			usbphy2: usbphy at 020ca000 {
+@@ -496,6 +497,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
 -- 
 1.7.8
