@@ -1,37 +1,65 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 16:41:47 +0800
-Subject: [PATCH v12 04/15] usb: doc: phy-mxs: update binding for adding anatop
- phandle
+Date: Mon, 3 Mar 2014 16:41:48 +0800
+Subject: [PATCH v12 05/15] usb: phy-mxs: Add anatop regmap
 In-Reply-To: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
 References: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393836118-4265-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393836118-4265-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle which is used to access anatop registers to
-control PHY's power and other USB operations.
+It is needed by imx6 SoC series, but not for imx23 and imx28.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index ea5134a..cef181a 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -8,10 +8,12 @@ Required properties:
-   "fsl,imx23-usbphy" is still a fallback for other strings
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
-+- fsl,anatop: phandle for anatop register, it is only for imx6 SoC series
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index d7adca3..2411e05 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -21,6 +21,8 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/of_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
  
- Example:
- usbphy1: usbphy at 020c9000 {
- 	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 	reg = <0x020c9000 0x1000>;
- 	interrupts = <0 44 0x04>;
-+	fsl,anatop = <&anatop>;
+ #define DRIVER_NAME "mxs_phy"
+ 
+@@ -87,6 +89,7 @@ struct mxs_phy {
+ 	struct usb_phy phy;
+ 	struct clk *clk;
+ 	const struct mxs_phy_data *data;
++	struct regmap *regmap_anatop;
  };
+ 
+ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+@@ -197,6 +200,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	int ret;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+@@ -216,6 +220,17 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	/* Some SoCs don't have anatop registers */
++	if (of_get_property(np, "fsl,anatop", NULL)) {
++		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
++			(np, "fsl,anatop");
++		if (IS_ERR(mxs_phy->regmap_anatop)) {
++			dev_dbg(&pdev->dev,
++				"failed to find regmap for anatop\n");
++			return PTR_ERR(mxs_phy->regmap_anatop);
++		}
++	}
++
+ 	mxs_phy->phy.io_priv		= base;
+ 	mxs_phy->phy.dev		= &pdev->dev;
+ 	mxs_phy->phy.label		= DRIVER_NAME;
 -- 
 1.7.8
