@@ -1,43 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 03 Mar 2014 12:00:02 +0100
-Subject: [PATCH 4/4] ARM: shmobile: r7s72100: use workaround for non
- DT-clocks
-In-Reply-To: <20140303092200.GB6531@katana>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <1712106.fu6iC2mT2W@avalon> <20140303092200.GB6531@katana>
-Message-ID: <8879891.pRJJJrkMnR@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Mar 2014 11:55:14 +0100
+Subject: [PATCH v4 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
+ NMI controller
+In-Reply-To: <1393529662-8663-2-git-send-email-carlo@caione.org>
+References: <1393529662-8663-1-git-send-email-carlo@caione.org>
+ <1393529662-8663-2-git-send-email-carlo@caione.org>
+Message-ID: <20140303105514.GV607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 March 2014 10:22:00 Wolfram Sang wrote:
-> On Sun, Mar 02, 2014 at 11:21:40PM +0100, Laurent Pinchart wrote:
-> > Hi Wolfram,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Friday 28 February 2014 22:09:28 Wolfram Sang wrote:
-> > > From: Wolfram Sang <wsa@sang-engineering.com>
-> > > 
-> > > SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
-> > > workaround via clkdev for now.
-> > 
-> > What about adding a DT node for the serial port instead ? :-)
-> 
-> Yes, done in V2 already. Yet, I'd like to keep SCIF in here because it
-> is the least intrusive way to get the system to boot. When the SCIF
-> nodes are added later incrementally, I remove the sh-sci.2 workaround,
-> but the whole mechanism is still needed for MTU2 anyhow.
+Hi Carlo,
 
-True. I'm working on MTU2 DT support, but that will take a bit more time.
+On Thu, Feb 27, 2014 at 08:34:20PM +0100, Carlo Caione wrote:
+> Allwinner A20/A31 SoCs have special registers to control / (un)mask /
+> acknowledge NMI. This NMI controller is separated and independent from GIC.
+> This patch adds a new irqchip to manage NMI.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/69234a61/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/2c0a8c14/attachment.sig>
