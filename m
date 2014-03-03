@@ -1,34 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Mar 2014 09:54:41 +0100
-Subject: linux-next: manual merge of the akpm-current tree with the
- arm-soc tree
-In-Reply-To: <20140303190152.8b87330c0d83679b10c5ca5a@canb.auug.org.au>
-References: <20140303190152.8b87330c0d83679b10c5ca5a@canb.auug.org.au>
-Message-ID: <20140303085441.GW6865@pengutronix.de>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 03 Mar 2014 09:55:47 +0100
+Subject: [PATCH v2 3/8] ARM: dts: omap3-overo: Use complete poweroff
+In-Reply-To: <530FA916.8030001@ti.com>
+References: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393533032-1619-4-git-send-email-florian.vaussard@epfl.ch>
+ <530FA23E.1040909@ti.com> <530FA497.7000407@epfl.ch>
+ <530FA916.8030001@ti.com>
+Message-ID: <53144393.6050408@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 07:01:52PM +1100, Stephen Rothwell wrote:
-> Hi Andrew,
+On 02/27/2014 10:07 PM, Nishanth Menon wrote:
+> +devicetree list.
 > 
-> Today's linux-next merge of the akpm-current tree got a conflict in
-> arch/arm/mach-vexpress/Kconfig between commit 9352b05b6e4e ("ARM: select
-> MIGHT_HAVE_CACHE_L2X0 for V6 and V7 multi-platform") from the arm-soc
-> tree and commit b096b0b50c4b ("Kconfig: rename HAS_IOPORT to
-> HAS_IOPORT_MAP") from the akpm-current tree.
+> On 02/27/2014 02:48 PM, Florian Vaussard wrote:
+>> On 02/27/2014 09:38 PM, Nishanth Menon wrote:
+>>> On 02/27/2014 02:30 PM, Florian Vaussard wrote:
+>>>> Currently, the TWL4030 PMIC does not completely poweroff the processor.
+>>>> Commit b0fc1da4d0359d3cce8f12e0f014aed0704ae202 introduced the necessary
+>>>> binding to do this, so use it.
+>>>>
+>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>> ---
+>>>>  arch/arm/boot/dts/omap3-overo.dtsi | 5 +++++
+>>>>  1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> index aea64c0..018e1e0 100644
+>>>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> @@ -73,6 +73,11 @@
+>>>>  			codec {
+>>>>  			};
+>>>>  		};
+>>>> +
+>>>> +		twl_power: power {
+>>>> +			compatible = "ti,twl4030-power";
+>>>> +			ti,use_poweroff;
+>>>> +		};
+>>>>  	};
+>>>>  };
+>>>>  
+>>>>
+>>> Urrgh.. this slipped past.. :(
+>>>
+>>> ti,system-power-controller is traditionally used for other PMICs from
+>>> TI to indicate that poweroff functionality will be provided by the
+>>> PMIC driver. similar approach is taken by Maxim as well.. I know the
+>>> commit introducing the binding has been around for long, but
+>>> considering that we do not have a single dts using this yet, should we
+>>> consider adding "ti,system-power-controller"(as against removing
+>>> ti,use_poweroff - so that older down stream dtbs still work) and using
+>>> it in the new code?
+>>>
+>>
+>> It does make sense, so I am not against it. My only concern is that I
+>> find the name to be slightly less easy to understand, but I can live
+>> with it :-)
+> :)
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-your resolution and the two earlier ones from today[1] all look right
+>>
+>> I do not remember if DT maintainers came up with a clear policy to
+>> deprecate a binding.
+> I dont think we can depreciate a binding [1] - as you mentioned -
+> renaming the property is probably what is appropriate, but introducing
+> a new one which has the same behavior as the old one does'nt seem
+> covered either.. considering potential downstream kernel usage, I'd
+> suggest additional property inline with today's convention.
+> 
 
-Best regards
-Uwe
+Ok, so I will drop this patch from the series, so that the other patches
+can hopefully go into 3.15. I will address this issue separately. Thank
+you for pointing out this binding issue.
 
-[1] The conflicts with
-
-	ddb902cc3459 ("ARM: centralize common multi-platform kconfig options")
-	9352b05b6e4e ("ARM: select MIGHT_HAVE_CACHE_L2X0 for V6 and V7 multi-platform")
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Florian
