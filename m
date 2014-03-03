@@ -1,40 +1,46 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 3 Mar 2014 14:27:23 -0800
-Subject: Tegra baseline test results for v3.14-rc5
-Message-ID: <531501CB.4010101@nvidia.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 03 Mar 2014 17:29:08 -0500
+Subject: [PATCH v4 0/6] generic early_ioremap support
+In-Reply-To: <530CF21E.1020603@zytor.com>
+References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
+ <1393337404.7307.51.camel@deneb.redhat.com>
+ <20140225183012.GA27164@mudshark.cambridge.arm.com>
+ <1393353942.26583.10.camel@deneb.redhat.com> <530CF21E.1020603@zytor.com>
+Message-ID: <1393885748.5094.14.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.14-rc5.
-Logs and other details at:
+On Tue, 2014-02-25 at 11:42 -0800, H. Peter Anvin wrote:
+> On 02/25/2014 10:45 AM, Mark Salter wrote:
+> > On Tue, 2014-02-25 at 18:30 +0000, Will Deacon wrote:
+> >> I'd suggest spitting the core part out from the arch-specific parts. That
+> >> way, the core part can merged independently and architectures can move over
+> >> as they see fit. It also signals (at least to me) that, "hey, I should
+> >> probably review this" whilst my current stance is "there's a whole load of
+> >> stuff under mm/ that needs to be acked first".
+> >>
+> >> If you put the whole thing into next, you just run the risk of conflicts
+> >> with all the arch trees.
+> > 
+> > I've been thinking of breaking out the common bits and x86 bits and just
+> > going with that for now. There's no point in just doing the common bits
+> > because it won't get tested without at least one architecture using it.
+> > 
+> 
+> If you think it makes sense we could take the common bits + x86 and put
+> them through the -tip tree.  The other option would be to put the whole
+> thread in linux-next with Acks.
+> 
+> As far as x86 is concerned it looks like it is mostly just code
+> movement, so I'm happy giving my:
+> 
+> Acked-by: H. Peter Anvin <hpa@linux.intel.com>
+> 
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc5/20140302193106/
+I going to send out a v5 with the arm bits dropped and Ack-bys added.
+There is still some work left there, so I think I'll redo the arm bits
+separately after once the common bits are in the kernel.
 
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691)):
-    text     data      bss    total  kernel
-    +379      -16        0     +363  multi_v7_defconfig
-    +387        0        0     +387  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Peter, is your Acked-by only for "[3/6] x86: use generic early_ioremap"?
+Or did you intend "[1/6] x86/mm: sparse warning fix for early_memremap"
+and/or "[2/6] mm: create generic early_ioremap() support" also?
