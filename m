@@ -1,281 +1,203 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 3 Mar 2014 17:29:00 +0530
-Subject: [PATCH V9 2/2] ARM: dts: Enable ahci sata and sata phy
-In-Reply-To: <1393824160-27040-3-git-send-email-yuvaraj.cd@samsung.com>
-References: <1393824160-27040-1-git-send-email-yuvaraj.cd@samsung.com>
- <1393824160-27040-3-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <53146E84.7060508@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Mar 2014 12:12:04 +0000
+Subject: Generic PM domains - too noisy?
+Message-ID: <20140303121204.GH21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rafael,
 
+I've been trying out the generic PM domains support with a small driver
+on Marvell Dove.  At the moment, I have just one domain with one device
+in it, and it's quite basic in that all it does is provide a power_on
+and power_off hook.
 
-On Monday 03 March 2014 10:52 AM, Yuvaraj Kumar C D wrote:
-> This patch adds dt entry for ahci sata controller and its
-> corresponding phy controller.phy node has been added w.r.t
-> new generic phy framework.
->
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+Both of these hooks read/write three registers in sequence under a spin
+lock, so nothing too heavy.  The lock is only taken by this code, so at
+the moment there's no contention on that lock.
 
-This should go via exynos dt tree.
+However, what I find is that it's very noisy in the kernel log, printing
+much of this at warning level:
 
-FWIW
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Changes since V8:
-> 	1.sata at 122f0000 and sata_phy at 12170000 disabled by default in
-> 	  SOC specific dts file and enabled the same in board dts file.
->
-> Changes since V7:
-> 	1.syscon-phandle name updated.
->
-> Changes since V6:none
->
-> Changes since V5:none
->
-> Changes since V4:
-> 	1.Used the new phandle "sata_phy_i2c" in the DT entry.
-> 	2.Updated binding document.
->
-> Changes since V3:
-> 	1.Moved the binding info to the /bindings/phy/
->
-> Changes since V2:
-> 	1.Used syscon interface to PMU handling.
-> 	2.Changed "sata-phy-i2c" to "exynos-sataphy-i2c".
->
-> Changes since V1:
-> 	1.Minor changes to node name convention.
-> 	2.Updated binding document.
->
->
->   .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --------
->   .../devicetree/bindings/ata/exynos-sata.txt        |   25 +++++++++-----
->   .../devicetree/bindings/phy/samsung-phy.txt        |   36 ++++++++++++++++++++
->   arch/arm/boot/dts/exynos5250-arndale.dts           |   21 ++++++++++++
->   arch/arm/boot/dts/exynos5250-smdk5250.dts          |   17 +++++----
->   arch/arm/boot/dts/exynos5250.dtsi                  |   18 +++++++---
->   6 files changed, 98 insertions(+), 33 deletions(-)
->   delete mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
->
-> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-> deleted file mode 100644
-> index 37824fa..0000000
-> --- a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-> +++ /dev/null
-> @@ -1,14 +0,0 @@
-> -* Samsung SATA PHY Controller
-> -
-> -SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
-> -Each SATA PHY controller should have its own node.
-> -
-> -Required properties:
-> -- compatible        : compatible list, contains "samsung,exynos5-sata-phy"
-> -- reg               : <registers mapping>
-> -
-> -Example:
-> -        sata at ffe07000 {
-> -                compatible = "samsung,exynos5-sata-phy";
-> -                reg = <0xffe07000 0x1000>;
-> -        };
-> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> index 0849f10..b2adb1f 100644
-> --- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> +++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> @@ -4,14 +4,21 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
->   Each SATA controller should have its own node.
->
->   Required properties:
-> -- compatible        : compatible list, contains "samsung,exynos5-sata"
-> -- interrupts        : <interrupt mapping for SATA IRQ>
-> -- reg               : <registers mapping>
-> -- samsung,sata-freq : <frequency in MHz>
-> +- compatible		: compatible list, contains "samsung,exynos5-sata"
-> +- interrupts		: <interrupt mapping for SATA IRQ>
-> +- reg			: <registers mapping>
-> +- samsung,sata-freq	: <frequency in MHz>
-> +- phys			: as mentioned in phy-bindings.txt
-> +- phy-names		: as mentioned in phy-bindings.txt
->
->   Example:
-> -        sata at ffe08000 {
-> -                compatible = "samsung,exynos5-sata";
-> -                reg = <0xffe08000 0x1000>;
-> -                interrupts = <115>;
-> -        };
-> +	sata at 122f0000 {
-> +		compatible = "snps,dwc-ahci";
-> +		samsung,sata-freq = <66>;
-> +		reg = <0x122f0000 0x1ff>;
-> +		interrupts = <0 115 0>;
-> +		clocks = <&clock 277>, <&clock 143>;
-> +		clock-names = "sata", "sclk_sata";
-> +		phys = <&sata_phy>;
-> +		phy-names = "sata-phy";
-> +	};
-> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> index c0fccaa..a937f75 100644
-> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> @@ -20,3 +20,39 @@ Required properties:
->   - compatible : should be "samsung,exynos5250-dp-video-phy";
->   - reg : offset and length of the Display Port PHY register set;
->   - #phy-cells : from the generic PHY bindings, must be 0;
-> +
-> +Samsung SATA PHY Controller
-> +---------------------------
-> +
-> +SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
-> +Each SATA PHY controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains "samsung,exynos5250-sata-phy"
-> +- reg : offset and length of the SATA PHY register set;
-> +- #phy-cells : from the generic phy bindings;
-> +
-> +Example:
-> +	sata_phy: sata-phy at 12170000 {
-> +		compatible = "samsung,exynos5250-sata-phy";
-> +		reg = <0x12170000 0x1ff>;
-> +		clocks = <&clock 287>;
-> +		clock-names = "sata_phyctrl";
-> +		#phy-cells = <0>;
-> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
-> +		samsung,syscon-phandle = <&pmu_syscon>;
-> +	};
-> +
-> +Device-Tree bindings for sataphy i2c client driver
-> +--------------------------------------------------
-> +
-> +Required properties:
-> +compatible: Should be "samsung,exynos-sataphy-i2c"
-> +- reg: I2C address of the sataphy i2c device.
-> +
-> +Example:
-> +
-> +	sata_phy_i2c:sata-phy at 38 {
-> +		compatible = "samsung,exynos-sataphy-i2c";
-> +		reg = <0x38>;
-> +	};
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index 38b96a4..97eef40 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -375,6 +375,27 @@
->   		};
->   	};
->
-> +	i2c at 121D0000 {
-> +		status = "okay";
-> +		samsung,i2c-sda-delay = <100>;
-> +		samsung,i2c-max-bus-freq = <40000>;
-> +		samsung,i2c-slave-addr = <0x38>;
-> +
-> +		sata_phy_i2c:sata-phy at 38 {
-> +			compatible = "samsung,exynos-sataphy-i2c";
-> +			reg = <0x38>;
-> +		};
-> +	};
-> +
-> +	sata at 122F0000 {
-> +		status = "okay";
-> +	};
-> +
-> +	sata-phy at 12170000 {
-> +		status = "okay";
-> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
-> +	};
-> +
->   	mmc_0: mmc at 12200000 {
->   		status = "okay";
->   		num-slots = <1>;
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 0837dd8..e0da05b 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -100,16 +100,12 @@
->   		samsung,i2c-slave-addr = <0x38>;
->   		status = "okay";
->
-> -		sata-phy {
-> -			compatible = "samsung,sata-phy";
-> +		sata_phy_i2c:sata-phy at 38 {
-> +			compatible = "samsung,exynos-sataphy-i2c";
->   			reg = <0x38>;
->   		};
->   	};
->
-> -	sata at 122F0000 {
-> -		samsung,sata-freq = <66>;
-> -	};
-> -
->   	i2c at 12C80000 {
->   		samsung,i2c-sda-delay = <100>;
->   		samsung,i2c-max-bus-freq = <66000>;
-> @@ -132,6 +128,15 @@
->   		};
->   	};
->
-> +	sata at 122F0000 {
-> +		status = "okay";
-> +	};
-> +
-> +	sata-phy at 12170000 {
-> +		status = "okay";
-> +		samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
-> +	};
-> +
->   	mmc at 12200000 {
->   		status = "okay";
->   		num-slots = <1>;
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 8f6300f..31f7cab 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -46,6 +46,7 @@
->   		i2c6 = &i2c_6;
->   		i2c7 = &i2c_7;
->   		i2c8 = &i2c_8;
-> +		i2c9 = &i2c_9;
->   		pinctrl0 = &pinctrl_0;
->   		pinctrl1 = &pinctrl_1;
->   		pinctrl2 = &pinctrl_2;
-> @@ -233,16 +234,25 @@
->   	};
->
->   	sata at 122F0000 {
-> -		compatible = "samsung,exynos5-sata-ahci";
-> +		compatible = "snps,dwc-ahci";
-> +		samsung,sata-freq = <66>;
->   		reg = <0x122F0000 0x1ff>;
->   		interrupts = <0 115 0>;
->   		clocks = <&clock 277>, <&clock 143>;
->   		clock-names = "sata", "sclk_sata";
-> +		phys = <&sata_phy>;
-> +		phy-names = "sata-phy";
-> +		status = "disabled";
->   	};
->
-> -	sata-phy at 12170000 {
-> -		compatible = "samsung,exynos5-sata-phy";
-> +	sata_phy: sata-phy at 12170000 {
-> +		compatible = "samsung,exynos5250-sata-phy";
->   		reg = <0x12170000 0x1ff>;
-> +		clocks = <&clock 287>;
-> +		clock-names = "sata_phyctrl";
-> +		#phy-cells = <0>;
-> +		samsung,syscon-phandle = <&pmu_system_controller>;
-> +		status = "disabled";
->   	};
->
->   	i2c_0: i2c at 12C60000 {
-> @@ -360,7 +370,7 @@
->   		status = "disabled";
->   	};
->
-> -	i2c at 121D0000 {
-> +	i2c_9: i2c at 121D0000 {
->                   compatible = "samsung,exynos5-sata-phy-i2c";
->                   reg = <0x121D0000 0x100>;
->                   #address-cells = <1>;
->
+ap510-vmeta ap510-vmeta.0: start latency exceeded, new value 2352 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 3594 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 2784 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3234 ns
+vpu: Power-off latency exceeded, new value 12025 ns
+vpu: Power-on latency exceeded, new value 12156 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3342 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 3840 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3564 ns
+vpu: Power-off latency exceeded, new value 104996 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3570 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3612 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 2790 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 2808 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3636 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 3924 ns
+vpu: Power-on latency exceeded, new value 21000 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 3732 ns
+vpu: Power-on latency exceeded, new value 5066544 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 3942 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 27006 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 27072 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 130850 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 59821 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 181628 ns
+vpu: Power-off latency exceeded, new value 215840 ns
+ap510-vmeta ap510-vmeta.0: start latency exceeded, new value 73057 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 86659 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 155288 ns
+ap510-vmeta ap510-vmeta.0: start latency exceeded, new value 143629 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 156973 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 135715 ns
+ap510-vmeta ap510-vmeta.0: state save latency exceeded, new value 364768 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 484019 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 355288 ns
+ap510-vmeta ap510-vmeta.0: state restore latency exceeded, new value 1981264 ns
+ap510-vmeta ap510-vmeta.0: start latency exceeded, new value 521765 ns
+ap510-vmeta ap510-vmeta.0: start latency exceeded, new value 616560 ns
+vpu: Power-off latency exceeded, new value 495882 ns
+vpu: Power-off latency exceeded, new value 501834 ns
+ap510-vmeta ap510-vmeta.0: stop latency exceeded, new value 436259 ns
+
+Rerally, the power on/power off latency should be small - which it would
+be if only this code was being run and measured.
+
+However, when you factor in interrupts, context switches due to preemption,
+etc, it quickly becomes apparent that measuring the absolute time that it
+takes for a handler to complete is nonsense - not only are you measuring
+the latency of that handler to complete, but if the kernel ends up by way
+of preemption switching to another thread, your latency includes the time
+it takes for the system to return back to running the handler.  The more
+the system is loaded, the longer these latency measurements will be.
+
+So, here's the question: what use is this information which can be wrong
+by a factor of 300x or more, and why does it need to be printed at
+warning level?
+
+Here's my code:
+
+struct pmu_data {
+        spinlock_t lock;
+};
+
+struct pmu_domain {
+        struct pmu_data *pmu;
+        unsigned int pwr_mask;
+        unsigned int rst_mask;
+        unsigned int iso_mask;
+        struct generic_pm_domain base;
+};
+
+#define to_pmu_domain(dom) container_of(dom, struct pmu_domain, base)
+
+static int pmu_domain_power_off(struct generic_pm_domain *domain)
+{
+        struct pmu_domain *pmu_dom = to_pmu_domain(domain);
+        struct pmu_data *pmu = pmu_dom->pmu;
+        unsigned long flags;
+        unsigned int val;
+
+        spin_lock_irqsave(&pmu->lock, flags);
+
+        /* Enable isolators */
+        if (pmu_dom->iso_mask) {
+                val = readl(PMU_ISO_CTRL_REG);
+                val &= ~pmu_dom->iso_mask;
+                writel(val, PMU_ISO_CTRL_REG);
+        }
+
+        /* Reset unit */
+        if (pmu_dom->rst_mask) {
+                val = readl(PMU_SW_RST_CTRL_REG);
+                val &= ~pmu_dom->rst_mask;
+                writel(val, PMU_SW_RST_CTRL_REG);
+        }
+
+        /* Power down */
+        val = readl(PMU_PWR_SUPLY_CTRL_REG);
+        val |= pmu_dom->pwr_mask;
+        writel(val, PMU_PWR_SUPLY_CTRL_REG);
+
+        spin_unlock_irqrestore(&pmu->lock, flags);
+
+        return 0;
+}
+
+static int pmu_domain_power_on(struct generic_pm_domain *domain)
+{
+        struct pmu_domain *pmu_dom = to_pmu_domain(domain);
+        struct pmu_data *pmu = pmu_dom->pmu;
+        unsigned long flags;
+        unsigned int val;
+
+        spin_lock_irqsave(&pmu->lock, flags);
+
+        /* Power on */
+        val = readl(PMU_PWR_SUPLY_CTRL_REG);
+        val &= ~pmu_dom->pwr_mask;
+        writel(val, PMU_PWR_SUPLY_CTRL_REG);
+
+        /* Release reset */
+        if (pmu_dom->rst_mask) {
+                val = readl(PMU_SW_RST_CTRL_REG);
+                val |= pmu_dom->rst_mask;
+                writel(val, PMU_SW_RST_CTRL_REG);
+        }
+
+        /* Disable isolators */
+        if (pmu_dom->iso_mask) {
+                val = readl(PMU_ISO_CTRL_REG);
+                val |= pmu_dom->iso_mask;
+                writel(val, PMU_ISO_CTRL_REG);
+        }
+
+        spin_unlock_irqrestore(&pmu->lock, flags);
+
+        return 0;
+}
+
+static struct pmu_data pmu = {
+        .lock   = __SPIN_LOCK_UNLOCKED(&pmu.lock),
+};
+
+static struct pmu_domain vpu_domain = {
+        .pmu = &pmu,
+        .pwr_mask = PMU_PWR_VPU_PWR_DWN_MASK,
+        .rst_mask = PMU_SW_RST_VIDEO_MASK,
+        .iso_mask = PMU_ISO_VIDEO_MASK,
+        .base = {
+                .name = "vpu",
+                .dev_irq_safe = true,
+                .power_off = pmu_domain_power_off,
+                .power_on = pmu_domain_power_on,
+        },
+};
+
+static void pmu_domain_register(struct pmu_domain *pmu_dom)
+{
+        unsigned int val;
+
+        val = readl(PMU_PWR_SUPLY_CTRL_REG);
+
+        return pm_genpd_init(&pmu_dom->base, NULL, !(val & pmu_dom->pwr_mask));
+}
+...
+
+        pmu_domain_register(&vpu_domain);
+        pm_genpd_poweroff_unused();
+
+In the driver, on probe:
+
+        pm_runtime_use_autosuspend(&pdev->dev);
+        pm_runtime_enable(&pdev->dev);
+
+and then I'm calling pm_runtime_get_sync(), pm_runtime_mark_last_busy()
+and pm_runtime_put_autosuspend() at appropriate points - yes, I'm aware
+that the autosuspend delay will be zero at this point which means
+immediate suspend on put_autosuspend().
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
