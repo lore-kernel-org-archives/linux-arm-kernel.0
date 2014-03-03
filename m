@@ -1,44 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 2 Mar 2014 17:13:00 -0800
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140301152756.67A02C40238@trevor.secretlab.ca>
-References: <20140226183454.GA14639@cbox>
- <20140301152756.67A02C40238@trevor.secretlab.ca>
-Message-ID: <20140303011300.GB12962@lvm>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 3 Mar 2014 01:49:01 +0000
+Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
+In-Reply-To: <53109A64.9030701@ti.com>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-5-git-send-email-santosh.shilimkar@ti.com>
+ <10040083.PbPEQQPCjl@wuerfel> <53109A64.9030701@ti.com>
+Message-ID: <20140303014901.GA18773@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
-> Hi Christoffer. I've got another comment on the text, this time about the format of the ESP:
-> 
-> On Wed, 26 Feb 2014 10:34:54 -0800, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> [...]
-> > Image format
-> > ------------
-> > The image format, as presented to the VM, needs to be well-defined in
-> > order for prepared disk images to be bootable across various
-> > virtualization implementations.
+On Fri, Feb 28, 2014 at 09:17:08AM -0500, Santosh Shilimkar wrote:
+> On Friday 28 February 2014 04:39 AM, Arnd Bergmann wrote:
+> > On Thursday 27 February 2014 16:17:49 Santosh Shilimkar wrote:
+> >> +
+> >> +/**
+> >> + * of_dma_is_coherent - Check if device is coherent
+> >> + * @np:        device node
+> >> + *
+> >> + * It returns true if "dma-coherent" property was found
+> >> + * for this device in DT.
+> >> + */
+> >> +bool of_dma_is_coherent(struct device_node *np)
+> >> +{
+> >> +       struct device_node *node = np;
+> >> +
+> >> +       while (node) {
+> >> +               if (of_property_read_bool(node, "dma-coherent")) {
+> >> +                       of_node_put(node);
+> >> +                       return true;
+> >> +               }
+> >> +               node = of_get_next_parent(node);
+> >> +       }
+> >> +       return false;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
+> >>
 > > 
-> > The raw disk format as presented to the VM must be partitioned with a
-> > GUID Partition Table (GPT).  The bootable software must be placed in the
-> > EFI System Partition (ESP), using the UEFI removable media path, and
-> > must be an EFI application complying to the UEFI Specification 2.4
-> > Revision A [6].
+> > This won't work on architectures that are always coherent and
+> > did not need 'dma-coherent' properties before, such as IBM
+> > Power servers.
 > > 
-> > The ESP partition's GPT entry's partition type GUID must be
-> > C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> > formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+> > That said, I think the property makes sense, and we already have
+> > platforms using it (highbank is the one I'm aware of).
 > > 
-> > The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> > execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> > state.
+> > We probably need ways to override this function in both ways:
+> > "always coherent" (powerpc, x86), and "never coherent" (keystone
+> > without LPAE) from platform code, and it would be nice to put
+> > either option into DT in a global location as well. We may have
+> > to go through a few iterations of this patch to get the best
+> > algorithm, but I think the interface is good at least.
 > 
-> I would also reference section 3.3 (Boot Option Variables Default Boot
-> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
-> restate the meaning of the requirement in this spec, but the UEFI spec
-> is the authoritative source. Distributed VM disk images fall under the
-> same scenario as the firmware not having any valid boot variables.
+> Probably we should discuss bit more next week at connect. The
+> current 'dma-coherent' is a per device property. For arch's
+> which are always coherent, the per device property doesn't make
+> sense.
 > 
-ack, thanks.
+> BTW, the current users of this API is only ARM32 bit port
+> and if this satisfies the ARM platforms, we should get
+> this in kernel and then address other cases on need
+> basis.
 
--Christoffer
+I have a suspicion that we'll need this API on arm64 at some point as
+well. I get regular questions about DMA cache maintenance for arm64 and
+I carried a patch in my tree for a long time (now in -next). While full
+coherency is nice, there are some devices on certain SoCs that are more
+efficient (power, speed) when they don't have to snoop the CPU caches.
+
+-- 
+Catalin
