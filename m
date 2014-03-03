@@ -1,48 +1,86 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 3 Mar 2014 16:41:49 +0800
-Subject: [PATCH v12 06/15] usb: phy-mxs: change description of usb device speed
+Date: Mon, 3 Mar 2014 16:41:50 +0800
+Subject: [PATCH v12 07/15] usb: phy-mxs: Enable IC fixes for related SoCs
 In-Reply-To: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
 References: <1393836118-4265-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393836118-4265-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393836118-4265-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change "high speed" to "HS"
-Change "non-high speed" to "FS/LS"
-
-Implementation of notify_suspend and notify_resume will be different
-according to mxs_phy_data->flags.
+Two PHY bugs are fixed by IC logic, but these bits are not
+enabled by default, so we enable them at driver.
+The two bugs are: MXS_PHY_ABNORMAL_IN_SUSPEND and MXS_PHY_SENDING_SOF_TOO_FAST
+which are described at code.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
+ 1 files changed, 21 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 2411e05..1663a66 100644
+index 1663a66..cb71135 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -168,8 +168,8 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- static int mxs_phy_on_connect(struct usb_phy *phy,
- 		enum usb_device_speed speed)
- {
--	dev_dbg(phy->dev, "%s speed device has connected\n",
--		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+	dev_dbg(phy->dev, "%s device has connected\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
+@@ -31,6 +31,10 @@
+ #define HW_USBPHY_CTRL_SET			0x34
+ #define HW_USBPHY_CTRL_CLR			0x38
  
- 	if (speed == USB_SPEED_HIGH)
- 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-@@ -181,8 +181,8 @@ static int mxs_phy_on_connect(struct usb_phy *phy,
- static int mxs_phy_on_disconnect(struct usb_phy *phy,
- 		enum usb_device_speed speed)
- {
--	dev_dbg(phy->dev, "%s speed device has disconnected\n",
--		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+	dev_dbg(phy->dev, "%s device has disconnected\n",
-+		(speed == USB_SPEED_HIGH) ? "HS" : "FS/LS");
++#define HW_USBPHY_IP				0x90
++#define HW_USBPHY_IP_SET			0x94
++#define HW_USBPHY_IP_CLR			0x98
++
+ #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+ #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+ #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
+@@ -42,6 +46,8 @@
+ #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+ #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
  
- 	if (speed == USB_SPEED_HIGH)
- 		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
++
+ #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+ 
+ /* Do disconnection between PHY and controller without vbus */
+@@ -60,6 +66,14 @@
+  */
+ #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
+ 
++/*
++ * IC has bug fixes logic, they include
++ * MXS_PHY_ABNORMAL_IN_SUSPEND and MXS_PHY_SENDING_SOF_TOO_FAST
++ * which are described at above flags, the RTL will handle it
++ * according to different versions.
++ */
++#define MXS_PHY_NEED_IP_FIX			BIT(3)
++
+ struct mxs_phy_data {
+ 	unsigned int flags;
+ };
+@@ -70,11 +84,13 @@ static const struct mxs_phy_data imx23_phy_data = {
+ 
+ static const struct mxs_phy_data imx6q_phy_data = {
+ 	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
+-		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
++		MXS_PHY_NEED_IP_FIX,
+ };
+ 
+ static const struct mxs_phy_data imx6sl_phy_data = {
+-	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
++		MXS_PHY_NEED_IP_FIX,
+ };
+ 
+ static const struct of_device_id mxs_phy_dt_ids[] = {
+@@ -118,6 +134,9 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ 		BM_USBPHY_CTRL_ENUTMILEVEL3,
+ 	       base + HW_USBPHY_CTRL_SET);
+ 
++	if (mxs_phy->data->flags & MXS_PHY_NEED_IP_FIX)
++		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.8
