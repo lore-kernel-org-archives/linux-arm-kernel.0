@@ -1,76 +1,77 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 3 Mar 2014 20:20:16 +0530
-Subject: [RESEND Patch 0/9] dts pending patches for TI omap
-Message-ID: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
+Date: Mon, 3 Mar 2014 20:20:18 +0530
+Subject: [RESEND Patch 1/9] ARM: dts: am437x gp-evm: add sd card dt nodes
+In-Reply-To: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
+References: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1393858226-32595-3-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit/Tony
+From: Balaji T K <balajitk@ti.com>
 
-Here I am send all the pending dt patches that can go into 3.15 merge window,
-all the patches were already posted to mailing list and has beed reviewed.
+enable sd card slot on am437x-gp-evm
 
-I have rebased the patches on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.15/dt
-and fixed all the merge conflicts.
+Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ arch/arm/boot/dts/am437x-gp-evm.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Pasting the mail archive for the patches series
-
-* Add ABB device nodes
-http://linux-kernel.2935.n7.nabble.com/PATCH-0-4-ARM-dts-OMAP3630-Add-ABB-device-nodes-td794852.html
-
-* MMC hot plug support
-http://mail.blameitonlove.com/lists/linux-omap/msg101933.html
-Dropped [PATCH 2/3] ARM: dts: am335x-evmsk: add SD card hotplug support as this
-is already merged with commit id 29ea5efb0bb612d352aa360de26e2095cb230e4a
-
-* DRA7 Cross bar DTS patches
-Cross bar driver has been pulled for next merge, so the dts patches can also
-be pulled for next merge window.
-
-Here is the pull request for the same patch series.
-
-The following changes since commit f777ba1780584b100ab9664cc06d04f3bb273a84:
-
-  Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
-
-are available in the git repository at:
-
-
-  git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git omapdt-for-3.15
-
-for you to fetch changes up to 5f78b45aa45c5b2c4de895c3b0740fda4684dae4:
-
-  ARM: DTS: DRA7: Add routable-irqs property for gic node (2014-03-03 19:53:25 +0530)
-
-----------------------------------------------------------------
-Andrii.Tseglytskyi (2):
-      ARM: dts: OMAP36xx: Add device node for ABB
-      ARM: dts: OMAP4: Add device nodes for ABB
-
-Balaji T K (3):
-      ARM: dts: am437x gp-evm: add sd card dt nodes
-      ARM: dts: am335x-evm: add SD card hotplug support
-      ARM: dts: am43x-epos-evm: add SD card hotplug support
-
-Nishanth Menon (1):
-      ARM: dts: DRA7: Add device nodes for ABB
-
-Sricharan R (3):
-      ARM: DTS: DRA7: Add crossbar device binding
-      ARM: DTS: DRA7: Replace peripheral interrupt numbers with crossbar inputs
-      ARM: DTS: DRA7: Add routable-irqs property for gic node
-
- arch/arm/boot/dts/am335x-evm.dts     |   9 ++
- arch/arm/boot/dts/am4372.dtsi        |   1 +
- arch/arm/boot/dts/am437x-gp-evm.dts  |  27 +++++
- arch/arm/boot/dts/am43x-epos-evm.dts |   9 ++
- arch/arm/boot/dts/dra7.dtsi          | 227 ++++++++++++++++++++++++++++-------
- arch/arm/boot/dts/omap36xx.dtsi      |  20 +++
- arch/arm/boot/dts/omap4.dtsi         |  26 ++++
- arch/arm/boot/dts/omap443x.dtsi      |  26 ++++
- arch/arm/boot/dts/omap4460.dtsi      |  37 ++++++
- 9 files changed, 339 insertions(+), 43 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 4eb72b8..df8798e 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -19,6 +19,14 @@
+ 	model = "TI AM437x GP EVM";
+ 	compatible = "ti,am437x-gp-evm","ti,am4372","ti,am43";
+ 
++	vmmcsd_fixed: fixedregulator-sd {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmcsd_fixed";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++	};
++
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&ecap0 0 50000 PWM_POLARITY_INVERTED>;
+@@ -62,6 +70,12 @@
+ 		>;
+ 	};
+ 
++	mmc1_pins: pinmux_mmc1_pins {
++		pinctrl-single,pins = <
++			0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
++		>;
++	};
++
+ 	ecap0_pins: backlight_pins {
+ 		pinctrl-single,pins = <
+ 			0x164 MUX_MODE0       /* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
+@@ -91,6 +105,10 @@
+ 	pinctrl-0 = <&ecap0_pins>;
+ };
+ 
++&gpio0 {
++	status = "okay";
++};
++
+ &gpio3 {
+ 	status = "okay";
+ };
+@@ -98,3 +116,12 @@
+ &gpio4 {
+ 	status = "okay";
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&vmmcsd_fixed>;
++	bus-width = <4>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++};
 -- 
 1.9.0
