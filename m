@@ -1,95 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 3 Mar 2014 10:56:16 +0900
-Subject: [PATCH 6/7] regulator: AXP20x: Add support for regulators
- subsystem
-In-Reply-To: <1393692352-10839-7-git-send-email-carlo@caione.org>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
-Message-ID: <20140303015616.GN2411@sirena.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 3 Mar 2014 11:45:16 +0800
+Subject: nand pmecc crash detected
+In-Reply-To: <5310B108.8040800@celad.com>
+References: <5310B108.8040800@celad.com>
+Message-ID: <5313FACC.8030202@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
+Dear Herve
 
-> index d59c826..0cef101 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -69,3 +69,4 @@ CONFIG_NFS_FS=y
->  CONFIG_ROOT_NFS=y
->  CONFIG_NLS=y
->  CONFIG_PRINTK_TIME=y
-> +CONFIG_REGULATOR_AXP20X=y
+On 2/28/2014 11:53 PM, Herve Codina wrote:
+> Hi,
+>
+> I am using an sam5d35 and its pmecc nand ecc controller.
+>
+> In barebox, using similar atmel_nand.c the system crashes.
+>
+> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+> (nand_base.c) when we write a sub page.
+>
+> chip->ecc.hwctl function is not set when we are using PMECC controller.
+>
+> As a workaround, i set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+> order to disable sub page access in nand_write_page.
+>
+> I think we can have the same problem in Linux. I do not performed
+> subpage nand writes from Linux but i made the following patch according
+> to my Barebox defect.
 
-If you want to update the defconfig do it in a separate patch.
+Thank you for catching this crash bug. The fix is fine for me. But I 
+think it's better to send out the Linux kernel patch alone.
 
-> +static int axp20x_set_suspend_voltage(struct regulator_dev *rdev, int uV)
-> +{
-> +	return regulator_set_voltage_sel_regmap(rdev, 0);
-> +}
+You can rebase your patch on the top of Linux-mtd git 
+repo(git://git.infradead.org/l2-mtd.git) instead of your local Linux.
+Then use 'git send-email' send to linux-mtd at lists.infradead.org and 
+linux-arm-kernel at lists.infradead.org. I will ack your patch.
 
-I'm not entirely clear what this is supposed to do but it's broken - it
-both ignores the voltage that is passed in and immediately writes to the
-normal voltage select register which will presumably distrupt the system.
+If the patch is merged in Linux-mtd, it should be easier port to barebox 
+then.
 
-> +static int axp20x_io_enable_regmap(struct regulator_dev *rdev)
-> +{
-> +	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-> +				  rdev->desc->enable_mask, AXP20X_IO_ENABLED);
-> +}
+>
+> Here after are my patches (same modification) for 1st my local Barebox
+> and 2nd my local Linux :
+>
+> ---8<-------------------
+>  From 757e8dbf141619a55b7a5b1ca11780b2589eacc1 Mon Sep 17 00:00:00 2001
+> From: Herve Codina <Herve.CODINA@celad.com>
+> Date: Fri, 28 Feb 2014 08:39:08 +0100
+> Subject: [PATCH 5/5] Disable Subpage nand write when using Atmel PMECC.
+>
+>
+> Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+> ---
+>   drivers/mtd/nand/atmel_nand.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 2ff7427..cdbe685 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -837,6 +837,7 @@ static int __init
+> atmel_pmecc_nand_init_params(struct device_d *dev,
+>   		return err_no;
+>   	}
+>
+> +	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
+>   	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+>   	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
+>
 
-Please make some helpers for this (or extend the existing ones to cope
-with more than a single bit control) - there's several other devices
-which have similar multi-bit controls so we should factor this out
-rather than open coding.
-
-> +	np = of_node_get(pdev->dev.parent->of_node);
-> +	if (!np)
-> +		return 0;
-> +
-> +	regulators = of_find_node_by_name(np, "regulators");
-> +	if (!regulators) {
-> +		dev_err(&pdev->dev, "regulators node not found\n");
-> +		return -EINVAL;
-> +	}
-
-The driver should be able to start up with no configuration provided at
-all except for the device being registered - the user won't be able to
-change anything but they will be able to read the current state of the
-hardware which can be useful for diagnostics.
-
-> +static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 workmode)
-> +{
-> +	unsigned int mask = AXP20X_WORKMODE_DCDC2_MASK;
-> +
-> +	if ((id != AXP20X_DCDC2) && (id != AXP20X_DCDC3))
-> +		return -EINVAL;
-> +
-> +	if (id == AXP20X_DCDC3)
-> +		mask = AXP20X_WORKMODE_DCDC3_MASK;
-> +
-> +	return regmap_update_bits(rdev->regmap, AXP20X_DCDC_MODE, mask, workmode);
-> +}
-
-What is a workmode?
-
-> +		pmic->rdev[i] = regulator_register(&pmic->rdesc[i], &config);
-> +		if (IS_ERR(pmic->rdev[i])) {
-
-Use devm_regulator_register() and then you don't need to clean up the
-regulators either.
-
-> +static int __init axp20x_regulator_init(void)
-> +{
-> +	return platform_driver_register(&axp20x_regulator_driver);
-> +}
-> +
-> +subsys_initcall(axp20x_regulator_init);
-
-module_platform_driver().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/19ba4f02/attachment.sig>
+Best Regards,
+Josh Wu
