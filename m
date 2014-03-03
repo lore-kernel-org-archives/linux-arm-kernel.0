@@ -1,46 +1,161 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 03 Mar 2014 17:38:49 +0100
-Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping
- when DEBUG is enabled
-In-Reply-To: <20140303163308.GA10987@saruman.home>
-References: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
- <20140303163308.GA10987@saruman.home>
-Message-ID: <5314B019.9040505@free-electrons.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 3 Mar 2014 10:41:10 -0600
+Subject: [PATCH 2/3] soc: keystone: add QMSS driver
+In-Reply-To: <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1568CFCC-C778-4116-95F6-4EB407F096D6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2014 17:33, Felipe Balbi wrote:
-> On Fri, Feb 28, 2014 at 03:34:01PM +0100, Gregory CLEMENT wrote:
->> The debug trace in the atmel_usba_stop function made the assumption
->> that the driver pointer passed in parameter was not NULL. Since the
->> commit "usb: gadget: udc-core: fix a regression during gadget driver
->> unbinding", it was no more always true. This lead to a kernel crash.
->>
->> This commit now use the driver pointer stored in udc which fixes this
->> issue.
->>
->> Since the commit which have triggered this issue was backported to the
->> 3.2 stable branch, then this one should also be backported to the same
->> kernel.
->>
->> Cc: stable at vger.kernel.org # v3.2+
->> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
+
+On Feb 28, 2014, at 5:18 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+
+> From: Sandeep Nair <sandeep_n@ti.com>
 > 
-> this line shouldn't be here and you're missing a SoB line, can't take
-> this patch, sorry.
+> The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+> the main hardware sub system which forms the backbone of the Keystone
+> Multi-core Navigator. QMSS consist of queue managers, packed-data structure
+> processors(PDSP), linking RAM, descriptor pools and infrastructure
+> Packet DMA.
+> 
+> The Queue Manager is a hardware module that is responsible for accelerating
+> management of the packet queues. Packets are queued/de-queued by writing or
+> reading descriptor address to a particular memory mapped location. The PDSPs
+> perform QMSS related functions like accumulation, QoS, or event management.
+> Linking RAM registers are used to link the descriptors which are stored in
+> descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+> 
+> The QMSS driver manages the PDSP setups, linking RAM regions,
+> queue pool management (allocation, push, pop and notify) and descriptor
+> pool management. The specifics on the device tree bindings for
+> QMSS can be found in:
+>        Documentation/devicetree/bindings/soc/keystone-qmss.txt
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> .../devicetree/bindings/soc/keystone-qmss.txt      |  209 +++
+> drivers/Kconfig                                    |    2 +
+> drivers/Makefile                                   |    3 +
+> drivers/soc/Kconfig                                |    2 +
+> drivers/soc/Makefile                               |    5 +
+> drivers/soc/keystone/Kconfig                       |   15 +
+> drivers/soc/keystone/Makefile                      |    5 +
+> drivers/soc/keystone/qmss_acc.c                    |  591 ++++++++
+> drivers/soc/keystone/qmss_queue.c                  | 1533 ++++++++++++++++++++
+> drivers/soc/keystone/qmss_queue.h                  |  236 +++
 
-Right, I forgot the -s option for this commit.
+So this should be drivers/soc/ti, much like we use vendor in drivers/net/ethernet
 
-and you want the "Fixes" line be before the Cc: line, right?
+> include/linux/soc/keystone_qmss.h                  |  390 +++++
 
-Thanks,
+include/linux/soc/ti/
 
-Gregory
+> 11 files changed, 2991 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/soc/keystone-qmss.txt
+> create mode 100644 drivers/soc/Makefile
+> create mode 100644 drivers/soc/keystone/Kconfig
+> create mode 100644 drivers/soc/keystone/Makefile
+> create mode 100644 drivers/soc/keystone/qmss_acc.c
+> create mode 100644 drivers/soc/keystone/qmss_queue.c
+> create mode 100644 drivers/soc/keystone/qmss_queue.h
+> create mode 100644 include/linux/soc/keystone_qmss.h
 
+[snip]
 
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index 37f955f..3220516 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -146,6 +146,8 @@ source "drivers/remoteproc/Kconfig"
+> 
+> source "drivers/rpmsg/Kconfig"
+> 
+> +source "drivers/soc/Kconfig"
+> +
+> source "drivers/devfreq/Kconfig"
+> 
+> source "drivers/extcon/Kconfig"
+> diff --git a/drivers/Makefile b/drivers/Makefile
+> index 0d8e2a4..0c22db8 100644
+> --- a/drivers/Makefile
+> +++ b/drivers/Makefile
+> @@ -146,6 +146,9 @@ obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
+> obj-$(CONFIG_REMOTEPROC)	+= remoteproc/
+> obj-$(CONFIG_RPMSG)		+= rpmsg/
+> 
+> +# SOC specific drivers
+> +obj-y				+= soc/
+> +
+> # Virtualization drivers
+> obj-$(CONFIG_VIRT_DRIVERS)	+= virt/
+> obj-$(CONFIG_HYPERV)		+= hv/
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index 2f9d7d0..59980bd 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -1,3 +1,5 @@
+> menu "SOC specific Drivers"
+> 
+> +source "drivers/soc/keystone/Kconfig"
+> +
+> endmenu
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> new file mode 100644
+> index 0000000..c5d141e
+> --- /dev/null
+> +++ b/drivers/soc/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for the Linux kernel SOC specific device drivers.
+> +#
+> +
+> +obj-$(CONFIG_ARCH_KEYSTONE)		+= keystone/
+> diff --git a/drivers/soc/keystone/Kconfig b/drivers/soc/keystone/Kconfig
+> new file mode 100644
+> index 0000000..0b3131b
+> --- /dev/null
+> +++ b/drivers/soc/keystone/Kconfig
+> @@ -0,0 +1,15 @@
+> +#
+> +# TI Keystone Soc drivers
+> +#
+> +
+
+We should have this be something like:
+
+menuconfig SOC_TI
+	bool ?TI SoC support?
+	
+
+if SOC_TI
+
+> +config KEYSTONE_QMSS
+> +	tristate "Keystone Queue Manager Sub System"
+> +	depends on ARCH_KEYSTONE
+> +	help
+> +	  Say y here to support the Keystone Hardware Queue Manager support.
+> +	  The Queue Manager is a hardware module that is responsible for
+> +	  accelerating management of the packet queues. Packets are queued/
+> +	  de-queued by writing/reading descriptor address to a particular
+> +	  memory mapped location in the Queue Manager module.
+> +
+> +	  If unsure, say N.
+
+endif # SOC_TI
+
+[snip]
+
+- k
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
