@@ -1,55 +1,77 @@
-From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Mon, 3 Mar 2014 11:28:59 +0000
-Subject: [PATCH] MAINTAINERS: Update ARM STi maintainers
-Message-ID: <1393846139-18088-1-git-send-email-srinivas.kandagatla@st.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 3 Mar 2014 17:08:10 +0530
+Subject: [PATCH v5 1/6] usb: dwc3: core: support optional PHYs
+In-Reply-To: <1393846695-14644-1-git-send-email-kishon@ti.com>
+References: <1393846695-14644-1-git-send-email-kishon@ti.com>
+Message-ID: <1393846695-14644-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Since PHYs for dwc3 is optional (not all SoCs having PHYs for DWC3
+should be programmed), do not return from probe if the USB PHY library
+returns -ENODEV as that indicates the platform does not have a
+programmable PHY.
 
-This patch adds Maxime and Patrice to ARM/STi maintainers list.
-As Stuart Menefy opted to be removed from the list, this patch removes
-his email from maintainers. Updated my email with private email address.
+While this can be considered as a temporary fix, a long term solution
+would be to add 'nop' PHY for platforms that does not have programmable
+PHY.
 
-This patch also adds few more drivers to the list so that get_maintainer
-script can pick the right people to send patch to and avoid email
-bounces.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-CC: Stuart Menefy <stuart.menefy@st.com>
-CC: Maxime Coquelin <maxime.coquelin@st.com>
-CC: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Reviewed-by: Roger Quadros <rogerq@ti.com>
 ---
- MAINTAINERS |   12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ drivers/usb/dwc3/core.c |   34 ++++++++++++++--------------------
+ 1 file changed, 14 insertions(+), 20 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 85b3dd8..0b74b45 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1275,13 +1275,21 @@ S:	Maintained
- F:	drivers/clk/socfpga/
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index 7d0cb34..225a4d6 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -529,32 +529,26 @@ static int dwc3_probe(struct platform_device *pdev)
  
- ARM/STI ARCHITECTURE
--M:	Srinivas Kandagatla <srinivas.kandagatla@st.com>
--M:	Stuart Menefy <stuart.menefy@st.com>
-+M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-+M:	Maxime Coquelin <maxime.coquelin@st.com>
-+M:	Patrice Chotard <patrice.chotard@st.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	kernel at stlinux.com
- W:	http://www.stlinux.com
- S:	Maintained
- F:	arch/arm/mach-sti/
-+F:	arch/arm/boot/dts/sti*
-+F:	drivers/clocksource/arm_global_timer.c
-+F:	drivers/reset/sti/
-+F:	drivers/pinctrl/pinctrl-st.c
-+F:	drivers/media/rc/st_rc.c
-+F:	drivers/i2c/busses/i2c-st.c
-+F:	drivers/tty/serial/st-asc.c
+ 	if (IS_ERR(dwc->usb2_phy)) {
+ 		ret = PTR_ERR(dwc->usb2_phy);
+-
+-		/*
+-		 * if -ENXIO is returned, it means PHY layer wasn't
+-		 * enabled, so it makes no sense to return -EPROBE_DEFER
+-		 * in that case, since no PHY driver will ever probe.
+-		 */
+-		if (ret == -ENXIO)
++		if (ret == -ENXIO || ret == -ENODEV) {
++			dwc->usb2_phy = NULL;
++		} else if (ret == -EPROBE_DEFER) {
+ 			return ret;
+-
+-		dev_err(dev, "no usb2 phy configured\n");
+-		return -EPROBE_DEFER;
++		} else {
++			dev_err(dev, "no usb2 phy configured\n");
++			return ret;
++		}
+ 	}
  
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
+ 	if (IS_ERR(dwc->usb3_phy)) {
+ 		ret = PTR_ERR(dwc->usb3_phy);
+-
+-		/*
+-		 * if -ENXIO is returned, it means PHY layer wasn't
+-		 * enabled, so it makes no sense to return -EPROBE_DEFER
+-		 * in that case, since no PHY driver will ever probe.
+-		 */
+-		if (ret == -ENXIO)
++		if (ret == -ENXIO || ret == -ENODEV) {
++			dwc->usb3_phy = NULL;
++		} else if (ret == -EPROBE_DEFER) {
+ 			return ret;
+-
+-		dev_err(dev, "no usb3 phy configured\n");
+-		return -EPROBE_DEFER;
++		} else {
++			dev_err(dev, "no usb3 phy configured\n");
++			return ret;
++		}
+ 	}
+ 
+ 	dwc->xhci_resources[0].start = res->start;
 -- 
 1.7.9.5
