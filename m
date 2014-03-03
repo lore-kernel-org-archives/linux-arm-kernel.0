@@ -1,270 +1,121 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 03 Mar 2014 18:40:04 +0100
-Subject: [PATCH v7 02/15] ahci-platform: Add support for devices with more
- then 1 clock
-In-Reply-To: <1393084424-31099-3-git-send-email-hdegoede@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
- <1393084424-31099-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <1913842.kQBYcblUGT@amdc1032>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 3 Mar 2014 10:43:25 -0700
+Subject: [PATCH v2] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <1393854036-5244-1-git-send-email-sthokal@xilinx.com>
+References: <1393854036-5244-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <20140303174325.GB31062@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 03, 2014 at 07:10:36PM +0530, Srikanth Thokala wrote:
 
-Hi,
+> +Required properties:
+> +- #address-cells: Address representation for root ports, set to <3>
+> +- #size-cells: Size representation for root ports, set to <2>
+> +- compatible: Should contain "xlnx,axi-pcie-host-1.00.a"
+> +- reg: Should contain AXI PCIe registers location and length
+> +- interrupts: Should contain AXI PCIe interrupt
+> +- ranges: ranges for the PCI memory regions
+> +	Please refer to the standard PCI bus binding document for a more
+> +	detailed explanation
+> +
+> +Example:
+> +++++++++
+> +
+> +	pci_express: axi-pcie at 50000000 {
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		compatible = "xlnx,axi-pcie-host-1.00.a";
+> +		reg = < 0x50000000 0x10000000 >;
+> +		interrupts = < 0 52 4 >;
+> +		ranges = < 0x02000000 0 0x60000000 0x60000000 0 0x10000000 >;
+> +	};
 
-On Saturday, February 22, 2014 04:53:31 PM Hans de Goede wrote:
-> The allwinner-sun4i AHCI controller needs 2 clocks to be enabled and the
-> imx AHCI controller needs 3 clocks to be enabled.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  .../devicetree/bindings/ata/ahci-platform.txt      |   1 +
->  drivers/ata/ahci.h                                 |   3 +-
->  drivers/ata/ahci_platform.c                        | 119 ++++++++++++++++-----
->  include/linux/ahci_platform.h                      |   4 +
->  4 files changed, 99 insertions(+), 28 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> index 89de156..3ced07d 100644
-> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> @@ -10,6 +10,7 @@ Required properties:
->  
->  Optional properties:
->  - dma-coherent      : Present if dma operations are coherent
-> +- clocks            : a list of phandle + clock specifier pairs
->  
->  Example:
->          sata at ffe08000 {
-> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-> index 64d1a99..c12862b 100644
-> --- a/drivers/ata/ahci.h
-> +++ b/drivers/ata/ahci.h
-> @@ -51,6 +51,7 @@
->  
->  enum {
->  	AHCI_MAX_PORTS		= 32,
-> +	AHCI_MAX_CLKS		= 3,
->  	AHCI_MAX_SG		= 168, /* hardware max is 64K */
->  	AHCI_DMA_BOUNDARY	= 0xffffffff,
->  	AHCI_MAX_CMDS		= 32,
-> @@ -321,7 +322,7 @@ struct ahci_host_priv {
->  	u32 			em_loc; /* enclosure management location */
->  	u32			em_buf_sz;	/* EM buffer size in byte */
->  	u32			em_msg_type;	/* EM message type */
-> -	struct clk		*clk;		/* Only for platforms supporting clk */
-> +	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
->  	void			*plat_data;	/* Other platform data */
->  	/*
->  	 * Optional ahci_start_engine override, if not set this gets set to the
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index 4b231ba..609975d 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -87,6 +87,66 @@ static struct scsi_host_template ahci_platform_sht = {
->  	AHCI_SHT("ahci_platform"),
->  };
->  
-> +/**
-> + *	ahci_platform_enable_clks - Enable platform clocks
-> + *	@hpriv: host private area to store config values
-> + *
-> + *	This function enables all the clks found in hpriv->clks, starting
-> + *	at index 0. If any clk fails to enable it disables all the clks
-> + *	already enabled in reverse order, and then returns an error.
-> + *
-> + *	LOCKING:
-> + *	None.
-> + *
-> + *	RETURNS:
-> + *	0 on success otherwise a negative error code
-> + */
-> +int ahci_platform_enable_clks(struct ahci_host_priv *hpriv)
+That is much shorter, more notes:
+ - It looks like the driver (HW?) has no support for IO space?
+ - How are INTA/B/C/D handled? Typically I'd like to see an
+   interrupt-mapping block describing them.
+
+   There are a few options here, if the HW can decode A/B/C/D then
+   it probably needs another irq_domain for INTx, and have the IRQ
+   handler decode like it does for MSI.
+- The stanza needs a
+    device_type = "pci";
+
+> +	for (i = 0; i < port->mem_resno; i++)
+> +		pci_add_resource_offset(&sys->resources, &port->mem[i],
+> +					sys->mem_offset);
+
+The sys->mem_offset is probably wrong, please review Arnd's comments
+on the recent threads with Will and Liviu regarding how this is
+supposed to work with DT.
+
+You may want to work with Liviu to use his patch set which provides
+more generic support. Also, the driver needs to put every one of these
+ports in a PCI domain, Liviu is working on generic support for that
+too.
+
+> +static struct pci_bus __init *xilinx_pcie_scan_bus(int nr,
+> +				struct pci_sys_data *sys)
 > +{
-> +	int c, rc;
+> +	struct xilinx_pcie_port *port = sys_to_pcie(sys);
+> +	struct pci_bus *bus;
 > +
-> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++) {
-> +		rc = clk_prepare_enable(hpriv->clks[c]);
-> +		if (rc)
-> +			goto disable_unprepare_clk;
-> +	}
-> +	return 0;
-> +
-> +disable_unprepare_clk:
-> +	while (--c >= 0)
-> +		clk_disable_unprepare(hpriv->clks[c]);
-> +	return rc;
-> +}
-> +EXPORT_SYMBOL_GPL(ahci_platform_enable_clks);
-> +
-> +/**
-> + *	ahci_platform_disable_clks - Disable platform clocks
-> + *	@hpriv: host private area to store config values
-> + *
-> + *	This function disables all the clks found in hpriv->clks, in reverse
-> + *	order of ahci_platform_enable_clks (starting at the end of the array).
-> + *
-> + *	LOCKING:
-> + *	None.
-> + */
-> +void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
+> +	if (port) {
+> +		port->root_busno = sys->busnr;
+> +		bus = pci_scan_root_bus(NULL, sys->busnr, &xilinx_pcie_ops,
+> +					sys, &sys->resources);
+
+The NULL is probably wrong, please review the recent thread with Lucas
+and Jingoo 'PCI irq mapping fixes and cleanups'
+
+> +static int xilinx_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 > +{
-> +	int c;
+> +	struct xilinx_pcie_port *port = sys_to_pcie(dev->bus->sysdata);
 > +
-> +	for (c = AHCI_MAX_CLKS - 1; c >= 0; c--)
-> +		if (hpriv->clks[c])
-> +			clk_disable_unprepare(hpriv->clks[c]);
+> +	if (!port)
+> +		return -EINVAL;
+> +
+> +	return port->irq;
 > +}
-> +EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
-> +
-> +static void ahci_put_clks(struct ahci_host_priv *hpriv)
-> +{
-> +	int c;
-> +
-> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
-> +		clk_put(hpriv->clks[c]);
-> +}
-> +
->  static int ahci_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -97,6 +157,7 @@ static int ahci_probe(struct platform_device *pdev)
->  	struct ahci_host_priv *hpriv;
->  	struct ata_host *host;
->  	struct resource *mem;
-> +	struct clk *clk;
->  	int irq;
->  	int n_ports;
->  	int i;
-> @@ -131,17 +192,31 @@ static int ahci_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> -	hpriv->clk = clk_get(dev, NULL);
-> -	if (IS_ERR(hpriv->clk)) {
-> -		dev_err(dev, "can't get clock\n");
-> -	} else {
-> -		rc = clk_prepare_enable(hpriv->clk);
-> -		if (rc) {
-> -			dev_err(dev, "clock prepare enable failed");
-> -			goto free_clk;
-> +	for (i = 0; i < AHCI_MAX_CLKS; i++) {
-> +		/*
-> +		 * For now we must use clk_get(dev, NULL) for the first clock,
-> +		 * because some platforms (da850, spear13xx) are not yet
-> +		 * converted to use devicetree for clocks.  For new platforms
-> +		 * this is equivalent to of_clk_get(dev->of_node, 0).
-> +		 */
-> +		if (i == 0)
-> +			clk = clk_get(dev, NULL);
-> +		else
-> +			clk = of_clk_get(dev->of_node, i);
-> +
-> +		if (IS_ERR(clk)) {
-> +			rc = PTR_ERR(clk);
-> +			if (rc == -EPROBE_DEFER)
-> +				goto free_clk;
-> +			break;
->  		}
-> +		hpriv->clks[i] = clk;
->  	}
->  
-> +	rc = ahci_enable_clks(dev, hpriv);
 
-This should be ahci_platform_enable_clks().
+It is preferred to use DT mechanisms via of_irq_parse_and_map_pci
+(interrupt-mapping, etc) to define the slot IRQ, drivers should not
+provide a map_irq unless absolutely necessary.
 
-> +	if (rc)
-> +		goto free_clk;
-> +
->  	/*
->  	 * Some platforms might need to prepare for mmio region access,
->  	 * which could be done in the following init call. So, the mmio
-> @@ -222,11 +297,9 @@ pdata_exit:
->  	if (pdata && pdata->exit)
->  		pdata->exit(dev);
->  disable_unprepare_clk:
-> -	if (!IS_ERR(hpriv->clk))
-> -		clk_disable_unprepare(hpriv->clk);
-> +	ahci_disable_clks(hpriv);
+> +	/* make sure it is root port before touching header */
+> +	pcie_write(port, PCI_COMMAND_MASTER, PCI_COMMAND);
 
-ahci_platform_disable_clks()
+Bit of a confusing comment
 
->  free_clk:
-> -	if (!IS_ERR(hpriv->clk))
-> -		clk_put(hpriv->clk);
-> +	ahci_put_clks(hpriv);
->  	return rc;
->  }
->  
-> @@ -239,10 +312,8 @@ static void ahci_host_stop(struct ata_host *host)
->  	if (pdata && pdata->exit)
->  		pdata->exit(dev);
->  
-> -	if (!IS_ERR(hpriv->clk)) {
-> -		clk_disable_unprepare(hpriv->clk);
-> -		clk_put(hpriv->clk);
-> -	}
-> +	ahci_disable_clks(hpriv);
+> +	/* Check if PCIe link is up? */
+> +	port->link_up = xilinx_pcie_is_link_up(port);
+> +	if (!port->link_up)
+> +		dev_info(port->dev, "PCIe Link is DOWN\n");
+> +	else
+> +		dev_info(port->dev, "PCIe Link is UP\n");
 
-ahci_platform_disable_clks()
+Don't forget to think about hot plug
 
-> +	ahci_put_clks(hpriv);
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -277,8 +348,7 @@ static int ahci_suspend(struct device *dev)
->  	if (pdata && pdata->suspend)
->  		return pdata->suspend(dev);
->  
-> -	if (!IS_ERR(hpriv->clk))
-> -		clk_disable_unprepare(hpriv->clk);
-> +	ahci_disable_clks(hpriv);
+> +	/* Register Interrupt Handler */
+> +	err = request_irq(port->irq, xilinx_pcie_intr_handler,
+> +				IRQF_SHARED, "xilinx-pcie", port);
 
-ahci_platform_disable_clks()
+Use devm? This is leaking on error cases.
 
->  	return 0;
->  }
-> @@ -290,13 +360,9 @@ static int ahci_resume(struct device *dev)
->  	struct ahci_host_priv *hpriv = host->private_data;
->  	int rc;
->  
-> -	if (!IS_ERR(hpriv->clk)) {
-> -		rc = clk_prepare_enable(hpriv->clk);
-> -		if (rc) {
-> -			dev_err(dev, "clock prepare enable failed");
-> -			return rc;
-> -		}
-> -	}
-> +	rc = ahci_enable_clks(dev, hpriv);
+Review other resources too...
 
-ahci_platform_enable_clks()
+> +	/* Request and map I/O memory */
+> +	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	port->phys_reg_base = io->start;
+> +	port->reg_size = resource_size(io);
 
-> +	if (rc)
-> +		return rc;
->  
->  	if (pdata && pdata->resume) {
->  		rc = pdata->resume(dev);
-> @@ -317,8 +383,7 @@ static int ahci_resume(struct device *dev)
->  	return 0;
->  
->  disable_unprepare_clk:
-> -	if (!IS_ERR(hpriv->clk))
-> -		clk_disable_unprepare(hpriv->clk);
-> +	ahci_disable_clks(hpriv);
+Here it uses the platform resource..
 
-ahci_platform_disable_clks()
+> +	/* Map the IRQ */
+> +	port->irq = irq_of_parse_and_map(node, 0);
 
-[...]
+.. And here it doesn't, probably should be consistent and just use the
+platform resources.
 
-All code in question gets rewritten in patch #4/15 so the actual
-problem is the broken bisectability between patch #2 and #4.
-
-It seems too late to fix it now but in the future please remember
-to build-test each patch separately (in addition to testing the whole
-patchset).
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Jason
