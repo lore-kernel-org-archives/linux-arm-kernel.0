@@ -1,154 +1,55 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon,  3 Mar 2014 17:02:12 +0100
-Subject: [PATCH v2 07/11] ARM: s3c64xx: pm: Add device tree based power domain
- instantiation
+Date: Mon,  3 Mar 2014 17:02:13 +0100
+Subject: [PATCH v2 08/11] ARM: s3c64xx: dt: Enable SoC-level power management
 In-Reply-To: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
 References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1393862536-9842-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1393862536-9842-9-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for registering power domains of S3C64xx SoCs
-and binding devices to them using device tree.
+This patch adds call to s3c64xx_pm_init() from init_machine() callback
+of mach-s3c64xx-dt to enable SoC-level power management features, such
+as power domain management and sleep support.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c64xx/pm.c                      | 71 +++++++++++++++++++++----
- include/dt-bindings/arm/s3c64xx-power-domains.h | 26 +++++++++
- 2 files changed, 88 insertions(+), 9 deletions(-)
- create mode 100644 include/dt-bindings/arm/s3c64xx-power-domains.h
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index b422eed..cebbd44 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -17,8 +17,11 @@
- #include <linux/serial_core.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
- #include <linux/pm_domain.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+index 2fddf38..45a4ddc 100644
+--- a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
++++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+@@ -15,6 +15,7 @@
+ #include <asm/system_misc.h>
  
-+#include <dt-bindings/arm/s3c64xx-power-domains.h>
-+
+ #include <plat/cpu.h>
++#include <plat/pm.h>
+ #include <plat/watchdog-reset.h>
+ 
  #include <mach/map.h>
- #include <mach/irqs.h>
- 
-@@ -165,17 +168,63 @@ static struct s3c64xx_pm_domain s3c64xx_pm_v = {
- 	},
- };
- 
--static struct s3c64xx_pm_domain *s3c64xx_pm_domains[] = {
--	&s3c64xx_pm_irom,
--	&s3c64xx_pm_etm,
--	&s3c64xx_pm_g,
--	&s3c64xx_pm_v,
--	&s3c64xx_pm_i,
--	&s3c64xx_pm_p,
--	&s3c64xx_pm_s,
--	&s3c64xx_pm_f,
-+static struct s3c64xx_pm_domain *s3c64xx_pm_domains[NR_DOMAINS] = {
-+	[DOMAIN_V] = &s3c64xx_pm_v,
-+	[DOMAIN_G] = &s3c64xx_pm_g,
-+	[DOMAIN_I] = &s3c64xx_pm_i,
-+	[DOMAIN_P] = &s3c64xx_pm_p,
-+	[DOMAIN_F] = &s3c64xx_pm_f,
-+	[DOMAIN_S] = &s3c64xx_pm_s,
-+	[DOMAIN_ETM] = &s3c64xx_pm_etm,
-+	[DOMAIN_IROM] = &s3c64xx_pm_irom,
-+};
-+
-+#ifdef CONFIG_OF
-+static struct of_device_id s3c64xx_pd_matches[] = {
-+	{ .compatible = "samsung,s3c6400-clock", },
-+	{ .compatible = "samsung,s3c6410-clock", },
-+	{ },
- };
- 
-+static struct genpd_onecell_data pd_data;
-+
-+static int s3c64xx_pm_parse_domains(void)
-+{
-+	struct device_node *np;
-+	int i;
-+
-+	np = of_find_matching_node(NULL, s3c64xx_pd_matches);
-+	if (!np)
-+		return -ENODEV;
-+
-+	pd_data.domains = kcalloc(ARRAY_SIZE(s3c64xx_pm_domains),
-+				  sizeof(*pd_data.domains), GFP_KERNEL);
-+	if (!pd_data.domains)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); ++i) {
-+		struct s3c64xx_pm_domain *pd = s3c64xx_pm_domains[i];
-+		struct dev_power_governor *gov = NULL;
-+		int on;
-+
-+		on = __raw_readl(S3C64XX_NORMAL_CFG) & pd->ena;
-+
-+		if (pd->always_on)
-+			gov = &pm_domain_always_on_gov;
-+
-+		pm_genpd_init(&pd->pd, gov, !on);
-+		pd_data.domains[i] = &pd->pd;
-+
-+		pr_debug("%s: registered domain %s\n", __func__, pd->pd.name);
-+	}
-+
-+	pd_data.domain_num = ARRAY_SIZE(s3c64xx_pm_domains);
-+	of_genpd_add_provider(np, of_genpd_xlate_onecell, &pd_data);
-+
-+	return 0;
-+}
-+#endif
-+
- #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
- void s3c_pm_debug_smdkled(u32 set, u32 clear)
+@@ -49,9 +50,15 @@ static void __init s3c64xx_dt_map_io(void)
+ static void __init s3c64xx_dt_init_machine(void)
  {
-@@ -312,6 +361,10 @@ int __init s3c64xx_pm_init(void)
+ 	samsung_wdt_reset_of_init();
++	s3c64xx_pm_init();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
- 	s3c_pm_init();
- 
-+#ifdef CONFIG_OF
-+	if (of_have_populated_dt())
-+		return s3c64xx_pm_parse_domains();
-+#endif
- 
- 	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); i++) {
- 		struct s3c64xx_pm_domain *pd = s3c64xx_pm_domains[i];
-diff --git a/include/dt-bindings/arm/s3c64xx-power-domains.h b/include/dt-bindings/arm/s3c64xx-power-domains.h
-new file mode 100644
-index 0000000..ce39bef
---- /dev/null
-+++ b/include/dt-bindings/arm/s3c64xx-power-domains.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (c) 2014 Tomasz Figa <tomasz.figa@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants for Samsung S3C64xx power domains.
-+*/
++static void __init s3c64xx_dt_init_late(void)
++{
++	s3c64xx_pm_late_initcall();
++}
 +
-+#ifndef _DT_BINDINGS_ARM_S3C64XX_POWER_DOMAINS_H
-+#define _DT_BINDINGS_ARM_S3C64XX_POWER_DOMAINS_H
-+
-+#define DOMAIN_V		0
-+#define DOMAIN_G		1
-+#define DOMAIN_I		2
-+#define DOMAIN_P		3
-+#define DOMAIN_F		4
-+#define DOMAIN_S		5
-+#define DOMAIN_ETM		6
-+#define DOMAIN_IROM		7
-+
-+/* Total number of clocks. */
-+#define NR_DOMAINS		(DOMAIN_IROM + 1)
-+
-+#endif /* _DT_BINDINGS_ARM_S3C64XX_POWER_DOMAINS_H */
+ static void s3c64xx_dt_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	if (mode != REBOOT_SOFT)
+@@ -72,5 +79,6 @@ DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
+ 	.dt_compat	= s3c64xx_dt_compat,
+ 	.map_io		= s3c64xx_dt_map_io,
+ 	.init_machine	= s3c64xx_dt_init_machine,
++	.init_late	= s3c64xx_dt_init_late,
+ 	.restart        = s3c64xx_dt_restart,
+ MACHINE_END
 -- 
 1.9.0
