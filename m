@@ -1,40 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 3 Mar 2014 08:58:01 +0100
-Subject: nand pmecc crash detected
-In-Reply-To: <5310B108.8040800@celad.com>
-References: <5310B108.8040800@celad.com>
-Message-ID: <20140303075801.GJ17250@pengutronix.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 3 Mar 2014 18:59:40 +1100
+Subject: linux-next: manual merge of the akpm-current tree with the arm-soc
+ tree
+Message-ID: <20140303185940.a4fd9da2d758967f3bc52a09@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 04:53:44PM +0100, Herve Codina wrote:
-> Hi,
-> 
-> I am using an sam5d35 and its pmecc nand ecc controller.
-> 
-> In barebox, using similar atmel_nand.c the system crashes.
-> 
-> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
-> (nand_base.c) when we write a sub page.
-> 
-> chip->ecc.hwctl function is not set when we are using PMECC controller.
-> 
-> As a workaround, i set NAND_NO_SUBPAGE_WRITE for PMECC controller in
-> order to disable sub page access in nand_write_page.
-> 
-> I think we can have the same problem in Linux. I do not performed
-> subpage nand writes from Linux but i made the following patch according
-> to my Barebox defect.
-> 
-> Here after are my patches (same modification) for 1st my local Barebox
-> and 2nd my local Linux :
+Hi Andrew,
 
-Applied (for barebox ;), thanks
+Today's linux-next merge of the akpm-current tree got a conflict in
+arch/arm/mach-prima2/Kconfig between commit 9352b05b6e4e ("ARM: select
+MIGHT_HAVE_CACHE_L2X0 for V6 and V7 multi-platform") from the arm-soc
+tree and commit b096b0b50c4b ("Kconfig: rename HAS_IOPORT to
+HAS_IOPORT_MAP") from the akpm-current tree.
 
-Sascha
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-prima2/Kconfig
+index 2c726b4f9356,850ff5500821..000000000000
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@@ -1,8 -1,10 +1,8 @@@
+  config ARCH_SIRF
+  	bool "CSR SiRF" if ARCH_MULTI_V7
+  	select ARCH_REQUIRE_GPIOLIB
+ -	select GENERIC_CLOCKEVENTS
+  	select GENERIC_IRQ_CHIP
+- 	select NO_IOPORT
+ -	select MIGHT_HAVE_CACHE_L2X0
++ 	select NO_IOPORT_MAP
+  	select PINCTRL
+  	select PINCTRL_SIRF
+  	help
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/ac7c85d0/attachment.sig>
