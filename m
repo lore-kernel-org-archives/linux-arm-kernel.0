@@ -1,39 +1,55 @@
-From: mohun106@gmail.com (mohun106 at gmail.com)
-Date: Mon,  3 Mar 2014 12:49:01 +0530
-Subject: [PATCH v2 0/1] arm64: Add support for Cavium Thunder ARMv8 platform
-Message-ID: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 3 Mar 2014 08:29:17 +0100
+Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
+ suspend
+In-Reply-To: <7021741.2WcVMr4q95@vostro.rjw.lan>
+References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
+ <7021741.2WcVMr4q95@vostro.rjw.lan>
+Message-ID: <CAPDyKFq5=Zdexm_YdBSmqvPhtAi3pUktqUWU7vc4NzrawDZSXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On 2 March 2014 00:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Saturday, March 01, 2014 11:56:03 AM Ulf Hansson wrote:
+>> Patch 1 -> 2:
+>> These patches provides two new runtime PM helper functions which intend to be
+>> used from system suspend/resume callbacks, to make sure devices are put into low
+>> power state during system suspend and brought back to full power at system
+>> resume.
+>>
+>> The prerequisite is to have all levels of a device's runtime PM callbacks to be
+>> defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
+>> for CONFIG_PM.
+>>
+>> By using the new runtime PM helper functions especially the two scenarios below
+>> will be addressed.
+>>
+>> 1) The PM core prevents .runtime_suspend callbacks from being invoked during
+>> system suspend. That means even for a runtime PM centric subsystem and driver,
+>> the device needs to be put into low power state from a system suspend callback.
+>> Otherwise it may very well be left in full power state (runtime resumed) while
+>> the system is suspended. By using the new helper functions, we make sure to walk
+>> the hierarchy of a device's power domain, subsystem and driver.
+>>
+>> 2) Subsystems and drivers need to cope with all the combinations of
+>> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
+>> addresses this.
+>
+> OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
+> and I think it'd be better to push them through the respective subsystem trees
+> later anyway.
 
-This patch adds preliminary support for Cavium's Thunder SoC which is
-based on ARMv8 core.
+Thanks Rafael!
 
-The Thunder platform is full GICv3 compliant and uses 48-bit Physical
-Addresses.
+Agree, regarding 3->8, they were at this point mostly included for
+your reference.
 
-This patch depends on the following submitted patches
-1) GICv3 driver from Marc Zyngier
-[PATCH 01/18] arm64: initial support for GICv3
-http://www.spinics.net/lists/arm-kernel/msg305027.html
+Kind regards
+Uffe
 
-2) GICv3 devicetree bindings
-[PATCH 02/18] arm64: GICv3 device tree binding documentation
-http://www.spinics.net/lists/arm-kernel/msg305023.html
-
-3) Boot time configuration of Intermediate Physical Address size
-[RFC PATCH 1/1] arm64: Add boot time configuration of
-Intermediate Physical Address size
-http://www.spinics.net/lists/arm-kernel/msg312370.html
-
-Changes from v1:
-- Removed Kconfig option for Thunder.
-
-Radha Mohan Chintakuntla (1):
-  arm64: Add initial dts for Cavium Thunder SoC
-
- arch/arm64/boot/dts/Makefile    |    1 +
- arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 159 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/boot/dts/thunder.dts
+>
+> Thanks!
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
