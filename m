@@ -1,31 +1,39 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Mon, 3 Mar 2014 11:06:58 -0800
-Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings 0
- failures (next/next-20140228))
-In-Reply-To: <20140303161217.GK7308@joshc.qualcomm.com>
-References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
- <5311449E.90902@codeaurora.org>
- <20140301161258.GN12219@tassilo.jf.intel.com>
- <20140303161217.GK7308@joshc.qualcomm.com>
-Message-ID: <20140303190658.GO12219@tassilo.jf.intel.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 3 Mar 2014 20:07:36 +0100
+Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
+In-Reply-To: <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
+References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20140302202940.GQ3327@book.gsilab.sittig.org>
+ <19206d89-cd0d-4fea-9170-3fd0a8482bf5@VA3EHSMHS045.ehs.local>
+Message-ID: <20140303190736.GU3327@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 10:12:17AM -0600, Josh Cartwright wrote:
-> On Sat, Mar 01, 2014 at 08:12:58AM -0800, Andi Kleen wrote:
-> > > These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
-> > > 2014-02-08). Before that change asmlinkage was defined to nothing on
-> > > ARM, but now it's __visible. Should we just drop asmlinkage here?
-> >
-> > These functions are just called by the generic C interrupt layer right?
-> > Yes should just drop asmlinkage. It doesn't make any sense to mark
-> > functions that only called from C asmlinkage.
+On Mon, Mar 03, 2014 at 09:35 -0800, S?ren Brinkmann wrote:
 > 
-> On ARM[64], these functions are called from assembly indirectly through
-> the 'handle_arch_irq' function pointer, so I don't think it makes sense
-> to drop 'asmlinkage'.
+> It would be nice if we could use the logic provided in the mux, div etc
+> primitives independently of how the HW is accessed and what is
+> necessary to shift and mask those register values around, right? I
+> mean, at then end we want to model a clk-(div|mux) and not a
+> clk-(div|mux) which has only a single, memory-mapped control register,
+> that does not overlap with other things, ...
 
-So do you do anything special in asmlinkage? If not it won't make
-any difference for you.
+Did you lookup the ll_ops discussion in the thread that
+originated from
+http://article.gmane.org/gmane.linux.ports.arm.kernel/289895 and
+did you see the outlined logic in
+http://article.gmane.org/gmane.linux.ports.arm.omap/109233 and
+http://article.gmane.org/gmane.linux.ports.arm.omap/109381 ?
 
--Andi
+Support for regmap access instead of mere MMIO was one of the
+things you could do with this approach.  You appear to be in the
+situation where you need such an extension (or something similar,
+but you really should look into the ll_ops thing).
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
