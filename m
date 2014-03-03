@@ -1,42 +1,25 @@
-From: satish.patel@ti.com (Satish Patel)
-Date: Mon, 3 Mar 2014 11:39:59 +0530
-Subject: [RFC PATCH v1 0/2] clock and HWMOD changes for USIM module
-In-Reply-To: <20140228215936.GE13624@atomide.com>
-References: <1389010351-17320-1-git-send-email-satish.patel@ti.com>
- <52CE59C8.6040409@ti.com> <20140228215936.GE13624@atomide.com>
-Message-ID: <53141CB7.20906@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Mar 2014 13:22:21 +0800
+Subject: [PATCH 1/3] ARM: dts: imx6: extend PCIe interrupt list for MSI
+In-Reply-To: <1393608633-18321-2-git-send-email-l.stach@pengutronix.de>
+References: <1393608633-18321-1-git-send-email-l.stach@pengutronix.de>
+ <1393608633-18321-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140303052216.GC9706@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 28, 2014 at 06:30:31PM +0100, Lucas Stach wrote:
+> Optional IRQ necessary for handling MSI.
+> 
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 9 ++++++++-
 
+Please have this change go with driver or a separate patch, not with
+dts update.
 
-On 3/1/2014 3:29 AM, Tony Lindgren wrote:
-> * Satish Patel <satish.patel@ti.com> [140109 00:13]:
->>
->>
->> On 1/6/2014 5:42 PM, Satish Patel wrote:
->>> Patch set includes clock and HWMOD entries for AM43x's USIM modoule.
->>>
->>> Note: I am in process of mainlining usim driver.
->>>
->>> Satish Patel (2):
->>>   ARM: dts: AM43xx-clocks: Entries added for ti-usim
->>>   ARM: OMAP: AM43xx: HWMOD changes added for ti-usim
->>>
->>
->> Tony,
->>
->> Can you pull in these patches if there are no comments?
-> 
-> Would like to see acks from Benoit/Tero/Paul first.
-> 
-Benoit/Tero/Paul:
-Can you please review and ack this patch series,
-so that tony can pick it up.
+Shawn
 
-Thanks
-satish
-> Regards,
-> 
-> Tony
-> 
+>  arch/arm/boot/dts/imx6qdl.dtsi                           | 4 +++-
+>  2 files changed, 11 insertions(+), 2 deletions(-)
