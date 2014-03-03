@@ -1,56 +1,39 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 3 Mar 2014 09:23:05 +0200
-Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
- Connector
-In-Reply-To: <CAMuHMdVpT2Y-KQO46o=zbRSgqgx2mbBsPjGgoTDDwwfCOxUCmw@mail.gmail.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	<1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>	<20140228160612.GR21483@n2100.arm.linux.org.uk>	<5310B609.1010105@ti.com>	<20140228163431.GV21483@n2100.arm.linux.org.uk>
- <CAMuHMdVpT2Y-KQO46o=zbRSgqgx2mbBsPjGgoTDDwwfCOxUCmw@mail.gmail.com>
-Message-ID: <53142DD9.4020709@ti.com>
+From: mohun106@gmail.com (mohun106 at gmail.com)
+Date: Mon,  3 Mar 2014 12:49:01 +0530
+Subject: [PATCH v2 0/1] arm64: Add support for Cavium Thunder ARMv8 platform
+Message-ID: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/14 20:58, Geert Uytterhoeven wrote:
-> On Fri, Feb 28, 2014 at 5:34 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> There's actually three HDMI connectors:
->>
->>   All three connectors carry all required HDMI signals, including a TMDS
->>   link. The Type B connector is slightly larger and carries a second TMDS
->>   link, which is necessary to support very high resolution displays using
->>   dual link. The Type C connector carries the same signals as the Type A
->>   but is more compact and intended for mobile applications.
->>
->> So, Type C and Type A are electrically the same.
-> 
-> There's also D (e.g. on BeagleBone Black) and E:
-> 
-> http://en.wikipedia.org/wiki/HDMI#Connectors
-> 
-> Electrically they seem to be the same as A/C.
+From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-Right. And then there are the HDMI versions, and things like HDMI
-Ethernet Channel. After looking at these a bit, I don't think the HDMI
-connector needs any of those (hdmi version, eth) defined.
+This patch adds preliminary support for Cavium's Thunder SoC which is
+based on ARMv8 core.
 
-So...
+The Thunder platform is full GICv3 compliant and uses 48-bit Physical
+Addresses.
 
-	compatible = "hdmi-connector";
-	type = "a";
+This patch depends on the following submitted patches
+1) GICv3 driver from Marc Zyngier
+[PATCH 01/18] arm64: initial support for GICv3
+http://www.spinics.net/lists/arm-kernel/msg305027.html
 
-Or
+2) GICv3 devicetree bindings
+[PATCH 02/18] arm64: GICv3 device tree binding documentation
+http://www.spinics.net/lists/arm-kernel/msg305023.html
 
-	compatible = "hdmi-connector";
-	type-a;
+3) Boot time configuration of Intermediate Physical Address size
+[RFC PATCH 1/1] arm64: Add boot time configuration of
+Intermediate Physical Address size
+http://www.spinics.net/lists/arm-kernel/msg312370.html
 
-I don't right away see any big pro with either one compared to the other.
+Changes from v1:
+- Removed Kconfig option for Thunder.
 
- Tomi
+Radha Mohan Chintakuntla (1):
+  arm64: Add initial dts for Cavium Thunder SoC
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/9622c09d/attachment.sig>
+ arch/arm64/boot/dts/Makefile    |    1 +
+ arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 159 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/thunder.dts
