@@ -1,73 +1,77 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon,  3 Mar 2014 17:02:07 +0100
-Subject: [PATCH v2 02/11] drivercore: Bind/unbind power domain on probe/remove
-In-Reply-To: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1393862536-9842-3-git-send-email-tomasz.figa@gmail.com>
+Date: Mon,  3 Mar 2014 17:02:05 +0100
+Subject: [PATCH v2 00/11] Generic Device Tree based power domain look-up
+Message-ID: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a number of platforms, devices are part of controllable power
-domains, which need to be enabled before such devices can be accessed
-and may be powered down when the device is idle to save some power.
-This means that on systems that support power domain control using
-generic power domains subsystem, it is necessary to add device to its
-power domain before binding a driver to it and remove it from its power
-domain after its driver is unbound to make sure that an unused device
-does not affect power domain state.
+Up till now there was no single generic method to bind devices to their
+power domains using Device Tree. Each platform has been doing this using
+its own way, example of which are Exynos power domain bindings [1] and
+look-up code [2].
 
-Since this is not limited to particular busses and specific
-archs/platforms, it is more convenient to do the above directly in
-driver core, just as done with pinctrl default configuration. This patch
-adds necessary code to really_probe() and __device_release_driver() to
-achieve this and maintain consistent stack-like ordering of operations
-happening when binding and unbinding a driver.
+This series is intended to change this and provide generic DT bindings for
+power domain specification and generic code performing look-up of power
+domains and binding them to devices.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/base/dd.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+First two patches are the most important part of this series, as they
+introduce $subject. Patch 3 converts mach-exynos to use the new generic
+method. Further patches are adding one more user of the new code,
+mach-s3c64xx, with first 3 patches (4-6) required to clean-up its power
+domain driver a bit and last 3 patches (9-11) adding display support for
+Mini6410 board, including a node for display controller (FIMD) which is
+a power domain consumer.
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 0605176..78e5b36 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -23,6 +23,7 @@
- #include <linux/kthread.h>
- #include <linux/wait.h>
- #include <linux/async.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/pinctrl/devinfo.h>
- 
-@@ -273,6 +274,11 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 
- 	dev->driver = drv;
- 
-+	/* If using genpd, bind power domain now before probing */
-+	ret = genpd_bind_domain(dev);
-+	if (ret)
-+		goto probe_failed;
-+
- 	/* If using pinctrl, bind pins now before probing */
- 	ret = pinctrl_bind_pins(dev);
- 	if (ret)
-@@ -303,6 +309,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- probe_failed:
- 	devres_release_all(dev);
- 	driver_sysfs_remove(dev);
-+	genpd_unbind_domain(dev);
- 	dev->driver = NULL;
- 	dev_set_drvdata(dev, NULL);
- 
-@@ -513,7 +520,7 @@ static void __device_release_driver(struct device *dev)
- 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 						     BUS_NOTIFY_UNBOUND_DRIVER,
- 						     dev);
--
-+		genpd_unbind_domain(dev);
- 	}
- }
- 
+The design of DT bindings and provider code is heavily inspired by
+implementation of clock providers in Common Clock Framework, while
+the code binding devices to power domains by my Exynos power domain
+implementation (now removed by this series ;)).
+
+Successfully tested on S3C6410-based Mini6410 board.
+
+[1] Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+[2] arch/arm/mach-exynos/pm_domains.c
+
+Changes since v1 (RFC):
+[https://lkml.org/lkml/2014/1/11/141]
+ - rebased onto current Rafael's linux-pm bleeding-edge branch,
+ - reordered the patches a bit (to have the generic ones first),
+ - dropped renaming of S3C64xx power domains (as suggested by Mark Brown),
+ - added support for deferred probing (as suggested by Stephen Boyd),
+ - fixed several minor issues pointed by Stephen Boyd,
+ - replaced notifiers with direct hooks in driver core to make power domain
+   support independent from specific bus type and allow error handling.
+
+Tomasz Figa (11):
+  base: power: Add generic OF-based power domain look-up
+  drivercore: Bind/unbind power domain on probe/remove
+  ARM: exynos: Move to generic power domain bindings
+  ARM: s3c64xx: pm: Use name field of generic_pm_domain
+  ARM: s3c64xx: pm: Add always_on field to s3c64xx_pm_domain struct
+  ARM: s3c64xx: pm: Add pwr_stat bit for domain G
+  ARM: s3c64xx: pm: Add device tree based power domain instantiation
+  ARM: s3c64xx: dt: Enable SoC-level power management
+  ARM: dts: s3c64xx: Add nodes for power domains
+  ARM: dts: s3c64xx: Add node for display controller
+  ARM: dts: s3c6410-mini6410: Add support for LCD screen
+
+ .../bindings/arm/exynos/power_domain.txt           |  12 +-
+ .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+ arch/arm/boot/dts/s3c6400.dtsi                     |   1 +
+ arch/arm/boot/dts/s3c6410-mini6410.dts             |  33 +++
+ arch/arm/boot/dts/s3c6410.dtsi                     |   1 +
+ arch/arm/boot/dts/s3c64xx.dtsi                     |  13 +
+ arch/arm/mach-exynos/pm_domains.c                  |  80 +-----
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c            |   8 +
+ arch/arm/mach-s3c64xx/pm.c                         | 106 ++++++--
+ drivers/base/dd.c                                  |   9 +-
+ drivers/base/power/domain.c                        | 298 +++++++++++++++++++++
+ include/dt-bindings/arm/s3c64xx-power-domains.h    |  26 ++
+ include/linux/pm_domain.h                          |  46 ++++
+ kernel/power/Kconfig                               |   4 +
+ 14 files changed, 576 insertions(+), 112 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+ create mode 100644 include/dt-bindings/arm/s3c64xx-power-domains.h
+
 -- 
 1.9.0
