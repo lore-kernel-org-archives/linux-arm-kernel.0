@@ -1,565 +1,319 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  3 Mar 2014 18:46:40 +0000
-Subject: [PATCH v5] PCI: ARM: add support for generic PCI host controller
-Message-ID: <1393872400-7262-1-git-send-email-will.deacon@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 3 Mar 2014 20:51:42 +0200
+Subject: [PATCH 00/12] ARM: OMAP2 DT clock conversion
+In-Reply-To: <20140303184642.GB25804@atomide.com>
+References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
+ <5310B271.5040708@ti.com> <20140228180112.GC15399@atomide.com>
+ <5310D2FE.5090209@ti.com> <20140228183313.GD15399@atomide.com>
+ <53143A7A.9020703@ti.com> <20140303184642.GB25804@atomide.com>
+Message-ID: <5314CF3E.3020808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for a generic PCI host controller, such as a
-firmware-initialised device with static windows or an emulation by
-something such as kvmtool.
+On 03/03/2014 08:46 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [140303 00:20]:
+>> On 02/28/2014 08:33 PM, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [140228 10:21]:
+>>>>
+>>>> Hmm, some clock node is broken, might be missing a name or parent
+>>>> name for some reason. Can you try to boot with DEBUG enabled so you
+>>>> get pr_debug:s out and see which clock is being initialized during
+>>>> the crash?
+>>>
+>>> ...
+>>> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: core_d18_ck
+>>> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_mux_fck
+>>> [    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_fck
+>>> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>>> ...
+>>>
+>>> We really should be registering the clocks lazily as needed BTW. That
+>>> leaves out the dependency to DEBUG_LL for seeing any kind of decent
+>>> error messages during the booting.
+>>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>
+>> Hey Tony,
+>>
+>> Can you retry with the branch? I just pushed one patch there, seems
+>> the parents for the vlynq_mux_fck were somewhat broken (there are
+>> holes in the valid mux values list, which hasn't happened with any
+>> other mux-clock so far.)
+>>
+>> If this works, I will rework the series a bit and send v2 out.
+>> Alternatively I need to add extra debug info.
+>
+> Still getting this without omap3:
+>
+> drivers/built-in.o: In function `of_ti_dpll_setup':
+> /home/tmlind/src/linux-2.6/drivers/clk/ti/dpll.c:235: undefined reference to `clkhwops_omap3_dpll'
+> drivers/built-in.o:(.rodata+0x1d7a0): undefined reference to `omap3_noncore_dpll_enable'
+> drivers/built-in.o:(.rodata+0x1d7a4): undefined reference to `omap3_noncore_dpll_disable'
+> drivers/built-in.o:(.rodata+0x1d7b0): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0x1d7c4): undefined reference to `omap3_noncore_dpll_set_rate'
+> drivers/built-in.o:(.rodata+0x1d808): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0x1d84c): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0x1d860): undefined reference to `omap3_noncore_dpll_set_rate'
+>
+> and after enabling omap3 getting this without 2430:
+>
+> drivers/built-in.o: In function `of_ti_omap2430_interface_clk_setup':
+> /home/tmlind/src/linux-2.6/drivers/clk/ti/interface.c:129: undefined reference to `clkhwops_omap2430_i2chs_wait'
 
-The controller itself has no configuration registers and has its address
-spaces described entirely by the device-tree (using the bindings from
-ePAPR). Both CAM and ECAM are supported for Config Space accesses.
+Yea, I didn't fix these with the patch I pushed, just the boot problem. 
+I will fix these with the next version of the set, in addition to the 
+issues reported by Nishanth.
 
-Corresponding documentation is added for the DT binding.
+>
+> But after enabling those, it now boots on n8x0. The dmesg is below.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+This is good, so the culprit was only the vlynq fck.
 
-Hi,
+> Care to post a patch to try dropping the legacy clock data as it should
+> now work with the DT clocks only for omap2?
 
-This is version 5 of the patches previously posted here:
+Yes, I can post patches for this for omap2/omap3 also tomorrow.
 
-  v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229679.html
-  v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232213.html
-  v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/233491.html
-  v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235468.html
+-Tero
 
-Changes since v4 include:
-
-  - Changed binding example to use I/O bus address 0x0
-
-  - Fixed and simplified rounding code for I/O ranges so that we don't
-    mess around with the registered resource
-
-  - Finally fixed I/O offset handling
-
-Note that I didn't use of_property_read_bool for parsing "linux,pci-probe-only"
-since that would interfere with "pci=firmware" being passed on the command
-line (meaning we have a tri-state). I also didn't move the resource
-registration into gen_pci_calc_*_offset, since that duplicates code and
-complicates the freeing paths.
-
-As per usual, all feedback welcome. The next step is probably to work out
-a set of library functions that can be extracted from this driver.
-
-Will
-
- .../devicetree/bindings/pci/host-generic-pci.txt   | 100 ++++++
- drivers/pci/host/Kconfig                           |   7 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-host-generic.c                | 369 +++++++++++++++++++++
- 4 files changed, 477 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/host-generic-pci.txt
- create mode 100644 drivers/pci/host/pci-host-generic.c
-
-diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-new file mode 100644
-index 000000000000..98788c153302
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-@@ -0,0 +1,100 @@
-+* Generic PCI host controller
-+
-+Firmware-initialised PCI host controllers and PCI emulations, such as the
-+virtio-pci implementations found in kvmtool and other para-virtualised
-+systems, do not require driver support for complexities such as regulator
-+and clock management. In fact, the controller may not even require the
-+configuration of a control interface by the operating system, instead
-+presenting a set of fixed windows describing a subset of IO, Memory and
-+Configuration Spaces.
-+
-+Such a controller can be described purely in terms of the standardized device
-+tree bindings communicated in pci.txt:
-+
-+
-+Properties of the host controller node:
-+
-+- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
-+                   depending on the layout of configuration space (CAM vs
-+                   ECAM respectively).
-+
-+- device_type    : Must be "pci".
-+
-+- ranges         : As described in IEEE Std 1275-1994, but must provide
-+                   at least a definition of non-prefetchable memory. One
-+                   or both of prefetchable Memory and IO Space may also
-+                   be provided.
-+
-+- bus-range      : Optional property (also described in IEEE Std 1275-1994)
-+                   to indicate the range of bus numbers for this controller.
-+                   If absent, defaults to <0 255> (i.e. all buses).
-+
-+- #address-cells : Must be 3.
-+
-+- #size-cells    : Must be 2.
-+
-+- reg            : The Configuration Space base address and size, as accessed
-+                   from the parent bus.
-+
-+
-+Properties of the /chosen node:
-+
-+- linux,pci-probe-only
-+                 : Optional property which takes a single-cell argument.
-+                   If '0', then Linux will assign devices in its usual manner,
-+                   otherwise it will not try to assign devices and instead use
-+                   them as they are configured already.
-+
-+Configuration Space is assumed to be memory-mapped (as opposed to being
-+accessed via an ioport) and laid out with a direct correspondence to the
-+geography of a PCI bus address by concatenating the various components to
-+form an offset.
-+
-+For CAM, this 24-bit offset is:
-+
-+        cfg_offset(bus, device, function, register) =
-+                   bus << 16 | device << 11 | function << 8 | register
-+
-+Whilst ECAM extends this by 4 bits to accomodate 4k of function space:
-+
-+        cfg_offset(bus, device, function, register) =
-+                   bus << 20 | device << 15 | function << 12 | register
-+
-+Interrupt mapping is exactly as described in `Open Firmware Recommended
-+Practice: Interrupt Mapping' and requires the following properties:
-+
-+- #interrupt-cells   : Must be 1
-+
-+- interrupt-map      : <see aforementioned specification>
-+
-+- interrupt-map-mask : <see aforementioned specification>
-+
-+
-+Example:
-+
-+pci {
-+    compatible = "pci-host-cam-generic"
-+    device_type = "pci";
-+    #address-cells = <3>;
-+    #size-cells = <2>;
-+    bus-range = <0x0 0x1>;
-+
-+    // CPU_PHYSICAL(2)  SIZE(2)
-+    reg = <0x0 0x40000000  0x0 0x1000000>;
-+
-+    // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
-+    ranges = <0x0000000 0x0 0x01000000  0x0 0x01000000  0x0 0x00010000>,
-+             <0x1000000 0x0 0x41000000  0x0 0x41000000  0x0 0x3f000000>;
-+
-+
-+    #interrupt-cells = <0x1>;
-+
-+    // PCI_DEVICE(3)  INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(3)
-+    interrupt-map = <  0x0 0x0 0x0  0x1  &gic  0x0 0x4 0x1
-+                     0x800 0x0 0x0  0x1  &gic  0x0 0x5 0x1
-+                    0x1000 0x0 0x0  0x1  &gic  0x0 0x6 0x1
-+                    0x1800 0x0 0x0  0x1  &gic  0x0 0x7 0x1>;
-+
-+    // PCI_DEVICE(3)  INT#(1)
-+    interrupt-map-mask = <0xf800 0x0 0x0  0x7>;
-+}
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 47d46c6d8468..f91637d47065 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -33,4 +33,11 @@ config PCI_RCAR_GEN2
- 	  There are 3 internal PCI controllers available with a single
- 	  built-in EHCI/OHCI host controller present on each one.
- 
-+config PCI_HOST_GENERIC
-+	bool "Generic PCI host controller"
-+	depends on ARM && OF
-+	help
-+	  Say Y here if you want to support a simple generic PCI host
-+	  controller, such as the one emulated by kvmtool.
-+
- endmenu
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 13fb3333aa05..bd1bf1ab4ac8 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -4,3 +4,4 @@ obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
- obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
- obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
-+obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-new file mode 100644
-index 000000000000..b761f3e64a6a
---- /dev/null
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -0,0 +1,369 @@
-+/*
-+ * Simple, generic PCI host controller driver targetting firmware-initialised
-+ * systems and virtual machines (e.g. the PCI emulation provided by kvmtool).
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (C) 2014 ARM Limited
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_pci.h>
-+#include <linux/platform_device.h>
-+
-+struct gen_pci_cfg_bus_ops {
-+	u32 bus_shift;
-+	void __iomem *(*map_bus)(struct pci_bus *, unsigned int, int);
-+};
-+
-+struct gen_pci_cfg_windows {
-+	struct resource				res;
-+	struct resource				bus_range;
-+	void __iomem				**win;
-+
-+	const struct gen_pci_cfg_bus_ops	*ops;
-+};
-+
-+struct gen_pci {
-+	struct pci_host_bridge			host;
-+	struct gen_pci_cfg_windows		cfg;
-+};
-+
-+static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
-+					     unsigned int devfn,
-+					     int where)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	struct gen_pci *pci = sys->private_data;
-+	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
-+
-+	return pci->cfg.win[idx] + ((devfn << 8) | where);
-+}
-+
-+static struct gen_pci_cfg_bus_ops gen_pci_cfg_cam_bus_ops = {
-+	.bus_shift	= 16,
-+	.map_bus	= gen_pci_map_cfg_bus_cam,
-+};
-+
-+static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
-+					      unsigned int devfn,
-+					      int where)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	struct gen_pci *pci = sys->private_data;
-+	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
-+
-+	return pci->cfg.win[idx] + ((devfn << 12) | where);
-+}
-+
-+static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
-+	.bus_shift	= 20,
-+	.map_bus	= gen_pci_map_cfg_bus_ecam,
-+};
-+
-+static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
-+				int where, int size, u32 *val)
-+{
-+	void __iomem *addr;
-+	struct pci_sys_data *sys = bus->sysdata;
-+	struct gen_pci *pci = sys->private_data;
-+
-+	addr = pci->cfg.ops->map_bus(bus, devfn, where);
-+
-+	switch (size) {
-+	case 1:
-+		*val = readb(addr);
-+		break;
-+	case 2:
-+		*val = readw(addr);
-+		break;
-+	default:
-+		*val = readl(addr);
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
-+				 int where, int size, u32 val)
-+{
-+	void __iomem *addr;
-+	struct pci_sys_data *sys = bus->sysdata;
-+	struct gen_pci *pci = sys->private_data;
-+
-+	addr = pci->cfg.ops->map_bus(bus, devfn, where);
-+
-+	switch (size) {
-+	case 1:
-+		writeb(val, addr);
-+		break;
-+	case 2:
-+		writew(val, addr);
-+		break;
-+	default:
-+		writel(val, addr);
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static struct pci_ops gen_pci_ops = {
-+	.read	= gen_pci_config_read,
-+	.write	= gen_pci_config_write,
-+};
-+
-+static int gen_pci_calc_io_offset(struct device *dev,
-+				  struct of_pci_range *range,
-+				  struct resource *res,
-+				  resource_size_t *offset)
-+{
-+	static atomic_t wins = ATOMIC_INIT(0);
-+	int err, idx, max_win;
-+	unsigned int window;
-+
-+	if (!PAGE_ALIGNED(range->cpu_addr))
-+		return -EINVAL;
-+
-+	max_win = (IO_SPACE_LIMIT + 1) / SZ_64K;
-+	idx = atomic_inc_return(&wins);
-+	if (idx >= max_win)
-+		return -ENOSPC;
-+
-+	window = (idx - 1) * SZ_64K;
-+	err = pci_ioremap_io(window, range->cpu_addr);
-+	if (err)
-+		return err;
-+
-+	of_pci_range_to_resource(range, dev->of_node, res);
-+	res->start = window;
-+	res->end = res->start + range->size - 1;
-+	*offset = window - range->pci_addr;
-+	return 0;
-+}
-+
-+static int gen_pci_calc_mem_offset(struct device *dev,
-+				   struct of_pci_range *range,
-+				   struct resource *res,
-+				   resource_size_t *offset)
-+{
-+	of_pci_range_to_resource(range, dev->of_node, res);
-+	*offset = range->cpu_addr - range->pci_addr;
-+	return 0;
-+}
-+
-+static const struct of_device_id gen_pci_of_match[] = {
-+	{ .compatible = "pci-host-cam-generic",
-+	  .data = &gen_pci_cfg_cam_bus_ops },
-+
-+	{ .compatible = "pci-host-ecam-generic",
-+	  .data = &gen_pci_cfg_ecam_bus_ops },
-+
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, gen_pci_of_match);
-+
-+static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-+{
-+	int err, res_valid;
-+	u8 bus_max;
-+	struct pci_host_bridge_window *win;
-+	struct resource *bus_range;
-+	resource_size_t busn;
-+	const char *type;
-+	struct of_pci_range range;
-+	struct of_pci_range_parser parser;
-+	const struct of_device_id *of_id;
-+	const int *prop;
-+	struct gen_pci *pci = sys->private_data;
-+	struct device *dev = pci->host.dev.parent;
-+	struct device_node *np = dev->of_node;
-+
-+	type = of_get_property(np, "device_type", NULL);
-+	if (!type || strcmp(type, "pci")) {
-+		dev_err(dev, "invalid \"device_type\" %s\n", type);
-+		return -EINVAL;
-+	}
-+
-+	if (of_pci_range_parser_init(&parser, np)) {
-+		dev_err(dev, "missing \"ranges\" property\n");
-+		return -EINVAL;
-+	}
-+
-+	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
-+	if (prop) {
-+		if (*prop)
-+			pci_add_flags(PCI_PROBE_ONLY);
-+		else
-+			pci_clear_flags(PCI_PROBE_ONLY);
-+	}
-+
-+	if (of_pci_parse_bus_range(np, &pci->cfg.bus_range))
-+		pci->cfg.bus_range = (struct resource) {
-+			.name	= np->name,
-+			.start	= 0,
-+			.end	= 0xff,
-+			.flags	= IORESOURCE_BUS,
-+		};
-+
-+	err = of_address_to_resource(np, 0, &pci->cfg.res);
-+	if (err) {
-+		dev_err(dev, "missing \"reg\" property\n");
-+		return err;
-+	}
-+
-+	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-+				    sizeof(*pci->cfg.win), GFP_KERNEL);
-+	if (!pci->cfg.win)
-+		return -ENOMEM;
-+
-+	of_id = of_match_node(gen_pci_of_match, np);
-+	pci->cfg.ops = of_id->data;
-+	INIT_LIST_HEAD(&pci->host.windows);
-+
-+	/* Limit the bus-range to fit within reg */
-+	bus_max = pci->cfg.bus_range.start +
-+		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-+	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
-+				       bus_max);
-+
-+	/* Create and register resources from the ranges property */
-+	res_valid = 0;
-+	for_each_of_pci_range(&parser, &range) {
-+		struct resource *parent, *res;
-+		resource_size_t offset;
-+		u32 restype = range.flags & IORESOURCE_TYPE_BITS;
-+
-+		res = devm_kmalloc(dev, sizeof(*res), GFP_KERNEL);
-+		if (!res) {
-+			err = -ENOMEM;
-+			goto out_release_res;
-+		}
-+
-+		switch (restype) {
-+		case IORESOURCE_IO:
-+			parent = &ioport_resource;
-+			err = gen_pci_calc_io_offset(dev, &range, res, &offset);
-+			break;
-+		case IORESOURCE_MEM:
-+			parent = &iomem_resource;
-+			err = gen_pci_calc_mem_offset(dev, &range, res, &offset);
-+			res_valid |= !(res->flags & IORESOURCE_PREFETCH || err);
-+			break;
-+		default:
-+			err = -EINVAL;
-+			continue;
-+		}
-+
-+		if (err) {
-+			dev_warn(dev,
-+				 "error %d: failed to add resource [type 0x%x, %lld bytes]\n",
-+				 err, restype, range.size);
-+			continue;
-+		}
-+
-+		err = request_resource(parent, res);
-+		if (err)
-+			goto out_release_res;
-+
-+		pci_add_resource_offset(&sys->resources, res, offset);
-+	}
-+
-+	if (!res_valid) {
-+		dev_err(dev, "non-prefetchable memory resource required\n");
-+		err = -EINVAL;
-+		goto out_release_res;
-+	}
-+
-+	/* Map our Configuration Space windows */
-+	if (!request_mem_region(pci->cfg.res.start,
-+				resource_size(&pci->cfg.res),
-+				"Configuration Space"))
-+		goto out_release_res;
-+
-+	bus_range = &pci->cfg.bus_range;
-+	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
-+		u32 idx = busn - bus_range->start;
-+		u32 sz = 1 << pci->cfg.ops->bus_shift;
-+
-+		pci->cfg.win[idx] = devm_ioremap(dev,
-+						 pci->cfg.res.start + busn * sz,
-+						 sz);
-+		if (!pci->cfg.win[idx]) {
-+			err = -ENOMEM;
-+			goto out_unmap_cfg;
-+		}
-+	}
-+
-+	/* Register bus resource */
-+	pci_add_resource(&sys->resources, bus_range);
-+	return 1;
-+
-+out_unmap_cfg:
-+	while (busn-- > bus_range->start)
-+		devm_iounmap(dev, pci->cfg.win[busn - bus_range->start]);
-+
-+out_release_res:
-+	release_child_resources(&iomem_resource);
-+	release_child_resources(&ioport_resource);
-+
-+	list_for_each_entry(win, &sys->resources, list)
-+		devm_kfree(dev, win->res);
-+	pci_free_resource_list(&sys->resources);
-+
-+	devm_kfree(dev, pci->cfg.win);
-+	return err;
-+}
-+
-+static int gen_pci_probe(struct platform_device *pdev)
-+{
-+	struct hw_pci hw;
-+	struct gen_pci *pci;
-+	struct device *dev = &pdev->dev;
-+
-+	if (!dev->of_node)
-+		return -ENODEV;
-+
-+	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-+	if (!pci)
-+		return -ENOMEM;
-+
-+	pci->host.dev.parent = dev;
-+	hw = (struct hw_pci) {
-+		.nr_controllers	= 1,
-+		.private_data	= (void **)&pci,
-+		.setup		= gen_pci_setup,
-+		.map_irq	= of_irq_parse_and_map_pci,
-+		.ops		= &gen_pci_ops,
-+	};
-+
-+	pci_common_init_dev(dev, &hw);
-+	return 0;
-+}
-+
-+static struct platform_driver gen_pci_driver = {
-+	.driver = {
-+		.name = "pci-host-generic",
-+		.owner = THIS_MODULE,
-+		.of_match_table = gen_pci_of_match,
-+	},
-+	.probe = gen_pci_probe,
-+};
-+module_platform_driver(gen_pci_driver);
-+
-+MODULE_DESCRIPTION("Generic PCI host driver");
-+MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
-+MODULE_LICENSE("GPLv2");
--- 
-1.8.2.2
+>
+> Regards,
+>
+> Tony
+>
+>
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 3.14.0-rc5-00014-g2297f72-dirty (tmlind at muffinssi) (gcc version 4.3.5 (Debian 4.3.5-4) ) #388 Mon Mar 3 10:38:58 PST 2014
+> [    0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2 (ARMv6TEJ), cr=00c5387d
+> [    0.000000] CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
+> [    0.000000] Machine model: Nokia N800
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] debug: ignoring loglevel setting.
+> [    0.000000] Memory policy: Data cache writeback
+> [    0.000000] On node 0 totalpages: 32512
+> [    0.000000] free_area_init_node: node 0, pgdat c07969a8, node_mem_map c7df9000
+> [    0.000000]   Normal zone: 256 pages used for memmap
+> [    0.000000]   Normal zone: 0 pages reserved
+> [    0.000000]   Normal zone: 32512 pages, LIFO batch:7
+> [    0.000000] CPU: All CPU(s) started in SVC mode.
+> [    0.000000] OMAP2420
+> [    0.000000]
+> [    0.000000] pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
+> [    0.000000] pcpu-alloc: [0] 0
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32256
+> [    0.000000] Kernel command line: root=/dev/mmcblk0p2 rootwait console=ttyO2,115200 earlyprintk ignore_loglevel
+> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> [    0.000000] Memory: 115492K/130048K available (5098K kernel code, 457K rwdata, 1884K rodata, 304K init, 5485K bss, 14556K reserved, 0K highmem)
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+> [    0.000000]       .text : 0xc0008000 - 0xc06d9e10   (6984 kB)
+> [    0.000000]       .init : 0xc06da000 - 0xc072601c   ( 305 kB)
+> [    0.000000]       .data : 0xc0728000 - 0xc079a690   ( 458 kB)
+> [    0.000000]        .bss : 0xc079a690 - 0xc0cf5b10   (5486 kB)
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] IRQ: Found an INTC at 0xfa0fe000 (revision 2.0) with 96 interrupts
+> [    0.000000] Total of 96 interrupts on 1 active controller
+> [    0.000000] Clocking rate (Crystal/DPLL/MPU): 19.2/658/329 MHz
+> [    0.000000] OMAP clockevent source: timer1 at 32768 Hz
+> [    0.000030] sched_clock: 32 bits at 32kHz, resolution 30517ns, wraps every 65536000000000ns
+> [    0.008758] OMAP clocksource: 32k_counter at 32768 Hz
+> [    0.014465] hw-breakpoint: CPUID feature registers not supported. Assuming v6 debug is present.
+> [    0.026245] Console: colour dummy device 80x30
+> [    0.031005] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
+> [    0.039215] ... MAX_LOCKDEP_SUBCLASSES:  8
+> [    0.043609] ... MAX_LOCK_DEPTH:          48
+> [    0.048034] ... MAX_LOCKDEP_KEYS:        8191
+> [    0.052673] ... CLASSHASH_SIZE:          4096
+> [    0.057250] ... MAX_LOCKDEP_ENTRIES:     16384
+> [    0.061981] ... MAX_LOCKDEP_CHAINS:      32768
+> [    0.066680] ... CHAINHASH_SIZE:          16384
+> [    0.071411]  memory used by lock dependency info: 3695 kB
+> [    0.077056]  per task-struct memory footprint: 1152 bytes
+> [    0.082916] Calibrating delay loop... 324.40 BogoMIPS (lpj=1622016)
+> [    0.143737] pid_max: default: 32768 minimum: 301
+> [    0.149230] Security Framework initialized
+> [    0.153930] Mount-cache hash table entries: 512
+> [    0.247467] CPU: Testing write buffer coherency: ok
+> [    0.256866] Setting up static identity map for 0x804db430 - 0x804db4a0
+> [    0.286865] VFP support v0.3: implementor 41 architecture 1 part 20 variant b rev 2
+> [    0.404479] pinctrl core: initialized pinctrl subsystem
+> [    0.424957] regulator-dummy: no parameters
+> [    0.437042] NET: Registered protocol family 16
+> [    0.443664] DMA: preallocated 256 KiB pool for atomic coherent allocations
+> [    0.615081] omap_gpio 48018000.gpio: Could not get gpio dbck
+> [    0.626770] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
+> [    0.636871] OMAP GPIO hardware version 1.8
+> [    0.647003] omap_gpio 4801a000.gpio: Could not get gpio dbck
+> [    0.655456] gpiochip_add: registered GPIOs 32 to 63 on device: gpio
+> [    0.668640] omap_gpio 4801c000.gpio: Could not get gpio dbck
+> [    0.677062] gpiochip_add: registered GPIOs 64 to 95 on device: gpio
+> [    0.690704] omap_gpio 4801e000.gpio: Could not get gpio dbck
+> [    0.698974] gpiochip_add: registered GPIOs 96 to 127 on device: gpio
+> [    0.712554] omap-gpmc 6800a000.gpmc: GPMC revision 2.0
+> [    0.730529] platform mmci-omap.0: alias fck already exists
+> [    0.743072] No ATAGs?
+> [    0.745300] hw-breakpoint: found 6 breakpoint and 1 watchpoint registers.
+> [    0.752807] hw-breakpoint: maximum watchpoint size is 4 bytes.
+> [    0.771942] OMAP DMA hardware revision 2.0
+> [    1.001983] bio: create slab <bio-0> at 0
+> [    1.308654] omap-dma-engine 48056000.dma-controller: OMAP DMA engine driver
+> [    1.336578] SCSI subsystem initialized
+> [    1.351013] usbcore: registered new interface driver usbfs
+> [    1.358825] usbcore: registered new interface driver hub
+> [    1.366912] usbcore: registered new device driver usb
+> [    1.391571] omap_i2c 48070000.i2c: bus 0 rev3.3 at 400 kHz
+> [    1.401855] omap_i2c 48072000.i2c: bus 1 rev3.3 at 400 kHz
+> [    1.433074] Switched to clocksource 32k_counter
+> [    1.892578] NET: Registered protocol family 2
+> [    1.902313] TCP established hash table entries: 1024 (order: 0, 4096 bytes)
+> [    1.910247] TCP bind hash table entries: 1024 (order: 3, 36864 bytes)
+> [    1.918212] TCP: Hash tables configured (established 1024 bind 1024)
+> [    1.925659] TCP: reno registered
+> [    1.929168] UDP hash table entries: 256 (order: 2, 20480 bytes)
+> [    1.936157] UDP-Lite hash table entries: 256 (order: 2, 20480 bytes)
+> [    1.946411] NET: Registered protocol family 1
+> [    1.955749] RPC: Registered named UNIX socket transport module.
+> [    1.962005] RPC: Registered udp transport module.
+> [    1.967132] RPC: Registered tcp transport module.
+> [    1.972106] RPC: Registered tcp NFSv4.1 backchannel transport module.
+> [    1.983520] hw perfevents: enabled with v6 PMU driver, 3 counters available
+> [    2.018554] futex hash table entries: 256 (order: 1, 10240 bytes)
+> [    2.587036] VFS: Disk quotas dquot_6.5.2
+> [    2.591400] Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
+> [    2.603668] NFS: Registering the id_resolver key type
+> [    2.610473] Key type id_resolver registered
+> [    2.615142] Key type id_legacy registered
+> [    2.619812] jffs2: version 2.2. (NAND) (SUMMARY)  ? 2001-2006 Red Hat, Inc.
+> [    2.629089] msgmni has been set to 225
+> [    2.645568] io scheduler noop registered
+> [    2.649749] io scheduler deadline registered
+> [    2.654632] io scheduler cfq registered (default)
+> [    2.671997] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+> [    2.702178] omap_uart 4806a000.serial: no wakeirq for uart0
+> [    2.708282] of_get_named_gpiod_flags: can't parse gpios property of node '/ocp/serial at 4806a000[0]'
+> [    2.720428] 4806a000.serial: ttyO0 at MMIO 0x4806a000 (irq = 88, base_baud = 3000000) is a OMAP UART0
+> [    2.736633] omap_uart 4806c000.serial: no wakeirq for uart0
+> [    2.742553] of_get_named_gpiod_flags: can't parse gpios property of node '/ocp/serial at 4806c000[0]'
+> [    2.753723] 4806c000.serial: ttyO1 at MMIO 0x4806c000 (irq = 89, base_baud = 3000000) is a OMAP UART1
+> [    2.768005] omap_uart 4806e000.serial: no wakeirq for uart0
+> [    2.774078] of_get_named_gpiod_flags: can't parse gpios property of node '/ocp/serial at 4806e000[0]'
+> [    2.784912] 4806e000.serial: ttyO2 at MMIO 0x4806e000 (irq = 90, base_baud = 3000000) is a OMAP UART2
+> [    2.795776] console [ttyO2] enabled
+> [    2.795776] console [ttyO2] enabled
+> [    2.803344] bootconsole [earlycon0] disabled
+> [    2.803344] bootconsole [earlycon0] disabled
+> [    2.825744] omap_rng 480a0000.rng: OMAP Random Number Generator ver. 40
+> [    2.935699] brd: module loaded
+> [    2.997741] loop: module loaded
+> [    3.006866] Menelaus rev 2.2
+> [    3.047821] mtdoops: mtd device (mtddev=name/number) must be supplied
+> [    3.059997] omap2-onenand omap2-onenand: initializing on CS0, phys base 0x04000000, virtual base c88c0000, freq 54 MHz
+> [    3.071533] OneNAND Manufacturer: Samsung (0xec)
+> [    3.076538] Muxed OneNAND(DDP) 256MB 1.8V 16-bit (0x48)
+> [    3.082092] OneNAND version = 0x0011
+> [    3.085968] Chip support all block unlock
+> [    3.090332] onenand_wait: controller error = 0x0400
+> [    3.097259] Scanning device for bad blocks
+> [    3.254333] 6 ofpart partitions found on MTD device omap2-onenand
+> [    3.260803] Creating 6 MTD partitions on "omap2-onenand":
+> [    3.266662] 0x000000000000-0x000000020000 : "bootloader"
+> [    3.292877] 0x000000020000-0x000000080000 : "config"
+> [    3.312042] 0x000000080000-0x000000280000 : "kernel"
+> [    3.331085] 0x000000280000-0x000000680000 : "initfs"
+> [    3.350555] 0x000000680000-0x000010000000 : "rootfs"
+> [    3.393737] 0x000000000000-0x000010000000 : "omap2-onenand"
+> [    3.474853] usbcore: registered new interface driver asix
+> [    3.482421] usbcore: registered new interface driver ax88179_178a
+> [    3.490844] usbcore: registered new interface driver cdc_ether
+> [    3.498992] usbcore: registered new interface driver r815x
+> [    3.506896] usbcore: registered new interface driver smsc95xx
+> [    3.514953] usbcore: registered new interface driver net1080
+> [    3.522705] usbcore: registered new interface driver cdc_subset
+> [    3.530944] usbcore: registered new interface driver zaurus
+> [    3.539093] usbcore: registered new interface driver cdc_ncm
+> [    3.551727] usbcore: registered new interface driver cdc_wdm
+> [    3.559906] usbcore: registered new interface driver usb-storage
+> [    3.568420] usbcore: registered new interface driver usbtest
+> [    3.583953] mousedev: PS/2 mouse device common for all mice
+> [    3.606262] i2c /dev entries driver
+> [    3.620574] of_get_named_gpiod_flags exited with status 0
+> [    3.626647] of_get_named_gpiod_flags exited with status 0
+> [    3.632476] of_get_named_gpiod_flags exited with status 0
+> [    3.656005] retu-mfd 2-0001: Retu & Vilma v1.5 found
+> [    3.677124] input: retu-pwrbutton as /devices/ocp.3/i2c.4/i2c-2/2-0001/retu-pwrbutton/input/input0
+> [    3.695190] Driver for 1-wire Dallas network protocol.
+> [    3.724243] mmci-omap mmci-omap.0: no slots
+> [    3.728820] platform mmci-omap.0: Driver mmci-omap requests probe deferral
+> [    3.745727] usbcore: registered new interface driver usbhid
+> [    3.751678] usbhid: USB HID core driver
+> [    3.760375] oprofile: using arm/armv6
+> [    3.766571] TCP: cubic registered
+> [    3.770111] Initializing XFRM netlink socket
+> [    3.775299] NET: Registered protocol family 17
+> [    3.780242] NET: Registered protocol family 15
+> [    3.786315] Key type dns_resolver registered
+> [    3.804290] omap_mux_get_by_name: Could not find signal sys_ndmareq0
+> [    3.811065] omap_mux_get_by_name: Could not find signal sys_ndmareq1
+> [    3.817932] omap_mux_get_by_name: Could not find signal sys_ndmareq2
+> [    3.824768] omap_mux_get_by_name: Could not find signal sys_ndmareq3
+> [    3.831512] omap_mux_get_by_name: Could not find signal sys_ndmareq4
+> [    3.838317] omap_mux_get_by_name: Could not find signal sys_ndmareq5
+> [    3.854064] usb_phy_gen_xceiv supply vcc not found, using dummy regulator
+> [    3.883972] tusb: prcm2.0 int2.0 gpio3.0 dma3.0 dieid2 rev3.1
+> [    3.890167] musb-hdrc: ConfigData=0x06 (UTMI-8, dyn FIFOs, SoftConn)
+> [    3.897064] musb-hdrc: MHDRC RTL version 1.400
+> [    3.901885] musb-hdrc: setup fifo_mode 4
+> [    3.906188] musb-hdrc: 28/31 max ep, 16384/16384 memory
+> [    3.912506] musb-hdrc musb-hdrc.0.auto: MUSB HDRC host driver
+> [    3.928985] musb-hdrc musb-hdrc.0.auto: new USB bus registered, assigned bus number 1
+> [    3.942871] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+> [    3.950256] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+> [    3.958068] usb usb1: Product: MUSB HDRC host driver
+> [    3.963439] usb usb1: Manufacturer: Linux 3.14.0-rc5-00014-g2297f72-dirty musb-hcd
+> [    3.971466] usb usb1: SerialNumber: musb-hdrc.0.auto
+> [    3.992279] hub 1-0:1.0: USB hub found
+> [    3.997680] hub 1-0:1.0: 1 port detected
+> [    4.022338] TUSB 6010
+> [    4.157165] mmci-omap mmci-omap.0: command timeout (CMD52)
+> [    4.165161] mmci-omap mmci-omap.0: command timeout (CMD52)
+> [    4.196777] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.203491] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.210144] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.219604] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.241088] drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
+> [    4.353851] Waiting for root device /dev/mmcblk0p2...
+> [    4.385711] mmc0: host does not support reading read-only switch. assuming write-enable.
+> [    4.395019] mmc0: new SDHC card at address ea4d
+> [    4.407897] mmcblk0: mmc0:ea4d SU04G 3.79 GiB
+> [    4.428863]  mmcblk0: p1 p2
+> [    4.447296] mmci-omap mmci-omap.0: command timeout (CMD52)
+> [    4.454101] mmci-omap mmci-omap.0: command timeout (CMD52)
+> [    4.464874] mmci-omap mmci-omap.0: command timeout (CMD8)
+> [    4.477966] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.488250] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.498260] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.506286] EXT3-fs (mmcblk0p2): recovery required on readonly filesystem
+> [    4.513671] EXT3-fs (mmcblk0p2): write access will be enabled during recovery
+> [    4.523468] mmci-omap mmci-omap.0: command timeout (CMD5)
+> [    4.540527] mmci-omap mmci-omap.0: command timeout (CMD8)
+> [    4.547363] kjournald starting.  Commit interval 5 seconds
+> [    4.562103] EXT3-fs (mmcblk0p2): recovery complete
+> [    4.567413] EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
+> [    4.577270] VFS: Mounted root (ext3 filesystem) readonly on device 179:2.
+> [    4.587280] Freeing unused kernel memory: 304K (c06da000 - c0726000)
+> [    4.662048] mmc1: host does not support reading read-only switch. assuming write-enable.
+> [    4.671020] mmc1: new SD card at address e624
+> [    4.683898] mmcblk1: mmc1:e624 SD128 120 MiB
+> [    4.706298]  mmcblk1: p1
+> INIT: version 2.86 booting
+>
