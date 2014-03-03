@@ -1,47 +1,270 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 3 Mar 2014 18:37:40 +0100
-Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
-In-Reply-To: <20140303150215.GI21483@n2100.arm.linux.org.uk>
-References: <20140207180836.GE8533@titan.lakedaemon.net>
- <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
- <20140303150215.GI21483@n2100.arm.linux.org.uk>
-Message-ID: <20140303173740.GC16655@lunn.ch>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 03 Mar 2014 18:40:04 +0100
+Subject: [PATCH v7 02/15] ahci-platform: Add support for devices with more
+ then 1 clock
+In-Reply-To: <1393084424-31099-3-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+ <1393084424-31099-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1913842.kQBYcblUGT@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 03:02:15PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 17, 2014 at 08:00:36PM +0000, Jason Cooper wrote:
-> > The corresponding driver didn't make it into v3.14, so we need to remove
-> > the node.  Dove systems fail to boot with the node present and no
-> > driver.
-> > 
-> > This node will be re-added when the driver makes it to mainline.
+
+Hi,
+
+On Saturday, February 22, 2014 04:53:31 PM Hans de Goede wrote:
+> The allwinner-sun4i AHCI controller needs 2 clocks to be enabled and the
+> imx AHCI controller needs 3 clocks to be enabled.
 > 
-> I'm going to stick my oar in on this and ask what is a very fundamental
-> question.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../devicetree/bindings/ata/ahci-platform.txt      |   1 +
+>  drivers/ata/ahci.h                                 |   3 +-
+>  drivers/ata/ahci_platform.c                        | 119 ++++++++++++++++-----
+>  include/linux/ahci_platform.h                      |   4 +
+>  4 files changed, 99 insertions(+), 28 deletions(-)
 > 
-> If we're adding the PMU interrupt controller as a separate "device"
-> aren't we describing our implementation rather than the hardware?  It
-> isn't a separate device as far as the description of it in the reference
-> manuals.
-> 
-> Moreover, should the PMU interrupt controller be something which is
-> handled by a separate chunk of code to a driver for the PMU as a whole,
-> or are we storing up problems with resource clashes?  I can quite see
-> a PMU driver coming along in the future offering a pair of generic
-> power domains for the GPU and VPU, and such a driver would need to map
-> all the PMU registers so it can access the power control, reset and
-> isolator registers.
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index 89de156..3ced07d 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -10,6 +10,7 @@ Required properties:
+>  
+>  Optional properties:
+>  - dma-coherent      : Present if dma operations are coherent
+> +- clocks            : a list of phandle + clock specifier pairs
+>  
+>  Example:
+>          sata at ffe08000 {
+> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+> index 64d1a99..c12862b 100644
+> --- a/drivers/ata/ahci.h
+> +++ b/drivers/ata/ahci.h
+> @@ -51,6 +51,7 @@
+>  
+>  enum {
+>  	AHCI_MAX_PORTS		= 32,
+> +	AHCI_MAX_CLKS		= 3,
+>  	AHCI_MAX_SG		= 168, /* hardware max is 64K */
+>  	AHCI_DMA_BOUNDARY	= 0xffffffff,
+>  	AHCI_MAX_CMDS		= 32,
+> @@ -321,7 +322,7 @@ struct ahci_host_priv {
+>  	u32 			em_loc; /* enclosure management location */
+>  	u32			em_buf_sz;	/* EM buffer size in byte */
+>  	u32			em_msg_type;	/* EM message type */
+> -	struct clk		*clk;		/* Only for platforms supporting clk */
+> +	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
+>  	void			*plat_data;	/* Other platform data */
+>  	/*
+>  	 * Optional ahci_start_engine override, if not set this gets set to the
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 4b231ba..609975d 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -87,6 +87,66 @@ static struct scsi_host_template ahci_platform_sht = {
+>  	AHCI_SHT("ahci_platform"),
+>  };
+>  
+> +/**
+> + *	ahci_platform_enable_clks - Enable platform clocks
+> + *	@hpriv: host private area to store config values
+> + *
+> + *	This function enables all the clks found in hpriv->clks, starting
+> + *	at index 0. If any clk fails to enable it disables all the clks
+> + *	already enabled in reverse order, and then returns an error.
+> + *
+> + *	LOCKING:
+> + *	None.
+> + *
+> + *	RETURNS:
+> + *	0 on success otherwise a negative error code
+> + */
+> +int ahci_platform_enable_clks(struct ahci_host_priv *hpriv)
+> +{
+> +	int c, rc;
+> +
+> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++) {
+> +		rc = clk_prepare_enable(hpriv->clks[c]);
+> +		if (rc)
+> +			goto disable_unprepare_clk;
+> +	}
+> +	return 0;
+> +
+> +disable_unprepare_clk:
+> +	while (--c >= 0)
+> +		clk_disable_unprepare(hpriv->clks[c]);
+> +	return rc;
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_platform_enable_clks);
+> +
+> +/**
+> + *	ahci_platform_disable_clks - Disable platform clocks
+> + *	@hpriv: host private area to store config values
+> + *
+> + *	This function disables all the clks found in hpriv->clks, in reverse
+> + *	order of ahci_platform_enable_clks (starting at the end of the array).
+> + *
+> + *	LOCKING:
+> + *	None.
+> + */
+> +void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
+> +{
+> +	int c;
+> +
+> +	for (c = AHCI_MAX_CLKS - 1; c >= 0; c--)
+> +		if (hpriv->clks[c])
+> +			clk_disable_unprepare(hpriv->clks[c]);
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
+> +
+> +static void ahci_put_clks(struct ahci_host_priv *hpriv)
+> +{
+> +	int c;
+> +
+> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
+> +		clk_put(hpriv->clks[c]);
+> +}
+> +
+>  static int ahci_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -97,6 +157,7 @@ static int ahci_probe(struct platform_device *pdev)
+>  	struct ahci_host_priv *hpriv;
+>  	struct ata_host *host;
+>  	struct resource *mem;
+> +	struct clk *clk;
+>  	int irq;
+>  	int n_ports;
+>  	int i;
+> @@ -131,17 +192,31 @@ static int ahci_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> -	hpriv->clk = clk_get(dev, NULL);
+> -	if (IS_ERR(hpriv->clk)) {
+> -		dev_err(dev, "can't get clock\n");
+> -	} else {
+> -		rc = clk_prepare_enable(hpriv->clk);
+> -		if (rc) {
+> -			dev_err(dev, "clock prepare enable failed");
+> -			goto free_clk;
+> +	for (i = 0; i < AHCI_MAX_CLKS; i++) {
+> +		/*
+> +		 * For now we must use clk_get(dev, NULL) for the first clock,
+> +		 * because some platforms (da850, spear13xx) are not yet
+> +		 * converted to use devicetree for clocks.  For new platforms
+> +		 * this is equivalent to of_clk_get(dev->of_node, 0).
+> +		 */
+> +		if (i == 0)
+> +			clk = clk_get(dev, NULL);
+> +		else
+> +			clk = of_clk_get(dev->of_node, i);
+> +
+> +		if (IS_ERR(clk)) {
+> +			rc = PTR_ERR(clk);
+> +			if (rc == -EPROBE_DEFER)
+> +				goto free_clk;
+> +			break;
+>  		}
+> +		hpriv->clks[i] = clk;
+>  	}
+>  
+> +	rc = ahci_enable_clks(dev, hpriv);
 
-Hi Russell
+This should be ahci_platform_enable_clks().
 
-I suspect you are right, we are storing up problems.
+> +	if (rc)
+> +		goto free_clk;
+> +
+>  	/*
+>  	 * Some platforms might need to prepare for mmio region access,
+>  	 * which could be done in the following init call. So, the mmio
+> @@ -222,11 +297,9 @@ pdata_exit:
+>  	if (pdata && pdata->exit)
+>  		pdata->exit(dev);
+>  disable_unprepare_clk:
+> -	if (!IS_ERR(hpriv->clk))
+> -		clk_disable_unprepare(hpriv->clk);
+> +	ahci_disable_clks(hpriv);
 
-During the 4 months between submitting this driver and actually
-getting it accepted, i've learned quite a bit. I tried to implement
-cpufreq for Dove and ran into the problems you mention. The registers
-in the PMU are interleaved so that you cannot cleanly separate out the
-range needed for cpufreq. We probably need a PMU device, which exports
-a register syscon and have the interrupt controller make use of it.
+ahci_platform_disable_clks()
 
-	Andrew
+>  free_clk:
+> -	if (!IS_ERR(hpriv->clk))
+> -		clk_put(hpriv->clk);
+> +	ahci_put_clks(hpriv);
+>  	return rc;
+>  }
+>  
+> @@ -239,10 +312,8 @@ static void ahci_host_stop(struct ata_host *host)
+>  	if (pdata && pdata->exit)
+>  		pdata->exit(dev);
+>  
+> -	if (!IS_ERR(hpriv->clk)) {
+> -		clk_disable_unprepare(hpriv->clk);
+> -		clk_put(hpriv->clk);
+> -	}
+> +	ahci_disable_clks(hpriv);
+
+ahci_platform_disable_clks()
+
+> +	ahci_put_clks(hpriv);
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
+> @@ -277,8 +348,7 @@ static int ahci_suspend(struct device *dev)
+>  	if (pdata && pdata->suspend)
+>  		return pdata->suspend(dev);
+>  
+> -	if (!IS_ERR(hpriv->clk))
+> -		clk_disable_unprepare(hpriv->clk);
+> +	ahci_disable_clks(hpriv);
+
+ahci_platform_disable_clks()
+
+>  	return 0;
+>  }
+> @@ -290,13 +360,9 @@ static int ahci_resume(struct device *dev)
+>  	struct ahci_host_priv *hpriv = host->private_data;
+>  	int rc;
+>  
+> -	if (!IS_ERR(hpriv->clk)) {
+> -		rc = clk_prepare_enable(hpriv->clk);
+> -		if (rc) {
+> -			dev_err(dev, "clock prepare enable failed");
+> -			return rc;
+> -		}
+> -	}
+> +	rc = ahci_enable_clks(dev, hpriv);
+
+ahci_platform_enable_clks()
+
+> +	if (rc)
+> +		return rc;
+>  
+>  	if (pdata && pdata->resume) {
+>  		rc = pdata->resume(dev);
+> @@ -317,8 +383,7 @@ static int ahci_resume(struct device *dev)
+>  	return 0;
+>  
+>  disable_unprepare_clk:
+> -	if (!IS_ERR(hpriv->clk))
+> -		clk_disable_unprepare(hpriv->clk);
+> +	ahci_disable_clks(hpriv);
+
+ahci_platform_disable_clks()
+
+[...]
+
+All code in question gets rewritten in patch #4/15 so the actual
+problem is the broken bisectability between patch #2 and #4.
+
+It seems too late to fix it now but in the future please remember
+to build-test each patch separately (in addition to testing the whole
+patchset).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
