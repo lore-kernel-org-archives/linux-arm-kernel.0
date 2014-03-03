@@ -1,62 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Mar 2014 09:41:36 -0700
-Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
- level
-In-Reply-To: <20140303005246.GA22047@xora-yoga13>
-References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
- <20140227210227.GE2931@xora-haswell> <530FAFAE.5050800@wwwdotorg.org>
- <20140228055818.GA29849@sirena.org.uk> <5310BA99.4050203@wwwdotorg.org>
- <20140303005246.GA22047@xora-yoga13>
-Message-ID: <5314B0C0.4040008@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 3 Mar 2014 10:40:51 -0600
+Subject: [PATCH v5 0/6] Make dwc3 use Generic PHY Framework
+In-Reply-To: <1393846695-14644-1-git-send-email-kishon@ti.com>
+References: <1393846695-14644-1-git-send-email-kishon@ti.com>
+Message-ID: <20140303164051.GB10987@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2014 05:52 PM, Graeme Gregory wrote:
-> On Fri, Feb 28, 2014 at 09:34:33AM -0700, Stephen Warren wrote:
->> On 02/27/2014 10:58 PM, Mark Brown wrote:
->>> On Thu, Feb 27, 2014 at 02:35:42PM -0700, Stephen Warren wrote:
->>>> On 02/27/2014 02:02 PM, Graeme Gregory wrote:
->>>
->>>>>> +- ti,irq-externally-inverted : If missing, the polarity of the Palmas IRQ
->>>>>> +  output should be set to the opposite of the polarity indicated by the IRQ
->>>>>> +  specifier in the interrupts property. If absent, the polarity should be
->>>>>> +  configured to match. This allows the representation of an inverter between
->>>>>> +  the Palmas IRQ output and the interrupt parent's IRQ input.
->>>
->>>>> This has got to be the wrong way to do things, all this leads to is every
->>>>> device doing this property in its own way and having totally inconsistent
->>>>> properties all meaning the same thing.
-...
->> Another alternative might be to add an extra IRQ bit in the IRQ
->> specifier (and something similar would be needed for GPIO specifiers)
->> that indicates "inversion between source and destination". This could be
->> queried by drivers in exactly the same way as the existing polarity/type
->> IRQ flags. We'd need to update each individual IRQ controller binding to
->> enable that flag, since each binding defines its own definition of such
->> flags. (although in practice since most use the same centrally suggested
->> flags, this wouldn't be any more than just saying yes, this binding
->> allows that new flag to be used).
->>
-> A new flag would meet my concerns of every chip doing basic inversion
-> in different ways.
+Hi,
 
-OK, I'll look into a new flag.
+On Mon, Mar 03, 2014 at 05:08:09PM +0530, Kishon Vijay Abraham I wrote:
+> Added support for optional PHY in dwc3 as not all SoCs having PHYs for DWC3
+> should be programmed. While this can be considered as a temporary fix,
+> a long term solution would be to add 'nop' PHY for platforms that does
+> not have programmable PHY.
+> Adapted DWC3 and USB3 PHY to use Generic PHY framework. Also changed the
+> name of USB3 PHY driver to PIPE3 PHY driver since the same driver has to
+> be used for SATA and PCIE too.
+> 
+> Changes from v4: (sending the entire patch series again)
+> * check the return values of phy_init and phy_power_on
+> * print errors if power_on or power_off of PHY fails.
+> 
+> Changes from v3: (Sent only adapt dwc3 core to use Generic PHY Framework) 
+> * avoided using quirks and rely on the return values of PHY APIs to find the
+> presence of PHY.
+> 
+> Changes from v2:
+> * added a couple of fixes. One is invoking phy_resume after phy_init and the
+> other is power off phy in error patch
+> * used quirks to identify if a particular platform does not have PHYs
+> * removed using separate header for pipe3 driver and also removed all referencs
+> to SATA and PCIe in pipe3 driver since it's not yet adapted for those drivers.
+> 
+> Changes from v1:
+> * The logic in which the driver detects the presence of PHYs has changed.
+> * patch ordering has changed
+> * udelay is replaced with usleep_range
+> * A patch to remove set_suspend callback which was deferred from Generic
+> PHY Framework series has been included.
+> 
+> Kishon Vijay Abraham I (6):
+>   usb: dwc3: core: support optional PHYs
+>   usb: dwc3: adapt dwc3 core to use Generic PHY Framework
+>   drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY Framework
+>   usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
+>   phy: omap-usb2: move omap_usb.h from linux/usb/ to linux/phy/
+>   arm/dts: added dt properties to adapt to the new phy framwork
 
-The one thing I worry about is that we can either:
+patches 1 and 2 are in my testing/next, I guess 3,4,5 and 6 have no
+direct dependency on those, right ?
 
-1) Have every IC driver with a configurable output polarity read a DT
-flag (and we can fully standardize it's name), which is 1 line of code
-per IC driver.
-
-or:
-
-2) We can go through every single interrupt controller's DT binding and
-driver, and implement (document and parse) the new IRQ specifier flag
-there, and pass it throgh the Linux IRQ stack, yet we still need code in
-every IC driver to actually read the flag, so we haven't removed any
-code. It seems /much/ simpler, and no more of a maintenance or
-consistency burden, to just have the IC driver read the flag directly
-from their own DT.
-
-Still, as I said, I'll go try and code it up and see how bad it is in
-practice.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/b157ecf7/attachment-0001.sig>
