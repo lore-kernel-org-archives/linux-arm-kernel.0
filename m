@@ -1,38 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Mar 2014 16:31:39 +0000
-Subject: static asmlinkage in irqchip (was Re: next build: 78 warnings
- 0 failures (next/next-20140228))
-In-Reply-To: <20140303161217.GK7308@joshc.qualcomm.com>
-References: <5310415c.2d79420a.3275.ffff92bb@mx.google.com>
- <5311449E.90902@codeaurora.org> <20140301161258.GN12219@tassilo.jf.intel.com>
- <20140303161217.GK7308@joshc.qualcomm.com>
-Message-ID: <20140303163139.GJ21483@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 3 Mar 2014 10:33:08 -0600
+Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping
+ when DEBUG is enabled
+In-Reply-To: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140303163308.GA10987@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 10:12:17AM -0600, Josh Cartwright wrote:
-> On Sat, Mar 01, 2014 at 08:12:58AM -0800, Andi Kleen wrote:
-> > > These seem to be caused by 128ea04a9885 (lto: Make asmlinkage __visible,
-> > > 2014-02-08). Before that change asmlinkage was defined to nothing on
-> > > ARM, but now it's __visible. Should we just drop asmlinkage here?
-> >
-> > These functions are just called by the generic C interrupt layer right?
-> > Yes should just drop asmlinkage. It doesn't make any sense to mark
-> > functions that only called from C asmlinkage.
+On Fri, Feb 28, 2014 at 03:34:01PM +0100, Gregory CLEMENT wrote:
+> The debug trace in the atmel_usba_stop function made the assumption
+> that the driver pointer passed in parameter was not NULL. Since the
+> commit "usb: gadget: udc-core: fix a regression during gadget driver
+> unbinding", it was no more always true. This lead to a kernel crash.
 > 
-> On ARM[64], these functions are called from assembly indirectly through
-> the 'handle_arch_irq' function pointer, so I don't think it makes sense
-> to drop 'asmlinkage'.
+> This commit now use the driver pointer stored in udc which fixes this
+> issue.
+> 
+> Since the commit which have triggered this issue was backported to the
+> 3.2 stable branch, then this one should also be backported to the same
+> kernel.
+> 
+> Cc: stable at vger.kernel.org # v3.2+
+> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
 
-If building with a C++ compiler:
-
-	asmlinkage = extern "C"
-
-	static asmlinkage = static extern "C"
-
-That doesn't quite make much sense when you think about it - even with
-the existing definition in current mainline kernels.
+this line shouldn't be here and you're missing a SoB line, can't take
+this patch, sorry.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140303/43f67785/attachment.sig>
