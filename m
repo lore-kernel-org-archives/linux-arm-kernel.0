@@ -1,66 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Mar 2014 11:00:42 +0000
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM
-In-Reply-To: <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
-References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
- <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140304110042.GD8766@mudshark.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 04 Mar 2014 12:02:31 +0100
+Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <20140303162731.GA3732@katana>
+References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+ <1722697.3h0GnbWuD3@avalon> <20140303162731.GA3732@katana>
+Message-ID: <2207635.bd10VfTU6U@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi Wolfram,
 
-On Mon, Mar 03, 2014 at 09:53:21AM +0000, Jean Pihet wrote:
-> Introducing perf_regs_load function, which is going
-> to be used for dwarf unwind test in following patches.
+On Monday 03 March 2014 17:27:31 Wolfram Sang wrote:
+> > While the parent is indeed selected at boot time only, and only one parent
+> > is thus needed, parent selection could be performed by a DIP switch
+> > connected to MD_CLK on the board for instance. In that case both parents
+> > should be available in DT, as selection will be done by the kernel at
+> > boot time, not at DT compile time.
 > 
-> It takes single argument as a pointer to the regs dump
-> buffer and populates it with current registers values.
+> OK, I understand the case. I still wonder about specifying two parents,
+> though. If a board uses USB_X1, it then has to spefify a dummy EXTAL
+> clock (or an empty one), just because USB_X1 is enumerated as second
+> entry?
 
-[...]
+That's a good question. Mike, would it be possible to support "holes" in the 
+DT clocks lists, like the GPIO DT bindings do ?
 
-> diff --git a/tools/perf/arch/arm/tests/regs_load.S b/tools/perf/arch/arm/tests/regs_load.S
-> new file mode 100644
-> index 0000000..241c6df
-> --- /dev/null
-> +++ b/tools/perf/arch/arm/tests/regs_load.S
-> @@ -0,0 +1,51 @@
-> +#include <linux/linkage.h>
-> +
-> +#define R0 0x00
-> +#define R1 0x08
+> > > Again, now that I already coded it, what is the gain to remove it? The
+> > > drawback is that other people might get encouraged to find reasons to
+> > > allow them sloppy practices.
+> > 
+> > It will make the kernel binary smaller by removing code that is not needed
+> > in practice.
+> 
+> Sounds like a micro-optimazation to me. If you insist, we should BUG()
+> right away in that case, to make the code comprehensible. Returning with
+> a leak and saying "we will probably fail somewhere" should really be
+> avoided IMO.
 
-Why are you using a 64-bit stride for 32-bit registers? (which prevents you
-from using stm later on).
+It's a micro-optimization indeed, but a simple one, so I believe it makes 
+sense. I'll leave it up to you in the end.
 
-> +.text
-> +.type perf_regs_load,%function
-> +ENTRY(perf_regs_load)
-> +	push {r1}
+-- 
+Regards,
 
-Do you only push r1 here so that you can do the stack arithmetic later? That
-doesn't make sense to me -- can't you str sp directly?
-
-> +	str r0, [r0, #R0]
-> +	str r1, [r0, #R1]
-> +	str r2, [r0, #R2]
-> +	str r3, [r0, #R3]
-> +	str r4, [r0, #R4]
-> +	str r5, [r0, #R5]
-> +	str r6, [r0, #R6]
-> +	str r7, [r0, #R7]
-> +	str r8, [r0, #R8]
-> +	str r9, [r0, #R9]
-> +	str sl, [r0, #SL]
-> +	str fp, [r0, #FP]
-> +	str ip, [r0, #IP]
-> +	add r1, sp, #4		@ Retrieve and save sp at entry time
-> +	str r1, [r0, #SP]
-> +	str lr, [r0, #LR]
-> +	str lr, [r0, #PC]	@ Save caller PC
-
-This isn't necessarily the `caller PC' (depending on how you define it).
-It's the return address, which is probably (but not always) the instruction
-following the branch to this function.
-
-Will
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140304/e2ea5833/attachment.sig>
