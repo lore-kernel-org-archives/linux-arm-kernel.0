@@ -1,58 +1,34 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Tue, 4 Mar 2014 11:32:33 +0100
-Subject: BUG_ON for DMA-bounce and bidirectional mappings (e100 on IXP4xx)
-Message-ID: <20140304113233.14c95fe0@marrow.netinsight.se>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 04 Mar 2014 11:32:50 +0100
+Subject: [PATCH v2 1/5] ASoC: kirkwood: prepare new Dove DT Kconfig
+ variable
+In-Reply-To: <20140304040314.GC2411@sirena.org.uk>
+References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393662801-17950-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140304040314.GC2411@sirena.org.uk>
+Message-ID: <5315ABD2.9030809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Sorry, sent to wrong mailing list address)
+On 03/04/2014 05:03 AM, Mark Brown wrote:
+> On Sat, Mar 01, 2014 at 09:33:17AM +0100, Sebastian Hesselbarth wrote:
+>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> DT-only MACH_DOVE Kconfig.
+>
+> This doesn't apply against current ASoC, please check and resend.
 
-Hi!
+Mark,
 
-We have a IXP4xx-based board which has an e100 NIC. During bootup, we
-trigger a BUG_ON in dmabounce.c because the mapped direction doesn't
-match the synced one. e100.c maps buffers bidirectional, but the sync
-is done fromdevice.
+actually looking at what that specific Kconfig will look like in
+asoc/for-next, I guess the current version is sufficient already.
 
-Krzysztof Ha?asa sent a patch 2012-09-20 which excludes bidirectional
-mappings from the sync BUG_ONs, as seen below. We need that patch for
-our board to boot. The patch in full is available at
+It already says:
 
-  http://patchwork.ozlabs.org/patch/185486/
+depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || COMPILE_TEST
 
-This was never applied, but also received no comments. Does the patch
-make sense?
+and MACH_DOVE will be part of ARCH_MVEBU.
 
+Thanks for pointing this out, please ignore this patch.
 
-For further reference, the e100 BUG_ON was discussed here a few years
-ago:
-
-  http://comments.gmane.org/gmane.linux.ports.arm.kernel/48922
-
-there is a e100 patch there from Jesse Brandeburg which changes the
-mapping, however with that patch the NIC stops receiving traffic after
-a while.
-
-Thanks,
-// Simon
-
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -375,7 +375,7 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
-@@ -415,7 +415,7 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+Sebastian
