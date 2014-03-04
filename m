@@ -1,128 +1,57 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  4 Mar 2014 15:50:13 +0000
-Subject: [PATCH v5 0/3] [RFC] Add support for PCI in AArch64
-Message-ID: <1393948216-11599-1-git-send-email-Liviu.Dudau@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 04 Mar 2014 08:57:15 -0700
+Subject: [PATCH V3 1/5] genirq: define flag IRQ_SRC_DST_INVERTED, and
+ accessors
+In-Reply-To: <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
+References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
+ <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
+Message-ID: <5315F7DB.6000700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/04/2014 03:04 AM, Thomas Gleixner wrote:
+> On Mon, 3 Mar 2014, Stephen Warren wrote:
+> 
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Some devices have configurable IRQ output polarities. Software might
+>> use IRQ_TYPE_* to determine how to configure such a device's IRQ
+>> output polarity in order to match how the IRQ controller input is
+>> configured. If the board or SoC inverts the signal between the
+>> device's IRQ output and controller's IRQ output, software must be
+>> aware of this fact, in order to program the IRQ output to the correct
+>> (i.e. opposite) polarity. This flag provides that information.
+> 
+> So what you're saying is:
+> 
+> Device IRQ output --> [Optional Inverter Logic] --> IRQ controller input.
+> 
+> And you're storing the information about the presence of the inverter
+> logic in the irq itself, but the core does not make any use of it and
+> you let the device driver deal with the outcome.
+> 
+> This sucks as all affected drivers have to implement the same sanity
+> logic for this.
+> 
+> Why don't you implement a core function which tells the driver which
+> polarity to select? That requires a few more changes, but I think it's
+> worth it for other reasons.
+> 
+> Right now the set_type logic requires the irq chip drivers to
+> implement sanity checking and default selections for TYPE_NONE. We can
+> be more clever about that and add this information to the irq chip
+> flags.
 
-This patch adds support for PCI to AArch64. It is based on my v5 patch
-that adds support for creating generic host bridge structure from
-device tree. With that in place, I was able to boot a platform that
-has PCIe host bridge support and use a PCIe network card.
+I don't see any such checking in drivers/irqchip/irq-gic.c; it rejects
+any type other than IRQ_TYPE_LEVEL_HIGH or IRQ_TYPE_EDGE_RISING, and I
+don't see any mention of TYPE_NONE in that file. Is the driver incomplete?
 
-Changes from v4:
-  - Fixed the pci_domain_nr() implementation for arm64. Now we use
-    find_pci_host_bride() to find the host bridge before we retrieve
-    the domain number.
+Instead of adding all this extra logic to the core, what do you think of
+simply telling each driver that has a configurable interrupt output
+polarity exactly which polarity to use. This information would come from
+device tree or platform data. This is what I implemented in V1/V2 of
+this series:
 
-Changes from v3:
-  - Added Acks accumulated so far ;)
-  - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
-    lands in linux-next or mainline, in order to ease applying the series
+http://www.spinics.net/lists/devicetree/msg23648.html
 
-Changes from v2:
-  - Implement an arch specific version of pci_register_io_range() and
-    pci_address_to_pio().
-  - Return 1 from pci_proc_domain().
-
-Changes from v1:
-  - Added Catalin's patch for moving the PCI_IO_BASE location and extend
-    its size to 16MB
-  - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
-    keeping track of assigned IO space and returns an io_offset. At the
-    moment the code is added in arch/arm64 but it can be moved in drivers/pci.
-  - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
-    as suggested by Arnd.
-
-v4 thread here: https://lkml.org/lkml/2014/3/3/298
-v3 thread here: https://lkml.org/lkml/2014/2/28/211
-v2 thread here: https://lkml.org/lkml/2014/2/27/255
-v1 thread here: https://lkml.org/lkml/2014/2/3/389
-
-
-The API used is different from the one used by ARM architecture. There is
-no pci_common_init_dev() function and no hw_pci structure, as that is no
-longer needed. Once the last signature is added to the legal agreement, I
-will post the host bridge driver code that I am using. Meanwhile, here
-is an example of what the probe function looks like, posted as an example:
-
-static int myhostbridge_probe(struct platform_device *pdev)
-{
-	int err;
-	struct device_node *dev;
-	struct pci_host_bridge *bridge;
-	struct myhostbridge_port *pp;
-	resource_size_t lastbus;
-
-	dev = pdev->dev.of_node;
-
-	if (!of_device_is_available(dev)) {
-		pr_warn("%s: disabled\n", dev->full_name);
-		return -ENODEV;
-	}
-
-	pp = kzalloc(sizeof(struct myhostbridge_port), GFP_KERNEL);
-	if (!pp)
-		return -ENOMEM;
-
-	bridge = of_create_pci_host_bridge(&pdev->dev, &myhostbridge_ops, pp);
-	if (IS_ERR(bridge)) {
-		err = PTR_ERR(bridge);
-		goto bridge_create_fail;
-	}
-
-	err = myhostbridge_setup(bridge->bus);
-	if (err)
-		goto bridge_setup_fail;
-
-	/* We always enable PCI domains and we keep domain 0 backward
-	 * compatible in /proc for video cards
-	 */
-	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
-	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
-
-	lastbus = pci_scan_child_bus(bridge->bus);
-	pci_bus_update_busn_res_end(bridge->bus, lastbus);
-
-	pci_assign_unassigned_bus_resources(bridge->bus);
-
-	pci_bus_add_devices(bridge->bus);
-
-	return 0;
-
-bridge_setup_fail:
-	put_device(&bridge->dev);
-	device_unregister(&bridge->dev);
-bridge_create_fail:
-	kfree(pp);
-	return err;
-}
-
-Best regards,
-Liviu
-
-
-
-Catalin Marinas (1):
-  arm64: Extend the PCI I/O space to 16MB
-
-Liviu Dudau (2):
-  Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-  arm64: Add architecture support for PCI
-
- Documentation/arm64/memory.txt |  16 ++--
- arch/arm64/Kconfig             |  19 ++++-
- arch/arm64/include/asm/Kbuild  |   1 +
- arch/arm64/include/asm/io.h    |   5 +-
- arch/arm64/include/asm/pci.h   |  49 ++++++++++++
- arch/arm64/kernel/Makefile     |   1 +
- arch/arm64/kernel/pci.c        | 178 +++++++++++++++++++++++++++++++++++++++++
- include/asm-generic/io.h       |   2 +-
- 8 files changed, 261 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/pci.c
-
--- 
-1.9.0
+Is that any better, or do you definitely want the IRQ core to manage this?
