@@ -1,64 +1,35 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue,  4 Mar 2014 06:54:24 -0800
-Subject: [PATCH 1/2] of/irq: Fix irq-mapping in of_irq_parse_raw()
-Message-ID: <1393944864-28113-1-git-send-email-tharvey@gateworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Mar 2014 15:53:39 +0100
+Subject: [PATCH 7/7] PCI: designware: split samsung and fsl bindings
+In-Reply-To: <1393942383.9405.8.camel@weser.hi.pengutronix.de>
+References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
+ <201402282103.01897.arnd@arndb.de>
+ <1393942383.9405.8.camel@weser.hi.pengutronix.de>
+Message-ID: <201403041553.40202.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an interrupt-map contains multiple entries an imap pointer arithmetic
-bug can cause only the first entry to be properly evaluated and causes
-the out_irq parameters to be incorrect depending on the #interrupt-cells
-and #address-cells of the parent interrupt controller.
+On Tuesday 04 March 2014, Lucas Stach wrote:
+> Right, we should be able to reuse the clock names. Though I'm not really
+> sure how the Samsung clocks maps to those used on i.MX, as the names are
+> a bit generic. Maybe someone from Samsung could shed a bit of light on
+> this.
+> 
+> On i.MX6 the clock names (which I have to agree are pretty bad) map as
+> follows:
+> pcie_axi: host controller main register/bus access clock
+> pcie_ref_125m: pcie phy reference clock
+> 
+> sata_ref_100m: pcie bus 100MHz reference clock
 
-Specifically, the imap pointer into the interrupt-map table should be
-adjusted by the parent interrupt controller #interrupt-cells size only
-as at this point the only the parent unit interrupt specifier needs to be
-stepped over.
+That doesn't explain why it's called "sata_ref_100m".
 
-This resolves an issue encountered when using the of_irq_parse_and_map_pci()
-for the imx6 pcie host controller driver map_irq function where a P2P bridge
-is on the bus and legacy PCI interrupts are to be used.
+> lvds_gate: bad abstraction. Decides if the reference clock is sourced
+> internal (i.e. the 100MHz ref clock above) or from an SoC external
+> source. We should really find a better way of representing this in the
+> clock tree.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-samsung-soc <linux-samsung-soc@vger.kernel.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: linux-tegra <linux-tegra@vger.kernel.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@linaro.org>
----
- drivers/of/irq.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I don't understand this description at all. Can you try to explain that
+with different words?
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 9bcf2cf..8829197 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -237,11 +237,11 @@ int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq)
- 			/* Check for malformed properties */
- 			if (WARN_ON(newaddrsize + newintsize > MAX_PHANDLE_ARGS))
- 				goto fail;
--			if (imaplen < (newaddrsize + newintsize))
-+			if (imaplen < newintsize)
- 				goto fail;
- 
--			imap += newaddrsize + newintsize;
--			imaplen -= newaddrsize + newintsize;
-+			imap += newintsize;
-+			imaplen -= newintsize;
- 
- 			pr_debug(" -> imaplen=%d\n", imaplen);
- 		}
--- 
-1.8.3.2
+	Arnd
