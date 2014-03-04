@@ -1,269 +1,143 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 3 Mar 2014 16:42:11 -0800
-Subject: [PATCH v4 5/6] pci: Use parent domain number when allocating
- child busses.
-In-Reply-To: <20140303235132.GA13582@bart.dudau.co.uk>
-References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
- <1393867996-32299-6-git-send-email-Liviu.Dudau@arm.com>
- <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
- <20140303235132.GA13582@bart.dudau.co.uk>
-Message-ID: <CACoXjc=FM5Bohpw6xmD0OCRX40gX2EHzWmf0dXgDosY-Wg8=ZA@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 3 Mar 2014 16:38:10 -0800
+Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
+In-Reply-To: <20140303233733.GA5603@obsidianresearch.com>
+References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+ <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
+ <7755759.E1g1jlxbyc@wuerfel>
+ <20140228173957.GC7773@obsidianresearch.com>
+ <CAJ+vNU0Ao4BJhL9kQL45_nGf7hFZWsBMXMs9Y_pr10Mamqtnxw@mail.gmail.com>
+ <20140301012234.GA31062@obsidianresearch.com>
+ <CAJ+vNU0CLO6GWpYGx6SG1sXrqkn=6BNoFGodBtWxeCYUTEQW5Q@mail.gmail.com>
+ <20140303233733.GA5603@obsidianresearch.com>
+Message-ID: <CAJ+vNU1+o=2+YF8W=QfBNUhyCoC1tm17KD=cwRnUJozbbsN8qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Mar 3, 2014 at 3:37 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Mon, Mar 03, 2014 at 11:59:51AM -0800, Tim Harvey wrote:
+>
+>> A pci fixup for the XIO2001 could at least be placed in
+>> arch/arm/mach-imx/mach-imx6q.c with a check for
+>> of_machine_is_compatible("gw, ventana").  This is currently done in
+>> order to handle GPIO on the PEX890x bridge which is used as PERST# for
+>> downstream slots (see
+>> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mach-imx/mach-imx6q.c#n87).
+>
+> That is an odd looking thing .. PERST# of a subordinate port should be
+> tied to the PCI_BRIDGE_CTL_BUS_RESET bit in the port's bridge
+> configuration space - is more configuration of the PLX chip required?
 
-Please see inline.
+PCI_BRIDGE_CTL_BUS_RESET does cause a hot reset on the corresponding
+downstream link however the minPCIe card slot has a PERST# pin that is
+for a functional reset to the card.  The GPIO's I mention on the PLX
+bridge are routed to that signal for the various slots.  Regardless of
+what a device may do when it gets a hot-reset some devices still may
+require a hard reset.  Think of MiniPCIe form-factor USB cellular
+modems for example which don't even use the PCIe bus.
 
-On Mon, Mar 3, 2014 at 3:51 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> On Mon, Mar 03, 2014 at 03:14:47PM -0800, Tanmay Inamdar wrote:
->> Hello Liviu,
+>
+> Also, be aware that PCI specifies a minimum time after
+> reset-deassertion before accessing the bus, and I don't see a sleep...
+
+there is an msleep(100) there after the de-assertion.
+
+>
+>> I'm still not understanding what needs to go in the 'reg' property for
+>> a DT node representing a PCI dev (what you are using PCI_ID() for).
+>
+> It is a 3 DW address in this format:
+>
+> phys.hi cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
+> phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
+> phys.low cell: llllllll llllllll llllllll llllllll
+>
+> And in this context you use 'ss' = 0 for configuration:
+>
+> * npt000ss bbbbbbbb dddddfff rrrrrrrr
+> = 00000000 00000000 dddddfff 00000000
+>
+> So devfn << 8 sounds right to me.
+>
+> I *think* you can use 0 for the bus in this context.
+
+yes, it would appear bus can be 0 from my findings.  Thanks for
+clarifying that verbiage!
+
+>
+>> #address-cells = <3> and #size-cells = <2> as the enw pcie dev nodes
+>> kept defaulting to something else - I didn't realize those were not
+>> inherited from the parent DT node.
+>
+> Right, sorry, I was making it terse..
+>
+>> In all, your examples here were extremely helpful to me.  I now know
+>> how to properly describe my GigE PCI dev node so that the driver can
+>> have a hope of getting its MAC from DT.  Thank you!
+>
+> Right!
+>
+>> > Also, bear in mind that every single explicitly declared stanza requires
+>> > a correct interrupt-map.
 >>
->> Thanks for fixing up domain_nr. Now I have moved on further to a new
->> domain_nr related warning dump :-)
->>
->> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->> xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
->> pci_bus 0001:00: scanning bus
->> pci_setup_device:1101 domain_nr = 1
->> pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
->> pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
->> pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
->> pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
->> pci 0001:00:00.0: supports D1 D2
->> pci_bus 0001:00: fixups for bus
->> pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
->> pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
->> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
->> ** pci_scan_bridge:855  pci_domain_nr(bus) = 1
->> ** pci_alloc_child_bus:681  pci_domain_nr(bus) = 1
->> pci_bus 0001:01: scanning bus
->> pci_setup_device:1101 domain_nr = 0
+>> if not specified it wouldn't default to standard bridge mapping such
+>> that I only need to provide interrupt-map for the node with the the TI
+>> bridge?
 >
-> Why does the domain_nr change here?
+> Nope, there are two distinct mechanisms - finding the closes DT node
+> to the actual PCI device (of_irq_parse_pci) - this swizzles as it
+> searches. The rational here is to support hot pluggable devices that
+> were not discovered during initialization time.
+>
+> The second is the completely generic interrupt-map mechanism
+> (of_irq_parse_raw), which takes the interrupt specification from the
+> first phase and transates it into an actual interrupt. This isn't PCI
+> aware and doesn't change the description in any way.
+>
+> So if you specify a node, you have to specify an interrupt-map that
+> covers that node. I recommend placing the map in the node itself so
+> the bus number is not required.
+>
+>> Ok - so this assumes that the host controller driver _is_ calling
+>> something like of_irq_parse_and_map_pci() instead of returning based
+>> on some static mapping (like pp->irq) right?
+>
+> Yes, absoultely. All DT based PCI drivers need to use this mechanism
+> to get the expected interrupt-map behavior.
+>
+>> What confuses me is that swizzling is done to the pin before the call
+>> to map_irq(dev, slot, pin).  It looks like that this common swizzling
+>> is ignored when using of_irq_parse_and_map_pci() which instead would
+>> perform what you describe above correct?
+>
+> Right, the pin # from the PCI core isn't used in the OF code:
+>
+>  * of_irq_parse_and_map_pci() - Decode a PCI irq from the device tree and map to a virq
+>  * @slot and @pin are unused, but included in the function so that this
+>  * function can be used directly as the map_irq callback to pci_fixup_irqs().
+>
+> It re-reads the device's pin number directly and feeds that through
+> the standard swizzle and OF's UIS system.
+>
+> Jason
 
-The bridge device pointer for parent and child should be same right? I
-think this is not the case here. Please look at the log at the bottom
-that I captured after trying your suggestions.
+Ok - that all makes sense and hopefully when I get the legacy PCI
+interrupt mapping via DT working for IMX6 I can prove it out.
 
->
->> pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
->> pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
->> pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
->> pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
->> ------------[ cut here ]------------
->> WARNING: CPU: 0 PID: 1 at
->> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
->> sysfs_warn_dup+0x80/0xc0()
->> sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
->> Modules linked in:
->> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #40
->> Call trace:
->> [<ffffffc000088180>] dump_backtrace+0x0/0x140
->> [<ffffffc0000882d0>] show_stack+0x10/0x20
->> [<ffffffc0004f65ac>] dump_stack+0x74/0xc4
->> [<ffffffc000096e04>] warn_slowpath_common+0x84/0xc0
->> [<ffffffc000096e8c>] warn_slowpath_fmt+0x4c/0x60
->> [<ffffffc0001b83dc>] sysfs_warn_dup+0x7c/0xc0
->> [<ffffffc0001b8894>] sysfs_do_create_link_sd.isra.2+0xf4/0x100
->> [<ffffffc0001b88bc>] sysfs_create_link+0x1c/0x40
->> [<ffffffc0003250b0>] bus_add_device+0x110/0x1c0
->> [<ffffffc000322f1c>] device_add+0x31c/0x520
->> [<ffffffc0002c444c>] pci_device_add+0xec/0x140
->> [<ffffffc0004f1758>] pci_scan_single_device+0x98/0xe0
->> [<ffffffc0002c44e8>] pci_scan_slot+0x48/0x120
->> [<ffffffc0002c5368>] pci_scan_child_bus+0x48/0x140
->> [<ffffffc0002c522c>] pci_scan_bridge+0x4ec/0x5e0
->> [<ffffffc0002c53c8>] pci_scan_child_bus+0xa8/0x140
->> [<ffffffc0004f1b30>] pci_rescan_bus+0x10/0x40
->> [<ffffffc0006a12ac>] xgene_pcie_probe_bridge+0x660/0x72c
->> [<ffffffc000327d20>] platform_drv_probe+0x20/0x60
->> [<ffffffc000325e30>] really_probe+0xf0/0x220
->> [<ffffffc000326080>] __driver_attach+0xa0/0xc0
->> [<ffffffc000323ed4>] bus_for_each_dev+0x54/0xa0
->> [<ffffffc0003258bc>] driver_attach+0x1c/0x40
->> [<ffffffc00032548c>] bus_add_driver+0x14c/0x220
->> [<ffffffc00032683c>] driver_register+0x5c/0x120
->> [<ffffffc000327cdc>] __platform_driver_register+0x5c/0x80
->> [<ffffffc0006a0c40>] xgene_pcie_driver_init+0x14/0x20
->> [<ffffffc0000814c0>] do_one_initcall+0xe0/0x160
->> [<ffffffc00068c934>] kernel_init_freeable+0x134/0x1d8
->> [<ffffffc0004f07ac>] kernel_init+0xc/0xe0
->> ---[ end trace 3ee052d463aab7f3 ]---
->> ------------[ cut here ]------------
->> WARNING: CPU: 0 PID: 1 at
->> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:1380
->> pci_device_add+0x128/0x140()
->> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->>
->> I have made a small fix above your patch. After the fix is applied,
->> dumps are gone and the enumeration finishes up smoothly for all the
->> ports.
->> Since the change is small, just pasting it here. Please review and
->> apply if it's clean.
->
-> Honestly, I have no idea. I kept staring at the code for a better part of an hour
-> trying to decipher what the intent of the code was, without too much progress. I
-> still don't understand why the code in pci_alloc_child_bus() takes a shortcut when
-> the bridge argument is NULL when in my opinion it should use parent->bridge instead
-> and continue as normal.
->
->>
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index a12cda5..aac8366 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -693,7 +693,7 @@ static struct pci_bus *pci_alloc_child_bus(struct
->> pci_bus *parent,
->>         }
->>
->>         child->self = bridge;
->> -       child->bridge = get_device(&bridge->dev);
->> +       child->bridge = get_device(parent->bridge);
->>         child->dev.parent = child->bridge;
->
-> Hmm, not sure why this is needed. What does get_device(&bridge->dev)
-> return for you? The next line sets child->dev.parent to child->bridge,
-> but with your change I'm not sure we end up using the correct parent.
->
-> Can you try to revert your change and modify the implementation of pci_domain_nr() in arm64
-> to look like this:
->
-> static inline int pci_domain_nr(struct pci_bus *bus)
-> {
->         struct pci_host_bridge *bridge;
->
->         while (bus->parent)
->                 bus = bus->parent;
->
->         bridge = to_pci_host_bridge(bus->bridge);
->         if (bridge)
->                 return bridge->domain_nr;
->
->         return 0;
-> }
->
+What did you think of my two ideas above to resolve this issue on our
+add-in card where the bus-topology isn't known ahead of time:
 
-This did not work for me.
+ 1. bootloader builds out DT with proper interrupt-map's to handle the
+mis-map after enumerating the bus to understand the toplogy.
 
+or
 
-> Please let me know what results you get.
->
-I am printing following values
+ 2. a pci fixup for xio2001 that further qualifies the DT machine and
+the 'depth' of the xio2001 (ie make sure its the first xio2001 bridge
+on the bus) that replaces the swizzle function.  This would be in
+arch/arm/mach-imx/mach-imx6q.c
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index a12cda5..c89f86a 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -695,6 +695,8 @@ static struct pci_bus *pci_alloc_child_bus(struct
-pci_bus *parent,
-        child->self = bridge;
-        child->bridge = get_device(&bridge->dev);
-        child->dev.parent = child->bridge;
-+       printk("%s:%d bus = %p , bridge_dev = %p, domain = %d\n",
-+               __func__, __LINE__, child, child->bridge,
-pci_domain_nr(parent));
-        pci_set_bus_of_node(child);
-        pci_set_bus_speed(child);
+Thanks,
 
-@@ -1095,6 +1097,8 @@ int pci_setup_device(struct pci_dev *dev)
-        dev_set_name(&dev->dev, "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
-                     dev->bus->number, PCI_SLOT(dev->devfn),
-                     PCI_FUNC(dev->devfn));
-+       printk("%s:%d bus = %p , bridge_dev = %p, domain = %d\n",
-+               __func__, __LINE__, dev->bus, dev->bus->bridge,
-pci_domain_nr(dev->bus));
-
-        pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
-        dev->revision = class & 0xff;
-
-Following looks suspicious to me.
-
-bridge_dev = ffffffc7e03ffc00 for bus 0 in domain 1 while bridge_dev =
-ffffffc7e03f7098 for bus 1 in domain 1.
-
- Log -->
------------------------------------------------------------------------------------------------------------------------------
-xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
-pci_bus 0001:00: scanning bus
-pci_setup_device:1101 bus = ffffffc7e0060400 , bridge_dev =
-ffffffc7e03ffc00, domain = 1
-pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
-pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
-pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
-pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
-pci 0001:00:00.0: supports D1 D2
-pci_bus 0001:00: fixups for bus
-pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
-pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
-pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-pci_alloc_child_bus:699 bus = ffffffc7e0063000 , bridge_dev =
-ffffffc7e03f7098, domain = 1
-pci_bus 0001:01: scanning bus
-pci_setup_device:1101 bus = ffffffc7e0063000 , bridge_dev =
-ffffffc7e03f7098, domain = 0
-pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
-pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
-pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
-pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at
-/home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
-sysfs_warn_dup+0x80/0xc0()
-sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #50
------------------------------------------------------------------------------------------------------------------------------
-
-
-> Best regards,
-> Liviu
->
->
->>         pci_set_bus_of_node(child);
->>         pci_set_bus_speed(child);
->>
->> Thanks,
->> Tanmay
->>
->> On Mon, Mar 3, 2014 at 9:33 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > pci_alloc_child_bus() uses the newly allocated child bus to figure
->> > out the domain number that is going to use for setting the device
->> > name. A better option is to use the parent bus domain number.
->> >
->> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> >
->> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> > index 26237a0..a12cda5 100644
->> > --- a/drivers/pci/probe.c
->> > +++ b/drivers/pci/probe.c
->> > @@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->> >          * now as the parent is not properly set up yet.
->> >          */
->> >         child->dev.class = &pcibus_class;
->> > -       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
->> > +       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
->> >
->> >         /*
->> >          * Set up the primary, secondary and subordinate
->> > --
->> > 1.9.0
->> >
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
-> --
-> -------------------
->    .oooO
->    (   )
->     \ (  Oooo.
->      \_) (   )
->           ) /
->          (_/
->
->  One small step
->    for me ...
->
+Tim
