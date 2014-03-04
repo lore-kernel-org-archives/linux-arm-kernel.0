@@ -1,287 +1,161 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Mar 2014 07:21:04 +0000
-Subject: [PATCH] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1393916911-15571-1-git-send-email-broonie@kernel.org>
-References: <1393916911-15571-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140304072104.GA20016@e106331-lin.cambridge.arm.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 4 Mar 2014 15:30:36 +0800
+Subject: [PATCH] netfilter:Change nf_conntrack modules to use vmalloc
+In-Reply-To: <20140303141044.GA9139@kroah.com>
+References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
+ <53104ECA.4010702@freescale.com>
+ <35FD53F367049845BC99AC72306C23D102844605F38D@CNBJMBX05.corpusers.net>
+ <20140228163304.GA15614@kroah.com>
+ <35FD53F367049845BC99AC72306C23D102844605F38F@CNBJMBX05.corpusers.net>
+ <20140303030821.GA16732@kroah.com>
+ <35FD53F367049845BC99AC72306C23D102844605F390@CNBJMBX05.corpusers.net>
+ <20140303141044.GA9139@kroah.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D102844605F39A@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 07:08:31AM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Add basic CPU topology support to arm64, based on the existing pre-v8
-> code and some work done by Mark Hambleton.  This patch does not
-> implement any topology discovery support since that should be based on
-> information from firmware, it merely implements the scaffolding for
-> integration of topology support in the architecture.
-> 
-> No locking of the topology data is done since it is only modified during
-> CPU bringup with external serialisation from the SMP code.
-> 
-> The goal is to separate the architecture hookup for providing topology
-> information from the DT parsing in order to ease review and avoid
-> blocking the architecture code (which will be built on by other work)
-> with the DT code review by providing something simple and basic.
-> 
-> A following patch will implement support for parsing the DT topology
-> bindings for ARM, similar patches will be needed for ACPI.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+This patch change some nf_conntrack modules to
+use vmalloc to allocate large memory instead of kmalloc,
+to save low memorys.
 
+Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+---
+ net/netfilter/nf_conntrack_ftp.c       | 6 +++---
+ net/netfilter/nf_conntrack_h323_main.c | 8 ++++----
+ net/netfilter/nf_conntrack_irc.c       | 6 +++---
+ net/netfilter/nf_conntrack_sane.c      | 6 +++---
+ 4 files changed, 13 insertions(+), 13 deletions(-)
 
-As discussed in person, this looks like a sane base for the rest of the
-CPU topology support.
-
-Acked-by: Mark RUtland <mark.rutland@arm.com>
-
-> ---
-> 
-> Just posting the first patch for now, I've tweaked the debug output so
-> we don't print errors on missing topology information now but otherwise
-> no changes.  I will repost the DT stuff once I've managed to test
-> changes to completely discard the DT topology on error, should be next
-> week if not this.
-> 
->  arch/arm64/Kconfig                | 24 ++++++++++
->  arch/arm64/include/asm/topology.h | 39 ++++++++++++++++
->  arch/arm64/kernel/Makefile        |  1 +
->  arch/arm64/kernel/smp.c           | 11 +++++
->  arch/arm64/kernel/topology.c      | 95 +++++++++++++++++++++++++++++++++++++++
->  5 files changed, 170 insertions(+)
->  create mode 100644 arch/arm64/include/asm/topology.h
->  create mode 100644 arch/arm64/kernel/topology.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 764d682..80e0eb1 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -165,6 +165,30 @@ config SMP
->  
->  	  If you don't know what to do here, say N.
->  
-> +config CPU_TOPOLOGY
-> +	bool "Support CPU topology definition"
-> +	depends on SMP
-> +	default y
-> +	help
-> +	  Support CPU topology definition, based on configuration
-> +	  provided by the firmware.
-> +
-> +config SCHED_MC
-> +	bool "Multi-core scheduler support"
-> +	depends on CPU_TOPOLOGY
-> +	help
-> +	  Multi-core scheduler support improves the CPU scheduler's decision
-> +	  making when dealing with multi-core CPU chips at a cost of slightly
-> +	  increased overhead in some places. If unsure say N here.
-> +
-> +config SCHED_SMT
-> +	bool "SMT scheduler support"
-> +	depends on CPU_TOPOLOGY
-> +	help
-> +	  Improves the CPU scheduler's decision making when dealing with
-> +	  MultiThreading at a cost of slightly increased overhead in some
-> +	  places. If unsure say N here.
-> +
->  config NR_CPUS
->  	int "Maximum number of CPUs (2-32)"
->  	range 2 32
-> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> new file mode 100644
-> index 0000000..c8a47e8
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/topology.h
-> @@ -0,0 +1,39 @@
-> +#ifndef __ASM_TOPOLOGY_H
-> +#define __ASM_TOPOLOGY_H
-> +
-> +#ifdef CONFIG_CPU_TOPOLOGY
-> +
-> +#include <linux/cpumask.h>
-> +
-> +struct cpu_topology {
-> +	int thread_id;
-> +	int core_id;
-> +	int cluster_id;
-> +	cpumask_t thread_sibling;
-> +	cpumask_t core_sibling;
-> +};
-> +
-> +extern struct cpu_topology cpu_topology[NR_CPUS];
-> +
-> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
-> +#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-> +#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-> +#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-> +
-> +#define mc_capable()	(cpu_topology[0].cluster_id != -1)
-> +#define smt_capable()	(cpu_topology[0].thread_id != -1)
-> +
-> +void init_cpu_topology(void);
-> +void store_cpu_topology(unsigned int cpuid);
-> +const struct cpumask *cpu_coregroup_mask(int cpu);
-> +
-> +#else
-> +
-> +static inline void init_cpu_topology(void) { }
-> +static inline void store_cpu_topology(unsigned int cpuid) { }
-> +
-> +#endif
-> +
-> +#include <asm-generic/topology.h>
-> +
-> +#endif /* _ASM_ARM_TOPOLOGY_H */
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index e52bcdc..da1dafb 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -21,6 +21,7 @@ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
->  arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
->  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
->  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
-> +arm64-obj-$(CONFIG_CPU_TOPOLOGY)	+= topology.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 5070dc3..f0a141d 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -114,6 +114,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->  	return ret;
->  }
->  
-> +static void smp_store_cpu_info(unsigned int cpuid)
-> +{
-> +	store_cpu_topology(cpuid);
-> +}
-> +
->  /*
->   * This is the secondary CPU boot entry.  We're using this CPUs
->   * idle thread stack, but a set of temporary page tables.
-> @@ -152,6 +157,8 @@ asmlinkage void secondary_start_kernel(void)
->  	 */
->  	notify_cpu_starting(cpu);
->  
-> +	smp_store_cpu_info(cpu);
-> +
->  	/*
->  	 * OK, now it's safe to let the boot CPU continue.  Wait for
->  	 * the CPU migration code to notice that the CPU is online
-> @@ -391,6 +398,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->  	int err;
->  	unsigned int cpu, ncores = num_possible_cpus();
->  
-> +	init_cpu_topology();
-> +
-> +	smp_store_cpu_info(smp_processor_id());
-> +
->  	/*
->  	 * are we trying to boot more cores than exist?
->  	 */
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> new file mode 100644
-> index 0000000..91889d7
-> --- /dev/null
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -0,0 +1,95 @@
-> +/*
-> + * arch/arm64/kernel/topology.c
-> + *
-> + * Copyright (C) 2011,2013,2014 Linaro Limited.
-> + *
-> + * Based on the arm32 version written by Vincent Guittot in turn based on
-> + * arch/sh/kernel/topology.c
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/init.h>
-> +#include <linux/percpu.h>
-> +#include <linux/node.h>
-> +#include <linux/nodemask.h>
-> +#include <linux/sched.h>
-> +
-> +#include <asm/topology.h>
-> +
-> +/*
-> + * cpu topology table
-> + */
-> +struct cpu_topology cpu_topology[NR_CPUS];
-> +EXPORT_SYMBOL_GPL(cpu_topology);
-> +
-> +const struct cpumask *cpu_coregroup_mask(int cpu)
-> +{
-> +	return &cpu_topology[cpu].core_sibling;
-> +}
-> +
-> +static void update_siblings_masks(unsigned int cpuid)
-> +{
-> +	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-> +	int cpu;
-> +
-> +	if (cpuid_topo->cluster_id == -1) {
-> +		/*
-> +		 * DT does not contain topology information for this cpu
-> +		 * reset it to default behaviour
-> +		 */
-> +		pr_dbg("CPU%u: No topology information configured\n", cpuid);
-> +		cpuid_topo->core_id = 0;
-> +		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
-> +		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
-> +		return;
-> +	}
-> +
-> +	/* update core and thread sibling masks */
-> +	for_each_possible_cpu(cpu) {
-> +		cpu_topo = &cpu_topology[cpu];
-> +
-> +		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
-> +			continue;
-> +
-> +		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-> +		if (cpu != cpuid)
-> +			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-> +
-> +		if (cpuid_topo->core_id != cpu_topo->core_id)
-> +			continue;
-> +
-> +		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-> +		if (cpu != cpuid)
-> +			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-> +	}
-> +}
-> +
-> +void store_cpu_topology(unsigned int cpuid)
-> +{
-> +	update_siblings_masks(cpuid);
-> +}
-> +
-> +/*
-> + * init_cpu_topology is called at boot when only one cpu is running
-> + * which prevent simultaneous write access to cpu_topology array
-> + */
-> +void __init init_cpu_topology(void)
-> +{
-> +	unsigned int cpu;
-> +
-> +	/* init core mask and power*/
-> +	for_each_possible_cpu(cpu) {
-> +		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
-> +
-> +		cpu_topo->thread_id = -1;
-> +		cpu_topo->core_id =  -1;
-> +		cpu_topo->cluster_id = -1;
-> +		cpumask_clear(&cpu_topo->core_sibling);
-> +		cpumask_clear(&cpu_topo->thread_sibling);
-> +	}
-> +}
-> -- 
-> 1.9.0
-> 
-> 
+diff --git a/net/netfilter/nf_conntrack_ftp.c b/net/netfilter/nf_conntrack_ftp.c
+index b8a0924..aad7eca 100644
+--- a/net/netfilter/nf_conntrack_ftp.c
++++ b/net/netfilter/nf_conntrack_ftp.c
+@@ -14,7 +14,7 @@
+ #include <linux/moduleparam.h>
+ #include <linux/netfilter.h>
+ #include <linux/ip.h>
+-#include <linux/slab.h>
++#include <linux/vmalloc.h>
+ #include <linux/ipv6.h>
+ #include <linux/ctype.h>
+ #include <linux/inet.h>
+@@ -593,14 +593,14 @@ static void nf_conntrack_ftp_fini(void)
+ 		}
+ 	}
+ 
+-	kfree(ftp_buffer);
++	vfree(ftp_buffer);
+ }
+ 
+ static int __init nf_conntrack_ftp_init(void)
+ {
+ 	int i, j = -1, ret = 0;
+ 
+-	ftp_buffer = kmalloc(65536, GFP_KERNEL);
++	ftp_buffer = vmalloc(65536);
+ 	if (!ftp_buffer)
+ 		return -ENOMEM;
+ 
+diff --git a/net/netfilter/nf_conntrack_h323_main.c b/net/netfilter/nf_conntrack_h323_main.c
+index 70866d1..5baee1a 100644
+--- a/net/netfilter/nf_conntrack_h323_main.c
++++ b/net/netfilter/nf_conntrack_h323_main.c
+@@ -18,7 +18,7 @@
+ #include <linux/inet.h>
+ #include <linux/in.h>
+ #include <linux/ip.h>
+-#include <linux/slab.h>
++#include <linux/vmalloc.h>
+ #include <linux/udp.h>
+ #include <linux/tcp.h>
+ #include <linux/skbuff.h>
+@@ -1837,7 +1837,7 @@ static void __exit nf_conntrack_h323_fini(void)
+ 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[1]);
+ 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[0]);
+ 	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
+-	kfree(h323_buffer);
++	vfree(h323_buffer);
+ 	pr_debug("nf_ct_h323: fini\n");
+ }
+ 
+@@ -1846,7 +1846,7 @@ static int __init nf_conntrack_h323_init(void)
+ {
+ 	int ret;
+ 
+-	h323_buffer = kmalloc(65536, GFP_KERNEL);
++	h323_buffer = vmalloc(65536);
+ 	if (!h323_buffer)
+ 		return -ENOMEM;
+ 	ret = nf_conntrack_helper_register(&nf_conntrack_helper_h245);
+@@ -1876,7 +1876,7 @@ err3:
+ err2:
+ 	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
+ err1:
+-	kfree(h323_buffer);
++	vfree(h323_buffer);
+ 	return ret;
+ }
+ 
+diff --git a/net/netfilter/nf_conntrack_irc.c b/net/netfilter/nf_conntrack_irc.c
+index 0fd2976..b57df10 100644
+--- a/net/netfilter/nf_conntrack_irc.c
++++ b/net/netfilter/nf_conntrack_irc.c
+@@ -16,7 +16,7 @@
+ #include <linux/ip.h>
+ #include <linux/tcp.h>
+ #include <linux/netfilter.h>
+-#include <linux/slab.h>
++#include <linux/vmalloc.h>
+ 
+ #include <net/netfilter/nf_conntrack.h>
+ #include <net/netfilter/nf_conntrack_expect.h>
+@@ -244,7 +244,7 @@ static int __init nf_conntrack_irc_init(void)
+ 	irc_exp_policy.max_expected = max_dcc_channels;
+ 	irc_exp_policy.timeout = dcc_timeout;
+ 
+-	irc_buffer = kmalloc(65536, GFP_KERNEL);
++	irc_buffer = vmalloc(65536);
+ 	if (!irc_buffer)
+ 		return -ENOMEM;
+ 
+@@ -285,7 +285,7 @@ static void nf_conntrack_irc_fini(void)
+ 
+ 	for (i = 0; i < ports_c; i++)
+ 		nf_conntrack_helper_unregister(&irc[i]);
+-	kfree(irc_buffer);
++	vfree(irc_buffer);
+ }
+ 
+ module_init(nf_conntrack_irc_init);
+diff --git a/net/netfilter/nf_conntrack_sane.c b/net/netfilter/nf_conntrack_sane.c
+index 4a2134f..a4c8bf3 100644
+--- a/net/netfilter/nf_conntrack_sane.c
++++ b/net/netfilter/nf_conntrack_sane.c
+@@ -20,7 +20,7 @@
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/netfilter.h>
+-#include <linux/slab.h>
++#include <linux/vmalloc.h>
+ #include <linux/in.h>
+ #include <linux/tcp.h>
+ #include <net/netfilter/nf_conntrack.h>
+@@ -185,14 +185,14 @@ static void nf_conntrack_sane_fini(void)
+ 		}
+ 	}
+ 
+-	kfree(sane_buffer);
++	vfree(sane_buffer);
+ }
+ 
+ static int __init nf_conntrack_sane_init(void)
+ {
+ 	int i, j = -1, ret = 0;
+ 
+-	sane_buffer = kmalloc(65536, GFP_KERNEL);
++	sane_buffer = vmalloc(65536);
+ 	if (!sane_buffer)
+ 		return -ENOMEM;
+ 
+-- 
+1.8.2.2
