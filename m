@@ -1,161 +1,282 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 4 Mar 2014 15:30:36 +0800
-Subject: [PATCH] netfilter:Change nf_conntrack modules to use vmalloc
-In-Reply-To: <20140303141044.GA9139@kroah.com>
-References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
- <53104ECA.4010702@freescale.com>
- <35FD53F367049845BC99AC72306C23D102844605F38D@CNBJMBX05.corpusers.net>
- <20140228163304.GA15614@kroah.com>
- <35FD53F367049845BC99AC72306C23D102844605F38F@CNBJMBX05.corpusers.net>
- <20140303030821.GA16732@kroah.com>
- <35FD53F367049845BC99AC72306C23D102844605F390@CNBJMBX05.corpusers.net>
- <20140303141044.GA9139@kroah.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D102844605F39A@CNBJMBX05.corpusers.net>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 04 Mar 2014 08:37:10 +0100
+Subject: [PATCH v2] CNS3xxx: Fix PCIe early iotable_init().
+In-Reply-To: <m3eh2nqz7n.fsf@t19.piap.pl> ("Krzysztof =?utf-8?Q?Ha=C5=82as?=
+ =?utf-8?Q?a=22's?= message of "Fri, 28 Feb 2014 12:00:12 +0100")
+References: <m3eh2nqz7n.fsf@t19.piap.pl>
+Message-ID: <m3r46io1nd.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch change some nf_conntrack modules to
-use vmalloc to allocate large memory instead of kmalloc,
-to save low memorys.
+This patch fixes the following BUG:
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- net/netfilter/nf_conntrack_ftp.c       | 6 +++---
- net/netfilter/nf_conntrack_h323_main.c | 8 ++++----
- net/netfilter/nf_conntrack_irc.c       | 6 +++---
- net/netfilter/nf_conntrack_sane.c      | 6 +++---
- 4 files changed, 13 insertions(+), 13 deletions(-)
+> kernel BUG at mm/vmalloc.c:1132!
+> PC is at vm_area_add_early+0x20/0x84
+> LR is at add_static_vm_early+0xc/0x60
+>
+> The problem is cns3xxx_pcie_init() (device_initcall) calls the "early"
+> iotable_init().
 
-diff --git a/net/netfilter/nf_conntrack_ftp.c b/net/netfilter/nf_conntrack_ftp.c
-index b8a0924..aad7eca 100644
---- a/net/netfilter/nf_conntrack_ftp.c
-+++ b/net/netfilter/nf_conntrack_ftp.c
-@@ -14,7 +14,7 @@
- #include <linux/moduleparam.h>
- #include <linux/netfilter.h>
- #include <linux/ip.h>
--#include <linux/slab.h>
-+#include <linux/vmalloc.h>
- #include <linux/ipv6.h>
- #include <linux/ctype.h>
- #include <linux/inet.h>
-@@ -593,14 +593,14 @@ static void nf_conntrack_ftp_fini(void)
- 		}
- 	}
+Instead of merely calling the PCIe iotable_init() from
+machine_desc->map_io(), this patch adds the required mappings to the
+main CNS3xxx mapping table. This means we don't convert .pfn back to
+virtual addresses in pcie.c. The size of the address space consumed for
+PCIe control is reduced from 96 MiB (6 * 16 MiB) to about 32 MiB (this
+doesn't include MMIO address space required by PCI devices):
+
+- Size of the PCIe "host" mapping is reduced from 16 MiB to 4 KiB.
+  It's a PCI configuration address space for the local (on-chip) PCIe
+  bridge.
+
+- Size of the "CFG0" mapping is reduced from 16 MiB to 64 KiB. It's for
+  Type 0 Configuration accesses, i.e., accesses to the single device
+  (with possible "functions") on the other end of the PCIe link.
+  We really only need a 4 KiB page at 0x8000 (see the offset
+  calculation in cns3xxx_pci_cfg_base()). There is still a potential
+  problem with PCI bus numbers > 0xF, are they supported?
+
+- The code in cns3xxx_pci_cfg_base() and cns3xxx_pcie_hw_init() should
+  be clearer now.
+
+- The maximum address space allocated for PCI MMIO is now correctly
+  shown in /proc/iomem as 176 MiB (per each of the two PCI "domains"
+  - previously only 16 MiB were reserved).
+
+This patch has been tested on Gateworks Laguna board, masqueraded as
+CNS3420VB.
+
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -47,6 +47,38 @@ static struct map_desc cns3xxx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(CNS3XXX_PM_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
++#ifdef CONFIG_PCI
++	}, {
++		.virtual	= CNS3XXX_PCIE0_HOST_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE0_HOST_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= CNS3XXX_PCIE0_CFG0_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE0_CFG0_BASE),
++		.length		= SZ_64K, /* really 4 KiB at offset 32 KiB */
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= CNS3XXX_PCIE0_CFG1_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE0_CFG1_BASE),
++		.length		= SZ_16M,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= CNS3XXX_PCIE1_HOST_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE1_HOST_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= CNS3XXX_PCIE1_CFG0_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE1_CFG0_BASE),
++		.length		= SZ_64K, /* really 4 KiB at offset 32 KiB */
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= CNS3XXX_PCIE1_CFG1_BASE_VIRT,
++		.pfn		= __phys_to_pfn(CNS3XXX_PCIE1_CFG1_BASE),
++		.length		= SZ_16M,
++		.type		= MT_DEVICE,
++#endif
+ 	},
+ };
  
--	kfree(ftp_buffer);
-+	vfree(ftp_buffer);
+--- a/arch/arm/mach-cns3xxx/pcie.c
++++ b/arch/arm/mach-cns3xxx/pcie.c
+@@ -23,15 +23,10 @@
+ #include "cns3xxx.h"
+ #include "core.h"
+ 
+-enum cns3xxx_access_type {
+-	CNS3XXX_HOST_TYPE = 0,
+-	CNS3XXX_CFG0_TYPE,
+-	CNS3XXX_CFG1_TYPE,
+-	CNS3XXX_NUM_ACCESS_TYPES,
+-};
+-
+ struct cns3xxx_pcie {
+-	struct map_desc cfg_bases[CNS3XXX_NUM_ACCESS_TYPES];
++	void __iomem *host_regs; /* PCI config registers for host bridge */
++	void __iomem *cfg0_regs; /* PCI Type 0 config registers */
++	void __iomem *cfg1_regs; /* PCI Type 1 config registers */
+ 	unsigned int irqs[2];
+ 	struct resource res_io;
+ 	struct resource res_mem;
+@@ -66,7 +61,6 @@ static void __iomem *cns3xxx_pci_cfg_base(struct pci_bus *bus,
+ 	int busno = bus->number;
+ 	int slot = PCI_SLOT(devfn);
+ 	int offset;
+-	enum cns3xxx_access_type type;
+ 	void __iomem *base;
+ 
+ 	/* If there is no link, just show the CNS PCI bridge. */
+@@ -78,17 +72,21 @@ static void __iomem *cns3xxx_pci_cfg_base(struct pci_bus *bus,
+ 	 * we still want to access it. For this to work, we must place
+ 	 * the first device on the same bus as the CNS PCI bridge.
+ 	 */
+-	if (busno == 0) {
+-		if (slot > 1)
+-			return NULL;
+-		type = slot;
+-	} else {
+-		type = CNS3XXX_CFG1_TYPE;
+-	}
++	if (busno == 0) { /* directly connected PCIe bus */
++		switch (slot) {
++		case 0: /* host bridge device, function 0 only */
++			base = cnspci->host_regs;
++			break;
++		case 1: /* directly connected device */
++			base = cnspci->cfg0_regs;
++			break;
++		default:
++			return NULL; /* no such device */
++		}
++	} else /* remote PCI bus */
++		base = cnspci->cfg1_regs;
+ 
+-	base = (void __iomem *)cnspci->cfg_bases[type].virtual;
+ 	offset = ((busno & 0xf) << 20) | (devfn << 12) | (where & 0xffc);
+-
+ 	return base + offset;
  }
  
- static int __init nf_conntrack_ftp_init(void)
- {
- 	int i, j = -1, ret = 0;
+@@ -180,36 +178,19 @@ static int cns3xxx_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
  
--	ftp_buffer = kmalloc(65536, GFP_KERNEL);
-+	ftp_buffer = vmalloc(65536);
- 	if (!ftp_buffer)
- 		return -ENOMEM;
+ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+ 	[0] = {
+-		.cfg_bases = {
+-			[CNS3XXX_HOST_TYPE] = {
+-				.virtual = CNS3XXX_PCIE0_HOST_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE0_HOST_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-			[CNS3XXX_CFG0_TYPE] = {
+-				.virtual = CNS3XXX_PCIE0_CFG0_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE0_CFG0_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-			[CNS3XXX_CFG1_TYPE] = {
+-				.virtual = CNS3XXX_PCIE0_CFG1_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE0_CFG1_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-		},
++		.host_regs = (void __iomem *)CNS3XXX_PCIE0_HOST_BASE_VIRT,
++		.cfg0_regs = (void __iomem *)CNS3XXX_PCIE0_CFG0_BASE_VIRT,
++		.cfg1_regs = (void __iomem *)CNS3XXX_PCIE0_CFG1_BASE_VIRT,
+ 		.res_io = {
+ 			.name = "PCIe0 I/O space",
+ 			.start = CNS3XXX_PCIE0_IO_BASE,
+-			.end = CNS3XXX_PCIE0_IO_BASE + SZ_16M - 1,
++			.end = CNS3XXX_PCIE0_CFG0_BASE - 1, /* 16 MiB */
+ 			.flags = IORESOURCE_IO,
+ 		},
+ 		.res_mem = {
+ 			.name = "PCIe0 non-prefetchable",
+ 			.start = CNS3XXX_PCIE0_MEM_BASE,
+-			.end = CNS3XXX_PCIE0_MEM_BASE + SZ_16M - 1,
++			.end = CNS3XXX_PCIE0_HOST_BASE - 1, /* 176 MiB */
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
+@@ -222,36 +203,19 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+ 		},
+ 	},
+ 	[1] = {
+-		.cfg_bases = {
+-			[CNS3XXX_HOST_TYPE] = {
+-				.virtual = CNS3XXX_PCIE1_HOST_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE1_HOST_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-			[CNS3XXX_CFG0_TYPE] = {
+-				.virtual = CNS3XXX_PCIE1_CFG0_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE1_CFG0_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-			[CNS3XXX_CFG1_TYPE] = {
+-				.virtual = CNS3XXX_PCIE1_CFG1_BASE_VIRT,
+-				.pfn = __phys_to_pfn(CNS3XXX_PCIE1_CFG1_BASE),
+-				.length = SZ_16M,
+-				.type = MT_DEVICE,
+-			},
+-		},
++		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
++		.cfg0_regs = (void __iomem *)CNS3XXX_PCIE1_CFG0_BASE_VIRT,
++		.cfg1_regs = (void __iomem *)CNS3XXX_PCIE1_CFG1_BASE_VIRT,
+ 		.res_io = {
+ 			.name = "PCIe1 I/O space",
+ 			.start = CNS3XXX_PCIE1_IO_BASE,
+-			.end = CNS3XXX_PCIE1_IO_BASE + SZ_16M - 1,
++			.end = CNS3XXX_PCIE1_CFG0_BASE - 1, /* 16 MiB */
+ 			.flags = IORESOURCE_IO,
+ 		},
+ 		.res_mem = {
+ 			.name = "PCIe1 non-prefetchable",
+ 			.start = CNS3XXX_PCIE1_MEM_BASE,
+-			.end = CNS3XXX_PCIE1_MEM_BASE + SZ_16M - 1,
++			.end = CNS3XXX_PCIE1_HOST_BASE - 1, /* 176 MiB */
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
+@@ -307,18 +271,15 @@ static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+ 		.ops = &cns3xxx_pcie_ops,
+ 		.sysdata = &sd,
+ 	};
+-	u32 io_base = cnspci->res_io.start >> 16;
+-	u32 mem_base = cnspci->res_mem.start >> 16;
+-	u32 host_base = cnspci->cfg_bases[CNS3XXX_HOST_TYPE].pfn;
+-	u32 cfg0_base = cnspci->cfg_bases[CNS3XXX_CFG0_TYPE].pfn;
++	u16 mem_base  = cnspci->res_mem.start >> 16;
++	u16 mem_limit = cnspci->res_mem.end   >> 16;
++	u16 io_base   = cnspci->res_io.start  >> 16;
++	u16 io_limit  = cnspci->res_io.end    >> 16;
+ 	u32 devfn = 0;
+ 	u8 tmp8;
+ 	u16 pos;
+ 	u16 dc;
  
-diff --git a/net/netfilter/nf_conntrack_h323_main.c b/net/netfilter/nf_conntrack_h323_main.c
-index 70866d1..5baee1a 100644
---- a/net/netfilter/nf_conntrack_h323_main.c
-+++ b/net/netfilter/nf_conntrack_h323_main.c
-@@ -18,7 +18,7 @@
- #include <linux/inet.h>
- #include <linux/in.h>
- #include <linux/ip.h>
--#include <linux/slab.h>
-+#include <linux/vmalloc.h>
- #include <linux/udp.h>
- #include <linux/tcp.h>
- #include <linux/skbuff.h>
-@@ -1837,7 +1837,7 @@ static void __exit nf_conntrack_h323_fini(void)
- 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[1]);
- 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[0]);
- 	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
--	kfree(h323_buffer);
-+	vfree(h323_buffer);
- 	pr_debug("nf_ct_h323: fini\n");
- }
+-	host_base = (__pfn_to_phys(host_base) - 1) >> 16;
+-	cfg0_base = (__pfn_to_phys(cfg0_base) - 1) >> 16;
+-
+ 	pci_bus_write_config_byte(&bus, devfn, PCI_PRIMARY_BUS, 0);
+ 	pci_bus_write_config_byte(&bus, devfn, PCI_SECONDARY_BUS, 1);
+ 	pci_bus_write_config_byte(&bus, devfn, PCI_SUBORDINATE_BUS, 1);
+@@ -328,9 +289,9 @@ static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+ 	pci_bus_read_config_byte(&bus, devfn, PCI_SUBORDINATE_BUS, &tmp8);
  
-@@ -1846,7 +1846,7 @@ static int __init nf_conntrack_h323_init(void)
- {
- 	int ret;
+ 	pci_bus_write_config_word(&bus, devfn, PCI_MEMORY_BASE, mem_base);
+-	pci_bus_write_config_word(&bus, devfn, PCI_MEMORY_LIMIT, host_base);
++	pci_bus_write_config_word(&bus, devfn, PCI_MEMORY_LIMIT, mem_limit);
+ 	pci_bus_write_config_word(&bus, devfn, PCI_IO_BASE_UPPER16, io_base);
+-	pci_bus_write_config_word(&bus, devfn, PCI_IO_LIMIT_UPPER16, cfg0_base);
++	pci_bus_write_config_word(&bus, devfn, PCI_IO_LIMIT_UPPER16, io_limit);
  
--	h323_buffer = kmalloc(65536, GFP_KERNEL);
-+	h323_buffer = vmalloc(65536);
- 	if (!h323_buffer)
- 		return -ENOMEM;
- 	ret = nf_conntrack_helper_register(&nf_conntrack_helper_h245);
-@@ -1876,7 +1876,7 @@ err3:
- err2:
- 	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
- err1:
--	kfree(h323_buffer);
-+	vfree(h323_buffer);
- 	return ret;
- }
+ 	if (!cnspci->linked)
+ 		return;
+@@ -368,8 +329,6 @@ static int __init cns3xxx_pcie_init(void)
+ 			"imprecise external abort");
  
-diff --git a/net/netfilter/nf_conntrack_irc.c b/net/netfilter/nf_conntrack_irc.c
-index 0fd2976..b57df10 100644
---- a/net/netfilter/nf_conntrack_irc.c
-+++ b/net/netfilter/nf_conntrack_irc.c
-@@ -16,7 +16,7 @@
- #include <linux/ip.h>
- #include <linux/tcp.h>
- #include <linux/netfilter.h>
--#include <linux/slab.h>
-+#include <linux/vmalloc.h>
- 
- #include <net/netfilter/nf_conntrack.h>
- #include <net/netfilter/nf_conntrack_expect.h>
-@@ -244,7 +244,7 @@ static int __init nf_conntrack_irc_init(void)
- 	irc_exp_policy.max_expected = max_dcc_channels;
- 	irc_exp_policy.timeout = dcc_timeout;
- 
--	irc_buffer = kmalloc(65536, GFP_KERNEL);
-+	irc_buffer = vmalloc(65536);
- 	if (!irc_buffer)
- 		return -ENOMEM;
- 
-@@ -285,7 +285,7 @@ static void nf_conntrack_irc_fini(void)
- 
- 	for (i = 0; i < ports_c; i++)
- 		nf_conntrack_helper_unregister(&irc[i]);
--	kfree(irc_buffer);
-+	vfree(irc_buffer);
- }
- 
- module_init(nf_conntrack_irc_init);
-diff --git a/net/netfilter/nf_conntrack_sane.c b/net/netfilter/nf_conntrack_sane.c
-index 4a2134f..a4c8bf3 100644
---- a/net/netfilter/nf_conntrack_sane.c
-+++ b/net/netfilter/nf_conntrack_sane.c
-@@ -20,7 +20,7 @@
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/netfilter.h>
--#include <linux/slab.h>
-+#include <linux/vmalloc.h>
- #include <linux/in.h>
- #include <linux/tcp.h>
- #include <net/netfilter/nf_conntrack.h>
-@@ -185,14 +185,14 @@ static void nf_conntrack_sane_fini(void)
- 		}
- 	}
- 
--	kfree(sane_buffer);
-+	vfree(sane_buffer);
- }
- 
- static int __init nf_conntrack_sane_init(void)
- {
- 	int i, j = -1, ret = 0;
- 
--	sane_buffer = kmalloc(65536, GFP_KERNEL);
-+	sane_buffer = vmalloc(65536);
- 	if (!sane_buffer)
- 		return -ENOMEM;
- 
+ 	for (i = 0; i < ARRAY_SIZE(cns3xxx_pcie); i++) {
+-		iotable_init(cns3xxx_pcie[i].cfg_bases,
+-			     ARRAY_SIZE(cns3xxx_pcie[i].cfg_bases));
+ 		cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_PCIE(i));
+ 		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+ 		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+
 -- 
-1.8.2.2
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
