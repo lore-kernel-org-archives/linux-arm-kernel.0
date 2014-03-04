@@ -1,49 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  4 Mar 2014 17:28:36 +0100
-Subject: [PATCH v3 0/5] ARM: sun6i: Add support for the A31 I2C controller
-Message-ID: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 04 Mar 2014 09:27:09 -0700
+Subject: [PATCH] ARM: tegra: add LED options back into tegra_defconfig
+In-Reply-To: <201402282139.40122.arnd@arndb.de>
+References: <1392932240-14480-1-git-send-email-swarren@wwwdotorg.org>
+ <201402282139.40122.arnd@arndb.de>
+Message-ID: <5315FEDD.70407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 02/28/2014 01:39 PM, Arnd Bergmann wrote:
+> On Thursday 20 February 2014, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The last time tegra_defconfig was rebuilt, various LEDs options were
+>> somehow selected by other options, and hence their entries in
+>> tegra_defconfig were removed by "make savedefconfig". However, for some
+>> reason this is no longer happening, so we need to add the entries back
+>> into tegra_defconfig so the they are enabled in .config.
+>>
+>> Fixes: db079b1811d1 ("ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS)"
+>> Reported-by: Marc Dietrich <marvin24@gmx.de>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Another fix for 3.14.
+> 
+> Applied to fixes branch.
 
-This patchset adds support the A31 i2c controller. This is mostly the
-same controller as the one found in the other Allwinner SoCs, except
-for the interrupts acking.
-
-On the other SoCs using this driver, the interrupts are acked by
-clearing the INT_FLAG bit in the control register, while on the A31,
-the interrupt is acked by writing that bit into the control register.
-
-The other difference is that the I2C IP is maintained in reset by a
-reset controller, so we're adding optionnal support for the reset
-framework in the driver to deassert the device from reset.
-
-Thanks!
-Maxime
-
-Changes from v2:
-  - Rebased on top of v3.14-rc5
-  - Added Gregory Clement's Reviewed-by and Tested-by tags
-
-Changes from v1:
-  - Handle EPROBE_DEFER from the reset framework
-  - Put the device back in reset at remove/failed probe
-  - Document the newly introduced compatible string
-
-Maxime Ripard (5):
-  i2c: mv64xxx: Add reset deassert call
-  i2c: mv64xxx: Add support for the Allwinner A31 I2C driver
-  ARM: sun6i: Enable the I2C controllers
-  ARM: sun6i: Enable the I2C muxing options
-  ARM: sun6i: colombus: Enable the I2C controllers
-
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt        | 20 ++++---
- arch/arm/boot/dts/sun6i-a31-colombus.dts           | 18 +++++++
- arch/arm/boot/dts/sun6i-a31.dtsi                   | 61 ++++++++++++++++++++++
- drivers/i2c/busses/Kconfig                         |  1 +
- drivers/i2c/busses/i2c-mv64xxx.c                   | 32 +++++++++++-
- 5 files changed, 124 insertions(+), 8 deletions(-)
-
--- 
-1.9.0
+It looks like fixes isn't in linux-next. I think it'd be useful to add it.
