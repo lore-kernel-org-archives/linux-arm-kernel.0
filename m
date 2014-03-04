@@ -1,41 +1,61 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 4 Mar 2014 09:04:09 -0500
-Subject: [PATCH v3 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <4575362.nxyAcPCJSW@amdc1032>
-References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
- <1393328481-7251-3-git-send-email-lee.jones@linaro.org>
- <20140226144721.GP9195@lee--X1> <4575362.nxyAcPCJSW@amdc1032>
-Message-ID: <20140304140409.GA30338@htj.dyndns.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 04 Mar 2014 15:13:03 +0100
+Subject: [PATCH 7/7] PCI: designware: split samsung and fsl bindings
+In-Reply-To: <201402282103.01897.arnd@arndb.de>
+References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
+ <1393608523-17509-8-git-send-email-l.stach@pengutronix.de>
+ <201402282103.01897.arnd@arndb.de>
+Message-ID: <1393942383.9405.8.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 02:48:54PM +0100, Bartlomiej Zolnierkiewicz wrote:
+Am Freitag, den 28.02.2014, 21:03 +0100 schrieb Arnd Bergmann:
+> On Friday 28 February 2014, Lucas Stach wrote:
+> > +Required properties:
+> > +- compatible: "fsl,imx6q-pcie"
+> > +- reg: base addresse and length of the pcie controller
+> > +- interrupts: First entry must contain interrupt handle for controller
+> > +  INTA output.
 > 
-> Hi,
+> I think this should be documented as "optional" and only for
+> backwards compatibility with old kernels.
 > 
-> On Wednesday, February 26, 2014 02:47:21 PM Lee Jones wrote:
-> > ahci: st: Add support for ST's SATA IP
-> > 
-> > Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> > index b4a9262..ee7a3dc 100644
-> > --- a/drivers/ata/Kconfig
-> > +++ b/drivers/ata/Kconfig
-> > @@ -97,6 +97,15 @@ config SATA_AHCI_PLATFORM
-> >  
-> >  	  If unsure, say N.
-> >  
-> > +config SATA_AHCI_ST
+> > +- clocks: Must contain an entry for each entry in clock-names.
+> > +       See ../clocks/clock-bindings.txt for details.
+> > +- clock-names: Must include the following entries: 
+> > +       - "pcie_ref_125m"
+> > +       - "sata_ref_100m"
+> > +       - "lvds_gate"
+> > +       - "pcie_axi"
 > 
-> It would be better to name it just ACHI_ST for consistency with
-> existing config options (AHCI_IMX and AHCI_SUNXI).
+> I don't understand why you have completely different clocks here
+> from the exynos documentation. The clock names should really be
+> the same. Also, why do you have a "sata_ref_100m" clock?
+> Is this just driving a device that happens to be on-board
+> for a specific machine? Same for the "lvds_gate".
+> 
 
-The patch is already in for-3.15 branch.  Lee, can you please post an
-incremental patch addressing Bart's review points?
+Right, we should be able to reuse the clock names. Though I'm not really
+sure how the Samsung clocks maps to those used on i.MX, as the names are
+a bit generic. Maybe someone from Samsung could shed a bit of light on
+this.
 
-Thanks.
+On i.MX6 the clock names (which I have to agree are pretty bad) map as
+follows:
+pcie_axi: host controller main register/bus access clock
+pcie_ref_125m: pcie phy reference clock
+
+sata_ref_100m: pcie bus 100MHz reference clock
+lvds_gate: bad abstraction. Decides if the reference clock is sourced
+internal (i.e. the 100MHz ref clock above) or from an SoC external
+source. We should really find a better way of representing this in the
+clock tree.
+
+Regards,
+Lucas
 
 -- 
-tejun
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
