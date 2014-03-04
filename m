@@ -1,30 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 05 Mar 2014 03:10:15 +0300
-Subject: [PATCH] irq-gic: remove file name from heading comment
-In-Reply-To: <52D5CCFB.1090205@cogentembedded.com>
-References: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
- <52D5CCFB.1090205@cogentembedded.com>
-Message-ID: <53166B67.2060804@cogentembedded.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 4 Mar 2014 17:31:03 -0600
+Subject: [PATCH 5/5] arm64: add early_ioremap support
+In-Reply-To: <1393963738-9210-6-git-send-email-msalter@redhat.com>
+References: <1393963738-9210-1-git-send-email-msalter@redhat.com>
+ <1393963738-9210-6-git-send-email-msalter@redhat.com>
+Message-ID: <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Mar 4, 2014 at 2:08 PM, Mark Salter <msalter@redhat.com> wrote:
+> Add support for early IO or memory mappings which are needed
+> before the normal ioremap() is usable. This also adds fixmap
+> support for permanent fixed mappings such as that used by the
+> earlyprintk device register region.
 
-On 01/15/2014 02:49 AM, Sergei Shtylyov wrote:
+One minor comment:
 
->> File names in the heading comments  fell out of favor long ago, and this one
->> weren't even changed when the driver was moved from arch/arm/common/, so remove
->> it at last...
+> +enum fixed_addresses {
+> +       FIX_EARLYCON,
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Can you align this name with x86 and rename to FIX_EARLYCON_MEM_BASE.
+Doing that will help enable the earlycon driver in 8250_early.c.
 
->> ---
->> The patch is against the 'irq/core' branch of the 'tip.git' repo.
-
->     Thomas, is there a chance that you merge this patch for 3.14? Is it even
-> the right branch for cleanups (I'm seeing fixes there)?
-
-    Thomas, will you ever reply to me? Who's maintaining the GIC driver, you?
-Or the patches shoud just go in via arm-soc.git?
-
-WBR, Sergei
+Rob
