@@ -1,50 +1,90 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 04 Mar 2014 13:12:39 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzVdIGRyaXZlcnM6IGJ1czogb21hcF9sMzogQ29udmVy?=
- =?UTF-8?B?dCB0byB1c2UgZGV2bV9yZXF1ZXN0X2FuZF9pb3JlbWFwKCk=?=
-In-Reply-To: <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
- <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1393924359.866301359@f148.i.mail.ru>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 4 Mar 2014 11:14:07 +0200
+Subject: [PATCH 02/12] phy: omap-control: Update DT binding information
+In-Reply-To: <20140303190247.GD25804@atomide.com>
+References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
+ <1393859254-10937-3-git-send-email-rogerq@ti.com>
+ <20140303190247.GD25804@atomide.com>
+Message-ID: <5315995F.5050206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????,  4 ????? 2014, 11:01 +02:00 ?? Peter Ujfalusi <peter.ujfalusi@ti.com>:
-> We can then remove the iounmap() calls from probe and remove.
-> Since the driver requests the resources via index we can do the mem resource
-> request within a for loop.
+Hi Tony,
+
+On 03/03/2014 09:02 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [140303 07:10]:
+>> Move omap-control binding information to the right location.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/phy/ti-phy.txt   | 25 ++++++++++++++++++++++
+>>  Documentation/devicetree/bindings/usb/omap-usb.txt | 24 ---------------------
+>>  2 files changed, 25 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> index 207e14c..41dc132 100644
+>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> @@ -1,5 +1,30 @@
+>>  TI PHY: DT DOCUMENTATION FOR PHYs in TI PLATFORMs
+>>  
+>> +OMAP CONTROL PHY
+>> +
+>> +Required properties:
+>> + - compatible: Should be one of
+>> + "ti,control-phy-otghs" - if it has otghs_control mailbox register as on OMAP4.
+>> + "ti,control-phy-usb2" - if it has Power down bit in control_dev_conf register
+>> +                        e.g. USB2_PHY on OMAP5.
+>> + "ti,control-phy-pipe3" - if it has DPLL and individual Rx & Tx power control
+>> +                        e.g. USB3 PHY and SATA PHY on OMAP5.
+>> + "ti,control-phy-dra7usb2" - if it has power down register like USB2 PHY on
+>> +                        DRA7 platform.
+>> + "ti,control-phy-am437usb2" - if it has power down register like USB2 PHY on
+>> +                        AM437 platform.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
-> ---
+> To me it seems that you can leave out all the above. You can set these falgs
+> flags directly in the driver based on the compatible flag. Then just initialize
+> the .data in the driver based on the compatible flag.
 
-> +	/* Get mem resources */
-> +	for (i = 0; i < 3; i++) {
-> +		struct resource	*res = platform_get_resource(pdev,
-> +							     IORESOURCE_MEM, i);
-> +		if (!res) {
-> +			dev_err(&pdev->dev, "couldn't find resource %d\n", i);
-> +			return -ENODEV;
-> +		}
+I'm not sure if I got you. A single platform can have different type of phys.
 
-No need to check "res". devm_request_and_ioremap() do all for us.
+e.g. OMAP5 has both usb2 and pipe3 PHYs,
+DRA7 has both pipe3 and usb2 PHYs, but this usb2 PHY is not compatible with OMAP5 one
+so we need a new compatible id for that.
 
-> -	l3->l3_base[2] = ioremap(res->start, resource_size(res));
-> -	if (!l3->l3_base[2]) {
-> -		dev_err(&pdev->dev, "ioremap failed\n");
-> -		ret = -ENOMEM;
-> -		goto err2;
-> +		l3->l3_base[i] = devm_request_and_ioremap(&pdev->dev, res);
-> +		if (!l3->l3_base[i]) {
+To add to the woes, the designers were creative enough to make another mutation to
+the USB2 PHY for AM437x, :(
 
-if (IS_ERR(l3->l3_base[i]))
+What do you suggest the compatible ids should look like for these 5 types of PHY control?
+OTGHS	(OMAP4 & 5)
+USB2	(OMAP5)
+PIPE3	(OMAP5 & DRA7)
+USB2x	(DRA7)
+USB2y	(AM437)
 
-> +			dev_err(&pdev->dev, "ioremap %d failed\n", i);
+cheers,
+-roger
 
-Unnecessary.
-
-> +			return -ENOMEM;
-
-return PTR_ERR(l3->l3_base[i]);
-
----
+> 
+>> + - reg : Address and length of the register set for the device. It contains
+>> +   the address of "otghs_control" for control-phy-otghs or "power" register
+>> +   for other types.
+>> + - reg-names: should be "otghs_control" control-phy-otghs and "power" for
+>> +   other types.
+>> +
+>> +omap_control_usb: omap-control-usb at 4a002300 {
+>> +        compatible = "ti,control-phy-otghs";
+>> +        reg = <0x4a00233c 0x4>;
+>> +        reg-names = "otghs_control";
+>> +};
+> 
+> Then you would instead have something like this:
+> 
+> 	compatible = "ti,am347-control-phy-otghs";
+> 
+> That way you can initialize things without a need for custom bindings.
+> 
+> Regards,
+> 
+> Tony
+> 
