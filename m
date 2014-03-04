@@ -1,75 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Mar 2014 09:18:23 -0500
-Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
-In-Reply-To: <5315DCF1.90608@gmail.com>
-References: <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
- <20140303150215.GI21483@n2100.arm.linux.org.uk>
- <20140303173740.GC16655@lunn.ch>
- <20140303181529.GM21483@n2100.arm.linux.org.uk>
- <20140303222406.GW1872@titan.lakedaemon.net>
- <20140304092616.GH16655@lunn.ch> <5315AD6F.1070804@gmail.com>
- <20140304121136.GR21483@n2100.arm.linux.org.uk>
- <20140304135306.GL1872@titan.lakedaemon.net>
- <5315DCF1.90608@gmail.com>
-Message-ID: <20140304141823.GM1872@titan.lakedaemon.net>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 4 Mar 2014 14:24:36 +0000
+Subject: [REGRESSION] Arndale Octa panics when booting 3.14-rc1
+In-Reply-To: <CAHbNUh2kbYUa1OegRrOXMAEmKRjsf4PifT6tZnKdBx7NoDkq6A@mail.gmail.com>
+References: <20140303185755.GA11460@e102654-lin.cambridge.arm.com>
+ <5314D239.7090001@gmail.com> <5314EBCB.3060400@gmail.com>
+ <20140304101608.GA3852@e102654-lin.cambridge.arm.com>
+ <5315AB3B.5080207@samsung.com>
+ <20140304103936.GA10559@e102654-lin.cambridge.arm.com>
+ <CAHbNUh2kbYUa1OegRrOXMAEmKRjsf4PifT6tZnKdBx7NoDkq6A@mail.gmail.com>
+Message-ID: <20140304142435.GA15738@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 03:02:25PM +0100, Sebastian Hesselbarth wrote:
-> On 03/04/2014 02:53 PM, Jason Cooper wrote:
-> >On Tue, Mar 04, 2014 at 12:11:36PM +0000, Russell King - ARM Linux wrote:
-> >>On Tue, Mar 04, 2014 at 11:39:43AM +0100, Sebastian Hesselbarth wrote:
-> >>>On 03/04/2014 10:26 AM, Andrew Lunn wrote:
-> >>>>>I could have sworn this was discussed with this particular patchset, but
-> >>>>>I'm unable to find the conversation in my archives.  Neither during the
-> >>>>>patch submission process, nor the (long) pull request thread.
-> >>>>>
-> >>>>>Perhaps it was an irc conversation?  Andrew, Sebastian, can you find a
-> >>>>>link?  iirc, one of the DT maintainers (Mark Rutland?) raised the same
-> >>>>>concern and I thought we answered that sufficiently...
-> >>>>
-> >>>>It was the cpufreq driver which caused the discussion. I looked at it
-> >>>>for a while, and then task swapped onto the kirkwood move into
-> >>>>mach-mvebu.
-> >>>
-> >>>I guess you are looking for this discussion
-> >>>
-> >>>http://comments.gmane.org/gmane.linux.power-management.general/41053
-> >>>
-> >>>and specifically Mark's remarks on PMU and DT in here
-> >>>
-> >>>http://permalink.gmane.org/gmane.linux.ports.arm.kernel/285384
-> >>>
-> >>>BTW, +1 for a single PMU node that either serves an mfd (or type
-> >>>of) driver or that subsystem drivers derive their resources from.
-> >>>Looking at Dove FS, that would also include clock gating, which
-> >>>could be a mess to sort out.. anyway, let's get it on.
+Hi Tushar,
+
+On Tue, Mar 04, 2014 at 12:01:26PM +0000, Tushar Behera wrote:
+> On 4 March 2014 16:09, Javi Merino <javi.merino@arm.com> wrote:
+> > On Tue, Mar 04, 2014 at 10:30:19AM +0000, Sylwester Nawrocki wrote:
+> >> On 04/03/14 11:16, Javi Merino wrote:
+> >> > Yes, with [1] applied I don't get a kernel panic but the kernel fails
+> >> > to boot later on with an Imprecise external abort.  Removing the mdma
+> >> > nodes from the dts gets rid of that.  I guess what's missing is what
+> >> > you said: clocks for the mdma devices.
 > >>
-> >>So we have cpufreq, pm domains and an irq controller.  What's the plan
-> >>for this, who's going to look at sorting this out?
+> >> Is removing mdm0 node enough to fix the boot failure, or both have to be
+> >> removed ?
 > >
-> >Andrew, Sebastian?  I'm currently task-saturated...
+> > Actually, you it's only mdma1.  Just removing the mdma1 node from the
+> > dt fixes the imprecise external abort.
+> >
 > 
-> Phew, looks like I'll have to take it?
+> MDMA1 can support both secure and non-secure AXI transactions, the
+> actual behaviour is controlled by trustzone software. It may be the
+> case that MDMA1 is configured to be used in secure mode only, hence
+> accessing it in non-secure mode is causing the oops.
 > 
-> Are you guys ok with having a single PMU node with syscon provided
-> regmap and make all drivers depend on it? I'd like to get a go from
-> Russell here, as he has clearly something in mind.
+> Right now, the only solution looks like disabling this node in
+> Arndale-Octa dts file.
 > 
-> We can consolidate drivers later if required. If we start that now,
-> we definitely risk running out of time for v3.15.
+> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> @@ -354,4 +354,16 @@
+>                 samsung,i2s-controller = <&i2s0>;
+>                 samsung,audio-codec = <&i2s_stub>;
+>         };
+> +
+> +       amba {
+> +               mdma1: mdma at 11C10000 {
+> +                       /*
+> +                        * MDMA1 can support both secure and non-secure
+> +                        * AXI transactions. When this is enabled in the kernel
+> +                        * for boards that run in secure mode, we are getting
+> +                        * imprecise external aborts causing the kernel to oops.
+> +                        */
+> +                       status = "disabled";
+> +               };
+> +       };
+> 
+> If it works, I will submit this patch.
 
-Honestly, mvebu has enough going on atm.  I would target v3.16 and take
-our time.  At least with the binding.  If the driver comes together
-easily, we could always do like we did for mbus.  Do a legacy init from
-the board (soc) file, then switch to the dt binding once everyone is
-happy with it.
-
-v3.14-rc6 is less than a week away, so I'll be sending final mvebu pull
-requests late Wednesday/Thursday...
-
-v3.14-rcX has been awful quiet, there might not be an -rc7.
-
-thx,
-
-Jason.
+It works.  Please submit it.  Cheers,
+Javi
