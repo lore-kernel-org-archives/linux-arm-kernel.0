@@ -1,31 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Mar 2014 18:16:41 +0800
-Subject: [PATCH v2] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140304095534.GE30596@arm.com>
-References: <1393919477-27814-1-git-send-email-broonie@kernel.org>
- <20140304095534.GE30596@arm.com>
-Message-ID: <20140304101641.GK13126@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Mar 2014 10:23:16 +0000
+Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
+In-Reply-To: <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
+References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
+ <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
+Message-ID: <20140304102316.GG30596@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 09:55:36AM +0000, Catalin Marinas wrote:
-> On Tue, Mar 04, 2014 at 07:51:17AM +0000, Mark Brown wrote:
+On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
+> +ACPI ARM64
 
-> > +config CPU_TOPOLOGY
-> > +	bool "Support CPU topology definition"
+That's a pretty broad statement for a single file. Is it core support,
+architected peripherals, SoC?
 
-> Thanks for the patch. I applied it but not pushed to -next yet. I wonder
-> whether it makes sense to drop the description of the CPU_TOPOLOGY entry
-> here so that it is no longer selectable. It will be enabled by default
-> when SMP (I can do the change myself, no need to repost).
+> +M:	Hanjun Guo <hanjun.guo@linaro.org>
+> +M:	Graeme Gregory <graeme.gregory@linaro.org>
+> +S:	Supported
+> +L:	linux-acpi at vger.kernel.org
+> +F:	drivers/acpi/plat/arm-core.c
 
-I'm totally fine with that, I only made it selectable due to the 32 bit
-code doing that - I'm not sure we even need the separate symbol.
-Whatever you prefer.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140304/f38e2b28/attachment.sig>
+This patch should be part of the series introducing the arm-core.c file
+and it will be ACKed (or NAKed) following review. We can't really commit
+maintainers to a file which does not exist in mainline and while there is
+still feedback to be addressed. It's like a blank cheque.
+
+-- 
+Catalin
