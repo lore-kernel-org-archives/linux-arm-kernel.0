@@ -1,83 +1,64 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue, 4 Mar 2014 02:24:37 +0100
-Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for
- ARM
-In-Reply-To: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
-References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <CAFrcx1mg03A+e7q2d1HR=bR7uoDw5k36TVw5TQP68caWYBNJnQ@mail.gmail.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 03 Mar 2014 17:30:16 -0800
+Subject: [PATCH v4 0/6] generic early_ioremap support
+In-Reply-To: <1393885748.5094.14.camel@deneb.redhat.com>
+References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
+ <1393337404.7307.51.camel@deneb.redhat.com>
+ <20140225183012.GA27164@mudshark.cambridge.arm.com>
+ <1393353942.26583.10.camel@deneb.redhat.com> <530CF21E.1020603@zytor.com>
+ <1393885748.5094.14.camel@deneb.redhat.com>
+Message-ID: <2d10d2d3-02e3-42b6-9b81-464f56e4cf01@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+All three .
 
-Here are some notes about the performance improvement and the test usage.
-
-Jiri, do you need these notes in the one of commit description?
-
-1. Using libdw vs libunwind on ARMv7
-
-The performance gain is (more than) significant: >800%.
-
-I did not profile perf itself ;-p just did a timing measurement.
-The benchmark has been run multiple times with different perf.data
-sizes. The results are consistent across the tests runs.
-
-Usage:
-./tools/perf/perf record --call-graph dwarf --
-../../libunwind/test_app/stress_bt
-time ./tools/perf/perf report --stdio > /dev/null 2>&1
-
-Platform:
-Quad-core marvell XP370. perf runs on 1 cpu
-
-Perf data size:
-304MB    libunwind    libdw        improvement
-real    9m31.577s    1m13.052s    782%
-user    5m33.020s    1m2.910s    529%
-sys        3m57.770s    0m10.090s    2356%
-
-2. unwind test usage
-perf test list gives the list of supported tests. In this case the
-test #23 is dwarf unwinding:
-
-./tools/perf/perf test 23
-23: Test dwarf unwind                                      : Ok
-
-
-Regards,
-Jean
-
-
-On 3 March 2014 10:53, Jean Pihet <jean.pihet@linaro.org> wrote:
-> Adding libdw DWARF post unwind support, which is part
-> of elfutils-devel/libdw-dev package from version 0.158.
+On March 3, 2014 2:29:08 PM PST, Mark Salter <msalter@redhat.com> wrote:
+>On Tue, 2014-02-25 at 11:42 -0800, H. Peter Anvin wrote:
+>> On 02/25/2014 10:45 AM, Mark Salter wrote:
+>> > On Tue, 2014-02-25 at 18:30 +0000, Will Deacon wrote:
+>> >> I'd suggest spitting the core part out from the arch-specific
+>parts. That
+>> >> way, the core part can merged independently and architectures can
+>move over
+>> >> as they see fit. It also signals (at least to me) that, "hey, I
+>should
+>> >> probably review this" whilst my current stance is "there's a whole
+>load of
+>> >> stuff under mm/ that needs to be acked first".
+>> >>
+>> >> If you put the whole thing into next, you just run the risk of
+>conflicts
+>> >> with all the arch trees.
+>> > 
+>> > I've been thinking of breaking out the common bits and x86 bits and
+>just
+>> > going with that for now. There's no point in just doing the common
+>bits
+>> > because it won't get tested without at least one architecture using
+>it.
+>> > 
+>> 
+>> If you think it makes sense we could take the common bits + x86 and
+>put
+>> them through the -tip tree.  The other option would be to put the
+>whole
+>> thread in linux-next with Acks.
+>> 
+>> As far as x86 is concerned it looks like it is mostly just code
+>> movement, so I'm happy giving my:
+>> 
+>> Acked-by: H. Peter Anvin <hpa@linux.intel.com>
+>> 
 >
-> Also includes the test suite for dwarf unwinding, by adding the
-> arch specific test code and the perf_regs_load function.
+>I going to send out a v5 with the arm bits dropped and Ack-bys added.
+>There is still some work left there, so I think I'll redo the arm bits
+>separately after once the common bits are in the kernel.
 >
-> Jean Pihet (3):
->   perf tests: Introduce perf_regs_load function on ARM
->   perf tests: Add dwarf unwind test on ARM
->   perf tools: Add libdw DWARF post unwind support for ARM
->
->  tools/perf/Makefile.perf                 |  2 +-
->  tools/perf/arch/arm/Makefile             |  7 ++++
->  tools/perf/arch/arm/include/perf_regs.h  |  5 +++
->  tools/perf/arch/arm/tests/dwarf-unwind.c | 59 ++++++++++++++++++++++++++++++++
->  tools/perf/arch/arm/tests/regs_load.S    | 51 +++++++++++++++++++++++++++
->  tools/perf/arch/arm/util/unwind-libdw.c  | 36 +++++++++++++++++++
->  tools/perf/tests/builtin-test.c          |  2 +-
->  tools/perf/tests/tests.h                 |  2 +-
->  8 files changed, 161 insertions(+), 3 deletions(-)
->  create mode 100644 tools/perf/arch/arm/tests/dwarf-unwind.c
->  create mode 100644 tools/perf/arch/arm/tests/regs_load.S
->  create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
->
-> ---
->
-> - Rebased on latest acme/perf/core git tree,
-> - Tested on quad-core ARMv7 machine
->
-> --
-> 1.7.11.7
->
+>Peter, is your Acked-by only for "[3/6] x86: use generic
+>early_ioremap"?
+>Or did you intend "[1/6] x86/mm: sparse warning fix for early_memremap"
+>and/or "[2/6] mm: create generic early_ioremap() support" also?
+
+-- 
+Sent from my mobile phone.  Please pardon brevity and lack of formatting.
