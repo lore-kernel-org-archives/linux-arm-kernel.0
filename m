@@ -1,46 +1,72 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue,  4 Mar 2014 09:17:27 -0800
-Subject: [PATCH RFC 4/6] tty: cadence: Document DT binding
-In-Reply-To: <1393953449-28551-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1393953449-28551-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1393953449-28551-5-git-send-email-soren.brinkmann@xilinx.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue,  4 Mar 2014 18:51:47 +0100
+Subject: [PATCH] ARM: mvebu: Add a SOC bus device entry
+Message-ID: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the Cadence UART.
+Add the SoC Family, device ID and revision to /sys/bus/soc.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/serial/cadence_uart.txt      | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/cadence_uart.txt
+ arch/arm/mach-mvebu/Kconfig        |  1 +
+ arch/arm/mach-mvebu/mvebu-soc-id.c | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/cadence_uart.txt b/Documentation/devicetree/bindings/serial/cadence_uart.txt
-new file mode 100644
-index 000000000000..fc8ac527dee8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/cadence_uart.txt
-@@ -0,0 +1,20 @@
-+Binding for Cadence UART Controller
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 4cfc4d8abcac..16f3713654cf 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -10,6 +10,7 @@ config ARCH_MVEBU
+ 	select PINCTRL
+ 	select PLAT_ORION
+ 	select SPARSE_IRQ
++	select SOC_BUS
+ 	select CLKDEV_LOOKUP
+ 	select MVEBU_MBUS
+ 	select ZONE_DMA if ARM_LPAE
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+index f3d4cf53f746..72ea6b6d4ed2 100644
+--- a/arch/arm/mach-mvebu/mvebu-soc-id.c
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+@@ -23,6 +23,8 @@
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
+ #include "mvebu-soc-id.h"
+ 
+ #define PCIE_DEV_ID_OFF		0x0
+@@ -118,3 +120,29 @@ clk_err:
+ }
+ core_initcall(mvebu_soc_id_init);
+ 
++static int __init mvebu_soc_device(void)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	struct soc_device *soc_dev;
 +
-+Required properties:
-+- compatible : should be "cdns,uart-r1p8"
-+- reg: Should contain UART controller registers location and length.
-+- interrupts: Should contain UART controller interrupts.
-+- clocks: Must contain phandles to the UART clocks
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names: Tuple to identify input clocks, must contain "uart_clk" and "pclk"
-+  See ../clocks/clock-bindings.txt for details.
++	/* Also protects against running on non-mvebu systems */
++	if (!is_id_valid)
++		return;
 +
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		return -ENOMEM;
 +
-+Example:
-+	uart at e0000000 {
-+		compatible = "cdns,uart-r1p8";
-+		clocks = <&clkc 23>, <&clkc 40>;
-+		clock-names = "uart_clk", "pclk";
-+		reg = <0xE0000000 0x1000>;
-+		interrupts = <0 27 4>;
-+	};
++	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Marvell");
++	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X", soc_rev);
++	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%X", soc_dev_id);
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR(soc_dev)) {
++		kfree(soc_dev_attr->family);
++		kfree(soc_dev_attr->revision);
++		kfree(soc_dev_attr->soc_id);
++		kfree(soc_dev_attr);
++	}
++}
++postcore_initcall(mvebu_soc_device);
 -- 
-1.9.0.1.g4196000
+1.9.0
