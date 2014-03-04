@@ -1,199 +1,201 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 04 Mar 2014 10:28:59 +0800
-Subject: [RESEND][PATCH v5 2/5] ACPI / processor_core: Rework _PDC related
- stuff to make it more arch-independent
-In-Reply-To: <1392786649-5516-1-git-send-email-hanjun.guo@linaro.org>
-References: <1392786649-5516-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53153A6B.1060205@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Mar 2014 21:55:59 -0500
+Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
+In-Reply-To: <20140301052536.GS1872@titan.lakedaemon.net>
+References: <20140301052536.GS1872@titan.lakedaemon.net>
+Message-ID: <20140304025559.GY1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?02?19? 13:10, Hanjun Guo wrote:
-> _PDC related stuff in processor_core.c is little bit X86/IA64
-> dependent, macros of ACPI_PDC_* are _PDC bit definitions for
-> Intel processors, if we use these macros in processor_core.c,
-> we can not compile it when ACPI is enabled on ARM/ARM64.
->
-> This patch reworks the code to make it more arch-independent,
-> moving Intel related _PDC bits into architecture directory,
-> no functional change.
->
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: linux-ia64 at vger.kernel.org
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> ---
-> Hi Tony, Fenghua, Thomas, Peter, this patch was reviewed
-> in ACPI mailling list, and updated for serveral versions,
-> Rafael needs your opinion on this patch, could you please
-> review and ack it?
+Guys,
 
-Ping...
+V2: removed the dove PMU interrupt node (er, undid the re-addition of
+the node.  ie: let the revert stand).  So, commit id's for this pull
+only are changed.  No previous pulls or tags affected.  Confirmed the
+change with a diff between the old branch and the new branch.  And did a
+run of building dtbs.  No problems.  Sorry for the confusion.
 
->
-> Thanks
-> Hanjun
-> ---
->   arch/ia64/include/asm/acpi.h  |    5 +----
->   arch/ia64/kernel/acpi.c       |   14 ++++++++++++++
->   arch/x86/include/asm/acpi.h   |   19 +------------------
->   arch/x86/kernel/acpi/cstate.c |   29 +++++++++++++++++++++++++++++
->   drivers/acpi/processor_core.c |   19 +------------------
->   5 files changed, 46 insertions(+), 40 deletions(-)
->
-> diff --git a/arch/ia64/include/asm/acpi.h b/arch/ia64/include/asm/acpi.h
-> index d651102..d2b8b9d 100644
-> --- a/arch/ia64/include/asm/acpi.h
-> +++ b/arch/ia64/include/asm/acpi.h
-> @@ -152,10 +152,7 @@ extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
->   #endif
->   
->   static inline bool arch_has_acpi_pdc(void) { return true; }
-> -static inline void arch_acpi_set_pdc_bits(u32 *buf)
-> -{
-> -	buf[2] |= ACPI_PDC_EST_CAPABILITY_SMP;
-> -}
-> +extern void arch_acpi_set_pdc_bits(u32 *buf);
->   
->   #define acpi_unlazy_tlb(x)
->   
-> diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
-> index 07d209c..af9d9e4 100644
-> --- a/arch/ia64/kernel/acpi.c
-> +++ b/arch/ia64/kernel/acpi.c
-> @@ -1014,3 +1014,17 @@ EXPORT_SYMBOL(acpi_unregister_ioapic);
->    * TBD when when IA64 starts to support suspend...
->    */
->   int acpi_suspend_lowlevel(void) { return 0; }
-> +
-> +void arch_acpi_set_pdc_bits(u32 *buf)
-> +{
-> +	/* Enable coordination with firmware's _TSD info */
-> +	buf[2] |= ACPI_PDC_SMP_T_SWCOORD | ACPI_PDC_EST_CAPABILITY_SMP;
-> +	if (boot_option_idle_override == IDLE_NOMWAIT) {
-> +		/*
-> +		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-> +		 * mode will be disabled in the parameter of _PDC object.
-> +		 * Of course C1_FFH access mode will also be disabled.
-> +		 */
-> +		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-> +	}
-> +}
-> diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
-> index c8c1e70..e9f71bc 100644
-> --- a/arch/x86/include/asm/acpi.h
-> +++ b/arch/x86/include/asm/acpi.h
-> @@ -147,24 +147,7 @@ static inline bool arch_has_acpi_pdc(void)
->   		c->x86_vendor == X86_VENDOR_CENTAUR);
->   }
->   
-> -static inline void arch_acpi_set_pdc_bits(u32 *buf)
-> -{
-> -	struct cpuinfo_x86 *c = &cpu_data(0);
-> -
-> -	buf[2] |= ACPI_PDC_C_CAPABILITY_SMP;
-> -
-> -	if (cpu_has(c, X86_FEATURE_EST))
-> -		buf[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP;
-> -
-> -	if (cpu_has(c, X86_FEATURE_ACPI))
-> -		buf[2] |= ACPI_PDC_T_FFH;
-> -
-> -	/*
-> -	 * If mwait/monitor is unsupported, C2/C3_FFH will be disabled
-> -	 */
-> -	if (!cpu_has(c, X86_FEATURE_MWAIT))
-> -		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
-> -}
-> +extern void arch_acpi_set_pdc_bits(u32 *buf);
->   
->   #else /* !CONFIG_ACPI */
->   
-> diff --git a/arch/x86/kernel/acpi/cstate.c b/arch/x86/kernel/acpi/cstate.c
-> index e69182f..a36638f 100644
-> --- a/arch/x86/kernel/acpi/cstate.c
-> +++ b/arch/x86/kernel/acpi/cstate.c
-> @@ -16,6 +16,35 @@
->   #include <asm/mwait.h>
->   #include <asm/special_insns.h>
->   
-> +void arch_acpi_set_pdc_bits(u32 *buf)
-> +{
-> +	struct cpuinfo_x86 *c = &cpu_data(0);
-> +
-> +	/* Enable coordination with firmware's _TSD info */
-> +	buf[2] |= ACPI_PDC_SMP_T_SWCOORD | ACPI_PDC_C_CAPABILITY_SMP;
-> +
-> +	if (cpu_has(c, X86_FEATURE_EST))
-> +		buf[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP;
-> +
-> +	if (cpu_has(c, X86_FEATURE_ACPI))
-> +		buf[2] |= ACPI_PDC_T_FFH;
-> +
-> +	/*
-> +	 * If mwait/monitor is unsupported, C2/C3_FFH will be disabled
-> +	 */
-> +	if (!cpu_has(c, X86_FEATURE_MWAIT))
-> +		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
-> +
-> +	if (boot_option_idle_override == IDLE_NOMWAIT) {
-> +		/*
-> +		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-> +		 * mode will be disabled in the parameter of _PDC object.
-> +		 * Of course C1_FFH access mode will also be disabled.
-> +		 */
-> +		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-> +	}
-> +}
-> +
->   /*
->    * Initialize bm_flags based on the CPU cache properties
->    * On SMP it depends on cache configuration
-> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-> index 4d91b32..4dcf776 100644
-> --- a/drivers/acpi/processor_core.c
-> +++ b/drivers/acpi/processor_core.c
-> @@ -255,9 +255,6 @@ static void acpi_set_pdc_bits(u32 *buf)
->   	buf[0] = ACPI_PDC_REVISION_ID;
->   	buf[1] = 1;
->   
-> -	/* Enable coordination with firmware's _TSD info */
-> -	buf[2] = ACPI_PDC_SMP_T_SWCOORD;
-> -
->   	/* Twiddle arch-specific bits needed for _PDC */
->   	arch_acpi_set_pdc_bits(buf);
->   }
-> @@ -282,7 +279,7 @@ static struct acpi_object_list *acpi_processor_alloc_pdc(void)
->   		return NULL;
->   	}
->   
-> -	buf = kmalloc(12, GFP_KERNEL);
-> +	buf = kzalloc(12, GFP_KERNEL);
->   	if (!buf) {
->   		printk(KERN_ERR "Memory allocation error\n");
->   		kfree(obj);
-> @@ -310,20 +307,6 @@ acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
->   {
->   	acpi_status status = AE_OK;
->   
-> -	if (boot_option_idle_override == IDLE_NOMWAIT) {
-> -		/*
-> -		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-> -		 * mode will be disabled in the parameter of _PDC object.
-> -		 * Of course C1_FFH access mode will also be disabled.
-> -		 */
-> -		union acpi_object *obj;
-> -		u32 *buffer = NULL;
-> -
-> -		obj = pdc_in->pointer;
-> -		buffer = (u32 *)(obj->buffer.pointer);
-> -		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-> -
-> -	}
->   	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
->   
->   	if (ACPI_FAILURE(status))
+Russell just raised a very valid point today regarding the overall
+design of an eventual PMU driver that would cover several tasks we
+hadn't considered with the original binding.  Better to pull it now than
+have to support it indefinitely.  Revert of the driver in the works.
+
+--- original text ---
+
+Here's another rather large round of DT changes for mvebu.  It's all
+summed up below and has been in -next for a while now.
+
+This is an incremental pull from tags/mvebu-dt-3.15-2 in the mvebu/dt
+branch up to tags/mvebu-dt-3.15-3.
+
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit 7a5b293f2086cfc17519e586bd8f89be72a2fc4e:
+
+  ARM: dove: Enable Dove watchdog in the devicetree (2014-02-17 21:44:09 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15-3
+
+for you to fetch changes up to e2b15689dcb052b8c4c6580c79aef50052c55581:
+
+  ARM: kirkwood: Add dts file describing HP T5325 thin client (2014-03-04 02:18:08 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.15 (incremental pull #3)
+
+ - mvebu
+    - merge armada 375, 380, 385 boards (mvebu/dt-3xx)
+
+ - kirkwood
+    - Add many Synology NAS boards
+    - add board HP T5325
+    - add L2 cache node
+    - add system-controller node
+    - add audio node
+
+ - dove
+    - add pinctrl and global-config register
+
+Depends:
+ - tags/mvebu-dt-fixes-3.14 (mvebu/dt-fixes)
+    - removed dove PMU interrupt controller
+
+Conflicts:
+ - mvebu/soc (arch/arm/boot/dts/Makefile)
+    - add/add conflict.
+    - move CONFIG_ARCH_LPC32XX to alphabetical order (after KIRKWOOD)
+
+----------------------------------------------------------------
+
+Andrew Lunn (11):
+      ARM: Kirkwood: Add support for Excito Bubba B3
+      ARM: Kirkwood: Add DT description of QNAP 419
+      ARM: Kirkwood: Add DT description of rd88f6192.
+      ARM: Kirkwood: convert rd88f6281-setup.c to DT.
+      DT: Vendor prefixes: Add ricoh, qnap, sii and synology
+      DT: i2c: Trivial: Add sii,s35390a
+      ARM: kirkwood: Instantiate L2 cache from DT.
+      ARM: mvebu: Instantiate system controller in kirkwood.dtsi
+      ARM: kirkwood: Add audio node to kirkwood.dtsi
+      ARM: kirkwood: Add i2c alias so setting bus number
+      ARM: kirkwood: Add dts file describing HP T5325 thin client
+
+Ben Peddell (1):
+      ARM: Kirkwood: Add support for many Synology NAS devices
+
+Ezequiel Garcia (3):
+      ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
+      ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
+      ARM: dove: Enable Dove watchdog in the devicetree
+
+Gregory CLEMENT (1):
+      ARM: mvebu: add Device Tree description of the Armada 375 SoC
+
+Jason Cooper (4):
+      Merge tag 'tags/mvebu-dt-fixes-3.14' into mvebu/dt
+      Merge branch 'mvebu/dt-3xx' into mvebu/dt
+      ARM: mvebu: select dtbs from MACH_ARMADA_*
+
+Sebastian Hesselbarth (2):
+      ARM: dove: add additional pinctrl registers
+      ARM: dove: add global-config register node
+
+Thomas Petazzoni (12):
+      ARM: mvebu: use GPIO DT defines in Armada 370/XP boards
+      ARM: mvebu: use input DT defines in Armada 370/XP boards
+      ARM: mvebu: add audio I2S controller to Armada 370 Device Tree
+      ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
+      ARM: mvebu: add audio support to Armada 370 DB
+      ARM: mvebu: enable S/PDIF audio in Armada 370 DB Device Tree
+      ARM: mvebu: add Device Tree for the Armada 375 DB board
+      ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs
+      ARM: mvebu: add Device Tree for the Armada 385 DB board
+      ARM: mvebu: use C preprocessor include for Armada 375/38x DTs
+      ARM: mvebu: use GIC_{SPI,PPI} in Armada 375/38x DTs
+      ARM: mvebu: use macros for interrupt flags on Armada 375/38x
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |   1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   4 +
+ arch/arm/boot/dts/Makefile                         |  36 +-
+ arch/arm/boot/dts/armada-370-db.dts                |  56 ++
+ arch/arm/boot/dts/armada-370-mirabox.dts           |   7 +-
+ arch/arm/boot/dts/armada-370-rd.dts                |   6 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
+ arch/arm/boot/dts/armada-370.dtsi                  |  33 +
+ arch/arm/boot/dts/armada-375-db.dts                | 130 +++
+ arch/arm/boot/dts/armada-375.dtsi                  | 464 +++++++++++
+ arch/arm/boot/dts/armada-380.dtsi                  | 117 +++
+ arch/arm/boot/dts/armada-385-db.dts                | 101 +++
+ arch/arm/boot/dts/armada-385.dtsi                  | 149 ++++
+ arch/arm/boot/dts/armada-38x.dtsi                  | 351 +++++++++
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts          |   6 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  12 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |   6 +
+ arch/arm/boot/dts/dove.dtsi                        |  18 +-
+ arch/arm/boot/dts/kirkwood-b3.dts                  | 204 +++++
+ arch/arm/boot/dts/kirkwood-ds109.dts               |  41 +
+ arch/arm/boot/dts/kirkwood-ds110jv10.dts           |  41 +
+ arch/arm/boot/dts/kirkwood-ds111.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds112.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds209.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds210.dts               |  46 ++
+ arch/arm/boot/dts/kirkwood-ds212.dts               |  47 ++
+ arch/arm/boot/dts/kirkwood-ds212j.dts              |  41 +
+ arch/arm/boot/dts/kirkwood-ds409.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds409slim.dts           |  40 +
+ arch/arm/boot/dts/kirkwood-ds411.dts               |  52 ++
+ arch/arm/boot/dts/kirkwood-ds411j.dts              |  48 ++
+ arch/arm/boot/dts/kirkwood-ds411slim.dts           |  48 ++
+ arch/arm/boot/dts/kirkwood-rd88f6192.dts           | 112 +++
+ arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts        |  26 +
+ arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts        |  31 +
+ arch/arm/boot/dts/kirkwood-rd88f6281.dtsi          | 152 ++++
+ arch/arm/boot/dts/kirkwood-rs212.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-rs409.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-rs411.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-synology.dtsi           | 871 +++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-t5325.dts               | 208 +++++
+ arch/arm/boot/dts/kirkwood-ts419-6281.dts          |  20 +
+ arch/arm/boot/dts/kirkwood-ts419-6282.dts          |  32 +
+ arch/arm/boot/dts/kirkwood-ts419.dtsi              |  75 ++
+ arch/arm/boot/dts/kirkwood.dtsi                    |  24 +-
+ 45 files changed, 3961 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-375-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-375.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-380.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-385-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-385.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-38x.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds109.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds110jv10.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds111.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds112.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds209.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds210.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6192.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-synology.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-t5325.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
