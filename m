@@ -1,117 +1,49 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Mar 2014 11:04:55 +0100 (CET)
-Subject: [PATCH V3 1/5] genirq: define flag IRQ_SRC_DST_INVERTED, and
- accessors
-In-Reply-To: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
-References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Mar 2014 10:08:37 +0000
+Subject: [PATCH 3/5] documentation/iommu: update description of ARM
+ System MMU binding
+In-Reply-To: <5310C253.40804@codeaurora.org>
+References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
+ <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+ <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
+ <20140228162114.GA30996@mudshark.cambridge.arm.com>
+ <5310C253.40804@codeaurora.org>
+Message-ID: <20140304100837.GB8766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Mar 2014, Stephen Warren wrote:
-
-> From: Stephen Warren <swarren@nvidia.com>
+On Fri, Feb 28, 2014 at 05:07:31PM +0000, Timur Tabi wrote:
+> On 02/28/2014 10:21 AM, Will Deacon wrote:
+> >>> > >+- calxeda,smmu-secure-config-access : Enable proper handling of buggy
+> >>> > >+                  implementations that always use secure access to
+> >>> > >+                  SMMU configuration registers. In this case non-secure
+> >>> > >+                 aliases of secure registers have to be used during
+> >>> > >+                 SMMU configuration.
+> >> >
+> >> >I'm confused.  Why does this property have a "calxeda" prefix?  How is
+> >> >it a Calxeda-specific property?
 > 
-> Some devices have configurable IRQ output polarities. Software might
-> use IRQ_TYPE_* to determine how to configure such a device's IRQ
-> output polarity in order to match how the IRQ controller input is
-> configured. If the board or SoC inverts the signal between the
-> device's IRQ output and controller's IRQ output, software must be
-> aware of this fact, in order to program the IRQ output to the correct
-> (i.e. opposite) polarity. This flag provides that information.
+> > Because they wired up their SMMU backwards. It's basically an
+> > implementation-specific erratum workaround.
+> 
+> Hmmmm....
+> 
+> Other than making the same wiring mistake, is there any reason any other 
+> ARM chip would need this property set?
 
-So what you're saying is:
+Not that I can think of, no.
 
-Device IRQ output --> [Optional Inverter Logic] --> IRQ controller input.
+> The reason I ask is that it's kinda weird (well, to me at least) that we 
+> have an property named for a specific SoC, but the implementation and 
+> documentation tries so hard to hide that fact.  I would think that the 
+> binding document would provide some explanation as to why the property 
+> has a "calxeda" prefix.
 
-And you're storing the information about the presence of the inverter
-logic in the irq itself, but the core does not make any use of it and
-you let the device driver deal with the outcome.
+I don't agree. We're making sensible use of a vendor prefix to isolate
+errata workarounds. The description clearly states that the implementation
+is buggy.
 
-This sucks as all affected drivers have to implement the same sanity
-logic for this.
+Given that there aren't any Calxeda engineers left working on this stuff,
+I'm heavily inclined to leave this patch as-is.
 
-Why don't you implement a core function which tells the driver which
-polarity to select? That requires a few more changes, but I think it's
-worth it for other reasons.
-
-Right now the set_type logic requires the irq chip drivers to
-implement sanity checking and default selections for TYPE_NONE. We can
-be more clever about that and add this information to the irq chip
-flags.
-
-enum {
-     IRQ_CHIP_TYPES_MASK	= 0x0f,
-     IRQ_CHIP_DEFAULT_MASK	= 0xf0,
-     IRQ_CHIP_EXISTING_FLAGS	....
-}
-
-Now the irq_chip setup tells the core which types are available and
-which one is the default fallback for TYPE_NONE.
-
-So the core can do the sanity checks and we can kill quite some
-repeated stuff from the irq chip implementations. For the inverted
-logic case you can handle the inversion in the core as well, i.e. if a
-driver requests IRQ_TYPE_LEVEL_HIGH you select IRQ_TYPE_LEVEL_LOW for
-the chip, if possible.
-
-For the case where the irq chip can only handle a single polarity you
-can provide a core function to figure out to which polarity the driver
-should set the device IRQ output line.
-
-int irq_get_device_irq_polarity(int irq, int device_types)
-{
-	/*
-	 * Handle the inversion logic and select a proper
-	 * device irq polarity from irq_chip(@irq)->flags and
-	 * @device_types.
-	 *
-	 * Return a proper error code if no match.
-	 */
-}
-
-Let's look at an example:
-
-      irq_chip.flags = IRQ_TYPE_LEVEL_HIGH;
-      device_types = IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW;
-
-Now for the non inverted case, this returns IRQ_TYPE_LEVEL_HIGH, for
-the inverted case it returns IRQ_TYPE_LEVEL_LOW.
-
-In both cases the irq_set_type() logic handles this correctly:
-
-Non-Inverted case:
-  	     irq_set_type(irq, IRQ_TYPE_LEVEL_HIGH);
-	     -> Success
-
-Inverted case:
-  	     irq_set_type(irq, IRQ_TYPE_LEVEL_LOW);
-	     invert -> IRQ_TYPE_LEVEL_HIGH
-	     -> Success
-
-To make this work for interrupt chips which have no set_type callback
-we can do the following in irq_set_type():
-
-       if (irq_is_inverted(irq))
-	  type = invert(type);
-
-       ret = irq_check_type(chip, &type);
-       if (ret < 0 || !chip->irq_settype)
-	  return ret;
-
-       return chip->irq_settype();
-
-And irq_check_type() does:
-
-       if (!(chip->flags & IRQ_CHIP_TYPES_MASK))
-       	  return chip->irq_settype ? 0 : -ENOTSUP;
-
-       if (*type == IRQ_TYPE_NONE)
-       	  *type == (chip->flags & IRQ_CHIP_DEFAULT_MASK) >> 4;
-	
-       return type_supported(chip->flags, *type);
-
-Thanks,
-
-	tglx
-       	  
+Will
