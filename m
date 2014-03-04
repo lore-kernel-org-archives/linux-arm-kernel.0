@@ -1,59 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Mar 2014 11:34:13 +0100 (CET)
-Subject: [PATCH V3 1/5] genirq: define flag IRQ_SRC_DST_INVERTED, and
- accessors
-In-Reply-To: <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
-References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
- <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
-Message-ID: <alpine.DEB.2.02.1403041130280.18573@ionos.tec.linutronix.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 4 Mar 2014 13:28:43 +0200
+Subject: [RESEND][PATCH v4] gpio: davinci: reuse for keystone soc
+In-Reply-To: <CACRpkda=+vnOEfGeZNS7+7WXU4v29gfQYY0xoc8d-sFEfrWqUw@mail.gmail.com>
+References: <52FBB6BC.2060801@ti.com>	<1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkda=+vnOEfGeZNS7+7WXU4v29gfQYY0xoc8d-sFEfrWqUw@mail.gmail.com>
+Message-ID: <5315B8EB.40806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Mar 2014, Thomas Gleixner wrote:
+On 03/04/2014 11:20 AM, Linus Walleij wrote:
+> On Thu, Feb 13, 2014 at 4:58 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>
+>> The similar GPIO HW block is used by keystone SoCs as
+>> in Davinci SoCs.
+>> Hence, reuse Davinci GPIO driver for Keystone taking into
+>> account that Keystone contains ARM GIC IRQ controller which
+>> is implemented using IRQ Chip.
+>>
+>> Documentation:
+>>          http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> Applied! Santosh hunted me down in person so it really happened this
+> time...
 
-> On Mon, 3 Mar 2014, Stephen Warren wrote:
-> 
-> > From: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Some devices have configurable IRQ output polarities. Software might
-> > use IRQ_TYPE_* to determine how to configure such a device's IRQ
-> > output polarity in order to match how the IRQ controller input is
-> > configured. If the board or SoC inverts the signal between the
-> > device's IRQ output and controller's IRQ output, software must be
-> > aware of this fact, in order to program the IRQ output to the correct
-> > (i.e. opposite) polarity. This flag provides that information.
-> 
-> So what you're saying is:
-> 
-> Device IRQ output --> [Optional Inverter Logic] --> IRQ controller input.
-> 
-> And you're storing the information about the presence of the inverter
-> logic in the irq itself, but the core does not make any use of it and
-> you let the device driver deal with the outcome.
-> 
-> This sucks as all affected drivers have to implement the same sanity
-> logic for this.
-> 
-> Why don't you implement a core function which tells the driver which
-> polarity to select? That requires a few more changes, but I think it's
-> worth it for other reasons.
-> 
-> Right now the set_type logic requires the irq chip drivers to
-> implement sanity checking and default selections for TYPE_NONE. We can
-> be more clever about that and add this information to the irq chip
-> flags.
-> 
-> enum {
->      IRQ_CHIP_TYPES_MASK	= 0x0f,
->      IRQ_CHIP_DEFAULT_MASK	= 0xf0,
->      IRQ_CHIP_EXISTING_FLAGS	....
-> }
+Thanks a lot :)
 
-We need to extend the mask to indicate whether the chip supports
-BOTH_EDGES. A chip can support FALLING and RISING, but not both at the
-same time. For the set_type side the current BOTH = FALLING | RISING
-is fine, but for checking the supported type it's not sufficient.
-
-Thanks,
-
-	tglx
+>
+> Yours,
+> Linus Walleij
+>
