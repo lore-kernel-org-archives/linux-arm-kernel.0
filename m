@@ -1,31 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Mar 2014 10:20:54 +0100
-Subject: [RESEND][PATCH v4] gpio: davinci: reuse for keystone soc
-In-Reply-To: <1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
-References: <52FBB6BC.2060801@ti.com>
- <1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CACRpkda=+vnOEfGeZNS7+7WXU4v29gfQYY0xoc8d-sFEfrWqUw@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 4 Mar 2014 11:21:37 +0200
+Subject: [PATCH 06/12] phy: omap: Select OMAP_OCP2SCP bus driver
+In-Reply-To: <20140303185235.GC25804@atomide.com>
+References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
+ <1393859254-10937-7-git-send-email-rogerq@ti.com>
+ <20140303185235.GC25804@atomide.com>
+Message-ID: <53159B21.6030102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 4:58 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+On 03/03/2014 08:52 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [140303 07:11]:
+>> The OMAP_USB2 and OMAP_PIP3 phy devices will not be
+>> detected if the OMAP_OCP2SCP driver is not present.
+>> So select it.
+> 
+> Selecting drivers like this will easily lead into missing
+> dependencies. Especially it's bad for tristate driver
+> options that people may want to have as loadable modules.
+> 
+> How about instead depends on OMAP_OCP2SCP?
 
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
->
-> Documentation:
->         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+OK, 'depends' seems fine.
 
-Applied! Santosh hunted me down in person so it really happened this
-time...
+cheers,
+-roger
 
-Yours,
-Linus Walleij
+> 
+>  
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/phy/Kconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 2f02ec8..afdab3e 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -44,6 +44,7 @@ config OMAP_USB2
+>>  	depends on USB_PHY
+>>  	select GENERIC_PHY
+>>  	select OMAP_CONTROL_PHY
+>> +	select OMAP_OCP2SCP
+>>  	help
+>>  	  Enable this to support the transceiver that is part of SOC. This
+>>  	  driver takes care of all the PHY functionality apart from comparator.
+>> @@ -55,6 +56,7 @@ config TI_PIPE3
+>>  	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+>>  	select GENERIC_PHY
+>>  	select OMAP_CONTROL_PHY
+>> +	select OMAP_OCP2SCP
+>>  	help
+>>  	  Enable this to support the PIPE3 PHY that is part of TI SOCs. This
+>>  	  driver takes care of all the PHY functionality apart from comparator.
+>> -- 
+>> 1.8.3.2
+>>
