@@ -1,205 +1,70 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 18:19:14 +0200
-Subject: [PATCH 14/18] ARM: OMAP2/3: PRM: split PRM header file to common and
- internal versions
+Date: Tue, 4 Mar 2014 18:19:17 +0200
+Subject: [PATCH 17/18] ARM: OMAP3: PRM: move modem reset and iva2 idle to PRM
+ driver
 In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
 References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393949958-816-15-git-send-email-t-kristo@ti.com>
+Message-ID: <1393949958-816-18-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Internal version contains the direct register access macros and should
-only be used by PRCM drivers.
+Done in preparation to move PRM into its own driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm2xxx.c              |    2 +-
- arch/arm/mach-omap2/prm2xxx_3xxx.c         |    2 +-
- arch/arm/mach-omap2/prm2xxx_3xxx.h         |   47 -----------------
- arch/arm/mach-omap2/prm2xxx_3xxx_private.h |   77 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm3xxx.c              |    2 +-
- 5 files changed, 80 insertions(+), 50 deletions(-)
- create mode 100644 arch/arm/mach-omap2/prm2xxx_3xxx_private.h
+ arch/arm/mach-omap2/pm34xx.c  |   15 ---------------
+ arch/arm/mach-omap2/prm3xxx.c |    7 +++++++
+ 2 files changed, 7 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index 8d4db6f..45f83dd 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -23,7 +23,7 @@
- #include "vp.h"
- #include "powerdomain.h"
- #include "clockdomain.h"
--#include "prm2xxx.h"
-+#include "prm2xxx_3xxx_private.h"
- #include "cm2xxx_3xxx.h"
- #include "prm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 8df2d65..faa2c05 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -346,27 +346,12 @@ restore:
  
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index 947f6ad..5209823 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -18,7 +18,7 @@
+ #endif /* CONFIG_SUSPEND */
  
- #include "common.h"
- #include "powerdomain.h"
--#include "prm2xxx_3xxx.h"
-+#include "prm2xxx_3xxx_private.h"
- #include "prm-regbits-24xx.h"
- #include "clockdomain.h"
+-static void __init omap3_d2d_idle(void)
+-{
+-	omap3_ctrl_setup_d2d_padconf();
+-
+-	/* reset modem */
+-	omap3_prm_reset_modem();
+-}
+-
+ static void __init prcm_setup_regs(void)
+ {
+ 	/* XXX This should be handled by hwmod code or SCM init code */
+ 	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
  
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-index 9624b40..1c5d998 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-@@ -52,53 +52,6 @@
- #include <linux/io.h>
- #include "powerdomain.h"
+ 	omap3_prm_init_pm(cpu_is_omap3630(), omap3_has_iva());
+-
+-	/*
+-	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
+-	 */
+-	omap3xxx_prm_iva_idle();
+-
+-	omap3_d2d_idle();
+ }
  
--/* Power/reset management domain register get/set */
--static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
--{
--	return __raw_readl(prm_base + module + idx);
--}
--
--static inline void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx)
--{
--	__raw_writel(val, prm_base + module + idx);
--}
--
--/* Read-modify-write a register in a PRM module. Caller must lock */
--static inline u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
--					     s16 idx)
--{
--	u32 v;
--
--	v = omap2_prm_read_mod_reg(module, idx);
--	v &= ~mask;
--	v |= bits;
--	omap2_prm_write_mod_reg(v, module, idx);
--
--	return v;
--}
--
--/* Read a PRM register, AND it, and shift the result down to bit 0 */
--static inline u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
--{
--	u32 v;
--
--	v = omap2_prm_read_mod_reg(domain, idx);
--	v &= mask;
--	v >>= __ffs(mask);
--
--	return v;
--}
--
--static inline u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_prm_rmw_mod_reg_bits(bits, bits, module, idx);
--}
--
--static inline u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
--}
--
- /* These omap2_ PRM functions apply to both OMAP2 and 3 */
- extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
- extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx_private.h b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
-new file mode 100644
-index 0000000..6e007e9
---- /dev/null
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
-@@ -0,0 +1,77 @@
-+/*
-+ * OMAP2xxx/3xxx-common Power/Reset Management (PRM) register definitions
-+ *
-+ * Copyright (C) 2007-2009, 2011-2012 Texas Instruments, Inc.
-+ * Copyright (C) 2008-2010 Nokia Corporation
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * The PRM hardware modules on the OMAP2/3 are quite similar to each
-+ * other.  The PRM on OMAP4 has a new register layout, and is handled
-+ * in a separate file.
-+ */
-+#ifndef __ARCH_ARM_MACH_OMAP2_PRM2XXX_3XXX_PRIVATE_H
-+#define __ARCH_ARM_MACH_OMAP2_PRM2XXX_3XXX_PRIVATE_H
-+
-+#include "prcm-common.h"
-+#include "prm.h"
-+#include "prm2xxx_3xxx.h"
-+
-+#ifndef __ASSEMBLER__
-+
-+#include <linux/io.h>
-+#include "powerdomain.h"
-+
-+/* Power/reset management domain register get/set */
-+static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
-+{
-+	return __raw_readl(prm_base + module + idx);
-+}
-+
-+static inline void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx)
-+{
-+	__raw_writel(val, prm_base + module + idx);
-+}
-+
-+/* Read-modify-write a register in a PRM module. Caller must lock */
-+static inline u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
-+					     s16 idx)
-+{
-+	u32 v;
-+
-+	v = omap2_prm_read_mod_reg(module, idx);
-+	v &= ~mask;
-+	v |= bits;
-+	omap2_prm_write_mod_reg(v, module, idx);
-+
-+	return v;
-+}
-+
-+/* Read a PRM register, AND it, and shift the result down to bit 0 */
-+static inline u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
-+{
-+	u32 v;
-+
-+	v = omap2_prm_read_mod_reg(domain, idx);
-+	v &= mask;
-+	v >>= __ffs(mask);
-+
-+	return v;
-+}
-+
-+static inline u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_prm_rmw_mod_reg_bits(bits, bits, module, idx);
-+}
-+
-+static inline u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
-+}
-+
-+#endif /* __ASSEMBLER */
-+
-+#endif
+ void omap3_pm_off_mode_enable(int enable)
 diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 09e50d2..eb37970 100644
+index eb37970..239163f 100644
 --- a/arch/arm/mach-omap2/prm3xxx.c
 +++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -23,7 +23,7 @@
- #include "vp.h"
- #include "powerdomain.h"
- #include "prm3xxx.h"
--#include "prm2xxx_3xxx.h"
-+#include "prm2xxx_3xxx_private.h"
- #include "cm2xxx_3xxx_private.h"
- #include "prm-regbits-34xx.h"
- #include "cm3xxx.h"
+@@ -361,6 +361,13 @@ void __init omap3_prm_init_pm(bool has_uart4, bool has_iva)
+ 
+ 	/* Clear any pending PRCM interrupts */
+ 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++
++	/* We need to idle iva2_pwrdm even on am3703 with no iva2. */
++	omap3xxx_prm_iva_idle();
++
++	omap3_ctrl_setup_d2d_padconf();
++
++	omap3_prm_reset_modem();
+ }
+ 
+ /**
 -- 
 1.7.9.5
