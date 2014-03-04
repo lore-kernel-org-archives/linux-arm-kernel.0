@@ -1,158 +1,205 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 18:19:15 +0200
-Subject: [PATCH 15/18] ARM: OMAP4+: PRM: make prm register access internal to
- PRM driver only
+Date: Tue, 4 Mar 2014 18:19:14 +0200
+Subject: [PATCH 14/18] ARM: OMAP2/3: PRM: split PRM header file to common and
+ internal versions
 In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
 References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393949958-816-16-git-send-email-t-kristo@ti.com>
+Message-ID: <1393949958-816-15-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed exported prototypes from the public header file for the direct
-register access. Also made a new driver API for clearing mpuss previous
-logic powerstate so that the register APIs are no longer needed.
+Internal version contains the direct register access macros and should
+only be used by PRCM drivers.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   15 ++----------
- arch/arm/mach-omap2/prm44xx.c             |    2 +-
- arch/arm/mach-omap2/prminst44xx.c         |   12 ++++++++++
- arch/arm/mach-omap2/prminst44xx.h         |   10 +-------
- arch/arm/mach-omap2/prminst44xx_private.h |   37 +++++++++++++++++++++++++++++
- 5 files changed, 53 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/mach-omap2/prminst44xx_private.h
+ arch/arm/mach-omap2/prm2xxx.c              |    2 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.c         |    2 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.h         |   47 -----------------
+ arch/arm/mach-omap2/prm2xxx_3xxx_private.h |   77 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm3xxx.c              |    2 +-
+ 5 files changed, 80 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/prm2xxx_3xxx_private.h
 
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 667915d..53ed6c0 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -144,17 +144,6 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
- 	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
- }
+diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
+index 8d4db6f..45f83dd 100644
+--- a/arch/arm/mach-omap2/prm2xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx.c
+@@ -23,7 +23,7 @@
+ #include "vp.h"
+ #include "powerdomain.h"
+ #include "clockdomain.h"
+-#include "prm2xxx.h"
++#include "prm2xxx_3xxx_private.h"
+ #include "cm2xxx_3xxx.h"
+ #include "prm-regbits-24xx.h"
  
--/* Helper functions for MPUSS OSWR */
--static inline void mpuss_clear_prev_logic_pwrst(void)
--{
--	u32 reg;
--
--	reg = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
--		OMAP4430_PRM_MPU_INST, OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
--	omap4_prminst_write_inst_reg(reg, OMAP4430_PRM_PARTITION,
--		OMAP4430_PRM_MPU_INST, OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
--}
--
- static inline void cpu_clear_prev_logic_pwrst(unsigned int cpu_id)
- {
- 	u32 reg;
-@@ -252,7 +241,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 	 * Check MPUSS next state and save interrupt controller if needed.
- 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
- 	 */
--	mpuss_clear_prev_logic_pwrst();
-+	omap4_prminst_mpuss_clear_prev_logic_pwrst();
- 	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
- 		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
- 		save_state = 2;
-@@ -382,7 +371,7 @@ int __init omap4_mpuss_init(void)
- 		return -ENODEV;
- 	}
- 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
--	mpuss_clear_prev_logic_pwrst();
-+	omap4_prminst_mpuss_clear_prev_logic_pwrst();
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 947f6ad..5209823 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -18,7 +18,7 @@
  
- 	/* Save device type on scratchpad for low level code to use */
- 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 03a6034..3655e16 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -26,7 +26,7 @@
- #include "prm44xx.h"
- #include "prm-regbits-44xx.h"
- #include "prcm44xx.h"
--#include "prminst44xx.h"
-+#include "prminst44xx_private.h"
+ #include "common.h"
+ #include "powerdomain.h"
+-#include "prm2xxx_3xxx.h"
++#include "prm2xxx_3xxx_private.h"
+ #include "prm-regbits-24xx.h"
+ #include "clockdomain.h"
+ 
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 9624b40..1c5d998 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -52,53 +52,6 @@
+ #include <linux/io.h>
  #include "powerdomain.h"
  
- /* Static data */
-diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
-index 6334b96..00b69d1 100644
---- a/arch/arm/mach-omap2/prminst44xx.c
-+++ b/arch/arm/mach-omap2/prminst44xx.c
-@@ -191,3 +191,15 @@ void omap4_prminst_global_warm_sw_reset(void)
- 				    OMAP4430_PRM_DEVICE_INST,
- 				    OMAP4_PRM_RSTCTRL_OFFSET);
- }
-+
-+void omap4_prminst_mpuss_clear_prev_logic_pwrst(void)
-+{
-+	u32 reg;
-+
-+	reg = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-+					  OMAP4430_PRM_MPU_INST,
-+					  OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
-+	omap4_prminst_write_inst_reg(reg, OMAP4430_PRM_PARTITION,
-+				     OMAP4430_PRM_MPU_INST,
-+				     OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
-+}
-diff --git a/arch/arm/mach-omap2/prminst44xx.h b/arch/arm/mach-omap2/prminst44xx.h
-index a2ede2d..fec8f18 100644
---- a/arch/arm/mach-omap2/prminst44xx.h
-+++ b/arch/arm/mach-omap2/prminst44xx.h
-@@ -12,15 +12,6 @@
- #ifndef __ARCH_ASM_MACH_OMAP2_PRMINST44XX_H
- #define __ARCH_ASM_MACH_OMAP2_PRMINST44XX_H
- 
--/*
-- * In an ideal world, we would not export these low-level functions,
-- * but this will probably take some time to fix properly
-- */
--extern u32 omap4_prminst_read_inst_reg(u8 part, s16 inst, u16 idx);
--extern void omap4_prminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx);
--extern u32 omap4_prminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
--					   s16 inst, u16 idx);
+-/* Power/reset management domain register get/set */
+-static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
+-{
+-	return __raw_readl(prm_base + module + idx);
+-}
 -
- extern void omap4_prminst_global_warm_sw_reset(void);
- 
- extern int omap4_prminst_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
-@@ -29,6 +20,7 @@ extern int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
- 					  u16 rstctrl_offs);
- extern int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
- 					    u16 rstctrl_offs);
-+void omap4_prminst_mpuss_clear_prev_logic_pwrst(void);
- 
- extern void omap_prm_base_init(void);
- 
-diff --git a/arch/arm/mach-omap2/prminst44xx_private.h b/arch/arm/mach-omap2/prminst44xx_private.h
+-static inline void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx)
+-{
+-	__raw_writel(val, prm_base + module + idx);
+-}
+-
+-/* Read-modify-write a register in a PRM module. Caller must lock */
+-static inline u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
+-					     s16 idx)
+-{
+-	u32 v;
+-
+-	v = omap2_prm_read_mod_reg(module, idx);
+-	v &= ~mask;
+-	v |= bits;
+-	omap2_prm_write_mod_reg(v, module, idx);
+-
+-	return v;
+-}
+-
+-/* Read a PRM register, AND it, and shift the result down to bit 0 */
+-static inline u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
+-{
+-	u32 v;
+-
+-	v = omap2_prm_read_mod_reg(domain, idx);
+-	v &= mask;
+-	v >>= __ffs(mask);
+-
+-	return v;
+-}
+-
+-static inline u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
+-{
+-	return omap2_prm_rmw_mod_reg_bits(bits, bits, module, idx);
+-}
+-
+-static inline u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+-{
+-	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
+-}
+-
+ /* These omap2_ PRM functions apply to both OMAP2 and 3 */
+ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx_private.h b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
 new file mode 100644
-index 0000000..c36be15
+index 0000000..6e007e9
 --- /dev/null
-+++ b/arch/arm/mach-omap2/prminst44xx_private.h
-@@ -0,0 +1,25 @@
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
+@@ -0,0 +1,77 @@
 +/*
-+ * OMAP4 Power/Reset Management (PRM) function prototypes
++ * OMAP2xxx/3xxx-common Power/Reset Management (PRM) register definitions
 + *
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Copyright (C) 2007-2009, 2011-2012 Texas Instruments, Inc.
++ * Copyright (C) 2008-2010 Nokia Corporation
 + * Paul Walmsley
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
++ *
++ * The PRM hardware modules on the OMAP2/3 are quite similar to each
++ * other.  The PRM on OMAP4 has a new register layout, and is handled
++ * in a separate file.
 + */
-+#ifndef __ARCH_ARM_MACH_OMAP2_PRMINST44XX_PRIVATE_H
-+#define __ARCH_ARM_MACH_OMAP2_PRMINST44XX_PRIVATE_H
++#ifndef __ARCH_ARM_MACH_OMAP2_PRM2XXX_3XXX_PRIVATE_H
++#define __ARCH_ARM_MACH_OMAP2_PRM2XXX_3XXX_PRIVATE_H
 +
-+#include "prminst44xx.h"
++#include "prcm-common.h"
++#include "prm.h"
++#include "prm2xxx_3xxx.h"
 +
-+/*
-+ * In an ideal world, we would not export these low-level functions,
-+ * but this will probably take some time to fix properly
-+ */
-+u32 omap4_prminst_read_inst_reg(u8 part, s16 inst, u16 idx);
-+void omap4_prminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx);
-+u32 omap4_prminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
-+				    s16 inst, u16 idx);
++#ifndef __ASSEMBLER__
++
++#include <linux/io.h>
++#include "powerdomain.h"
++
++/* Power/reset management domain register get/set */
++static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
++{
++	return __raw_readl(prm_base + module + idx);
++}
++
++static inline void omap2_prm_write_mod_reg(u32 val, s16 module, u16 idx)
++{
++	__raw_writel(val, prm_base + module + idx);
++}
++
++/* Read-modify-write a register in a PRM module. Caller must lock */
++static inline u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
++					     s16 idx)
++{
++	u32 v;
++
++	v = omap2_prm_read_mod_reg(module, idx);
++	v &= ~mask;
++	v |= bits;
++	omap2_prm_write_mod_reg(v, module, idx);
++
++	return v;
++}
++
++/* Read a PRM register, AND it, and shift the result down to bit 0 */
++static inline u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
++{
++	u32 v;
++
++	v = omap2_prm_read_mod_reg(domain, idx);
++	v &= mask;
++	v >>= __ffs(mask);
++
++	return v;
++}
++
++static inline u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	return omap2_prm_rmw_mod_reg_bits(bits, bits, module, idx);
++}
++
++static inline u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
++}
++
++#endif /* __ASSEMBLER */
++
 +#endif
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index 09e50d2..eb37970 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -23,7 +23,7 @@
+ #include "vp.h"
+ #include "powerdomain.h"
+ #include "prm3xxx.h"
+-#include "prm2xxx_3xxx.h"
++#include "prm2xxx_3xxx_private.h"
+ #include "cm2xxx_3xxx_private.h"
+ #include "prm-regbits-34xx.h"
+ #include "cm3xxx.h"
 -- 
 1.7.9.5
