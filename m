@@ -1,21 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Mar 2014 10:47:40 -0800
-Subject: [PATCHv2] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
- EV-MSK
-In-Reply-To: <1393837376-25779-1-git-send-email-kaloz@openwrt.org>
-References: <1393837376-25779-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <20140304184740.GA8771@atomide.com>
+Date: Tue, 4 Mar 2014 10:47:51 -0800
+Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
+In-Reply-To: <53144CBC.2050607@ti.com>
+References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
+ <20140228225627.GU13624@atomide.com> <53144CBC.2050607@ti.com>
+Message-ID: <20140304184750.GB8771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Imre Kaloz <kaloz@openwrt.org> [140303 01:06]:
-> Enable the WiLink6 connected to mmc2.
+* Roger Quadros <rogerq@ti.com> [140303 01:38]:
+> Hi Tony,
 > 
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org
-> ---
-> Changes since v1: use the right refclock
+> On 03/01/2014 12:56 AM, Tony Lindgren wrote:
+> > * Roger Quadros <rogerq@ti.com> [140227 06:21]:
+> >> Hi,
+> >>
+> >> This patchset brings up USB Host ports and Ethernet port on
+> >> the OMAP5 uEVM board.
+> >>
+> >> It also does some cleanup with respect to DT clock binding
+> >> for the mfd/omap-usb-host driver.
+> >>
+> >> Please queue these for -next.
+> >>
+> >> Lee,
+> >>
+> >> I've folded some platform data dependent patches with mfd patches
+> >> so that they don't break functionality when applied individually.
+> >> You can safely pull in all MFD patches (1 to 6).
+> >>
+> >> Tony & Benoit,
+> >>
+> >> Can you please accept patches 7, 8 and 9?
+> > 
+> > Are 7, 8 and 9 safe to queue separately from the MFD changes
+> > or do they need to wait for the MFD changes to get merged
+> > first?
+> > 
+> 
+> They are safe to queue separately.
 
-Thanks applying into omap-for-v3.15/dt.
+OK thanks applying 7, 8 and 9 into omap-for-v3.15/dt.
 
 Regards,
 
