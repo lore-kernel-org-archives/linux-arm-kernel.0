@@ -1,49 +1,31 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  4 Mar 2014 15:49:58 +0000
-Subject: [PATCH v5 1/7] pci: Introduce pci_register_io_range() helper function.
+Date: Tue,  4 Mar 2014 15:50:02 +0000
+Subject: [PATCH v5 5/7] pci: Use parent domain number when allocating child
+ busses.
 In-Reply-To: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1393948204-11555-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1393948204-11555-6-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures do not share x86 simple view of the I/O space and
-instead use a range of addresses that map to external devices. For PCI,
-these ranges can be expressed by OF bindings in a device tree file.
-
-Introduce a pci_register_io_range() helper function that can be used
-by the architecture code to keep track of the io ranges described by the
-PCI bindings.
+pci_alloc_child_bus() uses the newly allocated child bus to figure
+out the domain number that is going to use for setting the device
+name. A better option is to use the parent bus domain number.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 1a54f1f..d1bb30f 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -619,6 +619,11 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
- }
- EXPORT_SYMBOL(of_get_address);
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 26237a0..a12cda5 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	 * now as the parent is not properly set up yet.
+ 	 */
+ 	child->dev.class = &pcibus_class;
+-	dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
++	dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
  
-+int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-+{
-+	return 0;
-+}
-+
- unsigned long __weak pci_address_to_pio(phys_addr_t address)
- {
- 	if (address > IO_SPACE_LIMIT)
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 5f6ed6b..40c418d 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -56,6 +56,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
- extern const __be32 *of_get_address(struct device_node *dev, int index,
- 			   u64 *size, unsigned int *flags);
- 
-+extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
- extern unsigned long pci_address_to_pio(phys_addr_t addr);
- 
- extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+ 	/*
+ 	 * Set up the primary, secondary and subordinate
 -- 
 1.9.0
