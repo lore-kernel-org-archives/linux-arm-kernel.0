@@ -1,48 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Mar 2014 15:21:37 +0000
-Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
-In-Reply-To: <CAL_JsqLQrHwVx0ZbeeasKsTXp_NVMYX1voxhUdjH737tptiAeQ@mail.gmail.com>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
- <10040083.PbPEQQPCjl@wuerfel>
- <CAL_JsqL6-hoD4F7+adPhsOJXeM5f+wpEuBWg_6AWqj3k2v0NEw@mail.gmail.com>
- <5773663.p5fEFmy536@wuerfel>
- <CAL_JsqLQrHwVx0ZbeeasKsTXp_NVMYX1voxhUdjH737tptiAeQ@mail.gmail.com>
-Message-ID: <20140304152137.GL8766@mudshark.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 04 Mar 2014 16:34:19 +0100
+Subject: [PATCH 7/7] PCI: designware: split samsung and fsl bindings
+In-Reply-To: <201403041553.40202.arnd@arndb.de>
+References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
+ <201402282103.01897.arnd@arndb.de>
+ <1393942383.9405.8.camel@weser.hi.pengutronix.de>
+ <201403041553.40202.arnd@arndb.de>
+Message-ID: <1393947259.9405.18.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 02:04:17PM +0000, Rob Herring wrote:
-> Adding Will...
-
-Thanks Rob!
-
-> On Fri, Feb 28, 2014 at 9:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 28 February 2014 09:14:19 Rob Herring wrote:
-> >>
-> >> I know Will D was not a fan of this property. Primarily I believe
-> >> because you may need to describe more than just a boolean in more
-> >> complex bus topologies.
-> >
-> > I can't think of any example where it's not per-device. Do you
-> > think we can end up with a device that has multiple bus master
-> > ports, only some of which are coherent, or is there a different
-> > concern?
+Am Dienstag, den 04.03.2014, 15:53 +0100 schrieb Arnd Bergmann:
+> On Tuesday 04 March 2014, Lucas Stach wrote:
+> > Right, we should be able to reuse the clock names. Though I'm not really
+> > sure how the Samsung clocks maps to those used on i.MX, as the names are
+> > a bit generic. Maybe someone from Samsung could shed a bit of light on
+> > this.
+> > 
+> > On i.MX6 the clock names (which I have to agree are pretty bad) map as
+> > follows:
+> > pcie_axi: host controller main register/bus access clock
+> > pcie_ref_125m: pcie phy reference clock
+> > 
+> > sata_ref_100m: pcie bus 100MHz reference clock
 > 
-> Perhaps Will can post his slides from the ARM kernel summit or chime
-> in here, but I believe it was more that coherency is just one aspect
-> of bus master bus topology. The DT models the slave bus hierarchy and
-> doesn't model the master side which is becoming more complex and
-> needing to be described. In the case of highbank, you have an ACP bus
-> with some number of masters on it. They are configurable, but it is
-> not the device that is configurable, but really which bus they are
-> connected to.
+> That doesn't explain why it's called "sata_ref_100m".
+> 
+I agree this is bad naming. It's called this way because someone decided
+to name it like the internal clock it is sourced from on most boards.
+This really should be pcie_ref, or something. I suspect this corresponds
+to the pcie_bus clock in the Exynos binding in which case we should just
+name it this way.
 
-I'm not sure what happened to this slides but, yes, you have the right idea.
-It's not only DMA coherency that's directly related to master topology, but
-also SMMU configuration and MSI routing will depend on this information.
+> > lvds_gate: bad abstraction. Decides if the reference clock is sourced
+> > internal (i.e. the 100MHz ref clock above) or from an SoC external
+> > source. We should really find a better way of representing this in the
+> > clock tree.
+> 
+> I don't understand this description at all. Can you try to explain that
+> with different words?
+> 
+On i.MX6 the PCIe reference clock is routed through a generic clock pad,
+which can be configured either as input or output. When the i.MX is the
+PCI master we source the clock from sata_ref_100m and configure this pad
+as clock output.
+Somebody decided to abstract the input/output switch as a gate, which is
+arguably wrong, this should be a mux deciding between internal or
+external clock source.
 
-Using a per-device, boolean property to describe DMA coherency may work for a
-simple, statically configured system, but it really just avoids the bigger
-issue.
+The PCIe host driver should really only need the clk pad clock,
+activation of the sata_ref_100m clock should be handled through
+parent<->child relationship of those clocks in the clock tree, which
+isn't properly handled right now. I'll try to fix this up, but it won't
+be backward compatible in any way.
 
-Will
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
