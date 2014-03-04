@@ -1,149 +1,152 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Mar 2014 10:34:44 -0800
-Subject: [PATCH v5 5/9] Input: pmic8xxx-pwrkey - Migrate to DT
-In-Reply-To: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1393958088-1456-6-git-send-email-sboyd@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 4 Mar 2014 10:44:38 -0800
+Subject: [PATCHv3 2/4] net: phy: extend fixed driver with
+ fixed_phy_register()
+In-Reply-To: <1393930704-24374-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1393930704-24374-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAGVrzca7m0hwL-Wgv2eqO9_khpJP3ioZjbRNX7dOged-bq_C9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is only supported on DT enabled platforms. Convert the
-driver to DT so that it can probe properly.
+2014-03-04 2:58 GMT-08:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> The existing fixed_phy_add() function has several drawbacks that
+> prevents it from being used as is for OF-based declaration of fixed
+> PHYs:
+>
+>  * The address of the PHY on the fake bus needs to be passed, while a
+>    dynamic allocation is desired.
+>
+>  * Since the phy_device instantiation is post-poned until the next
+>    mdiobus scan, there is no way to associate the fixed PHY with its
+>    OF node, which later prevents of_phy_connect() from finding this
+>    fixed PHY from a given OF node.
+>
+> To solve this, this commit introduces fixed_phy_register(), which will
+> allocate an available PHY address, add the PHY using fixed_phy_add()
+> and instantiate the phy_device structure associated with the provided
+> OF node.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/input/misc/pmic8xxx-pwrkey.c  | 33 ++++++++++++++++++++-------------
- include/linux/input/pmic8xxx-pwrkey.h | 31 -------------------------------
- 2 files changed, 20 insertions(+), 44 deletions(-)
- delete mode 100644 include/linux/input/pmic8xxx-pwrkey.h
+Besides the !CONFIG_FIXED_PHY hiccup (see below), this looks good to me:
 
-diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-index 0e1a05f95858..99a3587ff49f 100644
---- a/drivers/input/misc/pmic8xxx-pwrkey.c
-+++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-@@ -19,8 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/log2.h>
--
--#include <linux/input/pmic8xxx-pwrkey.h>
-+#include <linux/of.h>
- 
- #define PON_CNTL_1 0x1C
- #define PON_CNTL_PULL_UP BIT(7)
-@@ -79,6 +78,13 @@ static int pmic8xxx_pwrkey_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(pm8xxx_pwr_key_pm_ops,
- 		pmic8xxx_pwrkey_suspend, pmic8xxx_pwrkey_resume);
- 
-+static const struct of_device_id pm8xxx_pwr_key_id_table[] = {
-+	{ .compatible = "qcom,pm8058-pwrkey" },
-+	{ .compatible = "qcom,pm8921-pwrkey" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pm8xxx_pwr_key_id_table);
-+
- static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- {
- 	struct input_dev *pwr;
-@@ -89,15 +95,15 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	unsigned int pon_cntl;
- 	struct regmap *regmap;
- 	struct pmic8xxx_pwrkey *pwrkey;
--	const struct pm8xxx_pwrkey_platform_data *pdata =
--					dev_get_platdata(&pdev->dev);
-+	u32 kpd_delay;
-+	bool pull_up;
- 
--	if (!pdata) {
--		dev_err(&pdev->dev, "power key platform data not supplied\n");
--		return -EINVAL;
--	}
-+	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
-+		kpd_delay = 0;
-+
-+	pull_up = of_property_read_bool(pdev->dev.of_node, "pull-up");
- 
--	if (pdata->kpd_trigger_delay_us > 62500) {
-+	if (kpd_delay > 62500) {
- 		dev_err(&pdev->dev, "invalid power key trigger delay\n");
- 		return -EINVAL;
- 	}
-@@ -125,7 +131,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	pwr->name = "pmic8xxx_pwrkey";
- 	pwr->phys = "pmic8xxx_pwrkey/input0";
- 
--	delay = (pdata->kpd_trigger_delay_us << 10) / USEC_PER_SEC;
-+	delay = (kpd_delay << 10) / USEC_PER_SEC;
- 	delay = 1 + ilog2(delay);
- 
- 	err = regmap_read(regmap, PON_CNTL_1, &pon_cntl);
-@@ -136,7 +142,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 
- 	pon_cntl &= ~PON_CNTL_TRIG_DELAY_MASK;
- 	pon_cntl |= (delay & PON_CNTL_TRIG_DELAY_MASK);
--	if (pdata->pull_up)
-+	if (pull_up)
- 		pon_cntl |= PON_CNTL_PULL_UP;
- 	else
- 		pon_cntl &= ~PON_CNTL_PULL_UP;
-@@ -172,7 +178,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, pwrkey);
--	device_init_wakeup(&pdev->dev, pdata->wakeup);
-+	device_init_wakeup(&pdev->dev, 1);
- 
- 	return 0;
- }
-@@ -188,9 +194,10 @@ static struct platform_driver pmic8xxx_pwrkey_driver = {
- 	.probe		= pmic8xxx_pwrkey_probe,
- 	.remove		= pmic8xxx_pwrkey_remove,
- 	.driver		= {
--		.name	= PM8XXX_PWRKEY_DEV_NAME,
-+		.name	= "pm8xxx-pwrkey",
- 		.owner	= THIS_MODULE,
- 		.pm	= &pm8xxx_pwr_key_pm_ops,
-+		.of_match_table = pm8xxx_pwr_key_id_table,
- 	},
- };
- module_platform_driver(pmic8xxx_pwrkey_driver);
-diff --git a/include/linux/input/pmic8xxx-pwrkey.h b/include/linux/input/pmic8xxx-pwrkey.h
-deleted file mode 100644
-index 6d2974e57109..000000000000
---- a/include/linux/input/pmic8xxx-pwrkey.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef __PMIC8XXX_PWRKEY_H__
--#define __PMIC8XXX_PWRKEY_H__
--
--#define PM8XXX_PWRKEY_DEV_NAME "pm8xxx-pwrkey"
--
--/**
-- * struct pm8xxx_pwrkey_platform_data - platform data for pwrkey driver
-- * @pull up:  power on register control for pull up/down configuration
-- * @kpd_trigger_delay_us: time delay for power key state change interrupt
-- *                  trigger.
-- * @wakeup: configure power key as wakeup source
-- */
--struct pm8xxx_pwrkey_platform_data  {
--	bool pull_up;
--	u32  kpd_trigger_delay_us;
--	u32  wakeup;
--};
--
--#endif /* __PMIC8XXX_PWRKEY_H__ */
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/net/phy/fixed.c   | 61 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/phy_fixed.h | 11 +++++++++
+>  2 files changed, 72 insertions(+)
+>
+> diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+> index 0f02403..82095cc 100644
+> --- a/drivers/net/phy/fixed.c
+> +++ b/drivers/net/phy/fixed.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/phy_fixed.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>
+>  #define MII_REGS_NUM 29
+>
+> @@ -203,6 +204,66 @@ err_regs:
+>  }
+>  EXPORT_SYMBOL_GPL(fixed_phy_add);
+>
+> +void fixed_phy_del(int phy_addr)
+> +{
+> +       struct fixed_mdio_bus *fmb = &platform_fmb;
+> +       struct fixed_phy *fp, *tmp;
+> +
+> +       list_for_each_entry_safe(fp, tmp, &fmb->phys, node) {
+> +               if (fp->addr == phy_addr) {
+> +                       list_del(&fp->node);
+> +                       kfree(fp);
+> +                       return;
+> +               }
+> +       }
+> +}
+> +EXPORT_SYMBOL_GPL(fixed_phy_del);
+> +
+> +static int phy_fixed_addr;
+> +static DEFINE_SPINLOCK(phy_fixed_addr_lock);
+> +
+> +int fixed_phy_register(unsigned int irq,
+> +                      struct fixed_phy_status *status,
+> +                      struct device_node *np)
+> +{
+> +       struct fixed_mdio_bus *fmb = &platform_fmb;
+> +       struct phy_device *phy;
+> +       int phy_addr;
+> +       int ret;
+> +
+> +       /* Get the next available PHY address, up to PHY_MAX_ADDR */
+> +       spin_lock(&phy_fixed_addr_lock);
+> +       if (phy_fixed_addr == PHY_MAX_ADDR) {
+> +               spin_unlock(&phy_fixed_addr_lock);
+> +               return -ENOSPC;
+> +       }
+> +       phy_addr = phy_fixed_addr++;
+> +       spin_unlock(&phy_fixed_addr_lock);
+> +
+> +       ret = fixed_phy_add(PHY_POLL, phy_addr, status);
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       phy = get_phy_device(fmb->mii_bus, phy_addr, false);
+> +       if (!phy || IS_ERR(phy)) {
+> +               fixed_phy_del(phy_addr);
+> +               return -EINVAL;
+> +       }
+> +
+> +       of_node_get(np);
+> +       phy->dev.of_node = np;
+> +
+> +       ret = phy_device_register(phy);
+> +       if (ret) {
+> +               phy_device_free(phy);
+> +               of_node_put(np);
+> +               fixed_phy_del(phy_addr);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static int __init fixed_mdio_bus_init(void)
+>  {
+>         struct fixed_mdio_bus *fmb = &platform_fmb;
+> diff --git a/include/linux/phy_fixed.h b/include/linux/phy_fixed.h
+> index 509d8f5..902e8a1 100644
+> --- a/include/linux/phy_fixed.h
+> +++ b/include/linux/phy_fixed.h
+> @@ -9,15 +9,26 @@ struct fixed_phy_status {
+>         int asym_pause;
+>  };
+>
+> +struct device_node;
+> +
+>  #ifdef CONFIG_FIXED_PHY
+>  extern int fixed_phy_add(unsigned int irq, int phy_id,
+>                          struct fixed_phy_status *status);
+> +extern int fixed_phy_register(unsigned int irq,
+> +                             struct fixed_phy_status *status,
+> +                             struct device_node *np);
+>  #else
+>  static inline int fixed_phy_add(unsigned int irq, int phy_id,
+>                                 struct fixed_phy_status *status)
+>  {
+>         return -ENODEV;
+>  }
+> +extern int fixed_phy_register(unsigned int irq,
+> +                             struct fixed_phy_status *status,
+> +                             struct device_node *np)
+> +{
+> +       return -ENODEV;
+> +}
+
+s/extern/static/ otherwise I doubt this builds correctly.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Florian
