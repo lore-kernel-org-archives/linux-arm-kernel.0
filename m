@@ -1,47 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Mar 2014 10:47:51 -0800
-Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
-In-Reply-To: <53144CBC.2050607@ti.com>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
- <20140228225627.GU13624@atomide.com> <53144CBC.2050607@ti.com>
-Message-ID: <20140304184750.GB8771@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  4 Mar 2014 10:48:50 -0800
+Subject: [PATCH 0/2] pm8921 driver cleanup
+Message-ID: <1393958932-3585-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [140303 01:38]:
-> Hi Tony,
-> 
-> On 03/01/2014 12:56 AM, Tony Lindgren wrote:
-> > * Roger Quadros <rogerq@ti.com> [140227 06:21]:
-> >> Hi,
-> >>
-> >> This patchset brings up USB Host ports and Ethernet port on
-> >> the OMAP5 uEVM board.
-> >>
-> >> It also does some cleanup with respect to DT clock binding
-> >> for the mfd/omap-usb-host driver.
-> >>
-> >> Please queue these for -next.
-> >>
-> >> Lee,
-> >>
-> >> I've folded some platform data dependent patches with mfd patches
-> >> so that they don't break functionality when applied individually.
-> >> You can safely pull in all MFD patches (1 to 6).
-> >>
-> >> Tony & Benoit,
-> >>
-> >> Can you please accept patches 7, 8 and 9?
-> > 
-> > Are 7, 8 and 9 safe to queue separately from the MFD changes
-> > or do they need to wait for the MFD changes to get merged
-> > first?
-> > 
-> 
-> They are safe to queue separately.
+Two small cleanup patches for the pm8921 core driver.
 
-OK thanks applying 7, 8 and 9 into omap-for-v3.15/dt.
+Stephen Boyd (2):
+  mfd: pm8921: Drop irq_set_lockdep_class() code
+  mfd: pm8921: Use IRQCHIP_SKIP_SET_WAKE
 
-Regards,
+ drivers/mfd/pm8921-core.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-Tony
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
