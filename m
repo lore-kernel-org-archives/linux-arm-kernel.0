@@ -1,30 +1,50 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 04 Mar 2014 10:08:56 +0100
-Subject: [PATCH v2] CNS3xxx: Fix PCIe early iotable_init().
-In-Reply-To: <m3r46io1nd.fsf@t19.piap.pl> ("Krzysztof =?utf-8?Q?Ha=C5=82as?=
- =?utf-8?Q?a=22's?= message of "Tue, 04 Mar 2014 08:37:10 +0100")
-References: <m3eh2nqz7n.fsf@t19.piap.pl> <m3r46io1nd.fsf@t19.piap.pl>
-Message-ID: <m3eh2inxef.fsf@t19.piap.pl>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 04 Mar 2014 13:12:39 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzVdIGRyaXZlcnM6IGJ1czogb21hcF9sMzogQ29udmVy?=
+ =?UTF-8?B?dCB0byB1c2UgZGV2bV9yZXF1ZXN0X2FuZF9pb3JlbWFwKCk=?=
+In-Reply-To: <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
+ <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1393924359.866301359@f148.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-khalasa at piap.pl (Krzysztof Ha?asa) writes:
+???????,  4 ????? 2014, 11:01 +02:00 ?? Peter Ujfalusi <peter.ujfalusi@ti.com>:
+> We can then remove the iounmap() calls from probe and remove.
+> Since the driver requests the resources via index we can do the mem resource
+> request within a for loop.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
+> ---
 
-> This patch fixes the following BUG:
->
->> kernel BUG at mm/vmalloc.c:1132!
->> PC is at vm_area_add_early+0x20/0x84
->> LR is at add_static_vm_early+0xc/0x60
->>
->> The problem is cns3xxx_pcie_init() (device_initcall) calls the "early"
->> iotable_init().
+> +	/* Get mem resources */
+> +	for (i = 0; i < 3; i++) {
+> +		struct resource	*res = platform_get_resource(pdev,
+> +							     IORESOURCE_MEM, i);
+> +		if (!res) {
+> +			dev_err(&pdev->dev, "couldn't find resource %d\n", i);
+> +			return -ENODEV;
+> +		}
 
-That's obviously:
+No need to check "res". devm_request_and_ioremap() do all for us.
 
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+> -	l3->l3_base[2] = ioremap(res->start, resource_size(res));
+> -	if (!l3->l3_base[2]) {
+> -		dev_err(&pdev->dev, "ioremap failed\n");
+> -		ret = -ENOMEM;
+> -		goto err2;
+> +		l3->l3_base[i] = devm_request_and_ioremap(&pdev->dev, res);
+> +		if (!l3->l3_base[i]) {
 
--- 
-Krzysztof Halasa
+if (IS_ERR(l3->l3_base[i]))
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+> +			dev_err(&pdev->dev, "ioremap %d failed\n", i);
+
+Unnecessary.
+
+> +			return -ENOMEM;
+
+return PTR_ERR(l3->l3_base[i]);
+
+---
