@@ -1,47 +1,30 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Mar 2014 11:08:30 +0200
-Subject: [PATCH v2 5/5] drivers: bus: omap_l3: Change pr_crit() to dev_err()
- when IRQ request fails
-In-Reply-To: <1393924110-11132-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1393924110-11132-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1393924110-11132-6-git-send-email-peter.ujfalusi@ti.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 04 Mar 2014 10:08:56 +0100
+Subject: [PATCH v2] CNS3xxx: Fix PCIe early iotable_init().
+In-Reply-To: <m3r46io1nd.fsf@t19.piap.pl> ("Krzysztof =?utf-8?Q?Ha=C5=82as?=
+ =?utf-8?Q?a=22's?= message of "Tue, 04 Mar 2014 08:37:10 +0100")
+References: <m3eh2nqz7n.fsf@t19.piap.pl> <m3r46io1nd.fsf@t19.piap.pl>
+Message-ID: <m3eh2inxef.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_err() which will going to print the driver's name as well and the
-KERN_ERR level is sufficient in this case (we also print via dev_err when
-there is an error with the mem resources)
+khalasa at piap.pl (Krzysztof Ha?asa) writes:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/bus/omap_l3_noc.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+> This patch fixes the following BUG:
+>
+>> kernel BUG at mm/vmalloc.c:1132!
+>> PC is at vm_area_add_early+0x20/0x84
+>> LR is at add_static_vm_early+0xc/0x60
+>>
+>> The problem is cns3xxx_pcie_init() (device_initcall) calls the "early"
+>> iotable_init().
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index ed428ada44f7..3a36e3ebcb57 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -162,8 +162,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-dbg-irq", l3);
- 	if (ret) {
--		pr_crit("L3: request_irq failed to register for 0x%x\n",
--						l3->debug_irq);
-+		dev_err(&pdev->dev, "request_irq failed for %d\n",
-+			l3->debug_irq);
- 		return ret;
- 	}
- 
-@@ -171,8 +171,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-app-irq", l3);
- 	if (ret)
--		pr_crit("L3: request_irq failed to register for 0x%x\n",
--						l3->app_irq);
-+		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
- 
- 	return ret;
- }
+That's obviously:
+
+Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+
 -- 
-1.9.0
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
