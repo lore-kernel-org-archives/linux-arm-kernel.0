@@ -1,89 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  4 Mar 2014 09:10:04 +0800
-Subject: [PATCH] arm64: enable generic CPU feature modalias matching for this
- architecture
-Message-ID: <1393895404-14776-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Mar 2014 02:12:54 +0100
+Subject: [GIT PULL] ux500 devicetree cleanups for v3.15, take two
+Message-ID: <CACRpkdb4SgZgbgQ6m31LWmqTT7nskaR8yV4OXO9RmvgXhVZPCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables support for the generic CPU feature modalias implementation that
-wires up optional CPU features to udev based module autoprobing.
+Hi ARM SoC folks,
 
-A file <asm/cpufeature.h> is provided that maps CPU feature numbers to
-elf_hwcap bits, which is the standard way on arm64 to advertise optional CPU
-features both internally and to user space.
+this is a set of cleanups building upon the already submitted cleanups
+queued on the ux500/dt branch in the ARM SoC tree.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-The generic part of this code was pulled by Greg-KH into driver-core and has
-been sitting in -next for about 2 weeks, so it is expected to be merged in 3.15.
+This kills of another three boardfile things with just constants so it's a
+real nice step forward to finalizing ux500 as a DT-only platform.
 
-http://git.kernel.org/cgit/linux/kernel/git/gregkh/driver-core.git/commit/?h=driver-core-next&id=67bad2fdb754
+Remaining cleanups are a few hardcoded DMA definitions related to
+DMA (that I won't do until I can really test the result) and some MMC
+stuff that first need proper DT support in the MMC subsystem.
 
-This is a soft prerequisite for the crypto patches that enable v8 Crypto
-Extensions in the kernel, as it allows those modules to be loaded automatically
-based on the presence of the extensions.
+This contains a u300 patch as well, as it is closely related to the same
+ux500 patch and I do not plan to send any separate u300 pull request
+for this kernel cycle.
 
-The modalias advertised by the CPU looks something like
+So please pull this in!
 
-  cpu:type:aarch64:features:,0001,0002,0003
-
-The modalias match entry in, e.g., the AES module would look like
-
-  cpu:type:*:features:*0003*
+Yours,
+Linus Walleij
 
 
- arch/arm64/Kconfig                  |  1 +
- arch/arm64/include/asm/cpufeature.h | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm64/include/asm/cpufeature.h
+The following changes since commit 77ad9dfc2c7e3b5ce49efc5c0c215f7c36c91cf2:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc7202a..3d27a1c4e4ad 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -16,6 +16,7 @@ config ARM64
- 	select DCACHE_WORD_ACCESS
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-new file mode 100644
-index 000000000000..019e4fe24d56
---- /dev/null
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_CPUFEATURE_H
-+#define __ASM_CPUFEATURE_H
-+
-+#include <asm/hwcap.h>
-+
-+/*
-+ * In the arm64 world (as in the ARM world), elf_hwcap is used both internally
-+ * in the kernel and for user space to keep track of which optional features
-+ * are supported by the current system. So let's map feature 'x' to HWCAP_x.
-+ * Note that HWCAP_x constants are bit fields so we need to take the log.
-+ */
-+
-+#define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
-+#define cpu_feature(x)		ilog2(HWCAP_ ## x)
-+
-+static inline bool cpu_have_feature(unsigned int num)
-+{
-+	return !!(elf_hwcap & (1UL << num));
-+}
-+
-+#endif
--- 
-1.8.3.2
+  ARM: ux500: move last AB8505 set-up to DT (2014-02-04 20:50:55 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dt-v3.15-2
+
+for you to fetch changes up to f864c46aae4cb6aed09e98615c427fcc4f1de104:
+
+  mfd: dbx500/abx500: root out hardcoded IRQ assignments (2014-03-04
+08:58:11 +0800)
+
+----------------------------------------------------------------
+A set of device tree-related cleanups for the ux500 platform:
+
+- Rename SSP/SPI clocks to the name found in the hardware
+  reference manual. (Also includes a rename in the U300
+  device tree file.)
+
+- Delete dead non-DT code.
+
+- Drop now completely unused GPIO definition header file.
+
+- Delete all hardcoded IRQ number assignments. This hits
+  MFD a bit so the patch has been ACKed by Lee Jones from
+  the MFD side.
+
+----------------------------------------------------------------
+Linus Walleij (6):
+      ARM: ux500: switch SSP/SPI clock name to "SSPCLK"
+      ARM: u300: switch SSP/SPI clock name to "SSPCLK"
+      ARM: ux500: delete pointless DT config option
+      ARM: ux500: skip GIC CPU and dist address checks
+      ARM: ux500: drop a chunk of GPIO definitions
+      mfd: dbx500/abx500: root out hardcoded IRQ assignments
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi        |  12 +--
+ arch/arm/boot/dts/ste-u300.dts           |   2 +-
+ arch/arm/mach-ux500/Kconfig              |   5 --
+ arch/arm/mach-ux500/board-mop500-audio.c |   1 -
+ arch/arm/mach-ux500/board-mop500.h       |  69 -----------------
+ arch/arm/mach-ux500/cpu-db8500.c         |   7 --
+ arch/arm/mach-ux500/cpu.c                |  10 ---
+ arch/arm/mach-ux500/irqs-board-mop500.h  |  55 --------------
+ arch/arm/mach-ux500/irqs-db8500.h        | 125 -------------------------------
+ arch/arm/mach-ux500/irqs.h               |  49 ------------
+ drivers/mfd/ab8500-core.c                |  27 +++----
+ drivers/mfd/db8500-prcmu.c               |  34 ++++++---
+ include/linux/mfd/abx500/ab8500.h        |   2 -
+ include/linux/mfd/dbx500-prcmu.h         |   2 -
+ 14 files changed, 43 insertions(+), 357 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/irqs-board-mop500.h
+ delete mode 100644 arch/arm/mach-ux500/irqs-db8500.h
+ delete mode 100644 arch/arm/mach-ux500/irqs.h
