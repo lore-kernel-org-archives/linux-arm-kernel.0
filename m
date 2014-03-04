@@ -1,72 +1,124 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Tue,  4 Mar 2014 21:20:13 +0100
-Subject: [PATCH] [RESEND] ARM: footbridge: remove obsolete IRQF_DISABLED
-In-Reply-To: <1386395865-11910-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1386395865-11910-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <1393964413-16829-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 04 Mar 2014 12:23:11 -0800
+Subject: [RFC PATCH] Remove CONFIG_DCACHE_WORD_ACCESS
+Message-ID: <1393964591.20435.58.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the IRQF_DISABLED flag from footbridge
-code. It's a NOOP since 2.6.35.
+It seems to duplicate CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+so use that instead.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+This changes the !CPU_LITTLE_ENDIAN powerpc arch to use unaligned
+accesses in fs/dcache.c and fs/namei.c as
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is enabled for that arch.
+
+Remove the now unused DCACHE_WORD_ACCESS defines & uses.
+
+Signed-off-by: Joe Perches <joe@perches.com>
 ---
- arch/arm/mach-footbridge/dc21285-timer.c |  2 +-
- arch/arm/mach-footbridge/dc21285.c       | 10 +++++-----
- arch/arm/mach-footbridge/isa-timer.c     |  2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig                      | 1 -
+ arch/arm/include/asm/word-at-a-time.h | 4 ++--
+ arch/arm64/Kconfig                    | 1 -
+ arch/x86/Kconfig                      | 1 -
+ fs/Kconfig                            | 4 ----
+ fs/dcache.c                           | 2 +-
+ fs/namei.c                            | 2 +-
+ 7 files changed, 4 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
-index 3971104d32d4..952508f58ffb 100644
---- a/arch/arm/mach-footbridge/dc21285-timer.c
-+++ b/arch/arm/mach-footbridge/dc21285-timer.c
-@@ -105,7 +105,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
- static struct irqaction footbridge_timer_irq = {
- 	.name		= "dc21285_timer1",
- 	.handler	= timer1_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &ckevt_dc21285,
- };
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 623a272..d5a2e60 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -12,7 +12,6 @@ config ARM
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+-	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_IDLE_POLL_SETUP
+diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+index a6d0a29..778b2ad 100644
+--- a/arch/arm/include/asm/word-at-a-time.h
++++ b/arch/arm/include/asm/word-at-a-time.h
+@@ -54,7 +54,7 @@ static inline unsigned long find_zero(unsigned long mask)
+ #include <asm-generic/word-at-a-time.h>
+ #endif
  
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 7c2fdae9a38b..96a3d73ef4bf 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -334,15 +334,15 @@ void __init dc21285_preinit(void)
- 	/*
- 	 * We don't care if these fail.
- 	 */
--	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, 0,
- 			    "PCI system error", &serr_timer);
--	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, 0,
- 			    "PCI parity error", &perr_timer);
--	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, 0,
- 			    "PCI abort", NULL);
--	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, 0,
- 			    "Discard timer", NULL);
--	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, IRQF_DISABLED,
-+	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, 0,
- 			    "PCI data parity", NULL);
+-#ifdef CONFIG_DCACHE_WORD_ACCESS
++#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
  
- 	if (cfn_mode) {
-diff --git a/arch/arm/mach-footbridge/isa-timer.c b/arch/arm/mach-footbridge/isa-timer.c
-index d9301dd56354..b73f52e196b9 100644
---- a/arch/arm/mach-footbridge/isa-timer.c
-+++ b/arch/arm/mach-footbridge/isa-timer.c
-@@ -27,7 +27,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
- static struct irqaction pit_timer_irq = {
- 	.name		= "pit",
- 	.handler	= pit_timer_interrupt,
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.dev_id		= &i8253_clockevent,
- };
+ /*
+  * Load an unaligned word from kernel space.
+@@ -94,5 +94,5 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
+ 	return ret;
+ }
  
--- 
-1.8.3.2
+-#endif	/* DCACHE_WORD_ACCESS */
++#endif	/* HAVE_EFFICIENT_UNALIGNED_ACCESS */
+ #endif /* __ASM_ARM_WORD_AT_A_TIME_H */
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 764d682..2d6978c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -13,7 +13,6 @@ config ARM64
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+-	select DCACHE_WORD_ACCESS
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_IOMAP
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index abb261e..60cfa073 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -98,7 +98,6 @@ config X86
+ 	select CLKEVT_I8253
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select GENERIC_IOMAP
+-	select DCACHE_WORD_ACCESS
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select ARCH_WANT_IPC_PARSE_VERSION if X86_32
+ 	select HAVE_ARCH_SECCOMP_FILTER
+diff --git a/fs/Kconfig b/fs/Kconfig
+index 312393f..7511271 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -4,10 +4,6 @@
+ 
+ menu "File systems"
+ 
+-# Use unaligned word dcache accesses
+-config DCACHE_WORD_ACCESS
+-       bool
+-
+ if BLOCK
+ 
+ source "fs/ext2/Kconfig"
+diff --git a/fs/dcache.c b/fs/dcache.c
+index 265e0ce..4e3c195 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -163,7 +163,7 @@ int proc_nr_dentry(ctl_table *table, int write, void __user *buffer,
+  * Compare 2 name strings, return 0 if they match, otherwise non-zero.
+  * The strings are both count bytes long, and count is non-zero.
+  */
+-#ifdef CONFIG_DCACHE_WORD_ACCESS
++#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 
+ #include <asm/word-at-a-time.h>
+ /*
+diff --git a/fs/namei.c b/fs/namei.c
+index 385f781..1ee33ca 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -1618,7 +1618,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
+  *   the final mask". Again, that could be replaced with a
+  *   efficient population count instruction or similar.
+  */
+-#ifdef CONFIG_DCACHE_WORD_ACCESS
++#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 
+ #include <asm/word-at-a-time.h>
+ 
