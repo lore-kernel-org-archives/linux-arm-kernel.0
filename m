@@ -1,58 +1,155 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 4 Mar 2014 11:17:46 +0000
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <5315a319.a3b2440a.039b.ffffc66e@mx.google.com>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
- <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
- <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
- <20140228201557.29118.62126@capellas-linux>
- <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
- <53111e0f.a50a430a.6ef6.ffff99ae@mx.google.com>
- <5315a319.a3b2440a.039b.ffffc66e@mx.google.com>
-Message-ID: <20140304111745.GB21431@e102568-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Mar 2014 12:30:38 +0100
+Subject: [PATCHv3 4/4] net: mvneta: add support for fixed links
+In-Reply-To: <1393930704-24374-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1393930704-24374-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140304123038.652f933d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 09:55:31AM +0000, Sebastian Capella wrote:
-> Quoting Sebastian Capella (2014-02-28 15:38:54)
-> > Quoting Lorenzo Pieralisi (2014-02-28 14:49:33)
-> > > On Fri, Feb 28, 2014 at 08:15:57PM +0000, Sebastian Capella wrote:
-> > > > > 
-> > > > > This does not guarantee your stack is 8-byte aligned, that's not AAPCS
-> > > > > compliant and might buy you trouble.
-> > > > > 
-> > > > > Either you align the stack or you align the pointer you are passing.
-> > > > > 
-> > > > > Please have a look at kernel/process.c
-> > > > 
-> > > > I've added this for now, do you see any issues?
-> > > > 
-> > > > -static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
-> > > > +static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
-> > > > -               resume_stack + sizeof(resume_stack));
-> > > > +               resume_stack + ARRAY_SIZE(resume_stack));
-> > > 
-> > > I do not see why the stack depends on the PAGE_SIZE. I would be surprised
-> > > if you need more than a few bytes (given that soft_restart switches stack
-> > > again...), go through it with a debugger, it is easy to check the stack
-> > > usage and allow for some extra buffer (but half a page is not needed).
-> > 
-> > I assuming this is becase the no-save region is one page anyway (we skip
-> > restoring the no-save region physical page).  So maybe 1/2 is a way to
-> > leave some room for whatever else may need to be here, but in any case
-> > the 4k is used for nosave.  I think you're right that it can be much less.
-> 
-> Hi Lorenzo,
-> 
-> Are you ok with this just being half a page?  Or do you want me to try
-> to reduce the stack size?  I am at Connect without my debugger, so in
-> that case it would have to wait until next week.
+Hello all,
 
-I am ok, either you leave that as it is (that multiple division looks
-horrible but it is just nitpicking on my side) or define it as an u8 array,
-stick __attribute__((aligned(8)) to the definition (and explain why) and be
-done with it.
+On Tue,  4 Mar 2014 11:58:24 +0100, Thomas Petazzoni wrote:
 
-You can add my:
+>  	phy_node = of_parse_phandle(dn, "phy", 0);
+> -	if (!phy_node) {
+> -		dev_err(&pdev->dev, "no associated PHY\n");
+> -		err = -ENODEV;
+> -		goto err_free_irq;
+> +	if (of_phy_is_fixed_link(phy_node)) {
+> +		err = of_phy_register_fixed_link(phy_node);
+> +		if (err < 0) {
+> +			dev_err(&pdev->dev, "cannot register fixed PHY\n");
+> +			goto err_free_irq;
+> +		}
+>  	}
+>  
+>  	phy_mode = of_get_phy_mode(dn);
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+As noted by Sebastian Hesselbarth (talking with me on IRC), it would be
+nicer if network driver didn't had to be modified to ensure that the
+fixed PHY the network device is connected to gets registered into the
+kernel.
+
+So ideally, the fixed MDIO bus implemented in drivers/net/phy/fixed.c
+should scan the Device Tree, and register at boot time the fixed PHYs.
+The only problem is how to recognize in the DT which nodes are fixed
+PHYs. Looking for the "fixed-link" property is very fragile as other
+completely unrelated nodes may use this property for other purposes.
+Using a compatible string? A device_type property? Or should we have a
+fragment of the DT for the fixed MDIO bus itself?
+
+I've done a quick prototype that is based on using the "fixed-eth-phy"
+compatible string as the key to find fixed PHYs in the DT, just to see
+how it would work. It works well, and allows to get rid of changes in
+the network driver completely. See below for the prototype-level patch
+(which applies on top of the proposed patch series, for now).
+
+Suggestions?
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 053a650..8a68a07 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2805,14 +2805,6 @@ static int mvneta_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	phy_node = of_parse_phandle(dn, "phy", 0);
+-	if (of_phy_is_fixed_link(phy_node)) {
+-		err = of_phy_register_fixed_link(phy_node);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "cannot register fixed PHY\n");
+-			goto err_free_irq;
+-		}
+-	}
+-
+ 	phy_mode = of_get_phy_mode(dn);
+ 	if (phy_mode < 0) {
+ 		dev_err(&pdev->dev, "incorrect phy-mode\n");
+diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+index 82095cc..45a7d5a 100644
+--- a/drivers/net/phy/fixed.c
++++ b/drivers/net/phy/fixed.c
+@@ -22,6 +22,7 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
++#include <linux/of_mdio.h>
+ 
+ #define MII_REGS_NUM 29
+ 
+@@ -293,6 +294,8 @@ static int __init fixed_mdio_bus_init(void)
+ 	if (ret)
+ 		goto err_mdiobus_alloc;
+ 
++	of_phy_register_fixed_phys();
++
+ 	return 0;
+ 
+ err_mdiobus_alloc:
+diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+index c645fb8..4e75a70 100644
+--- a/drivers/of/of_mdio.c
++++ b/drivers/of/of_mdio.c
+@@ -277,16 +277,12 @@ struct phy_device *of_phy_attach(struct net_device *dev,
+ EXPORT_SYMBOL(of_phy_attach);
+ 
+ #if defined(CONFIG_FIXED_PHY)
+-bool of_phy_is_fixed_link(struct device_node *np)
+-{
+-	return of_property_read_bool(np, "fixed-link");
+-}
+-EXPORT_SYMBOL(of_phy_is_fixed_link);
+-
+-int of_phy_register_fixed_link(struct device_node *np)
++static int of_phy_register_fixed_link(struct device_node *np)
+ {
+ 	struct fixed_phy_status status = {};
+ 
+ 	status.link = 1;
+ 	status.duplex = of_property_read_bool(np, "full-duplex");
+ 	if (of_property_read_u32(np, "speed", &status.speed))
+@@ -296,5 +292,14 @@ int of_phy_register_fixed_link(struct device_node *np)
+ 
+ 	return fixed_phy_register(PHY_POLL, &status, np);
+ }
+-EXPORT_SYMBOL(of_phy_register_fixed_link);
++
++void of_phy_register_fixed_phys(void)
++{
++	struct device_node *np;
++
++	for_each_compatible_node(np, NULL, "fixed-eth-phy") {
++		of_phy_register_fixed_link(np);
++	}
++}
++
+ #endif
+diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
+index 77a6e32..c8d080b 100644
+--- a/include/linux/of_mdio.h
++++ b/include/linux/of_mdio.h
+@@ -68,17 +68,9 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
+ #endif /* CONFIG_OF */
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
+-extern int of_phy_register_fixed_link(struct device_node *np);
+-extern bool of_phy_is_fixed_link(struct device_node *np);
++extern void of_phy_register_fixed_phys(void);
+ #else
+-static inline int of_phy_register_fixed_link(struct device_node *np)
+-{
+-	return -ENOSYS;
+-}
+-static inline bool of_phy_is_fixed_link(struct device_node *np)
+-{
+-	return false;
+-}
++static inline void of_phy_register_fixed_phys(void) {};
+ #endif
+ 
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
