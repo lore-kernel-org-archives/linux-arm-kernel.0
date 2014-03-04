@@ -1,42 +1,56 @@
-From: graeme@xora.org.uk (Graeme Gregory)
-Date: Wed, 5 Mar 2014 03:03:18 +0800
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <20140304102316.GG30596@arm.com>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
- <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
- <20140304102316.GG30596@arm.com>
-Message-ID: <20140304190318.GE28736@xora-yoga13>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Mar 2014 20:04:24 +0100
+Subject: [PATCHv3 1/4] net: phy: decouple PHY id and PHY address in
+ fixed PHY driver
+In-Reply-To: <CAGVrzcYF0g-vDpkP_fnqb13faPtOOSy_Pqfo-Pgti0S26-1nSg@mail.gmail.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1393930704-24374-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAGVrzcYF0g-vDpkP_fnqb13faPtOOSy_Pqfo-Pgti0S26-1nSg@mail.gmail.com>
+Message-ID: <20140304200424.66a6171f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 10:23:16AM +0000, Catalin Marinas wrote:
-> On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
-> > +ACPI ARM64
-> 
-> That's a pretty broad statement for a single file. Is it core support,
-> architected peripherals, SoC?
-> 
-Hi Catalin would changing the title to ACPI ARM64 Core Support be better
-in your mind. I do intend for the maintainership to cover just the
-plat/arm-core.c file.
+Dear Florian Fainelli,
 
-Graeme
+On Tue, 4 Mar 2014 10:43:12 -0800, Florian Fainelli wrote:
 
-> > +M:	Hanjun Guo <hanjun.guo@linaro.org>
-> > +M:	Graeme Gregory <graeme.gregory@linaro.org>
-> > +S:	Supported
-> > +L:	linux-acpi at vger.kernel.org
-> > +F:	drivers/acpi/plat/arm-core.c
+> >  struct fixed_phy {
+> > -       int id;
+> > +       int addr;
+> >         u16 regs[MII_REGS_NUM];
+> >         struct phy_device *phydev;
+> >         struct fixed_phy_status status;
+> > @@ -104,8 +104,8 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
+> >         if (fp->status.asym_pause)
+> >                 lpa |= LPA_PAUSE_ASYM;
+> >
+> > -       fp->regs[MII_PHYSID1] = fp->id >> 16;
+> > -       fp->regs[MII_PHYSID2] = fp->id;
+> > +       fp->regs[MII_PHYSID1] = 0xdead;
+> > +       fp->regs[MII_PHYSID2] = 0xbeef;
 > 
-> This patch should be part of the series introducing the arm-core.c file
-> and it will be ACKed (or NAKed) following review. We can't really commit
-> maintainers to a file which does not exist in mainline and while there is
-> still feedback to be addressed. It's like a blank cheque.
+> I am still scratching my head as to whether we want that change to be
+> in this particular version of changes, or if we want that to happen at
+> a later time when (if?) we can finally get some proper OUI number
+> allocation.
 > 
-> -- 
-> Catalin
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Technically we are presenting some sort of ABI to user-space, although
+> detecting a fixed PHY device by reading its MII_PHYSID1/2 and matching
+> it against its PHY address on the fixed MDIO bus would have been a
+> little "weak" (especially when you can check that the parent device in
+> sysfs is the fixed-0 bus).
+
+Well the problem is that fp->id really isn't an id, it's the fake
+address of the PHY on the fake fixed MDIO bus. So it would mean that
+the MII_PHYSID of the first fixed PHY would probably be 0x0, then the
+second would have 0x1, then 0x2, and so on.
+
+Probably not worse than what is done today, though.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
