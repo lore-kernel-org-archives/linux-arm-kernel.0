@@ -1,33 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Mar 2014 20:02:15 +0100
-Subject: [PATCH 4/4] ARM: mvebu: the Armada XP Matrix board has 4 GB
-In-Reply-To: <20140304185512.GQ1872@titan.lakedaemon.net>
-References: <1393951022-18114-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1393951022-18114-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140304185512.GQ1872@titan.lakedaemon.net>
-Message-ID: <20140304200215.71cf4c13@skate>
+From: graeme@xora.org.uk (Graeme Gregory)
+Date: Wed, 5 Mar 2014 03:03:18 +0800
+Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
+In-Reply-To: <20140304102316.GG30596@arm.com>
+References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
+ <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
+ <20140304102316.GG30596@arm.com>
+Message-ID: <20140304190318.GE28736@xora-yoga13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Tue, 4 Mar 2014 13:55:12 -0500, Jason Cooper wrote:
-> On Tue, Mar 04, 2014 at 05:37:02PM +0100, Thomas Petazzoni wrote:
-> > Since the Armada XP Matrix board has 4 GB of RAM and not 2 GB, we
-> > update the Device Tree to take into account the correct amount of
-> > memory. As noted in the new comment, the last 256 MB of RAM are in
-> > fact not usable, due to the overlap with the MBus Window address
-> > range.
+On Tue, Mar 04, 2014 at 10:23:16AM +0000, Catalin Marinas wrote:
+> On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
+> > +ACPI ARM64
 > 
-> usually the bootloader (DT) or atags_to_fdt overwrites this.  Is there a
-> scenario when that doesn't happen?
+> That's a pretty broad statement for a single file. Is it core support,
+> architected peripherals, SoC?
+> 
+Hi Catalin would changing the title to ACPI ARM64 Core Support be better
+in your mind. I do intend for the maintainership to cover just the
+plat/arm-core.c file.
 
-ATAGs booting with CONFIG_ARM_ATAG_DTB_COMPAT disabled. Though mainly
-the intent here is that if the amount of memory is mentioned in the DT,
-it's nicer when it's actually correct :-)
+Graeme
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> > +M:	Hanjun Guo <hanjun.guo@linaro.org>
+> > +M:	Graeme Gregory <graeme.gregory@linaro.org>
+> > +S:	Supported
+> > +L:	linux-acpi at vger.kernel.org
+> > +F:	drivers/acpi/plat/arm-core.c
+> 
+> This patch should be part of the series introducing the arm-core.c file
+> and it will be ACKed (or NAKed) following review. We can't really commit
+> maintainers to a file which does not exist in mainline and while there is
+> still feedback to be addressed. It's like a blank cheque.
+> 
+> -- 
+> Catalin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
