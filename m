@@ -1,60 +1,28 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Mar 2014 12:50:34 +0200
-Subject: [PATCH 2/5] drivers: bus: omap_l3: Convert to use
- devm_request_and_ioremap()
-In-Reply-To: <1393924359.866301359@f148.i.mail.ru>
-References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
- <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
- <1393924359.866301359@f148.i.mail.ru>
-Message-ID: <5315AFFA.40101@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Mar 2014 18:52:27 +0800
+Subject: [PATCH v2] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140304102806.GH30596@arm.com>
+References: <1393919477-27814-1-git-send-email-broonie@kernel.org>
+ <20140304095534.GE30596@arm.com>
+ <20140304101641.GK13126@sirena.org.uk>
+ <20140304102806.GH30596@arm.com>
+Message-ID: <20140304105227.GM13126@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 11:12 AM, Alexander Shiyan wrote:
-> ???????,  4 ????? 2014, 11:01 +02:00 ?? Peter Ujfalusi <peter.ujfalusi@ti.com>:
->> We can then remove the iounmap() calls from probe and remove.
->> Since the driver requests the resources via index we can do the mem resource
->> request within a for loop.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
->> ---
-> 
->> +	/* Get mem resources */
->> +	for (i = 0; i < 3; i++) {
->> +		struct resource	*res = platform_get_resource(pdev,
->> +							     IORESOURCE_MEM, i);
->> +		if (!res) {
->> +			dev_err(&pdev->dev, "couldn't find resource %d\n", i);
->> +			return -ENODEV;
->> +		}
-> 
-> No need to check "res". devm_request_and_ioremap() do all for us.
-> 
->> -	l3->l3_base[2] = ioremap(res->start, resource_size(res));
->> -	if (!l3->l3_base[2]) {
->> -		dev_err(&pdev->dev, "ioremap failed\n");
->> -		ret = -ENOMEM;
->> -		goto err2;
->> +		l3->l3_base[i] = devm_request_and_ioremap(&pdev->dev, res);
->> +		if (!l3->l3_base[i]) {
-> 
-> if (IS_ERR(l3->l3_base[i]))
-> 
->> +			dev_err(&pdev->dev, "ioremap %d failed\n", i);
-> 
-> Unnecessary.
+On Tue, Mar 04, 2014 at 10:28:06AM +0000, Catalin Marinas wrote:
 
-I'm going to keep this since it tells which resource of the three has failed.
+> > I'm totally fine with that, I only made it selectable due to the 32 bit
+> > code doing that - I'm not sure we even need the separate symbol.
+> > Whatever you prefer.
 
-> 
->> +			return -ENOMEM;
-> 
-> return PTR_ERR(l3->l3_base[i]);
-> 
-> ---
-> 
+> Like that?
 
-
--- 
-P?ter
+Looks good to me!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140304/b01453f2/attachment-0001.sig>
