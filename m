@@ -1,201 +1,82 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 18:19:07 +0200
-Subject: [PATCH 07/18] ARM: OMAP2/3: CM: remove direct register access macros
- from common header
+Date: Tue, 4 Mar 2014 18:19:09 +0200
+Subject: [PATCH 09/18] ARM: OMAP3: PRM: add API for saving PRM scratchpad
+ contents
 In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
 References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393949958-816-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1393949958-816-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Done in preparation to move CM to be a driver of its own. This patch causes
-currently a build breakage which will be addressed in next patches.
+This isolates the PRM register access within the PRM driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm2xxx.c              |    1 +
- arch/arm/mach-omap2/cm2xxx_3xxx.h         |   48 -------------------
- arch/arm/mach-omap2/cm2xxx_3xxx_private.h |   74 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/cm3xxx.c              |    1 +
- arch/arm/mach-omap2/prm3xxx.c             |    2 +-
- 5 files changed, 77 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cm2xxx_3xxx_private.h
+ arch/arm/mach-omap2/control.c |   11 ++---------
+ arch/arm/mach-omap2/prm3xxx.c |    9 +++++++++
+ arch/arm/mach-omap2/prm3xxx.h |    1 +
+ 3 files changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index 8be6ea5..4c29f63 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 4322135..5eb991a 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -44,8 +44,7 @@ struct omap3_scratchpad {
+ };
  
- #include "prm2xxx.h"
- #include "cm.h"
-+#include "cm2xxx_3xxx_private.h"
- #include "cm2xxx.h"
- #include "cm-regbits-24xx.h"
- #include "clockdomain.h"
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-index bfbd16f..b40b5bd 100644
---- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-@@ -48,54 +48,6 @@
+ struct omap3_scratchpad_prcm_block {
+-	u32 prm_clksrc_ctrl;
+-	u32 prm_clksel;
++	u32 prm_contents[2];
+ 	u32 cm_contents[11];
+ 	u32 prcm_block_size;
+ };
+@@ -327,13 +326,7 @@ void omap3_save_scratchpad_contents(void)
+ 	scratchpad_contents.sdrc_block_offset = 0x64;
  
- #ifndef __ASSEMBLER__
+ 	/* Populate the PRCM block contents */
+-	prcm_block_contents.prm_clksrc_ctrl =
+-		omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+-				       OMAP3_PRM_CLKSRC_CTRL_OFFSET);
+-	prcm_block_contents.prm_clksel =
+-		omap2_prm_read_mod_reg(OMAP3430_CCR_MOD,
+-				       OMAP3_PRM_CLKSEL_OFFSET);
+-
++	omap3_prm_save_scratchpad_contents(prcm_block_contents.prm_contents);
+ 	omap3_cm_save_scratchpad_contents(prcm_block_contents.cm_contents);
  
--#include <linux/io.h>
--
--static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
--{
--	return __raw_readl(cm_base + module + idx);
--}
--
--static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
--{
--	__raw_writel(val, cm_base + module + idx);
--}
--
--/* Read-modify-write a register in a CM module. Caller must lock */
--static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
--					    s16 idx)
--{
--	u32 v;
--
--	v = omap2_cm_read_mod_reg(module, idx);
--	v &= ~mask;
--	v |= bits;
--	omap2_cm_write_mod_reg(v, module, idx);
--
--	return v;
--}
--
--/* Read a CM register, AND it, and shift the result down to bit 0 */
--static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
--{
--	u32 v;
--
--	v = omap2_cm_read_mod_reg(domain, idx);
--	v &= mask;
--	v >>= __ffs(mask);
--
--	return v;
--}
--
--static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
--}
--
--static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
--}
--
- extern int omap2xxx_cm_apll54_enable(void);
- extern void omap2xxx_cm_apll54_disable(void);
- extern int omap2xxx_cm_apll96_enable(void);
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx_private.h b/arch/arm/mach-omap2/cm2xxx_3xxx_private.h
-new file mode 100644
-index 0000000..9131829
---- /dev/null
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx_private.h
-@@ -0,0 +1,74 @@
-+/*
-+ * OMAP2/3 Clock Management (CM) register definitions
-+ *
-+ * Copyright (C) 2007-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2010 Nokia Corporation
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * The CM hardware modules on the OMAP2/3 are quite similar to each
-+ * other.  The CM modules/instances on OMAP4 are quite different, so
-+ * they are handled in a separate file.
-+ */
-+#ifndef __ARCH_ARM_MACH_OMAP2_CM2XXX_3XXX_PRIVATE_H
-+#define __ARCH_ARM_MACH_OMAP2_CM2XXX_3XXX_PRIVATE_H
-+
-+#include "cm.h"
-+#include "cm2xxx_3xxx.h"
-+
-+#ifndef __ASSEMBLER__
-+
-+#include <linux/io.h>
-+
-+static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
-+{
-+	return __raw_readl(cm_base + module + idx);
-+}
-+
-+static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
-+{
-+	__raw_writel(val, cm_base + module + idx);
-+}
-+
-+/* Read-modify-write a register in a CM module. Caller must lock */
-+static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
-+					    s16 idx)
-+{
-+	u32 v;
-+
-+	v = omap2_cm_read_mod_reg(module, idx);
-+	v &= ~mask;
-+	v |= bits;
-+	omap2_cm_write_mod_reg(v, module, idx);
-+
-+	return v;
-+}
-+
-+/* Read a CM register, AND it, and shift the result down to bit 0 */
-+static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
-+{
-+	u32 v;
-+
-+	v = omap2_cm_read_mod_reg(domain, idx);
-+	v &= mask;
-+	v >>= __ffs(mask);
-+
-+	return v;
-+}
-+
-+static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
-+}
-+
-+static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
-+}
-+
-+#endif
-+
-+#endif
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 129a4e7..989590e 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -20,6 +20,7 @@
- 
- #include "prm2xxx_3xxx.h"
- #include "cm.h"
-+#include "cm2xxx_3xxx_private.h"
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- #include "clockdomain.h"
+ 	prcm_block_contents.prcm_block_size = 0x0;
 diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 92ab46a..6dfa95c 100644
+index 2a6be73..9ebc22c 100644
 --- a/arch/arm/mach-omap2/prm3xxx.c
 +++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -24,7 +24,7 @@
- #include "powerdomain.h"
- #include "prm3xxx.h"
- #include "prm2xxx_3xxx.h"
--#include "cm2xxx_3xxx.h"
-+#include "cm2xxx_3xxx_private.h"
- #include "prm-regbits-34xx.h"
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
+@@ -408,6 +408,15 @@ int omap3xxx_prm_clear_global_cold_reset(void)
+ 	return 0;
+ }
+ 
++void omap3_prm_save_scratchpad_contents(u32 *ptr)
++{
++	*ptr++ = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
++					OMAP3_PRM_CLKSRC_CTRL_OFFSET);
++
++	*ptr++ = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
++					OMAP3_PRM_CLKSEL_OFFSET);
++}
++
+ /* Powerdomain low-level functions */
+ 
+ static int omap3_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 12ff4a0..829cdc3 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -166,6 +166,7 @@ int omap3xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits);
+ void omap3xxx_prm_iva_idle(void);
+ void omap3_prm_reset_modem(void);
+ int omap3xxx_prm_clear_global_cold_reset(void);
++void omap3_prm_save_scratchpad_contents(u32 *ptr);
+ 
+ #endif /* __ASSEMBLER */
+ 
 -- 
 1.7.9.5
