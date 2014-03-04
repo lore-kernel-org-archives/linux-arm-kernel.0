@@ -1,56 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 4 Mar 2014 22:37:22 +0800
-Subject: [PATCH v3 5/5] drivers: bus: omap_l3: Change pr_crit() to
- dev_err() when IRQ request fails
-In-Reply-To: <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
-References: <1393937293-6036-1-git-send-email-peter.ujfalusi@ti.com>
- <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5315E522.9090606@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 4 Mar 2014 15:41:29 +0100
+Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
+In-Reply-To: <20140304140135.GS21483@n2100.arm.linux.org.uk>
+References: <20140303150215.GI21483@n2100.arm.linux.org.uk>
+ <20140303173740.GC16655@lunn.ch>
+ <20140303181529.GM21483@n2100.arm.linux.org.uk>
+ <20140303222406.GW1872@titan.lakedaemon.net>
+ <20140304092616.GH16655@lunn.ch> <5315AD6F.1070804@gmail.com>
+ <20140304121136.GR21483@n2100.arm.linux.org.uk>
+ <20140304135306.GL1872@titan.lakedaemon.net>
+ <20140304135452.GK16655@lunn.ch>
+ <20140304140135.GS21483@n2100.arm.linux.org.uk>
+Message-ID: <20140304144129.GM16655@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 March 2014 08:48 PM, Peter Ujfalusi wrote:
-> Use dev_err() which will going to print the driver's name as well and the
-> KERN_ERR level is sufficient in this case (we also print via dev_err when
-> there is an error with the mem resources)
+On Tue, Mar 04, 2014 at 02:01:36PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 04, 2014 at 02:54:52PM +0100, Andrew Lunn wrote:
+> > > > So we have cpufreq, pm domains and an irq controller.  What's the plan
+> > > > for this, who's going to look at sorting this out?
+> > > 
+> > > Andrew, Sebastian?  I'm currently task-saturated...
+> > 
+> > I doubt i will be doing anything with it for the remainder of this
+> > cycle. I would like to finish converting kirkwood to DT before
+> > starting on anything new.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  drivers/bus/omap_l3_noc.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> index 0eff48585ae3..972691a668a3 100644
-> --- a/drivers/bus/omap_l3_noc.c
-> +++ b/drivers/bus/omap_l3_noc.c
-> @@ -158,8 +158,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
->  	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
->  			       IRQF_DISABLED, "l3-dbg-irq", l3);
->  	if (ret) {
-> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> -						l3->debug_irq);
-> +		dev_err(&pdev->dev, "request_irq failed for %d\n",
-> +			l3->debug_irq);
->  		return ret;
->  	}
->  
-> @@ -167,8 +167,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
->  	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
->  			       IRQF_DISABLED, "l3-app-irq", l3);
->  	if (ret)
-> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> -						l3->app_irq);
-> +		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
->  
->  	return ret;
->  }
-> 
-So this one change in the log level. If I look at now, may be dev_err
-is fine but the change is not same.
+> Okay, can someone send me the cpufreq code then please?
 
-Apart from above comment, rest of the series looks fine to me.
-Feel free to add my ack...
+Hi Russell
 
-Regards,
-Santosh
+Take a look at:
+
+https://github.com/lunn/linux.git v3.13-rc2-rafael-next-dove-cpufreq
+
+The cpufreq drivers/framework have been going through quite a bit of
+refactoring recently, so maybe some work will be needed on it.
+
+	    Andrew
