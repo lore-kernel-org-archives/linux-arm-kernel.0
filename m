@@ -1,109 +1,200 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 4 Mar 2014 21:56:23 +0100
-Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
- regulators subsystem
-In-Reply-To: <20140303015616.GN2411@sirena.org.uk>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
- <20140303015616.GN2411@sirena.org.uk>
-Message-ID: <CAOQ7t2a2TLcckDn21obOvR6rfvbaM4kDeE_2Kdgj__JC3xAzKg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 4 Mar 2014 12:58:41 -0800
+Subject: [PATCHv3 3/4] of: provide a binding for fixed link PHYs
+In-Reply-To: <1393930704-24374-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1393930704-24374-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAGVrzcbHwxtgUfC4+u_3wszcmEYpz8Y7gu13xJy6TbT6fgR1sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 3, 2014 at 2:56 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
+Hi Thomas,
+
+2014-03-04 2:58 GMT-08:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Some Ethernet MACs have a "fixed link", and are not connected to a
+> normal MDIO-managed PHY device. For those situations, a Device Tree
+> binding allows to describe a "fixed link" using a special PHY node.
 >
->> index d59c826..0cef101 100644
->> --- a/arch/arm/configs/sunxi_defconfig
->> +++ b/arch/arm/configs/sunxi_defconfig
->> @@ -69,3 +69,4 @@ CONFIG_NFS_FS=y
->>  CONFIG_ROOT_NFS=y
->>  CONFIG_NLS=y
->>  CONFIG_PRINTK_TIME=y
->> +CONFIG_REGULATOR_AXP20X=y
+> This patch adds:
 >
-> If you want to update the defconfig do it in a separate patch.
-
-Ok, I'll split the patch.
-
->> +static int axp20x_set_suspend_voltage(struct regulator_dev *rdev, int uV)
->> +{
->> +     return regulator_set_voltage_sel_regmap(rdev, 0);
->> +}
-
-Right. I'll fix it in v2.
-
-> I'm not entirely clear what this is supposed to do but it's broken - it
-> both ignores the voltage that is passed in and immediately writes to the
-> normal voltage select register which will presumably distrupt the system.
+>  * A documentation for the fixed PHY Device Tree binding.
 >
->> +static int axp20x_io_enable_regmap(struct regulator_dev *rdev)
->> +{
->> +     return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
->> +                               rdev->desc->enable_mask, AXP20X_IO_ENABLED);
->> +}
+>  * An of_phy_is_fixed_link() function that an Ethernet driver can call
+>    on its PHY phandle to find out whether it's a fixed link PHY or
+>    not. It should typically be used to know if
+>    of_phy_register_fixed_link() should be called.
 >
-> Please make some helpers for this (or extend the existing ones to cope
-> with more than a single bit control) - there's several other devices
-> which have similar multi-bit controls so we should factor this out
-> rather than open coding.
+>  * An of_phy_register_fixed_link() function that instantiates the
+>    fixed PHY into the PHY subsystem, so that when the driver calls
+>    of_phy_connect(), the PHY device associated to the OF node will be
+>    found.
 
-No prob, I'll submit a patch for the helpers before submitting the v2
-of this patchset
+I have a better understanding of why Grant objected last time, and I
+just found yet another argument which should hopefully be in favor of
+this new binding.
 
->> +     np = of_node_get(pdev->dev.parent->of_node);
->> +     if (!np)
->> +             return 0;
->> +
->> +     regulators = of_find_node_by_name(np, "regulators");
->> +     if (!regulators) {
->> +             dev_err(&pdev->dev, "regulators node not found\n");
->> +             return -EINVAL;
->> +     }
+One of the problems mentioned earlier about the 'fixed-link' 5-digit
+property is that it is inflexible. It turns out that it seems to
+capture everything we need, as nobody needed to extend it with a 6th
+type for instance. This new binding allows for more flexibility and is
+more human readable, which is a net bonus, though not a compelling
+reason (yet).
+
+Another problem with that "old" 'fixed-link' property is that we are
+not properly capturing and representing Ethernet switches/PHYs whose
+data-path are isolated from the control path. For instance such
+devices will traditionally expose their control path as a
+MMIO/GPIO/I2C/SPI interface. Using the 5-digit 'fixed-link' property
+we are not representing this, on one side the Ethernet MAC is just
+told to hardcode the link parameters with some parameters, and on
+other side, any MMIO/GPIO/I2C/SPI device is not equipped with the
+correct properties to express the fact that is also has a data-path
+connected to an Ethernet MAC.
+
+What I like about this new binding is that we could place the
+'fixed-link' related properties in e.g: a SPI slave node, and have the
+Ethernet MAC be pointed at it by a phandle to tell it: look this is
+your PHY, it might not be one you could address on a MDIO bus, so I
+have been providing additional properties to help you with the link
+configuration.
+
+One thing that needs to be addressed in this patch is how to deal with
+the existing 5-digit fixed-link, something that sounds fairly easy and
+which would not require changing the callers of of_phy_connect_fixed()
+is to do the following:
+
+- of_phy_is_fixed_link() needs to look for *all* required compatible
+properties of the new binding to give an accurate verdict on the
+nature of the PHY (to avoid false positives as mentioned in PATCH 4),
+and it also needs to look for the 5-digit fixed-link property and
+ensure the property is 5-digits long if existing
+
+- of_phy_register_fixed_link() needs to also parse the old 5-digit
+fixed-link property, most likely just copy-pasting what
+arch/powerpc/sysdev/fsl_soc.c::of_add_fixed_phys does with the
+property endian-swapping (as this code is for PowerPC)
+
+Then we can deal with how to make that semi-automatic for the new
+binding users to make it smoother to use a regular or "fixed PHY"
+device.
+
 >
-> The driver should be able to start up with no configuration provided at
-> all except for the device being registered - the user won't be able to
-> change anything but they will be able to read the current state of the
-> hardware which can be useful for diagnostics.
-
-seems reasonable
-
->> +static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 workmode)
->> +{
->> +     unsigned int mask = AXP20X_WORKMODE_DCDC2_MASK;
->> +
->> +     if ((id != AXP20X_DCDC2) && (id != AXP20X_DCDC3))
->> +             return -EINVAL;
->> +
->> +     if (id == AXP20X_DCDC3)
->> +             mask = AXP20X_WORKMODE_DCDC3_MASK;
->> +
->> +     return regmap_update_bits(rdev->regmap, AXP20X_DCDC_MODE, mask, workmode);
->> +}
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++++++++++++
+>  drivers/of/of_mdio.c                               | 24 +++++++++++++++
+>  include/linux/of_mdio.h                            | 15 ++++++++++
+>  3 files changed, 73 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
 >
-> What is a workmode?
-
-It defines if the output from DCDC2 or DCDC3 (that can be used as PWM chargers).
-I'll document it better in the bindings documentation.
-
->> +             pmic->rdev[i] = regulator_register(&pmic->rdesc[i], &config);
->> +             if (IS_ERR(pmic->rdev[i])) {
+> diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
+> new file mode 100644
+> index 0000000..9f2a1a50
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
+> @@ -0,0 +1,34 @@
+> +Fixed link Device Tree binding
+> +------------------------------
+> +
+> +Some Ethernet MACs have a "fixed link", and are not connected to a
+> +normal MDIO-managed PHY device. For those situations, a Device Tree
+> +binding allows to describe a "fixed link".
+> +
+> +Such a fixed link situation is described by creating a PHY node as a
+> +sub-node of an Ethernet device, with the following properties:
+> +
+> +* 'fixed-link' (boolean, mandatory), to indicate that this PHY is a
+> +  fixed link PHY.
+> +* 'speed' (integer, mandatory), to indicate the link speed. Accepted
+> +  values are 10, 100 and 1000
+> +* 'full-duplex' (boolean, optional), to indicate that full duplex is
+> +  used. When absent, half duplex is assumed.
+> +* 'pause' (boolean, optional), to indicate that pause should be
+> +  enabled.
+> +* 'asym-pause' (boolean, optional), to indicate that asym_pause should
+> +  be enabled.
+> +
+> +Example:
+> +
+> +ethernet at 0 {
+> +       ...
+> +       phy = <&phy0>;
+> +       phy0: phy at 0 {
+> +             fixed-link;
+> +             speed = <1000>;
+> +             full-duplex;
+> +       };
+> +       ...
+> +};
+> +
+> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+> index 875b7b6..c645fb8 100644
+> --- a/drivers/of/of_mdio.c
+> +++ b/drivers/of/of_mdio.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/netdevice.h>
+>  #include <linux/err.h>
+>  #include <linux/phy.h>
+> +#include <linux/phy_fixed.h>
+>  #include <linux/of.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_mdio.h>
+> @@ -274,3 +275,26 @@ struct phy_device *of_phy_attach(struct net_device *dev,
+>         return phy_attach_direct(dev, phy, flags, iface) ? NULL : phy;
+>  }
+>  EXPORT_SYMBOL(of_phy_attach);
+> +
+> +#if defined(CONFIG_FIXED_PHY)
+> +bool of_phy_is_fixed_link(struct device_node *np)
+> +{
+> +       return of_property_read_bool(np, "fixed-link");
+> +}
+> +EXPORT_SYMBOL(of_phy_is_fixed_link);
+> +
+> +int of_phy_register_fixed_link(struct device_node *np)
+> +{
+> +       struct fixed_phy_status status = {};
+> +
+> +       status.link = 1;
+> +       status.duplex = of_property_read_bool(np, "full-duplex");
+> +       if (of_property_read_u32(np, "speed", &status.speed))
+> +               return -EINVAL;
+> +       status.pause = of_property_read_bool(np, "pause");
+> +       status.asym_pause = of_property_read_bool(np, "asym-pause");
+> +
+> +       return fixed_phy_register(PHY_POLL, &status, np);
+> +}
+> +EXPORT_SYMBOL(of_phy_register_fixed_link);
+> +#endif
+> diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
+> index 6fe8464..77a6e32 100644
+> --- a/include/linux/of_mdio.h
+> +++ b/include/linux/of_mdio.h
+> @@ -67,4 +67,19 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
+>  }
+>  #endif /* CONFIG_OF */
 >
-> Use devm_regulator_register() and then you don't need to clean up the
-> regulators either.
->
->> +static int __init axp20x_regulator_init(void)
->> +{
->> +     return platform_driver_register(&axp20x_regulator_driver);
->> +}
->> +
->> +subsys_initcall(axp20x_regulator_init);
->
-> module_platform_driver().
+> +#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
+> +extern int of_phy_register_fixed_link(struct device_node *np);
+> +extern bool of_phy_is_fixed_link(struct device_node *np);
+> +#else
+> +static inline int of_phy_register_fixed_link(struct device_node *np)
+> +{
+> +       return -ENOSYS;
+> +}
+> +static inline bool of_phy_is_fixed_link(struct device_node *np)
+> +{
+> +       return false;
+> +}
+> +#endif
+> +
+> +
+>  #endif /* __LINUX_OF_MDIO_H */
+> --
+> 1.8.3.2
 
-I'll fix both in v2.
 
-Thank you,
 
 -- 
-Carlo Caione
+Florian
