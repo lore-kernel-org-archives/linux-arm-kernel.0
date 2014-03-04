@@ -1,111 +1,270 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue,  4 Mar 2014 08:57:13 +0100
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM
-In-Reply-To: <CAFrcx1nBhu6jkcdpOu8POOk95MtDH5vjtFy92=9MGdVgEknzLg@mail.gmail.com>
-References: <CAFrcx1nBhu6jkcdpOu8POOk95MtDH5vjtFy92=9MGdVgEknzLg@mail.gmail.com>
-Message-ID: <1393919833-15154-1-git-send-email-jean.pihet@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue,  4 Mar 2014 15:51:17 +0800
+Subject: [PATCH v2] arm64: topology: Implement basic CPU topology support
+Message-ID: <1393919477-27814-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing perf_regs_load function, which is going
-to be used for dwarf unwind test in following patches.
+From: Mark Brown <broonie@linaro.org>
 
-It takes single argument as a pointer to the regs dump
-buffer and populates it with current registers values.
+Add basic CPU topology support to arm64, based on the existing pre-v8
+code and some work done by Mark Hambleton.  This patch does not
+implement any topology discovery support since that should be based on
+information from firmware, it merely implements the scaffolding for
+integration of topology support in the architecture.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-Cc: David Ahern <dsahern@gmail.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
+No locking of the topology data is done since it is only modified during
+CPU bringup with external serialisation from the SMP code.
+
+The goal is to separate the architecture hookup for providing topology
+information from the DT parsing in order to ease review and avoid
+blocking the architecture code (which will be built on by other work)
+with the DT code review by providing something simple and basic.
+
+Following patches will implement support for interpreting topology
+information from MPIDR and for parsing the DT topology bindings for ARM,
+similar patches will be needed for ACPI.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+Acked-by: Mark RUtland <mark.rutland@arm.com>
 ---
- tools/perf/arch/arm/Makefile            |  1 +
- tools/perf/arch/arm/include/perf_regs.h |  2 ++
- tools/perf/arch/arm/tests/regs_load.S   | 47 +++++++++++++++++++++++++++++++++
- 3 files changed, 50 insertions(+)
- create mode 100644 tools/perf/arch/arm/tests/regs_load.S
+ arch/arm64/Kconfig                | 24 ++++++++++
+ arch/arm64/include/asm/topology.h | 39 ++++++++++++++++
+ arch/arm64/kernel/Makefile        |  1 +
+ arch/arm64/kernel/smp.c           | 11 +++++
+ arch/arm64/kernel/topology.c      | 95 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 170 insertions(+)
+ create mode 100644 arch/arm64/include/asm/topology.h
+ create mode 100644 arch/arm64/kernel/topology.c
 
-diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 67e9b3d..9b8f87e 100644
---- a/tools/perf/arch/arm/Makefile
-+++ b/tools/perf/arch/arm/Makefile
-@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- endif
-diff --git a/tools/perf/arch/arm/include/perf_regs.h b/tools/perf/arch/arm/include/perf_regs.h
-index 2a1cfde..1476ae7 100644
---- a/tools/perf/arch/arm/include/perf_regs.h
-+++ b/tools/perf/arch/arm/include/perf_regs.h
-@@ -5,6 +5,8 @@
- #include "../../util/types.h"
- #include <asm/perf_regs.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 764d682..80e0eb1 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -165,6 +165,30 @@ config SMP
  
-+void perf_regs_load(u64 *regs);
+ 	  If you don't know what to do here, say N.
+ 
++config CPU_TOPOLOGY
++	bool "Support CPU topology definition"
++	depends on SMP
++	default y
++	help
++	  Support CPU topology definition, based on configuration
++	  provided by the firmware.
 +
- #define PERF_REGS_MASK	((1ULL << PERF_REG_ARM_MAX) - 1)
- #define PERF_REG_IP	PERF_REG_ARM_PC
- #define PERF_REG_SP	PERF_REG_ARM_SP
-diff --git a/tools/perf/arch/arm/tests/regs_load.S b/tools/perf/arch/arm/tests/regs_load.S
++config SCHED_MC
++	bool "Multi-core scheduler support"
++	depends on CPU_TOPOLOGY
++	help
++	  Multi-core scheduler support improves the CPU scheduler's decision
++	  making when dealing with multi-core CPU chips at a cost of slightly
++	  increased overhead in some places. If unsure say N here.
++
++config SCHED_SMT
++	bool "SMT scheduler support"
++	depends on CPU_TOPOLOGY
++	help
++	  Improves the CPU scheduler's decision making when dealing with
++	  MultiThreading at a cost of slightly increased overhead in some
++	  places. If unsure say N here.
++
+ config NR_CPUS
+ 	int "Maximum number of CPUs (2-32)"
+ 	range 2 32
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
 new file mode 100644
-index 0000000..916d268
+index 0000000..c8a47e8
 --- /dev/null
-+++ b/tools/perf/arch/arm/tests/regs_load.S
-@@ -0,0 +1,47 @@
-+#include <linux/linkage.h>
++++ b/arch/arm64/include/asm/topology.h
+@@ -0,0 +1,39 @@
++#ifndef __ASM_TOPOLOGY_H
++#define __ASM_TOPOLOGY_H
 +
-+#define R0 0x00
-+#define R1 0x08
-+#define R2 0x10
-+#define R3 0x18
-+#define R4 0x20
-+#define R5 0x28
-+#define R6 0x30
-+#define R7 0x38
-+#define R8 0x40
-+#define R9 0x48
-+#define SL 0x50
-+#define FP 0x58
-+#define IP 0x60
-+#define SP 0x68
-+#define LR 0x70
-+#define PC 0x78
++#ifdef CONFIG_CPU_TOPOLOGY
 +
-+@ Implementation of void perf_regs_load(u64 *regs);
-+@
-+@ This functions fills in the 'regs' buffer from the actual registers values.
-+@ Note that the return value (i.e. caller values) of pc is retrieved
-+@ and stored, in order to skip the call to this function.
++#include <linux/cpumask.h>
 +
-+.text
-+.type perf_regs_load,%function
-+ENTRY(perf_regs_load)
-+	str r0, [r0, #R0]
-+	str r1, [r0, #R1]
-+	str r2, [r0, #R2]
-+	str r3, [r0, #R3]
-+	str r4, [r0, #R4]
-+	str r5, [r0, #R5]
-+	str r6, [r0, #R6]
-+	str r7, [r0, #R7]
-+	str r8, [r0, #R8]
-+	str r9, [r0, #R9]
-+	str sl, [r0, #SL]
-+	str fp, [r0, #FP]
-+	str ip, [r0, #IP]
-+	str sp, [r0, #SP]
-+	str lr, [r0, #LR]
-+	str lr, [r0, #PC]	@ Save caller PC
++struct cpu_topology {
++	int thread_id;
++	int core_id;
++	int cluster_id;
++	cpumask_t thread_sibling;
++	cpumask_t core_sibling;
++};
 +
-+	bx lr
-+ENDPROC(perf_regs_load)
++extern struct cpu_topology cpu_topology[NR_CPUS];
++
++#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
++#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
++#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
++#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
++
++#define mc_capable()	(cpu_topology[0].cluster_id != -1)
++#define smt_capable()	(cpu_topology[0].thread_id != -1)
++
++void init_cpu_topology(void);
++void store_cpu_topology(unsigned int cpuid);
++const struct cpumask *cpu_coregroup_mask(int cpu);
++
++#else
++
++static inline void init_cpu_topology(void) { }
++static inline void store_cpu_topology(unsigned int cpuid) { }
++
++#endif
++
++#include <asm-generic/topology.h>
++
++#endif /* _ASM_ARM_TOPOLOGY_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index e52bcdc..da1dafb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -21,6 +21,7 @@ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
++arm64-obj-$(CONFIG_CPU_TOPOLOGY)	+= topology.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 5070dc3..f0a141d 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -114,6 +114,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 	return ret;
+ }
+ 
++static void smp_store_cpu_info(unsigned int cpuid)
++{
++	store_cpu_topology(cpuid);
++}
++
+ /*
+  * This is the secondary CPU boot entry.  We're using this CPUs
+  * idle thread stack, but a set of temporary page tables.
+@@ -152,6 +157,8 @@ asmlinkage void secondary_start_kernel(void)
+ 	 */
+ 	notify_cpu_starting(cpu);
+ 
++	smp_store_cpu_info(cpu);
++
+ 	/*
+ 	 * OK, now it's safe to let the boot CPU continue.  Wait for
+ 	 * the CPU migration code to notice that the CPU is online
+@@ -391,6 +398,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	int err;
+ 	unsigned int cpu, ncores = num_possible_cpus();
+ 
++	init_cpu_topology();
++
++	smp_store_cpu_info(smp_processor_id());
++
+ 	/*
+ 	 * are we trying to boot more cores than exist?
+ 	 */
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+new file mode 100644
+index 0000000..3e06b0b
+--- /dev/null
++++ b/arch/arm64/kernel/topology.c
+@@ -0,0 +1,95 @@
++/*
++ * arch/arm64/kernel/topology.c
++ *
++ * Copyright (C) 2011,2013,2014 Linaro Limited.
++ *
++ * Based on the arm32 version written by Vincent Guittot in turn based on
++ * arch/sh/kernel/topology.c
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/cpu.h>
++#include <linux/cpumask.h>
++#include <linux/init.h>
++#include <linux/percpu.h>
++#include <linux/node.h>
++#include <linux/nodemask.h>
++#include <linux/sched.h>
++
++#include <asm/topology.h>
++
++/*
++ * cpu topology table
++ */
++struct cpu_topology cpu_topology[NR_CPUS];
++EXPORT_SYMBOL_GPL(cpu_topology);
++
++const struct cpumask *cpu_coregroup_mask(int cpu)
++{
++	return &cpu_topology[cpu].core_sibling;
++}
++
++static void update_siblings_masks(unsigned int cpuid)
++{
++	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
++	int cpu;
++
++	if (cpuid_topo->cluster_id == -1) {
++		/*
++		 * DT does not contain topology information for this cpu
++		 * reset it to default behaviour
++		 */
++		pr_debug("CPU%u: No topology information configured\n", cpuid);
++		cpuid_topo->core_id = 0;
++		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
++		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
++		return;
++	}
++
++	/* update core and thread sibling masks */
++	for_each_possible_cpu(cpu) {
++		cpu_topo = &cpu_topology[cpu];
++
++		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
++			continue;
++
++		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
++		if (cpu != cpuid)
++			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
++
++		if (cpuid_topo->core_id != cpu_topo->core_id)
++			continue;
++
++		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
++		if (cpu != cpuid)
++			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
++	}
++}
++
++void store_cpu_topology(unsigned int cpuid)
++{
++	update_siblings_masks(cpuid);
++}
++
++/*
++ * init_cpu_topology is called at boot when only one cpu is running
++ * which prevent simultaneous write access to cpu_topology array
++ */
++void __init init_cpu_topology(void)
++{
++	unsigned int cpu;
++
++	/* init core mask and power*/
++	for_each_possible_cpu(cpu) {
++		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
++
++		cpu_topo->thread_id = -1;
++		cpu_topo->core_id =  -1;
++		cpu_topo->cluster_id = -1;
++		cpumask_clear(&cpu_topo->core_sibling);
++		cpumask_clear(&cpu_topo->thread_sibling);
++	}
++}
 -- 
-1.8.1.2
+1.9.0
