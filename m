@@ -1,121 +1,237 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Mar 2014 10:34:40 -0800
-Subject: [PATCH v5 1/9] Input: pmic8xxx-keypad - Fix build by removing gpio
- configuration
+Date: Tue,  4 Mar 2014 10:34:42 -0800
+Subject: [PATCH v5 3/9] Input: pmic8xxx-keypad - Migrate to regmap APIs
 In-Reply-To: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
 References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1393958088-1456-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1393958088-1456-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio configuration in this driver doesn't work because the
-gpio.h include doesn't exist. Remove the configuration as it
-isn't strictly necessary, allowing us to actually compile this
-driver. If it's needed in the future, it should be done via a
-pinctrl driver.
+Use the regmap APIs for this driver instead of custom pm8xxx
+APIs. This breaks this driver's dependency on the pm8xxx APIs and
+allows us to easily port it to other bus protocols in the future.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/input/keyboard/pmic8xxx-keypad.c | 58 --------------------------------
- 1 file changed, 58 deletions(-)
+ drivers/input/keyboard/pmic8xxx-keypad.c | 81 ++++++++++++--------------------
+ 1 file changed, 29 insertions(+), 52 deletions(-)
 
 diff --git a/drivers/input/keyboard/pmic8xxx-keypad.c b/drivers/input/keyboard/pmic8xxx-keypad.c
-index 2c9f19ac35ea..c4aa882c8fb9 100644
+index bec53ebde7b2..0efd11e16b7e 100644
 --- a/drivers/input/keyboard/pmic8xxx-keypad.c
 +++ b/drivers/input/keyboard/pmic8xxx-keypad.c
-@@ -21,7 +21,6 @@
+@@ -19,8 +19,8 @@
+ #include <linux/bitops.h>
+ #include <linux/delay.h>
  #include <linux/mutex.h>
++#include <linux/regmap.h>
  
- #include <linux/mfd/pm8xxx/core.h>
--#include <linux/mfd/pm8xxx/gpio.h>
+-#include <linux/mfd/pm8xxx/core.h>
  #include <linux/input/pmic8xxx-keypad.h>
  
  #define PM8XXX_MAX_ROWS		18
-@@ -447,27 +446,6 @@ static int pmic8xxx_kpd_init(struct pmic8xxx_kp *kp)
+@@ -86,6 +86,7 @@
+  * struct pmic8xxx_kp - internal keypad data structure
+  * @pdata - keypad platform data pointer
+  * @input - input device pointer for keypad
++ * @regmap - regmap handle
+  * @key_sense_irq - key press/release irq number
+  * @key_stuck_irq - key stuck notification irq number
+  * @keycodes - array to hold the key codes
+@@ -97,6 +98,7 @@
+ struct pmic8xxx_kp {
+ 	const struct pm8xxx_keypad_platform_data *pdata;
+ 	struct input_dev *input;
++	struct regmap *regmap;
+ 	int key_sense_irq;
+ 	int key_stuck_irq;
  
- }
+@@ -109,33 +111,6 @@ struct pmic8xxx_kp {
+ 	u8 ctrl_reg;
+ };
  
--static int  pmic8xxx_kp_config_gpio(int gpio_start, int num_gpios,
--			struct pmic8xxx_kp *kp, struct pm_gpio *gpio_config)
+-static int pmic8xxx_kp_write_u8(struct pmic8xxx_kp *kp,
+-				 u8 data, u16 reg)
 -{
--	int	rc, i;
+-	int rc;
 -
--	if (gpio_start < 0 || num_gpios < 0)
--		return -EINVAL;
--
--	for (i = 0; i < num_gpios; i++) {
--		rc = pm8xxx_gpio_config(gpio_start + i, gpio_config);
--		if (rc) {
--			dev_err(kp->dev, "%s: FAIL pm8xxx_gpio_config():"
--					"for PM GPIO [%d] rc=%d.\n",
--					__func__, gpio_start + i, rc);
--			return rc;
--		}
--	 }
--
--	return 0;
+-	rc = pm8xxx_writeb(kp->dev->parent, reg, data);
+-	return rc;
 -}
 -
- static int pmic8xxx_kp_enable(struct pmic8xxx_kp *kp)
+-static int pmic8xxx_kp_read(struct pmic8xxx_kp *kp,
+-				 u8 *data, u16 reg, unsigned num_bytes)
+-{
+-	int rc;
+-
+-	rc = pm8xxx_read_buf(kp->dev->parent, reg, data, num_bytes);
+-	return rc;
+-}
+-
+-static int pmic8xxx_kp_read_u8(struct pmic8xxx_kp *kp,
+-				 u8 *data, u16 reg)
+-{
+-	int rc;
+-
+-	rc = pmic8xxx_kp_read(kp, data, reg, 1);
+-	return rc;
+-}
+-
+ static u8 pmic8xxx_col_state(struct pmic8xxx_kp *kp, u8 col)
+ {
+ 	/* all keys pressed on that particular row? */
+@@ -160,9 +135,9 @@ static u8 pmic8xxx_col_state(struct pmic8xxx_kp *kp, u8 col)
+ static int pmic8xxx_chk_sync_read(struct pmic8xxx_kp *kp)
  {
  	int rc;
-@@ -527,27 +505,6 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
- 	int rc;
- 	u8 ctrl_val;
+-	u8 scan_val;
++	unsigned int scan_val;
  
--	struct pm_gpio kypd_drv = {
--		.direction	= PM_GPIO_DIR_OUT,
--		.output_buffer	= PM_GPIO_OUT_BUF_OPEN_DRAIN,
--		.output_value	= 0,
--		.pull		= PM_GPIO_PULL_NO,
--		.vin_sel	= PM_GPIO_VIN_S3,
--		.out_strength	= PM_GPIO_STRENGTH_LOW,
--		.function	= PM_GPIO_FUNC_1,
--		.inv_int_pol	= 1,
--	};
+-	rc = pmic8xxx_kp_read_u8(kp, &scan_val, KEYP_SCAN);
++	rc = regmap_read(kp->regmap, KEYP_SCAN, &scan_val);
+ 	if (rc < 0) {
+ 		dev_err(kp->dev, "Error reading KEYP_SCAN reg, rc=%d\n", rc);
+ 		return rc;
+@@ -170,7 +145,7 @@ static int pmic8xxx_chk_sync_read(struct pmic8xxx_kp *kp)
+ 
+ 	scan_val |= 0x1;
+ 
+-	rc = pmic8xxx_kp_write_u8(kp, scan_val, KEYP_SCAN);
++	rc = regmap_write(kp->regmap, KEYP_SCAN, scan_val);
+ 	if (rc < 0) {
+ 		dev_err(kp->dev, "Error writing KEYP_SCAN reg, rc=%d\n", rc);
+ 		return rc;
+@@ -186,26 +161,24 @@ static int pmic8xxx_kp_read_data(struct pmic8xxx_kp *kp, u16 *state,
+ 					u16 data_reg, int read_rows)
+ {
+ 	int rc, row;
+-	u8 new_data[PM8XXX_MAX_ROWS];
++	unsigned int val;
+ 
+-	rc = pmic8xxx_kp_read(kp, new_data, data_reg, read_rows);
+-	if (rc)
+-		return rc;
 -
--	struct pm_gpio kypd_sns = {
--		.direction	= PM_GPIO_DIR_IN,
--		.pull		= PM_GPIO_PULL_UP_31P5,
--		.vin_sel	= PM_GPIO_VIN_S3,
--		.out_strength	= PM_GPIO_STRENGTH_NO,
--		.function	= PM_GPIO_FUNC_NORMAL,
--		.inv_int_pol	= 1,
--	};
--
--
- 	if (!pdata || !pdata->num_cols || !pdata->num_rows ||
- 		pdata->num_cols > PM8XXX_MAX_COLS ||
- 		pdata->num_rows > PM8XXX_MAX_ROWS ||
-@@ -653,20 +610,6 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
- 		goto err_get_irq;
+-	for (row = 0; row < kp->pdata->num_rows; row++) {
+-		dev_dbg(kp->dev, "new_data[%d] = %d\n", row,
+-					new_data[row]);
+-		state[row] = pmic8xxx_col_state(kp, new_data[row]);
++	for (row = 0; row < read_rows; row++) {
++		rc = regmap_read(kp->regmap, data_reg, &val);
++		if (rc)
++			return rc;
++		dev_dbg(kp->dev, "%d = %d\n", row, val);
++		state[row] = pmic8xxx_col_state(kp, val);
  	}
  
--	rc = pmic8xxx_kp_config_gpio(pdata->cols_gpio_start,
--					pdata->num_cols, kp, &kypd_sns);
--	if (rc < 0) {
--		dev_err(&pdev->dev, "unable to configure keypad sense lines\n");
--		goto err_gpio_config;
--	}
--
--	rc = pmic8xxx_kp_config_gpio(pdata->rows_gpio_start,
--					pdata->num_rows, kp, &kypd_drv);
--	if (rc < 0) {
--		dev_err(&pdev->dev, "unable to configure keypad drive lines\n");
--		goto err_gpio_config;
--	}
--
- 	rc = request_any_context_irq(kp->key_sense_irq, pmic8xxx_kp_irq,
- 				 IRQF_TRIGGER_RISING, "pmic-keypad", kp);
+-	return rc;
++	return 0;
+ }
+ 
+ static int pmic8xxx_kp_read_matrix(struct pmic8xxx_kp *kp, u16 *new_state,
+ 					 u16 *old_state)
+ {
+ 	int rc, read_rows;
+-	u8 scan_val;
++	unsigned int scan_val;
+ 
+ 	if (kp->pdata->num_rows < PM8XXX_MIN_ROWS)
+ 		read_rows = PM8XXX_MIN_ROWS;
+@@ -235,14 +208,14 @@ static int pmic8xxx_kp_read_matrix(struct pmic8xxx_kp *kp, u16 *new_state,
+ 	/* 4 * 32KHz clocks */
+ 	udelay((4 * DIV_ROUND_UP(USEC_PER_SEC, KEYP_CLOCK_FREQ)) + 1);
+ 
+-	rc = pmic8xxx_kp_read_u8(kp, &scan_val, KEYP_SCAN);
++	rc = regmap_read(kp->regmap, KEYP_SCAN, &scan_val);
  	if (rc < 0) {
-@@ -703,7 +646,6 @@ err_pmic_reg_read:
- 	free_irq(kp->key_stuck_irq, kp);
- err_req_stuck_irq:
- 	free_irq(kp->key_sense_irq, kp);
--err_gpio_config:
- err_get_irq:
- 	input_free_device(kp->input);
- err_alloc_device:
+ 		dev_err(kp->dev, "Error reading KEYP_SCAN reg, rc=%d\n", rc);
+ 		return rc;
+ 	}
+ 
+ 	scan_val &= 0xFE;
+-	rc = pmic8xxx_kp_write_u8(kp, scan_val, KEYP_SCAN);
++	rc = regmap_write(kp->regmap, KEYP_SCAN, scan_val);
+ 	if (rc < 0)
+ 		dev_err(kp->dev, "Error writing KEYP_SCAN reg, rc=%d\n", rc);
+ 
+@@ -378,10 +351,10 @@ static irqreturn_t pmic8xxx_kp_stuck_irq(int irq, void *data)
+ static irqreturn_t pmic8xxx_kp_irq(int irq, void *data)
+ {
+ 	struct pmic8xxx_kp *kp = data;
+-	u8 ctrl_val, events;
++	unsigned int ctrl_val, events;
+ 	int rc;
+ 
+-	rc = pmic8xxx_kp_read(kp, &ctrl_val, KEYP_CTRL, 1);
++	rc = regmap_read(kp->regmap, KEYP_CTRL, &ctrl_val);
+ 	if (rc < 0) {
+ 		dev_err(kp->dev, "failed to read keyp_ctrl register\n");
+ 		return IRQ_HANDLED;
+@@ -420,7 +393,7 @@ static int pmic8xxx_kpd_init(struct pmic8xxx_kp *kp)
+ 
+ 	ctrl_val |= (bits << KEYP_CTRL_SCAN_ROWS_SHIFT);
+ 
+-	rc = pmic8xxx_kp_write_u8(kp, ctrl_val, KEYP_CTRL);
++	rc = regmap_write(kp->regmap, KEYP_CTRL, ctrl_val);
+ 	if (rc < 0) {
+ 		dev_err(kp->dev, "Error writing KEYP_CTRL reg, rc=%d\n", rc);
+ 		return rc;
+@@ -438,7 +411,7 @@ static int pmic8xxx_kpd_init(struct pmic8xxx_kp *kp)
+ 
+ 	scan_val |= (cycles << KEYP_SCAN_ROW_HOLD_SHIFT);
+ 
+-	rc = pmic8xxx_kp_write_u8(kp, scan_val, KEYP_SCAN);
++	rc = regmap_write(kp->regmap, KEYP_SCAN, scan_val);
+ 	if (rc)
+ 		dev_err(kp->dev, "Error writing KEYP_SCAN reg, rc=%d\n", rc);
+ 
+@@ -452,7 +425,7 @@ static int pmic8xxx_kp_enable(struct pmic8xxx_kp *kp)
+ 
+ 	kp->ctrl_reg |= KEYP_CTRL_KEYP_EN;
+ 
+-	rc = pmic8xxx_kp_write_u8(kp, kp->ctrl_reg, KEYP_CTRL);
++	rc = regmap_write(kp->regmap, KEYP_CTRL, kp->ctrl_reg);
+ 	if (rc < 0)
+ 		dev_err(kp->dev, "Error writing KEYP_CTRL reg, rc=%d\n", rc);
+ 
+@@ -465,7 +438,7 @@ static int pmic8xxx_kp_disable(struct pmic8xxx_kp *kp)
+ 
+ 	kp->ctrl_reg &= ~KEYP_CTRL_KEYP_EN;
+ 
+-	rc = pmic8xxx_kp_write_u8(kp, kp->ctrl_reg, KEYP_CTRL);
++	rc = regmap_write(kp->regmap, KEYP_CTRL, kp->ctrl_reg);
+ 	if (rc < 0)
+ 		return rc;
+ 
+@@ -503,7 +476,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 	const struct matrix_keymap_data *keymap_data;
+ 	struct pmic8xxx_kp *kp;
+ 	int rc;
+-	u8 ctrl_val;
++	unsigned int ctrl_val;
+ 
+ 	if (!pdata || !pdata->num_cols || !pdata->num_rows ||
+ 		pdata->num_cols > PM8XXX_MAX_COLS ||
+@@ -547,6 +520,10 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 	if (!kp)
+ 		return -ENOMEM;
+ 
++	kp->regmap = dev_get_regmap(pdev->dev.parent, NULL);
++	if (!kp->regmap)
++		return -ENODEV;
++
+ 	platform_set_drvdata(pdev, kp);
+ 
+ 	kp->pdata	= pdata;
+@@ -621,7 +598,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+ 		return rc;
+ 	}
+ 
+-	rc = pmic8xxx_kp_read_u8(kp, &ctrl_val, KEYP_CTRL);
++	rc = regmap_read(kp->regmap, KEYP_CTRL, &ctrl_val);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "failed to read KEYP_CTRL register\n");
+ 		return rc;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
