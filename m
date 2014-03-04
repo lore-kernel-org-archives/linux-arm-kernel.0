@@ -1,28 +1,117 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Mar 2014 09:55:36 +0000
-Subject: [PATCH v2] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1393919477-27814-1-git-send-email-broonie@kernel.org>
-References: <1393919477-27814-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140304095534.GE30596@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Mar 2014 11:04:55 +0100 (CET)
+Subject: [PATCH V3 1/5] genirq: define flag IRQ_SRC_DST_INVERTED, and
+ accessors
+In-Reply-To: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
+References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 07:51:17AM +0000, Mark Brown wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 764d682..80e0eb1 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -165,6 +165,30 @@ config SMP
->  
->  	  If you don't know what to do here, say N.
->  
-> +config CPU_TOPOLOGY
-> +	bool "Support CPU topology definition"
+On Mon, 3 Mar 2014, Stephen Warren wrote:
 
-Thanks for the patch. I applied it but not pushed to -next yet. I wonder
-whether it makes sense to drop the description of the CPU_TOPOLOGY entry
-here so that it is no longer selectable. It will be enabled by default
-when SMP (I can do the change myself, no need to repost).
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Some devices have configurable IRQ output polarities. Software might
+> use IRQ_TYPE_* to determine how to configure such a device's IRQ
+> output polarity in order to match how the IRQ controller input is
+> configured. If the board or SoC inverts the signal between the
+> device's IRQ output and controller's IRQ output, software must be
+> aware of this fact, in order to program the IRQ output to the correct
+> (i.e. opposite) polarity. This flag provides that information.
 
--- 
-Catalin
+So what you're saying is:
+
+Device IRQ output --> [Optional Inverter Logic] --> IRQ controller input.
+
+And you're storing the information about the presence of the inverter
+logic in the irq itself, but the core does not make any use of it and
+you let the device driver deal with the outcome.
+
+This sucks as all affected drivers have to implement the same sanity
+logic for this.
+
+Why don't you implement a core function which tells the driver which
+polarity to select? That requires a few more changes, but I think it's
+worth it for other reasons.
+
+Right now the set_type logic requires the irq chip drivers to
+implement sanity checking and default selections for TYPE_NONE. We can
+be more clever about that and add this information to the irq chip
+flags.
+
+enum {
+     IRQ_CHIP_TYPES_MASK	= 0x0f,
+     IRQ_CHIP_DEFAULT_MASK	= 0xf0,
+     IRQ_CHIP_EXISTING_FLAGS	....
+}
+
+Now the irq_chip setup tells the core which types are available and
+which one is the default fallback for TYPE_NONE.
+
+So the core can do the sanity checks and we can kill quite some
+repeated stuff from the irq chip implementations. For the inverted
+logic case you can handle the inversion in the core as well, i.e. if a
+driver requests IRQ_TYPE_LEVEL_HIGH you select IRQ_TYPE_LEVEL_LOW for
+the chip, if possible.
+
+For the case where the irq chip can only handle a single polarity you
+can provide a core function to figure out to which polarity the driver
+should set the device IRQ output line.
+
+int irq_get_device_irq_polarity(int irq, int device_types)
+{
+	/*
+	 * Handle the inversion logic and select a proper
+	 * device irq polarity from irq_chip(@irq)->flags and
+	 * @device_types.
+	 *
+	 * Return a proper error code if no match.
+	 */
+}
+
+Let's look at an example:
+
+      irq_chip.flags = IRQ_TYPE_LEVEL_HIGH;
+      device_types = IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW;
+
+Now for the non inverted case, this returns IRQ_TYPE_LEVEL_HIGH, for
+the inverted case it returns IRQ_TYPE_LEVEL_LOW.
+
+In both cases the irq_set_type() logic handles this correctly:
+
+Non-Inverted case:
+  	     irq_set_type(irq, IRQ_TYPE_LEVEL_HIGH);
+	     -> Success
+
+Inverted case:
+  	     irq_set_type(irq, IRQ_TYPE_LEVEL_LOW);
+	     invert -> IRQ_TYPE_LEVEL_HIGH
+	     -> Success
+
+To make this work for interrupt chips which have no set_type callback
+we can do the following in irq_set_type():
+
+       if (irq_is_inverted(irq))
+	  type = invert(type);
+
+       ret = irq_check_type(chip, &type);
+       if (ret < 0 || !chip->irq_settype)
+	  return ret;
+
+       return chip->irq_settype();
+
+And irq_check_type() does:
+
+       if (!(chip->flags & IRQ_CHIP_TYPES_MASK))
+       	  return chip->irq_settype ? 0 : -ENOTSUP;
+
+       if (*type == IRQ_TYPE_NONE)
+       	  *type == (chip->flags & IRQ_CHIP_DEFAULT_MASK) >> 4;
+	
+       return type_supported(chip->flags, *type);
+
+Thanks,
+
+	tglx
+       	  
