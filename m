@@ -1,213 +1,309 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 3 Mar 2014 17:07:37 -0800
-Subject: [REGRESSION] Arndale Octa panics when booting 3.14-rc1
-In-Reply-To: <5314D239.7090001@gmail.com>
-References: <20140303185755.GA11460@e102654-lin.cambridge.arm.com>
- <5314D239.7090001@gmail.com>
-Message-ID: <CAPtuhTj-yKebFG=N38=CjugxbehmugXSmA+9fAWXSkF5MgaWpQ@mail.gmail.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Tue, 4 Mar 2014 01:39:06 +0000
+Subject: [PATCH v4 5/6] pci: Use parent domain number when allocating
+ child busses.
+In-Reply-To: <CACoXjc=FM5Bohpw6xmD0OCRX40gX2EHzWmf0dXgDosY-Wg8=ZA@mail.gmail.com>
+References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393867996-32299-6-git-send-email-Liviu.Dudau@arm.com>
+ <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
+ <20140303235132.GA13582@bart.dudau.co.uk>
+ <CACoXjc=FM5Bohpw6xmD0OCRX40gX2EHzWmf0dXgDosY-Wg8=ZA@mail.gmail.com>
+Message-ID: <20140304013906.GB13582@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 3, 2014 at 11:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi,
->
->
-> On 03.03.2014 19:57, Javi Merino wrote:
->>
->> Hi,
->>
->> Commit fcb0ee6a3d (clk: Implement clk_unregister) added calls to
->> kref_get() and kref_put() to __clk_get() and __clk_put() without
->> checking if clk is not NULL:
->>
->>> @@ -1987,6 +2097,7 @@ int __clk_get(struct clk *clk)
->>>          if (clk && !try_module_get(clk->owner))
->>>                  return 0;
->>>
->>> +       kref_get(&clk->ref);
->>>          return 1;
->>>   }
->>>
->>> @@ -1995,6 +2106,10 @@ void __clk_put(struct clk *clk)
->>>          if (WARN_ON_ONCE(IS_ERR(clk)))
->>>                  return;
->>>
->>> +       clk_prepare_lock();
->>> +       kref_put(&clk->ref, __clk_release);
->>> +       clk_prepare_unlock();
->>> +
->>>          if (clk)
->>>                  module_put(clk->owner);
->>>   }
->>
->>
->> Before this commit, these functions allowed clk to be NULL.  In
->> particular, the "if (clk)" in __clk_put() is now useless, as clk has
->> been dereferenced by the time you reach it.
->>
->> This causes Arndale Octa to panic on boot:
->>
->> 8<---
->>      [    7.430000] Creating amba device /amba/pdma at 121B0000
->>      [    7.435000]    create child: /amba/mdma at 10800000
->>      [    7.440000] Creating amba device /amba/mdma at 10800000
->>      [    7.445000] Unable to handle kernel NULL pointer dereference at
->> virtual address 00000050
->>      [    7.450000] pgd = c0004000
->>      [    7.450000] [00000050] *pgd=00000000
->>      [    7.455000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
->>      [    7.455000] Modules linked in:
->>      [    7.455000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
->> 3.14.0-rc3-00003-gb6026fe-dirty #23
->>      [    7.455000] task: ee0a8000 ti: ee0a6000 task.ti: ee0a6000
->>      [    7.455000] PC is at __clk_get+0x24/0x84
->>      [    7.455000] LR is at of_clk_get+0x5c/0x74
->>      [    7.455000] pc : [<c02e5cc8>]    lr : [<c02e34b8>]    psr:
->> 60000113
->>      [    7.455000] sp : ee0a7d78  ip : ee0a7d88  fp : 00000001
->>      [    7.455000] r10: f001c000  r9 : ee193a10  r8 : 00000000
->>      [    7.455000] r7 : 00000000  r6 : ee7dedb4  r5 : c045e930  r4 :
->> 00000000
->>      [    7.455000] r3 : 00000050  r2 : 000001d9  r1 : c0575df8  r0 :
->> 00000000
->>      [    7.455000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
->> Segment kernel
->>      [    7.455000] Control: 10c5387d  Table: 2000406a  DAC: 00000015
->>      [    7.455000] Process swapper/0 (pid: 1, stack limit = 0xee0a6240)
->>      [    7.455000] Stack: (0xee0a7d78 to 0xee0a8000)
->>      [    7.455000] 7d60:
->> 00000000 c02e34b8
->>      [    7.455000] 7d80: ee0a7d88 c02df2e4 ee7dd984 00000001 000001d9
->> ee7dedb4 00000000 c02df300
->>      [    7.455000] 7da0: ee1779c0 c045e930 ee7dedb4 00000000 ee1779c0
->> c02e350c 00000000 ee1779c0
->>      [    7.455000] 7dc0: c045e930 00001000 00000000 c02e35a4 00000000
->> ee194000 ee194128 c01ee6fc
->>      [    7.455000] 7de0: ee194000 ee194128 00001000 c01ee7ec 00000000
->> ee7dedb4 ee194000 00000009
->>      [    7.455000] 7e00: ee19416c 00000000 00000001 c02e0f94 c053f0f2
->> 00000000 ee193a10 c03b6880
->>      [    7.455000] 7e20: 00000000 ee7dedb4 ee193a10 00000000 00000000
->> 00000001 00000000 c0385924
->>      [    7.455000] 7e40: c047832c ee7dea18 00000000 ee7dedb4 ee193a10
->> 00000000 00000000 00000001
->>      [    7.455000] 7e60: 00000000 c02e103c 00000001 c04c9500 00000079
->> c03b6880 00000000 00000000
->>      [    7.455000] 7e80: 60000113 c05352d8 00000000 00000000 c03b6880
->> 00000001 00000000 ee7dea18
->>      [    7.455000] 7ea0: ee7d6e28 00000000 00000000 c03b6880 00000000
->> 00000001 00000000 c02e116c
->>      [    7.455000] 7ec0: 00000001 00000000 c04cc264 ee0a6000 c04ec240
->> 00000000 c04c9500 c04fec18
->>      [    7.455000] 7ee0: 00000079 c04cc280 00000000 c00088e8 00000000
->> c038cb70 0000006d 00000000
->>      [    7.455000] 7f00: 00000001 c0101a2c ee15ce00 ee15d080 60000100
->> c050fb40 60000113 c050fb40
->>      [    7.455000] 7f20: c04ec230 c050fb3c c050fb3c c04a79f0 c04a79f0
->> ef7fc9ff ef7fc9fb c0034f40
->>      [    7.455000] 7f40: c043e434 c04a7260 00000003 00000003 00000000
->> c04ec260 00000003 c04ec240
->>      [    7.455000] 7f60: c053b2c0 c04c9500 c04fec18 00000079 00000000
->> c04c9c50 00000003 00000003
->>      [    7.455000] 7f80: c04c9500 c003e450 00000000 c0384474 00000000
->> 00000000 00000000 00000000
->>      [    7.455000] 7fa0: 00000000 c038447c 00000000 c000e4b8 00000000
->> 00000000 00000000 00000000
->>      [    7.455000] 7fc0: 00000000 00000000 00000000 00000000 00000000
->> 00000000 00000000 00000000
->>      [    7.455000] 7fe0: 00000000 00000000 00000000 00000000 00000013
->> 00000000 ffffffff ffffffff
->>      [    7.455000] [<c02e5cc8>] (__clk_get) from [<c02e34b8>]
->> (of_clk_get+0x5c/0x74)
->>      [    7.455000] [<c02e34b8>] (of_clk_get) from [<c02e350c>]
->> (of_clk_get_by_name+0x3c/0xb0)
->>      [    7.455000] [<c02e350c>] (of_clk_get_by_name) from [<c02e35a4>]
->> (clk_get+0x24/0x44)
->>      [    7.455000] [<c02e35a4>] (clk_get) from [<c01ee6fc>]
->> (amba_get_enable_pclk+0x10/0x60)
->>      [    7.455000] [<c01ee6fc>] (amba_get_enable_pclk) from [<c01ee7ec>]
->> (amba_device_add+0xa0/0x1e0)
->>      [    7.455000] [<c01ee7ec>] (amba_device_add) from [<c02e0f94>]
->> (of_platform_bus_create+0x190/0x308)
->>      [    7.455000] [<c02e0f94>] (of_platform_bus_create) from
->> [<c02e103c>] (of_platform_bus_create+0x238
->>      [    7.455000] [<c02e103c>] (of_platform_bus_create) from
->> [<c02e116c>] (of_platform_populate+0x60/0x
->>      [    7.455000] [<c02e116c>] (of_platform_populate) from [<c04cc280>]
->> (customize_machine+0x1c/0x40)
->>      [    7.455000] [<c04cc280>] (customize_machine) from [<c00088e8>]
->> (do_one_initcall+0xe4/0x140)
->>      [    7.455000] [<c00088e8>] (do_one_initcall) from [<c04c9c50>]
->> (kernel_init_freeable+0xfc/0x1c8)
->>      [    7.455000] [<c04c9c50>] (kernel_init_freeable) from [<c038447c>]
->> (kernel_init+0x8/0xe4)
->>      [    7.455000] [<c038447c>] (kernel_init) from [<c000e4b8>]
->> (ret_from_fork+0x14/0x3c)
->>      [    7.455000] Code: e3500000 08bd8010 e2843050 f57ff05b (e1932f9f)
->>      [    7.460000] ---[ end trace fe5cfa405506a77d ]---
->>      [    7.460000] Kernel panic - not syncing: Attempted to kill init!
->> exitcode=0x0000000b
->> 8<---
->>
->> I've tried putting "if (clk)" around the calls to kref_get() and
->> kref_put(), but that makes the Octa fail to boot like 3.13 did: when
->> tries to mount root.
->>
->> What works for me so far is to remove the offending nodes from the DT:
->>
->> 8<---
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
->> b/arch/arm/boot/dts/exynos5420.dtsi
->> index 8db792b..c4ab992 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -303,27 +303,6 @@
->>                          #dma-requests = <32>;
->>                  };
->>
->> -               mdma0: mdma at 10800000 {
->> -                       compatible = "arm,pl330", "arm,primecell";
->> -                       reg = <0x10800000 0x1000>;
->> -                       interrupts = <0 33 0>;
->> -                       clocks = <&clock 473>;
->> -                       clock-names = "apb_pclk";
->> -                       #dma-cells = <1>;
->> -                       #dma-channels = <8>;
->> -                       #dma-requests = <1>;
->> -               };
->> -
->> -               mdma1: mdma at 11C10000 {
->> -                       compatible = "arm,pl330", "arm,primecell";
->> -                       reg = <0x11C10000 0x1000>;
->> -                       interrupts = <0 124 0>;
->> -                       clocks = <&clock 442>;
->> -                       clock-names = "apb_pclk";
->> -                       #dma-cells = <1>;
->> -                       #dma-channels = <8>;
->> -                       #dma-requests = <1>;
->> -               };
->>          };
->>
->>          spi_0: spi at 12d20000 {
->> 8<---
->>
->> With this the Arndale Octa boots.  This issue is present from 3.14-rc1
->> to 3.14-rc5.  Any idea how this should be properly fixed in mainline?
->
->
-> This should be fixed with [1], which was supposed to be merged for 3.14-rc5.
-> Mike?
+On Mon, Mar 03, 2014 at 04:42:11PM -0800, Tanmay Inamdar wrote:
+> Hello,
+> 
+> Please see inline.
+> 
+> On Mon, Mar 3, 2014 at 3:51 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> > On Mon, Mar 03, 2014 at 03:14:47PM -0800, Tanmay Inamdar wrote:
+> >> Hello Liviu,
+> >>
+> >> Thanks for fixing up domain_nr. Now I have moved on further to a new
+> >> domain_nr related warning dump :-)
+> >>
+> >> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> >> xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
+> >> pci_bus 0001:00: scanning bus
+> >> pci_setup_device:1101 domain_nr = 1
+> >> pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
+> >> pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
+> >> pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
+> >> pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
+> >> pci 0001:00:00.0: supports D1 D2
+> >> pci_bus 0001:00: fixups for bus
+> >> pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
+> >> pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
+> >> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> >> ** pci_scan_bridge:855  pci_domain_nr(bus) = 1
+> >> ** pci_alloc_child_bus:681  pci_domain_nr(bus) = 1
+> >> pci_bus 0001:01: scanning bus
+> >> pci_setup_device:1101 domain_nr = 0
+> >
+> > Why does the domain_nr change here?
+> 
+> The bridge device pointer for parent and child should be same right? I
+> think this is not the case here. Please look at the log at the bottom
+> that I captured after trying your suggestions.
+> 
+> >
+> >> pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
+> >> pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
+> >> pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
+> >> pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
+> >> ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 1 at
+> >> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
+> >> sysfs_warn_dup+0x80/0xc0()
+> >> sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
+> >> Modules linked in:
+> >> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #40
+> >> Call trace:
+> >> [<ffffffc000088180>] dump_backtrace+0x0/0x140
+> >> [<ffffffc0000882d0>] show_stack+0x10/0x20
+> >> [<ffffffc0004f65ac>] dump_stack+0x74/0xc4
+> >> [<ffffffc000096e04>] warn_slowpath_common+0x84/0xc0
+> >> [<ffffffc000096e8c>] warn_slowpath_fmt+0x4c/0x60
+> >> [<ffffffc0001b83dc>] sysfs_warn_dup+0x7c/0xc0
+> >> [<ffffffc0001b8894>] sysfs_do_create_link_sd.isra.2+0xf4/0x100
+> >> [<ffffffc0001b88bc>] sysfs_create_link+0x1c/0x40
+> >> [<ffffffc0003250b0>] bus_add_device+0x110/0x1c0
+> >> [<ffffffc000322f1c>] device_add+0x31c/0x520
+> >> [<ffffffc0002c444c>] pci_device_add+0xec/0x140
+> >> [<ffffffc0004f1758>] pci_scan_single_device+0x98/0xe0
+> >> [<ffffffc0002c44e8>] pci_scan_slot+0x48/0x120
+> >> [<ffffffc0002c5368>] pci_scan_child_bus+0x48/0x140
+> >> [<ffffffc0002c522c>] pci_scan_bridge+0x4ec/0x5e0
+> >> [<ffffffc0002c53c8>] pci_scan_child_bus+0xa8/0x140
+> >> [<ffffffc0004f1b30>] pci_rescan_bus+0x10/0x40
+> >> [<ffffffc0006a12ac>] xgene_pcie_probe_bridge+0x660/0x72c
+> >> [<ffffffc000327d20>] platform_drv_probe+0x20/0x60
+> >> [<ffffffc000325e30>] really_probe+0xf0/0x220
+> >> [<ffffffc000326080>] __driver_attach+0xa0/0xc0
+> >> [<ffffffc000323ed4>] bus_for_each_dev+0x54/0xa0
+> >> [<ffffffc0003258bc>] driver_attach+0x1c/0x40
+> >> [<ffffffc00032548c>] bus_add_driver+0x14c/0x220
+> >> [<ffffffc00032683c>] driver_register+0x5c/0x120
+> >> [<ffffffc000327cdc>] __platform_driver_register+0x5c/0x80
+> >> [<ffffffc0006a0c40>] xgene_pcie_driver_init+0x14/0x20
+> >> [<ffffffc0000814c0>] do_one_initcall+0xe0/0x160
+> >> [<ffffffc00068c934>] kernel_init_freeable+0x134/0x1d8
+> >> [<ffffffc0004f07ac>] kernel_init+0xc/0xe0
+> >> ---[ end trace 3ee052d463aab7f3 ]---
+> >> ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 1 at
+> >> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:1380
+> >> pci_device_add+0x128/0x140()
+> >> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> >>
+> >> I have made a small fix above your patch. After the fix is applied,
+> >> dumps are gone and the enumeration finishes up smoothly for all the
+> >> ports.
+> >> Since the change is small, just pasting it here. Please review and
+> >> apply if it's clean.
+> >
+> > Honestly, I have no idea. I kept staring at the code for a better part of an hour
+> > trying to decipher what the intent of the code was, without too much progress. I
+> > still don't understand why the code in pci_alloc_child_bus() takes a shortcut when
+> > the bridge argument is NULL when in my opinion it should use parent->bridge instead
+> > and continue as normal.
+> >
+> >>
+> >> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> >> index a12cda5..aac8366 100644
+> >> --- a/drivers/pci/probe.c
+> >> +++ b/drivers/pci/probe.c
+> >> @@ -693,7 +693,7 @@ static struct pci_bus *pci_alloc_child_bus(struct
+> >> pci_bus *parent,
+> >>         }
+> >>
+> >>         child->self = bridge;
+> >> -       child->bridge = get_device(&bridge->dev);
+> >> +       child->bridge = get_device(parent->bridge);
+> >>         child->dev.parent = child->bridge;
+> >
+> > Hmm, not sure why this is needed. What does get_device(&bridge->dev)
+> > return for you? The next line sets child->dev.parent to child->bridge,
+> > but with your change I'm not sure we end up using the correct parent.
+> >
+> > Can you try to revert your change and modify the implementation of pci_domain_nr() in arm64
+> > to look like this:
+> >
+> > static inline int pci_domain_nr(struct pci_bus *bus)
+> > {
+> >         struct pci_host_bridge *bridge;
+> >
+> >         while (bus->parent)
+> >                 bus = bus->parent;
+> >
+> >         bridge = to_pci_host_bridge(bus->bridge);
+> >         if (bridge)
+> >                 return bridge->domain_nr;
+> >
+> >         return 0;
+> > }
+> >
+> 
+> This did not work for me.
+> 
+> 
+> > Please let me know what results you get.
+> >
+> I am printing following values
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index a12cda5..c89f86a 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -695,6 +695,8 @@ static struct pci_bus *pci_alloc_child_bus(struct
+> pci_bus *parent,
+>         child->self = bridge;
+>         child->bridge = get_device(&bridge->dev);
+>         child->dev.parent = child->bridge;
+> +       printk("%s:%d bus = %p , bridge_dev = %p, domain = %d\n",
+> +               __func__, __LINE__, child, child->bridge,
+> pci_domain_nr(parent));
 
-Sent but not merged for -rc5. Guess it will be merged for -rc6:
+I see that you are using parent here.
 
-https://lkml.org/lkml/2014/3/2/277
+>         pci_set_bus_of_node(child);
+>         pci_set_bus_speed(child);
+> 
+> @@ -1095,6 +1097,8 @@ int pci_setup_device(struct pci_dev *dev)
+>         dev_set_name(&dev->dev, "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
+>                      dev->bus->number, PCI_SLOT(dev->devfn),
+>                      PCI_FUNC(dev->devfn));
+> +       printk("%s:%d bus = %p , bridge_dev = %p, domain = %d\n",
+> +               __func__, __LINE__, dev->bus, dev->bus->bridge,
+> pci_domain_nr(dev->bus));
+> 
+>         pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
+>         dev->revision = class & 0xff;
+> 
+> Following looks suspicious to me.
+> 
+> bridge_dev = ffffffc7e03ffc00 for bus 0 in domain 1 while bridge_dev =
+> ffffffc7e03f7098 for bus 1 in domain 1.
+> 
+>  Log -->
+> -----------------------------------------------------------------------------------------------------------------------------
+> xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
+> pci_bus 0001:00: scanning bus
+> pci_setup_device:1101 bus = ffffffc7e0060400 , bridge_dev =
+> ffffffc7e03ffc00, domain = 1
 
-Regards,
-Mike
+This is domain = 1, bus = 0, right?
 
->
-> [1]
-> https://git.linaro.org/people/mike.turquette/linux.git/commit/00efcb1c8e1c3c5e5d3ce6f0682d66402911a84f
->
-> Best regards,
-> Tomasz
+> pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
+> pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
+> pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
+> pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
+> pci 0001:00:00.0: supports D1 D2
+> pci_bus 0001:00: fixups for bus
+> pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
+> pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
+> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> pci_alloc_child_bus:699 bus = ffffffc7e0063000 , bridge_dev =
+> ffffffc7e03f7098, domain = 1
+
+This is domain = 1, bus = 1, correct?
+
+> pci_bus 0001:01: scanning bus
+> pci_setup_device:1101 bus = ffffffc7e0063000 , bridge_dev =
+> ffffffc7e03f7098, domain = 0
+
+Then this is ... ? bus pointer matches 0001:01, same for bridge_dev, but
+suddenly domain is 0 ? That means that when the child was created, the
+bridge->dev was not setup? (in which case your patch would make sense).
+
+It would be really helpful if you could add more tracing messages so that
+we can figure out why the domain ends up being zero here. 
+
+Many thanks,
+Liviu
+
+
+> pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
+> pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
+> pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
+> pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at
+> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
+> sysfs_warn_dup+0x80/0xc0()
+> sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #50
+> -----------------------------------------------------------------------------------------------------------------------------
+> 
+> 
+> > Best regards,
+> > Liviu
+> >
+> >
+> >>         pci_set_bus_of_node(child);
+> >>         pci_set_bus_speed(child);
+> >>
+> >> Thanks,
+> >> Tanmay
+> >>
+> >> On Mon, Mar 3, 2014 at 9:33 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > pci_alloc_child_bus() uses the newly allocated child bus to figure
+> >> > out the domain number that is going to use for setting the device
+> >> > name. A better option is to use the parent bus domain number.
+> >> >
+> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> >
+> >> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> >> > index 26237a0..a12cda5 100644
+> >> > --- a/drivers/pci/probe.c
+> >> > +++ b/drivers/pci/probe.c
+> >> > @@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+> >> >          * now as the parent is not properly set up yet.
+> >> >          */
+> >> >         child->dev.class = &pcibus_class;
+> >> > -       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
+> >> > +       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
+> >> >
+> >> >         /*
+> >> >          * Set up the primary, secondary and subordinate
+> >> > --
+> >> > 1.9.0
+> >> >
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>
+> >
+> > --
+> > -------------------
+> >    .oooO
+> >    (   )
+> >     \ (  Oooo.
+> >      \_) (   )
+> >           ) /
+> >          (_/
+> >
+> >  One small step
+> >    for me ...
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
