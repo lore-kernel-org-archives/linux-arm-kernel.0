@@ -1,32 +1,22 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 4 Mar 2014 22:40:39 +0100
-Subject: [BUG] atmel: spi: scheduling while atomic
-In-Reply-To: <5315E33C.5000205@aksignal.cz>
-References: <5315E33C.5000205@aksignal.cz>
-Message-ID: <20140304214039.GA4441@piout.net>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 04 Mar 2014 16:47:59 -0500 (EST)
+Subject: [PATCH 1/2] sched: Remove unused mc_capable() and smt_capable()
+In-Reply-To: <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20140304210621.16893.8772.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20140304.164759.2230363367739786819.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ji??,
+From: Bjorn Helgaas <bhelgaas@google.com>
+Date: Tue, 04 Mar 2014 14:07:37 -0700
 
-Thank you for that report.
-
-On 04/03/2014 at 15:29:16 +0100, Ji?? Prchal wrote :
-> Hi,
-> I discovered some problem when I access anything on SPI. But it
-> seems to work correctly, only log is full of this messages. I've
-> tried kernels 3.13.0 and 3.14.0, both are the same.
+> Remove mc_capable() and smt_capable().  Neither is used.
 > 
-> [    0.875000] atmel_spi f0000000.spi: version: 0x212
-> [    0.878906] atmel_spi f0000000.spi: Using dma0chan0 (tx) and dma0chan1 (rx) for DMA transfers
-> [    0.882812] atmel_spi f0000000.spi: Atmel SPI Controller at 0xf0000000 (irq 28)
-> ...
+> Both were added by 5c45bf279d37 ("sched: mc/smt power savings sched
+> policy").  Uses of both were removed by 8e7fbcbc22c1 ("sched: Remove stale
+> power aware scheduling remnants and dysfunctional knobs").
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 
-For now, as a work around, I would suggest disabling dma. I believe it
-will solve that particular issue but I didn't try. I would be grateful
-if you could post the result.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: David S. Miller <davem@davemloft.net>
