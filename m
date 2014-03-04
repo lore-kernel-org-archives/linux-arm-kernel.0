@@ -1,79 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Mar 2014 11:15:21 +0000
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <CACxGe6tD3mQshDSoEQaPXAnXG_siUdiFoAWhjmO2gDY7ZzkjUw@mail.gmail.com>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
- <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
- <1393899715.20435.8.camel@joe-AO722>
- <53153A4C.9050602@infradead.org>
- <CACxGe6tD3mQshDSoEQaPXAnXG_siUdiFoAWhjmO2gDY7ZzkjUw@mail.gmail.com>
-Message-ID: <20140304111520.GE8766@mudshark.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 4 Mar 2014 11:17:46 +0000
+Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <5315a319.a3b2440a.039b.ffffc66e@mx.google.com>
+References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
+ <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+ <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
+ <20140228201557.29118.62126@capellas-linux>
+ <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
+ <53111e0f.a50a430a.6ef6.ffff99ae@mx.google.com>
+ <5315a319.a3b2440a.039b.ffffc66e@mx.google.com>
+Message-ID: <20140304111745.GB21431@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 10:59:46AM +0000, Grant Likely wrote:
-> On Tue, Mar 4, 2014 at 10:28 AM, Randy Dunlap <rdunlap@infradead.org> wrote:
-> > On 03/03/2014 06:21 PM, Joe Perches wrote:
-> >> On Tue, 2014-03-04 at 10:15 +0800, Graeme Gregory wrote:
-> >>> Add maintainers for the arm-core file for arm64 ACPI support
-> >>
-> >> Shouldn't something have to be in the kernel
-> >> tree before there's a MAINTAINERS entry?
-> >
-> > or in linux-next and the patch can be added to linux-next (some git tree).
+On Tue, Mar 04, 2014 at 09:55:31AM +0000, Sebastian Capella wrote:
+> Quoting Sebastian Capella (2014-02-28 15:38:54)
+> > Quoting Lorenzo Pieralisi (2014-02-28 14:49:33)
+> > > On Fri, Feb 28, 2014 at 08:15:57PM +0000, Sebastian Capella wrote:
+> > > > > 
+> > > > > This does not guarantee your stack is 8-byte aligned, that's not AAPCS
+> > > > > compliant and might buy you trouble.
+> > > > > 
+> > > > > Either you align the stack or you align the pointer you are passing.
+> > > > > 
+> > > > > Please have a look at kernel/process.c
+> > > > 
+> > > > I've added this for now, do you see any issues?
+> > > > 
+> > > > -static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
+> > > > +static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
+> > > > -               resume_stack + sizeof(resume_stack));
+> > > > +               resume_stack + ARRAY_SIZE(resume_stack));
+> > > 
+> > > I do not see why the stack depends on the PAGE_SIZE. I would be surprised
+> > > if you need more than a few bytes (given that soft_restart switches stack
+> > > again...), go through it with a debugger, it is easy to check the stack
+> > > usage and allow for some extra buffer (but half a page is not needed).
+> > 
+> > I assuming this is becase the no-save region is one page anyway (we skip
+> > restoring the no-save region physical page).  So maybe 1/2 is a way to
+> > leave some room for whatever else may need to be here, but in any case
+> > the 4k is used for nosave.  I think you're right that it can be much less.
 > 
-> Sure, it makes sense to merge this file along with the rest of the
-> series, but I certainly appreciate that Graeme and Hanjun are willing
-> to volunteer to do this work.
-
-Well, to put it another way, it makes no sense at all to merge this patch
-independently.
-
-> On Tue, Mar 4, 2014 at 6:23 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
-> >> +ACPI ARM64
-> >
-> > That's a pretty broad statement for a single file. Is it core support,
-> > architected peripherals, SoC?
+> Hi Lorenzo,
 > 
-> That's a good point. Graeme, it would be good if you could put some
-> text in the patch describing how you propose the maintainership to
-> work. Unfortunately the maintainers file doesn't have any kind of
-> comments field, otherwise I'd suggest you make those comments directly
-> there.
-> 
-> Given that ACPI can touch a lot of subsystems I would expect you and
-> Hanjun not to be merging much code directly, but being listed in
-> maintainers means that you will be kept in the loop when it comes to
-> merging ARM ACPI changes. I would also expect that anything that does
-> go through you (instead of merely acked) would be merged via Rafael
-> and Len's tree.
-> 
-> >
-> >> +M:   Hanjun Guo <hanjun.guo@linaro.org>
-> >> +M:   Graeme Gregory <graeme.gregory@linaro.org>
-> >> +S:   Supported
-> >> +L:   linux-acpi at vger.kernel.org
-> >> +F:   drivers/acpi/plat/arm-core.c
-> >
-> > This patch should be part of the series introducing the arm-core.c file
-> > and it will be ACKed (or NAKed) following review. We can't really commit
-> > maintainers to a file which does not exist in mainline and while there is
-> > still feedback to be addressed. It's like a blank cheque.
-> 
-> I agree with merging it with the rest of the series, but comparing it
-> to a blank cheque is not appropriate. Merely having an entry in
-> MAINTAINERS doesn't immediately confer trust or ability to merge code,
-> but it does tell people who to talk to when looking at ACPI on ARM.
-> You can bet that neither Linus, Len or Rafael will merge ARM ACPI
-> trees from them if you disagree. (And even if they did, you would
-> yell, and Linus would revert it).
+> Are you ok with this just being half a page?  Or do you want me to try
+> to reduce the stack size?  I am at Connect without my debugger, so in
+> that case it would have to wait until next week.
 
-If you want to know who to talk to regarding a subsystem then you use
-get_maintainer.pl and/or git blame. Regardless of this patch, neither of
-those tools will identify Graeme or Hanjun as the contacts for ACPI on ARM.
+I am ok, either you leave that as it is (that multiple division looks
+horrible but it is just nitpicking on my side) or define it as an u8 array,
+stick __attribute__((aligned(8)) to the definition (and explain why) and be
+done with it.
 
-I think we're in agreement, but just to spell it out: this patch should be
-included at the end of a series adding the files which will be maintained.
+You can add my:
 
-Will
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
