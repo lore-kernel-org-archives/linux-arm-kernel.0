@@ -1,30 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Mar 2014 23:50:44 +0000
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <20140304190318.GE28736@xora-yoga13>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
- <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
- <20140304102316.GG30596@arm.com>
- <20140304190318.GE28736@xora-yoga13>
-Message-ID: <20140304235044.GB11418@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 4 Mar 2014 15:51:15 -0800
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+Message-ID: <1b9f22ac-4dde-4ecc-885a-3d8081157081@AM1EHSMHS012.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 07:03:18PM +0000, Graeme Gregory wrote:
-> On Tue, Mar 04, 2014 at 10:23:16AM +0000, Catalin Marinas wrote:
-> > On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
-> > > +ACPI ARM64
-> > 
-> > That's a pretty broad statement for a single file. Is it core support,
-> > architected peripherals, SoC?
-> > 
-> Hi Catalin would changing the title to ACPI ARM64 Core Support be better
-> in your mind. I do intend for the maintainership to cover just the
-> plat/arm-core.c file.
+Hi Kedar,
 
-See my reply to Grant. If that's the only thing you guys are aiming for,
-who's in charge of the other bits? Face-to-face meeting in 3 hours
-anyway, so we can get back here with the conclusion.
+On Tue, 2014-03-04 at 06:50PM +0530, Kedareswara rao Appana wrote:
+> This patch adds xilinx CAN controller support.
+> This driver supports both ZYNQ CANPS and Soft IP
+> AXI CAN controller.
+> 
+[...]
+> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> new file mode 100644
+> index 0000000..0e57103
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> @@ -0,0 +1,45 @@
+> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
+> +---------------------------------------------------------
+> +
+> +Required properties:
+> +- compatible		: Should be "xlnx,zynq-can-1.00.a" for Zynq CAN
+> +			  controllers and "xlnx,axi-can-1.00.a" for Axi CAN
+> +			  controllers.
+> +- reg			: Physical base address and size of the Axi CAN/Zynq
+> +			  CANPS registers map.
+> +- interrupts		: Property with a value describing the interrupt
+> +			  number.
+> +- interrupt-parent	: Must be core interrupt controller
+> +- clock-names		: List of input clock names - "ref_clk", "aper_clk"
 
--- 
-Catalin
+Let's reconsider these names. These are rather Zynq specific names. Does
+the IP documentation use these as well? The names should match the
+naming used for the IP, rather than the SOC. Is this the correct data sheet:
+http://www.xilinx.com/support/documentation/ip_documentation/axi_can/v1_03_a/ds791_axi_can.pdf
+? According to that the names should rather be 's_axi_aclk' and
+'can_clk', IMHO.
+
+	S?ren
