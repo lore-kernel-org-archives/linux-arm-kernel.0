@@ -1,31 +1,50 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 04 Mar 2014 12:38:28 +0100
-Subject: I2C dummy adapter driver ?
-In-Reply-To: <20140228060728.GB29849@sirena.org.uk>
-References: <5305382E.9050902@gmail.com>
- <CAJe_ZhcMMVRTErH3ctbnZyn30_cp9XXjEfUZXdWaVWUHqs4CRw@mail.gmail.com>
- <53073C51.5010401@samsung.com> <20140228060728.GB29849@sirena.org.uk>
-Message-ID: <5315BB34.8080803@samsung.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 04 Mar 2014 15:54:24 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NSAxLzNdIHR0eS9zZXJpYWw6IEFkZCBHUElPTElCIGhl?=
+ =?UTF-8?B?bHBlcnMgZm9yIGNvbnRyb2xsaW5nIG1vZGVtIGxpbmVz?=
+In-Reply-To: <CACQ1gAgURezr+Oqd6mX4D4K_C1LtmVh4a2fOnie0Xfj9sfYjQQ@mail.gmail.com>
+References: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
+ <1393846030.273217958@f113.i.mail.ru>
+ <CACQ1gAgURezr+Oqd6mX4D4K_C1LtmVh4a2fOnie0Xfj9sfYjQQ@mail.gmail.com>
+Message-ID: <1393934064.723888132@f365.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 07:07, Mark Brown wrote:
-> On Fri, Feb 21, 2014 at 12:45:21PM +0100, Sylwester Nawrocki wrote:
-> 
->> The I2C bus driver with empty i2c_algorithm.master_xfer() helps WRT to
->> using standard DT binding and v4l2_subdev interface.
-> 
-> Wouldn't a platform device do just as well here if there's no actual
-> control?
+Hello.
 
-Then the I2C client devices would have to be instantiated manually, 
-I think it's more trouble.
-I could as well create custom I2C client drivers per ISP, but then the 
-I2C devices would have to be represented somehow in DT, to pass stuff 
-like voltage regulators and GPIOs. Anyway, it's not something could be 
-done in mainline.
+???????,  4 ????? 2014, 12:37 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
+> 2014-03-03 12:27 GMT+01:00 Alexander Shiyan <shc_work@mail.ru>:
+> > Hello.
+> >
+> > ???????????,  3 ????? 2014, 12:11 +01:00 ?? Richard Genoud <noreply.rgenoud@gmail.com>:
+> >> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> >> GPIO.
+> >> This will be useful for many boards which have a serial controller that
+> >> only handle CTS/RTS pins (or even just RX/TX).
+> >>
+> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> > ...
+> >> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> >> +{
+> >> +     struct mctrl_gpios *gpios;
+> >> +     enum mctrl_gpio_idx i;
+> >> +     int err;
+> >> +
+> >> +     gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
+> >> +     if (!gpios)
+> >> +             goto out;
+> >
+> > if (!gpios)
+> >   return ERR_PTR(-ENOMEM);
+> I think we are looping here...
+> If I returns a ERR_PTR(-ENOMEM), I'll have to change back all tests
+> from if (!gpios) to if (IS_ERR_OR_NULL(gpios))
+> So, I'll just return NULL here, and change the test in atmel_serial.c
+> (that was wrong anyway, as you pointed out)
 
-Even if there is no actual I2C communication on the host CPU side, the 
-power up/down sequence is handled there. The intention is to keep this 
-common per an I2C client, regardless of whether I2C communication is 
-done by firmware or the host the CPU.
+Yes, a little confused :)
+So, let's revert back to check IS_ERR_OR_NULL(gpios).
+We able to check error codes in the driver in this case.
+gpios = NULL at the end of mctrl_gpio_free() is still needed.
+
+---
