@@ -1,86 +1,42 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue,  4 Mar 2014 23:06:02 +0100
-Subject: [PATCH] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <5315ED51.1000006@ti.com>
-References: <5315ED51.1000006@ti.com>
-Message-ID: <1393970762-5346-1-git-send-email-holler@ahsoftware.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Mar 2014 23:16:26 +0100
+Subject: [PATCH RFC 3/6] tty: Rename xilinx_uart -> cadence_uart
+In-Reply-To: <20140304193913.71c6f307@alan.etchedpixels.co.uk>
+References: <1393953449-28551-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1393953449-28551-4-git-send-email-soren.brinkmann@xilinx.com>
+ <20140304193913.71c6f307@alan.etchedpixels.co.uk>
+Message-ID: <201403042316.26221.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver missed an of_xlate function to translate gpio numbers
-as found in the DT to the correct chip and number.
+On Tuesday 04 March 2014, One Thousand Gnomes wrote:
+> On Tue,  4 Mar 2014 09:17:26 -0800
+> Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
 
-While there I've set #gpio_cells to a fixed value of 2.
+> The following aspects of the change set are IMHO acceptable
+> 
+> - Cleaning up all the code formatting
+> - Update the driver comments and header to explain the Cadence/Xilinx
+>   thing
+> - change "Xilinx PS UART Support" text to "Cadence (Xilinx PS) Support"
+>   or similar wording in Kconfig
+> - Adding the cadence devicetree compatibility strings and inputs *in
+>   addition* to the existing ones.
+> - Documentation for the new options
 
-I've used gpio-pxa.c as template for those changes and tested my changes
-successfully on a da850 board using entries for gpio-leds in a DT. So I didn't
-reinvent the wheel but just copied and tested stuff.
+I agree. I think it would also be nice to allow the standard clock names
+to be used as an alternative to the bogus ref_clk" and "aper_clk"
+names, but just like the compatible string, it's too late to remove
+support for the existing ones.
 
-Thanks to Grygorii Strashko for the hint of the existing code in gpio-pxa.
+Regarding the "xlnx,xuartps" compatible string, even if we were to break
+backwards comptibility with the clocks, I would still want to see this
+string being used in addition to "cdns,uart-r1p8" so we have a way to
+detect possible changes that xilinx did on top of the r1p8 version.
+I also wonder if "cdns,uart-r1p8" is actually specific enough: r1p8
+looks like a version number rather than a name, and it seems possible
+that Cadence has produced more than one uart implemention in the past
+or will do another one in the future that is not just a different
+revision of this one but instead something completely different.
 
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- drivers/gpio/gpio-davinci.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 7629b4f..79f45c4 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -44,6 +44,9 @@ struct davinci_gpio_regs {
- 
- static void __iomem *gpio_base;
- 
-+static struct davinci_gpio_controller *davinci_gpio_chips;
-+static int davinci_last_gpio;
-+
- static struct davinci_gpio_regs __iomem *gpio2regs(unsigned gpio)
- {
- 	void __iomem *ptr;
-@@ -172,6 +175,24 @@ of_err:
- 	return NULL;
- }
- 
-+#ifdef CONFIG_OF_GPIO
-+static int davinci_gpio_of_xlate(struct gpio_chip *gc,
-+			     const struct of_phandle_args *gpiospec,
-+			     u32 *flags)
-+{
-+	if (gpiospec->args[0] > davinci_last_gpio)
-+		return -EINVAL;
-+
-+	if (gc != &davinci_gpio_chips[gpiospec->args[0] / 32].chip)
-+		return -EINVAL;
-+
-+	if (flags)
-+		*flags = gpiospec->args[1];
-+
-+	return gpiospec->args[0] % 32;
-+}
-+#endif
-+
- static int davinci_gpio_probe(struct platform_device *pdev)
- {
- 	int i, base;
-@@ -236,6 +257,8 @@ static int davinci_gpio_probe(struct platform_device *pdev)
- 			chips[i].chip.ngpio = 32;
- 
- #ifdef CONFIG_OF_GPIO
-+		chips[i].chip.of_gpio_n_cells = 2;
-+		chips[i].chip.of_xlate = davinci_gpio_of_xlate;
- 		chips[i].chip.of_node = dev->of_node;
- #endif
- 		spin_lock_init(&chips[i].lock);
-@@ -251,6 +274,10 @@ static int davinci_gpio_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, chips);
- 	davinci_gpio_irq_setup(pdev);
-+
-+	davinci_gpio_chips = chips;
-+	davinci_last_gpio = ngpio;
-+
- 	return 0;
- }
- 
--- 
-1.8.3.1
+	Arnd
