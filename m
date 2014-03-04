@@ -1,72 +1,66 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 4 Mar 2014 18:59:46 +0800
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <53153A4C.9050602@infradead.org>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
- <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
- <1393899715.20435.8.camel@joe-AO722> <53153A4C.9050602@infradead.org>
-Message-ID: <CACxGe6tD3mQshDSoEQaPXAnXG_siUdiFoAWhjmO2gDY7ZzkjUw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Mar 2014 11:00:42 +0000
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM
+In-Reply-To: <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
+References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
+ <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140304110042.GD8766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 4, 2014 at 10:28 AM, Randy Dunlap <rdunlap@infradead.org> wrote:
-> On 03/03/2014 06:21 PM, Joe Perches wrote:
->> On Tue, 2014-03-04 at 10:15 +0800, Graeme Gregory wrote:
->>> Add maintainers for the arm-core file for arm64 ACPI support
->>
->> Shouldn't something have to be in the kernel
->> tree before there's a MAINTAINERS entry?
->
-> or in linux-next and the patch can be added to linux-next (some git tree).
+Hi Jean,
 
-Sure, it makes sense to merge this file along with the rest of the
-series, but I certainly appreciate that Graeme and Hanjun are willing
-to volunteer to do this work.
+On Mon, Mar 03, 2014 at 09:53:21AM +0000, Jean Pihet wrote:
+> Introducing perf_regs_load function, which is going
+> to be used for dwarf unwind test in following patches.
+> 
+> It takes single argument as a pointer to the regs dump
+> buffer and populates it with current registers values.
 
-On Tue, Mar 4, 2014 at 6:23 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
->> +ACPI ARM64
->
-> That's a pretty broad statement for a single file. Is it core support,
-> architected peripherals, SoC?
+[...]
 
-That's a good point. Graeme, it would be good if you could put some
-text in the patch describing how you propose the maintainership to
-work. Unfortunately the maintainers file doesn't have any kind of
-comments field, otherwise I'd suggest you make those comments directly
-there.
+> diff --git a/tools/perf/arch/arm/tests/regs_load.S b/tools/perf/arch/arm/tests/regs_load.S
+> new file mode 100644
+> index 0000000..241c6df
+> --- /dev/null
+> +++ b/tools/perf/arch/arm/tests/regs_load.S
+> @@ -0,0 +1,51 @@
+> +#include <linux/linkage.h>
+> +
+> +#define R0 0x00
+> +#define R1 0x08
 
-Given that ACPI can touch a lot of subsystems I would expect you and
-Hanjun not to be merging much code directly, but being listed in
-maintainers means that you will be kept in the loop when it comes to
-merging ARM ACPI changes. I would also expect that anything that does
-go through you (instead of merely acked) would be merged via Rafael
-and Len's tree.
+Why are you using a 64-bit stride for 32-bit registers? (which prevents you
+from using stm later on).
 
->
->> +M:   Hanjun Guo <hanjun.guo@linaro.org>
->> +M:   Graeme Gregory <graeme.gregory@linaro.org>
->> +S:   Supported
->> +L:   linux-acpi at vger.kernel.org
->> +F:   drivers/acpi/plat/arm-core.c
->
-> This patch should be part of the series introducing the arm-core.c file
-> and it will be ACKed (or NAKed) following review. We can't really commit
-> maintainers to a file which does not exist in mainline and while there is
-> still feedback to be addressed. It's like a blank cheque.
+> +.text
+> +.type perf_regs_load,%function
+> +ENTRY(perf_regs_load)
+> +	push {r1}
 
-I agree with merging it with the rest of the series, but comparing it
-to a blank cheque is not appropriate. Merely having an entry in
-MAINTAINERS doesn't immediately confer trust or ability to merge code,
-but it does tell people who to talk to when looking at ACPI on ARM.
-You can bet that neither Linus, Len or Rafael will merge ARM ACPI
-trees from them if you disagree. (And even if they did, you would
-yell, and Linus would revert it).
+Do you only push r1 here so that you can do the stack arithmetic later? That
+doesn't make sense to me -- can't you str sp directly?
 
->
-> --
-> Catalin
+> +	str r0, [r0, #R0]
+> +	str r1, [r0, #R1]
+> +	str r2, [r0, #R2]
+> +	str r3, [r0, #R3]
+> +	str r4, [r0, #R4]
+> +	str r5, [r0, #R5]
+> +	str r6, [r0, #R6]
+> +	str r7, [r0, #R7]
+> +	str r8, [r0, #R8]
+> +	str r9, [r0, #R9]
+> +	str sl, [r0, #SL]
+> +	str fp, [r0, #FP]
+> +	str ip, [r0, #IP]
+> +	add r1, sp, #4		@ Retrieve and save sp at entry time
+> +	str r1, [r0, #SP]
+> +	str lr, [r0, #LR]
+> +	str lr, [r0, #PC]	@ Save caller PC
 
-Graeme, you can add my a-b line:
+This isn't necessarily the `caller PC' (depending on how you define it).
+It's the return address, which is probably (but not always) the instruction
+following the branch to this function.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Will
