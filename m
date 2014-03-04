@@ -1,73 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  4 Mar 2014 17:28:39 +0100
-Subject: [PATCH v3 3/5] ARM: sun6i: Enable the I2C controllers
+Date: Tue,  4 Mar 2014 17:28:40 +0100
+Subject: [PATCH v3 4/5] ARM: sun6i: Enable the I2C muxing options
 In-Reply-To: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1393950521-4173-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1393950521-4173-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has 4 I2C controllers that are the same than the one in the
-other Allwinner SoCs, except for the fact that they are asserted in
-reset by the reset unit.
-
-Add these i2c controllers to the DTSI.
+The i2c controllers have a few muxing options on the A31. Enable the
+ones found in the A31 Colombus board.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index af6f87c..22d3eae 100644
+index 22d3eae..8d3ea29 100644
 --- a/arch/arm/boot/dts/sun6i-a31.dtsi
 +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -359,6 +359,46 @@
- 			status = "disabled";
+@@ -257,6 +257,27 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			i2c0_pins_a: i2c0 at 0 {
++				allwinner,pins = "PH14", "PH15";
++				allwinner,function = "i2c0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c1_pins_a: i2c1 at 0 {
++				allwinner,pins = "PH16", "PH17";
++				allwinner,function = "i2c1";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				allwinner,pins = "PH18", "PH19";
++				allwinner,function = "i2c2";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
  		};
  
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <0 6 4>;
-+			clocks = <&apb2_gates 0>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <0 7 4>;
-+			clocks = <&apb2_gates 1>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 1>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <0 8 4>;
-+			clocks = <&apb2_gates 2>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 2>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at 01c2b800 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b800 0x400>;
-+			interrupts = <0 9 4>;
-+			clocks = <&apb2_gates 3>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 3>;
-+			status = "disabled";
-+		};
-+
- 		spi0: spi at 01c68000 {
- 			compatible = "allwinner,sun6i-a31-spi";
- 			reg = <0x01c68000 0x1000>;
+ 		ahb1_rst: reset at 01c202c0 {
 -- 
 1.9.0
