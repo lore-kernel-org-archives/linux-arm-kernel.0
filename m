@@ -1,61 +1,74 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 4 Mar 2014 13:54:54 +0100
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <20140228162327.GT21483@n2100.arm.linux.org.uk>
+Date: Tue, 4 Mar 2014 13:59:48 +0100
+Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <20140228160612.GR21483@n2100.arm.linux.org.uk>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>
- <5310B567.7040605@ti.com>
- <20140228162327.GT21483@n2100.arm.linux.org.uk>
-Message-ID: <20140304125454.GZ17001@phenom.ffwll.local>
+ <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
+ <20140228160612.GR21483@n2100.arm.linux.org.uk>
+Message-ID: <20140304125948.GA17001@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 04:23:27PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 28, 2014 at 06:12:23PM +0200, Tomi Valkeinen wrote:
-> > On 28/02/14 17:59, Russell King - ARM Linux wrote:
+On Fri, Feb 28, 2014 at 04:06:12PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 28, 2014 at 02:20:11PM +0200, Tomi Valkeinen wrote:
+> > Add DT binding documentation for HDMI Connector.
 > > 
-> > >> +dvi0: connector at 0 {
-> > >> +	compatible = "dvi-connector";
-> > >> +	label = "dvi";
-> > >> +
-> > >> +	i2c-bus = <&i2c3>;
-> > >> +
-> > >> +	dvi_connector_in: endpoint {
-> > >> +		remote-endpoint = <&tfp410_out>;
-> > >> +	};
-> > >> +};
-> > > 
-> > > This looks far too simplistic.  There are different classes of DVI
-> > > connector - there is:
-> > > 
-> > > DVI A - analogue only
-> > > DVI D - digital only (single and dual link)
-> > > DVI I - both (single and dual digital link)
-> > > 
-> > > DRM at least makes a distinction between these three classes, and this
-> > > disctinction is part of the user API.  How would a display system know
-> > > which kind of DVI connector is wired up on the board from this DT
-> > > description?
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Reviewed-by: Archit Taneja <archit@ti.com>
+> > ---
+> >  .../devicetree/bindings/video/hdmi-connector.txt   | 23 ++++++++++++++++++++++
+> >  1 file changed, 23 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
 > > 
-> > Yes, I think that's a valid change. But do we also need to specify
-> > single/dual link, in addition to the three types?
+> > diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> > new file mode 100644
+> > index 000000000000..5d25f6a432bb
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> > @@ -0,0 +1,23 @@
+> > +HDMI Connector
+> > +==============
+> > +
+> > +Required properties:
+> > +- compatible: "hdmi-connector"
+> > +
+> > +Optional properties:
+> > +- label: a symbolic name for the connector
+> > +
+> > +Required nodes:
+> > +- Video port for HDMI input
+> > +
+> > +Example
+> > +-------
+> > +
+> > +hdmi0: connector at 1 {
+> > +	compatible = "hdmi-connector";
+> > +	label = "hdmi";
+> > +
+> > +	hdmi_connector_in: endpoint {
+> > +		remote-endpoint = <&tpd12s015_out>;
+> > +	};
+> > +};
 > 
-> I would argue that as it's a difference in physical hardware, then it
-> should be described in DT, even if we don't use it.  The reasoning is
-> that although we may not use it today, we may need to use it in the
-> future, and as we're describing what the hardware actually is - and
-> even in this case what pins may be present or missing on the connector,
-> it's unlikely to be problematical (the only problem is when someone
-> omits it...)
+> It seems rather weird to have DVI connectors having an optional I2C
+> property, but HDMI (which augments DVI) not having that as at least an
+> optional property.
+> 
+> I can quite well see the iMX HDMI support needing an i2c bus here.
+> 
+> Also, HDMI has two connector standards - type A and type B, much like
+> the single vs dual link of DVI.  Again, DRM exposes this to userspace.
 
-If you plug a dual-link dvi screen into a soc which can do dual-link but
-the actual connector is cheap and doesn't have this wired up
-(differentiate wtf) then the kernel needs to know. Otherwise it can't
-correctly filter out the modes with dotclocks high enough to require dual
-link and the user will look at a black screen.
+Yeah, there's a dual-link hdmi standard somewhere. I've never seen it in
+the wild anywhere though, and newer hdmi all just increase the max link
+clock to push higher res modes over the wire. Imo can't hurt to just
+enumerate all type of physical connectors standardized.
 
-3.14 has a regression in drm/i915 where we've screwed this up ;-)
+HDMI revisions themselves are only relevant for the sink (as advertised
+capabilities in the EDID) and for your hdmi encoder chip (where pretty
+much just the max dotclock is interesting really). So I don't think we
+need a hdmi revision in dt for the physical connector.
 -Daniel
 -- 
 Daniel Vetter
