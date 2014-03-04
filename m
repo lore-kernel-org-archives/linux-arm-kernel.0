@@ -1,39 +1,86 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Mar 2014 23:07:29 -0500
-Subject: [PATCH 4/4] ARM: add Marvell Dove and some drivers to multi_v7
- defconfig
-In-Reply-To: <1393536486-3827-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393536486-3827-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140304040729.GJ1872@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 4 Mar 2014 05:02:06 +0100
+Subject: nand pmecc crash detected
+In-Reply-To: <5313FACC.8030202@atmel.com>
+References: <5310B108.8040800@celad.com>
+ <5313FACC.8030202@atmel.com>
+Message-ID: <20140304040206.GO9671@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
-
-On Thu, Feb 27, 2014 at 10:28:05PM +0100, Sebastian Hesselbarth wrote:
-> With Marvell Dove now being part of the multi_v7 family, add some Dove
-> specific drivers to multi_v7 defconfig.
+On 11:45 Mon 03 Mar     , Josh Wu wrote:
+> Dear Herve
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/configs/multi_v7_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
+> On 2/28/2014 11:53 PM, Herve Codina wrote:
+> >Hi,
+> >
+> >I am using an sam5d35 and its pmecc nand ecc controller.
+> >
+> >In barebox, using similar atmel_nand.c the system crashes.
+> >
+> >The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+> >(nand_base.c) when we write a sub page.
+> >
+> >chip->ecc.hwctl function is not set when we are using PMECC controller.
+> >
+> >As a workaround, i set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+> >order to disable sub page access in nand_write_page.
+> >
+> >I think we can have the same problem in Linux. I do not performed
+> >subpage nand writes from Linux but i made the following patch according
+> >to my Barebox defect.
+> 
+> Thank you for catching this crash bug. The fix is fine for me. But I
+> think it's better to send out the Linux kernel patch alone.
+> 
+> You can rebase your patch on the top of Linux-mtd git
+> repo(git://git.infradead.org/l2-mtd.git) instead of your local
+> Linux.
+> Then use 'git send-email' send to linux-mtd at lists.infradead.org and
+> linux-arm-kernel at lists.infradead.org. I will ack your patch.
+> 
+> If the patch is merged in Linux-mtd, it should be easier port to
+> barebox then.
 
-I'm taking the other part of this series in, so:
+no need for that notion of priority send it to both
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+Best Regards,
+J.
+> 
+> >
+> >Here after are my patches (same modification) for 1st my local Barebox
+> >and 2nd my local Linux :
+> >
+> >---8<-------------------
+> > From 757e8dbf141619a55b7a5b1ca11780b2589eacc1 Mon Sep 17 00:00:00 2001
+> >From: Herve Codina <Herve.CODINA@celad.com>
+> >Date: Fri, 28 Feb 2014 08:39:08 +0100
+> >Subject: [PATCH 5/5] Disable Subpage nand write when using Atmel PMECC.
+> >
+> >
+> >Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+> >---
+> >  drivers/mtd/nand/atmel_nand.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> >diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> >index 2ff7427..cdbe685 100644
+> >--- a/drivers/mtd/nand/atmel_nand.c
+> >+++ b/drivers/mtd/nand/atmel_nand.c
+> >@@ -837,6 +837,7 @@ static int __init
+> >atmel_pmecc_nand_init_params(struct device_d *dev,
+> >  		return err_no;
+> >  	}
+> >
+> >+	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
+> >  	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+> >  	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
+> >
+> 
+> Best Regards,
+> Josh Wu
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
