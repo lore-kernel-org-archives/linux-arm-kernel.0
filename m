@@ -1,106 +1,217 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 11:18:08 +0200
-Subject: [PATCHv2 02/14] ARM: OMAP2420: clock: get rid of fixed-div property
- use
+Date: Tue, 4 Mar 2014 11:18:09 +0200
+Subject: [PATCHv2 03/14] CLK: TI: DPLL: simplify autoidle register detection
+ logic
 In-Reply-To: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
 References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393924700-6510-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1393924700-6510-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleans up the code a bit and is useful for clock data DT conversion.
+AMxxxx dpll_data previously had autoidle_mask set, even if these SoC:s
+don't have autoidle register. Remove the bit-field value as it is unused,
+also drop the unnecessary DPLL_HAS_AUTOIDLE flag passing during init,
+as we can just simply check against the contents of the autoidle_mask.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cclock2420_data.c |   15 ++++-----------
- arch/arm/mach-omap2/clock.c           |   21 ---------------------
- arch/arm/mach-omap2/clock.h           |    3 ---
- 3 files changed, 4 insertions(+), 35 deletions(-)
+ drivers/clk/ti/dpll.c |   39 +++++++++++++++------------------------
+ 1 file changed, 15 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
-index 3e46ac1..3b0beea 100644
---- a/arch/arm/mach-omap2/cclock2420_data.c
-+++ b/arch/arm/mach-omap2/cclock2420_data.c
-@@ -1025,18 +1025,12 @@ DEFINE_CLK_OMAP_MUX_GATE(iva1_ifck, "iva1_clkdm", dsp_fck_clksel,
- 			 OMAP2420_EN_IVA_COP_SHIFT, &clkhwops_wait,
- 			 dsp_fck_parent_names, dsp_fck_ops);
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index 7e498a4..dda262d 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
+@@ -25,8 +25,6 @@
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
  
-+DEFINE_CLK_FIXED_FACTOR(iva1_ifck_div, "iva1_ifck", &iva1_ifck, 0x0, 1, 2);
-+
- static struct clk iva1_mpu_int_ifck;
- 
- static const char *iva1_mpu_int_ifck_parent_names[] = {
--	"iva1_ifck",
--};
+-#define DPLL_HAS_AUTOIDLE	0x1
 -
--static const struct clk_ops iva1_mpu_int_ifck_ops = {
--	.init		= &omap2_init_clk_clkdm,
--	.enable		= &omap2_dflt_clk_enable,
--	.disable	= &omap2_dflt_clk_disable,
--	.is_enabled	= &omap2_dflt_clk_is_enabled,
--	.recalc_rate	= &omap_fixed_divisor_recalc,
-+	"iva1_ifck_div",
- };
- 
- static struct clk_hw_omap iva1_mpu_int_ifck_hw = {
-@@ -1047,11 +1041,10 @@ static struct clk_hw_omap iva1_mpu_int_ifck_hw = {
- 	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
- 	.enable_bit	= OMAP2420_EN_IVA_MPU_SHIFT,
- 	.clkdm_name	= "iva1_clkdm",
--	.fixed_div	= 2,
- };
- 
- DEFINE_STRUCT_CLK(iva1_mpu_int_ifck, iva1_mpu_int_ifck_parent_names,
--		  iva1_mpu_int_ifck_ops);
-+		  aes_ick_ops);
- 
- static struct clk mailboxes_ick;
- 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 591581a..4ac6e3d 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -82,27 +82,6 @@ u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
- }
- 
- /*
-- * Used for clocks that have the same value as the parent clock,
-- * divided by some factor
-- */
--unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
--		unsigned long parent_rate)
--{
--	struct clk_hw_omap *oclk;
--
--	if (!hw) {
--		pr_warn("%s: hw is NULL\n", __func__);
--		return -EINVAL;
--	}
--
--	oclk = to_clk_hw_omap(hw);
--
--	WARN_ON(!oclk->fixed_div);
--
--	return parent_rate / oclk->fixed_div;
--}
--
--/*
-  * OMAP2+ specific clock functions
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+ 	defined(CONFIG_SOC_DRA7XX)
+ static const struct clk_ops dpll_m4xen_ck_ops = {
+@@ -193,14 +191,12 @@ static void ti_clk_register_dpll_x2(struct device_node *node,
+  * @node: device node containing the DPLL info
+  * @ops: ops for the DPLL
+  * @ddt: DPLL data template to use
+- * @init_flags: flags for controlling init types
+  *
+  * Initializes a DPLL clock from device tree data.
   */
+ static void __init of_ti_dpll_setup(struct device_node *node,
+ 				    const struct clk_ops *ops,
+-				    const struct dpll_data *ddt,
+-				    u8 init_flags)
++				    const struct dpll_data *ddt)
+ {
+ 	struct clk_hw_omap *clk_hw = NULL;
+ 	struct clk_init_data *init = NULL;
+@@ -247,7 +243,7 @@ static void __init of_ti_dpll_setup(struct device_node *node,
+ 	if (!dd->control_reg || !dd->idlest_reg || !dd->mult_div1_reg)
+ 		goto cleanup;
  
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index bda767a..3843c9f 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -189,9 +189,6 @@ struct clk_hw_omap_ops {
- 	void			(*deny_idle)(struct clk_hw_omap *oclk);
- };
+-	if (init_flags & DPLL_HAS_AUTOIDLE) {
++	if (dd->autoidle_mask) {
+ 		dd->autoidle_reg = ti_clk_get_reg_addr(node, 3);
+ 		if (!dd->autoidle_reg)
+ 			goto cleanup;
+@@ -310,7 +306,7 @@ static void __init of_ti_omap3_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
  
--unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
--					unsigned long parent_rate);
--
- /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
- #define CORE_CLK_SRC_32K		0x0
- #define CORE_CLK_SRC_DPLL		0x1
+-	of_ti_dpll_setup(node, &omap3_dpll_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &omap3_dpll_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap3_dpll_clock, "ti,omap3-dpll-clock",
+ 	       of_ti_omap3_dpll_setup);
+@@ -329,7 +325,7 @@ static void __init of_ti_omap3_core_dpll_setup(struct device_node *node)
+ 		.freqsel_mask = 0xf0,
+ 	};
+ 
+-	of_ti_dpll_setup(node, &omap3_dpll_core_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &omap3_dpll_core_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap3_core_dpll_clock, "ti,omap3-dpll-core-clock",
+ 	       of_ti_omap3_core_dpll_setup);
+@@ -349,7 +345,7 @@ static void __init of_ti_omap3_per_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &omap3_dpll_per_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &omap3_dpll_per_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap3_per_dpll_clock, "ti,omap3-dpll-per-clock",
+ 	       of_ti_omap3_per_dpll_setup);
+@@ -371,7 +367,7 @@ static void __init of_ti_omap3_per_jtype_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &omap3_dpll_per_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &omap3_dpll_per_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap3_per_jtype_dpll_clock, "ti,omap3-dpll-per-j-type-clock",
+ 	       of_ti_omap3_per_jtype_dpll_setup);
+@@ -391,7 +387,7 @@ static void __init of_ti_omap4_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &dpll_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap4_dpll_clock, "ti,omap4-dpll-clock",
+ 	       of_ti_omap4_dpll_setup);
+@@ -410,7 +406,7 @@ static void __init of_ti_omap4_core_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_core_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &dpll_core_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap4_core_dpll_clock, "ti,omap4-dpll-core-clock",
+ 	       of_ti_omap4_core_dpll_setup);
+@@ -433,7 +429,7 @@ static void __init of_ti_omap4_m4xen_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_m4xen_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &dpll_m4xen_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap4_m4xen_dpll_clock, "ti,omap4-dpll-m4xen-clock",
+ 	       of_ti_omap4_m4xen_dpll_setup);
+@@ -454,7 +450,7 @@ static void __init of_ti_omap4_jtype_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_m4xen_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
++	of_ti_dpll_setup(node, &dpll_m4xen_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_omap4_jtype_dpll_clock, "ti,omap4-dpll-j-type-clock",
+ 	       of_ti_omap4_jtype_dpll_setup);
+@@ -465,7 +461,6 @@ static void __init of_ti_am3_no_gate_dpll_setup(struct device_node *node)
+ 	const struct dpll_data dd = {
+ 		.idlest_mask = 0x1,
+ 		.enable_mask = 0x7,
+-		.autoidle_mask = 0x7,
+ 		.mult_mask = 0x7ff << 8,
+ 		.div1_mask = 0x7f,
+ 		.max_multiplier = 2047,
+@@ -474,7 +469,7 @@ static void __init of_ti_am3_no_gate_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_no_gate_ck_ops, &dd, 0);
++	of_ti_dpll_setup(node, &dpll_no_gate_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_am3_no_gate_dpll_clock, "ti,am3-dpll-no-gate-clock",
+ 	       of_ti_am3_no_gate_dpll_setup);
+@@ -484,7 +479,6 @@ static void __init of_ti_am3_jtype_dpll_setup(struct device_node *node)
+ 	const struct dpll_data dd = {
+ 		.idlest_mask = 0x1,
+ 		.enable_mask = 0x7,
+-		.autoidle_mask = 0x7,
+ 		.mult_mask = 0x7ff << 8,
+ 		.div1_mask = 0x7f,
+ 		.max_multiplier = 4095,
+@@ -494,7 +488,7 @@ static void __init of_ti_am3_jtype_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_ck_ops, &dd, 0);
++	of_ti_dpll_setup(node, &dpll_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_am3_jtype_dpll_clock, "ti,am3-dpll-j-type-clock",
+ 	       of_ti_am3_jtype_dpll_setup);
+@@ -504,7 +498,6 @@ static void __init of_ti_am3_no_gate_jtype_dpll_setup(struct device_node *node)
+ 	const struct dpll_data dd = {
+ 		.idlest_mask = 0x1,
+ 		.enable_mask = 0x7,
+-		.autoidle_mask = 0x7,
+ 		.mult_mask = 0x7ff << 8,
+ 		.div1_mask = 0x7f,
+ 		.max_multiplier = 2047,
+@@ -514,7 +507,7 @@ static void __init of_ti_am3_no_gate_jtype_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_no_gate_ck_ops, &dd, 0);
++	of_ti_dpll_setup(node, &dpll_no_gate_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_am3_no_gate_jtype_dpll_clock,
+ 	       "ti,am3-dpll-no-gate-j-type-clock",
+@@ -525,7 +518,6 @@ static void __init of_ti_am3_dpll_setup(struct device_node *node)
+ 	const struct dpll_data dd = {
+ 		.idlest_mask = 0x1,
+ 		.enable_mask = 0x7,
+-		.autoidle_mask = 0x7,
+ 		.mult_mask = 0x7ff << 8,
+ 		.div1_mask = 0x7f,
+ 		.max_multiplier = 2047,
+@@ -534,7 +526,7 @@ static void __init of_ti_am3_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_ck_ops, &dd, 0);
++	of_ti_dpll_setup(node, &dpll_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_am3_dpll_clock, "ti,am3-dpll-clock", of_ti_am3_dpll_setup);
+ 
+@@ -543,7 +535,6 @@ static void __init of_ti_am3_core_dpll_setup(struct device_node *node)
+ 	const struct dpll_data dd = {
+ 		.idlest_mask = 0x1,
+ 		.enable_mask = 0x7,
+-		.autoidle_mask = 0x7,
+ 		.mult_mask = 0x7ff << 8,
+ 		.div1_mask = 0x7f,
+ 		.max_multiplier = 2047,
+@@ -552,7 +543,7 @@ static void __init of_ti_am3_core_dpll_setup(struct device_node *node)
+ 		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+ 	};
+ 
+-	of_ti_dpll_setup(node, &dpll_core_ck_ops, &dd, 0);
++	of_ti_dpll_setup(node, &dpll_core_ck_ops, &dd);
+ }
+ CLK_OF_DECLARE(ti_am3_core_dpll_clock, "ti,am3-dpll-core-clock",
+ 	       of_ti_am3_core_dpll_setup);
 -- 
 1.7.9.5
