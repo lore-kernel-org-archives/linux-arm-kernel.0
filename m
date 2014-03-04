@@ -1,44 +1,47 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Mar 2014 11:08:29 +0200
-Subject: [PATCH v2 4/5] drivers: bus: omap_l3: Remove the platform driver's
- remove function
+Date: Tue, 4 Mar 2014 11:08:30 +0200
+Subject: [PATCH v2 5/5] drivers: bus: omap_l3: Change pr_crit() to dev_err()
+ when IRQ request fails
 In-Reply-To: <1393924110-11132-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1393924110-11132-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1393924110-11132-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1393924110-11132-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is NOP after the devm_* conversion.
+Use dev_err() which will going to print the driver's name as well and the
+KERN_ERR level is sufficient in this case (we also print via dev_err when
+there is an error with the mem resources)
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/bus/omap_l3_noc.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/bus/omap_l3_noc.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 2bbc87bdea2b..ed428ada44f7 100644
+index ed428ada44f7..3a36e3ebcb57 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -177,11 +177,6 @@ static int omap4_l3_probe(struct platform_device *pdev)
+@@ -162,8 +162,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-dbg-irq", l3);
+ 	if (ret) {
+-		pr_crit("L3: request_irq failed to register for 0x%x\n",
+-						l3->debug_irq);
++		dev_err(&pdev->dev, "request_irq failed for %d\n",
++			l3->debug_irq);
+ 		return ret;
+ 	}
+ 
+@@ -171,8 +171,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-app-irq", l3);
+ 	if (ret)
+-		pr_crit("L3: request_irq failed to register for 0x%x\n",
+-						l3->app_irq);
++		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
+ 
  	return ret;
  }
- 
--static int omap4_l3_remove(struct platform_device *pdev)
--{
--	return 0;
--}
--
- #if defined(CONFIG_OF)
- static const struct of_device_id l3_noc_match[] = {
- 	{.compatible = "ti,omap4-l3-noc", },
-@@ -194,7 +189,6 @@ MODULE_DEVICE_TABLE(of, l3_noc_match);
- 
- static struct platform_driver omap4_l3_driver = {
- 	.probe		= omap4_l3_probe,
--	.remove		= omap4_l3_remove,
- 	.driver		= {
- 		.name		= "omap_l3_noc",
- 		.owner		= THIS_MODULE,
 -- 
 1.9.0
