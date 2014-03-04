@@ -1,46 +1,73 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Mar 2014 10:34:45 -0800
-Subject: [PATCH v5 6/9] Input: pm8xxx-vibrator - Add DT match table
+Date: Tue,  4 Mar 2014 10:34:47 -0800
+Subject: [PATCH v5 8/9] devicetree: bindings: Document PM8921/8058 power keys
 In-Reply-To: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
 References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1393958088-1456-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1393958088-1456-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is only supported on DT enabled platforms. Convert the
-driver to DT so that it can probe properly.
+Document the power key found on PM8921 and PM8058 PMICs.
 
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/input/misc/pm8xxx-vibrator.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../bindings/input/qcom,pm8xxx-pwrkey.txt          | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
 
-diff --git a/drivers/input/misc/pm8xxx-vibrator.c b/drivers/input/misc/pm8xxx-vibrator.c
-index b88b7cbf93e2..5079bc54c3aa 100644
---- a/drivers/input/misc/pm8xxx-vibrator.c
-+++ b/drivers/input/misc/pm8xxx-vibrator.c
-@@ -141,6 +141,13 @@ static int pm8xxx_vib_play_effect(struct input_dev *dev, void *data,
- 	return 0;
- }
- 
-+static const struct of_device_id pm8xxx_vib_id_table[] = {
-+	{ .compatible = "qcom,pm8058-vib" },
-+	{ .compatible = "qcom,pm8921-vib" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pm8xxx_vib_id_table);
+diff --git a/Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt b/Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
+new file mode 100644
+index 000000000000..588536cc96ed
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
+@@ -0,0 +1,46 @@
++Qualcomm PM8xxx PMIC Power Key
 +
- static int pm8xxx_vib_probe(struct platform_device *pdev)
- 
- {
-@@ -220,6 +227,7 @@ static struct platform_driver pm8xxx_vib_driver = {
- 		.name	= "pm8xxx-vib",
- 		.owner	= THIS_MODULE,
- 		.pm	= &pm8xxx_vib_pm_ops,
-+		.of_match_table = pm8xxx_vib_id_table,
- 	},
- };
- module_platform_driver(pm8xxx_vib_driver);
++PROPERTIES
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,pm8058-pwrkey"
++		    "qcom,pm8921-pwrkey"
++
++- reg:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: address of power key control register
++
++- interrupts:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: the first interrupt specifies the key release interrupt
++		    and the second interrupt specifies the key press interrupt.
++		    The format of the specifier is defined by the binding
++		    document describing the node's interrupt parent.
++
++- debounce:
++	Usage: optional
++	Value type: <u32>
++	Definition: time in microseconds that key must be pressed or release
++		    for state change interrupt to trigger.
++
++- pull-up:
++	Usage: optional
++	Value type: <empty>
++	Definition: presence of this property indicates that the KPDPWR_N pin
++		    should be configured for pull up.
++
++EXAMPLE
++
++	pwrkey at 1c {
++		compatible = "qcom,pm8921-pwrkey";
++		reg = <0x1c>;
++		interrupt-parent = <&pmicintc>;
++		interrupts = <50 1>, <51 1>;
++		debounce = <15625>;
++		pull-up;
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
