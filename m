@@ -1,58 +1,47 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 4 Mar 2014 11:21:37 +0200
-Subject: [PATCH 06/12] phy: omap: Select OMAP_OCP2SCP bus driver
-In-Reply-To: <20140303185235.GC25804@atomide.com>
-References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
- <1393859254-10937-7-git-send-email-rogerq@ti.com>
- <20140303185235.GC25804@atomide.com>
-Message-ID: <53159B21.6030102@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 04 Mar 2014 13:23:20 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzVdIGRyaXZlcnM6IGJ1czogb21hcF9sMzogQ29udmVy?=
+ =?UTF-8?B?dCB0byB1c2UgZGV2bV9yZXF1ZXN0X2FuZF9pb3JlbWFwKCk=?=
+In-Reply-To: <1393924359.866301359@f148.i.mail.ru>
+References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
+ <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
+ <1393924359.866301359@f148.i.mail.ru>
+Message-ID: <1393925000.716948505@f148.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2014 08:52 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [140303 07:11]:
->> The OMAP_USB2 and OMAP_PIP3 phy devices will not be
->> detected if the OMAP_OCP2SCP driver is not present.
->> So select it.
+???????,  4 ????? 2014, 13:12 +04:00 ?? Alexander Shiyan <shc_work@mail.ru>:
+> ???????,  4 ????? 2014, 11:01 +02:00 ?? Peter Ujfalusi <peter.ujfalusi@ti.com>:
+> > We can then remove the iounmap() calls from probe and remove.
+> > Since the driver requests the resources via index we can do the mem resource
+> > request within a for loop.
+> > 
+> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
+> > ---
 > 
-> Selecting drivers like this will easily lead into missing
-> dependencies. Especially it's bad for tristate driver
-> options that people may want to have as loadable modules.
+> > +	/* Get mem resources */
+> > +	for (i = 0; i < 3; i++) {
+> > +		struct resource	*res = platform_get_resource(pdev,
+> > +							     IORESOURCE_MEM, i);
+> > +		if (!res) {
+> > +			dev_err(&pdev->dev, "couldn't find resource %d\n", i);
+> > +			return -ENODEV;
+> > +		}
 > 
-> How about instead depends on OMAP_OCP2SCP?
-
-OK, 'depends' seems fine.
-
-cheers,
--roger
-
+> No need to check "res". devm_request_and_ioremap() do all for us.
 > 
->  
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  drivers/phy/Kconfig | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 2f02ec8..afdab3e 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -44,6 +44,7 @@ config OMAP_USB2
->>  	depends on USB_PHY
->>  	select GENERIC_PHY
->>  	select OMAP_CONTROL_PHY
->> +	select OMAP_OCP2SCP
->>  	help
->>  	  Enable this to support the transceiver that is part of SOC. This
->>  	  driver takes care of all the PHY functionality apart from comparator.
->> @@ -55,6 +56,7 @@ config TI_PIPE3
->>  	depends on ARCH_OMAP2PLUS || COMPILE_TEST
->>  	select GENERIC_PHY
->>  	select OMAP_CONTROL_PHY
->> +	select OMAP_OCP2SCP
->>  	help
->>  	  Enable this to support the PIPE3 PHY that is part of TI SOCs. This
->>  	  driver takes care of all the PHY functionality apart from comparator.
->> -- 
->> 1.8.3.2
->>
+> > -	l3->l3_base[2] = ioremap(res->start, resource_size(res));
+> > -	if (!l3->l3_base[2]) {
+> > -		dev_err(&pdev->dev, "ioremap failed\n");
+> > -		ret = -ENOMEM;
+> > -		goto err2;
+> > +		l3->l3_base[i] = devm_request_and_ioremap(&pdev->dev, res);
+> > +		if (!l3->l3_base[i]) {
+> 
+> if (IS_ERR(l3->l3_base[i]))
+
+Ahh, I messed up this with devm_ioremap_resource().
+However, if there is reason to use devm_request_and_ioremap() here?
+
+---
