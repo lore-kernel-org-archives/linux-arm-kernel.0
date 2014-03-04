@@ -1,72 +1,74 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue,  4 Mar 2014 18:51:47 +0100
-Subject: [PATCH] ARM: mvebu: Add a SOC bus device entry
-Message-ID: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 4 Mar 2014 11:59:34 -0600
+Subject: [PATCH 2/3] soc: keystone: add QMSS driver
+In-Reply-To: <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <AAE2808F-A2C8-4031-BFA4-1A20B182EA69@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SoC Family, device ID and revision to /sys/bus/soc.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-mvebu/Kconfig        |  1 +
- arch/arm/mach-mvebu/mvebu-soc-id.c | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+On Feb 28, 2014, at 5:18 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 4cfc4d8abcac..16f3713654cf 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -10,6 +10,7 @@ config ARCH_MVEBU
- 	select PINCTRL
- 	select PLAT_ORION
- 	select SPARSE_IRQ
-+	select SOC_BUS
- 	select CLKDEV_LOOKUP
- 	select MVEBU_MBUS
- 	select ZONE_DMA if ARM_LPAE
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index f3d4cf53f746..72ea6b6d4ed2 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -23,6 +23,8 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
- #include "mvebu-soc-id.h"
- 
- #define PCIE_DEV_ID_OFF		0x0
-@@ -118,3 +120,29 @@ clk_err:
- }
- core_initcall(mvebu_soc_id_init);
- 
-+static int __init mvebu_soc_device(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+
-+	/* Also protects against running on non-mvebu systems */
-+	if (!is_id_valid)
-+		return;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Marvell");
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X", soc_rev);
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%X", soc_dev_id);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr);
-+	}
-+}
-+postcore_initcall(mvebu_soc_device);
+> From: Sandeep Nair <sandeep_n@ti.com>
+> 
+> The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+> the main hardware sub system which forms the backbone of the Keystone
+> Multi-core Navigator. QMSS consist of queue managers, packed-data structure
+> processors(PDSP), linking RAM, descriptor pools and infrastructure
+> Packet DMA.
+> 
+> The Queue Manager is a hardware module that is responsible for accelerating
+> management of the packet queues. Packets are queued/de-queued by writing or
+> reading descriptor address to a particular memory mapped location. The PDSPs
+> perform QMSS related functions like accumulation, QoS, or event management.
+> Linking RAM registers are used to link the descriptors which are stored in
+> descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+> 
+> The QMSS driver manages the PDSP setups, linking RAM regions,
+> queue pool management (allocation, push, pop and notify) and descriptor
+> pool management. The specifics on the device tree bindings for
+> QMSS can be found in:
+>        Documentation/devicetree/bindings/soc/keystone-qmss.txt
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> .../devicetree/bindings/soc/keystone-qmss.txt      |  209 +++
+> drivers/Kconfig                                    |    2 +
+> drivers/Makefile                                   |    3 +
+> drivers/soc/Kconfig                                |    2 +
+> drivers/soc/Makefile                               |    5 +
+> drivers/soc/keystone/Kconfig                       |   15 +
+> drivers/soc/keystone/Makefile                      |    5 +
+> drivers/soc/keystone/qmss_acc.c                    |  591 ++++++++
+> drivers/soc/keystone/qmss_queue.c                  | 1533 ++++++++++++++++++++
+> drivers/soc/keystone/qmss_queue.h                  |  236 +++
+> include/linux/soc/keystone_qmss.h                  |  390 +++++
+> 11 files changed, 2991 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/soc/keystone-qmss.txt
+> create mode 100644 drivers/soc/Makefile
+> create mode 100644 drivers/soc/keystone/Kconfig
+> create mode 100644 drivers/soc/keystone/Makefile
+> create mode 100644 drivers/soc/keystone/qmss_acc.c
+> create mode 100644 drivers/soc/keystone/qmss_queue.c
+> create mode 100644 drivers/soc/keystone/qmss_queue.h
+> create mode 100644 include/linux/soc/keystone_qmss.h
+
+Do you see qmss being able to provide HW support for a qdisc or doing processor to processor communication over something like rpmsg?
+
+I ask because I do wondering if we should be looking at a drivers/hwqueue as other vendors have similar hardware.
+
+- k
+
 -- 
-1.9.0
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
