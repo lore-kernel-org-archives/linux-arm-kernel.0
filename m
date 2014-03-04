@@ -1,24 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 04 Mar 2014 12:29:05 -0800
-Subject: [PATCH] [RESEND] ARM: footbridge: remove obsolete IRQF_DISABLED
-In-Reply-To: <1393964413-16829-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1386395865-11910-1-git-send-email-michael.opdenacker@free-electrons.com>
- <1393964413-16829-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <53163791.50202@codeaurora.org>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 05 Mar 2014 00:39:13 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiBSRVNFTkQgMS8zXSBBUk06IGNscHM3MTF4OiBBZGQg?=
+ =?UTF-8?B?Q0xQUzcxMVggaXJxY2hpcCBkcml2ZXI=?=
+In-Reply-To: <alpine.DEB.2.02.1403041957320.18573@ionos.tec.linutronix.de>
+References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
+ <alpine.DEB.2.02.1403041957320.18573@ionos.tec.linutronix.de>
+Message-ID: <1393965553.856224948@f346.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/14 12:20, Michael Opdenacker wrote:
-> This patch proposes to remove the IRQF_DISABLED flag from footbridge
-> code. It's a NOOP since 2.6.35.
->
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+???????,  4 ????? 2014, 21:15 +01:00 ?? Thomas Gleixner <tglx@linutronix.de>:
+> On Sun, 2 Feb 2014, Alexander Shiyan wrote:
+> 
+> > +static const struct {
+> > +#define CLPS711X_FLAG_EN	(1 << 0)
+> > +#define CLPS711X_FLAG_FIQ	(1 << 1)
+> > +	unsigned int	flags;
+> > +	phys_addr_t	eoi;
+> > +} clps711x_irqs[] = {
+> > +	[1]	= { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
+> > +	[3]	= { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
+> > +	[4]	= { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
+> > +	[5]	= { CLPS711X_FLAG_EN, },
+> > +	[6]	= { CLPS711X_FLAG_EN, },
+> > +	[7]	= { CLPS711X_FLAG_EN, },
+> > +	[8]	= { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
+> > +	[9]	= { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
+> > +	[10]	= { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
+> > +	[11]	= { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
+> > +	[12]	= { CLPS711X_FLAG_EN, },
+> > +	[13]	= { CLPS711X_FLAG_EN, },
+> > +	[14]	= { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
+> > +	[15]	= { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
+> > +	[16]	= { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
+> > +	[17]	= { CLPS711X_FLAG_EN, },
+> > +	[18]	= { CLPS711X_FLAG_EN, },
+> > +	[28]	= { CLPS711X_FLAG_EN, },
+> > +	[29]	= { CLPS711X_FLAG_EN, },
+> > +	[32]	= { CLPS711X_FLAG_FIQ, },
+> 
+> Is anything really using the FIQs on those clps711x machines?
+> 
+> If yes, I have no objections to export the no_action handler.
 
-You should send this to Russell's patch tracker[1] given that nobody has
-commented in over 6 months on two resends.
+Yes, the patch ("no_action") is the result of the question raised by the
+driver that uses FIQ.
+http://thread.gmane.org/gmane.linux.alsa.devel/119730/focus=119842
 
-[1] http://www.arm.linux.org.uk/developer/patches/info.php
+> > +static void clps711x_intc_mask(struct irq_data *d)
+> > +{
+> > +	irq_hw_number_t hwirq = irqd_to_hwirq(d);
+> > +	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
+> > +	u32 tmp;
+> > +
+> > +	tmp = readl_relaxed(intmr);
+> > +	tmp &= ~(1 << (hwirq % 16));
+> > +	writel_relaxed(tmp, intmr);
+> 
+> Why can't you use a generic irq chip for all of this ?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I thought many times on this subject, but I can not imagine how to
+handle EOI, because each EOI interrupt uses a separate register.
+
+Thanks.
+---
