@@ -1,47 +1,21 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Mar 2014 11:01:50 +0200
-Subject: [PATCH 5/5] drivers: bus: omap_l3: Change pr_crit() to dev_err() when
- IRQ request fails
-In-Reply-To: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 4 Mar 2014 11:07:52 +0200
+Subject: [PATCH 1/5] drivers: bus: omap_l3: Convert to use devm_kzalloc
+In-Reply-To: <1393923710-10377-2-git-send-email-peter.ujfalusi@ti.com>
 References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1393923710-10377-6-git-send-email-peter.ujfalusi@ti.com>
+ <1393923710-10377-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <531597E8.50509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_err() which will going to print the driver's name as well and the
-KERN_ERR level is sufficient in this case (we also print via dev_err when
-there is an error with the mem resources)
+On 03/04/2014 11:01 AM, Peter Ujfalusi wrote:
+> We can remove the kfree() calls from probe and remove.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
----
- drivers/bus/omap_l3_noc.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Where did the ".com" went from Santosh's email address??
+I'll resend it in a minute with a fixed commit message.
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index ed428ada44f7..3a36e3ebcb57 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -162,8 +162,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-dbg-irq", l3);
- 	if (ret) {
--		pr_crit("L3: request_irq failed to register for 0x%x\n",
--						l3->debug_irq);
-+		dev_err(&pdev->dev, "request_irq failed for %d\n",
-+			l3->debug_irq);
- 		return ret;
- 	}
- 
-@@ -171,8 +171,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-app-irq", l3);
- 	if (ret)
--		pr_crit("L3: request_irq failed to register for 0x%x\n",
--						l3->app_irq);
-+		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
- 
- 	return ret;
- }
 -- 
-1.9.0
+P?ter
