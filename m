@@ -1,57 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 04 Mar 2014 08:57:15 -0700
-Subject: [PATCH V3 1/5] genirq: define flag IRQ_SRC_DST_INVERTED, and
- accessors
-In-Reply-To: <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
-References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
- <alpine.DEB.2.02.1403041018370.18573@ionos.tec.linutronix.de>
-Message-ID: <5315F7DB.6000700@wwwdotorg.org>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 4 Mar 2014 17:04:32 +0100
+Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
+In-Reply-To: <20140228230000.GW13624@atomide.com>
+References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
+ <20140228230000.GW13624@atomide.com>
+Message-ID: <20140304160432.GG2799@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 03:04 AM, Thomas Gleixner wrote:
-> On Mon, 3 Mar 2014, Stephen Warren wrote:
+On Fri, Feb 28, 2014 at 03:00:00PM -0800, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [140228 12:46]:
+> > Hi Joerg, Tony,
+> > 
+> > This is an updated series of the OMAP IOMMU DT adaptation intended
+> > for 3.15 merge window, addressing the comments from the v2 series.
+> > This series is rebased onto 3.14-rc4, and the only change to bindings
+> > is to drop the dma-window property.
+> > 
+> > The first 7 patches in the series are in drivers/iommu, with the first
+> > 3 patches performing some cleanup. The DT bindings and adaptation are
+> > done in patches 4 and 5.
+> > 
+> > Tony,
+> > Patches 8 through 13 are in arch/arm/mach-omap2 layer, so I am guessing
+> > these would have to go through your tree. Of these, patches 8 and 9 are
+> > cleanup fixes to get OMAP3 IVA MMU working, patches 10 & 11 are fixes
+> > required with DT-boot for OMAP3/4, patches 12 & 13 add the OMAP5 support.
 > 
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Some devices have configurable IRQ output polarities. Software might
->> use IRQ_TYPE_* to determine how to configure such a device's IRQ
->> output polarity in order to match how the IRQ controller input is
->> configured. If the board or SoC inverts the signal between the
->> device's IRQ output and controller's IRQ output, software must be
->> aware of this fact, in order to program the IRQ output to the correct
->> (i.e. opposite) polarity. This flag provides that information.
-> 
-> So what you're saying is:
-> 
-> Device IRQ output --> [Optional Inverter Logic] --> IRQ controller input.
-> 
-> And you're storing the information about the presence of the inverter
-> logic in the irq itself, but the core does not make any use of it and
-> you let the device driver deal with the outcome.
-> 
-> This sucks as all affected drivers have to implement the same sanity
-> logic for this.
-> 
-> Why don't you implement a core function which tells the driver which
-> polarity to select? That requires a few more changes, but I think it's
-> worth it for other reasons.
-> 
-> Right now the set_type logic requires the irq chip drivers to
-> implement sanity checking and default selections for TYPE_NONE. We can
-> be more clever about that and add this information to the irq chip
-> flags.
+> Are patches 8 to 13 OK to apply separately from the iommu patches or
+> do they need to wait for the iommu patches to get merged first?
 
-I don't see any such checking in drivers/irqchip/irq-gic.c; it rejects
-any type other than IRQ_TYPE_LEVEL_HIGH or IRQ_TYPE_EDGE_RISING, and I
-don't see any mention of TYPE_NONE in that file. Is the driver incomplete?
+Applied patches 1-7 to my arm/omap branch.
 
-Instead of adding all this extra logic to the core, what do you think of
-simply telling each driver that has a configurable interrupt output
-polarity exactly which polarity to use. This information would come from
-device tree or platform data. This is what I implemented in V1/V2 of
-this series:
+Tony, you can pull that branch into your tree if needed (when I pushed
+it, which will happen today or tomorrow).
 
-http://www.spinics.net/lists/devicetree/msg23648.html
 
-Is that any better, or do you definitely want the IRQ core to manage this?
+	Joerg
