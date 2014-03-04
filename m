@@ -1,22 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 04 Mar 2014 16:48:06 -0500 (EST)
-Subject: [PATCH 2/2] sparc64: Remove unused sparc64_multi_core
-In-Reply-To: <20140304210744.16893.75929.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Mar 2014 23:12:09 +0100 (CET)
+Subject: [PATCH 1/2] sched: Remove unused mc_capable() and
+ smt_capable()
+In-Reply-To: <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
 References: <20140304210621.16893.8772.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20140304210744.16893.75929.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20140304.164806.1723542180554308406.davem@davemloft.net>
+ <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <alpine.DEB.2.02.1403042311480.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <bhelgaas@google.com>
-Date: Tue, 04 Mar 2014 14:07:44 -0700
 
-> Remove sparc64_multi_core because it's not used any more.
+
+On Tue, 4 Mar 2014, Bjorn Helgaas wrote:
+
+> Remove mc_capable() and smt_capable().  Neither is used.
 > 
-> It was added by a2f9f6bbb30e ("Fix {mc,smt}_capable()"), and the last uses
-> were removed by e637d96bf462 ("sched: Remove unused mc_capable() and
-> smt_capable()").
+> Both were added by 5c45bf279d37 ("sched: mc/smt power savings sched
+> policy").  Uses of both were removed by 8e7fbcbc22c1 ("sched: Remove stale
+> power aware scheduling remnants and dysfunctional knobs").
 > 
 > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  arch/arm/include/asm/topology.h      |    3 ---
+>  arch/ia64/include/asm/topology.h     |    1 -
+>  arch/mips/include/asm/topology.h     |    4 ----
+>  arch/powerpc/include/asm/topology.h  |    1 -
+>  arch/sparc/include/asm/topology_64.h |    2 --
+>  arch/x86/include/asm/topology.h      |    6 ------
+>  6 files changed, 17 deletions(-)
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
