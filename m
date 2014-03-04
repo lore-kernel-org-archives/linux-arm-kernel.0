@@ -1,95 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Mar 2014 10:28:06 +0000
-Subject: [PATCH v2] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140304101641.GK13126@sirena.org.uk>
-References: <1393919477-27814-1-git-send-email-broonie@kernel.org>
- <20140304095534.GE30596@arm.com>
- <20140304101641.GK13126@sirena.org.uk>
-Message-ID: <20140304102806.GH30596@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Mar 2014 11:30:19 +0100
+Subject: [REGRESSION] Arndale Octa panics when booting 3.14-rc1
+In-Reply-To: <20140304101608.GA3852@e102654-lin.cambridge.arm.com>
+References: <20140303185755.GA11460@e102654-lin.cambridge.arm.com>
+ <5314D239.7090001@gmail.com> <5314EBCB.3060400@gmail.com>
+ <20140304101608.GA3852@e102654-lin.cambridge.arm.com>
+Message-ID: <5315AB3B.5080207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 10:16:41AM +0000, Mark Brown wrote:
-> On Tue, Mar 04, 2014 at 09:55:36AM +0000, Catalin Marinas wrote:
-> > On Tue, Mar 04, 2014 at 07:51:17AM +0000, Mark Brown wrote:
-> 
-> > > +config CPU_TOPOLOGY
-> > > +	bool "Support CPU topology definition"
-> 
-> > Thanks for the patch. I applied it but not pushed to -next yet. I wonder
-> > whether it makes sense to drop the description of the CPU_TOPOLOGY entry
-> > here so that it is no longer selectable. It will be enabled by default
-> > when SMP (I can do the change myself, no need to repost).
-> 
-> I'm totally fine with that, I only made it selectable due to the 32 bit
-> code doing that - I'm not sure we even need the separate symbol.
-> Whatever you prefer.
+On 04/03/14 11:16, Javi Merino wrote:
+> Yes, with [1] applied I don't get a kernel panic but the kernel fails
+> to boot later on with an Imprecise external abort.  Removing the mdma
+> nodes from the dts gets rid of that.  I guess what's missing is what
+> you said: clocks for the mdma devices.
 
-Like that?
+Is removing mdm0 node enough to fix the boot failure, or both have to be
+removed ?
 
+Unfortunately I don't access to exynos5420 datasheet at the moment, I've
+added guys from Samsung Linaro Landing Team at cc, hopefully they can
+provide a patch for the clocks driver to fix this.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4474e247f94a..140cd1a9dc0c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -165,17 +165,9 @@ config SMP
- 
- 	  If you don't know what to do here, say N.
- 
--config CPU_TOPOLOGY
--	bool "Support CPU topology definition"
--	depends on SMP
--	default y
--	help
--	  Support CPU topology definition, based on configuration
--	  provided by the firmware.
--
- config SCHED_MC
- 	bool "Multi-core scheduler support"
--	depends on CPU_TOPOLOGY
-+	depends on SMP
- 	help
- 	  Multi-core scheduler support improves the CPU scheduler's decision
- 	  making when dealing with multi-core CPU chips at a cost of slightly
-@@ -183,7 +175,7 @@ config SCHED_MC
- 
- config SCHED_SMT
- 	bool "SMT scheduler support"
--	depends on CPU_TOPOLOGY
-+	depends on SMP
- 	help
- 	  Improves the CPU scheduler's decision making when dealing with
- 	  MultiThreading at a cost of slightly increased overhead in some
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index c8a47e8f452b..0172e6d76bf3 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -1,7 +1,7 @@
- #ifndef __ASM_TOPOLOGY_H
- #define __ASM_TOPOLOGY_H
- 
--#ifdef CONFIG_CPU_TOPOLOGY
-+#ifdef CONFIG_SMP
- 
- #include <linux/cpumask.h>
- 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index da1dafb3db87..cfee8273fccb 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -14,14 +14,13 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
--arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
-+arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
--arm64-obj-$(CONFIG_CPU_TOPOLOGY)	+= topology.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
+> 8<---
+> [    8.060000] mmc_host mmc0: Bus speed (slot 0) = 50000000Hz (slot req 52000000Hz, actual 50000000HZ d)
+> [    8.070000] Registering SWP/SWPB emulation handler
+> [    8.075000] s3c-rtc 101e0000.rtc: setting system clock to 2000-01-01 00:00:00 UTC (946684800)
+> [    8.080000] mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 52000000Hz, actual 50000000HZ )
+> [    8.090000] Freeing unused kernel memory: 220K (c04c1000 - c04f8000)
+> [    8.100000] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> [    8.105000] mmc0: new high speed DDR MMC card at address 0001
+> [    8.110000] mmcblk0: mmc0:0001 M4G1FB 3.64 GiB 
+> [    8.115000] mmcblk0boot0: mmc0:0001 M4G1FB partition 1 1.00 MiB
+> [    8.120000] mmcblk0boot1: mmc0:0001 M4G1FB partition 2 1.00 MiB
+> [    8.125000] mmcblk0rpmb: mmc0:0001 M4G1FB partition 3 128 KiB
+> [    8.135000]  mmcblk0: p1 p2 p3 p4
+> [    8.140000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
+> [    8.140000] 
+> [    8.140000] CPU: 0 PID: 1 Comm: init Not tainted 3.14.0-rc5-00002-g691b10f #189
+> [    8.140000] [<c0013e24>] (unwind_backtrace) from [<c0011238>] (show_stack+0x10/0x14)
+> [    8.140000] [<c0011238>] (show_stack) from [<c038218c>] (dump_stack+0x64/0xb4)
+> [    8.140000] [<c038218c>] (dump_stack) from [<c037f6f4>] (panic+0x8c/0x1dc)
+> [    8.140000] [<c037f6f4>] (panic) from [<c001f178>] (do_exit+0x80c/0x8b8)
+> [    8.140000] [<c001f178>] (do_exit) from [<c001f310>] (do_group_exit+0x3c/0xb0)
+> [    8.140000] [<c001f310>] (do_group_exit) from [<c00298a0>] (get_signal_to_deliver+0x278/0x500)
+> [    8.140000] [<c00298a0>] (get_signal_to_deliver) from [<c001076c>] (do_signal+0x78/0x398)
+> [    8.140000] [<c001076c>] (do_signal) from [<c0010db4>] (do_work_pending+0x64/0xac)
+> [    8.140000] [<c0010db4>] (do_work_pending) from [<c000e460>] (work_pending+0xc/0x20)
+> 8<---
+> 
+> [1] https://git.linaro.org/people/mike.turquette/linux.git/commit/00efcb1c8e1c3c5e5d3ce6f0682d66402911a84f
+
+--
+Regards,
+Sylwester
