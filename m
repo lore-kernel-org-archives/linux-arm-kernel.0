@@ -1,124 +1,36 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 04 Mar 2014 12:23:11 -0800
-Subject: [RFC PATCH] Remove CONFIG_DCACHE_WORD_ACCESS
-Message-ID: <1393964591.20435.58.camel@joe-AO722>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 04 Mar 2014 12:25:24 -0800
+Subject: [PATCH] PM / devfreq: Rewrite devfreq_update_status() to fix
+ multiple bugs
+In-Reply-To: <8984550.302431393927576253.JavaMail.weblogic@epv6ml05>
+References: <8984550.302431393927576253.JavaMail.weblogic@epv6ml05>
+Message-ID: <531636B4.1060202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems to duplicate CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-so use that instead.
+On 03/04/2014 02:06 AM, MyungJoo Ham wrote:
+>> The current devfreq_update_status() has the following bugs:
+>> - If previous frequency doesn't have a valid level, it does an out of bounds
+>>    access into the trans_table and causes memory corruption.
+>> - When the new frequency doesn't have a valid level, the time spent in the
+>>    new frequency is counted towards the next valid frequency switch instead of
+>>    being ignored.
+>> - The time spent on the previous frequency is added to the new frequency's
+>>    stats instead of the previous frequency's stats.
+>>
+>> This patch fixes all of this.
+>>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> 
+> Merged.
+> 
+> It appears to be Greg's LTS material as well.
+> 
 
-This changes the !CPU_LITTLE_ENDIAN powerpc arch to use unaligned
-accesses in fs/dcache.c and fs/namei.c as
-CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is enabled for that arch.
+Thanks!
 
-Remove the now unused DCACHE_WORD_ACCESS defines & uses.
+-Saravana
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/Kconfig                      | 1 -
- arch/arm/include/asm/word-at-a-time.h | 4 ++--
- arch/arm64/Kconfig                    | 1 -
- arch/x86/Kconfig                      | 1 -
- fs/Kconfig                            | 4 ----
- fs/dcache.c                           | 2 +-
- fs/namei.c                            | 2 +-
- 7 files changed, 4 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 623a272..d5a2e60 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -12,7 +12,6 @@ config ARM
- 	select BUILDTIME_EXTABLE_SORT if MMU
- 	select CLONE_BACKWARDS
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
--	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IDLE_POLL_SETUP
-diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
-index a6d0a29..778b2ad 100644
---- a/arch/arm/include/asm/word-at-a-time.h
-+++ b/arch/arm/include/asm/word-at-a-time.h
-@@ -54,7 +54,7 @@ static inline unsigned long find_zero(unsigned long mask)
- #include <asm-generic/word-at-a-time.h>
- #endif
- 
--#ifdef CONFIG_DCACHE_WORD_ACCESS
-+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
- 
- /*
-  * Load an unaligned word from kernel space.
-@@ -94,5 +94,5 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
- 	return ret;
- }
- 
--#endif	/* DCACHE_WORD_ACCESS */
-+#endif	/* HAVE_EFFICIENT_UNALIGNED_ACCESS */
- #endif /* __ASM_ARM_WORD_AT_A_TIME_H */
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 764d682..2d6978c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -13,7 +13,6 @@ config ARM64
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
--	select DCACHE_WORD_ACCESS
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IOMAP
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index abb261e..60cfa073 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -98,7 +98,6 @@ config X86
- 	select CLKEVT_I8253
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select GENERIC_IOMAP
--	select DCACHE_WORD_ACCESS
- 	select GENERIC_SMP_IDLE_THREAD
- 	select ARCH_WANT_IPC_PARSE_VERSION if X86_32
- 	select HAVE_ARCH_SECCOMP_FILTER
-diff --git a/fs/Kconfig b/fs/Kconfig
-index 312393f..7511271 100644
---- a/fs/Kconfig
-+++ b/fs/Kconfig
-@@ -4,10 +4,6 @@
- 
- menu "File systems"
- 
--# Use unaligned word dcache accesses
--config DCACHE_WORD_ACCESS
--       bool
--
- if BLOCK
- 
- source "fs/ext2/Kconfig"
-diff --git a/fs/dcache.c b/fs/dcache.c
-index 265e0ce..4e3c195 100644
---- a/fs/dcache.c
-+++ b/fs/dcache.c
-@@ -163,7 +163,7 @@ int proc_nr_dentry(ctl_table *table, int write, void __user *buffer,
-  * Compare 2 name strings, return 0 if they match, otherwise non-zero.
-  * The strings are both count bytes long, and count is non-zero.
-  */
--#ifdef CONFIG_DCACHE_WORD_ACCESS
-+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
- 
- #include <asm/word-at-a-time.h>
- /*
-diff --git a/fs/namei.c b/fs/namei.c
-index 385f781..1ee33ca 100644
---- a/fs/namei.c
-+++ b/fs/namei.c
-@@ -1618,7 +1618,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
-  *   the final mask". Again, that could be replaced with a
-  *   efficient population count instruction or similar.
-  */
--#ifdef CONFIG_DCACHE_WORD_ACCESS
-+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
- 
- #include <asm/word-at-a-time.h>
- 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
