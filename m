@@ -1,36 +1,37 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Mar 2014 23:00:53 -0500
-Subject: [PATCH 1/4] ARM: dove: add system controller node
-In-Reply-To: <1393536486-3827-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393536486-3827-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140304040053.GD1872@titan.lakedaemon.net>
+Date: Mon, 3 Mar 2014 23:01:57 -0500
+Subject: [PATCH v2 1/5] ASoC: kirkwood: prepare new Dove DT Kconfig
+ variable
+In-Reply-To: <1393662801-17950-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393662801-17950-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140304040157.GE1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 10:28:02PM +0100, Sebastian Hesselbarth wrote:
-> This adds a DT node for the system-controller found on Marvell Dove
-> SoCs.
+On Sat, Mar 01, 2014 at 09:33:17AM +0100, Sebastian Hesselbarth wrote:
+> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE Kconfig.
 > 
 > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Mark, as requested, this is the ASoC only patch touching Kconfig for
+> Marvell Dove to mach-mvebu conversion.
+> 
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
 > Cc: Andrew Lunn <andrew@lunn.ch>
 > Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
+> Cc: alsa-devel at alsa-project.org
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: linux-kernel at vger.kernel.org
 > ---
->  arch/arm/boot/dts/dove.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+>  sound/soc/kirkwood/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to mvebu/dt
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
 thx,
 
