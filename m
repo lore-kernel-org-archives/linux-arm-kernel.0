@@ -1,27 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Mar 2014 15:47:52 +0800
-Subject: [PATCH] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1393916911-15571-1-git-send-email-broonie@kernel.org>
-References: <1393916911-15571-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140304074752.GF13126@sirena.org.uk>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Mon, 3 Mar 2014 23:48:39 -0800
+Subject: [PATCH 06/22] Add helper functions used by arm/arm64
+In-Reply-To: <20140303140811.GA18828@console-pimps.org>
+References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
+ <1391619853-10601-7-git-send-email-leif.lindholm@linaro.org>
+ <20140213112606.GF20717@console-pimps.org>
+ <CAFECyb_wUphr4XOyW9tC-Rw5Py3m39e6GQorCtFGtSXTUTBnFQ@mail.gmail.com>
+ <20140303140811.GA18828@console-pimps.org>
+Message-ID: <CAFECyb9eXYCFTQ7G35EEsx0P2vRwm7qNtwT46ZteTGbycbcEBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 03:08:31PM +0800, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Add basic CPU topology support to arm64, based on the existing pre-v8
-> code and some work done by Mark Hambleton.  This patch does not
-> implement any topology discovery support since that should be based on
-> information from firmware, it merely implements the scaffolding for
-> integration of topology support in the architecture.
+On Mon, Mar 3, 2014 at 6:08 AM, Matt Fleming <matt@console-pimps.org> wrote:
+> On Fri, 14 Feb, at 11:02:49AM, Roy Franz wrote:
+>>
+>> The get_dram_base() function is only used by arm/arm64, but
+>> there is nothing architecture specific about it, which is why I put it
+>> here to begin with.  I don't feel strongly about this either way.
+>
+> Sorry Roy, I just realised that you probably wanted a response from me
+> about this last point.
+>
+> OK, leaving get_dram_base() in efi-stub-helper.c is fine.
+>
+> FYI, "NUL" isn't a typo,
+>
+>> -     options_size++;  /* NUL termination */
+> [...]
+>> +     options_size++;  /* NULL termination */
+>
+> http://en.wikipedia.org/wiki/Null_character
+>
+> --
+> Matt Fleming, Intel Open Source Technology Center
 
-Sorry, needs a respin due to me failing to rebase down the right
-pr_macro - new version shortly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140304/010d7829/attachment.sig>
+Thanks - I'll take care of this in the next revision.
+
+Roy
