@@ -1,61 +1,103 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Tue, 4 Mar 2014 12:37:14 +0100
-Subject: BUG_ON for DMA-bounce and bidirectional mappings (e100 on IXP4xx)
-In-Reply-To: <20140304104528.GQ21483@n2100.arm.linux.org.uk>
-References: <20140304112459.354f0980@marrow.netinsight.se>
- <20140304104528.GQ21483@n2100.arm.linux.org.uk>
-Message-ID: <20140304123714.7e1fe704@marrow.netinsight.se>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 4 Mar 2014 12:37:59 +0100
+Subject: [PATCH v5 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <1393846030.273217958@f113.i.mail.ru>
+References: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
+ <1393845120-6340-2-git-send-email-richard.genoud@gmail.com>
+ <1393846030.273217958@f113.i.mail.ru>
+Message-ID: <CACQ1gAgURezr+Oqd6mX4D4K_C1LtmVh4a2fOnie0Xfj9sfYjQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Mar 2014 10:45:28 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+2014-03-03 12:27 GMT+01:00 Alexander Shiyan <shc_work@mail.ru>:
+> Hello.
+>
+> ???????????,  3 ????? 2014, 12:11 +01:00 ?? Richard Genoud <noreply.rgenoud@gmail.com>:
+>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+>> GPIO.
+>> This will be useful for many boards which have a serial controller that
+>> only handle CTS/RTS pins (or even just RX/TX).
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ...
+>> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>> +{
+>> +     struct mctrl_gpios *gpios;
+>> +     enum mctrl_gpio_idx i;
+>> +     int err;
+>> +
+>> +     gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
+>> +     if (!gpios)
+>> +             goto out;
+>
+> if (!gpios)
+>   return ERR_PTR(-ENOMEM);
+I think we are looping here...
+If I returns a ERR_PTR(-ENOMEM), I'll have to change back all tests
+from if (!gpios) to if (IS_ERR_OR_NULL(gpios))
+So, I'll just return NULL here, and change the test in atmel_serial.c
+(that was wrong anyway, as you pointed out)
 
-> On Tue, Mar 04, 2014 at 11:24:59AM +0100, Simon K?gstr?m wrote:
-> > We have a IXP4xx-based board which has an e100 NIC. During bootup, we
-> > trigger a BUG_ON in dmabounce.c because the mapped direction doesn't
-> > match the synced one. e100.c maps buffers bidirectional, but the sync
-> > is done fromdevice.
-> 
-> First and foremost, enable DMA API debugging and check whether that
-> complains too (I think it should do, you're not allowed to change the
-> direction argument until a mapping is unmapped.)
+>
+>> +     for (i = 0; i < UART_GPIO_MAX; i++) {
+>> +             gpios->gpio[i] = devm_gpiod_get_index(dev,
+>> +                                                   mctrl_gpios_desc[i].name,
+>> +                                                   idx);
+>> +
+>> +             /*
+>> +              * The GPIOs are maybe not all filled,
+>> +              * this is not an error.
+>> +              */
+>> +             if (IS_ERR_OR_NULL(gpios->gpio[i]))
+>> +                     continue;
+>> +
+>> +             if (mctrl_gpios_desc[i].dir_out)
+>> +                     err = gpiod_direction_output(gpios->gpio[i], 0);
+>> +             else
+>> +                     err = gpiod_direction_input(gpios->gpio[i]);
+>> +             if (err) {
+>> +                     dev_warn(dev, "Unable to set direction for %s GPIO",
+>> +                              mctrl_gpios_desc[i].name);
+>> +                     devm_gpiod_put(dev, gpios->gpio[i]);
+>> +                     gpios->gpio[i] = NULL;
+>> +             }
+>> +     }
+>> +
+>> +out:
+>> +     return gpios;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_init);
+>> +
+>> +void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>> +{
+>> +     enum mctrl_gpio_idx i;
+>> +
+>> +     if (!gpios)
+>> +             return;
+>> +
+>> +     for (i = 0; i < UART_GPIO_MAX; i++)
+>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i])) {
+>> +                     devm_gpiod_put(dev, gpios->gpio[i]);
+>> +                     gpios->gpio[i] = NULL;
+>
+> No need to NULL this variable. Instead, you should NULL
+> "gpios" entirely at the end of this function.
+that's right, setting to NULL here is now useless.
 
-Well, you are right, but the warning I get is not for direction:
+>> +             }
+>> +     devm_kfree(dev, gpios);
+>
+> gpios = NULL;
+> So this will indicate that its no more valid.
+well, this won't help...
+to do that, we'll have to pass a struct mctrl_gpios** instead of a
+struct mctrl_gpios *
 
-  WARNING: at /srv/lhome/simkag/devel/nc602/external/kernel/lib/dma-debug.c:986 check_sync+0x14c/0x540()
-  e100 0000:00:02.0: DMA-API: device driver tries to sync DMA memory it has not allocated [device address=0x0000000003c01000] [size=16 bytes]
-  [...]
-  [<c0134b24>] (debug_dma_sync_single_for_device+0x44/0x50) from [<c017a5e8>] (e100_rx_alloc_skb+0x1c4/0x1e8)
-  [<c017a5e8>] (e100_rx_alloc_skb+0x1c4/0x1e8) from [<c017c58c>] (e100_rx_alloc_list+0x84/0x164)
-  [<c017c58c>] (e100_rx_alloc_list+0x84/0x164) from [<c017e958>] (e100_up+0xc/0x14c)
-  [<c017e958>] (e100_up+0xc/0x14c) from [<c017ecc8>] (e100_open+0x14/0x40)
-  [<c017ecc8>] (e100_open+0x14/0x40) from [<c019b230>] (__dev_open+0x8c/0x134)
+>> +}
+> ...
+>
+> Thanks.
+> ---
 
-And the dma_debug code explicitly skips the check if the direction is
-DMA_BIDIRECTIONAL:
-
-  static void check_sync(struct device *dev,
-		       struct dma_debug_entry *ref,
-		       bool to_cpu)
-  {
-	[...]
-	if (entry->direction == DMA_BIDIRECTIONAL)
-		goto out;
-
-	if (ref->direction != entry->direction) {
-		err_printk(dev, entry, "DMA-API: device driver syncs "
-				"DMA memory with different direction "
-				"[device address=0x%016llx] [size=%llu bytes] "
-				"[mapped with %s] [synced with %s]\n",
-				(unsigned long long)ref->dev_addr, entry->size,
-				dir2name[entry->direction],
-				dir2name[ref->direction]);
-	}
-	[...]
-  }
-
-Krzysztofs patch does the same for dmabounce.c, from the dma-debug code
-it seems to me that it would make sense there as well?
-
-// Simon
+thanks !
