@@ -1,115 +1,343 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 04 Mar 2014 14:47:12 +0100
-Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm
- device tree bindings
-In-Reply-To: <53103C72.5030509@ti.com>
-References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
- <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>
- <530F1C4C.2010504@ti.com>
- <1393506385.4507.49.camel@paszta.hi.pengutronix.de>
- <20140227130020.GJ21483@n2100.arm.linux.org.uk> <530F43B9.800@ti.com>
- <1393520088.4507.92.camel@paszta.hi.pengutronix.de>
- <53103C72.5030509@ti.com>
-Message-ID: <1393940832.3917.84.camel@paszta.hi.pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 04 Mar 2014 14:48:54 +0100
+Subject: [PATCH v3 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140226144721.GP9195@lee--X1>
+References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+ <1393328481-7251-3-git-send-email-lee.jones@linaro.org>
+ <20140226144721.GP9195@lee--X1>
+Message-ID: <4575362.nxyAcPCJSW@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
 
-Am Freitag, den 28.02.2014, 09:36 +0200 schrieb Tomi Valkeinen:
-> On 27/02/14 18:54, Philipp Zabel wrote:
+Hi,
+
+On Wednesday, February 26, 2014 02:47:21 PM Lee Jones wrote:
+> ahci: st: Add support for ST's SATA IP
 > 
-> >> - One IPU enabled, one disabled: nothing special here, just set the
-> >> other IPU to status="disabled" in the DT data. The driver for the
-> >> enabled IPU would register the required DRM entities.
-> > 
-> > that should work. Let the enabled IPU create the imx-drm platform device
-> > on probe, parse the device tree and ignore everything only hanging off
-> > of the disabled IPU.
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> I think you misunderstood me a bit.
-> 
-> What I meant is that there's no need for imx-drm device at all, neither
-> in the DT data or in the kernel side.
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index b4a9262..ee7a3dc 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -97,6 +97,15 @@ config SATA_AHCI_PLATFORM
+>  
+>  	  If unsure, say N.
+>  
+> +config SATA_AHCI_ST
 
-agreed about the DT node. But the drm_device must be associated with a
-struct device. There is no reason to have the device representing the
-whole display subsystem hang off of one IPU over the other, and I'd
-rather not special case the IPU code with master/slave cases.
+It would be better to name it just ACHI_ST for consistency with
+existing config options (AHCI_IMX and AHCI_SUNXI).
 
-> There'd just be the DT nodes for the IPUs, which would cause the IPU
-> platform devices to be created, and a driver for the IPU. So just like
-> for any other normal platform device.
+> +	tristate "ST SATA support"
 
-Except that one IPU has to create the drm_device and the other needs to
-be drm_device-less.
+"ST AHCI SATA support"
 
-> In the simplest cases, where only one IPU is enabled, or the IPUs want
-> to be considered as totally independent, there'd be nothing special. The
-> IPU driver would just register the drm entities.
+> +	depends on SATA_AHCI_PLATFORM
 
-[...]
-> Here the slave IPU doesn't need to scan the graph at all. It just needs
-> to make itself available somehow to the master. Maybe just by exported
-> functions, or registering itself somewhere.
->
-> Only the master IPU will scan the graph, and as all the entities are
-> connected to the same graph, including the slave IPU, the master can
-> find all the relevant nodes.
+There should be also dependency on ARCH_STI here.  We don't want this
+driver to be available on other ARM architectures.
 
-Somehow it needs to know whether it should create the component master
-and drm_device, or just register as a slave component. I'd strongly
-prefer to have a look at the graph over giving explicit "master;" or
-"slave;" properties to the IPU device nodes for this single
-Linux-specific reason.
+> +	select GENERIC_PHY
 
-[...]
-> And I don't even know if the master-slave method I described is valid,
-> although I don't see why it would not work. The master
-> "display-subsystem" DT node does make sense to me in cases like this,
-> where the IPUs need to be driven as a single unit.
+This doesn't belong here anylonger and should be removed.
 
-which is a sensible default for i.MX6.
+> +	help
+> +	  This option enables support for ST SATA controller.
 
-> > Did anybody propose such a generic term? How about:
-> > 
-> > -imx-drm {
-> > -	compatible = "fsl,imx-drm";
-> > -	ports = <&ipu1_di0>, <&ipu1_di1>;
-> > -};
-> > +display-subsystem {
-> > +	compatible = "fsl,imx-display-subsystem";
-> > +	ports = <&ipu1_di0>, <&ipu1_di1>;
-> > +};
-> 
-> That sounds fine to me.
-> 
-> I wonder how it works if, say, there are 4 IPUs, and you want to run
-> them in two pairs. In that case you need two of those display-subsystem
-> nodes. But I guess it's just a matter of assigning a number for them
-> with 'regs' property, and making sure the driver has nothing that
-> prevents multiple instances of it.
+ST AHCI SATA
 
-Exactly. I'm not even sure it is necessary to assign a number.
+> +	  If unsure, say N.
+> +
+>  config AHCI_IMX
+>  	tristate "Freescale i.MX AHCI SATA support"
+>  	depends on SATA_AHCI_PLATFORM && MFD_SYSCON
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 246050b..6bbd6da 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -5,6 +5,7 @@ obj-$(CONFIG_ATA)		+= libata.o
+>  obj-$(CONFIG_SATA_AHCI)		+= ahci.o libahci.o
+>  obj-$(CONFIG_SATA_ACARD_AHCI)	+= acard-ahci.o libahci.o
+>  obj-$(CONFIG_SATA_AHCI_PLATFORM) += ahci_platform.o libahci.o
+> +obj-$(CONFIG_SATA_AHCI_ST)      += ahci_st.o
+>  obj-$(CONFIG_SATA_FSL)		+= sata_fsl.o
+>  obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
+>  obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+> diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
+> new file mode 100644
+> index 0000000..2f95133
+> --- /dev/null
+> +++ b/drivers/ata/ahci_st.c
+> @@ -0,0 +1,239 @@
+> +/*
+> + * Copyright (C) 2012 STMicroelectronics Limited
+> + *
+> + * Authors: Francesco Virlinzi <francesco.virlinzi@st.com>
+> + *	    Alexandre Torgue <alexandre.torgue@st.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/export.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/of.h>
+> +#include <linux/ahci_platform.h>
+> +#include <linux/phy/phy.h>
 
-[...]
-> >> If that's not possible, then the drivers in question could have an
-> >> option to enable or disable themselves, passed via the kernel command
-> >> line, so that the user can select which subsystem to use.
-> > 
-> > That is the exact same problem as having multiple drivers that can bind
-> > to the same device.
-> 
-> Hmm, sorry? Weren't we just discussing about that problem =). Or maybe I
-> missed the original point from Russell, as the problem about DRM and
-> fbdev conflicting sounded a bit unrelated.
+Not needed anylonger.
 
-I guess I missed it, though. Rereading the context, I am just
-(re)stating that this is a problem beyond DRM and fbdev. Compiling a
-kernel with two drivers binding to the same device, you effectively say
-"whichever binds first, I don't care". To change this, we'd need
-something similar to module blacklists for non-modular builds. I'd
-rather strive to remove the need for duplicate drivers in the kernel.
+> +#include <linux/libata.h>
+> +#include <linux/reset.h>
+> +#include <linux/io.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +#include "ahci.h"
+> +
+> +#define ST_AHCI_OOBR			0xbc
+> +#define ST_AHCI_OOBR_WE			BIT(31)
+> +#define ST_AHCI_OOBR_CWMIN_SHIFT	24
+> +#define ST_AHCI_OOBR_CWMAX_SHIFT	16
+> +#define ST_AHCI_OOBR_CIMIN_SHIFT	8
+> +#define ST_AHCI_OOBR_CIMAX_SHIFT	0
+> +
+> +struct st_ahci_drv_data {
+> +	struct platform_device *ahci;
+> +	struct phy *phy;
 
-regards
-Philipp
+ditto
+
+> +	struct reset_control *pwr;
+> +	struct reset_control *sw_rst;
+> +	struct reset_control *pwr_rst;
+> +	struct ahci_host_priv *hpriv;
+> +};
+> +
+> +static void st_ahci_configure_oob(void __iomem *mmio)
+> +{
+> +	unsigned long old_val, new_val;
+> +
+> +	new_val = (0x02 << ST_AHCI_OOBR_CWMIN_SHIFT) |
+> +		  (0x04 << ST_AHCI_OOBR_CWMAX_SHIFT) |
+> +		  (0x08 << ST_AHCI_OOBR_CIMIN_SHIFT) |
+> +		  (0x0C << ST_AHCI_OOBR_CIMAX_SHIFT);
+> +
+> +	old_val = readl(mmio + ST_AHCI_OOBR);
+> +	writel(old_val | ST_AHCI_OOBR_WE, mmio + ST_AHCI_OOBR);
+> +	writel(new_val | ST_AHCI_OOBR_WE, mmio + ST_AHCI_OOBR);
+> +	writel(new_val, mmio + ST_AHCI_OOBR);
+> +}
+> +
+> +static int st_ahci_deassert_resets(struct device *dev)
+> +{
+> +	struct st_ahci_drv_data *drv_data = dev_get_drvdata(dev);
+> +	int err;
+> +
+> +	if (drv_data->pwr) {
+> +		err = reset_control_deassert(drv_data->pwr);
+> +		if (err) {
+> +			dev_err(dev, "unable to bring out of pwrdwn\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	st_ahci_configure_oob(drv_data->hpriv->mmio);
+> +
+> +	if (drv_data->sw_rst) {
+> +		err = reset_control_deassert(drv_data->sw_rst);
+> +		if (err) {
+> +			dev_err(dev, "unable to bring out of sw-rst\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	if (drv_data->pwr_rst) {
+> +		err = reset_control_deassert(drv_data->pwr_rst);
+> +		if (err) {
+> +			dev_err(dev, "unable to bring out of pwr-rst\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_ahci_probe_resets(struct platform_device *pdev)
+> +{
+> +	struct st_ahci_drv_data *drv_data = platform_get_drvdata(pdev);
+> +
+> +	drv_data->pwr = devm_reset_control_get(&pdev->dev, "pwr-dwn");
+> +	if (IS_ERR(drv_data->pwr)) {
+> +		dev_info(&pdev->dev, "power reset control not defined\n");
+> +		drv_data->pwr = NULL;
+> +	}
+> +
+> +	drv_data->sw_rst = devm_reset_control_get(&pdev->dev, "sw-rst");
+> +	if (IS_ERR(drv_data->sw_rst)) {
+> +		dev_info(&pdev->dev, "soft reset control not defined\n");
+> +		drv_data->sw_rst = NULL;
+> +	}
+> +
+> +	drv_data->pwr_rst = devm_reset_control_get(&pdev->dev, "pwr-rst");
+> +	if (IS_ERR(drv_data->pwr_rst)) {
+> +		dev_dbg(&pdev->dev, "power soft reset control not defined\n");
+> +		drv_data->pwr_rst = NULL;
+> +	}
+> +
+> +	return st_ahci_deassert_resets(&pdev->dev);
+> +}
+> +
+> +static const struct ata_port_info st_ahci_port_info = {
+> +	.flags          = AHCI_FLAG_COMMON,
+> +	.pio_mask       = ATA_PIO4,
+> +	.udma_mask      = ATA_UDMA6,
+> +	.port_ops       = &ahci_platform_ops,
+> +};
+> +
+> +static int st_ahci_probe(struct platform_device *pdev)
+> +{
+> +	struct st_ahci_drv_data *drv_data;
+> +	struct ahci_host_priv *hpriv;
+> +	int err;
+> +
+> +	drv_data = devm_kzalloc(&pdev->dev, sizeof(*drv_data), GFP_KERNEL);
+> +	if (!drv_data)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, drv_data);
+> +
+> +	hpriv = ahci_platform_get_resources(pdev);
+> +	if (IS_ERR(hpriv))
+> +		return PTR_ERR(hpriv);
+> +
+> +	drv_data->hpriv = hpriv;
+> +
+> +	err = st_ahci_probe_resets(pdev);
+> +	if (err)
+> +		return err;
+> +
+> +	err = ahci_platform_enable_resources(hpriv);
+> +	if (err)
+> +		return err;
+> +
+> +	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info, 0, 0);
+> +	if (err) {
+> +		ahci_platform_disable_resources(hpriv);
+> +		return err;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_ahci_remove(struct platform_device *pdev)
+> +{
+> +	struct st_ahci_drv_data *drv_data = platform_get_drvdata(pdev);
+> +	struct ahci_host_priv *hpriv = drv_data->hpriv;
+> +	int err;
+> +
+> +	if (drv_data->pwr) {
+> +		err = reset_control_assert(drv_data->pwr);
+> +		if (err)
+> +			dev_err(&pdev->dev, "unable to pwrdwn\n");
+> +	}
+> +
+> +	ahci_platform_disable_resources(hpriv);
+> +
+> +	return 0;
+> +}
+
+This driver should define its own ->host_stop method which will
+do reset_control_assert() and ahci_platform_disable_resources().
+
+Then instead of st_ahci_remove() the ata_platform_remove_one()
+one should be used as ->remove method.
+
+[ Please see ahci_imx.c for details/example. ]
+
+> +#ifdef CONFIG_PM_SLEEP
+> +static int st_ahci_suspend(struct device *dev)
+> +{
+> +	struct st_ahci_drv_data *drv_data = dev_get_drvdata(dev);
+> +	struct ahci_host_priv *hpriv = drv_data->hpriv;
+> +	int err;
+> +
+> +	if (drv_data->pwr) {
+> +		err = reset_control_assert(drv_data->pwr);
+> +		if (err) {
+> +			dev_err(dev, "unable to pwrdwn");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	ahci_platform_disable_resources(hpriv);
+
+I think that ata_platform_suspend_host() should be used in
+st_ahci_suspend() (please refer to ahci_imx.c).
+
+> +	return 0;
+> +}
+> +
+> +static int st_ahci_resume(struct device *dev)
+> +{
+> +	struct st_ahci_drv_data *drv_data = dev_get_drvdata(dev);
+> +	struct ahci_host_priv *hpriv = drv_data->hpriv;
+> +	int err;
+> +
+> +	err = ahci_platform_enable_resources(hpriv);
+
+Similarly, ata_platform_resume_host() should be used in
+st_ahci_resume() (please refer to ahci_imx.c).
+
+> +	if (err)
+> +		return err;
+> +
+> +	err = st_ahci_deassert_resets(dev);
+> +	if (err) {
+> +		ahci_platform_disable_resources(hpriv);
+> +		return err;
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(st_ahci_pm_ops, st_ahci_suspend, st_ahci_resume);
+> +
+> +static struct of_device_id st_ahci_match[] = {
+> +	{ .compatible = "st,ahci", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, st_ahci_match);
+> +
+> +static struct platform_driver st_ahci_driver = {
+> +	.driver = {
+> +		.name = "st_ahci",
+> +		.owner = THIS_MODULE,
+> +		.pm = &st_ahci_pm_ops,
+> +		.of_match_table = of_match_ptr(st_ahci_match),
+> +	},
+> +	.probe = st_ahci_probe,
+> +	.remove = st_ahci_remove,
+> +};
+> +module_platform_driver(st_ahci_driver);
+> +
+> +MODULE_AUTHOR("Alexandre Torgue <alexandre.torgue@st.com>");
+> +MODULE_AUTHOR("Francesco Virlinzi <francesco.virlinzi@st.com>");
+> +MODULE_DESCRIPTION("STMicroelectronics Sata Ahci driver");
+
+"Sata Ahci" -> "SATA AHCI"
+
+> +MODULE_LICENSE("GPL v2");
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
