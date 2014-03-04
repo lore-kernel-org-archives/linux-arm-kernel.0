@@ -1,39 +1,28 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 4 Mar 2014 17:04:32 +0100
-Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
-In-Reply-To: <20140228230000.GW13624@atomide.com>
-References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
- <20140228230000.GW13624@atomide.com>
-Message-ID: <20140304160432.GG2799@8bytes.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 4 Mar 2014 18:19:00 +0200
+Subject: [PATCH 00/18] ARM: OMAP2+: CM/PRM cleanup set
+Message-ID: <1393949958-816-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 03:00:00PM -0800, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [140228 12:46]:
-> > Hi Joerg, Tony,
-> > 
-> > This is an updated series of the OMAP IOMMU DT adaptation intended
-> > for 3.15 merge window, addressing the comments from the v2 series.
-> > This series is rebased onto 3.14-rc4, and the only change to bindings
-> > is to drop the dma-window property.
-> > 
-> > The first 7 patches in the series are in drivers/iommu, with the first
-> > 3 patches performing some cleanup. The DT bindings and adaptation are
-> > done in patches 4 and 5.
-> > 
-> > Tony,
-> > Patches 8 through 13 are in arch/arm/mach-omap2 layer, so I am guessing
-> > these would have to go through your tree. Of these, patches 8 and 9 are
-> > cleanup fixes to get OMAP3 IVA MMU working, patches 10 & 11 are fixes
-> > required with DT-boot for OMAP3/4, patches 12 & 13 add the OMAP5 support.
-> 
-> Are patches 8 to 13 OK to apply separately from the iommu patches or
-> do they need to wait for the iommu patches to get merged first?
+Hi,
 
-Applied patches 1-7 to my arm/omap branch.
+This set cleans up the CM/PRM codebase a bit, removing the need for direct
+CM/PRM register access macros outside CM/PRM drivers. This is done in
+preparation to isolate these drivers into its own driver directory.
+Currently my plan is to create a single PRCM driver, which will contain
+both, and as such, CM/PRM inter-access is not removed in this set.
 
-Tony, you can pull that branch into your tree if needed (when I pushed
-it, which will happen today or tomorrow).
+This set is built on top of the OMAP2 DT clock conversion set, but most
+of the patches can also be standalone if need be.
 
+Testing done:
+- omap2 : none (any feedback welcome)
+- omap3-beagle : boot, suspend-resume (RET), suspend-resume (OFF)
+- omap4-panda-es : boot, suspend-resume (RET)
 
-	Joerg
+Branch also available here:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 3.14-rc4-cm-prm-cleanup
+
+-Tero
