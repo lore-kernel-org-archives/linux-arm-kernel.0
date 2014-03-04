@@ -1,33 +1,23 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 5 Mar 2014 01:07:34 +0800
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <20140304111520.GE8766@mudshark.cambridge.arm.com>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
- <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
- <1393899715.20435.8.camel@joe-AO722> <53153A4C.9050602@infradead.org>
- <CACxGe6tD3mQshDSoEQaPXAnXG_siUdiFoAWhjmO2gDY7ZzkjUw@mail.gmail.com>
- <20140304111520.GE8766@mudshark.cambridge.arm.com>
-Message-ID: <CACxGe6svyLHZO8k6qVs+hhyAWxeg3tzh1wUfbRB_z-sxRMv4qw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 04 Mar 2014 21:09:53 +0300
+Subject: [PATCHv3 0/4] Add DT support for fixed PHYs
+In-Reply-To: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <531616F1.5060703@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 4, 2014 at 7:15 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Mar 04, 2014 at 10:59:46AM +0000, Grant Likely wrote:
->> I agree with merging it with the rest of the series, but comparing it
->> to a blank cheque is not appropriate. Merely having an entry in
->> MAINTAINERS doesn't immediately confer trust or ability to merge code,
->> but it does tell people who to talk to when looking at ACPI on ARM.
->> You can bet that neither Linus, Len or Rafael will merge ARM ACPI
->> trees from them if you disagree. (And even if they did, you would
->> yell, and Linus would revert it).
->
-> If you want to know who to talk to regarding a subsystem then you use
-> get_maintainer.pl and/or git blame. Regardless of this patch, neither of
-> those tools will identify Graeme or Hanjun as the contacts for ACPI on ARM.
->
-> I think we're in agreement, but just to spell it out: this patch should be
-> included at the end of a series adding the files which will be maintained.
+Hello.
 
-Yes, agreed.
+On 03/04/2014 01:58 PM, Thomas Petazzoni wrote:
 
-g.
+> Here is a third version of the patch set that adds a Device Tree
+> binding and the related code to support fixed PHYs.
+
+> Since the second version, the changes have been:
+
+>   * Rebased on top of v3.14-rc1, and re-tested on hardware.
+
+    This needs to be rebased atop of net-next.git repo on git.kernel.org.
+
+WBR, Sergei
