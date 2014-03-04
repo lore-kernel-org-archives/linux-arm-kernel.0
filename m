@@ -1,59 +1,72 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Mar 2014 21:15:01 +0100 (CET)
-Subject: [PATCH v2 RESEND 1/3] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
-References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
-Message-ID: <alpine.DEB.2.02.1403041957320.18573@ionos.tec.linutronix.de>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Tue,  4 Mar 2014 21:20:13 +0100
+Subject: [PATCH] [RESEND] ARM: footbridge: remove obsolete IRQF_DISABLED
+In-Reply-To: <1386395865-11910-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1386395865-11910-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <1393964413-16829-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2 Feb 2014, Alexander Shiyan wrote:
+This patch proposes to remove the IRQF_DISABLED flag from footbridge
+code. It's a NOOP since 2.6.35.
 
-> +static const struct {
-> +#define CLPS711X_FLAG_EN	(1 << 0)
-> +#define CLPS711X_FLAG_FIQ	(1 << 1)
-> +	unsigned int	flags;
-> +	phys_addr_t	eoi;
-> +} clps711x_irqs[] = {
-> +	[1]	= { CLPS711X_FLAG_FIQ, CLPS711X_BLEOI, },
-> +	[3]	= { CLPS711X_FLAG_FIQ, CLPS711X_MCEOI, },
-> +	[4]	= { CLPS711X_FLAG_EN, CLPS711X_COEOI, },
-> +	[5]	= { CLPS711X_FLAG_EN, },
-> +	[6]	= { CLPS711X_FLAG_EN, },
-> +	[7]	= { CLPS711X_FLAG_EN, },
-> +	[8]	= { CLPS711X_FLAG_EN, CLPS711X_TC1EOI, },
-> +	[9]	= { CLPS711X_FLAG_EN, CLPS711X_TC2EOI, },
-> +	[10]	= { CLPS711X_FLAG_EN, CLPS711X_RTCEOI, },
-> +	[11]	= { CLPS711X_FLAG_EN, CLPS711X_TEOI, },
-> +	[12]	= { CLPS711X_FLAG_EN, },
-> +	[13]	= { CLPS711X_FLAG_EN, },
-> +	[14]	= { CLPS711X_FLAG_EN, CLPS711X_UMSEOI, },
-> +	[15]	= { CLPS711X_FLAG_EN, CLPS711X_SRXEOF, },
-> +	[16]	= { CLPS711X_FLAG_EN, CLPS711X_KBDEOI, },
-> +	[17]	= { CLPS711X_FLAG_EN, },
-> +	[18]	= { CLPS711X_FLAG_EN, },
-> +	[28]	= { CLPS711X_FLAG_EN, },
-> +	[29]	= { CLPS711X_FLAG_EN, },
-> +	[32]	= { CLPS711X_FLAG_FIQ, },
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-footbridge/dc21285-timer.c |  2 +-
+ arch/arm/mach-footbridge/dc21285.c       | 10 +++++-----
+ arch/arm/mach-footbridge/isa-timer.c     |  2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-Is anything really using the FIQs on those clps711x machines?
-
-If yes, I have no objections to export the no_action handler.
-
-> +};
-
-> +static void clps711x_intc_mask(struct irq_data *d)
-> +{
-> +	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-> +	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
-> +	u32 tmp;
-> +
-> +	tmp = readl_relaxed(intmr);
-> +	tmp &= ~(1 << (hwirq % 16));
-> +	writel_relaxed(tmp, intmr);
-
-Why can't you use a generic irq chip for all of this ?
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
+index 3971104d32d4..952508f58ffb 100644
+--- a/arch/arm/mach-footbridge/dc21285-timer.c
++++ b/arch/arm/mach-footbridge/dc21285-timer.c
+@@ -105,7 +105,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
+ static struct irqaction footbridge_timer_irq = {
+ 	.name		= "dc21285_timer1",
+ 	.handler	= timer1_interrupt,
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.dev_id		= &ckevt_dc21285,
+ };
+ 
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 7c2fdae9a38b..96a3d73ef4bf 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -334,15 +334,15 @@ void __init dc21285_preinit(void)
+ 	/*
+ 	 * We don't care if these fail.
+ 	 */
+-	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, 0,
+ 			    "PCI system error", &serr_timer);
+-	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, 0,
+ 			    "PCI parity error", &perr_timer);
+-	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, 0,
+ 			    "PCI abort", NULL);
+-	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, 0,
+ 			    "Discard timer", NULL);
+-	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, 0,
+ 			    "PCI data parity", NULL);
+ 
+ 	if (cfn_mode) {
+diff --git a/arch/arm/mach-footbridge/isa-timer.c b/arch/arm/mach-footbridge/isa-timer.c
+index d9301dd56354..b73f52e196b9 100644
+--- a/arch/arm/mach-footbridge/isa-timer.c
++++ b/arch/arm/mach-footbridge/isa-timer.c
+@@ -27,7 +27,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+ static struct irqaction pit_timer_irq = {
+ 	.name		= "pit",
+ 	.handler	= pit_timer_interrupt,
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.dev_id		= &i8253_clockevent,
+ };
+ 
+-- 
+1.8.3.2
