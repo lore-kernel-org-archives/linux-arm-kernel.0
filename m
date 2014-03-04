@@ -1,25 +1,62 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 4 Mar 2014 12:56:43 +0100
-Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
-In-Reply-To: <3106573.JU29eCDXeo@avalon>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <2207635.bd10VfTU6U@avalon> <20140304110706.GA12727@katana>
- <3106573.JU29eCDXeo@avalon>
-Message-ID: <20140304115643.GA13676@katana>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Tue, 4 Mar 2014 12:58:18 +0100
+Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for
+ ARM
+In-Reply-To: <CAFrcx1mg03A+e7q2d1HR=bR7uoDw5k36TVw5TQP68caWYBNJnQ@mail.gmail.com>
+References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
+ <CAFrcx1mg03A+e7q2d1HR=bR7uoDw5k36TVw5TQP68caWYBNJnQ@mail.gmail.com>
+Message-ID: <20140304115756.GC1119@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > I am currently playing with the status property for clocks, so we can
-> > "disable" clocks. Opinions?
+On Tue, Mar 04, 2014 at 02:24:37AM +0100, Jean Pihet wrote:
+> Hi,
 > 
-> Could you please provide an example of how you would like to use that ?
+> Here are some notes about the performance improvement and the test usage.
+> 
+> Jiri, do you need these notes in the one of commit description?
+> 
+> 1. Using libdw vs libunwind on ARMv7
+> 
+> The performance gain is (more than) significant: >800%.
+> 
+> I did not profile perf itself ;-p just did a timing measurement.
+> The benchmark has been run multiple times with different perf.data
+> sizes. The results are consistent across the tests runs.
+> 
+> Usage:
+> ./tools/perf/perf record --call-graph dwarf --
+> ../../libunwind/test_app/stress_bt
+> time ./tools/perf/perf report --stdio > /dev/null 2>&1
+> 
+> Platform:
+> Quad-core marvell XP370. perf runs on 1 cpu
+> 
+> Perf data size:
+> 304MB    libunwind    libdw        improvement
+> real    9m31.577s    1m13.052s    782%
+> user    5m33.020s    1m2.910s    529%
+> sys        3m57.770s    0m10.090s    2356%
+> 
+> 2. unwind test usage
+> perf test list gives the list of supported tests. In this case the
+> test #23 is dwarf unwinding:
+> 
+> ./tools/perf/perf test 23
+> 23: Test dwarf unwind                                      : Ok
+> 
+> 
+> Regards,
+> Jean
+> 
+> 
 
-Working on it...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140304/9e3537e7/attachment.sig>
+I can't speak for the arm specific stuff, but generally it fits
+and looks ok (and does not break the x86 build)
+
+also.. who wouldn't ack 800% speed improvement ;-)
+
+Acked-by: Jiri Olsa <jolsa@redhat.com>
+
+thanks,
+jirka
