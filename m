@@ -1,64 +1,93 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 03 Mar 2014 17:30:16 -0800
-Subject: [PATCH v4 0/6] generic early_ioremap support
-In-Reply-To: <1393885748.5094.14.camel@deneb.redhat.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
- <1393337404.7307.51.camel@deneb.redhat.com>
- <20140225183012.GA27164@mudshark.cambridge.arm.com>
- <1393353942.26583.10.camel@deneb.redhat.com> <530CF21E.1020603@zytor.com>
- <1393885748.5094.14.camel@deneb.redhat.com>
-Message-ID: <2d10d2d3-02e3-42b6-9b81-464f56e4cf01@email.android.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 4 Mar 2014 09:33:51 +0800
+Subject: [PATCH] ARM: pxa: add gpio keys information
+In-Reply-To: <1393329559-25320-1-git-send-email-dbaryshkov@gmail.com>
+References: <1393329559-25320-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CAN1soZzfr2QQ9=LoQ9qcFf-dLD-W6jiEiK+SiGbyeN=cfPJvYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All three .
-
-On March 3, 2014 2:29:08 PM PST, Mark Salter <msalter@redhat.com> wrote:
->On Tue, 2014-02-25 at 11:42 -0800, H. Peter Anvin wrote:
->> On 02/25/2014 10:45 AM, Mark Salter wrote:
->> > On Tue, 2014-02-25 at 18:30 +0000, Will Deacon wrote:
->> >> I'd suggest spitting the core part out from the arch-specific
->parts. That
->> >> way, the core part can merged independently and architectures can
->move over
->> >> as they see fit. It also signals (at least to me) that, "hey, I
->should
->> >> probably review this" whilst my current stance is "there's a whole
->load of
->> >> stuff under mm/ that needs to be acked first".
->> >>
->> >> If you put the whole thing into next, you just run the risk of
->conflicts
->> >> with all the arch trees.
->> > 
->> > I've been thinking of breaking out the common bits and x86 bits and
->just
->> > going with that for now. There's no point in just doing the common
->bits
->> > because it won't get tested without at least one architecture using
->it.
->> > 
->> 
->> If you think it makes sense we could take the common bits + x86 and
->put
->> them through the -tip tree.  The other option would be to put the
->whole
->> thread in linux-next with Acks.
->> 
->> As far as x86 is concerned it looks like it is mostly just code
->> movement, so I'm happy giving my:
->> 
->> Acked-by: H. Peter Anvin <hpa@linux.intel.com>
->> 
+On Tue, Feb 25, 2014 at 7:59 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> Switching from corgikbd to matrixkbd corgi has lost support for few switches.
+> Readd them through gpio-keys-polled device (-polled, since scoop does
+> not provide IRQ for GPIO).
 >
->I going to send out a v5 with the arm bits dropped and Ack-bys added.
->There is still some work left there, so I think I'll redo the arm bits
->separately after once the common bits are in the kernel.
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/mach-pxa/corgi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 >
->Peter, is your Acked-by only for "[3/6] x86: use generic
->early_ioremap"?
->Or did you intend "[1/6] x86/mm: sparse warning fix for early_memremap"
->and/or "[2/6] mm: create generic early_ioremap() support" also?
+> diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+> index f162f1b..57d6054 100644
+> --- a/arch/arm/mach-pxa/corgi.c
+> +++ b/arch/arm/mach-pxa/corgi.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/spi/pxa2xx_spi.h>
+>  #include <linux/mtd/sharpsl.h>
+>  #include <linux/input/matrix_keypad.h>
+> +#include <linux/gpio_keys.h>
+>  #include <linux/module.h>
+>  #include <video/w100fb.h>
+>
+> @@ -405,6 +406,44 @@ static struct platform_device corgikbd_device = {
+>         },
+>  };
+>
+> +static struct gpio_keys_button corgi_gpio_keys[] = {
+> +       {
+> +               .type   = EV_SW,
+> +               .code   = SW_LID,
+> +               .gpio   = CORGI_GPIO_SWA,
+> +               .desc   = "Lid close switch",
+> +               .debounce_interval = 500,
+> +       },
+> +       {
+> +               .type   = EV_SW,
+> +               .code   = SW_TABLET_MODE,
+> +               .gpio   = CORGI_GPIO_SWB,
+> +               .desc   = "Tablet mode switch",
+> +               .debounce_interval = 500,
+> +       },
+> +       {
+> +               .type   = EV_SW,
+> +               .code   = SW_HEADPHONE_INSERT,
+> +               .gpio   = CORGI_GPIO_AK_INT,
+> +               .desc   = "HeadPhone insert",
+> +               .debounce_interval = 500,
+> +       },
+> +};
+> +
+> +static struct gpio_keys_platform_data corgi_gpio_keys_platform_data = {
+> +       .buttons        = corgi_gpio_keys,
+> +       .nbuttons       = ARRAY_SIZE(corgi_gpio_keys),
+> +       .poll_interval  = 250,
+> +};
+> +
+> +static struct platform_device corgi_gpio_keys_device = {
+> +       .name   = "gpio-keys-polled",
+> +       .id     = -1,
+> +       .dev    = {
+> +               .platform_data  = &corgi_gpio_keys_platform_data,
+> +       },
+> +};
+> +
+>  /*
+>   * Corgi LEDs
+>   */
+> @@ -646,6 +685,7 @@ static struct platform_device sharpsl_rom_device = {
+>  static struct platform_device *devices[] __initdata = {
+>         &corgiscoop_device,
+>         &corgifb_device,
+> +       &corgi_gpio_keys_device,
+>         &corgikbd_device,
+>         &corgiled_device,
+>         &corgi_audio_device,
+> --
+> 1.8.5.3
+>
 
--- 
-Sent from my mobile phone.  Please pardon brevity and lack of formatting.
+Applied
+
+Thanks
+Haojian
