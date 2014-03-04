@@ -1,83 +1,48 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 4 Mar 2014 07:05:06 -0800
-Subject: [PATCH 6/7] PCI: designware: use new OF interrupt mapping when
- possible
-In-Reply-To: <1393608523-17509-7-git-send-email-l.stach@pengutronix.de>
-References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
- <1393608523-17509-7-git-send-email-l.stach@pengutronix.de>
-Message-ID: <CAJ+vNU1EBFWiX7GLeV7LsaWY9_d_r_RBCu9tz3e-s0nAcAjOfA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Mar 2014 15:21:37 +0000
+Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
+In-Reply-To: <CAL_JsqLQrHwVx0ZbeeasKsTXp_NVMYX1voxhUdjH737tptiAeQ@mail.gmail.com>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <10040083.PbPEQQPCjl@wuerfel>
+ <CAL_JsqL6-hoD4F7+adPhsOJXeM5f+wpEuBWg_6AWqj3k2v0NEw@mail.gmail.com>
+ <5773663.p5fEFmy536@wuerfel>
+ <CAL_JsqLQrHwVx0ZbeeasKsTXp_NVMYX1voxhUdjH737tptiAeQ@mail.gmail.com>
+Message-ID: <20140304152137.GL8766@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 9:28 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> This is the recommended method of doing the IRQ
-> mapping. For old devicetrees we fall back to the
-> previous practice.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  drivers/pci/host/pcie-designware.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 17ce88f79d2b..3e0c2af11528 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -17,6 +17,7 @@
->  #include <linux/module.h>
->  #include <linux/msi.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci.h>
->  #include <linux/pci_regs.h>
->  #include <linux/types.h>
-> @@ -738,8 +739,13 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->  {
->         struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-> +       int irq;
->
-> -       return pp->irq;
-> +       irq = of_irq_parse_and_map_pci(dev, slot, pin);
-> +       if (!irq)
-> +               irq = pp->irq;
-> +
-> +       return irq;
->  }
->
->  static void dw_pcie_add_bus(struct pci_bus *bus)
-> --
-> 1.8.5.3
->
+On Mon, Mar 03, 2014 at 02:04:17PM +0000, Rob Herring wrote:
+> Adding Will...
 
-Lucas,
+Thanks Rob!
 
-Please add the following which are required (at least the second one
-is required) for of_irq_parse_and_map_pci() to work properly for P2P
-bridges.  With the changes below as well as my of/irq fix
-(https://patchwork.kernel.org/patch/3762591/) I can now use devices
-behind a properly connected P2P bridge.
+> On Fri, Feb 28, 2014 at 9:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 28 February 2014 09:14:19 Rob Herring wrote:
+> >>
+> >> I know Will D was not a fan of this property. Primarily I believe
+> >> because you may need to describe more than just a boolean in more
+> >> complex bus topologies.
+> >
+> > I can't think of any example where it's not per-device. Do you
+> > think we can end up with a device that has multiple bus master
+> > ports, only some of which are coherent, or is there a different
+> > concern?
+> 
+> Perhaps Will can post his slides from the ARM kernel summit or chime
+> in here, but I believe it was more that coherency is just one aspect
+> of bus master bus topology. The DT models the slave bus hierarchy and
+> doesn't model the master side which is becoming more complex and
+> needing to be described. In the case of highbank, you have an ACP bus
+> with some number of masters on it. They are configurable, but it is
+> not the device that is configurable, but really which bus they are
+> connected to.
 
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -493,7 +493,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-        dw_pci.nr_controllers = 1;
-        dw_pci.private_data = (void **)&pp;
+I'm not sure what happened to this slides but, yes, you have the right idea.
+It's not only DMA coherency that's directly related to master topology, but
+also SMMU configuration and MSI routing will depend on this information.
 
--       pci_common_init(&dw_pci);
-+       pci_common_init_dev(pp->dev, &dw_pci);
-        pci_assign_unassigned_resources();
- #ifdef CONFIG_PCI_DOMAINS
-        dw_pci.domain++;
-@@ -726,7 +726,7 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_s
+Using a per-device, boolean property to describe DMA coherency may work for a
+simple, statically configured system, but it really just avoids the bigger
+issue.
 
-        if (pp) {
-                pp->root_bus_nr = sys->busnr;
--               bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
-+               bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
-                                        sys, &sys->resources);
-        } else {
-                bus = NULL;
-
-Thanks,
-
-Tim
+Will
