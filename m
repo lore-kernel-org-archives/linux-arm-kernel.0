@@ -1,57 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Mar 2014 23:29:42 -0500
-Subject: [PATCH v3 3/4] ARM: mvebu: move DT Dove to MVEBU
-In-Reply-To: <1393663178-22120-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393538613-28293-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393663178-22120-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140304042942.GK1872@titan.lakedaemon.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Mon, 03 Mar 2014 21:12:05 -0800
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+In-Reply-To: <5312E46B.8020900@gmail.com>
+References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
+ <20140128141458.GD8713@xo-6d-61-c0.localdomain>
+ <20140128182245.18840.51279@capellas-linux>
+ <loom.20140216T140206-196@post.gmane.org>
+ <20140224215443.9748.65580@capellas-linux> <5312E46B.8020900@gmail.com>
+Message-ID: <531560aa.e7d5440a.0e5f.5f57@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 09:39:38AM +0100, Sebastian Hesselbarth wrote:
-> With all the DT support preparation done, we are able to move Dove
-> to MVEBU easily. Legacy non-DT mach-dove is left untouched to rot
-> for a while before removal.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> v1->v2:
-> - just rename CONFIG_ARCH_DOVE to CONFIG_MACH_DOVE in dts/Makefile
->   (Suggested by Jason Cooper)
-> v2->v3:
-> - dropped drivers/phy/Kconfig change, which is now an individual
->   patch sent to Kishon.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/Makefile    |  2 +-
->  arch/arm/mach-dove/Kconfig    | 12 ------------
->  arch/arm/mach-dove/Makefile   |  1 -
->  arch/arm/mach-dove/board-dt.c | 43 -------------------------------------------
->  arch/arm/mach-mvebu/Kconfig   | 12 ++++++++++++
->  arch/arm/mach-mvebu/Makefile  |  1 +
->  arch/arm/mach-mvebu/dove.c    | 39 +++++++++++++++++++++++++++++++++++++++
->  7 files changed, 53 insertions(+), 57 deletions(-)
->  delete mode 100644 arch/arm/mach-dove/board-dt.c
->  create mode 100644 arch/arm/mach-mvebu/dove.c
+Quoting tonyho (2014-03-01 23:57:31)
+> Now I have try to booting you hibernation_3.13_russMerge branch kernel 
+> from uboot(Version 2013-10) in BBB, and I don't know how to build the dtb.
+> I have built the uImage using:
+> 1. make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-
+> none-linux-gnueabi- omap2plus_defconfig && make ARCH=arm 
+> CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-none-linux-gnueabi- 
+> uImage LOADADDR=0x80008000
+Hi Tony, you'll want to do:
+make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm- dtbs
 
-We'll see how it goes!
+This will generate dtb files in arch/arm/boot/dts/
 
-Applied to mvebu/soc
+>From there, you must take the correct dtb file and include it in your
+u-boot.
 
-thx,
+You'll have to point the bootup to the dtb image you load.
 
-Jason.
+> 2. And I load the uImage using the ext4load from TF card?
+> (1)ext4load mmc 0:2 80007f00 /boot/uImage
+> (2)and 'iminfo 0x80007f00' hints image is OK.
+> (3)The Kernel Command Line is 'init=/linuxrc console=ttyO0,115200n8 
+> run_hardware_tests root=/dev/mmcblk0p2 ro rootfstype=ext4 rootwait' and 
+> I select the 'Always use the default kernel command line'
+> and the configuration has been verified in other version linux kernel 
+> source code.
+> (4)But when I 'bootm 80007f00', it just print the 'Starting kernel ...' 
+This is what you expect when it can't find the dtb image, as the dtb is
+required to boot.
+
+> and nothing more. And the USERLED0-3 in BBB are off.
+> 3. I guess this is caused by I haven't load a dts to memory
+> (1)Can you tell me how to build the dtb? Like 'make XXX.dtb/dts'?
+> (2)And which dtb should be loaded into memory? What the address should 
+> be load for the dtb files?
+
+If you're using beaglebone black, use am335x-boneblack.dtb
+
+The load address is tricky a bit, the answer is it depends on where you
+have room.
+
+I'm probably not much help here.
+
+> 4. I use the busybox to be the rootfs, and it test OK. I prepare add a 
+> resume command to /sys/power/resume in inittab. Should this work?
+
+For now, probably just get everything booting.  If you can, use an
+initrd or initramfs and boot it there.  Once you mount rootfs really on
+the SD card, it's too late as you'll corrupt your filesystem.
+
+Sorry about my delayed responses.  I'm in Macao at the Linaro Connect,
+but will check emails from time to time.
+
+Thanks,
+
+Sebastian
