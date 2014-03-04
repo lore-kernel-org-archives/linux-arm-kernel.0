@@ -1,35 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Mar 2014 10:17:31 -0800
-Subject: [PATCH 1/2] ARM: dts: Add support for OMAP4 Gumstix DuoVero/Parlor
-In-Reply-To: <5314549C.1030400@epfl.ch>
-References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
- <1393261669-32039-2-git-send-email-florian.vaussard@epfl.ch>
- <5314549C.1030400@epfl.ch>
-Message-ID: <20140304181731.GD17470@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 04 Mar 2014 19:19:34 +0100
+Subject: [PATCH 10/15] irda: sh_irda: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <63153015.VK19yFZrrS@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2434798.8bvsZzgdNb@avalon> <63153015.VK19yFZrrS@avalon>
+Message-ID: <4876025.BhmDicoI5K@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Florian Vaussard <florian.vaussard@epfl.ch> [140303 02:12]:
-> Hi Tony, Benoit,
-> 
-> On 02/24/2014 06:07 PM, Florian Vaussard wrote:
-> > Gumstix DuoVero is an OMAP4430-based Computer On Module.
-> > Parlor is one of the available expansion board.
-> > 
-> > Tested features:
-> > - GPMC ethernet
-> > - HSUSB2 and OTG
-> > - Audio out
-> > - WiFi and Bluetooth (w2cbw0015 SDIO module)
-> > - LED and button
-> > 
-> 
-> Can this patch go into 3.15? The other one (HDMI support) can wait for
-> the DSS support to be merged, but I would like to give to this DTS a
-> wider exposure to testing opportunities.
+Hi Samuel,
 
-Thanks applying into omap-for-v3.15/dt.
+On Tuesday 07 January 2014 16:13:49 Laurent Pinchart wrote:
+> On Wednesday 11 December 2013 13:49:15 Laurent Pinchart wrote:
+> > Hi Samuel,
+> > 
+> > Could you please pick this patch up for v3.14 ?
+> 
+> Ping ?
 
+PING ?
+
+> > On Wednesday 27 November 2013 02:18:32 Laurent Pinchart wrote:
+> > > This helps increasing build testing coverage.
+> > > 
+> > > Cc: Samuel Ortiz <samuel@sortiz.org>
+> > > Cc: netdev at vger.kernel.org
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > Acked-by: Simon Horman <horms@verge.net.au>
+> > > ---
+> > > 
+> > >  drivers/net/irda/Kconfig | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
+> > > index 2a30193..cae5ee2 100644
+> > > --- a/drivers/net/irda/Kconfig
+> > > +++ b/drivers/net/irda/Kconfig
+> > > @@ -403,7 +403,8 @@ config MCS_FIR
+> > > 
+> > >  config SH_IRDA
+> > >  
+> > >  	tristate "SuperH IrDA driver"
+> > > 
+> > > -	depends on IRDA && ARCH_SHMOBILE
+> > > +	depends on IRDA
+> > > +	depends on ARCH_SHMOBILE || COMPILE_TEST
+> > > 
+> > >  	help
+> > >  	
+> > >  	  Say Y here if your want to enable SuperH IrDA devices.
+
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
