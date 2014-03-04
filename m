@@ -1,49 +1,33 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 4 Mar 2014 11:04:01 -0600
-Subject: [PATCH 1/2] i2c: Add driver for Cadence I2C controller
-In-Reply-To: <8af0e222-6337-4ec4-b718-099a9decc5ec@TX2EHSMHS034.ehs.local>
-References: <1393632046-20062-1-git-send-email-soren.brinkmann@xilinx.com>
- <8af0e222-6337-4ec4-b718-099a9decc5ec@TX2EHSMHS034.ehs.local>
-Message-ID: <20140304170401.GA18529@joshc.qualcomm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 5 Mar 2014 01:07:34 +0800
+Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
+In-Reply-To: <20140304111520.GE8766@mudshark.cambridge.arm.com>
+References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org>
+ <1393899345-7397-2-git-send-email-graeme.gregory@linaro.org>
+ <1393899715.20435.8.camel@joe-AO722> <53153A4C.9050602@infradead.org>
+ <CACxGe6tD3mQshDSoEQaPXAnXG_siUdiFoAWhjmO2gDY7ZzkjUw@mail.gmail.com>
+ <20140304111520.GE8766@mudshark.cambridge.arm.com>
+Message-ID: <CACxGe6svyLHZO8k6qVs+hhyAWxeg3tzh1wUfbRB_z-sxRMv4qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 07:06:29PM -0800, S?ren Brinkmann wrote:
-> On Fri, 2014-02-28 at 04:00PM -0800, Soren Brinkmann wrote:
-> > Add a driver for the Cadence I2C controller. This controller is for
-> > example found in Xilinx Zynq.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  .../devicetree/bindings/i2c/i2c-cadence.txt        |  21 +
-> >  MAINTAINERS                                        |   1 +
-> >  drivers/i2c/busses/Kconfig                         |   7 +
-> >  drivers/i2c/busses/Makefile                        |   1 +
-> >  drivers/i2c/busses/i2c-cadence.c                   | 901 +++++++++++++++++++++
-> >  5 files changed, 931 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-> >  create mode 100644 drivers/i2c/busses/i2c-cadence.c
-> > 
-> [...]
-> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > index f5ed03164d86..7806c1654068 100644
-> > --- a/drivers/i2c/busses/Kconfig
-> > +++ b/drivers/i2c/busses/Kconfig
-> > @@ -375,6 +375,13 @@ config I2C_BLACKFIN_TWI_CLK_KHZ
-> >  	help
-> >  	  The unit of the TWI clock is kHz.
-> >  
-> > +config I2C_CADENCE
-> > +	tristate "Cadence I2C Controller"
-> > +	depends on ARCH_ZYNQ
-> This can be reduced to a dependency on COMMON_CLK only, I think.
+On Tue, Mar 4, 2014 at 7:15 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Mar 04, 2014 at 10:59:46AM +0000, Grant Likely wrote:
+>> I agree with merging it with the rest of the series, but comparing it
+>> to a blank cheque is not appropriate. Merely having an entry in
+>> MAINTAINERS doesn't immediately confer trust or ability to merge code,
+>> but it does tell people who to talk to when looking at ACPI on ARM.
+>> You can bet that neither Linus, Len or Rafael will merge ARM ACPI
+>> trees from them if you disagree. (And even if they did, you would
+>> yell, and Linus would revert it).
+>
+> If you want to know who to talk to regarding a subsystem then you use
+> get_maintainer.pl and/or git blame. Regardless of this patch, neither of
+> those tools will identify Graeme or Hanjun as the contacts for ACPI on ARM.
+>
+> I think we're in agreement, but just to spell it out: this patch should be
+> included at the end of a series adding the files which will be maintained.
 
-Do you really need to depend on COMMON_CLK?  Most of the clk_* API's are
-properly stubbed when !HAVE_CLK.
+Yes, agreed.
 
-Also, you may want to split out the device tree bindings in a separate
-patch for separate review.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+g.
