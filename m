@@ -1,123 +1,158 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 18:19:10 +0200
-Subject: [PATCH 10/18] ARM: OMAP24xx: PRM: add API for clearing wakeup status
- bits
+Date: Tue, 4 Mar 2014 18:19:15 +0200
+Subject: [PATCH 15/18] ARM: OMAP4+: PRM: make prm register access internal to
+ PRM driver only
 In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
 References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393949958-816-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1393949958-816-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This helps to isolate the PRM into its own driver.
+Removed exported prototypes from the public header file for the direct
+register access. Also made a new driver API for clearing mpuss previous
+logic powerstate so that the register APIs are no longer needed.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/pm24xx.c  |   31 +++++++++++++------------------
- arch/arm/mach-omap2/prm2xxx.c |   18 ++++++++++++++++++
- arch/arm/mach-omap2/prm2xxx.h |    1 +
- 3 files changed, 32 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   15 ++----------
+ arch/arm/mach-omap2/prm44xx.c             |    2 +-
+ arch/arm/mach-omap2/prminst44xx.c         |   12 ++++++++++
+ arch/arm/mach-omap2/prminst44xx.h         |   10 +-------
+ arch/arm/mach-omap2/prminst44xx_private.h |   37 +++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/prminst44xx_private.h
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 2dbc30c..21fc935 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -75,9 +75,9 @@ static int omap2_enter_full_retention(void)
- 
- 	/* Clear old wake-up events */
- 	/* REVISIT: These write to reserved bits? */
--	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, PM_WKST1);
--	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
--	omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
-+	omap2xxx_prm_clear_mod_irqs(CORE_MOD, PM_WKST1, ~0);
-+	omap2xxx_prm_clear_mod_irqs(CORE_MOD, OMAP24XX_PM_WKST2, ~0);
-+	omap2xxx_prm_clear_mod_irqs(WKUP_MOD, PM_WKST, ~0);
- 
- 	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
- 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
-@@ -104,23 +104,18 @@ no_sleep:
- 	clk_enable(osc_ck);
- 
- 	/* clear CORE wake-up events */
--	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, PM_WKST1);
--	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
-+	omap2xxx_prm_clear_mod_irqs(CORE_MOD, PM_WKST1, ~0);
-+	omap2xxx_prm_clear_mod_irqs(CORE_MOD, OMAP24XX_PM_WKST2, ~0);
- 
- 	/* wakeup domain events - bit 1: GPT1, bit5 GPIO */
--	omap2_prm_clear_mod_reg_bits(0x4 | 0x1, WKUP_MOD, PM_WKST);
-+	omap2xxx_prm_clear_mod_irqs(WKUP_MOD, PM_WKST, 0x4 | 0x1);
- 
- 	/* MPU domain wake events */
--	l = omap2_prm_read_mod_reg(OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
--	if (l & 0x01)
--		omap2_prm_write_mod_reg(0x01, OCP_MOD,
--				  OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
--	if (l & 0x20)
--		omap2_prm_write_mod_reg(0x20, OCP_MOD,
--				  OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
-+	omap2xxx_prm_clear_mod_irqs(OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET,
-+				    0x1);
- 
--	/* Mask future PRCM-to-MPU interrupts */
--	omap2_prm_write_mod_reg(0x0, OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
-+	omap2xxx_prm_clear_mod_irqs(OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET,
-+				    0x20);
- 
- 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
- 	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_ON);
-@@ -148,9 +143,9 @@ static void omap2_enter_mpu_retention(void)
- 	 * it is in retention mode. */
- 	if (omap2_allow_mpu_retention()) {
- 		/* REVISIT: These write to reserved bits? */
--		omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, PM_WKST1);
--		omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
--		omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
-+		omap2xxx_prm_clear_mod_irqs(CORE_MOD, PM_WKST1, ~0);
-+		omap2xxx_prm_clear_mod_irqs(CORE_MOD, OMAP24XX_PM_WKST2, ~0);
-+		omap2xxx_prm_clear_mod_irqs(WKUP_MOD, PM_WKST, ~0);
- 
- 		/* Try to enter MPU retention */
- 		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index 418de9c..12cf053 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -117,6 +117,24 @@ void omap2xxx_prm_dpll_reset(void)
- 	omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTCTRL);
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 667915d..53ed6c0 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -144,17 +144,6 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
+ 	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
  }
  
-+/**
-+ * omap2xxx_prm_clear_mod_irqs - clear wakeup status bits for a module
-+ * @module: PRM module to clear wakeups from
-+ * @regs: register offset to clear
-+ * @wkst_mask: wakeup status mask to clear
-+ *
-+ * Clears wakeup status bits for a given module, so that the device can
-+ * re-enter idle.
-+ */
-+void omap2xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 wkst_mask)
-+{
-+	u32 wkst;
-+
-+	wkst = omap2_prm_read_mod_reg(module, regs);
-+	wkst &= wkst_mask;
-+	omap2_prm_write_mod_reg(wkst, module, regs);
-+}
-+
- int omap2xxx_clkdm_sleep(struct clockdomain *clkdm)
+-/* Helper functions for MPUSS OSWR */
+-static inline void mpuss_clear_prev_logic_pwrst(void)
+-{
+-	u32 reg;
+-
+-	reg = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+-		OMAP4430_PRM_MPU_INST, OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
+-	omap4_prminst_write_inst_reg(reg, OMAP4430_PRM_PARTITION,
+-		OMAP4430_PRM_MPU_INST, OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
+-}
+-
+ static inline void cpu_clear_prev_logic_pwrst(unsigned int cpu_id)
  {
- 	omap2_prm_set_mod_reg_bits(OMAP24XX_FORCESTATE_MASK,
-diff --git a/arch/arm/mach-omap2/prm2xxx.h b/arch/arm/mach-omap2/prm2xxx.h
-index 3194dd8..e0e17b8 100644
---- a/arch/arm/mach-omap2/prm2xxx.h
-+++ b/arch/arm/mach-omap2/prm2xxx.h
-@@ -125,6 +125,7 @@ extern int omap2xxx_clkdm_sleep(struct clockdomain *clkdm);
- extern int omap2xxx_clkdm_wakeup(struct clockdomain *clkdm);
+ 	u32 reg;
+@@ -252,7 +241,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	 * Check MPUSS next state and save interrupt controller if needed.
+ 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
+ 	 */
+-	mpuss_clear_prev_logic_pwrst();
++	omap4_prminst_mpuss_clear_prev_logic_pwrst();
+ 	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
+ 		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
+ 		save_state = 2;
+@@ -382,7 +371,7 @@ int __init omap4_mpuss_init(void)
+ 		return -ENODEV;
+ 	}
+ 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+-	mpuss_clear_prev_logic_pwrst();
++	omap4_prminst_mpuss_clear_prev_logic_pwrst();
  
- extern void omap2xxx_prm_dpll_reset(void);
-+void omap2xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 wkst_mask);
+ 	/* Save device type on scratchpad for low level code to use */
+ 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 03a6034..3655e16 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -26,7 +26,7 @@
+ #include "prm44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prcm44xx.h"
+-#include "prminst44xx.h"
++#include "prminst44xx_private.h"
+ #include "powerdomain.h"
  
- extern int __init omap2xxx_prm_init(void);
+ /* Static data */
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index 6334b96..00b69d1 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -191,3 +191,15 @@ void omap4_prminst_global_warm_sw_reset(void)
+ 				    OMAP4430_PRM_DEVICE_INST,
+ 				    OMAP4_PRM_RSTCTRL_OFFSET);
+ }
++
++void omap4_prminst_mpuss_clear_prev_logic_pwrst(void)
++{
++	u32 reg;
++
++	reg = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
++					  OMAP4430_PRM_MPU_INST,
++					  OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
++	omap4_prminst_write_inst_reg(reg, OMAP4430_PRM_PARTITION,
++				     OMAP4430_PRM_MPU_INST,
++				     OMAP4_RM_MPU_MPU_CONTEXT_OFFSET);
++}
+diff --git a/arch/arm/mach-omap2/prminst44xx.h b/arch/arm/mach-omap2/prminst44xx.h
+index a2ede2d..fec8f18 100644
+--- a/arch/arm/mach-omap2/prminst44xx.h
++++ b/arch/arm/mach-omap2/prminst44xx.h
+@@ -12,15 +12,6 @@
+ #ifndef __ARCH_ASM_MACH_OMAP2_PRMINST44XX_H
+ #define __ARCH_ASM_MACH_OMAP2_PRMINST44XX_H
  
+-/*
+- * In an ideal world, we would not export these low-level functions,
+- * but this will probably take some time to fix properly
+- */
+-extern u32 omap4_prminst_read_inst_reg(u8 part, s16 inst, u16 idx);
+-extern void omap4_prminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx);
+-extern u32 omap4_prminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
+-					   s16 inst, u16 idx);
+-
+ extern void omap4_prminst_global_warm_sw_reset(void);
+ 
+ extern int omap4_prminst_is_hardreset_asserted(u8 shift, u8 part, s16 inst,
+@@ -29,6 +20,7 @@ extern int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
+ 					  u16 rstctrl_offs);
+ extern int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
+ 					    u16 rstctrl_offs);
++void omap4_prminst_mpuss_clear_prev_logic_pwrst(void);
+ 
+ extern void omap_prm_base_init(void);
+ 
+diff --git a/arch/arm/mach-omap2/prminst44xx_private.h b/arch/arm/mach-omap2/prminst44xx_private.h
+new file mode 100644
+index 0000000..c36be15
+--- /dev/null
++++ b/arch/arm/mach-omap2/prminst44xx_private.h
+@@ -0,0 +1,25 @@
++/*
++ * OMAP4 Power/Reset Management (PRM) function prototypes
++ *
++ * Copyright (C) 2010 Nokia Corporation
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __ARCH_ARM_MACH_OMAP2_PRMINST44XX_PRIVATE_H
++#define __ARCH_ARM_MACH_OMAP2_PRMINST44XX_PRIVATE_H
++
++#include "prminst44xx.h"
++
++/*
++ * In an ideal world, we would not export these low-level functions,
++ * but this will probably take some time to fix properly
++ */
++u32 omap4_prminst_read_inst_reg(u8 part, s16 inst, u16 idx);
++void omap4_prminst_write_inst_reg(u32 val, u8 part, s16 inst, u16 idx);
++u32 omap4_prminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
++				    s16 inst, u16 idx);
++#endif
 -- 
 1.7.9.5
