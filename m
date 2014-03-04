@@ -1,155 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Mar 2014 12:30:38 +0100
-Subject: [PATCHv3 4/4] net: mvneta: add support for fixed links
-In-Reply-To: <1393930704-24374-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1393930704-24374-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1393930704-24374-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140304123038.652f933d@skate>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Tue, 4 Mar 2014 12:37:14 +0100
+Subject: BUG_ON for DMA-bounce and bidirectional mappings (e100 on IXP4xx)
+In-Reply-To: <20140304104528.GQ21483@n2100.arm.linux.org.uk>
+References: <20140304112459.354f0980@marrow.netinsight.se>
+ <20140304104528.GQ21483@n2100.arm.linux.org.uk>
+Message-ID: <20140304123714.7e1fe704@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Tue, 4 Mar 2014 10:45:28 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-On Tue,  4 Mar 2014 11:58:24 +0100, Thomas Petazzoni wrote:
+> On Tue, Mar 04, 2014 at 11:24:59AM +0100, Simon K?gstr?m wrote:
+> > We have a IXP4xx-based board which has an e100 NIC. During bootup, we
+> > trigger a BUG_ON in dmabounce.c because the mapped direction doesn't
+> > match the synced one. e100.c maps buffers bidirectional, but the sync
+> > is done fromdevice.
+> 
+> First and foremost, enable DMA API debugging and check whether that
+> complains too (I think it should do, you're not allowed to change the
+> direction argument until a mapping is unmapped.)
 
->  	phy_node = of_parse_phandle(dn, "phy", 0);
-> -	if (!phy_node) {
-> -		dev_err(&pdev->dev, "no associated PHY\n");
-> -		err = -ENODEV;
-> -		goto err_free_irq;
-> +	if (of_phy_is_fixed_link(phy_node)) {
-> +		err = of_phy_register_fixed_link(phy_node);
-> +		if (err < 0) {
-> +			dev_err(&pdev->dev, "cannot register fixed PHY\n");
-> +			goto err_free_irq;
-> +		}
->  	}
->  
->  	phy_mode = of_get_phy_mode(dn);
+Well, you are right, but the warning I get is not for direction:
 
-As noted by Sebastian Hesselbarth (talking with me on IRC), it would be
-nicer if network driver didn't had to be modified to ensure that the
-fixed PHY the network device is connected to gets registered into the
-kernel.
+  WARNING: at /srv/lhome/simkag/devel/nc602/external/kernel/lib/dma-debug.c:986 check_sync+0x14c/0x540()
+  e100 0000:00:02.0: DMA-API: device driver tries to sync DMA memory it has not allocated [device address=0x0000000003c01000] [size=16 bytes]
+  [...]
+  [<c0134b24>] (debug_dma_sync_single_for_device+0x44/0x50) from [<c017a5e8>] (e100_rx_alloc_skb+0x1c4/0x1e8)
+  [<c017a5e8>] (e100_rx_alloc_skb+0x1c4/0x1e8) from [<c017c58c>] (e100_rx_alloc_list+0x84/0x164)
+  [<c017c58c>] (e100_rx_alloc_list+0x84/0x164) from [<c017e958>] (e100_up+0xc/0x14c)
+  [<c017e958>] (e100_up+0xc/0x14c) from [<c017ecc8>] (e100_open+0x14/0x40)
+  [<c017ecc8>] (e100_open+0x14/0x40) from [<c019b230>] (__dev_open+0x8c/0x134)
 
-So ideally, the fixed MDIO bus implemented in drivers/net/phy/fixed.c
-should scan the Device Tree, and register at boot time the fixed PHYs.
-The only problem is how to recognize in the DT which nodes are fixed
-PHYs. Looking for the "fixed-link" property is very fragile as other
-completely unrelated nodes may use this property for other purposes.
-Using a compatible string? A device_type property? Or should we have a
-fragment of the DT for the fixed MDIO bus itself?
+And the dma_debug code explicitly skips the check if the direction is
+DMA_BIDIRECTIONAL:
 
-I've done a quick prototype that is based on using the "fixed-eth-phy"
-compatible string as the key to find fixed PHYs in the DT, just to see
-how it would work. It works well, and allows to get rid of changes in
-the network driver completely. See below for the prototype-level patch
-(which applies on top of the proposed patch series, for now).
+  static void check_sync(struct device *dev,
+		       struct dma_debug_entry *ref,
+		       bool to_cpu)
+  {
+	[...]
+	if (entry->direction == DMA_BIDIRECTIONAL)
+		goto out;
 
-Suggestions?
+	if (ref->direction != entry->direction) {
+		err_printk(dev, entry, "DMA-API: device driver syncs "
+				"DMA memory with different direction "
+				"[device address=0x%016llx] [size=%llu bytes] "
+				"[mapped with %s] [synced with %s]\n",
+				(unsigned long long)ref->dev_addr, entry->size,
+				dir2name[entry->direction],
+				dir2name[ref->direction]);
+	}
+	[...]
+  }
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 053a650..8a68a07 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2805,14 +2805,6 @@ static int mvneta_probe(struct platform_device *pdev)
- 	}
- 
- 	phy_node = of_parse_phandle(dn, "phy", 0);
--	if (of_phy_is_fixed_link(phy_node)) {
--		err = of_phy_register_fixed_link(phy_node);
--		if (err < 0) {
--			dev_err(&pdev->dev, "cannot register fixed PHY\n");
--			goto err_free_irq;
--		}
--	}
--
- 	phy_mode = of_get_phy_mode(dn);
- 	if (phy_mode < 0) {
- 		dev_err(&pdev->dev, "incorrect phy-mode\n");
-diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
-index 82095cc..45a7d5a 100644
---- a/drivers/net/phy/fixed.c
-+++ b/drivers/net/phy/fixed.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/of.h>
-+#include <linux/of_mdio.h>
- 
- #define MII_REGS_NUM 29
- 
-@@ -293,6 +294,8 @@ static int __init fixed_mdio_bus_init(void)
- 	if (ret)
- 		goto err_mdiobus_alloc;
- 
-+	of_phy_register_fixed_phys();
-+
- 	return 0;
- 
- err_mdiobus_alloc:
-diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-index c645fb8..4e75a70 100644
---- a/drivers/of/of_mdio.c
-+++ b/drivers/of/of_mdio.c
-@@ -277,16 +277,12 @@ struct phy_device *of_phy_attach(struct net_device *dev,
- EXPORT_SYMBOL(of_phy_attach);
- 
- #if defined(CONFIG_FIXED_PHY)
--bool of_phy_is_fixed_link(struct device_node *np)
--{
--	return of_property_read_bool(np, "fixed-link");
--}
--EXPORT_SYMBOL(of_phy_is_fixed_link);
--
--int of_phy_register_fixed_link(struct device_node *np)
-+static int of_phy_register_fixed_link(struct device_node *np)
- {
- 	struct fixed_phy_status status = {};
- 
- 	status.link = 1;
- 	status.duplex = of_property_read_bool(np, "full-duplex");
- 	if (of_property_read_u32(np, "speed", &status.speed))
-@@ -296,5 +292,14 @@ int of_phy_register_fixed_link(struct device_node *np)
- 
- 	return fixed_phy_register(PHY_POLL, &status, np);
- }
--EXPORT_SYMBOL(of_phy_register_fixed_link);
-+
-+void of_phy_register_fixed_phys(void)
-+{
-+	struct device_node *np;
-+
-+	for_each_compatible_node(np, NULL, "fixed-eth-phy") {
-+		of_phy_register_fixed_link(np);
-+	}
-+}
-+
- #endif
-diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-index 77a6e32..c8d080b 100644
---- a/include/linux/of_mdio.h
-+++ b/include/linux/of_mdio.h
-@@ -68,17 +68,9 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
- #endif /* CONFIG_OF */
- 
- #if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
--extern int of_phy_register_fixed_link(struct device_node *np);
--extern bool of_phy_is_fixed_link(struct device_node *np);
-+extern void of_phy_register_fixed_phys(void);
- #else
--static inline int of_phy_register_fixed_link(struct device_node *np)
--{
--	return -ENOSYS;
--}
--static inline bool of_phy_is_fixed_link(struct device_node *np)
--{
--	return false;
--}
-+static inline void of_phy_register_fixed_phys(void) {};
- #endif
- 
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Krzysztofs patch does the same for dmabounce.c, from the dma-debug code
+it seems to me that it would make sense there as well?
+
+// Simon
