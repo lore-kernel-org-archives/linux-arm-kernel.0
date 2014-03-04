@@ -1,10 +1,10 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 4 Mar 2014 10:52:02 -0600
+Date: Tue, 4 Mar 2014 10:59:59 -0600
 Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
 In-Reply-To: <20140304160432.GG2799@8bytes.org>
 References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
  <20140228230000.GW13624@atomide.com> <20140304160432.GG2799@8bytes.org>
-Message-ID: <531604B2.5080400@ti.com>
+Message-ID: <5316068F.3020003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,8 +32,15 @@ On 03/04/2014 10:04 AM, Joerg Roedel wrote:
 >> do they need to wait for the iommu patches to get merged first?
 >
 > Applied patches 1-7 to my arm/omap branch.
+>
+> Tony, you can pull that branch into your tree if needed (when I pushed
+> it, which will happen today or tomorrow).
+>
 
-Thanks, Joerg.
+Tony,
+Can you also pull in the corresponding DTS node patches as well that go 
+along with this series.
+http://marc.info/?l=linux-omap&m=139362062805816&w=2
 
 regards
 Suman
