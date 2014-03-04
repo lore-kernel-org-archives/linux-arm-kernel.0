@@ -1,47 +1,47 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 04 Mar 2014 13:23:20 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzVdIGRyaXZlcnM6IGJ1czogb21hcF9sMzogQ29udmVy?=
- =?UTF-8?B?dCB0byB1c2UgZGV2bV9yZXF1ZXN0X2FuZF9pb3JlbWFwKCk=?=
-In-Reply-To: <1393924359.866301359@f148.i.mail.ru>
-References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
- <1393923710-10377-3-git-send-email-peter.ujfalusi@ti.com>
- <1393924359.866301359@f148.i.mail.ru>
-Message-ID: <1393925000.716948505@f148.i.mail.ru>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 4 Mar 2014 14:56:54 +0530
+Subject: [PATCH 01/12] phy: rename struct omap_control_usb to struct
+ omap_control_phy
+In-Reply-To: <1393859254-10937-2-git-send-email-rogerq@ti.com>
+References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
+ <1393859254-10937-2-git-send-email-rogerq@ti.com>
+Message-ID: <53159C5E.2040701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????,  4 ????? 2014, 13:12 +04:00 ?? Alexander Shiyan <shc_work@mail.ru>:
-> ???????,  4 ????? 2014, 11:01 +02:00 ?? Peter Ujfalusi <peter.ujfalusi@ti.com>:
-> > We can then remove the iounmap() calls from probe and remove.
-> > Since the driver requests the resources via index we can do the mem resource
-> > request within a for loop.
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
-> > ---
-> 
-> > +	/* Get mem resources */
-> > +	for (i = 0; i < 3; i++) {
-> > +		struct resource	*res = platform_get_resource(pdev,
-> > +							     IORESOURCE_MEM, i);
-> > +		if (!res) {
-> > +			dev_err(&pdev->dev, "couldn't find resource %d\n", i);
-> > +			return -ENODEV;
-> > +		}
-> 
-> No need to check "res". devm_request_and_ioremap() do all for us.
-> 
-> > -	l3->l3_base[2] = ioremap(res->start, resource_size(res));
-> > -	if (!l3->l3_base[2]) {
-> > -		dev_err(&pdev->dev, "ioremap failed\n");
-> > -		ret = -ENOMEM;
-> > -		goto err2;
-> > +		l3->l3_base[i] = devm_request_and_ioremap(&pdev->dev, res);
-> > +		if (!l3->l3_base[i]) {
-> 
-> if (IS_ERR(l3->l3_base[i]))
+Roger,
 
-Ahh, I messed up this with devm_ioremap_resource().
-However, if there is reason to use devm_request_and_ioremap() here?
+On Monday 03 March 2014 08:37 PM, Roger Quadros wrote:
+> From: Kishon Vijay Abraham I <kishon@ti.com>
+>
+> Rename struct omap_control_usb to struct omap_control_phy since it can
+> be used to control PHY of USB, SATA and PCIE. Also move the driver and
+> include files under *phy* and made the corresponding changes in the users
+> of phy-omap-control.
+>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   drivers/phy/Kconfig                  |  14 +-
+>   drivers/phy/Makefile                 |   1 +
+>   drivers/phy/phy-omap-control.c       | 320 +++++++++++++++++++++++++++++++++++
+>   drivers/phy/phy-omap-usb2.c          |   8 +-
+>   drivers/phy/phy-ti-pipe3.c           |   8 +-
+>   drivers/usb/musb/omap2430.c          |   2 +-
+>   drivers/usb/phy/Kconfig              |  10 --
+>   drivers/usb/phy/Makefile             |   1 -
+>   drivers/usb/phy/phy-omap-control.c   | 319 ----------------------------------
+>   include/linux/phy/omap_control_phy.h |  89 ++++++++++
+>   include/linux/usb/omap_control_usb.h |  89 ----------
+>   11 files changed, 431 insertions(+), 430 deletions(-)
+>   create mode 100644 drivers/phy/phy-omap-control.c
+>   delete mode 100644 drivers/usb/phy/phy-omap-control.c
+>   create mode 100644 include/linux/phy/omap_control_phy.h
+>   delete mode 100644 include/linux/usb/omap_control_usb.h
 
----
+you can use git format-patch -M if a file is moved from one place to 
+another. The diff count will be less in that case and reviewing will be 
+easier ;-)
+
+Cheers
+Kishon
