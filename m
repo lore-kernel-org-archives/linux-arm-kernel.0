@@ -1,186 +1,72 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Mon, 3 Mar 2014 23:51:32 +0000
-Subject: [PATCH v4 5/6] pci: Use parent domain number when allocating
- child busses.
-In-Reply-To: <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
-References: <1393867996-32299-1-git-send-email-Liviu.Dudau@arm.com>
- <1393867996-32299-6-git-send-email-Liviu.Dudau@arm.com>
- <CACoXjcnP80rSaYqy2EK8SBh8Q=5E8kh_GQ84Y_0hg3WrQ=fy+A@mail.gmail.com>
-Message-ID: <20140303235132.GA13582@bart.dudau.co.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 3 Mar 2014 17:01:02 -0700
+Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
+In-Reply-To: <CAJ+vNU2ojt_o9=AOGfpbx6NCOE_kE6tsV8FvjoGYk9BBwP_OFQ@mail.gmail.com>
+References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
+ <CAJ+vNU2VN5haOU2GN5o7UUg9vgYh06pAhvDaoGw6EzTBEbD0mg@mail.gmail.com>
+ <20140301183059.GA6315@obsidianresearch.com>
+ <000601cf36b8$330b3a90$9921afb0$%han@samsung.com>
+ <CAJ+vNU3UL+LTWnoxW7scAig19=z2xoYCA-HZ6a7GUyGEXtKK9Q@mail.gmail.com>
+ <CAJ+vNU2ojt_o9=AOGfpbx6NCOE_kE6tsV8FvjoGYk9BBwP_OFQ@mail.gmail.com>
+Message-ID: <20140304000102.GC5603@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 03:14:47PM -0800, Tanmay Inamdar wrote:
-> Hello Liviu,
-> 
-> Thanks for fixing up domain_nr. Now I have moved on further to a new
-> domain_nr related warning dump :-)
-> 
-> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-> xgene-pcie 1f500000.pcie: (rc) x8 gen-3 link up
-> pci_bus 0001:00: scanning bus
-> pci_setup_device:1101 domain_nr = 1
-> pci 0001:00:00.0: [e008:e004] type 01 class 0x060400
-> pci 0001:00:00.0: reg 0x10: [mem 0x4000000000-0x7fffffffff 64bit]
-> pci 0001:00:00.0: calling xgene_pcie_fixup_bridge+0x0/0x80
-> pci 0001:00:00.0: Hiding X-Gene pci host bridge resources 0001:00:00.0
-> pci 0001:00:00.0: supports D1 D2
-> pci_bus 0001:00: fixups for bus
-> pci 0001:00:00.0: scanning [bus 03-03] behind bridge, pass 0
-> pci 0001:00:00.0: bridge configuration invalid ([bus 03-03]), reconfiguring
-> pci 0001:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-> ** pci_scan_bridge:855  pci_domain_nr(bus) = 1
-> ** pci_alloc_child_bus:681  pci_domain_nr(bus) = 1
-> pci_bus 0001:01: scanning bus
-> pci_setup_device:1101 domain_nr = 0
+On Mon, Mar 03, 2014 at 03:40:43PM -0800, Tim Harvey wrote:
 
-Why does the domain_nr change here?
+> of_irq_parse_and_map_pci().  The GIC function that translates the
+> interrupt per domain is given irq_data: 0x123 0x04 0x00 
 
-> pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
-> pci 0000:01:00.0: reg 0x10: [mem 0x00100000-0x001fffff 64bit]
-> pci 0000:01:00.0: reg 0x18: [mem 0x00800000-0x00ffffff 64bit pref]
-> pci 0000:01:00.0: reg 0x30: [mem 0x01000000-0x010fffff pref]
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at
-> /home/tinamdar/work/open-source/linux/fs/sysfs/dir.c:52
-> sysfs_warn_dup+0x80/0xc0()
-> sysfs: cannot create duplicate filename '/bus/pci/devices/0000:01:00.0'
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc5+ #40
-> Call trace:
-> [<ffffffc000088180>] dump_backtrace+0x0/0x140
-> [<ffffffc0000882d0>] show_stack+0x10/0x20
-> [<ffffffc0004f65ac>] dump_stack+0x74/0xc4
-> [<ffffffc000096e04>] warn_slowpath_common+0x84/0xc0
-> [<ffffffc000096e8c>] warn_slowpath_fmt+0x4c/0x60
-> [<ffffffc0001b83dc>] sysfs_warn_dup+0x7c/0xc0
-> [<ffffffc0001b8894>] sysfs_do_create_link_sd.isra.2+0xf4/0x100
-> [<ffffffc0001b88bc>] sysfs_create_link+0x1c/0x40
-> [<ffffffc0003250b0>] bus_add_device+0x110/0x1c0
-> [<ffffffc000322f1c>] device_add+0x31c/0x520
-> [<ffffffc0002c444c>] pci_device_add+0xec/0x140
-> [<ffffffc0004f1758>] pci_scan_single_device+0x98/0xe0
-> [<ffffffc0002c44e8>] pci_scan_slot+0x48/0x120
-> [<ffffffc0002c5368>] pci_scan_child_bus+0x48/0x140
-> [<ffffffc0002c522c>] pci_scan_bridge+0x4ec/0x5e0
-> [<ffffffc0002c53c8>] pci_scan_child_bus+0xa8/0x140
-> [<ffffffc0004f1b30>] pci_rescan_bus+0x10/0x40
-> [<ffffffc0006a12ac>] xgene_pcie_probe_bridge+0x660/0x72c
-> [<ffffffc000327d20>] platform_drv_probe+0x20/0x60
-> [<ffffffc000325e30>] really_probe+0xf0/0x220
-> [<ffffffc000326080>] __driver_attach+0xa0/0xc0
-> [<ffffffc000323ed4>] bus_for_each_dev+0x54/0xa0
-> [<ffffffc0003258bc>] driver_attach+0x1c/0x40
-> [<ffffffc00032548c>] bus_add_driver+0x14c/0x220
-> [<ffffffc00032683c>] driver_register+0x5c/0x120
-> [<ffffffc000327cdc>] __platform_driver_register+0x5c/0x80
-> [<ffffffc0006a0c40>] xgene_pcie_driver_init+0x14/0x20
-> [<ffffffc0000814c0>] do_one_initcall+0xe0/0x160
-> [<ffffffc00068c934>] kernel_init_freeable+0x134/0x1d8
-> [<ffffffc0004f07ac>] kernel_init+0xc/0xe0
-> ---[ end trace 3ee052d463aab7f3 ]---
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at
-> /home/tinamdar/work/open-source/linux/drivers/pci/probe.c:1380
-> pci_device_add+0x128/0x140()
-> -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-> 
-> I have made a small fix above your patch. After the fix is applied,
-> dumps are gone and the enumeration finishes up smoothly for all the
-> ports.
-> Since the change is small, just pasting it here. Please review and
-> apply if it's clean.
+This has been shifted by 1 byte..
 
-Honestly, I have no idea. I kept staring at the code for a better part of an hour
-trying to decipher what the intent of the code was, without too much progress. I
-still don't understand why the code in pci_alloc_child_bus() takes a shortcut when
-the bridge argument is NULL when in my opinion it should use parent->bridge instead
-and continue as normal.
+> IRQ 123, which should get 32 added to it for irq155).  Instead, the
+> implementation of gic_irq_domain_xlate()
+> (http://lxr.missinglinkelectronics.com/linux/drivers/irqchip/irq-gic.c#L832)
+> adds 32 to the 0x04 returning 20:
+> [    1.841781] of_irq_parse_raw:  /soc/pcie at 0x01000000:00000001
+> [    1.841813] of_irq_parse_raw: ipar=/soc/pcie at 0x01000000, size=1
+> [    1.841838]  -> addrsize=3
+> [    1.841870]  -> match=1 (imaplen=28)
+                              ^^^^^^^^^^^^^
 
-> 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index a12cda5..aac8366 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -693,7 +693,7 @@ static struct pci_bus *pci_alloc_child_bus(struct
-> pci_bus *parent,
->         }
-> 
->         child->self = bridge;
-> -       child->bridge = get_device(&bridge->dev);
-> +       child->bridge = get_device(parent->bridge);
->         child->dev.parent = child->bridge;
+That looks odd, it should be the number of dwords in the
+interrupt-map, you have 4 lines of 8 dwords each, so it should be
+32. 
 
-Hmm, not sure why this is needed. What does get_device(&bridge->dev)
-return for you? The next line sets child->dev.parent to child->bridge,
-but with your change I'm not sure we end up using the correct parent.
+You have 7*4, which really suggests to me that your interrupt-map
+is corrupted somehow, are you sure you are using this:
 
-Can you try to revert your change and modify the implementation of pci_domain_nr() in arm64
-to look like this:
+>       interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+>                       <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+>                       <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+>                       <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
 
-static inline int pci_domain_nr(struct pci_bus *bus)
-{
-	struct pci_host_bridge *bridge;
+If an element was missing it would explain why everything is broken,
+in fact if GIC_SPI was missing it would match the debug perfectly.
 
-	while (bus->parent)
-		bus = bus->parent;
+> [    1.841903]  -> newintsize=3, newaddrsize=1
+> [    1.841916]  -> imaplen=23
+> [    1.841928]  -> new parent: /interrupt-controller at 00a01000
+> [    1.841946]  -> got it !
 
-	bridge = to_pci_host_bridge(bus->bridge);
-	if (bridge)
-		return bridge->domain_nr;
+K..
 
-	return 0;
-}
+> [    1.841972] irq_create_of_mapping: calling xlate for 123/4/0 3
 
-Please let me know what results you get.
-
-Best regards,
-Liviu
+And it is the wrong data.. 123/4/0 is 
 
 
->         pci_set_bus_of_node(child);
->         pci_set_bus_speed(child);
-> 
-> Thanks,
-> Tanmay
-> 
-> On Mon, Mar 3, 2014 at 9:33 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > pci_alloc_child_bus() uses the newly allocated child bus to figure
-> > out the domain number that is going to use for setting the device
-> > name. A better option is to use the parent bus domain number.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 26237a0..a12cda5 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
-> >          * now as the parent is not properly set up yet.
-> >          */
-> >         child->dev.class = &pcibus_class;
-> > -       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
-> > +       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
-> >
-> >         /*
-> >          * Set up the primary, secondary and subordinate
-> > --
-> > 1.9.0
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> For the slots above that swizzle to pin2,3,4 of_irq_parse_raw()
+> returns -EINVAL because for some reason it can't match an interrupt
+> mapping for the pcie host controller:
+> [    1.842996] of_irq_parse_raw:  /soc/pcie at 0x01000000/pcie at 0,0:00000002
+> [    1.843046] of_irq_parse_raw: ipar=/soc/pcie at 0x01000000, size=1
+> [    1.843070]  -> addrsize=3
+> [    1.843100]  -> match=0 (imaplen=28)
+> ^^^^^ indicates no match in interrupt map.
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+Well, since we know the map is corrupted somehow, it isn't surprising
+that the 2nd entry won't match anything. It is probably matching
+against '0 0 2 &intc'
+ 
+Jason
