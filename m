@@ -1,43 +1,33 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 4 Mar 2014 19:39:13 +0000
-Subject: [PATCH RFC 3/6] tty: Rename xilinx_uart -> cadence_uart
-In-Reply-To: <1393953449-28551-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1393953449-28551-1-git-send-email-soren.brinkmann@xilinx.com>
- <1393953449-28551-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140304193913.71c6f307@alan.etchedpixels.co.uk>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 4 Mar 2014 11:40:46 -0800
+Subject: [PATCH 1/2] of/irq: Fix irq-mapping in of_irq_parse_raw()
+In-Reply-To: <1393944864-28113-1-git-send-email-tharvey@gateworks.com>
+References: <1393944864-28113-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <CAJ+vNU07D-u+-Lj5nOSveO94S93d_5=FKq34Gk2O2OVDRexWww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  4 Mar 2014 09:17:26 -0800
-Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+On Tue, Mar 4, 2014 at 6:54 AM, Tim Harvey <tharvey@gateworks.com> wrote:
+> When an interrupt-map contains multiple entries an imap pointer arithmetic
+> bug can cause only the first entry to be properly evaluated and causes
+> the out_irq parameters to be incorrect depending on the #interrupt-cells
+> and #address-cells of the parent interrupt controller.
+>
+> Specifically, the imap pointer into the interrupt-map table should be
+> adjusted by the parent interrupt controller #interrupt-cells size only
+> as at this point the only the parent unit interrupt specifier needs to be
+> stepped over.
+>
+> This resolves an issue encountered when using the of_irq_parse_and_map_pci()
+> for the imx6 pcie host controller driver map_irq function where a P2P bridge
+> is on the bus and legacy PCI interrupts are to be used.
+>
 
-> The UART controller in Zynq is Cadence IP. Rename the driver
-> accordingly.
-> Furthermore, this affects the DT bindings:
->  - the compatibility string changes to 'cdns,uart-r1p8'
->  - clock inputs are named according to Cadence documentation - 'pclk'
->    and 'uart_clk'
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Note the subject of my patch was incorrect - its a single patch, not a
+series.  The subject should read:
 
-NAK. This breaks existing userspace builds, it breaks modules, it messes
-with the history and it breaks third prty DT files. It's an absolute
-no-no.
+[PATCH] of/irq: Fix irq-mapping in of_irq_parse_raw()
 
-Yes this happens - it's happened before and will happen again. She who
-merges first wins. If Cadence had submitted a driver first they'd have
-won 8)
+Sorry for the confusion,
 
-The following aspects of the change set are IMHO acceptable
-
-- Cleaning up all the code formatting
-- Update the driver comments and header to explain the Cadence/Xilinx
-  thing
-- change "Xilinx PS UART Support" text to "Cadence (Xilinx PS) Support"
-  or similar wording in Kconfig
-- Adding the cadence devicetree compatibility strings and inputs *in
-  addition* to the existing ones.
-- Documentation for the new options
-
-Alan
+Tim
