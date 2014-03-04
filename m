@@ -1,48 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Mar 2014 12:11:36 +0000
-Subject: [PATCH V2] ARM: dove: dt: revert PMU interrupt controller node
-In-Reply-To: <5315AD6F.1070804@gmail.com>
-References: <20140207180836.GE8533@titan.lakedaemon.net>
- <1392667236-19126-1-git-send-email-jason@lakedaemon.net>
- <20140303150215.GI21483@n2100.arm.linux.org.uk>
- <20140303173740.GC16655@lunn.ch>
- <20140303181529.GM21483@n2100.arm.linux.org.uk>
- <20140303222406.GW1872@titan.lakedaemon.net> <20140304092616.GH16655@lunn.ch>
- <5315AD6F.1070804@gmail.com>
-Message-ID: <20140304121136.GR21483@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 04 Mar 2014 13:16:28 +0100
+Subject: [PATCH v3 5/5] clk/exynos5260: add clock file for exynos5260
+In-Reply-To: <5315C2CA.60206@gmail.com>
+References: <1392724570-27977-1-git-send-email-rahul.sharma@samsung.com>	<1392724570-27977-6-git-send-email-rahul.sharma@samsung.com>	<53095A9A.4080606@gmail.com>
+ <CAPdUM4PL9p-fNaim_YFFMV_bA4higxQa6ppSNUGg5nmMc7a6Mw@mail.gmail.com>
+ <5315C2CA.60206@gmail.com>
+Message-ID: <5315C41C.1030200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 11:39:43AM +0100, Sebastian Hesselbarth wrote:
-> On 03/04/2014 10:26 AM, Andrew Lunn wrote:
->>> I could have sworn this was discussed with this particular patchset, but
->>> I'm unable to find the conversation in my archives.  Neither during the
->>> patch submission process, nor the (long) pull request thread.
+On 04.03.2014 13:10, Tomasz Figa wrote:
+> On 04.03.2014 05:14, Rahul Sharma wrote:
+>> On 23 February 2014 07:49, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>> On 18.02.2014 12:56, Rahul Sharma wrote:
+>>>> +       FRATE(ID_NONE, "phyclk_hdmi_link_o_tmds_clkhi", NULL,
+>>>> +                       CLK_IS_ROOT, 125000000),
+>>>> +       FRATE(ID_NONE, "phyclk_mipi_dphy_4l_m_txbyteclkhs", NULL,
+>>>> +                       CLK_IS_ROOT, 187500000),
+>>>> +       FRATE(ID_NONE, "phyclk_dptx_phy_o_ref_clk_24m", NULL,
+>>>> +                       CLK_IS_ROOT, 24000000),
+>>>> +       FRATE(ID_NONE, "phyclk_dptx_phy_clk_div2", NULL,
+>>>> +                       CLK_IS_ROOT, 135000000),
+>>>> +       FRATE(ID_NONE, "phyclk_mipi_dphy_4l_m_rxclkesc0", NULL,
+>>>> +                       CLK_IS_ROOT, 20000000),
+>>>> +       FRATE(ID_NONE, "phyclk_usbhost20_phy_phyclock", NULL,
+>>>> +                       CLK_IS_ROOT, 60000000),
+>>>> +       FRATE(ID_NONE, "phyclk_usbhost20_phy_freeclk", NULL,
+>>>> +                       CLK_IS_ROOT, 60000000),
+>>>> +       FRATE(ID_NONE, "phyclk_usbhost20_phy_clk48mohci", NULL,
+>>>> +                       CLK_IS_ROOT, 48000000),
+>>>> +       FRATE(ID_NONE, "phyclk_usbdrd30_udrd30_pipe_pclk", NULL,
+>>>> +                       CLK_IS_ROOT, 125000000),
+>>>> +       FRATE(ID_NONE, "phyclk_usbdrd30_udrd30_phyclock", NULL,
+>>>> +                       CLK_IS_ROOT, 60000000),
 >>>
->>> Perhaps it was an irc conversation?  Andrew, Sebastian, can you find a
->>> link?  iirc, one of the DT maintainers (Mark Rutland?) raised the same
->>> concern and I thought we answered that sufficiently...
+>>>
+>>> Are these really fixed rate clocks? It looks strange, because it's a bit
+>>> unlike previous Samsung SoCs, which used to have up 5 fixed rate
+>>> clocks in
+>>> average.
+>>>
 >>
->> It was the cpufreq driver which caused the discussion. I looked at it
->> for a while, and then task swapped onto the kirkwood move into
->> mach-mvebu.
+>> These are outputs of various phys. If these are removed we will be
+>> left with
+>> many orphan clocks.
+>>
 >
-> I guess you are looking for this discussion
->
-> http://comments.gmane.org/gmane.linux.power-management.general/41053
->
-> and specifically Mark's remarks on PMU and DT in here
->
-> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/285384
->
-> BTW, +1 for a single PMU node that either serves an mfd (or type
-> of) driver or that subsystem drivers derive their resources from.
-> Looking at Dove FS, that would also include clock gating, which
-> could be a mess to sort out.. anyway, let's get it on.
+> OK. Just wanted to make sure that they are real clocks found in the SoC,
+> as I don't have access to Exynos 5420 datasheet yet.
 
-So we have cpufreq, pm domains and an irq controller.  What's the plan
-for this, who's going to look at sorting this out?
+Exynos 5260 of course.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,
+Tomasz
