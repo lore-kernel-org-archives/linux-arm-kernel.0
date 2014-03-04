@@ -1,21 +1,36 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Mar 2014 11:07:52 +0200
-Subject: [PATCH 1/5] drivers: bus: omap_l3: Convert to use devm_kzalloc
-In-Reply-To: <1393923710-10377-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1393923710-10377-1-git-send-email-peter.ujfalusi@ti.com>
- <1393923710-10377-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <531597E8.50509@ti.com>
+Date: Tue, 4 Mar 2014 11:08:25 +0200
+Subject: [PATCH v2 0/5] drivers: bus: omap_l3: Conversion to devm_*
+Message-ID: <1393924110-11132-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 11:01 AM, Peter Ujfalusi wrote:
-> We can remove the kfree() calls from probe and remove.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti>
+Hi,
 
-Where did the ".com" went from Santosh's email address??
-I'll resend it in a minute with a fixed commit message.
+Changes since v1:
+- Fixed Santosh's email address in the commit messages.
+
+Cleanup of platform probe and remove (removing the remove function at the end)
+with converting the driver to use the devm_* versions kzalloc, ioremap and
+request_irq. 
+
+This is a resend of an old series which I found when doing some spring cleanup
+on my HDD:
+http://www.spinics.net/lists/linux-omap/msg90531.html
+
+Regards,
+Peter
+---
+Peter Ujfalusi (5):
+  drivers: bus: omap_l3: Convert to use devm_kzalloc
+  drivers: bus: omap_l3: Convert to use devm_request_and_ioremap()
+  drivers: bus: omap_l3: Convert to use devm_request_irq()
+  drivers: bus: omap_l3: Remove the platform driver's remove function
+  drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request
+    fails
+
+ drivers/bus/omap_l3_noc.c | 106 +++++++++++-----------------------------------
+ 1 file changed, 24 insertions(+), 82 deletions(-)
 
 -- 
-P?ter
+1.9.0
