@@ -1,58 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 04 Mar 2014 19:19:34 +0100
-Subject: [PATCH 10/15] irda: sh_irda: Enable driver compilation with
- COMPILE_TEST
-In-Reply-To: <63153015.VK19yFZrrS@avalon>
-References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2434798.8bvsZzgdNb@avalon> <63153015.VK19yFZrrS@avalon>
-Message-ID: <4876025.BhmDicoI5K@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 4 Mar 2014 10:23:10 -0800
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20140304182310.GA9985@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+On 03/03, Tomasz Figa wrote:
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index dc127e5..006b455 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -3,12 +3,16 @@
+>   *
+>   * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
+>   *
+> + * Support for Device Tree based power domain providers:
+> + * Copyright (C) 2014 Tomasz Figa <tomasz.figa@gmail.com>
+> + *
+>   * This file is released under the GPLv2.
+>   */
+>  
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/io.h>
+> +#include <linux/platform_device.h>
 
-On Tuesday 07 January 2014 16:13:49 Laurent Pinchart wrote:
-> On Wednesday 11 December 2013 13:49:15 Laurent Pinchart wrote:
-> > Hi Samuel,
-> > 
-> > Could you please pick this patch up for v3.14 ?
-> 
-> Ping ?
+Is this still needed?
 
-PING ?
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_qos.h>
+[...]
+> +
+> +/*
+> + * DEVICE<->DOMAIN BINDING USING DEVICE TREE LOOK-UP
+> + *
+> + * The code below registers a notifier for platform bus devices'
+> + * BUS_NOTIFY_BIND_DRIVER events and tries to attach devices to their power
+> + * domains by looking them up using Device Tree.
+> + *
+> + * Similarly in BUS_NOTIFY_UNBOUND_DRIVER the device is detached from its
+> + * domain, since it no longer supports runtime PM without any driver bound
+> + * to it.
 
-> > On Wednesday 27 November 2013 02:18:32 Laurent Pinchart wrote:
-> > > This helps increasing build testing coverage.
-> > > 
-> > > Cc: Samuel Ortiz <samuel@sortiz.org>
-> > > Cc: netdev at vger.kernel.org
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > Acked-by: Simon Horman <horms@verge.net.au>
-> > > ---
-> > > 
-> > >  drivers/net/irda/Kconfig | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
-> > > index 2a30193..cae5ee2 100644
-> > > --- a/drivers/net/irda/Kconfig
-> > > +++ b/drivers/net/irda/Kconfig
-> > > @@ -403,7 +403,8 @@ config MCS_FIR
-> > > 
-> > >  config SH_IRDA
-> > >  
-> > >  	tristate "SuperH IrDA driver"
-> > > 
-> > > -	depends on IRDA && ARCH_SHMOBILE
-> > > +	depends on IRDA
-> > > +	depends on ARCH_SHMOBILE || COMPILE_TEST
-> > > 
-> > >  	help
-> > >  	
-> > >  	  Say Y here if your want to enable SuperH IrDA devices.
+This looks outdated.
 
+> + *
+> + * Both generic and legacy Samsung-specific DT bindings are supported to
+> + * keep backwards compatibility with existing DTBs.
+> + */
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
