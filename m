@@ -1,124 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Mar 2014 18:19:18 +0200
-Subject: [PATCH 18/18] ARM: OMAP3: control: isolate control module init to its
- own function
-In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393949958-816-19-git-send-email-t-kristo@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  4 Mar 2014 17:18:01 +0100
+Subject: [PATCH v3 4/7] ARM: sun6i: Protect CPU clock
+In-Reply-To: <1393949884-892-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1393949884-892-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1393949884-892-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control module related PM initializations are now moved within control
-module driver. Done in preparation to isolate the code to its own driver.
+Right now, AHB is an indirect child clock of the CPU clock. If that happens to
+change, since the CPU clock has no other consumers declared in Linux, it would
+be shut down, which is not really a good idea.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Prevent this by forcing it enabled.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-omap2/control.c |   19 +++++++++++++++++--
- arch/arm/mach-omap2/control.h |    3 +--
- arch/arm/mach-omap2/pm34xx.c  |    3 +--
- arch/arm/mach-omap2/prm3xxx.c |    6 ------
- 4 files changed, 19 insertions(+), 12 deletions(-)
+ arch/arm/mach-sunxi/sun6i.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 2def1ff..5854b3c 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -564,7 +564,7 @@ int omap3_ctrl_save_padconf(void)
-  * Sets the bootmode for IVA2 to idle. This is needed by the PM code to
-  * force disable IVA2 so that it does not prevent any low-power states.
+diff --git a/arch/arm/mach-sunxi/sun6i.c b/arch/arm/mach-sunxi/sun6i.c
+index c5dc819..6b39055 100644
+--- a/arch/arm/mach-sunxi/sun6i.c
++++ b/arch/arm/mach-sunxi/sun6i.c
+@@ -10,6 +10,7 @@
+  * warranty of any kind, whether express or implied.
   */
--void omap3_ctrl_set_iva_bootmode_idle(void)
-+static void __init omap3_ctrl_set_iva_bootmode_idle(void)
+ 
++#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+ #include <linux/init.h>
+@@ -22,9 +23,17 @@
+ 
+ static void __init sun6i_dt_init(void)
  {
- 	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
- 			 OMAP343X_CONTROL_IVA2_BOOTMOD);
-@@ -576,7 +576,7 @@ void omap3_ctrl_set_iva_bootmode_idle(void)
-  * Sets up the pads controlling the stacked modem in such way that the
-  * device can enter idle.
-  */
--void omap3_ctrl_setup_d2d_padconf(void)
-+static void __init omap3_ctrl_setup_d2d_padconf(void)
- {
- 	u16 mask, padconf;
- 
-@@ -595,4 +595,19 @@ void omap3_ctrl_setup_d2d_padconf(void)
- 	padconf |= mask;
- 	omap_ctrl_writew(padconf, OMAP3_PADCONF_SAD2D_IDLEACK);
- }
++	struct clk *clk;
 +
-+/**
-+ * omap3_ctrl_init - does static initializations for control module
-+ *
-+ * Initializes system control module. This sets up the sysconfig autoidle,
-+ * and sets up modem and iva2 so that they can be idled properly.
-+ */
-+void __init omap3_ctrl_init(void)
-+{
-+	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
+ 	sunxi_setup_restart();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 +
-+	omap3_ctrl_set_iva_bootmode_idle();
-+
-+	omap3_ctrl_setup_d2d_padconf();
-+}
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index fc00158..ccbd70c 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -427,8 +427,7 @@ extern void omap_ctrl_write_dsp_boot_addr(u32 bootaddr);
- extern void omap_ctrl_write_dsp_boot_mode(u8 bootmode);
- extern void omap3630_ctrl_disable_rta(void);
- extern int omap3_ctrl_save_padconf(void);
--extern void omap3_ctrl_set_iva_bootmode_idle(void);
--void omap3_ctrl_setup_d2d_padconf(void);
-+void omap3_ctrl_init(void);
- extern void omap2_set_globals_control(void __iomem *ctrl,
- 				      void __iomem *ctrl_pad);
- #else
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index faa2c05..4ba0cce 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -348,8 +348,7 @@ restore:
- 
- static void __init prcm_setup_regs(void)
- {
--	/* XXX This should be handled by hwmod code or SCM init code */
--	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
-+	omap3_ctrl_init();
- 
- 	omap3_prm_init_pm(cpu_is_omap3630(), omap3_has_iva());
- }
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 239163f..6d3e9c2 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -28,7 +28,6 @@
- #include "prm-regbits-34xx.h"
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
--#include "control.h"
- 
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
- 	OMAP_PRCM_IRQ("wkup",	0,	0),
-@@ -365,8 +364,6 @@ void __init omap3_prm_init_pm(bool has_uart4, bool has_iva)
- 	/* We need to idle iva2_pwrdm even on am3703 with no iva2. */
- 	omap3xxx_prm_iva_idle();
- 
--	omap3_ctrl_setup_d2d_padconf();
--
- 	omap3_prm_reset_modem();
++	/* Make sure the clocks we absolutely need are enabled */
++	/* CPU clock */
++	clk = clk_get(NULL, "cpu");
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
  }
  
-@@ -469,9 +466,6 @@ void omap3xxx_prm_iva_idle(void)
- 	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
- 			       OMAP3430_IVA2_MOD, CM_FCLKEN);
- 
--	/* Set IVA2 boot mode to 'idle' */
--	omap3_ctrl_set_iva_bootmode_idle();
--
- 	/* Un-reset IVA2 */
- 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
- 
+ extern void __init sun6i_reset_init(void);
 -- 
-1.7.9.5
+1.9.0
