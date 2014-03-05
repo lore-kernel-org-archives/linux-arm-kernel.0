@@ -1,37 +1,50 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 5 Mar 2014 13:25:54 +0200
-Subject: [PATCH 0/8] OMAP: OMAP3 DSS related clock patches
-In-Reply-To: <5316F895.30607@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <5316E1B6.4060007@ti.com> <5316F895.30607@ti.com>
-Message-ID: <531709C2.6080607@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 5 Mar 2014 12:28:28 +0100
+Subject: [PATCH] clk: turn rate change failed warning into pr_debug
+In-Reply-To: <1389885175-14174-1-git-send-email-s.hauer@pengutronix.de>
+References: <1389885175-14174-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140305112828.GN24917@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/14 12:12, Tero Kristo wrote:
-> On 03/05/2014 10:35 AM, Tomi Valkeinen wrote:
->> Hi Tero,
->>
->> What about the dts fixes in this series? DSS DT depends on those fixes.
->> I'd like the dts fixes to be either merged for v3.14, or I can add them
->> to my DSS DT series (with acks).
+Mike,
+
+Any objections to this patch?
+
+Sascha
+
+On Thu, Jan 16, 2014 at 04:12:55PM +0100, Sascha Hauer wrote:
+> If a rate change failed it's the opportunity of the caller to handle
+> this. Do not spam the log with a message.
 > 
-> Well, I am not a maintainer of any sort, so you are asking wrong person
-> here. I am just tossing my acks around as my approval for the patches in
-> case someone cares. :) You need to ask Benoit here (or maybe Tony.)
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clk/clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2cf2ea6..f0124d4 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1460,7 +1460,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  	/* notify that we are about to change rates */
+>  	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
+>  	if (fail_clk) {
+> -		pr_warn("%s: failed to set %s rate\n", __func__,
+> +		pr_debug("%s: failed to set %s rate\n", __func__,
+>  				fail_clk->name);
+>  		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
+>  		ret = -EBUSY;
+> -- 
+> 1.8.5.2
+> 
+> 
 
-Ok.
-
-Benoit, Tony, can we get the dts fixes in this series to v3.14, or is it
-ok if I merge them via DSS DT branch for 3.15?
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/76fc7352/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
