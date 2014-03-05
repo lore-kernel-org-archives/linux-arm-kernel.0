@@ -1,24 +1,243 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 5 Mar 2014 13:45:22 +0800
-Subject: [PATCH v5 1/8] mtd: spi-nor: copy the SPI NOR commands to a new
- header file
-In-Reply-To: <201403050443.19529.marex@denx.de>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <201403042313.14353.marex@denx.de> <5316932C.5040405@freescale.com>
- <201403050443.19529.marex@denx.de>
-Message-ID: <5316B9F2.8050301@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Mar 2014 13:56:37 +0800
+Subject: [PATCH] ARM: i.MX: mx21ads: Replace direct handling of
+ peripheral bits with GPIOs
+In-Reply-To: <1393871864-25223-1-git-send-email-shc_work@mail.ru>
+References: <1393871864-25223-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140305055634.GG8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?03?05? 11:43, Marek Vasut ??:
-> Why didn't you keep it like that? Was there some reason for that ?
-http://marc.info/?l=linux-arm-kernel&m=138545182232220&w=4
+On Mon, Mar 03, 2014 at 10:37:44PM +0400, Alexander Shiyan wrote:
+> This patch replaces direct handling of peripheral bits with GPIOs by
+> using basic-mmio-gpio driver. As a result this change eliminate some
+> low-level code and removes custom io_map() from the board.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/mach-mx21ads.c | 136 +++++++++++++++++++--------------------
+>  1 file changed, 66 insertions(+), 70 deletions(-)
 
-Pekon suggestted  do not touch the m25p80.c.
-So i just copy these commands to a new header.
-Anyway, it's really not an important issue for me. :)
+I'm generally not fond of taking patches that touch the legacy board
+file unless they're fixing or cleaning up something.  Since it looks
+like a cleanup, I will probably take it.  But did you test the change on
+hardware?
 
+Shawn
 
-
-thanks
-Huang Shijie
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
+> index a06aa4d..8742594 100644
+> --- a/arch/arm/mach-imx/mach-mx21ads.c
+> +++ b/arch/arm/mach-imx/mach-mx21ads.c
+> @@ -17,51 +17,45 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/physmap.h>
+> +#include <linux/basic_mmio_gpio.h>
+>  #include <linux/gpio.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+> -#include <asm/mach/map.h>
+>  
+>  #include "common.h"
+>  #include "devices-imx21.h"
+>  #include "hardware.h"
+>  #include "iomux-mx21.h"
+>  
+> -/*
+> - * Memory-mapped I/O on MX21ADS base board
+> - */
+> -#define MX21ADS_MMIO_BASE_ADDR   0xf5000000
+> -#define MX21ADS_MMIO_SIZE        0xc00000
+> -
+> -#define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
+> -		(MX21ADS_MMIO_BASE_ADDR + (offset))
+> +#define MX21ADS_CS8900A_REG		(MX21_CS1_BASE_ADDR + 0x000000)
+> +#define MX21ADS_ST16C255_IOBASE_REG	(MX21_CS1_BASE_ADDR + 0x200000)
+> +#define MX21ADS_VERSION_REG		(MX21_CS1_BASE_ADDR + 0x400000)
+> +#define MX21ADS_IO_REG			(MX21_CS1_BASE_ADDR + 0x800000)
+>  
+> -#define MX21ADS_CS8900A_MMIO_SIZE   0x200000
+> -#define MX21ADS_CS8900A_IRQ_GPIO    IMX_GPIO_NR(5, 11)
+> -#define MX21ADS_ST16C255_IOBASE_REG MX21ADS_REG_ADDR(0x200000)
+> -#define MX21ADS_VERSION_REG         MX21ADS_REG_ADDR(0x400000)
+> -#define MX21ADS_IO_REG              MX21ADS_REG_ADDR(0x800000)
+> +#define MX21ADS_MMC_CD			IMX_GPIO_NR(4, 25)
+> +#define MX21ADS_CS8900A_IRQ_GPIO	IMX_GPIO_NR(5, 11)
+> +#define MX21ADS_MMGPIO_BASE		(6 * 32)
+>  
+>  /* MX21ADS_IO_REG bit definitions */
+> -#define MX21ADS_IO_SD_WP        0x0001 /* read */
+> -#define MX21ADS_IO_TP6          0x0001 /* write */
+> -#define MX21ADS_IO_SW_SEL       0x0002 /* read */
+> -#define MX21ADS_IO_TP7          0x0002 /* write */
+> -#define MX21ADS_IO_RESET_E_UART 0x0004
+> -#define MX21ADS_IO_RESET_BASE   0x0008
+> -#define MX21ADS_IO_CSI_CTL2     0x0010
+> -#define MX21ADS_IO_CSI_CTL1     0x0020
+> -#define MX21ADS_IO_CSI_CTL0     0x0040
+> -#define MX21ADS_IO_UART1_EN     0x0080
+> -#define MX21ADS_IO_UART4_EN     0x0100
+> -#define MX21ADS_IO_LCDON        0x0200
+> -#define MX21ADS_IO_IRDA_EN      0x0400
+> -#define MX21ADS_IO_IRDA_FIR_SEL 0x0800
+> -#define MX21ADS_IO_IRDA_MD0_B   0x1000
+> -#define MX21ADS_IO_IRDA_MD1     0x2000
+> -#define MX21ADS_IO_LED4_ON      0x4000
+> -#define MX21ADS_IO_LED3_ON      0x8000
+> +#define MX21ADS_IO_SD_WP		(MX21ADS_MMGPIO_BASE + 0)
+> +#define MX21ADS_IO_TP6			(MX21ADS_IO_SD_WP)
+> +#define MX21ADS_IO_SW_SEL		(MX21ADS_MMGPIO_BASE + 1)
+> +#define MX21ADS_IO_TP7			(MX21ADS_IO_SW_SEL)
+> +#define MX21ADS_IO_RESET_E_UART		(MX21ADS_MMGPIO_BASE + 2)
+> +#define MX21ADS_IO_RESET_BASE		(MX21ADS_MMGPIO_BASE + 3)
+> +#define MX21ADS_IO_CSI_CTL2		(MX21ADS_MMGPIO_BASE + 4)
+> +#define MX21ADS_IO_CSI_CTL1		(MX21ADS_MMGPIO_BASE + 5)
+> +#define MX21ADS_IO_CSI_CTL0		(MX21ADS_MMGPIO_BASE + 6)
+> +#define MX21ADS_IO_UART1_EN		(MX21ADS_MMGPIO_BASE + 7)
+> +#define MX21ADS_IO_UART4_EN		(MX21ADS_MMGPIO_BASE + 8)
+> +#define MX21ADS_IO_LCDON		(MX21ADS_MMGPIO_BASE + 9)
+> +#define MX21ADS_IO_IRDA_EN		(MX21ADS_MMGPIO_BASE + 10)
+> +#define MX21ADS_IO_IRDA_FIR_SEL		(MX21ADS_MMGPIO_BASE + 11)
+> +#define MX21ADS_IO_IRDA_MD0_B		(MX21ADS_MMGPIO_BASE + 12)
+> +#define MX21ADS_IO_IRDA_MD1		(MX21ADS_MMGPIO_BASE + 13)
+> +#define MX21ADS_IO_LED4_ON		(MX21ADS_MMGPIO_BASE + 14)
+> +#define MX21ADS_IO_LED3_ON		(MX21ADS_MMGPIO_BASE + 15)
+>  
+>  static const int mx21ads_pins[] __initconst = {
+>  
+> @@ -160,7 +154,7 @@ static struct platform_device mx21ads_nor_mtd_device = {
+>  };
+>  
+>  static struct resource mx21ads_cs8900_resources[] __initdata = {
+> -	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, MX21ADS_CS8900A_MMIO_SIZE),
+> +	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, SZ_1K),
+>  	/* irq number is run-time assigned */
+>  	DEFINE_RES_IRQ(-1),
+>  };
+> @@ -179,23 +173,39 @@ static const struct imxuart_platform_data uart_pdata_rts __initconst = {
+>  static const struct imxuart_platform_data uart_pdata_norts __initconst = {
+>  };
+>  
+> +static struct resource mx21ads_mmgpio_resource =
+> +	DEFINE_RES_MEM_NAMED(MX21ADS_IO_REG, SZ_2, "dat");
+> +
+> +static struct bgpio_pdata mx21ads_mmgpio_pdata = {
+> +	.base	= MX21ADS_MMGPIO_BASE,
+> +	.ngpio	= 16,
+> +};
+> +
+> +static struct platform_device mx21ads_mmgpio = {
+> +	.name = "basic-mmio-gpio",
+> +	.id = PLATFORM_DEVID_AUTO,
+> +	.resource = &mx21ads_mmgpio_resource,
+> +	.num_resources = 1,
+> +	.dev = {
+> +		.platform_data = &mx21ads_mmgpio_pdata,
+> +	},
+> +};
+> +
+>  static int mx21ads_fb_init(struct platform_device *pdev)
+>  {
+> -	u16 tmp;
+> +	int ret;
+>  
+> -	tmp = __raw_readw(MX21ADS_IO_REG);
+> -	tmp |= MX21ADS_IO_LCDON;
+> -	__raw_writew(tmp, MX21ADS_IO_REG);
+> -	return 0;
+> +	ret = gpio_request(MX21ADS_IO_LCDON, "fb-lcdon");
+> +	if (ret)
+> +		return ret;
+> +
+> +	return gpio_direction_output(MX21ADS_IO_LCDON, 1);
+>  }
+>  
+>  static void mx21ads_fb_exit(struct platform_device *pdev)
+>  {
+> -	u16 tmp;
+> -
+> -	tmp = __raw_readw(MX21ADS_IO_REG);
+> -	tmp &= ~MX21ADS_IO_LCDON;
+> -	__raw_writew(tmp, MX21ADS_IO_REG);
+> +	gpio_set_value(MX21ADS_IO_LCDON, 0);
+> +	gpio_free(MX21ADS_IO_LCDON);
+>  }
+>  
+>  /*
+> @@ -236,19 +246,26 @@ static const struct imx_fb_platform_data mx21ads_fb_data __initconst = {
+>  
+>  static int mx21ads_sdhc_get_ro(struct device *dev)
+>  {
+> -	return (__raw_readw(MX21ADS_IO_REG) & MX21ADS_IO_SD_WP) ? 1 : 0;
+> +	return gpio_get_value(MX21ADS_IO_SD_WP);
+>  }
+>  
+>  static int mx21ads_sdhc_init(struct device *dev, irq_handler_t detect_irq,
+>  	void *data)
+>  {
+> -	return request_irq(gpio_to_irq(IMX_GPIO_NR(4, 25)), detect_irq,
+> -		IRQF_TRIGGER_FALLING, "mmc-detect", data);
+> +	int ret;
+> +
+> +	ret = gpio_request(MX21ADS_IO_SD_WP, "mmc-ro");
+> +	if (ret)
+> +		return ret;
+> +
+> +	return request_irq(gpio_to_irq(MX21ADS_MMC_CD), detect_irq,
+> +			   IRQF_TRIGGER_FALLING, "mmc-detect", data);
+>  }
+>  
+>  static void mx21ads_sdhc_exit(struct device *dev, void *data)
+>  {
+> -	free_irq(gpio_to_irq(IMX_GPIO_NR(4, 25)), data);
+> +	free_irq(gpio_to_irq(MX21ADS_MMC_CD), data);
+> +	gpio_free(MX21ADS_IO_SD_WP);
+>  }
+>  
+>  static const struct imxmmc_platform_data mx21ads_sdhc_pdata __initconst = {
+> @@ -264,29 +281,8 @@ mx21ads_nand_board_info __initconst = {
+>  	.hw_ecc = 1,
+>  };
+>  
+> -static struct map_desc mx21ads_io_desc[] __initdata = {
+> -	/*
+> -	 * Memory-mapped I/O on MX21ADS Base board:
+> -	 *   - CS8900A Ethernet controller
+> -	 *   - ST16C2552CJ UART
+> -	 *   - CPU and Base board version
+> -	 *   - Base board I/O register
+> -	 */
+> -	{
+> -		.virtual = MX21ADS_MMIO_BASE_ADDR,
+> -		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
+> -		.length = MX21ADS_MMIO_SIZE,
+> -		.type = MT_DEVICE,
+> -	},
+> -};
+> -
+> -static void __init mx21ads_map_io(void)
+> -{
+> -	mx21_map_io();
+> -	iotable_init(mx21ads_io_desc, ARRAY_SIZE(mx21ads_io_desc));
+> -}
+> -
+>  static struct platform_device *platform_devices[] __initdata = {
+> +	&mx21ads_mmgpio,
+>  	&mx21ads_nor_mtd_device,
+>  };
+>  
+> @@ -321,7 +317,7 @@ static void __init mx21ads_timer_init(void)
+>  MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
+>  	/* maintainer: Freescale Semiconductor, Inc. */
+>  	.atag_offset = 0x100,
+> -	.map_io = mx21ads_map_io,
+> +	.map_io		= mx21_map_io,
+>  	.init_early = imx21_init_early,
+>  	.init_irq = mx21_init_irq,
+>  	.handle_irq = imx21_handle_irq,
+> -- 
+> 1.8.3.2
+> 
