@@ -1,43 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 05 Mar 2014 22:03:05 +0300
-Subject: [PATCH] irq-gic: remove file name from heading comment
-In-Reply-To: <alpine.DEB.2.02.1403050112180.18573@ionos.tec.linutronix.de>
-References: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
- <52D5CCFB.1090205@cogentembedded.com> <53166B67.2060804@cogentembedded.com>
- <alpine.DEB.2.02.1403050112180.18573@ionos.tec.linutronix.de>
-Message-ID: <531774E9.2000501@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Mar 2014 10:10:45 -0800
+Subject: [PATCHv2 13/14] ARM: OMAP24xx: clock: remove legacy clock data
+In-Reply-To: <20140305170857.GD4983@atomide.com>
+References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
+ <1393924700-6510-14-git-send-email-t-kristo@ti.com>
+ <20140304173200.GA17470@atomide.com> <5316217C.2070906@ti.com>
+ <20140304212811.GA8705@atomide.com> <5316DCF6.6070808@ti.com>
+ <20140305170857.GD4983@atomide.com>
+Message-ID: <20140305181045.GH4983@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Tony Lindgren <tony@atomide.com> [140305 09:12]:
+> * Tero Kristo <t-kristo@ti.com> [140305 00:17]:
+> > On 03/04/2014 11:28 PM, Tony Lindgren wrote:
+> > >* Tero Kristo <t-kristo@ti.com> [140304 10:58]:
+> > >>On 03/04/2014 07:32 PM, Tony Lindgren wrote:
+> > >>>* Tero Kristo <t-kristo@ti.com> [140304 01:22]:
+> > >>>>This is no longer needed as clock data is provided through DT.
+> > >>>
+> > >>>Looks like there's a new error even before applying this patch in
+> > >>>the series as I'm now getting the following oops on n8x0. So cannot
+> > >>>test this patch yet.
+> > >>
+> > >>Is this with OMAP2 only boot?
+> > >
+> > >Yeah that's with omap2 only.
+> > 
+> > That explains it, as previous series was never boot tested in omap2
+> > only config (due to build issues.)
+> > 
+> > I just force pushed the branch with the below additional patch, can
+> > you check if it works now?
+> 
+> Yes seems to work with that thanks. And with the omap2 legacy clock
+> data removed too, it boots fine on n8x0 and 2430sdp.
+> 
+> I suggest you drop the omap3 legacy data patch from this branch
+> as it's not omap2 related and cannot be done yet. Then try to get
+> acks from Paul. And if there are no issues, it seems Mike could take
+> the whole branch as it seems to merge just fine with what I have
+> queued. So for all the patches except for the omap3 legacy data
+> removal, feel free to add:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-On 03/05/2014 03:27 AM, Thomas Gleixner wrote:
+Found one randconfig error with this series when CONFIG_ARCH_OMAP2
+is not set:
 
->>>> File names in the heading comments  fell out of favor long ago, and this
->>>> one
->>>> weren't even changed when the driver was moved from arch/arm/common/, so
->>>> remove
->>>> it at last...
+/drivers/clk/ti/dpll.c:273: undefined reference to `omap2xxx_clkt_dpllcore_init'
+drivers/clk/ti/dpll.c:311: undefined reference to `clkhwops_omap2xxx_dpll'
 
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+It's also possible the error is the PRM clean up series, but probably
+in this series based drivers/clk/ti/dpll.c path.
 
->>>> ---
->>>> The patch is against the 'irq/core' branch of the 'tip.git' repo.
+Regards,
 
->>>      Thomas, is there a chance that you merge this patch for 3.14? Is it even
->>> the right branch for cleanups (I'm seeing fixes there)?
-
->>     Thomas, will you ever reply to me? Who's maintaining the GIC driver, you?
->> Or the patches shoud just go in via arm-soc.git?
-
-> That patch is so important^Wtrivial that it really can go via the
-> obvious trivial at kernel.org
-
-    I've never been redirected to trivial. I thought only typo fixes and such 
-go there. The question is why it did take so long to tell me to do this...
-
-> Sigh....
-
-    Yes... thanks anyway, I'll try sending to trivial.
-
-WBR, Sergei
+Tony
