@@ -1,29 +1,29 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 5 Mar 2014 17:44:41 +0100
-Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
- controller
-In-Reply-To: <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140305164441.GD9228@katana>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  5 Mar 2014 17:57:52 +0100
+Subject: [PATCH 0/3] iio: adc: at91 fixes
+Message-ID: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series fixes a kernel crash at probe time when using the at91_adc driver
+through platform_data. This crash appeared in 3.13.
 
-> +	qup->adap.nr = pdev->id;
-> +	qup->adap.dev.parent = qup->dev;
-> +	qup->adap.dev.of_node = pdev->dev.of_node;
-> +	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
-> +
-> +	ret = i2c_add_numbered_adapter(&qup->adap);
+The first patch fixes the crash. While it is already quite late, I think it
+would be good to get it in 3.14.
 
-I'd suggest to use just i2c_add_adapter and let the core check the
-aliases for you.
+The next patches restore support for at91_adc on the at91sam9g45 and at91sam9260
+based boards. It would be great if they could make it in 3.14. But I'm not sure
+it is worth applying them to 3.13.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/6fcc90a1/attachment.sig>
+Alexandre Belloni (3):
+  iio: adc: at91_adc: Repair broken platform_data support
+  ARM: at91: at91sam9g45: change at91_adc name
+  ARM: at91: at91sam9260: change at91_adc name
+
+ arch/arm/mach-at91/at91sam9260_devices.c |  2 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c |  2 +-
+ drivers/iio/adc/at91_adc.c               | 26 ++++++++++++++++++++++----
+ 3 files changed, 24 insertions(+), 6 deletions(-)
+
+-- 
+1.8.3.2
