@@ -1,52 +1,190 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Mar 2014 16:12:56 +0000
-Subject: [PATCH v2] ARM64: Kernel managed pages are only flushed
-In-Reply-To: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
-References: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
-Message-ID: <20140305161255.GG29309@mudshark.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 05 Mar 2014 17:15:54 +0100
+Subject: [PATCH v2 03/11] ARM: exynos: Move to generic power domain
+ bindings
+In-Reply-To: <1393862536-9842-4-git-send-email-tomasz.figa@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1713847.uSatLFRtJj@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 11:25:16AM +0000, Bharat Bhushan wrote:
-> Kernel can only access pages which maps to managed memory.
-> So flush only valid kernel pages.
+
+Hi Tomek,
+
+On Monday, March 03, 2014 05:02:08 PM Tomasz Figa wrote:
+> This patch moves Exynos power domain code to use the new generic power
+> domain look-up framework introduced by previous patch, allowing the new
+> code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
 > 
-> I observed kernel crash direct assigning a device using VFIO
-> and found that it was caused because of accessing invalid page
-> 
-> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
-> v1->v2
->  Getting pfn usin pte_pfn() in pfn_valid.
+>  .../bindings/arm/exynos/power_domain.txt           | 12 ++--
+>  arch/arm/mach-exynos/pm_domains.c                  | 80 +---------------------
+>  kernel/power/Kconfig                               |  2 +-
+>  3 files changed, 7 insertions(+), 87 deletions(-)
 > 
->  arch/arm64/mm/flush.c |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> index e4193e3..319826a 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -72,7 +72,18 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
+> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> index 5216b41..60f26a8 100644
+> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> @@ -8,6 +8,8 @@ Required Properties:
+>      * samsung,exynos4210-pd - for exynos4210 type power domain.
+>  - reg: physical base address of the controller and length of memory mapped
+>      region.
+> +- #power-domain-cells: number of cells in power domain specifier;
+> +    must be 0.
 >  
->  void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>  Node of a device using power domains must have a samsung,power-domain property
+>  defined with a phandle to respective power domain.
+> @@ -17,12 +19,8 @@ Example:
+>  	lcd0: power-domain-lcd0 {
+>  		compatible = "samsung,exynos4210-pd";
+>  		reg = <0x10023C00 0x10>;
+> +		#power-domain-cells = <0>;
+>  	};
+>  
+> -Example of the node using power domain:
+> -
+> -	node {
+> -		/* ... */
+> -		samsung,power-domain = <&lcd0>;
+> -		/* ... */
+> -	};
+> +See Documentation/devicetree/bindings/power/power_domain.txt for description
+> +of consumer-side bindings.
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 8fd2488..48ee6c9 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -75,78 +75,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+>  	return exynos_pd_power(domain, false);
+>  }
+>  
+> -static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+> -					 struct device *dev)
+> -{
+> -	int ret;
+> -
+> -	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+> -
+> -	while (1) {
+> -		ret = pm_genpd_add_device(&pd->pd, dev);
+> -		if (ret != -EAGAIN)
+> -			break;
+> -		cond_resched();
+> -	}
+> -
+> -	pm_genpd_dev_need_restore(dev, true);
+> -}
+> -
+> -static void exynos_remove_device_from_domain(struct device *dev)
+> -{
+> -	struct generic_pm_domain *genpd = dev_to_genpd(dev);
+> -	int ret;
+> -
+> -	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
+> -
+> -	while (1) {
+> -		ret = pm_genpd_remove_device(genpd, dev);
+> -		if (ret != -EAGAIN)
+> -			break;
+> -		cond_resched();
+> -	}
+> -}
+> -
+> -static void exynos_read_domain_from_dt(struct device *dev)
+> -{
+> -	struct platform_device *pd_pdev;
+> -	struct exynos_pm_domain *pd;
+> -	struct device_node *node;
+> -
+> -	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
+
+This removes "samsung,power-domain" phandle handling but I cannot find
+in your patch series updates to existing EXYNOS dts files converting
+them to use the new "power-domain" property.  Am I missing something?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> -	if (!node)
+> -		return;
+> -	pd_pdev = of_find_device_by_node(node);
+> -	if (!pd_pdev)
+> -		return;
+> -	pd = platform_get_drvdata(pd_pdev);
+> -	exynos_add_device_to_domain(pd, dev);
+> -}
+> -
+> -static int exynos_pm_notifier_call(struct notifier_block *nb,
+> -				    unsigned long event, void *data)
+> -{
+> -	struct device *dev = data;
+> -
+> -	switch (event) {
+> -	case BUS_NOTIFY_BIND_DRIVER:
+> -		if (dev->of_node)
+> -			exynos_read_domain_from_dt(dev);
+> -
+> -		break;
+> -
+> -	case BUS_NOTIFY_UNBOUND_DRIVER:
+> -		exynos_remove_device_from_domain(dev);
+> -
+> -		break;
+> -	}
+> -	return NOTIFY_DONE;
+> -}
+> -
+> -static struct notifier_block platform_nb = {
+> -	.notifier_call = exynos_pm_notifier_call,
+> -};
+> -
+>  static __init int exynos4_pm_init_power_domain(void)
 >  {
-> -	struct page *page = pte_page(pte);
-> +	struct page *page;
-> +
-> +#ifdef CONFIG_HAVE_ARCH_PFN_VALID
-> +	/*
-> +	 * We can only access pages that the kernel maps
-> +	 * as memory. Bail out for unmapped ones.
-> +	 */
-> +	if (!pfn_valid(pte_pfn(pte)))
-> +		return;
-> +
-> +#endif
-> +	page = pte_page(pte);
-
-How do you get into this function without a valid, userspace, executable pte?
-
-I suspect you've got changes elsewhere and are calling this function in a
-context where it's not supposed to be called.
-
-Will
+>  	struct platform_device *pdev;
+> @@ -156,8 +84,6 @@ static __init int exynos4_pm_init_power_domain(void)
+>  		struct exynos_pm_domain *pd;
+>  		int on;
+>  
+> -		pdev = of_find_device_by_node(np);
+> -
+>  		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+>  		if (!pd) {
+>  			pr_err("%s: failed to allocate memory for domain\n",
+> @@ -170,17 +96,13 @@ static __init int exynos4_pm_init_power_domain(void)
+>  		pd->base = of_iomap(np, 0);
+>  		pd->pd.power_off = exynos_pd_power_off;
+>  		pd->pd.power_on = exynos_pd_power_on;
+> -		pd->pd.of_node = np;
+> -
+> -		platform_set_drvdata(pdev, pd);
+>  
+>  		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
+>  
+>  		pm_genpd_init(&pd->pd, NULL, !on);
+> +		of_genpd_add_provider(np, of_genpd_xlate_simple, &pd->pd);
+>  	}
+>  
+> -	bus_register_notifier(&platform_bus_type, &platform_nb);
+> -
+>  	return 0;
+>  }
+>  arch_initcall(exynos4_pm_init_power_domain);
+> diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+> index 45aa98e..b17588c 100644
+> --- a/kernel/power/Kconfig
+> +++ b/kernel/power/Kconfig
+> @@ -308,7 +308,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
+>  
+>  config PM_GENERIC_DOMAINS_OF
+>  	def_bool y
+> -	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
+> +	depends on PM_GENERIC_DOMAINS && OF
+>  
+>  config CPU_PM
+>  	bool
