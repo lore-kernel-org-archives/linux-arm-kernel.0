@@ -1,34 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Mar 2014 11:33:26 -0800
-Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
-In-Reply-To: <5316068F.3020003@ti.com>
-References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
- <20140228230000.GW13624@atomide.com>
- <20140304160432.GG2799@8bytes.org> <5316068F.3020003@ti.com>
-Message-ID: <20140305193326.GA7599@atomide.com>
+Date: Wed, 5 Mar 2014 11:39:03 -0800
+Subject: [PATCH v3 4/7] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <5316D9D7.9070100@epfl.ch>
+References: <1393839247-6516-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393839247-6516-5-git-send-email-florian.vaussard@epfl.ch>
+ <53146166.4050906@ti.com> <53147A19.5070009@epfl.ch>
+ <53147E82.6030300@ti.com> <5316D9D7.9070100@epfl.ch>
+Message-ID: <20140305193903.GB7599@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [140304 09:03]:
-> On 03/04/2014 10:04 AM, Joerg Roedel wrote:
-> >
-> >Applied patches 1-7 to my arm/omap branch.
-> >
-> >Tony, you can pull that branch into your tree if needed (when I pushed
-> >it, which will happen today or tomorrow).
+* Florian Vaussard <florian.vaussard@epfl.ch> [140305 00:04]:
+> On 03/03/2014 02:07 PM, Roger Quadros wrote:
+> > 
+> > Putting usb host pins in omap3-overo.dtsi implies that all Overo expansion boards will use it
+> > but that is not always the case. Any expansion board vendor can decide not to use USB host feature.
+> > 
+> 
+> I do agree that this can be the case. So it makes sense to push the
+> USB host down to expansion boards.
+> 
+> Now how to do it? The omap3_pmx_core part can be put in
+> omap3-overo-tobi-common.dtsi. But unfortunately, the omap3_pmx_core2
+> part cannot
+> be factorized between the two variants, as one has to use a different
+> macro for each case (OMAP3430_CORE2_IOPAD vs. OMAP3630_CORE2_IOPAD).
+> Including the right .dtsi file is not enough.
 
-OK thanks, looks like remaining patches compile just fine even without
-it which is nice.
+FYI, it's best to have the mux registers board specific and separate
+because the mux settings can depend on the SoC revision or even
+packaging.
+ 
+> As it can be seen from include/dt-bindings/pinctrl/omap.h, even if the
+> padconf register physical address is identical for both SoCs, the offset
+> inside omap3_pmx_core2 will be different (as the start of
+> omap3_pmx_core2 is 0x480025d8 for omap34xx and 0x480025a0 for omap36xx).
+> 
+> Thus the pins belonging to omap3_pmx_core2 must be in a SoC-dependent
+> .dtsi file.
 
-> Tony,
-> Can you also pull in the corresponding DTS node patches as well that
-> go along with this series.
-> http://marc.info/?l=linux-omap&m=139362062805816&w=2
+It seems we need a top level .dts file incuding the right SoC and
+pinconf settings.
+ 
+> I will post a v4 with a new proposition. Thanks for your inputs.
 
-They look OK to me, but looks like Benoit and Paul are not Cc:ed
-on the hwmod changes. I suggest you resend just patches 8 - 13 and
-the .dts changes as a new series with Benoit and Paul on Cc for
-them so they have a chance to review and ack them.
+OK as that might change the other patches too let's wait for that.
 
 Regards,
 
