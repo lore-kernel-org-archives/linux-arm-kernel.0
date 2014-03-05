@@ -1,42 +1,17 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Wed, 5 Mar 2014 08:55:49 +0100
-Subject: [PATCH 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <20140305085311.07b3922a@marrow.netinsight.se>
-References: <20140305085311.07b3922a@marrow.netinsight.se>
-Message-ID: <20140305085549.3eb22236@marrow.netinsight.se>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 5 Mar 2014 14:52:30 +0800
+Subject: [PATCH v2 0/2] i2c: add DMA support for freescale i2c driver
+Message-ID: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver has been broken since commit 1a4901177574083c35fafc24c4d151c2a7c7647c
+Changed in v2:
+- remove has_dma_support property
+- unify i2c_imx_dma_rx and i2c_imx_dma_tx
+- unify i2c_imx_dma_read and i2c_imx_pio_read
+- unify i2c_imx_dma_write and i2c_imx_pio_write
 
-  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
-
-in 3.7 and would fail with
-
-[   33.055473] net eth1: coherent DMA mask is unset
-[   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
-
-Fix by setting up the DMA mask to the entire 32-bit range.
-
-Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
----
- drivers/net/ethernet/xscale/ixp4xx_eth.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-index 25283f1..e540e51 100644
---- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
-+++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-@@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
- 	port->netdev = dev;
- 	port->id = pdev->id;
- 
-+	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-+	if (err < 0)
-+		goto err_free;
-+
- 	switch (port->id) {
- 	case IXP4XX_ETH_NPEA:
- 		port->regs = (struct eth_regs __iomem *)IXP4XX_EthA_BASE_VIRT;
--- 
-1.7.9.6
+Added in v1:
+- Enable dma if it's support dma and transfer size bigger than the threshold.
+- Add device tree bindings for i2c eDMA support.
+- Add eDMA support for i2c driver.
