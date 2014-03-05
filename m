@@ -1,132 +1,167 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  5 Mar 2014 13:43:09 -0800
-Subject: [PATCH] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-Message-ID: <1394055789-31479-1-git-send-email-lauraa@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  5 Mar 2014 14:53:32 -0700
+Subject: [PATCH] pinctrl: tegra: fix some typos and inconsistencies
+Message-ID: <1394056412-12879-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a similar fashion to other architecture, add the infrastructure
-and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
-enabled, module ranges will be marked read-only/no-execute as
-appropriate.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+drive_dev3_pins in pinctrl-tegra114.c wasn't used; delete it.
+
+pinctrl-tegra124.c had quite a few typos. Fix those.
+
+pinctrl-tegra124.c had a few mismatches between the *_groups[] ararys
+and the function lists in tegra124_groups[]. Fix those.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm64/Kconfig.debug            |   11 +++++++++
- arch/arm64/include/asm/cacheflush.h |    4 +++
- arch/arm64/include/asm/pgtable.h    |   12 ++++++++++
- arch/arm64/mm/mmu.c                 |   42 +++++++++++++++++++++++++++++++++++
- 4 files changed, 69 insertions(+), 0 deletions(-)
+ drivers/pinctrl/pinctrl-tegra114.c |  5 -----
+ drivers/pinctrl/pinctrl-tegra124.c | 41 ++++++++++++++++----------------------
+ 2 files changed, 17 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 835c559..85d56c8 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -23,4 +23,15 @@ config PID_IN_CONTEXTIDR
- 	  instructions during context switch. Say Y here only if you are
- 	  planning to use hardware trace tools with this kernel.
+diff --git a/drivers/pinctrl/pinctrl-tegra114.c b/drivers/pinctrl/pinctrl-tegra114.c
+index 93c9e3899d5e..46da27ff2d64 100644
+--- a/drivers/pinctrl/pinctrl-tegra114.c
++++ b/drivers/pinctrl/pinctrl-tegra114.c
+@@ -1341,11 +1341,6 @@ static const unsigned drive_uda_pins[] = {
+ 	TEGRA_PIN_ULPI_STP_PY3,
+ };
  
-+config DEBUG_SET_MODULE_RONX
-+        bool "Set loadable kernel module data as NX and text as RO"
-+        depends on MODULES
-+        ---help---
-+          This option helps catch unintended modifications to loadable
-+          kernel module's text and read-only data. It also prevents execution
-+          of module data. Such protection may interfere with run-time code
-+          patching and dynamic kernel tracing - and they might also protect
-+          against certain classes of kernel exploits.
-+          If in doubt, say "N".
-+
- endmenu
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 88932498..02d2e8d 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -150,4 +150,8 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
- {
- }
+-static const unsigned drive_dev3_pins[] = {
+-	TEGRA_PIN_CLK3_OUT_PEE0,
+-	TEGRA_PIN_CLK3_REQ_PEE1,
+-};
+-
+ enum tegra_mux {
+ 	TEGRA_MUX_BLINK,
+ 	TEGRA_MUX_CEC,
+diff --git a/drivers/pinctrl/pinctrl-tegra124.c b/drivers/pinctrl/pinctrl-tegra124.c
+index c20e0e1dda83..7c6b7b63320f 100644
+--- a/drivers/pinctrl/pinctrl-tegra124.c
++++ b/drivers/pinctrl/pinctrl-tegra124.c
+@@ -325,13 +325,13 @@ static const struct pinctrl_pin_desc tegra124_pins[] = {
+ 	PINCTRL_PIN(TEGRA_PIN_KB_ROW8_PS0, "KB_ROW8 PS0"),
+ 	PINCTRL_PIN(TEGRA_PIN_KB_ROW9_PS1, "KB_ROW9 PS1"),
+ 	PINCTRL_PIN(TEGRA_PIN_KB_ROW10_PS2, "KB_ROW10 PS2"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW11_PS3, "KB_ROW10 PS3"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW12_PS4, "KB_ROW10 PS4"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW13_PS5, "KB_ROW10 PS5"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW14_PS6, "KB_ROW10 PS6"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW15_PS7, "KB_ROW10 PS7"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW16_PT0, "KB_ROW10 PT0"),
+-	PINCTRL_PIN(TEGRA_PIN_KB_ROW17_PT1, "KB_ROW10 PT1"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW11_PS3, "KB_ROW11 PS3"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW12_PS4, "KB_ROW12 PS4"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW13_PS5, "KB_ROW13 PS5"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW14_PS6, "KB_ROW14 PS6"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW15_PS7, "KB_ROW15 PS7"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW16_PT0, "KB_ROW16 PT0"),
++	PINCTRL_PIN(TEGRA_PIN_KB_ROW17_PT1, "KB_ROW17 PT1"),
+ 	PINCTRL_PIN(TEGRA_PIN_GEN2_I2C_SCL_PT5, "GEN2_I2C_SCL PT5"),
+ 	PINCTRL_PIN(TEGRA_PIN_GEN2_I2C_SDA_PT6, "GEN2_I2C_SDA PT6"),
+ 	PINCTRL_PIN(TEGRA_PIN_SDMMC4_CMD_PT7, "SDMMC4_CMD PT7"),
+@@ -1608,12 +1608,12 @@ static const char * const cpu_groups[] = {
+ };
  
-+int set_memory_ro(unsigned long addr, int numpages);
-+int set_memory_rw(unsigned long addr, int numpages);
-+int set_memory_x(unsigned long addr, int numpages);
-+int set_memory_nx(unsigned long addr, int numpages);
- #endif
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index aa3917c..b395af6 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -188,6 +188,18 @@ static inline pte_t pte_mkspecial(pte_t pte)
- 	return pte;
- }
+ static const char * const dap_groups[] = {
+-	"dap_mclk1_pee2",
++	"dap_mclk1_req_pee2",
+ 	"clk2_req_pcc5",
+ };
  
-+static inline pte_t pte_mkexec(pte_t pte)
-+{
-+	pte_val(pte) &= ~PTE_PXN;
-+	return pte;
-+}
-+
-+static inline pte_t pte_mknexec(pte_t pte)
-+{
-+	pte_val(pte) |= PTE_PXN;
-+	return pte;
-+}
-+
- static inline void set_pte(pte_t *ptep, pte_t pte)
- {
- 	*ptep = pte;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f8dc7e8..3f61cbd 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -122,6 +122,48 @@ static int __init early_cachepolicy(char *p)
- }
- early_param("cachepolicy", early_cachepolicy);
+ static const char * const dap1_groups[] = {
+-	"dap_mclk1_pee2",
++	"dap_mclk1_req_pee2",
+ };
  
-+#define PTE_SET_FN(_name, pteop) \
-+static int pte_set_##_name(pte_t *ptep, pgtable_t token, unsigned long addr, \
-+			void *data) \
-+{ \
-+	pte_t pte = pteop(*ptep); \
-+\
-+	set_pte(ptep, pte); \
-+	return 0; \
-+} \
-+
-+#define SET_MEMORY_FN(_name, callback) \
-+int set_memory_##_name(unsigned long addr, int numpages) \
-+{ \
-+	unsigned long start = addr; \
-+	unsigned long size = PAGE_SIZE*numpages; \
-+	unsigned long end = start + size; \
-+\
-+	if (start < MODULES_VADDR || start >= MODULES_END) \
-+		return -EINVAL;\
-+\
-+	if (end < MODULES_VADDR || end >= MODULES_END) \
-+		return -EINVAL; \
-+\
-+	apply_to_page_range(&init_mm, start, size, callback, NULL); \
-+	flush_tlb_kernel_range(start, end); \
-+	return 0;\
-+}
-+
-+PTE_SET_FN(ro, pte_wrprotect)
-+PTE_SET_FN(rw, pte_mkwrite)
-+PTE_SET_FN(x, pte_mkexec)
-+PTE_SET_FN(nx, pte_mknexec)
-+
-+SET_MEMORY_FN(ro, pte_set_ro)
-+EXPORT_SYMBOL(set_memory_ro);
-+SET_MEMORY_FN(rw, pte_set_rw)
-+EXPORT_SYMBOL(set_memory_rw);
-+SET_MEMORY_FN(x, pte_set_x)
-+EXPORT_SYMBOL(set_memory_x);
-+SET_MEMORY_FN(nx, pte_set_nx)
-+EXPORT_SYMBOL(set_memory_nx);
-+
- /*
-  * Adjust the PMD section entries according to the CPU in use.
-  */
+ static const char * const dap2_groups[] = {
+@@ -2013,8 +2013,8 @@ static const char * const rsvd2_groups[] = {
+ 	"gen1_i2c_scl_pc4",
+ 	"gen1_i2c_sda_pc5",
+ 
+-	"clk2_out_pee0",
+-	"clk2_req_pee1",
++	"clk3_out_pee0",
++	"clk3_req_pee1",
+ 	"pc7",
+ 	"pi5",
+ 	"pj0",
+@@ -2130,7 +2130,7 @@ static const char * const rsvd3_groups[] = {
+ 	"clk3_req_pee1",
+ 
+ 	"sdmmc4_dat5_paa5",
+-	"gpio_pcc1",
++	"pcc1",
+ 	"cam_i2c_scl_pbb1",
+ 	"cam_i2c_sda_pbb2",
+ 	"pbb5",
+@@ -2195,11 +2195,6 @@ static const char * const rsvd4_groups[] = {
+ 	"ddc_scl_pv4",
+ 	"ddc_sda_pv5",
+ 
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-
+ 	"pu0",
+ 	"pu1",
+ 	"pu2",
+@@ -2234,6 +2229,7 @@ static const char * const rsvd4_groups[] = {
+ 	"gen2_i2c_scl_pt5",
+ 	"gen2_i2c_sda_pt6",
+ 
++	"sdmmc4_clk_pcc4",
+ 	"sdmmc4_cmd_pt7",
+ 	"sdmmc4_dat0_paa0",
+ 	"sdmmc4_dat1_paa1",
+@@ -2271,7 +2267,7 @@ static const char * const rsvd4_groups[] = {
+ 	"dap1_din_pn1",
+ 	"dap1_sclk_pn3",
+ 	"dap_mclk1_req_pee2",
+-	"dap_mclk1_pw5",
++	"dap_mclk1_pw4",
+ 
+ 	"dap2_fs_pa2",
+ 	"dap2_din_pa4",
+@@ -2312,8 +2308,6 @@ static const char * const sdmmc1_groups[] = {
+ 	"sdmmc1_dat2_py5",
+ 	"sdmmc1_dat1_py6",
+ 	"sdmmc1_dat0_py7",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc",
+ 	"uart3_cts_n_pa1",
+ 	"sdmmc1_wp_n_pv3",
+ };
+@@ -2412,7 +2406,6 @@ static const char * const spi2_groups[] = {
+ 
+ 	"kb_row13_ps5",
+ 	"kb_row14_ps6",
+-	"kb_row15_ps7",
+ 	"kb_col0_pq0",
+ 	"kb_col1_pq1",
+ 	"kb_col2_pq2",
+@@ -2558,7 +2551,7 @@ static const char * const uartc_groups[] = {
+ 	"uart3_cts_n_pa1",
+ 	"uart3_rts_n_pc0",
+ 	"kb_row16_pt0",
+-	"kn_row17_pt1",
++	"kb_row17_pt1",
+ };
+ 
+ static const char * const uartd_groups[] = {
+@@ -2964,9 +2957,9 @@ static const struct tegra_pingroup tegra124_groups[] = {
+        PINGROUP(sdmmc4_dat4_paa4,       SDMMC4,     SPI3,       GMI,          RSVD4,       SDMMC4,     0x3270,  N,  Y,  N),
+        PINGROUP(sdmmc4_dat5_paa5,       SDMMC4,     SPI3,       RSVD3,        RSVD4,       SDMMC4,     0x3274,  N,  Y,  N),
+        PINGROUP(sdmmc4_dat6_paa6,       SDMMC4,     SPI3,       GMI,          RSVD4,       SDMMC4,     0x3278,  N,  Y,  N),
+-       PINGROUP(sdmmc4_dat7_paa7,       SDMMC4,     RSVD1,      GMI,          RSVD4,       SDMMC4,     0x327c,  N,  Y,  N),
++       PINGROUP(sdmmc4_dat7_paa7,       SDMMC4,     RSVD2,      GMI,          RSVD4,       SDMMC4,     0x327c,  N,  Y,  N),
+        PINGROUP(cam_mclk_pcc0,          VI,         VI_ALT1,    VI_ALT3,      SDMMC2,      VI,         0x3284,  N,  N,  N),
+-       PINGROUP(pcc1,                   I2S4,       RSVD1,      RSVD3,        SDMMC2,      I2S4,       0x3288,  N,  N,  N),
++       PINGROUP(pcc1,                   I2S4,       RSVD2,      RSVD3,        SDMMC2,      I2S4,       0x3288,  N,  N,  N),
+        PINGROUP(pbb0,                   VGP6,       VIMCLK2,    SDMMC2,       VIMCLK2_ALT, VGP6,       0x328c,  N,  N,  N),
+        PINGROUP(cam_i2c_scl_pbb1,       VGP1,       I2C3,       RSVD3,        SDMMC2,      VGP1,       0x3290,  Y,  N,  N),
+        PINGROUP(cam_i2c_sda_pbb2,       VGP2,       I2C3,       RSVD3,        SDMMC2,      VGP2,       0x3294,  Y,  N,  N),
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.5
