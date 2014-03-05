@@ -1,50 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Mar 2014 19:20:05 +0000
-Subject: [PATCH] Revert "irqchip: irq-dove: Add PMU interrupt controller."
-In-Reply-To: <alpine.DEB.2.02.1403051445020.18573@ionos.tec.linutronix.de>
-References: <20140304030838.GA1872@titan.lakedaemon.net>
- <1393911160-7688-1-git-send-email-jason@lakedaemon.net>
- <20140305004139.GT21483@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1403051445020.18573@ionos.tec.linutronix.de>
-Message-ID: <20140305192005.GX21483@n2100.arm.linux.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 5 Mar 2014 20:23:40 +0100
+Subject: [PATCH] ahci_imx: Put #ifdef CONFIG_PM_SLEEP around suspend /
+ resume functions
+In-Reply-To: <1394047069-29902-1-git-send-email-hdegoede@redhat.com>
+References: <1394047069-29902-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <201403052023.40492.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 03:42:34PM +0100, Thomas Gleixner wrote:
-> On Wed, 5 Mar 2014, Russell King - ARM Linux wrote:
-> > This results in the RTC alarm test receiving exactly one interrupt for
-> > each alarm expiry, as it should do.  Thoughts?
+On Wednesday, March 05, 2014 at 08:17:49 PM, Hans de Goede wrote:
+> This fixes the following warnings when CONFIG_PM_SLEEP is not set:
 > 
-> You are worried about clearing an interrupt which is transitory and
-> not kept active at the device level until you handled it for real,
-> right?
+> drivers/ata/ahci_imx.c:284:12: warning: ?imx_ahci_suspend? defined but not
+> used [-Wunused-function] drivers/ata/ahci_imx.c:299:12: warning:
+> ?imx_ahci_resume? defined but not used [-Wunused-function]
+> 
+> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Yep.  Let's take the code:
+Obviously makes sense.
 
-	ldr	r0, [r1]		; read the interrupt cause register
-	and	r0, r0, r2		; clear interrupts we've serviced
-	str	r0, [r1]		; write it back
+Acked-by: Marek Vasut <marex@denx.de>
 
-The problem here is if a transitory interrupt is received between the
-load and store, the write can clear it back to zero.  There's nothing
-which can be done to get around that - which is why I'd prefer to do
-this as infrequently as necessary.
-
-> Is the datasheet for this stuff public available?
-
-Thankfully, it is, but like many such things, it'll leave you with /lots/
-of questions.  In the case of this register, the documentation only goes
-as far as describing the bits, but doesn't really describe their behaviour.
-Much of that can only come via experimentation with the hardware. :(
-
-> I don't think it matters in which order you process multiple pending
-> interrupts.
-
-Me neither - I'm just going to use fls() for no other reason that it
-produces more efficient code.  My comments on that were to see whether
-I'd missed anything, and to stave off any review comments about why
-it's changed :)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,
+Marek Vasut
