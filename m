@@ -1,80 +1,72 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Mar 2014 14:11:32 +0800
-Subject: [PATCH] ARM: vf610: add UART choice for low-level debug
-In-Reply-To: <6cdb1444950fae035bb447f11519040c0a88992d.1393888981.git.stefan@agner.ch>
-References: <6cdb1444950fae035bb447f11519040c0a88992d.1393888981.git.stefan@agner.ch>
-Message-ID: <20140305061129.GH8784@S2101-09.ap.freescale.net>
+Date: Wed, 5 Mar 2014 14:22:19 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Add heartbeat led
+In-Reply-To: <1393943685-32579-1-git-send-email-vincent.stehle@freescale.com>
+References: <1393943685-32579-1-git-send-email-vincent.stehle@freescale.com>
+Message-ID: <20140305062216.GI8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 12:27:09AM +0100, Stefan Agner wrote:
-> Add choice for low-level debug UART. Similar to i.MX6, there is a
-> numeric configuration, valid choices are 0 to 3.
-> Not that the kernel assumes that the boot loader initialized clock
-> properly.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/Kconfig.debug      |  9 +++++++++
->  arch/arm/include/debug/vf.S | 16 ++++++++++++++--
->  2 files changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 0531da8..c2005a7 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -946,6 +946,15 @@ config DEBUG_IMX_UART_PORT
->  	  Choose UART port on which kernel low-level debug messages
->  	  should be output.
->  
-> +config DEBUG_VF_UART_PORT
-> +	int "Vybrid Debug UART Port Selection" if DEBUG_VF_UART
-> +	default 1
-> +	range 0 3
-> +	depends on SOC_VF610
-> +	help
-> +	  Choose UART port on which kernel low-level debug messages
-> +	  should be output.
-> +
->  config DEBUG_TEGRA_UART
->  	bool
->  	depends on ARCH_TEGRA
-> diff --git a/arch/arm/include/debug/vf.S b/arch/arm/include/debug/vf.S
-> index ba12cc4..4683b7c 100644
-> --- a/arch/arm/include/debug/vf.S
-> +++ b/arch/arm/include/debug/vf.S
-> @@ -7,9 +7,21 @@
->   *
->   */
->  
-> +#define VF_UART0_BASE_ADDR	0x40027000
-> +#define VF_UART1_BASE_ADDR	0x40028000
-> +#define VF_UART2_BASE_ADDR	0x40029000
-> +#define VF_UART3_BASE_ADDR	0x4002a000
-> +#define VF_UART_BASE_ADDR(n)	VF_UART##n##_BASE_ADDR
-> +#define VF_UART_BASE(n)		VF_UART_BASE_ADDR(n)
-> +#define VF_UART_PHYSICAL_BASE	VF_UART_BASE(CONFIG_DEBUG_VF_UART_PORT)
-> +
-> +#define VF_UART_VIRTUAL_BASE	0xfe000000
-> +
-> +
+On Tue, Mar 04, 2014 at 03:34:45PM +0100, Vincent Stehl? wrote:
+> Use the red gpio led for heartbeat.
 
-One new line is good enough.
-
->  	.macro	addruart, rp, rv, tmp
-> -	ldr	\rp, =0x40028000	@ physical
-> -	ldr	\rv, =0xfe028000	@ virtual
-> +	ldr	\rp, =(VF_UART_PHYSICAL_BASE) 	@ physical
-
-The parentheses is unnecessary.
+Some people think it's annoying to have a LED blinking all the time.
+Since it's a user defined LED, let's leave it to users for their
+particular use case.
 
 Shawn
 
-> +	and	\rv, \rp, #0xffffff		@ offset within 16MB section
-> +	add	\rv, \rv, #VF_UART_VIRTUAL_BASE
->  	.endm
+> 
+> Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> ---
+> 
+> Hi,
+> 
+> This has been tested on Sabre SD i.MX6 Quad board, with linux v3.14-rc5+ and
+> imx_v6_v7_defconfig.
+> 
+> As a side note, checkpatch.pl complains about gpio-leds being undocumented, but
+> I am not sure what to do about that.
+> 
+> Best regards,
+> 
+> V.
+> 
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index e75e11b..cf4d736 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -88,6 +88,16 @@
+>  		default-brightness-level = <7>;
+>  		status = "okay";
+>  	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		heartbeat-led {
+> +		        label = "Heartbeat";
+> +		        gpios = <&gpio1 2 0>;
+> +		        linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+>  };
 >  
->  	.macro	senduart, rd, rx
+>  &audmux {
+> @@ -182,6 +192,7 @@
+>  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
+>  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+>  				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+>  			>;
+>  		};
+>  	};
 > -- 
 > 1.9.0
+> 
 > 
