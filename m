@@ -1,59 +1,41 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 05 Mar 2014 11:15:09 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiBSRVNFTkQgMS8zXSBBUk06IGNscHM3MTF4OiBBZGQg?=
- =?UTF-8?B?Q0xQUzcxMVggaXJxY2hpcCBkcml2ZXI=?=
-In-Reply-To: <alpine.DEB.2.02.1403042322260.18573@ionos.tec.linutronix.de>
-References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
- <1393965553.856224948@f346.i.mail.ru>
- <alpine.DEB.2.02.1403042322260.18573@ionos.tec.linutronix.de>
-Message-ID: <1394003709.802584194@f289.i.mail.ru>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 05 Mar 2014 08:16:28 +0100
+Subject: [PATCH v4] PHY: sunxi: Add driver for sunxi usb phy
+In-Reply-To: <5316B88D.4080104@ti.com>
+References: <1393693766-15352-1-git-send-email-hdegoede@redhat.com>
+ <1393693766-15352-2-git-send-email-hdegoede@redhat.com>
+ <53121AF4.4080802@ti.com> <531232BC.2070903@redhat.com>
+ <5314811C.1000905@ti.com> <53160752.1030301@redhat.com>
+ <5316B88D.4080104@ti.com>
+Message-ID: <5316CF4C.6030606@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????,  4 ????? 2014, 23:32 +01:00 ?? Thomas Gleixner <tglx@linutronix.de>:
-> On Wed, 5 Mar 2014, Alexander Shiyan wrote:
-> > ???????,  4 ????? 2014, 21:15 +01:00 ?? Thomas Gleixner <tglx@linutronix.de>:
-> > > Is anything really using the FIQs on those clps711x machines?
-> > > 
-> > > If yes, I have no objections to export the no_action handler.
-> > 
-> > Yes, the patch ("no_action") is the result of the question raised by the
-> > driver that uses FIQ.
-> > http://thread.gmane.org/gmane.linux.alsa.devel/119730/focus=119842
-> 
-> Fair enough.
->  
-> > > > +static void clps711x_intc_mask(struct irq_data *d)
-> > > > +{
-> > > > +	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-> > > > +	void __iomem *intmr = clps711x_intc->intmr[hwirq / 16];
-> > > > +	u32 tmp;
-> > > > +
-> > > > +	tmp = readl_relaxed(intmr);
-> > > > +	tmp &= ~(1 << (hwirq % 16));
-> > > > +	writel_relaxed(tmp, intmr);
-> > > 
-> > > Why can't you use a generic irq chip for all of this ?
-> > 
-> > I thought many times on this subject, but I can not imagine how to
-> > handle EOI, because each EOI interrupt uses a separate register.
-> 
-> You specify the functions which are used by the generic chip
-> implementation.
-> 
-> So you can assign:
-> 
->    chip->irq_mask = irq_gc_mask_clear_bit;
->    chip->irq_unmask = irq_gc_mask_set_bit;
->    chip->irq_eoi = cpls_eoi_magic_function;
-> 
-> The eoi callback is only going to be used by the interrupts which have
-> the handle_irq_fasteoi handler installed. So you do not even need any
-> sanity checks in your cpls_eoi_magic_function.
+Hi,
 
-Ie if I understand correctly, we need to create three irq chip using
-irq_alloc_domain_generic_chips() and assign the mask address for each chip.
-And use a single EOI handler, taking the value of EOI register from an existing table.
-If so, I'll try to implement this.
+On 03/05/2014 06:39 AM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Tuesday 04 March 2014 10:33 PM, Hans de Goede wrote:
 
----
+<snip>
+
+>>> alright.. missed that earlier. Sorry.
+>>
+>> So does this mean you're going to take v4 as is, or do you want me to add
+>> the dev_err calls you've pointed out before (note I still prefer to not
+>> add these, but if you insist...) ?
+> 
+> You should have received a notification on it being merged to 'next'. didn't you?
+
+Not that I remember, I think I'm not receiving these kinds of notifications
+in general, except for when things hit one of gkh's trees.
+
+Is this something done by your own scripts, or something which I should
+get for every patch of mine which hits next? If it is the latter I'm definitely
+not getting these, if it is just from you then I think I'm not getting them
+either but I'm not 100% sure.
+
+Regards,
+
+Hans
