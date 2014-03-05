@@ -1,36 +1,90 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 5 Mar 2014 16:07:46 +0100
-Subject: [PATCH 3/4] clk: shmobile: add CPG driver for rz-platforms
-In-Reply-To: <1460103.hdWs652aMT@avalon>
-References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
- <2207635.bd10VfTU6U@avalon> <20140305135431.GA7985@katana>
- <1460103.hdWs652aMT@avalon>
-Message-ID: <20140305150746.GA9228@katana>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 5 Mar 2014 17:24:54 +0200
+Subject: [PATCH v5 2/6] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <531738FF.5050902@ti.com>
+References: <1393846695-14644-1-git-send-email-kishon@ti.com>
+ <1393846695-14644-3-git-send-email-kishon@ti.com> <53173809.2060303@ti.com>
+ <531738FF.5050902@ti.com>
+Message-ID: <531741C6.1040006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> That's fine with me (although given the low complexity I would probably have 
-> gone directly to supporting both clocks) as long as we can ensure both forward 
-
-We need to wait for GPIO support anyhow to get it real.
-
-> and backward compatibility. Should we give a name to the clock input through 
-> the clock-names property for that reason ?
-
-Not needed IMO.
-
-> > Note that the devkit will most likely be the only board ever with a
-> > selectable root clock.
+On 03/05/2014 04:47 PM, Kishon Vijay Abraham I wrote:
+> Roger,
 > 
-> Most probably, but that's no reason not to support it :-)
+> On Wednesday 05 March 2014 08:13 PM, Roger Quadros wrote:
+>> Hi Kishon,
+>>
+>> On 03/03/2014 01:38 PM, Kishon Vijay Abraham I wrote:
+>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>>> phy_power_on() and phy_power_off().
+>>>
+>>> However using the old USB phy library wont be removed till the PHYs of all
+>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/usb/dwc3.txt |    6 +-
+>>>   drivers/usb/dwc3/core.c                        |   86 +++++++++++++++++++++---
+>>>   drivers/usb/dwc3/core.h                        |    7 ++
+>>>   3 files changed, 89 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> index e807635..471366d 100644
+>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> @@ -6,11 +6,13 @@ Required properties:
+>>>    - compatible: must be "snps,dwc3"
+>>>    - reg : Address and length of the register set for the device
+>>>    - interrupts: Interrupts used by the dwc3 controller.
+>>> +
+>>> +Optional properties:
+>>>    - usb-phy : array of phandle for the PHY device.  The first element
+>>>      in the array is expected to be a handle to the USB2/HS PHY and
+>>>      the second element is expected to be a handle to the USB3/SS PHY
+>>> -
+>>> -Optional properties:
+>>> + - phys: from the *Generic PHY* bindings
+>>> + - phy-names: from the *Generic PHY* bindings
+>>>    - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>>
+>>>   This is usually a subnode to DWC3 glue to which it is connected.
+>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>> index 225a4d6..497234a 100644
+>>> --- a/drivers/usb/dwc3/core.c
+>>> +++ b/drivers/usb/dwc3/core.c
+>>> @@ -61,9 +61,10 @@ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
+>>>    * dwc3_core_soft_reset - Issues core soft reset and PHY reset
+>>>    * @dwc: pointer to our context structure
+>>>    */
+>>> -static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>> +static int dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>   {
+>>>       u32        reg;
+>>> +    int        ret;
+>>>
+>>>       /* Before Resetting PHY, put Core in Reset */
+>>>       reg = dwc3_readl(dwc->regs, DWC3_GCTL);
+>>> @@ -82,6 +83,15 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>
+>>>       usb_phy_init(dwc->usb2_phy);
+>>>       usb_phy_init(dwc->usb3_phy);
+>>> +    ret = phy_init(dwc->usb2_generic_phy);
+>>
+>> you need to check if dwc->usb?_generic_phy is not NULL before using any of the PHY APIs
+>> throughout this patch.
+> 
+> Recently a patch to allow NULL in phy APIs was added to support optional PHYs.
+> 
+> commit 04c2facad8fee66c981a51852806d8923336f362
+> Author: Andrew Lunn <andrew@lunn.ch>
+> Date:   Tue Feb 4 18:33:11 2014 +0100
+> 
+>     drivers: phy: Make NULL a valid phy reference
 
-Not in itself. Yet a low demand might be, a demand of 0 surely is ;)
+Oh OK, then it is fine. Thanks for the clarification.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/d7ef843e/attachment-0001.sig>
+cheers,
+-roger
