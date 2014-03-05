@@ -1,141 +1,21 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed,  5 Mar 2014 22:11:29 +0100
-Subject: [PATCH] regulator: helpers: Modify helpers enabling multi-bit control
-Message-ID: <1394053889-7273-1-git-send-email-carlo@caione.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed,  5 Mar 2014 22:21:12 +0100
+Subject: [RESEND Patch 0/2] DT vendor/soc updates
+Message-ID: <1394054474-4310-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the regulator helpers to account for device that use
-multiple bits for control when using regmap enable/disable/bypass ops.
+This is a resend because i've been told they did not make it to the
+list properly.
 
-The actual regulator helpers wrongly assume that the regulator control
-is always performed using single bits, using in the regulator_desc
-struct only two parameters *_reg and *_mask defining register and mask
-for control.
+Andrew Lunn (2):
+  DT: Vendor: Add prefixes used by Kirkwood devices
+  DT: bindings: add missing Marvell Kirkwood SoC documentation
 
-This patch extends this struct and introduces the helpers to take into
-account devices where control is performed using multiple bits and
-specific multi-bit values are used for enabling/disabling/bypassing the
-regulator.
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        | 13 +++
+ 2 files changed, 110 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- drivers/regulator/helpers.c      | 48 ++++++++++++++++++++++++++--------------
- include/linux/regulator/driver.h |  8 +++++++
- 2 files changed, 40 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/regulator/helpers.c b/drivers/regulator/helpers.c
-index e221a27..cbc3909 100644
---- a/drivers/regulator/helpers.c
-+++ b/drivers/regulator/helpers.c
-@@ -37,10 +37,17 @@ int regulator_is_enabled_regmap(struct regulator_dev *rdev)
- 	if (ret != 0)
- 		return ret;
- 
--	if (rdev->desc->enable_is_inverted)
--		return (val & rdev->desc->enable_mask) == 0;
--	else
--		return (val & rdev->desc->enable_mask) != 0;
-+	val &= rdev->desc->enable_mask;
-+
-+	if (rdev->desc->enable_is_inverted) {
-+		if (rdev->desc->enable_val)
-+			return val != rdev->desc->enable_val;
-+		return val == 0;
-+	} else {
-+		if (rdev->desc->enable_val)
-+			return val == rdev->desc->enable_val;
-+		return val != 0;
-+	}
- }
- EXPORT_SYMBOL_GPL(regulator_is_enabled_regmap);
- 
-@@ -57,10 +64,13 @@ int regulator_enable_regmap(struct regulator_dev *rdev)
- {
- 	unsigned int val;
- 
--	if (rdev->desc->enable_is_inverted)
--		val = 0;
--	else
--		val = rdev->desc->enable_mask;
-+	if (rdev->desc->enable_is_inverted) {
-+		val = rdev->desc->disable_val;
-+	} else {
-+		val = rdev->desc->enable_val;
-+		if (!val)
-+			val = rdev->desc->enable_mask;
-+	}
- 
- 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
- 				  rdev->desc->enable_mask, val);
-@@ -80,10 +90,13 @@ int regulator_disable_regmap(struct regulator_dev *rdev)
- {
- 	unsigned int val;
- 
--	if (rdev->desc->enable_is_inverted)
--		val = rdev->desc->enable_mask;
--	else
--		val = 0;
-+	if (rdev->desc->enable_is_inverted) {
-+		val = rdev->desc->enable_val;
-+		if (!val)
-+			val = rdev->desc->enable_mask;
-+	} else {
-+		val = rdev->desc->disable_val;
-+	}
- 
- 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
- 				  rdev->desc->enable_mask, val);
-@@ -419,10 +432,13 @@ int regulator_set_bypass_regmap(struct regulator_dev *rdev, bool enable)
- {
- 	unsigned int val;
- 
--	if (enable)
--		val = rdev->desc->bypass_mask;
--	else
--		val = 0;
-+	if (enable) {
-+		val = rdev->desc->bypass_val_on;
-+		if (!val)
-+			val = rdev->desc->bypass_mask;
-+	} else {
-+		val = rdev->desc->bypass_val_off;
-+	}
- 
- 	return regmap_update_bits(rdev->regmap, rdev->desc->bypass_reg,
- 				  rdev->desc->bypass_mask, val);
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index 9370e65..bbe03a1 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -228,10 +228,14 @@ enum regulator_type {
-  *                output when using regulator_set_voltage_sel_regmap
-  * @enable_reg: Register for control when using regmap enable/disable ops
-  * @enable_mask: Mask for control when using regmap enable/disable ops
-+ * @enable_val: Enabling value for control when using regmap enable/disable ops
-+ * @disable_val: Disabling value for control when using regmap enable/disable ops
-  * @enable_is_inverted: A flag to indicate set enable_mask bits to disable
-  *                      when using regulator_enable_regmap and friends APIs.
-  * @bypass_reg: Register for control when using regmap set_bypass
-  * @bypass_mask: Mask for control when using regmap set_bypass
-+ * @bypass_val_on: Enabling value for control when using regmap set_bypass
-+ * @bypass_val_off: Disabling value for control when using regmap set_bypass
-  *
-  * @enable_time: Time taken for initial enable of regulator (in uS).
-  */
-@@ -263,9 +267,13 @@ struct regulator_desc {
- 	unsigned int apply_bit;
- 	unsigned int enable_reg;
- 	unsigned int enable_mask;
-+	unsigned int enable_val;
-+	unsigned int disable_val;
- 	bool enable_is_inverted;
- 	unsigned int bypass_reg;
- 	unsigned int bypass_mask;
-+	unsigned int bypass_val_on;
-+	unsigned int bypass_val_off;
- 
- 	unsigned int enable_time;
- };
 -- 
-1.8.3.2
+1.9.0
