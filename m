@@ -1,229 +1,80 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 05 Mar 2014 15:25:33 +0100
-Subject: [PATCH v5 01/11] staging: imx-drm-core: Use OF graph to find
- components and connections between encoder and crtcs
-In-Reply-To: <20140305100516.GV21483@n2100.arm.linux.org.uk>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <1394011262-16849-2-git-send-email-p.zabel@pengutronix.de>
- <20140305100516.GV21483@n2100.arm.linux.org.uk>
-Message-ID: <1394029533.8754.21.camel@paszta.hi.pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 5 Mar 2014 15:42:34 +0100 (CET)
+Subject: [PATCH] Revert "irqchip: irq-dove: Add PMU interrupt controller."
+In-Reply-To: <20140305004139.GT21483@n2100.arm.linux.org.uk>
+References: <20140304030838.GA1872@titan.lakedaemon.net>
+ <1393911160-7688-1-git-send-email-jason@lakedaemon.net>
+ <20140305004139.GT21483@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1403051445020.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 05.03.2014, 10:05 +0000 schrieb Russell King - ARM
-Linux:
-> On Wed, Mar 05, 2014 at 10:20:52AM +0100, Philipp Zabel wrote:
-> > +struct imx_drm_component {
-> > +	struct device_node *of_node;
-> > +	struct list_head list;
-> > +};
-> > +
+On Wed, 5 Mar 2014, Russell King - ARM Linux wrote:
+> In some ways, this is good news - it shows that the bits in this register
+> latch '1' when an interrupt is pending, and remain '1' while the block
+> continues to assert its interrupt signal - but can we say that the other
+> interrupt functions in this register have that behaviour?
 > 
-> The only thing this structure appears to be doing is ensuring that a
-> single component doesn't get added twice - is that correct? 
-
-I also think of it as an optimization. Now we scan the whole device
-graph once in the probe function into a list of needed components that
-can be walked quickly every time master_ops' .add_components callback is
-run, instead of having to walk the device tree graph over and over.
-
-Functionally, it only protects against duplicate addition.
-
-> If so, (and the troublesome problem with the IPU crtcs is now gone)
-> we can modify the core component code such that it does this:
+> >From the spec, it looks like this is probably true of DFSDone as well.
+> DVSDone - I see no separate status register containing status bits
+> indicating what the cause of the DVSDone status is.  The thermal bits -
+> if it's a transitory excursion, may not hold.  Battery fault... we
+> can guess.
 > 
->                 if (c->master && c->master != master)
->                         continue;
+> Now, genirq doesn't have a good way to handle this.  I'll also say that
+> because of the above, I've always been worried about hardware races when
+> trying to clear down interrupts in this register - I'd much prefer not
+> to touch it unless absolutely necessary.  So... how about this instead?
 > 
->                 if (compare(c->dev, compare_data)) {
-> 			if (!c->master)
-> 	                        component_attach_master(master, c);
->                         ret = 0;
->                         break;
->                 }
+>         u32 stat = readl_relaxed(gc->reg_base + DOVE_PMC_IRQ_CAUSE) &
+>                    gc->mask_cache;
+> 	u32 done = ~0;
 > 
-> which will mean that you don't need to build this list anymore to track
-> what will be added - though I'd like to think a little more about that
-> before making that change.  Please confirm whether this will eliminate
-> your list generation.
+> 	while (stat) {
+> 		unsigned hwirq = ffs(stat) - 1;
+> 
+> 		stat &= ~(1 << hwirq);
+> 		done &= ~(1 << hwirq);
+> 
+> 		generic_handle_irq(irq_find_mapping(domain, hwirq));
+> 	}
+> 
+> 	irq_gc_lock(gc);
+> 	done &= readl_relaxed(gc->reg_base + DOVE_PMC_IRQ_CAUSE);
+> 	writel_relaxed(done, gc->reg_base + DOVE_PMC_IRQ_CAUSE);
+> 	irq_gc_unlock(gc);
+> 
+> This results in the RTC alarm test receiving exactly one interrupt for
+> each alarm expiry, as it should do.  Thoughts?
 
-Yes, I can confirm that with this change, I can remove the list, like
-this (tested on i.MX6S with a single LVDS panel):
+You are worried about clearing an interrupt which is transitory and
+not kept active at the device level until you handled it for real,
+right?
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c
-b/drivers/staging/imx-drm/imx-drm-core.c
-index 014e546..f6135b9 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -32,11 +32,6 @@
- 
- struct imx_drm_crtc;
- 
--struct imx_drm_component {
--	struct device_node *of_node;
--	struct list_head list;
--};
--
- struct imx_drm_device {
- 	struct drm_device			*drm;
- 	struct imx_drm_crtc			*crtc[MAX_CRTC];
-@@ -587,72 +582,10 @@ static int compare_of(struct device *dev, void
-*data)
- 	return dev->of_node == np;
- }
- 
--static LIST_HEAD(imx_drm_components);
--
- static int imx_drm_add_components(struct device *master, struct master
-*m)
- {
--	struct imx_drm_component *component;
--	int ret;
--
--	list_for_each_entry(component, &imx_drm_components, list) {
--		ret = component_master_add_child(m, compare_of,
--						 component->of_node);
--		if (ret)
--			return ret;
--	}
--	return 0;
--}
--
--static int imx_drm_bind(struct device *dev)
--{
--	return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
--}
--
--static void imx_drm_unbind(struct device *dev)
--{
--	drm_put_dev(dev_get_drvdata(dev));
--}
--
--static const struct component_master_ops imx_drm_ops = {
--	.add_components = imx_drm_add_components,
--	.bind = imx_drm_bind,
--	.unbind = imx_drm_unbind,
--};
--
--static struct imx_drm_component *imx_drm_find_component(struct device
-*dev,
--		struct device_node *node)
--{
--	struct imx_drm_component *component;
--
--	list_for_each_entry(component, &imx_drm_components, list)
--		if (component->of_node == node)
--			return component;
--
--	return NULL;
--}
--
--static int imx_drm_add_component(struct device *dev, struct device_node
-*node)
--{
--	struct imx_drm_component *component;
--
--	if (imx_drm_find_component(dev, node))
--		return 0;
--
--	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
--	if (!component)
--		return -ENOMEM;
--
--	component->of_node = node;
--	list_add_tail(&component->list, &imx_drm_components);
--
--	return 0;
--}
--
--static int imx_drm_platform_probe(struct platform_device *pdev)
--{
- 	struct device_node *ep, *port, *remote;
--	int ret;
--	int i;
-+	int i, ret;
- 
- 	/*
- 	 * Bind the IPU display interface ports first, so that
-@@ -660,23 +593,18 @@ static int imx_drm_platform_probe(struct
-platform_device *pdev)
- 	 * works as expected.
- 	 */
- 	for (i = 0; ; i++) {
--		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
-+		port = of_parse_phandle(master->of_node, "ports", i);
- 		if (!port)
- 			break;
- 
--		ret = imx_drm_add_component(&pdev->dev, port);
--		if (ret < 0)
-+		ret = component_master_add_child(m, compare_of, port);
-+		if (ret)
- 			return ret;
- 	}
- 
--	if (i == 0) {
--		dev_err(&pdev->dev, "missing 'ports' property\n");
--		return -ENODEV;
--	}
--
- 	/* Then bind all encoders */
- 	for (i = 0; ; i++) {
--		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
-+		port = of_parse_phandle(master->of_node, "ports", i);
- 		if (!port)
- 			break;
- 
-@@ -687,14 +615,44 @@ static int imx_drm_platform_probe(struct
-platform_device *pdev)
- 				continue;
- 			}
- 
--			ret = imx_drm_add_component(&pdev->dev, remote);
-+			ret = component_master_add_child(m, compare_of, remote);
- 			of_node_put(remote);
--			if (ret < 0)
-+			if (ret)
- 				return ret;
- 		}
- 		of_node_put(port);
- 	}
- 
-+	return 0;
-+}
-+
-+static int imx_drm_bind(struct device *dev)
-+{
-+	return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
-+}
-+
-+static void imx_drm_unbind(struct device *dev)
-+{
-+	drm_put_dev(dev_get_drvdata(dev));
-+}
-+
-+static const struct component_master_ops imx_drm_ops = {
-+	.add_components = imx_drm_add_components,
-+	.bind = imx_drm_bind,
-+	.unbind = imx_drm_unbind,
-+};
-+
-+static int imx_drm_platform_probe(struct platform_device *pdev)
-+{
-+	struct device_node *port;
-+	int ret;
-+
-+	port = of_parse_phandle(pdev->dev.of_node, "ports", 0);
-+	if (!port) {
-+		dev_err(&pdev->dev, "missing 'ports' property\n");
-+		return -ENODEV;
-+	}
-+
- 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
- 		return ret;
--- 
-1.9.0
+Is the datasheet for this stuff public available?
 
-regards
-Philipp
+> Another question: ffs(stat) - any reason to use ffs() there rather than
+> fls(stat) which would result in simpler code?  r1 = ffs(r4 = stat) creates:
+> 
+>  198:   e2641000        rsb     r1, r4, #0
+>  19c:   e1a00006        mov     r0, r6
+>  1a0:   e0011004        and     r1, r1, r4
+>  1a4:   e16f1f11        clz     r1, r1
+>  1a8:   e261101f        rsb     r1, r1, #31
+> 
+> whereas fls(stat):
+> 
+>  198:   e16f1f14        clz     r1, r4
+>  19c:   e261101f        rsb     r1, r1, #31
+>  1a0:   e1a00006        mov     r0, r6
+> 
+> Kind of a micro-optimisation, but I see no reason to prefer one over the
+> other except for this - and I think the switch to ffs() was made in the
+> hope of optimising this code!
+
+I don't think it matters in which order you process multiple pending
+interrupts.
+
+Thanks,
+
+	tglx
