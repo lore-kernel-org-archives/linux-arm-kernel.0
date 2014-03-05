@@ -1,44 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Mar 2014 23:31:35 +0000
-Subject: [PATCH v6 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-In-Reply-To: <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
-References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
- <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140305233135.GZ21483@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 6 Mar 2014 08:48:17 +0900
+Subject: [PATCH] iommu/exynos: Remove driver
+In-Reply-To: <001301cf291a$233fdc70$69bf9550$@samsung.com>
+References: <1391716317-20300-1-git-send-email-olof@lixom.net>
+ <CAAQKjZMo6=dtur6NfvDY9=jVF=7VxHub=isnEwPw0+RKCq6xAg@mail.gmail.com>
+ <CAH9JG2Xoz1_Y7CV6FUiGAO9o5T7jtFUYqJpcAysLttwu4527zQ@mail.gmail.com>
+ <52F4E481.3050902@samsung.com>
+ <CAL5jtJmfwajFD0cnYt6gOfFsZ5hGbFi=5kv8g4x23fY6qGBOew@mail.gmail.com>
+ <CAOesGMhH2WHvkaobewdnPeiThrWTfw0m4WWAZW98-iS2xdr+ow@mail.gmail.com>
+ <001301cf291a$233fdc70$69bf9550$@samsung.com>
+Message-ID: <CAH9JG2WtV7HeJmjGDaNfHVbZiKG5aDznqxK+AYaTzK_bCud-TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 11:49:08AM +0000, Liviu Dudau wrote:
-> The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
-> is wrong. It returns a mapped (i.e. virtual) address that can start from
-> zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
-> architectures that use !CONFIG_GENERIC_MAP define.
+On Fri, Feb 14, 2014 at 9:17 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>> -----Original Message-----
+>> From: Olof Johansson [mailto:olof at lixom.net]
+>> Sent: Friday, February 14, 2014 4:34 AM
+>>
+>> On Mon, Feb 10, 2014 at 10:21 PM, Kukjin Kim <kgene.kim@gmail.com> wrote:
+>>
+>> > Just adding KyongHo Cho.
+>> >
+>> > If he can fixup for this time, it would be best solution because he knows
+>> > well than others, I think.
+>>
+>> It's not so much a matter of "fixup for this time", it's a about
+>> having ownership of the driver, making sure it works (and keeps
+>> working if there is related development). The posted patches have not
+>> been followed through on and the result is a broken driver. :(
+>>
+>> I definitely appreciate his expertise, and we should make sure that he
+>> gets to review the code, but if someone else is able to spend time on
+>> reworking the driver (or rewriting a newer one) and maintaining it
+>> longer-term, then we should not stop them from doing so. And there is
+>> no reason to keep broken stale code in the kernel meanwhile.
+>>
+>
+> Thank you for your concerning.
+> I also definitely agree with you that the driver must work.
+> I am always concerning about it but it was not easy to make some time
+> for the patches.
+>
+> I will continue to post the next version of patches, of course.
+> I think it is not far from now to show it.
 
-What value does PCI_IOBASE and IO_SPACE_LIMIT have on other architectures
-who make use of asm-generic/io.h ?
+Lots of time is going from last reply. there are two options.
+1. just waiting more
+2. remove it as patch and start it again by someone.
 
-$ git grep asm-generic/io.h arch/
-arch/arc/include/asm/io.h:#include <asm-generic/io.h>
-arch/blackfin/include/asm/io.h:#include <asm-generic/io.h>
-arch/metag/include/asm/io.h:#include <asm-generic/io.h>
-arch/microblaze/include/asm/io.h:/* from asm-generic/io.h */
-arch/openrisc/include/asm/io.h:#include <asm-generic/io.h>
-arch/s390/include/asm/io.h:#include <asm-generic/io.h>
-arch/score/include/asm/io.h:#include <asm-generic/io.h>
-arch/unicore32/include/asm/io.h:#include <asm-generic/io.h>
-arch/xtensa/include/asm/io.h:#include <asm-generic/io.h>
-$ arch/arc/include/asm/io.h:#define PCI_IOBASE ((void __iomem *)0)
-arch/arm64/include/asm/io.h:#define PCI_IOBASE          ((void __iomem *)(MODULES_VADDR - SZ_2M))
-arch/arm64/include/asm/io.h:    return readb(addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:    return readw(addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:    return readl(addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:    writeb(b, addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:    writew(b, addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:    writel(b, addr + PCI_IOBASE);
-arch/arm64/include/asm/io.h:            *buf++ = __raw_readb(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            *buf++ = __raw_readw(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            *buf++ = __raw_readl(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writeb(*buf++, addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writew(*buf++, addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writel(*buf++, addr + PCI_IOBASE);arch/unicore32/include/asm/io.h:#define PCI_IOBASE      PKUNITY_PCILIO_BASE
-arch/unicore32/include/asm/io.h:#define PIO_OFFSET              (unsigned int)(PCI_IOBASE)
+what's the opinions?
 
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thank you,
+Kyungmin Park
