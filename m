@@ -1,89 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Mar 2014 19:42:28 +0800
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabresd.dtsi: Add red led
-In-Reply-To: <1394007383-21874-1-git-send-email-vincent.stehle@freescale.com>
-References: <20140305062216.GI8784@S2101-09.ap.freescale.net>
- <1394007383-21874-1-git-send-email-vincent.stehle@freescale.com>
-Message-ID: <20140305114223.GN8784@S2101-09.ap.freescale.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 05 Mar 2014 12:47:14 +0100
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <CAPDyKFqK1JqxeJ_L_bzduixRLGA5m_FFPq_of2r6y0aCpS7z9A@mail.gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>	<1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+ <CAPDyKFqK1JqxeJ_L_bzduixRLGA5m_FFPq_of2r6y0aCpS7z9A@mail.gmail.com>
+Message-ID: <53170EC2.6090908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 09:16:23AM +0100, Vincent Stehl? wrote:
-> Make the red gpio led available to the user.
-> 
-> This can be toggled with the sysfs for example, or used as a heartbeat or mmc
-> activity light by changing the trigger.
-> 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> 
-> ---
-> 
-> Hi Shawn,
-> 
-> Thanks for your feedback.
-> 
-> If you don't want to make the led a heartbeat by default, here is v2 of the
-> patch, which only makes the led available to the user. One is then free to use
-> it as a heartbeat, or something else. Do you prefer it this way?
-> 
-> Best regards,
-> 
-> V.
-> 
-> 
-> Changes since v1:
-> - Do not make it a heartbeat by default.
-> 
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index e75e11b..210a8df 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -88,6 +88,16 @@
->  		default-brightness-level = <7>;
->  		status = "okay";
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		red {
-> +		        gpios = <&gpio1 2 0>;
-> +		        linux,default-trigger = "none";
+Hi Ulf,
 
-Per Documentation/devicetree/bindings/leds/common.txt, 'none' is not a
-valid value of property 'linux,default-trigger'.  I suggest you simply
-drop the property.
+On 05.03.2014 08:19, Ulf Hansson wrote:
+>> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>>          list_add(&genpd->gpd_list_node, &gpd_list);
+>>          mutex_unlock(&gpd_list_lock);
+>>   }
+>> +
+>> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+>
+> Do we need a new config for this? Can't we just use CONFIG_OF?
+>
 
-> +		        default-state = "on";
-> +		};
-> +	};
->  };
->  
->  &audmux {
-> @@ -182,6 +192,7 @@
->  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
->  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
->  				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+I guess we could, but initially it would have to be CONFIG_OF && 
+!CONFIG_ARCH_EXYNOS until patch 03/11 converts Exynos to use the common 
+code.
 
-It's not a hog pin, so shouldn't be added here.  (Right, most of the
-existing pins shouldn't be here from the beginning)
+>> +       if (ret < 0) {
+>> +               dev_err(dev, "failed to add to power domain %s: %d",
+>> +                       pd->name, ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       pm_genpd_dev_need_restore(dev, true);
+>
+> So this will reflect the device as being inactive, which I think is
+> the wrong approach.
+>
+> Usually we should expect drivers that's being probed successfully to
+> leave their devices in active state, right?
 
-The patch from Liu Ying [1] could be a good example on this regard.
+It depends on domain power state, but actually it seems to be already 
+handled in __pm_genpd_add_device(), so this line might be not needed indeed.
 
-Shawn
+Strangely enough, it seemed to be needed on Exynos for correct 
+operation, but maybe in the meantime some fixes in genpd code showed up. 
+This will need some extra testing.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg308999.html
-
->  			>;
->  		};
->  	};
-> -- 
-> 1.9.0
-> 
-> 
+Best regards,
+Tomasz
