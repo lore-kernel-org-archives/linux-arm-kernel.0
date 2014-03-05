@@ -1,16 +1,16 @@
 From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Wed, 5 Mar 2014 09:49:26 -0800
+Date: Wed, 5 Mar 2014 09:51:11 -0800
 Subject: [PATCH v5 0/7] [RFC] Support for creating generic host_bridge
  from device tree
-In-Reply-To: <20140305114054.GG1692@e106497-lin.cambridge.arm.com>
+In-Reply-To: <20140305081800.GD1692@e106497-lin.cambridge.arm.com>
 References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
  <CACoXjcmmbVsmvy46NhjFoBg8mRO=APiY3dZZY=ra-Ceib9Sr4A@mail.gmail.com>
- <20140305114054.GG1692@e106497-lin.cambridge.arm.com>
-Message-ID: <CACoXjcmZQuuOW3b6BwWSWPRL7JBCQ9HMWMfXjhCy3tTi+-HV3A@mail.gmail.com>
+ <20140305081800.GD1692@e106497-lin.cambridge.arm.com>
+Message-ID: <CACoXjcnCeWzwa6mA-+xU1B5PnQjtf6OZMUbOPKp2HjvxZnDfYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 3:40 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+On Wed, Mar 5, 2014 at 12:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
 > On Wed, Mar 05, 2014 at 01:53:55AM +0000, Tanmay Inamdar wrote:
 >> Hello,
 >>
@@ -88,12 +88,16 @@ On Wed, Mar 5, 2014 at 3:40 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
 >> This series is working fine on X-Gene with multiple PCIe ports. You
 >> can add my Tested-by if you want.
 >
-> What about the arm64 series, can I add a Tested-by to that one as well?
+> Cheers! Any ETA on your updated patches?
 
-Sure.
+I will apply your V6 and generate mine on top of them. I will send my
+X-Gene patches out today.
 
 >
-> Thanks,
+> I might get the required signatures on the legal approval next week and
+> then I will publish my host controller driver.
+>
+> Best regards,
 > Liviu
 >
 >>
