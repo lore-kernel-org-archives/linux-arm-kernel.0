@@ -1,88 +1,40 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 5 Mar 2014 03:17:00 +0100
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM
-In-Reply-To: <20140304110042.GD8766@mudshark.cambridge.arm.com>
-References: <1393840403-26639-1-git-send-email-jean.pihet@linaro.org>
- <1393840403-26639-2-git-send-email-jean.pihet@linaro.org>
- <20140304110042.GD8766@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1=3+zZPErXC7dehwpKHnmwE=cWh1mR0kzN0PONpFZKaUw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 04 Mar 2014 19:18:30 -0700
+Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
+In-Reply-To: <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
+References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>	<1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>	<530D218E.9010007@wwwdotorg.org>
+ <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
+Message-ID: <53168976.7000008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 4 March 2014 12:00, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
-> On Mon, Mar 03, 2014 at 09:53:21AM +0000, Jean Pihet wrote:
->> Introducing perf_regs_load function, which is going
->> to be used for dwarf unwind test in following patches.
+On 03/04/2014 06:43 PM, Linus Walleij wrote:
+> On Wed, Feb 26, 2014 at 7:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> 
+>>> -     gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
+>>> +     gpio = devm_gpiod_get_index(&pdev->dev, NULL, 0);
 >>
->> It takes single argument as a pointer to the regs dump
->> buffer and populates it with current registers values.
->
-> [...]
->
->> diff --git a/tools/perf/arch/arm/tests/regs_load.S b/tools/perf/arch/arm/tests/regs_load.S
->> new file mode 100644
->> index 0000000..241c6df
->> --- /dev/null
->> +++ b/tools/perf/arch/arm/tests/regs_load.S
->> @@ -0,0 +1,51 @@
->> +#include <linux/linkage.h>
->> +
->> +#define R0 0x00
->> +#define R1 0x08
->
-> Why are you using a 64-bit stride for 32-bit registers? (which prevents you
-> from using stm later on).
-This is because perf internally uses a 64-bit array for the registers,
-cf. the function prototype in the comment above.
+>> I think the correct fix here is to look up the GPIO by name rather than
+>> by index, but simply hard-code the name rather than generating it with
+>> sprintf(). Index lookups are hard to expand compatibly, but named-based
+>> lookups scale much better.
+>>
+>> In other words, I rather specifically disagree with using a plain
+>> "gpios" property in any future DT binding, but would strongly prefer
+>> e.g. reset-gpios/shutdown-gpios or gpios/gpio-names.
+> 
+> If I understand the situation correctly it's like ACPI does not have named
+> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
+> to the work of abstracting the access to GPIO handlers so that drivers
+> need not know whether ACPI or DT is used for describing the hardware.
 
->
->> +.text
->> +.type perf_regs_load,%function
->> +ENTRY(perf_regs_load)
->> +     push {r1}
->
-> Do you only push r1 here so that you can do the stack arithmetic later? That
-> doesn't make sense to me -- can't you str sp directly?
-Yes indeed! I submitted a new version yesterday with that change and a
-fix in the comments.
+For devices that already have both ACPI and DT bindings, we can't
+pretend they can be the same; they are already potentially different. We
+simply need to parse DT and ACPI differently, since that's the sway
+their bindings are defined.
 
->
->> +     str r0, [r0, #R0]
->> +     str r1, [r0, #R1]
->> +     str r2, [r0, #R2]
->> +     str r3, [r0, #R3]
->> +     str r4, [r0, #R4]
->> +     str r5, [r0, #R5]
->> +     str r6, [r0, #R6]
->> +     str r7, [r0, #R7]
->> +     str r8, [r0, #R8]
->> +     str r9, [r0, #R9]
->> +     str sl, [r0, #SL]
->> +     str fp, [r0, #FP]
->> +     str ip, [r0, #IP]
->> +     add r1, sp, #4          @ Retrieve and save sp at entry time
->> +     str r1, [r0, #SP]
->> +     str lr, [r0, #LR]
->> +     str lr, [r0, #PC]       @ Save caller PC
->
-> This isn't necessarily the `caller PC' (depending on how you define it).
-> It's the return address, which is probably (but not always) the instruction
-> following the branch to this function.
-Agreed. However the perf test code expects a registers buffer filled
-in with the caller's values.
-I can change the comment here, is that needed?
+For any devices that don't have both ACPI and DT bindings, I agree we
+should certainly strive to make any new bindings aligned so we don't
+have to deal with this for them.
 
-Thanks for reviewing!
-Jean
-
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+However, we can't change the past.
