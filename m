@@ -1,35 +1,71 @@
 From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Wed, 5 Mar 2014 08:53:11 +0100
-Subject: [PATCH 0/2]: ixp4xx: Fix 3.7 regression for IXP4xx ethernet driver
-Message-ID: <20140305085311.07b3922a@marrow.netinsight.se>
+Date: Wed, 5 Mar 2014 08:55:42 +0100
+Subject: [PATCH 1/2] ARM: ixp4xx: Make dma_set_coherent_mask common, correct
+ implementation
+In-Reply-To: <20140305085311.07b3922a@marrow.netinsight.se>
+References: <20140305085311.07b3922a@marrow.netinsight.se>
+Message-ID: <20140305085542.078aca8f@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Non-PCI devices can use the entire 32-bit range, PCI dittos are
+limited to the first 64MiB.
 
-These two patches fixes the regression introduced in 3.7 by commit
-1a4901177574083c35fafc24c4d151c2a7c7647c,
+Also actually setup coherent_dma_mask.
 
-  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+---
+ arch/arm/mach-ixp4xx/common-pci.c |    8 --------
+ arch/arm/mach-ixp4xx/common.c     |   11 +++++++++++
+ 2 files changed, 11 insertions(+), 8 deletions(-)
 
-The patch above is not incorrect itself, but causes the driver to fail
-with
-
-  [   33.055473] net eth1: coherent DMA mask is unset
-  [   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
-
-The two patches fix this by generalizing and correcting the ixp4xx
-dma_set_coherent_mask(), which earlier only dealt with the PCI case.
-The second patch simply sets up the mask for the ixp4xx ethernet device.
-
-
-The patches have been verified on a board with 256MiB memory, one
-ipx4xx_eth device and a e100 PCI device, running Linus' tip.
-
-
-This issue has been discussed before:
-
-   https://lkml.org/lkml/2014/1/2/46
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148811.html
-
-// Simon
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index 200970d..b02c764 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -481,14 +481,6 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-int dma_set_coherent_mask(struct device *dev, u64 mask)
+-{
+-	if (mask >= SZ_64M - 1)
+-		return 0;
+-
+-	return -EIO;
+-}
+-
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+ EXPORT_SYMBOL(dma_set_coherent_mask);
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 6d68aed..b221c78 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -31,6 +31,7 @@
+ #include <linux/gpio.h>
+ #include <linux/cpu.h>
+ #include <linux/sched_clock.h>
++#include <linux/pci.h>
+ 
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+@@ -578,6 +579,16 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
+ 	}
+ }
+ 
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (dev_is_pci(dev) && mask >= SZ_64M)
++		return -EIO;
++
++	dev->coherent_dma_mask = mask;
++
++	return 0;
++}
++
+ #ifdef CONFIG_IXP4XX_INDIRECT_PCI
+ /*
+  * In the case of using indirect PCI, we simply return the actual PCI
+-- 
+1.7.9.6
