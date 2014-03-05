@@ -1,36 +1,213 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 5 Mar 2014 01:27:23 +0100 (CET)
-Subject: [PATCH] irq-gic: remove file name from heading comment
-In-Reply-To: <53166B67.2060804@cogentembedded.com>
-References: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
- <52D5CCFB.1090205@cogentembedded.com> <53166B67.2060804@cogentembedded.com>
-Message-ID: <alpine.DEB.2.02.1403050112180.18573@ionos.tec.linutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  4 Mar 2014 16:40:30 -0800
+Subject: [PATCH] irqchip: Remove asmlinkage from static functions
+In-Reply-To: <20140301161258.GN12219@tassilo.jf.intel.com>
+References: <20140301161258.GN12219@tassilo.jf.intel.com>
+Message-ID: <1393980030-17770-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Mar 2014, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 01/15/2014 02:49 AM, Sergei Shtylyov wrote:
-> 
-> > > File names in the heading comments  fell out of favor long ago, and this
-> > > one
-> > > weren't even changed when the driver was moved from arch/arm/common/, so
-> > > remove
-> > > it at last...
-> 
-> > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> > > ---
-> > > The patch is against the 'irq/core' branch of the 'tip.git' repo.
-> 
-> >     Thomas, is there a chance that you merge this patch for 3.14? Is it even
-> > the right branch for cleanups (I'm seeing fixes there)?
-> 
->    Thomas, will you ever reply to me? Who's maintaining the GIC driver, you?
-> Or the patches shoud just go in via arm-soc.git?
+LTO patches add __visible to the asmlinkage define, causing
+compilation warnings like:
 
-That patch is so important^Wtrivial that it really can go via the
-obvious trivial at kernel.org
+  drivers/irqchip/irq-gic.c:283:1: warning: 'externally_visible'
+  attribute have effect only on public objects [-Wattributes]
 
-Sigh....
+Drop asmlinkage here to avoid such warnings.
+
+Reported-by: Olof's autobuilder <build@lixom.net>
+Cc: Andi Kleen <ak@linux.intel.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Based on next-20140226.
+
+ drivers/irqchip/irq-armada-370-xp.c | 2 +-
+ drivers/irqchip/irq-bcm2835.c       | 4 ++--
+ drivers/irqchip/irq-gic.c           | 2 +-
+ drivers/irqchip/irq-mmp.c           | 6 ++----
+ drivers/irqchip/irq-moxart.c        | 2 +-
+ drivers/irqchip/irq-orion.c         | 2 +-
+ drivers/irqchip/irq-sirfsoc.c       | 2 +-
+ drivers/irqchip/irq-sun4i.c         | 4 ++--
+ drivers/irqchip/irq-vic.c           | 2 +-
+ drivers/irqchip/irq-vt8500.c        | 3 +--
+ drivers/irqchip/irq-zevio.c         | 2 +-
+ 11 files changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index cd79503abea9..41be897df8d5 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -410,7 +410,7 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static asmlinkage void __exception_irq_entry
++static void __exception_irq_entry
+ armada_370_xp_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat, irqnr;
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index 1693b8e7f26a..5916d6cdafa1 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -95,7 +95,7 @@ struct armctrl_ic {
+ };
+ 
+ static struct armctrl_ic intc __read_mostly;
+-static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
++static void __exception_irq_entry bcm2835_handle_irq(
+ 	struct pt_regs *regs);
+ 
+ static void armctrl_mask_irq(struct irq_data *d)
+@@ -196,7 +196,7 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
+ 	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
+ }
+ 
+-static asmlinkage void __exception_irq_entry bcm2835_handle_irq(
++static void __exception_irq_entry bcm2835_handle_irq(
+ 	struct pt_regs *regs)
+ {
+ 	u32 stat, irq;
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index a917b144895e..63922b9ba6b7 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -279,7 +279,7 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
+ #define gic_set_wake	NULL
+ #endif
+ 
+-static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat, irqnr;
+ 	struct gic_chip_data *gic = &gic_data[0];
+diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
+index 2cb7cd0bc2f5..3c8827fe83f3 100644
+--- a/drivers/irqchip/irq-mmp.c
++++ b/drivers/irqchip/irq-mmp.c
+@@ -194,8 +194,7 @@ static struct mmp_intc_conf mmp2_conf = {
+ 	.conf_mask	= 0x7f,
+ };
+ 
+-static asmlinkage void __exception_irq_entry
+-mmp_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry mmp_handle_irq(struct pt_regs *regs)
+ {
+ 	int irq, hwirq;
+ 
+@@ -207,8 +206,7 @@ mmp_handle_irq(struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
+ }
+ 
+-static asmlinkage void __exception_irq_entry
+-mmp2_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry mmp2_handle_irq(struct pt_regs *regs)
+ {
+ 	int irq, hwirq;
+ 
+diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
+index 5552fc2bf28a..00b3cc908f76 100644
+--- a/drivers/irqchip/irq-moxart.c
++++ b/drivers/irqchip/irq-moxart.c
+@@ -44,7 +44,7 @@ struct moxart_irq_data {
+ 
+ static struct moxart_irq_data intc;
+ 
+-static asmlinkage void __exception_irq_entry handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqstat;
+ 	int hwirq;
+diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
+index 8e41be62812e..e25f246cd2fb 100644
+--- a/drivers/irqchip/irq-orion.c
++++ b/drivers/irqchip/irq-orion.c
+@@ -30,7 +30,7 @@
+ 
+ static struct irq_domain *orion_irq_domain;
+ 
+-static asmlinkage void
++static void
+ __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
+ {
+ 	struct irq_domain_chip_generic *dgc = orion_irq_domain->gc;
+diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
+index 3a070c587ed9..581eefe331ae 100644
+--- a/drivers/irqchip/irq-sirfsoc.c
++++ b/drivers/irqchip/irq-sirfsoc.c
+@@ -47,7 +47,7 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 	ct->regs.mask = SIRFSOC_INT_RISC_MASK0;
+ }
+ 
+-static asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
+ {
+ 	void __iomem *base = sirfsoc_irqdomain->host_data;
+ 	u32 irqstat, irqnr;
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index a5438d889245..9fbff030c700 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -36,7 +36,7 @@
+ static void __iomem *sun4i_irq_base;
+ static struct irq_domain *sun4i_irq_domain;
+ 
+-static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
++static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
+ 
+ static void sun4i_irq_ack(struct irq_data *irqd)
+ {
+@@ -136,7 +136,7 @@ static int __init sun4i_of_init(struct device_node *node,
+ }
+ IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-ic", sun4i_of_init);
+ 
+-static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irq, hwirq;
+ 
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index fd2c980e4cea..37dab0b472cd 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -240,7 +240,7 @@ static void vic_handle_irq_cascaded(unsigned int irq, struct irq_desc *desc)
+  * Keep iterating over all registered VIC's until there are no pending
+  * interrupts.
+  */
+-static asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+ {
+ 	int i, handled;
+ 
+diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
+index 1846e7d66681..eb6e91efdec8 100644
+--- a/drivers/irqchip/irq-vt8500.c
++++ b/drivers/irqchip/irq-vt8500.c
+@@ -178,8 +178,7 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
+ 	.xlate = irq_domain_xlate_onecell,
+ };
+ 
+-static asmlinkage
+-void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 stat, i;
+ 	int irqnr, virq;
+diff --git a/drivers/irqchip/irq-zevio.c b/drivers/irqchip/irq-zevio.c
+index 8ed04c4a43ee..ceb3a4318f73 100644
+--- a/drivers/irqchip/irq-zevio.c
++++ b/drivers/irqchip/irq-zevio.c
+@@ -50,7 +50,7 @@ static void zevio_irq_ack(struct irq_data *irqd)
+ 	readl(gc->reg_base + regs->ack);
+ }
+ 
+-static asmlinkage void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
++static void __exception_irq_entry zevio_handle_irq(struct pt_regs *regs)
+ {
+ 	int irqnr;
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
