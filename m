@@ -1,24 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 5 Mar 2014 12:30:25 +0800
-Subject: [PATCH v2 08/11] ARM: s3c64xx: dt: Enable SoC-level power
- management
-In-Reply-To: <1393862536-9842-9-git-send-email-tomasz.figa@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
- <1393862536-9842-9-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20140305043025.GJ13126@sirena.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Mar 2014 15:36:18 +1100
+Subject: [PATCH 1/2] sched: Remove unused mc_capable() and smt_capable()
+In-Reply-To: <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20140304210621.16893.8772.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1393994178.11372.2.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 05:02:13PM +0100, Tomasz Figa wrote:
-> This patch adds call to s3c64xx_pm_init() from init_machine() callback
-> of mach-s3c64xx-dt to enable SoC-level power management features, such
-> as power domain management and sleep support.
+On Tue, 2014-03-04 at 14:07 -0700, Bjorn Helgaas wrote:
+> Remove mc_capable() and smt_capable().  Neither is used.
+> 
+> Both were added by 5c45bf279d37 ("sched: mc/smt power savings sched
+> policy").  Uses of both were removed by 8e7fbcbc22c1 ("sched: Remove stale
+> power aware scheduling remnants and dysfunctional knobs").
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Reviewed-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/7b530bb5/attachment.sig>
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
