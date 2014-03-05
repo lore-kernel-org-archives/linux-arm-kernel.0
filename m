@@ -1,43 +1,66 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Wed, 5 Mar 2014 11:07:10 +0100
-Subject: [PATCH 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <m38uspas21.fsf@t19.piap.pl>
-References: <20140305085311.07b3922a@marrow.netinsight.se>
- <20140305085549.3eb22236@marrow.netinsight.se>
- <m3d2i1atmq.fsf@t19.piap.pl>
- <20140305094330.GU21483@n2100.arm.linux.org.uk>
- <m38uspas21.fsf@t19.piap.pl>
-Message-ID: <20140305110710.0e92f4ca@marrow.netinsight.se>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 5 Mar 2014 12:12:37 +0200
+Subject: [PATCH 0/8] OMAP: OMAP3 DSS related clock patches
+In-Reply-To: <5316E1B6.4060007@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <5316E1B6.4060007@ti.com>
+Message-ID: <5316F895.30607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Mar 2014 10:55:02 +0100
-Krzysztof Ha?asa <khalasa@piap.pl> wrote:
+On 03/05/2014 10:35 AM, Tomi Valkeinen wrote:
+> Hi Tero,
+>
+> What about the dts fixes in this series? DSS DT depends on those fixes.
+> I'd like the dts fixes to be either merged for v3.14, or I can add them
+> to my DSS DT series (with acks).
 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Well, I am not a maintainer of any sort, so you are asking wrong person 
+here. I am just tossing my acks around as my approval for the patches in 
+case someone cares. :) You need to ask Benoit here (or maybe Tony.)
 
-> > If you have drivers missing this call, that's part of the problem:
-> >
-> > | For correct operation, you must interrogate the kernel in your device
-> > | probe routine to see if the DMA controller on the machine can properly
-> > | support the DMA addressing limitation your device has.
-> 
-> Well, we already know it can. Actually, the DMA controller is a part of
-> the CPU + RAM controller chip :-)
-> 
-> But I guess with this new wording it's something the drivers can use.
+-Tero
 
-With that wording, I would say these two patches should be applicable:
-The first corrects dma_set_coherent_mask() to actually setup the
-coherent_dma_mask (and make it applicable outside of the PCI domain)
-and the second sets it up in the driver, as per
-
-> > | support the DMA addressing limitation your device has.  It is good
-> > | style to do this even if your device holds the default setting,
-> > | because this shows that you did think about these issues wrt. your
-> > | device.
-
-Without these patches (or Krzysztofs patch), the ixp4xx platform is
-broken for many common configurations.
-
-// Simon
+>
+>   Tomi
+>
+> On 13/02/14 12:03, Tomi Valkeinen wrote:
+>> Hi,
+>>
+>> I've been debugging OMAP3 related issues with DSS clocks, and I hopefully have
+>> them all fixed with this series. This fixes the problems for both non-DT boot,
+>> but also for DT boot with DSS DT support (which is not merged yet).
+>>
+>> The non-DT boot related fixes should be merged for 3.14, but I'd like the DT
+>> boot related fixes to be merged for 3.14 also, as that'll make handling the DSS
+>> DT support easier.
+>>
+>> This is based on v3.14-rc2.
+>>
+>>   Tomi
+>>
+>> Tomi Valkeinen (8):
+>>    clk: divider: fix rate calculation for fractional rates
+>>    clk: ti/divider: fix rate calculation for fractional rates
+>>    ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+>>    ARM: dts: fix omap3 dss clock handle names
+>>    ARM: dts: fix DPLL4 x2 clkouts on 3630
+>>    ARM: dts: use ti,fixed-factor-clock for dpll4_m4x2_mul_ck
+>>    ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
+>>    OMAPDSS: fix rounding when calculating fclk rate
+>>
+>>   arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  6 +--
+>>   .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  6 +--
+>>   arch/arm/boot/dts/omap36xx-clocks.dtsi             | 20 +++++++
+>>   arch/arm/boot/dts/omap36xx.dtsi                    |  2 +-
+>>   arch/arm/boot/dts/omap3xxx-clocks.dtsi             |  8 +--
+>>   arch/arm/mach-omap2/cclock3xxx_data.c              |  2 +
+>>   arch/arm/mach-omap2/dpll3xxx.c                     | 62 ++++++++++++++++++++++
+>>   drivers/clk/clk-divider.c                          | 10 ++--
+>>   drivers/clk/ti/divider.c                           |  8 +--
+>>   drivers/video/omap2/dss/dss.c                      |  4 +-
+>>   include/linux/clk/ti.h                             |  4 ++
+>>   11 files changed, 111 insertions(+), 21 deletions(-)
+>>
+>
+>
