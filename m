@@ -1,52 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 5 Mar 2014 12:48:43 +0100
-Subject: [PATCH] ARM: i.MX: mx21ads: Replace direct handling of
- peripheral bits with GPIOs
-In-Reply-To: <20140305070147.GL8784@S2101-09.ap.freescale.net>
-References: <1393871864-25223-1-git-send-email-shc_work@mail.ru>
- <20140305055634.GG8784@S2101-09.ap.freescale.net>
- <1394002407.236079875@f309.i.mail.ru>
- <20140305070147.GL8784@S2101-09.ap.freescale.net>
-Message-ID: <20140305114843.GT17250@pengutronix.de>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed,  5 Mar 2014 11:48:56 +0000
+Subject: [PATCH v6 5/6] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1394020137-1830-6-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 03:01:49PM +0800, Shawn Guo wrote:
-> On Wed, Mar 05, 2014 at 10:53:27AM +0400, Alexander Shiyan wrote:
-> > ?????,  5 ????? 2014, 13:56 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
-> > > On Mon, Mar 03, 2014 at 10:37:44PM +0400, Alexander Shiyan wrote:
-> > > > This patch replaces direct handling of peripheral bits with GPIOs by
-> > > > using basic-mmio-gpio driver. As a result this change eliminate some
-> > > > low-level code and removes custom io_map() from the board.
-> > > > 
-> > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > > ---
-> > > >  arch/arm/mach-imx/mach-mx21ads.c | 136 +++++++++++++++++++--------------------
-> > > >  1 file changed, 66 insertions(+), 70 deletions(-)
-> > > 
-> > > I'm generally not fond of taking patches that touch the legacy board
-> > > file unless they're fixing or cleaning up something.  Since it looks
-> > > like a cleanup, I will probably take it.  But did you test the change on
-> > > hardware?
-> > 
-> > No. Unfortunately I do not have this board. Similar change I did for the
-> > other subarch, and it has been tested
-> > (https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-clps711x/board-p720t.c?id=6d640edeb598dd76c64aa99357d9b59996dcb3bc).
-> > 
-> > Yes, it is mostly cleanup. The next change to this board will introduce GPIO
-> > regulator (based on this change) for the framebuffer, it will help to remove
-> > ".init" and ".exit" hooks for the imxfb driver.
-> 
-> Ok, fare enough.  Sascha?
+This is a useful function and we should make it visible outside the
+generic PCI code. Export it as a GPL symbol.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+---
+ drivers/pci/host-bridge.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Unfortunately I don't have this hardware either.
-
-Sascha
-
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 06ace62..8708b652 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -17,12 +17,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+ 	return bus;
+ }
+ 
+-static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
++struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+ {
+ 	struct pci_bus *root_bus = find_pci_root_bus(bus);
+ 
+ 	return to_pci_host_bridge(root_bus->bridge);
+ }
++EXPORT_SYMBOL_GPL(find_pci_host_bridge);
+ 
+ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 				 void (*release_fn)(struct pci_host_bridge *),
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.0
