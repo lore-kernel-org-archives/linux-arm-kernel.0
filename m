@@ -1,41 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 05 Mar 2014 08:16:28 +0100
-Subject: [PATCH v4] PHY: sunxi: Add driver for sunxi usb phy
-In-Reply-To: <5316B88D.4080104@ti.com>
-References: <1393693766-15352-1-git-send-email-hdegoede@redhat.com>
- <1393693766-15352-2-git-send-email-hdegoede@redhat.com>
- <53121AF4.4080802@ti.com> <531232BC.2070903@redhat.com>
- <5314811C.1000905@ti.com> <53160752.1030301@redhat.com>
- <5316B88D.4080104@ti.com>
-Message-ID: <5316CF4C.6030606@redhat.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed,  5 Mar 2014 15:18:20 +0800
+Subject: [RFC 0/6] rework sched_domain topology description
+Message-ID: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset was previously part of the larger tasks packing patchset [1].
+I have splitted the latter in 3 different patchsets (at least) to make the
+thing easier.
+-configuration of sched_domain topology (this patchset)
+-update and consolidation of cpu_power
+-tasks packing algorithm
 
-On 03/05/2014 06:39 AM, Kishon Vijay Abraham I wrote:
-> 
-> 
-> On Tuesday 04 March 2014 10:33 PM, Hans de Goede wrote:
+Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
+the sched_domain level in order to let architectures to add specific level like
+the current BOOK level or the proposed power gating level for ARM architecture.
 
-<snip>
+[1] https://lkml.org/lkml/2013/10/18/121
+[2] https://lkml.org/lkml/2013/11/5/239
+[3] https://lkml.org/lkml/2013/11/5/449
 
->>> alright.. missed that earlier. Sorry.
->>
->> So does this mean you're going to take v4 as is, or do you want me to add
->> the dev_err calls you've pointed out before (note I still prefer to not
->> add these, but if you insist...) ?
-> 
-> You should have received a notification on it being merged to 'next'. didn't you?
+Vincent Guittot (6):
+  sched: remove unused SCHED_INIT_NODE
+  sched: rework of sched_domain topology definition
+  sched: s390: create a dedicated topology table
+  sched: powerpc: create a dedicated topology table
+  sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
+  sched: ARM: create a dedicated scheduler topology table
 
-Not that I remember, I think I'm not receiving these kinds of notifications
-in general, except for when things hit one of gkh's trees.
+ arch/arm/kernel/topology.c        |   26 ++++
+ arch/ia64/include/asm/topology.h  |   24 ----
+ arch/metag/include/asm/topology.h |   27 -----
+ arch/powerpc/kernel/smp.c         |   35 ++++--
+ arch/s390/include/asm/topology.h  |   13 +-
+ arch/s390/kernel/topology.c       |   25 ++++
+ arch/tile/include/asm/topology.h  |   33 ------
+ include/linux/sched.h             |   30 +++++
+ include/linux/topology.h          |  128 ++------------------
+ kernel/sched/core.c               |  235 ++++++++++++++++++-------------------
+ 10 files changed, 237 insertions(+), 339 deletions(-)
 
-Is this something done by your own scripts, or something which I should
-get for every patch of mine which hits next? If it is the latter I'm definitely
-not getting these, if it is just from you then I think I'm not getting them
-either but I'm not 100% sure.
-
-Regards,
-
-Hans
+-- 
+1.7.9.5
