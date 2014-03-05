@@ -1,51 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 5 Mar 2014 14:37:16 +0800
-Subject: [PATCH v2 1/7] ARM: mm: Introduce archdata.dma_pfn_offset
-In-Reply-To: <CACRpkdaRgf2yn51HYnJHBVKdrGdYhwSr0yf2GLmT3DwzmPbMDA@mail.gmail.com>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>	<1393535872-20915-2-git-send-email-santosh.shilimkar@ti.com>
- <CACRpkdaRgf2yn51HYnJHBVKdrGdYhwSr0yf2GLmT3DwzmPbMDA@mail.gmail.com>
-Message-ID: <5316C61C.9070206@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 5 Mar 2014 01:37:28 -0500
+Subject: [PATCH v2] ARM: dts: remove bcm11351-brt.dts
+In-Reply-To: <1392845512-31333-1-git-send-email-mporter@linaro.org>
+References: <1392845512-31333-1-git-send-email-mporter@linaro.org>
+Message-ID: <20140305063728.GB25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 March 2014 12:45 PM, Linus Walleij wrote:
-> On Fri, Feb 28, 2014 at 5:17 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
+On Wed, Feb 19, 2014 at 04:31:52PM -0500, Matt Porter wrote:
+> The BCM11351 BRT board will never see the light of day. Remove the BRT
+> dts since it is not maintainable.
 > 
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> In most of cases DMA addresses can be performed using offset value of
->>  Bus address space relatively to physical address space as following:
->>
->> PFN->DMA:
->>  __pfn_to_phys(pfn + [-]dma_pfn_offset)
->>
->> DMA->PFN:
->>  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
->>
->> This patch introduces new field dma_pfn_offset in ARM dev_archdata
->> structure which has to be filed per-device at arch init time
->> (simplest way is to use Platform bus notifier to handle
->> BUS_NOTIFY_ADD_DEVICE event) and updates DMA address translation
->> routines in order to accommodate bus offset value by default.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof Johansson <olof@lixom.net>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Alex Elder <elder@linaro.org>
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> ---
+> Changes since v1:
+> 	- remove bcm11351-brt from Makefile
 > 
-> This looks like exactly what I need to proceed to multiplatform on
-> Integrator.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-Thanks Linus.
 
-Just to make folks aware on the thread, after some more inputs and discussion
-at connect, looks like we need to make this work for other arch's too. So am
-going to move dma_pfn_offset from archdata to device_dma_parameters  so that
-arch code as well as driver code should be able to access/modify the pfn
-offset.
+Applied to mach-bcm for-3.15/dt
 
-Regards,
-Santosh
+-Matt
