@@ -1,29 +1,33 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 5 Mar 2014 17:31:31 +0100
-Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
-In-Reply-To: <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140305163131.GB9228@katana>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Wed,  5 Mar 2014 17:33:36 +0100
+Subject: [PATCH 1/4] ARM: spear: storage class should be before const qualifier
+Message-ID: <1394037216-1630-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 05:28:37PM +0100, Maxime Ripard wrote:
-> The Allwinner A31 SoC using that IP has a reset controller maintaining
-> it reset unless told otherwise.
-> 
-> Add some optional reset support to the driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The C99 specification states in section 6.11.5:
 
-Applied to for-next, thanks!
+The placement of a storage-class specifier other than at the beginning
+of the declaration specifiers in a declaration is an obsolescent
+feature.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/b8068a23/attachment.sig>
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ arch/arm/mach-spear/time.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+index d449673..1963f17 100644
+--- a/arch/arm/mach-spear/time.c
++++ b/arch/arm/mach-spear/time.c
+@@ -193,7 +193,7 @@ static void __init spear_clockevent_init(int irq)
+ 	setup_irq(irq, &spear_timer_irq);
+ }
+ 
+-const static struct of_device_id timer_of_match[] __initconst = {
++static const struct of_device_id timer_of_match[] __initconst = {
+ 	{ .compatible = "st,spear-timer", },
+ 	{ },
+ };
+-- 
+1.7.9.5
