@@ -1,68 +1,55 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 5 Mar 2014 10:14:46 +0200
-Subject: [PATCHv2 13/14] ARM: OMAP24xx: clock: remove legacy clock data
-In-Reply-To: <20140304212811.GA8705@atomide.com>
-References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
- <1393924700-6510-14-git-send-email-t-kristo@ti.com>
- <20140304173200.GA17470@atomide.com> <5316217C.2070906@ti.com>
- <20140304212811.GA8705@atomide.com>
-Message-ID: <5316DCF6.6070808@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 5 Mar 2014 08:16:33 +0000
+Subject: [PATCH v5 5/7] pci: Use parent domain number when allocating
+ child busses.
+In-Reply-To: <CACoXjcmKKObSFignRWZAuOmmvfFtLf5O04Y5romJ=c6a9Jriqg@mail.gmail.com>
+References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393948204-11555-6-git-send-email-Liviu.Dudau@arm.com>
+ <CACoXjcmKKObSFignRWZAuOmmvfFtLf5O04Y5romJ=c6a9Jriqg@mail.gmail.com>
+Message-ID: <20140305081633.GC1692@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 11:28 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [140304 10:58]:
->> On 03/04/2014 07:32 PM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [140304 01:22]:
->>>> This is no longer needed as clock data is provided through DT.
->>>
->>> Looks like there's a new error even before applying this patch in
->>> the series as I'm now getting the following oops on n8x0. So cannot
->>> test this patch yet.
->>
->> Is this with OMAP2 only boot?
->
-> Yeah that's with omap2 only.
+On Wed, Mar 05, 2014 at 01:49:13AM +0000, Tanmay Inamdar wrote:
+> Hello,
+> 
+> On Tue, Mar 4, 2014 at 7:50 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > pci_alloc_child_bus() uses the newly allocated child bus to figure
+> > out the domain number that is going to use for setting the device
+> > name. A better option is to use the parent bus domain number.
+> >
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 26237a0..a12cda5 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -677,7 +677,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+> >          * now as the parent is not properly set up yet.
+> >          */
+> >         child->dev.class = &pcibus_class;
+> > -       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
+> > +       dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(parent), busnr);
+> >
+> >         /*
+> >          * Set up the primary, secondary and subordinate
+> > --
+> > 1.9.0
+> >
+> 
+> This patch is not required after the fix in pci_domain_nr for arm64.
+> 
 
-That explains it, as previous series was never boot tested in omap2 only 
-config (due to build issues.)
+True. Thanks for testing this!
 
-I just force pushed the branch with the below additional patch, can you 
-check if it works now?
+Liviu
 
--Tero
-
-------------------------------------
-
- From b8be115c8bba8088f7b25922ed81c1d5867af974 Mon Sep 17 00:00:00 2001
-From: Tero Kristo <t-kristo@ti.com>
-Date: Wed, 5 Mar 2014 10:03:38 +0200
-Subject: [PATCH 12/15] CLK: TI: gate: add composite interface clock to OMAP2
-  only build
-
-Composite interface clock is needed by OMAP2, but it was only built
-in for OMAP3. Fixed the conditional build flag checks for this.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-  drivers/clk/ti/gate.c |    2 +-
-  1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
-index 3e2999d..474c171 100644
---- a/drivers/clk/ti/gate.c
-+++ b/drivers/clk/ti/gate.c
-@@ -185,7 +185,7 @@ of_ti_composite_no_wait_gate_clk_setup(struct 
-device_node *node)
-  CLK_OF_DECLARE(ti_composite_no_wait_gate_clk, 
-"ti,composite-no-wait-gate-clock",
-  	       of_ti_composite_no_wait_gate_clk_setup);
-
--#ifdef CONFIG_ARCH_OMAP3
-+#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
-  static void __init of_ti_composite_interface_clk_setup(struct 
-device_node *node)
-  {
-  	_of_ti_composite_gate_clk_setup(node, &clkhwops_iclk_wait);
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
