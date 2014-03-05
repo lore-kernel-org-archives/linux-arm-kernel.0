@@ -1,9 +1,9 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  5 Mar 2014 01:03:09 +0100
-Subject: [PATCH 2/3] devicetree: bindings: drop pinctrl PMU reg property
+Date: Wed,  5 Mar 2014 01:03:08 +0100
+Subject: [PATCH 1/3] ARM: dove: drop pinctrl PMU reg property
 In-Reply-To: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393977790-29110-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393977790-29110-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,7 +11,8 @@ Marvell Dove's pinctrl does require some PMU regs for muxing PMU
 functions to MPP pins. Recently, a discussion started about consolidating
 Power Management Unit (PMU) into a single DT node. As we don't want
 anymore DT ABI in the way, drop the corresponding reg property from
-pinctrl binding documentation now.
+pinctrl node now. The driver will derive the registers from existing
+reg properties.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -29,35 +30,22 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org 
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt  | 2 +-
- Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dove.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
-index cf52477cc7ee..3b3d465cbfd9 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
-@@ -6,7 +6,7 @@ part and usage.
- Required properties:
- - compatible: "marvell,dove-pinctrl"
- - clocks: (optional) phandle of pdma clock
--- reg: register specifiers of MPP, MPP4, and PMU MPP registers
-+- reg: register specifiers of MPP and MPP4 registers
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index b6fc27f8ed66..3b891dd20993 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -395,8 +395,7 @@
+ 			pinctrl: pin-ctrl at d0200 {
+ 				compatible = "marvell,dove-pinctrl";
+ 				reg = <0xd0200 0x14>,
+-				      <0xd0440 0x04>,
+-				      <0xd802c 0x08>;
++				      <0xd0440 0x04>;
+ 				clocks = <&gate_clk 22>;
  
- Available mpp pins/groups and functions:
- Note: brackets (x) are not part of the mpp name for marvell,function and given
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
-index 0c09f4eb2af0..111b6eea72e8 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
-@@ -37,7 +37,7 @@ uart1: serial at 12100 {
- 
- pinctrl: pinctrl at d0200 {
- 	compatible = "marvell,dove-pinctrl";
--	reg = <0xd0200 0x14>, <0xd0440 0x04>, <0xd802c 0x08>;
-+	reg = <0xd0200 0x14>, <0xd0440 0x04>;
- 
- 	pmx_uart1_sw: pmx-uart1-sw {
- 		marvell,pins = "mpp_uart1";
+ 				pmx_gpio_0: pmx-gpio-0 {
 -- 
 1.8.5.3
