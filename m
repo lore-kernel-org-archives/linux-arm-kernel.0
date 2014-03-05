@@ -1,30 +1,30 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  5 Mar 2014 04:39:32 +0100
-Subject: [PATCH 5/5] ARM: multi_v7_defconfig: add st-keyscan driver
-In-Reply-To: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
-References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393990772-9567-6-git-send-email-gabriel.fernandez@st.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 5 Mar 2014 04:43:19 +0100
+Subject: [PATCH v5 1/8] mtd: spi-nor: copy the SPI NOR commands to a new
+ header file
+In-Reply-To: <5316932C.5040405@freescale.com>
+References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
+ <201403042313.14353.marex@denx.de> <5316932C.5040405@freescale.com>
+Message-ID: <201403050443.19529.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds KEYBOARD_ST_KEYSCAN config
+On Wednesday, March 05, 2014 at 03:59:56 AM, Huang Shijie wrote:
+> ? 2014?03?05? 06:13, Marek Vasut ??:
+> > Please keep me on CC;-)
+> 
+> sorry, My fault :(
+> 
+> > I honestly have to wonder ... why do you not 'move' these definitions
+> > instead of copying them ?
+> 
+> In the first version , i did so:
+> http://marc.info/?l=linux-arm-kernel&m=138544933522564&w=2
+> 
+> if I need to resend the patch set again, i can change to move the
+> commands to the new header.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Why didn't you keep it like that? Was there some reason for that ?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index ee69829..5e926981 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -131,6 +131,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
-+CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_MISC=y
--- 
-1.9.0
+Best regards,
+Marek Vasut
