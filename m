@@ -1,47 +1,37 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 5 Mar 2014 15:10:17 +0200
-Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
-In-Reply-To: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
-References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
-Message-ID: <53172239.3030705@ti.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Wed, 05 Mar 2014 14:25:32 +0100
+Subject: [PATCH v4 4/4] ARM: OMAP2+: Add pdata quirk for sys_clkout2
+ for omap3 DBB056
+In-Reply-To: <53172175.5060603@ti.com>
+References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
+ <1392387656-15186-5-git-send-email-chf.fritz@googlemail.com>
+ <20140228223741.GM13624@atomide.com>  <53172175.5060603@ti.com>
+Message-ID: <1394025932.16566.44.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
+On Wed, 2014-03-05 at 15:07 +0200, Tero Kristo wrote:
+> On 03/01/2014 12:37 AM, Tony Lindgren wrote:
+> > * Christoph Fritz <chf.fritz@googlemail.com> [140214 06:24]:
+> >> Full device tree support for clock control, especially to set frequencies,
+> >> is not yet accomplished. Until then, configure the 24Mhz of sys_clkout2 to
+> >> feed an USB-Hub here.
+> >
+> > Hmm would like to see Tero's comments on this, I wonder if we should
+> > wait on this to avoid extra churn?
+> 
+> Well, the set I posted that adds default clock parenting / default rate 
+> support to DT hasn't actually moved forward, so you might want to take 
+> this in as is now if it should be rushed. The clk-enable part isn't done 
+> currently by anything anyway. Just wondering though, should you create 
+> some sort of driver for your usb-hub which would control these clocks?
 
-Mike, any feedback on this?
+The USB-Hub, a USB2512 is wired as non-configurable. Its pin
+'XTAL1/CLKIN' can be connected to either a crystal or an external clock
+input. To economise the crystal, the clock-out of the omap is wired
+here.
 
--Tero
+So in my view, a driver is unnecessary.
 
-On 02/13/2014 11:00 AM, Tero Kristo wrote:
-> Hi,
->
-> This set is a mix-match of new DT properties for generic and TI specific
-> clock drivers. Basically provided for commenting purposes. The patches
-> provide a way to configure clock parents / rates during boot through DT.
->
-> "default-rate" : sets rate of a clock during boot, supported for any DT
-> 		 clock type (through generic clock driver)
-> "ti,default-parent" : selects a default parent for a multiplexer clock,
-> 		      only supported for TI specific mux clock for now,
-> 		      as generic mux clock does not support DT clocks
->
-> Patch #4 provided as a reference how to move the default rates / parents
-> from kernel code to DT.
->
-> Default-rate logic in patch #2 looks somewhat complicated, as the clocks
-> need to be sorted based on their parents to avoid cases where a child clock
-> would set its rate first, just to be overridden by its parent changing
-> rate later and resulting in incorrect rate for the child clock.
->
-> If the default-rate generic property is not going to fly, it can be moved
-> to TI only drivers also.
->
-> -Tero
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+ Thanks
+  -- Christoph
