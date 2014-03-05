@@ -1,28 +1,31 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  5 Mar 2014 22:33:26 +0100
-Subject: [RESEND Patch 2/3] DT: Vendors: Add vendor prefix for Macronix
-In-Reply-To: <1394055207-4639-1-git-send-email-andrew@lunn.ch>
-References: <1394055207-4639-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1394055207-4639-3-git-send-email-andrew@lunn.ch>
+Date: Wed,  5 Mar 2014 22:33:24 +0100
+Subject: [RESEND Patch 0/3] Prefixes for Kirkwood DT files
+Message-ID: <1394055207-4639-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vendor prefix mxicy for Macronix International Co., Ltd.
+It has been reported that not all these patches made it to the
+list. This is probably because git send-email used UTF8 encoded, since
+some of the hunks contain context lines using none ASCII characters.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+Andrew Lunn (3):
+  DT: I2C: Add trivial bindings used by kirkwood boards
+  DT: Vendors: Add vendor prefix for Macronix
+  ARM: Kirkwood: DT: Add missing vendor prefix
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 860c467374fe..f4599aea1f7d 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -63,4 +63,5 @@ microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
- mpl	MPL AG
-+mxicy	Macronix International Co., Ltd.
- national	National Semiconductor
- netgear	Netgear, Inc.
+ .../devicetree/bindings/i2c/trivial-devices.txt         | 17 +++++++++++++++++
+ Documentation/devicetree/bindings/vendor-prefixes.txt   |  1 +
+ arch/arm/boot/dts/kirkwood-b3.dts                       |  2 +-
+ arch/arm/boot/dts/kirkwood-cloudbox.dts                 |  2 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts                |  2 +-
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts          |  2 +-
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi              |  2 +-
+ arch/arm/boot/dts/kirkwood-nsa310.dts                   |  2 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts                  |  2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts            |  2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts            |  2 +-
+ 11 files changed, 27 insertions(+), 9 deletions(-)
+
 -- 
 1.9.0
