@@ -1,64 +1,147 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 5 Mar 2014 10:35:02 +0200
-Subject: [PATCH 0/8] OMAP: OMAP3 DSS related clock patches
-In-Reply-To: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <5316E1B6.4060007@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Mar 2014 16:40:39 +0800
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <20140305073422.GD20016@e106331-lin.cambridge.arm.com>
+References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
+ <20140305073422.GD20016@e106331-lin.cambridge.arm.com>
+Message-ID: <20140305084039.GB14902@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Wed, 05 Mar 2014, Mark Rutland wrote:
 
-What about the dts fixes in this series? DSS DT depends on those fixes.
-I'd like the dts fixes to be either merged for v3.14, or I can add them
-to my DSS DT series (with acks).
+> On Fri, Feb 14, 2014 at 11:23:53AM +0000, Lee Jones wrote:
+> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> > devices. It has 2 ports which it can use for either; both SATA, both
+> > PCIe or one of each in any configuration.
+> > 
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/phy/phy-miphy365x.txt      | 54 ++++++++++++++++++++++
+> >  1 file changed, 54 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > new file mode 100644
+> > index 0000000..96f269f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > @@ -0,0 +1,54 @@
+> > +STMicroelectronics STi MIPHY365x PHY binding
+> > +============================================
+> > +
+> > +This binding describes a miphy device that is used to control PHY hardware
+> > +for SATA and PCIe.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "st,miphy365x-phy"
+> > +- #phy-cells: Should be 2 (See second example)
+> > +		First cell is the port number; MIPHY_PORT_{0,1}
+> > +		Second cell is device type; MIPHY_TYPE_{SATA,PCI}
+> 
+> Either this should refer to the header file, or specific values should
+> be given in the binding document.
 
- Tomi
+When you say specific values you mean break out the {,}s?
 
-On 13/02/14 12:03, Tomi Valkeinen wrote:
-> Hi,
-> 
-> I've been debugging OMAP3 related issues with DSS clocks, and I hopefully have
-> them all fixed with this series. This fixes the problems for both non-DT boot,
-> but also for DT boot with DSS DT support (which is not merged yet).
-> 
-> The non-DT boot related fixes should be merged for 3.14, but I'd like the DT
-> boot related fixes to be merged for 3.14 also, as that'll make handling the DSS
-> DT support easier.
-> 
-> This is based on v3.14-rc2.
-> 
->  Tomi
-> 
-> Tomi Valkeinen (8):
->   clk: divider: fix rate calculation for fractional rates
->   clk: ti/divider: fix rate calculation for fractional rates
->   ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
->   ARM: dts: fix omap3 dss clock handle names
->   ARM: dts: fix DPLL4 x2 clkouts on 3630
->   ARM: dts: use ti,fixed-factor-clock for dpll4_m4x2_mul_ck
->   ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
->   OMAPDSS: fix rounding when calculating fclk rate
-> 
->  arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  6 +--
->  .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  6 +--
->  arch/arm/boot/dts/omap36xx-clocks.dtsi             | 20 +++++++
->  arch/arm/boot/dts/omap36xx.dtsi                    |  2 +-
->  arch/arm/boot/dts/omap3xxx-clocks.dtsi             |  8 +--
->  arch/arm/mach-omap2/cclock3xxx_data.c              |  2 +
->  arch/arm/mach-omap2/dpll3xxx.c                     | 62 ++++++++++++++++++++++
->  drivers/clk/clk-divider.c                          | 10 ++--
->  drivers/clk/ti/divider.c                           |  8 +--
->  drivers/video/omap2/dss/dss.c                      |  4 +-
->  include/linux/clk/ti.h                             |  4 ++
->  11 files changed, 111 insertions(+), 21 deletions(-)
-> 
+I thought most people would know what they mean.
 
+> > +- reg:	      Address and length of the register set for the device
+> > +- reg-names:  The names of the register addresses corresponding to the
+> > +	      registers filled in "reg"
+> > +		Options are; sata{0,1} and pcie{0,1} (See first example)
+> 
+> How about something like:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/c929fbc3/attachment.sig>
+Same here.
+
+> - reg: a list of offset + length pairs, one for each entry in reg-names
+> - reg-names: should contain some of:
+>   * "sata0" for ...
+>   * "sata1" for ...
+>   * "pcie0" for ...
+>   * "pcie1" for ...
+> 
+> Where ... might just be "the sata port 0 registers"
+
+Seems awfully redundant.
+
+> > +- st,syscfg : Should be a phandle of the system configuration register group
+> > +	      which contain the SATA, PCIe mode setting bits
+> 
+> I'll assume this is well-defined by some other binding.
+
+Right.
+
+> > +
+> > +Optional properties:
+> > +- st,sata-gen	     : Generation of locally attached SATA IP. Expected values
+> > +		       are {1,2,3). If not supplied generation 1 hardware will
+> > +		       be expected
+> > +- st,pcie-tx-pol-inv : Bool property to invert the polarity PCIe Tx (Txn/Txp)
+> > +- st,sata-tx-pol-inv : Bool property to invert the polarity SATA Tx (Txn/Txp)
+> 
+> It might just be me, but the phrase "invert the polarity {SATA,PCIe} Tx"
+> sounds odd. What exactly is being inverted?
+
+>From the doc (and the only reference of this functionallity):
+
+rx_polarity:
+  1: switch rxp/rxn
+tx_polarity:
+  1: switch txp/txn
+
+If we don't set these registers up to reflect the h/w configuration of
+the board, the MiPHY will not work.
+
+> > +
+> > +Example:
+> > +
+> > +	miphy365x_phy: miphy365x at 0 {
+> > +		compatible = "st,miphy365x-phy";
+> > +		#phy-cells = <2>;
+> > +		reg =	<0xfe382000 0x100>,
+> > +			<0xfe38a000 0x100>,
+> > +			<0xfe394000 0x100>,
+> > +			<0xfe804000 0x100>;
+> > +		reg-names = "sata0", "sata1", "pcie0", "pcie1";
+> > +		st,syscfg= <&syscfg_rear>;
+> 
+> Nit: missing space before '='.
+
+Will fix.
+
+> > +	};
+> > +
+> > +Specifying phy control of devices
+> > +=================================
+> > +
+> > +Device nodes should specify the configuration required in their "phys"
+> > +property, containing a phandle to the miphy device node, a port number
+> > +and a device type.
+> > +
+> > +Example:
+> > +
+> > +#include <dt-bindings/phy/phy-miphy365x.h>
+> > +
+> > +	sata0: sata at fe380000 {
+> > +		...
+> > +		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
+> > +		...
+> > +	};
+> 
+> Is there not a generic phy binding we can point to? It seems a bit
+> redundant to do this in each phy binding.
+
+Sure, but that wouldn't make much of an example.
+
+  Documentation/devicetree/bindings/phy/phy-bindings.txt
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
