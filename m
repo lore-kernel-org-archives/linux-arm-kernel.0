@@ -1,26 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Mar 2014 09:50:53 +0800
-Subject: [PATCH 2/2] mfd: pm8921: Use IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <1393958932-3585-3-git-send-email-sboyd@codeaurora.org>
-References: <1393958932-3585-1-git-send-email-sboyd@codeaurora.org>
- <1393958932-3585-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140305015053.GJ10579@lee--X1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Mar 2014 09:52:29 +0800
+Subject: [PATCH 2/5] gpio: remove obsolete tnetv107x driver
+In-Reply-To: <1393418614-3968549-3-git-send-email-arnd@arndb.de>
+References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
+ <1393418614-3968549-3-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdaBMozNayXXyn8Ag+GUU_+C2j4X7aVuaZjgV_krCvSy0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We don't need to implement a dummy irq_set_wake op if we just set
-> IRQCHIP_SKIP_SET_WAKE.
-> 
-> Suggested-by: Josh Cartwright <joshc@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/pm8921-core.c | 8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
+On Wed, Feb 26, 2014 at 8:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Applied, thanks.
+> The tnetv107x platform is getting removed, so this driver won't
+> be needed any more.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-gpio at vger.kernel.org
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Can I have an ACK from some Sekhar to apply this
+to the GPIO tree, so we are all aligned?
+
+Or do you want my ACK to take this through ARM SoC?
+In that case Acked-by...
+
+Yours,
+Linus Walleij
