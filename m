@@ -1,115 +1,69 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 5 Mar 2014 07:34:22 +0000
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 5 Mar 2014 07:35:44 +0000
+Subject: [PATCH 2/4] phy: miphy365x: Add MiPHY365x header file for DT x
+ Driver defines
+In-Reply-To: <1392377036-12816-2-git-send-email-lee.jones@linaro.org>
 References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140305073422.GD20016@e106331-lin.cambridge.arm.com>
+ <1392377036-12816-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140305073544.GE20016@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 11:23:53AM +0000, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
+On Fri, Feb 14, 2014 at 11:23:54AM +0000, Lee Jones wrote:
+> This provides the shared header file which will be reference from both
+> the MiPHY365x driver and its associated Device Tree node(s).
 > 
 > Cc: devicetree at vger.kernel.org
 > Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  .../devicetree/bindings/phy/phy-miphy365x.txt      | 54 ++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> new file mode 100644
-> index 0000000..96f269f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -0,0 +1,54 @@
-> +STMicroelectronics STi MIPHY365x PHY binding
-> +============================================
-> +
-> +This binding describes a miphy device that is used to control PHY hardware
-> +for SATA and PCIe.
-> +
-> +Required properties:
-> +- compatible: Should be "st,miphy365x-phy"
-> +- #phy-cells: Should be 2 (See second example)
-> +		First cell is the port number; MIPHY_PORT_{0,1}
-> +		Second cell is device type; MIPHY_TYPE_{SATA,PCI}
+>  include/dt-bindings/phy/phy-miphy365x.h | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 
-Either this should refer to the header file, or specific values should
-be given in the binding document.
-
-> +- reg:	      Address and length of the register set for the device
-> +- reg-names:  The names of the register addresses corresponding to the
-> +	      registers filled in "reg"
-> +		Options are; sata{0,1} and pcie{0,1} (See first example)
-
-How about something like:
-
-- reg: a list of offset + length pairs, one for each entry in reg-names
-- reg-names: should contain some of:
-  * "sata0" for ...
-  * "sata1" for ...
-  * "pcie0" for ...
-  * "pcie1" for ...
-
-Where ... might just be "the sata port 0 registers"
-
-> +- st,syscfg : Should be a phandle of the system configuration register group
-> +	      which contain the SATA, PCIe mode setting bits
-
-I'll assume this is well-defined by some other binding.
-
-> +
-> +Optional properties:
-> +- st,sata-gen	     : Generation of locally attached SATA IP. Expected values
-> +		       are {1,2,3). If not supplied generation 1 hardware will
-> +		       be expected
-> +- st,pcie-tx-pol-inv : Bool property to invert the polarity PCIe Tx (Txn/Txp)
-> +- st,sata-tx-pol-inv : Bool property to invert the polarity SATA Tx (Txn/Txp)
-
-It might just be me, but the phrase "invert the polarity {SATA,PCIe} Tx"
-sounds odd. What exactly is being inverted?
-
-> +
-> +Example:
-> +
-> +	miphy365x_phy: miphy365x at 0 {
-> +		compatible = "st,miphy365x-phy";
-> +		#phy-cells = <2>;
-> +		reg =	<0xfe382000 0x100>,
-> +			<0xfe38a000 0x100>,
-> +			<0xfe394000 0x100>,
-> +			<0xfe804000 0x100>;
-> +		reg-names = "sata0", "sata1", "pcie0", "pcie1";
-> +		st,syscfg= <&syscfg_rear>;
-
-Nit: missing space before '='.
-
-> +	};
-> +
-> +Specifying phy control of devices
-> +=================================
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the miphy device node, a port number
-> +and a device type.
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy-miphy365x.h>
-> +
-> +	sata0: sata at fe380000 {
-> +		...
-> +		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-> +		...
-> +	};
-
-Is there not a generic phy binding we can point to? It seems a bit
-redundant to do this in each phy binding.
+Given this defines part of the binding, it should probably go in the
+same patch.
 
 Cheers,
 Mark.
+
+> 
+> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
+> new file mode 100644
+> index 0000000..8757c02
+> --- /dev/null
+> +++ b/include/dt-bindings/phy/phy-miphy365x.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This header provides constants for the phy framework
+> + * based on the STMicroelectronics miphy365x.
+> + */
+> +#ifndef _DT_BINDINGS_PHY_MIPHY
+> +#define _DT_BINDINGS_PHY_MIPHY
+> +
+> +/* Supports 16 ports without a datatype change (u8 & 0xF0). */
+> +#define MIPHY_PORT_0			0
+> +#define MIPHY_PORT_1			1
+> +#define MIPHY_PORT_2			2
+> +#define MIPHY_PORT_3			3
+> +
+> +/* Supports 16 types without a datatype change (u8 & 0x0F). */
+> +#define MIPHY_TYPE_SHIFT		4
+> +#define MIPHY_TYPE_SATA			(0 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_PCIE			(1 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_USB			(2 << MIPHY_TYPE_SHIFT)
+> +
+> +#define MIPHY_SATA_PORT0		(MIPHY_TYPE_SATA) | (MIPHY_PORT_0)
+> +#define MIPHY_SATA_PORT1		(MIPHY_TYPE_SATA) | (MIPHY_PORT_1)
+> +#define MIPHY_PCIE_PORT0		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_0)
+> +#define MIPHY_PCIE_PORT1		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_1)
+> +
+> +#endif /* _DT_BINDINGS_PHY_MIPHY */
+> -- 
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
