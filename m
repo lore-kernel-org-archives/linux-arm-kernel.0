@@ -1,41 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Mar 2014 09:43:16 +0800
-Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
-In-Reply-To: <530D218E.9010007@wwwdotorg.org>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
- <530D218E.9010007@wwwdotorg.org>
-Message-ID: <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Mar 2014 09:48:39 +0800
+Subject: [PATCH 2/3] dts: mpc512x: adjust clock specs for FEC nodes
+In-Reply-To: <20140303092231.GS3327@book.gsilab.sittig.org>
+References: <1393237557-31406-1-git-send-email-gsi@denx.de>
+ <1393237557-31406-2-git-send-email-gsi@denx.de>
+ <20140303092231.GS3327@book.gsilab.sittig.org>
+Message-ID: <20140305014836.GC8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 7:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Mon, Mar 03, 2014 at 10:22:31AM +0100, Gerhard Sittig wrote:
+> On Mon, Feb 24, 2014 at 11:25 +0100, Gerhard Sittig wrote:
+> > 
+> > a recent FEC binding document update that was motivated by i.MX
+> > development revealed that ARM and PowerPC implementations in Linux
+> > did not agree on the clock names to use for the FEC nodes
+> > 
+> > change clock names from "per" to "ipg" in the FEC nodes of the
+> > mpc5121.dtsi include file such that the .dts specs comply with
+> > the common FEC binding
+> > 
+> > this "incompatible" change does not break operation, because
+> > - COMMON_CLK support for MPC5121/23/25 and adjusted .dts files
+> >   were only introduced in Linux v3.14-rc1, no mainline release
+> >   provided these specs before
+> > - if this change won't make it for v3.14, the MPC512x CCF support
+> >   provides full backwards compability, and keeps operating with
+> >   device trees which lack clock specs or don't match in the names
+> > 
+> > Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> 
+> ping
+> 
+> Are there opinions about making PowerPC users of FEC use the same
+> clock names as ARM users do, to re-use (actually: keep sharing)
+> the FEC binding?  The alternative would be to fragment the FEC
+> binding into several bindings for ARM and PowerPC, which I feel
+> would be undesirable, and is not necessary.
 
->> -     gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
->> +     gpio = devm_gpiod_get_index(&pdev->dev, NULL, 0);
->
-> I think the correct fix here is to look up the GPIO by name rather than
-> by index, but simply hard-code the name rather than generating it with
-> sprintf(). Index lookups are hard to expand compatibly, but named-based
-> lookups scale much better.
->
-> In other words, I rather specifically disagree with using a plain
-> "gpios" property in any future DT binding, but would strongly prefer
-> e.g. reset-gpios/shutdown-gpios or gpios/gpio-names.
+As I already said, Documentation/devicetree/bindings/net/fsl-fec.txt
+was created specifically for i.MX FEC controller from day one.  And even
+as of today, it doesn't serve PowerPC, because for example the property
+'phy-mode' documented as required one is not required by PowerPC FEC.
+My opinion would be to patch fsl-fec.txt a little bit to make it clear
+that it's a binding doc for i.MX FEC, and create the other one for
+PowerPC FEC.  This is the way less confusing to people and easier for
+binding maintenance.
 
-If I understand the situation correctly it's like ACPI does not have named
-GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
-to the work of abstracting the access to GPIO handlers so that drivers
-need not know whether ACPI or DT is used for describing the hardware.
-
-We could do worse. Like putting the GPIOs in a differently indexed order
-in DT vs ACPI.
-
-I have no strong opinion really, I just see that people doing DT and ACPI
-HW descriptions need to cooperate if they want to share infrastructure
-or we have to give up that pipe dream and let each HW description
-method have its own unique probe()-runpath. Which would be the result
-in this driver if we persist on using named GPIOs.
-
-Yours,
-Linus Walleij
+Shawn
