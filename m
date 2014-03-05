@@ -1,30 +1,29 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 05 Mar 2014 11:38:44 -0500
-Subject: [PATCH 5/5] arm64: add early_ioremap support
-In-Reply-To: <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
-References: <1393963738-9210-1-git-send-email-msalter@redhat.com>
- <1393963738-9210-6-git-send-email-msalter@redhat.com>
- <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
-Message-ID: <1394037524.5094.35.camel@deneb.redhat.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 5 Mar 2014 17:44:41 +0100
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140305164441.GD9228@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-04 at 17:31 -0600, Rob Herring wrote:
-> On Tue, Mar 4, 2014 at 2:08 PM, Mark Salter <msalter@redhat.com> wrote:
-> > Add support for early IO or memory mappings which are needed
-> > before the normal ioremap() is usable. This also adds fixmap
-> > support for permanent fixed mappings such as that used by the
-> > earlyprintk device register region.
-> 
-> One minor comment:
-> 
-> > +enum fixed_addresses {
-> > +       FIX_EARLYCON,
-> 
-> Can you align this name with x86 and rename to FIX_EARLYCON_MEM_BASE.
-> Doing that will help enable the earlycon driver in 8250_early.c.
 
-Is there any advantage to earlycon=uart8250 vs. earlyprintk=uart8250?
-I don't mind using FIX_EARLYCON_MEM_BASE, but CONFIG_FIX_EARLYCON_MEM
-is X86 only right now and I think changing that should be a separate
-patch.
+> +	qup->adap.nr = pdev->id;
+> +	qup->adap.dev.parent = qup->dev;
+> +	qup->adap.dev.of_node = pdev->dev.of_node;
+> +	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
+> +
+> +	ret = i2c_add_numbered_adapter(&qup->adap);
+
+I'd suggest to use just i2c_add_adapter and let the core check the
+aliases for you.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/6fcc90a1/attachment.sig>
