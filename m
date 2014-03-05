@@ -1,50 +1,105 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 5 Mar 2014 17:31:42 +0900
-Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on
- r8a7790/lager and r8a7791/koelsch
-In-Reply-To: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
-References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 5 Mar 2014 08:33:12 +0000
+Subject: [PATCH v5 7/7] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
+References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
+ <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
+Message-ID: <20140305083311.GD13582@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 7:30 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->         Hi Simon, Magnus,
->
-> This patch series integrates support for the MSIOF module in the Renesas
-> R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
-> development boards.
->
-> It was tested on Lager and Koelsch, both legacy and DT, using a dummy
-> driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
-> ID.
->
->     [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
->     [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
->     [03/11] ARM: shmobile: lager legacy: Add MSIOF support
->     [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
->     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
->             spi0 alias
->     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
->             add spi0 alias
->     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
->     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
->     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
->     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
->     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
->
-> These are (reworked versions of) the remaining patches not taken from v1.
-> Changelogs are available in the individual patches.
+On Wed, Mar 05, 2014 at 10:20:28AM +0900, Jingoo Han wrote:
+> On Wednesday, March 05, 2014 12:50 AM, Liviu Dudau wrote:
+> > 
+> > Several platforms use a rather generic version of parsing
+> > the device tree to find the host bridge ranges. Move the common code
+> > into the generic PCI code and use it to create a pci_host_bridge
+> > structure that can be used by arch code.
+> > 
+> > Based on early attempts by Andrew Murray to unify the code.
+> > Used powerpc and microblaze PCI code as starting point.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > 
+> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> > index 8708b652..800678a 100644
+> > --- a/drivers/pci/host-bridge.c
+> > +++ b/drivers/pci/host-bridge.c
+> 
+> [.....]
+> 
+> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> 
+> It makes build error with exynos_defconfig. (ARM32)
+> Thus, 'slab.h' is necessary in order to fix the build error.
+> 
+> ./drivers/pci/host-bridge.c
+> @@ -8,6 +8,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/slab.h>
 
-Hi Geert,
+Will add, thanks!
 
-Thanks for your efforts. All these look fine to me.
+> 
+>  #include "pci.h"
+> 
+> 
+> > +		if (!res) {
+> > +			err = -ENOMEM;
+> > +			goto bridge_ranges_nomem;
+> > +		}
+> > +
+> > +		of_pci_range_to_resource(&range, dev, res);
+> > +
+> > +		if (resource_type(res) == IORESOURCE_IO)
+> > +			*io_base = range.cpu_addr;
+> > +
+> > +		pci_add_resource_offset(resources, res,
+> > +				res->start - range.pci_addr);
+> > +	}
+> > +
+> > +	/* Apply architecture specific fixups for the ranges */
+> > +	pcibios_fixup_bridge_ranges(resources);
+> 
+> It also makes compile problem with exynos_defconfig as below:
+> 
+> drivers/built-in.o: In function `pci_host_bridge_of_get_ranges':
+> drivers/pci/host-bridge.c:157: undefined reference to `pcibios_fixup_bridge_ranges'
 
-Acked-by: Magnus Damm <damm@opensource.se>
+Does that mean that exynos_defconfig doesn't define CONFIG_OF? How do you
+compile all the .dts files then? Should CONFIG_OF not be added to the default config
+file?
 
-Exactly what to merge upstream depends on what the ARM SoC maintainers prefer.
+Other than that, your comment is correct. drivers/pci/host-bridge.c gets compiled
+in regardless of CONFIG_OF and I need to provide an empty implementation for
+pcibios_fixup_bridge_ranges().
 
-Cheers,
+Thanks!
 
-/ magnus
+Liviu
+
+> 
+> Best regards,
+> Jingoo Han
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
