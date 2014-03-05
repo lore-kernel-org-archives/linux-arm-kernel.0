@@ -1,42 +1,142 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Mar 2014 12:45:01 +0800
-Subject: [PATCH v2 1/7] ARM: mm: Introduce archdata.dma_pfn_offset
-In-Reply-To: <1393535872-20915-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
- <1393535872-20915-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CACRpkdaRgf2yn51HYnJHBVKdrGdYhwSr0yf2GLmT3DwzmPbMDA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 5 Mar 2014 12:58:12 +0800
+Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
+In-Reply-To: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
+References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <635C1A75-4651-4B2C-AB64-E1D170A1F5F9@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 5:17 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
 
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
->
-> In most of cases DMA addresses can be performed using offset value of
->  Bus address space relatively to physical address space as following:
->
-> PFN->DMA:
->  __pfn_to_phys(pfn + [-]dma_pfn_offset)
->
-> DMA->PFN:
->  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
->
-> This patch introduces new field dma_pfn_offset in ARM dev_archdata
-> structure which has to be filed per-device at arch init time
-> (simplest way is to use Platform bus notifier to handle
-> BUS_NOTIFY_ADD_DEVICE event) and updates DMA address translation
-> routines in order to accommodate bus offset value by default.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Mar 5, 2014, at 9:53 AM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
 
-This looks like exactly what I need to proceed to multiplatform on
-Integrator.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> In order to support the pinctrl sleep state.
 
-Yours,
-Linus Walleij
+As I said before NACK
+
+this is not the job of the pinctrl to describe gpio output or input state
+
+Best Regards,
+J.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> Hi Linus,
+> 
+> The patch is based on branch: for-next
+> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl
+> 
+> Best Regards,
+> Wenyou Yang
+> 
+> drivers/pinctrl/pinctrl-at91.c     |   31 +++++++++++++++++++++++++++++++
+> include/dt-bindings/pinctrl/at91.h |    2 ++
+> 2 files changed, 33 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 5d24aae..fc51e59 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -62,6 +62,8 @@ static int gpio_banks;
+> #define DEGLITCH	(1 << 2)
+> #define PULL_DOWN	(1 << 3)
+> #define DIS_SCHMIT	(1 << 4)
+> +#define GPIO_OUTPUT_HIGH	(1 << 5)
+> +#define GPIO_OUTPUT_LOW		(1 << 6)
+> #define DEBOUNCE	(1 << 16)
+> #define DEBOUNCE_VAL_SHIFT	17
+> #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
+> @@ -152,12 +154,15 @@ struct at91_pinctrl_mux_ops {
+> 	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
+> 	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
+> 	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
+> +	bool (*get_gpio_output)(void __iomem *pio, unsigned mask);
+> +	void (*set_gpio_output)(void __iomem *pio, unsigned mask, bool is_high);
+> 	/* irq */
+> 	int (*irq_type)(struct irq_data *d, unsigned type);
+> };
+> 
+> static int gpio_irq_type(struct irq_data *d, unsigned type);
+> static int alt_gpio_irq_type(struct irq_data *d, unsigned type);
+> +static void at91_mux_gpio_enable(void __iomem *pio, unsigned mask, bool input);
+> 
+> struct at91_pinctrl {
+> 	struct device		*dev;
+> @@ -472,6 +477,20 @@ static bool at91_mux_pio3_get_schmitt_trig(void __iomem *pio, unsigned pin)
+> 	return (__raw_readl(pio + PIO_SCHMITT) >> pin) & 0x1;
+> }
+> 
+> +static bool at91_mux_pio3_get_gpio_output(void __iomem *pio, unsigned pin)
+> +{
+> +	return (__raw_readl(pio + PIO_ODSR) >> pin) & 0x1;
+> +}
+> +
+> +static void at91_mux_pio3_set_gpio_output(void __iomem *pio,
+> +						unsigned mask,
+> +						bool is_high)
+> +{
+> +	at91_mux_gpio_enable(pio, mask, 0);
+> +	writel_relaxed(mask, pio + (is_high ? PIO_SODR : PIO_CODR));
+> +}
+> +
+> +
+> static struct at91_pinctrl_mux_ops at91rm9200_ops = {
+> 	.get_periph	= at91_mux_get_periph,
+> 	.mux_A_periph	= at91_mux_set_A_periph,
+> @@ -495,6 +514,8 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
+> 	.set_pulldown	= at91_mux_pio3_set_pulldown,
+> 	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
+> 	.disable_schmitt_trig = at91_mux_pio3_disable_schmitt_trig,
+> +	.get_gpio_output = at91_mux_pio3_get_gpio_output,
+> +	.set_gpio_output = at91_mux_pio3_set_gpio_output,
+> 	.irq_type	= alt_gpio_irq_type,
+> };
+> 
+> @@ -741,6 +762,10 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
+> 		*config |= PULL_DOWN;
+> 	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
+> 		*config |= DIS_SCHMIT;
+> +	if (info->ops->get_gpio_output) {
+> +		*config |= info->ops->get_gpio_output(pio, pin) ?
+> +					GPIO_OUTPUT_HIGH : GPIO_OUTPUT_LOW;
+> +	}
+> 
+> 	return 0;
+> }
+> @@ -778,6 +803,12 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
+> 			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
+> 		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
+> 			info->ops->disable_schmitt_trig(pio, mask);
+> +		if (info->ops->set_gpio_output) {
+> +			if (config & GPIO_OUTPUT_HIGH)
+> +				info->ops->set_gpio_output(pio, mask, 1);
+> +			if (config & GPIO_OUTPUT_LOW)
+> +				info->ops->set_gpio_output(pio, mask, 0);
+> +		};
+> 
+> 	} /* for each config */
+> 
+> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
+> index 0fee6ff..e799268 100644
+> --- a/include/dt-bindings/pinctrl/at91.h
+> +++ b/include/dt-bindings/pinctrl/at91.h
+> @@ -15,6 +15,8 @@
+> #define AT91_PINCTRL_DEGLITCH		(1 << 2)
+> #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
+> #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
+> +#define AT91_PINCTRL_OUTPUT_HIGH	(1 << 5)
+> +#define AT91_PINCTRL_OUTPUT_LOW		(1 << 6)
+> #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
+> #define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
+> 
+> -- 
+> 1.7.9.5
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 842 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/4929bae4/attachment.sig>
