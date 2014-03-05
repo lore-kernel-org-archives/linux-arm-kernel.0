@@ -1,121 +1,42 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Mar 2014 13:41:35 +0900
-Subject: [PATCH v5 3/7] pci: Create pci_host_bridge before its associated
- bus in pci_create_root_bus.
-In-Reply-To: <53169E86.1090609@huawei.com>
-References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
- <1393948204-11555-4-git-send-email-Liviu.Dudau@arm.com>
- <53169E86.1090609@huawei.com>
-Message-ID: <002401cf382d$3062aa50$9127fef0$%han@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Mar 2014 12:45:01 +0800
+Subject: [PATCH v2 1/7] ARM: mm: Introduce archdata.dma_pfn_offset
+In-Reply-To: <1393535872-20915-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CACRpkdaRgf2yn51HYnJHBVKdrGdYhwSr0yf2GLmT3DwzmPbMDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 05, 2014 12:48 PM, Yijing Wang wrote:
-> On 2014/3/4 23:50, Liviu Dudau wrote:
-> > Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
-> > As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
-> > the creation order has been changed for no good reason. Revert the order of
-> > creation as we are going to depend on the pci_host_bridge structure to retrieve the
-> > domain number of the root bus.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 6e34498..78ccba0 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -505,7 +505,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
-> >  	kfree(bridge);
-> >  }
-> >
-> > -static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-> > +static struct pci_host_bridge *pci_alloc_host_bridge(void)
-> >  {
-> >  	struct pci_host_bridge *bridge;
-> >
-> > @@ -514,7 +514,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-> >  		return NULL;
-> >
-> >  	INIT_LIST_HEAD(&bridge->windows);
-> > -	bridge->bus = b;
-> >  	return bridge;
-> >  }
-> >
-> > @@ -1727,9 +1726,21 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  	char bus_addr[64];
-> >  	char *fmt;
-> >
-> > +	bridge = pci_alloc_host_bridge();
-> > +	if (!bridge)
-> > +		return NULL;
-> > +
-> > +	bridge->dev.parent = parent;
-> > +	bridge->dev.release = pci_release_host_bridge_dev;
-> > +	error = pcibios_root_bridge_prepare(bridge);
-> > +	if (error) {
-> > +		kfree(bridge);
-> > +		return NULL;
-> 
-> What about use goto err_out?
+On Fri, Feb 28, 2014 at 5:17 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
 
-+1
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> In most of cases DMA addresses can be performed using offset value of
+>  Bus address space relatively to physical address space as following:
+>
+> PFN->DMA:
+>  __pfn_to_phys(pfn + [-]dma_pfn_offset)
+>
+> DMA->PFN:
+>  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+>
+> This patch introduces new field dma_pfn_offset in ARM dev_archdata
+> structure which has to be filed per-device at arch init time
+> (simplest way is to use Platform bus notifier to handle
+> BUS_NOTIFY_ADD_DEVICE event) and updates DMA address translation
+> routines in order to accommodate bus offset value by default.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I agree with your opinion.
-It makes the code simpler.
+This looks like exactly what I need to proceed to multiplatform on
+Integrator.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Best regards,
-Jingoo Han
-
-> 
-> > +	}
-> > +
-> >  	b = pci_alloc_bus();
-> >  	if (!b)
-> > -		return NULL;
-> > +		goto err_out;
-> >
-> >  	b->sysdata = sysdata;
-> >  	b->ops = ops;
-> > @@ -1738,26 +1749,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  	if (b2) {
-> >  		/* If we already got to this bus through a different bridge, ignore it */
-> >  		dev_dbg(&b2->dev, "bus already known\n");
-> > -		goto err_out;
-> > +		goto err_bus_out;
-> >  	}
-> >
-> > -	bridge = pci_alloc_host_bridge(b);
-> > -	if (!bridge)
-> > -		goto err_out;
-> > -
-> > -	bridge->dev.parent = parent;
-> > -	bridge->dev.release = pci_release_host_bridge_dev;
-> > +	bridge->bus = b;
-> >  	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> > -	error = pcibios_root_bridge_prepare(bridge);
-> > -	if (error) {
-> > -		kfree(bridge);
-> > -		goto err_out;
-> > -	}
-> > -
-> >  	error = device_register(&bridge->dev);
-> >  	if (error) {
-> >  		put_device(&bridge->dev);
-> > -		goto err_out;
-> > +		goto err_bus_out;
-> >  	}
-> >  	b->bridge = get_device(&bridge->dev);
-> >  	device_enable_async_suspend(b->bridge);
-> > @@ -1814,8 +1814,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  class_dev_reg_err:
-> >  	put_device(&bridge->dev);
-> >  	device_unregister(&bridge->dev);
-> > -err_out:
-> > +err_bus_out:
-> >  	kfree(b);
-> > +err_out:
-> > +	kfree(bridge);
-> >  	return NULL;
-> >  }
-> >
-> >
+Yours,
+Linus Walleij
