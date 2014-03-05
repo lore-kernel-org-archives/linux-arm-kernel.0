@@ -1,52 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 5 Mar 2014 09:15:30 +0800
-Subject: I2C dummy adapter driver ?
-In-Reply-To: <5315BB34.8080803@samsung.com>
-References: <5305382E.9050902@gmail.com>
- <CAJe_ZhcMMVRTErH3ctbnZyn30_cp9XXjEfUZXdWaVWUHqs4CRw@mail.gmail.com>
- <53073C51.5010401@samsung.com>
- <20140228060728.GB29849@sirena.org.uk>
- <5315BB34.8080803@samsung.com>
-Message-ID: <20140305011530.GN13126@sirena.org.uk>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 05 Mar 2014 10:20:28 +0900
+Subject: [PATCH v5 7/7] pci: Add support for creating a generic host_bridge
+ from device tree
+In-Reply-To: <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
+References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 12:38:28PM +0100, Sylwester Nawrocki wrote:
-> On 28/02/14 07:07, Mark Brown wrote:
-> > On Fri, Feb 21, 2014 at 12:45:21PM +0100, Sylwester Nawrocki wrote:
+On Wednesday, March 05, 2014 12:50 AM, Liviu Dudau wrote:
+> 
+> Several platforms use a rather generic version of parsing
+> the device tree to find the host bridge ranges. Move the common code
+> into the generic PCI code and use it to create a pci_host_bridge
+> structure that can be used by arch code.
+> 
+> Based on early attempts by Andrew Murray to unify the code.
+> Used powerpc and microblaze PCI code as starting point.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 8708b652..800678a 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
 
-> >> The I2C bus driver with empty i2c_algorithm.master_xfer() helps WRT to
-> >> using standard DT binding and v4l2_subdev interface.
+[.....]
 
-> > Wouldn't a platform device do just as well here if there's no actual
-> > control?
+> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
 
-> Then the I2C client devices would have to be instantiated manually, 
-> I think it's more trouble.
+It makes build error with exynos_defconfig. (ARM32)
+Thus, 'slab.h' is necessary in order to fix the build error.
 
-I2C is not that much more enumerable than platform bus, I don't see the
-difference here?  To the extent I2C is enumerable a dummy adaptor isn't
-going to support that.
+./drivers/pci/host-bridge.c
+@@ -8,6 +8,7 @@
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/slab.h>
 
-> I could as well create custom I2C client drivers per ISP, but then the 
-> I2C devices would have to be represented somehow in DT, to pass stuff 
-> like voltage regulators and GPIOs. Anyway, it's not something could be 
-> done in mainline.
+ #include "pci.h"
 
-Why not?
 
-> Even if there is no actual I2C communication on the host CPU side, the 
-> power up/down sequence is handled there. The intention is to keep this 
-> common per an I2C client, regardless of whether I2C communication is 
-> done by firmware or the host the CPU.
+> +		if (!res) {
+> +			err = -ENOMEM;
+> +			goto bridge_ranges_nomem;
+> +		}
+> +
+> +		of_pci_range_to_resource(&range, dev, res);
+> +
+> +		if (resource_type(res) == IORESOURCE_IO)
+> +			*io_base = range.cpu_addr;
+> +
+> +		pci_add_resource_offset(resources, res,
+> +				res->start - range.pci_addr);
+> +	}
+> +
+> +	/* Apply architecture specific fixups for the ranges */
+> +	pcibios_fixup_bridge_ranges(resources);
 
-The way you're talking it sounds like your code is very hard coded to
-use I2C here.  What happens if someone uses SPI or some other bus to
-control an ISP?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/38a5366d/attachment.sig>
+It also makes compile problem with exynos_defconfig as below:
+
+drivers/built-in.o: In function `pci_host_bridge_of_get_ranges':
+drivers/pci/host-bridge.c:157: undefined reference to `pcibios_fixup_bridge_ranges'
+
+Best regards,
+Jingoo Han
