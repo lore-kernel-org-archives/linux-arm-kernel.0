@@ -1,68 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 05 Mar 2014 00:44:41 +0000
-Subject: [PATCH] arm: kernel: sleep: restore HYP mode configuration in
- cpu_resume
-In-Reply-To: <1393957413-2962-1-git-send-email-lorenzo.pieralisi@arm.com>
- (Lorenzo Pieralisi's message of "Tue, 4 Mar 2014 18:23:33 +0000")
-References: <1393957413-2962-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <87lhwp5v9i.fsf@sofa.wild-wind.fr.eu.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  4 Mar 2014 17:02:01 -0800
+Subject: [PATCH] irqchip: gic: Silence sparse warnings
+Message-ID: <1393981321-25721-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04 2014 at  6:23:33 pm GMT, Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com> wrote:
-> On CPUs with virtualization extensions the kernel installs HYP mode
-> configuration on both primary and secondary cpus upon cold boot.
->
-> On platforms where CPUs are shutdown in idle paths (ie CPU core gating),
-> when a CPU resumes from low-power states it currently does not execute
-> code that reinstalls the HYP configuration, which means that the kernel
-> cannot run eg KVM properly on such machines.
->
-> This patch, mirroring cold-boot behaviour, executes position independent
-> code that reinstalls HYP configuration and drops to SVC mode safely on
-> warmboot, so that deep idle states can be enabled in kernel running as
-> hosts on platforms with power management HW.
->
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+drivers/irqchip/irq-gic.c:53:23: warning: duplicate [noderef]
+drivers/irqchip/irq-gic.c:651:6: warning: symbol 'gic_raise_softirq' was not declared. Should it be static?
+drivers/irqchip/irq-gic.c:872:29: warning: symbol 'gic_irq_domain_ops' was not declared. Should it be static?
+drivers/irqchip/irq-gic.c:977:12: warning: symbol 'gic_of_init' was not declared. Should it be static?
 
-Look sensible to me.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/irqchip/irq-gic.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
-
-> ---
->  arch/arm/kernel/sleep.S | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index b907d9b..1b880db 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -127,6 +127,10 @@ ENDPROC(cpu_resume_after_mmu)
->  	.align
->  ENTRY(cpu_resume)
->  ARM_BE8(setend be)			@ ensure we are in BE mode
-> +#ifdef CONFIG_ARM_VIRT_EXT
-> +	bl	__hyp_stub_install_secondary
-> +#endif
-> +	safe_svcmode_maskall r1
->  	mov	r1, #0
->  	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
->  	ALT_UP_B(1f)
-> @@ -144,7 +148,6 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
->  	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
->  	ldr	r0, [r0, r1, lsl #2]
->  
-> -	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
->  	@ load phys pgd, stack, resume fn
->    ARM(	ldmia	r0!, {r1, sp, pc}	)
->  THUMB(	ldmia	r0!, {r1, r2, r3}	)
-
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 500e533b9648..a917b144895e 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -50,7 +50,7 @@
+ 
+ union gic_base {
+ 	void __iomem *common_base;
+-	void __percpu __iomem **percpu_base;
++	void __percpu * __iomem *percpu_base;
+ };
+ 
+ struct gic_chip_data {
+@@ -648,7 +648,7 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+ #endif
+ 
+ #ifdef CONFIG_SMP
+-void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
++static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+ 	int cpu;
+ 	unsigned long flags, map = 0;
+@@ -869,7 +869,7 @@ static struct notifier_block gic_cpu_notifier = {
+ };
+ #endif
+ 
+-const struct irq_domain_ops gic_irq_domain_ops = {
++static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.map = gic_irq_domain_map,
+ 	.xlate = gic_irq_domain_xlate,
+ };
+@@ -974,7 +974,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ #ifdef CONFIG_OF
+ static int gic_cnt __initdata;
+ 
+-int __init gic_of_init(struct device_node *node, struct device_node *parent)
++static int __init
++gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *cpu_base;
+ 	void __iomem *dist_base;
 -- 
-AAAFNRAA
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
