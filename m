@@ -1,55 +1,40 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Mar 2014 15:00:11 +0800
-Subject: [PATCH v5 4/5] ARM: dts: imx6sl: Add power-domain information to
- gpc node
-In-Reply-To: <1393603427-6199-5-git-send-email-p.zabel@pengutronix.de>
-References: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
- <1393603427-6199-5-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140305070009.GK8784@S2101-09.ap.freescale.net>
+Date: Wed, 5 Mar 2014 15:01:49 +0800
+Subject: [PATCH] ARM: i.MX: mx21ads: Replace direct handling of
+ peripheral bits with GPIOs
+In-Reply-To: <1394002407.236079875@f309.i.mail.ru>
+References: <1393871864-25223-1-git-send-email-shc_work@mail.ru>
+ <20140305055634.GG8784@S2101-09.ap.freescale.net>
+ <1394002407.236079875@f309.i.mail.ru>
+Message-ID: <20140305070147.GL8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 05:03:46PM +0100, Philipp Zabel wrote:
-> The PGC that is part of GPC controls isolation and power sequencing of the
-> power domains. The PU power domain will be handled by the generic pm domain
-> framework. It needs a phandle to the PU regulator to turn off power when
-> the domain is disabled and a list of clocks to be enabled during powerup
-> for reset propagation.
+On Wed, Mar 05, 2014 at 10:53:27AM +0400, Alexander Shiyan wrote:
+> ?????,  5 ????? 2014, 13:56 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
+> > On Mon, Mar 03, 2014 at 10:37:44PM +0400, Alexander Shiyan wrote:
+> > > This patch replaces direct handling of peripheral bits with GPIOs by
+> > > using basic-mmio-gpio driver. As a result this change eliminate some
+> > > low-level code and removes custom io_map() from the board.
+> > > 
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > ---
+> > >  arch/arm/mach-imx/mach-mx21ads.c | 136 +++++++++++++++++++--------------------
+> > >  1 file changed, 66 insertions(+), 70 deletions(-)
+> > 
+> > I'm generally not fond of taking patches that touch the legacy board
+> > file unless they're fixing or cleaning up something.  Since it looks
+> > like a cleanup, I will probably take it.  But did you test the change on
+> > hardware?
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> Changes since v4:
->  - Use OF power domain bindings
->  - Added reset clocks
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> No. Unfortunately I do not have this board. Similar change I did for the
+> other subarch, and it has been tested
+> (https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-clps711x/board-p720t.c?id=6d640edeb598dd76c64aa99357d9b59996dcb3bc).
 > 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 28558f1..0e61262 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -529,9 +529,13 @@
->  			};
->  
->  			gpc: gpc at 020dc000 {
-> -				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
-> +				compatible = "fsl,imx6sl-gpc";
+> Yes, it is mostly cleanup. The next change to this board will introduce GPIO
+> regulator (based on this change) for the framebuffer, it will help to remove
+> ".init" and ".exit" hooks for the imxfb driver.
 
-This change will break function imx_gpc_init(), which looks up
-"fsl,imx6q-gpc" even on imx6sl.
+Ok, fare enough.  Sascha?
 
 Shawn
-
->  				reg = <0x020dc000 0x4000>;
->  				interrupts = <0 89 0x04>;
-> +				pu-supply = <&reg_pu>;
-> +				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-> +					 <&clks IMX6SL_CLK_GPU2D_PODF>;
-> +				#power-domain-cells = <1>;
->  			};
->  
->  			gpr: iomuxc-gpr at 020e0000 {
-> -- 
-> 1.8.5.3
-> 
