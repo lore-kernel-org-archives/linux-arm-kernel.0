@@ -1,50 +1,49 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  5 Mar 2014 18:35:30 +0100
-Subject: [PATCH 05/15] ARM: at91: sam9m10g45ek: Add touchscreen support
- through at91_adc
+Date: Wed,  5 Mar 2014 18:35:37 +0100
+Subject: [PATCH 12/15] ARM: at91: remove atmel_tsadcc platform_data
 In-Reply-To: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394040940-18246-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394040940-18246-13-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_adc now supports reading a touchscreen for ADCs without a TSMR register.
-Enable touchscreen support through at91_adc. This allows to use both a
-touchscreen and the remaining ADC channel at the same time.
-
-Also, lower the clock for the ADC as it allows to have more stable reads and
-this is the speed used by atmel_tsadcc.
-
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9g45.c        | 2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/board.h          | 3 ---
+ include/linux/platform_data/atmel.h | 7 -------
+ 2 files changed, 10 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 2f455ce35268..3c519a7a938f 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -181,7 +181,7 @@ static struct clk vdec_clk = {
- static struct clk adc_op_clk = {
- 	.name		= "adc_op_clk",
- 	.type		= CLK_TYPE_PERIPHERAL,
--	.rate_hz	= 13200000,
-+	.rate_hz	= 300000,
+diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
+index 6c08b341167d..4e773b55bc2d 100644
+--- a/arch/arm/mach-at91/board.h
++++ b/arch/arm/mach-at91/board.h
+@@ -118,9 +118,6 @@ struct isi_platform_data;
+ extern void __init at91_add_device_isi(struct isi_platform_data *data,
+ 		bool use_pck_as_mck);
+ 
+- /* Touchscreen Controller */
+-extern void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data);
+-
+ /* CAN */
+ extern void __init at91_add_device_can(struct at91_can_data *data);
+ 
+diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+index cea9f70133c5..4b452c6a2f7b 100644
+--- a/include/linux/platform_data/atmel.h
++++ b/include/linux/platform_data/atmel.h
+@@ -86,13 +86,6 @@ struct atmel_uart_data {
+ 	struct serial_rs485	rs485;		/* rs485 settings */
  };
  
- /* AES/TDES/SHA clock - Only for sam9m11/sam9g56 */
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index ef39078c8ce2..4d775b796ce4 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -315,6 +315,7 @@ static struct at91_adc_data ek_adc_data = {
- 	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7),
- 	.use_external_triggers = true,
- 	.vref = 3300,
-+	.touchscreen_type = ATMEL_ADC_TOUCHSCREEN_4WIRE,
- };
- 
- /*
+- /* Touchscreen Controller */
+-struct at91_tsadcc_data {
+-	unsigned int    adc_clock;
+-	u8		pendet_debounce;
+-	u8		ts_sample_hold_time;
+-};
+-
+ /* CAN */
+ struct at91_can_data {
+ 	void (*transceiver_switch)(int on);
 -- 
 1.8.3.2
