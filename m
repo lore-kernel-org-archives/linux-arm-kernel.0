@@ -1,69 +1,64 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Mar 2014 10:20:28 +0900
-Subject: [PATCH v5 7/7] pci: Add support for creating a generic host_bridge
- from device tree
-In-Reply-To: <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
-References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
- <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Mar 2014 09:23:22 +0800
+Subject: [PATCHv9][ 2/2] ARM: dts: mbimxsd35: Add sound support.
+In-Reply-To: <1389806606-21521-2-git-send-email-denis@eukrea.com>
+References: <1389806606-21521-1-git-send-email-denis@eukrea.com>
+ <1389806606-21521-2-git-send-email-denis@eukrea.com>
+Message-ID: <20140305012319.GA8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 05, 2014 12:50 AM, Liviu Dudau wrote:
+On Wed, Jan 15, 2014 at 06:23:26PM +0100, Denis Carikli wrote:
+> Cc: Eric B?nard <eric@eukrea.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+
+Applied, thanks.
+
+Shawn
+
+> ---
+> ChangeLog v8->v9:
+> - Better Cc list.
 > 
-> Several platforms use a rather generic version of parsing
-> the device tree to find the host bridge ranges. Move the common code
-> into the generic PCI code and use it to create a pci_host_bridge
-> structure that can be used by arch code.
+> ChangeLog v7->v8:
+> - Ajusted to match the driver changes.
+> ---
+>  .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> Based on early attempts by Andrew Murray to unify the code.
-> Used powerpc and microblaze PCI code as starting point.
+> diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+> index 23f6fe1..3e207df 100644
+> --- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+> +++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+> @@ -46,6 +46,14 @@
+>  			linux,default-trigger = "heartbeat";
+>  		};
+>  	};
+> +
+> +	sound {
+> +		compatible = "eukrea,asoc-tlv320";
+> +		eukrea,model = "imx35-eukrea-tlv320aic23";
+> +		ssi-controller = <&ssi1>;
+> +		fsl,mux-int-port = <1>;
+> +		fsl,mux-ext-port = <4>;
+> +	};
+>  };
+>  
+>  &audmux {
+> @@ -118,6 +126,7 @@
+>  };
+>  
+>  &ssi1 {
+> +	codec-handle = <&tlv320aic23>;
+>  	fsl,mode = "i2s-slave";
+>  	status = "okay";
+>  };
+> -- 
+> 1.7.9.5
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 8708b652..800678a 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-
-[.....]
-
-> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-
-It makes build error with exynos_defconfig. (ARM32)
-Thus, 'slab.h' is necessary in order to fix the build error.
-
-./drivers/pci/host-bridge.c
-@@ -8,6 +8,7 @@
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/slab.h>
-
- #include "pci.h"
-
-
-> +		if (!res) {
-> +			err = -ENOMEM;
-> +			goto bridge_ranges_nomem;
-> +		}
-> +
-> +		of_pci_range_to_resource(&range, dev, res);
-> +
-> +		if (resource_type(res) == IORESOURCE_IO)
-> +			*io_base = range.cpu_addr;
-> +
-> +		pci_add_resource_offset(resources, res,
-> +				res->start - range.pci_addr);
-> +	}
-> +
-> +	/* Apply architecture specific fixups for the ranges */
-> +	pcibios_fixup_bridge_ranges(resources);
-
-It also makes compile problem with exynos_defconfig as below:
-
-drivers/built-in.o: In function `pci_host_bridge_of_get_ranges':
-drivers/pci/host-bridge.c:157: undefined reference to `pcibios_fixup_bridge_ranges'
-
-Best regards,
-Jingoo Han
