@@ -1,50 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Mar 2014 10:12:55 +0000
-Subject: [PATCH 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <m38uspas21.fsf@t19.piap.pl>
-References: <20140305085311.07b3922a@marrow.netinsight.se>
- <20140305085549.3eb22236@marrow.netinsight.se> <m3d2i1atmq.fsf@t19.piap.pl>
- <20140305094330.GU21483@n2100.arm.linux.org.uk> <m38uspas21.fsf@t19.piap.pl>
-Message-ID: <20140305101255.GW21483@n2100.arm.linux.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 5 Mar 2014 12:37:05 +0200
+Subject: [PATCH 02/12] phy: omap-control: Update DT binding information
+In-Reply-To: <20140304162855.GB3376@atomide.com>
+References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
+ <1393859254-10937-3-git-send-email-rogerq@ti.com>
+ <20140303190247.GD25804@atomide.com> <5315995F.5050206@ti.com>
+ <20140304162855.GB3376@atomide.com>
+Message-ID: <5316FE51.5090705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 10:55:02AM +0100, Krzysztof Ha?asa wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On 03/04/2014 06:28 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [140304 01:17]:
+>> Hi Tony,
+>>
+>> On 03/03/2014 09:02 PM, Tony Lindgren wrote:
+>>> * Roger Quadros <rogerq@ti.com> [140303 07:10]:
+>>>> Move omap-control binding information to the right location.
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt   | 25 ++++++++++++++++++++++
+>>>>  Documentation/devicetree/bindings/usb/omap-usb.txt | 24 ---------------------
+>>>>  2 files changed, 25 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> index 207e14c..41dc132 100644
+>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> @@ -1,5 +1,30 @@
+>>>>  TI PHY: DT DOCUMENTATION FOR PHYs in TI PLATFORMs
+>>>>  
+>>>> +OMAP CONTROL PHY
+>>>> +
+>>>> +Required properties:
+>>>> + - compatible: Should be one of
+>>>> + "ti,control-phy-otghs" - if it has otghs_control mailbox register as on OMAP4.
+>>>> + "ti,control-phy-usb2" - if it has Power down bit in control_dev_conf register
+>>>> +                        e.g. USB2_PHY on OMAP5.
+>>>> + "ti,control-phy-pipe3" - if it has DPLL and individual Rx & Tx power control
+>>>> +                        e.g. USB3 PHY and SATA PHY on OMAP5.
+>>>> + "ti,control-phy-dra7usb2" - if it has power down register like USB2 PHY on
+>>>> +                        DRA7 platform.
+>>>> + "ti,control-phy-am437usb2" - if it has power down register like USB2 PHY on
+>>>> +                        AM437 platform.
+>>>
+>>> To me it seems that you can leave out all the above. You can set these falgs
+>>> flags directly in the driver based on the compatible flag. Then just initialize
+>>> the .data in the driver based on the compatible flag.
+>>
+>> I'm not sure if I got you. A single platform can have different type of phys.
+>>
+>> e.g. OMAP5 has both usb2 and pipe3 PHYs,
+>> DRA7 has both pipe3 and usb2 PHYs, but this usb2 PHY is not compatible with OMAP5 one
+>> so we need a new compatible id for that.
+>>
+>> To add to the woes, the designers were creative enough to make another mutation to
+>> the USB2 PHY for AM437x, :(
 > 
-> >> > +	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-> >> > +	if (err < 0)
-> >> > +		goto err_free;
-> >> > +
-> >> 
-> >> Both David and the DMA API say 32 bits must be the default. OTOH there
-> >> is other code like this in the kernel, guess IXP4xx is not alone with
-> >> such constrains.
-> >
-> > If you have drivers missing this call, that's part of the problem:
-> >
-> > | For correct operation, you must interrogate the kernel in your device
-> > | probe routine to see if the DMA controller on the machine can properly
-> > | support the DMA addressing limitation your device has.
+> Oh OK, in that case the compatible flag may not be enough for configuring the
+> various instances.
+>  
+>> What do you suggest the compatible ids should look like for these 5 types of PHY control?
+>> OTGHS	(OMAP4 & 5)
+>> USB2	(OMAP5)
+>> PIPE3	(OMAP5 & DRA7)
+>> USB2x	(DRA7)
+>> USB2y	(AM437)
 > 
-> Well, we already know it can. Actually, the DMA controller is a part of
-> the CPU + RAM controller chip :-)
+> I think in that case having the various instances fully configurable from
+> device tree is OK if you prefer that. But if you wanted to use the
+> compatible flag, then you could do something like this:
+
+I'll stick to the compatible flag.
+
 > 
-> But I guess with this new wording it's something the drivers can use.
+> ti,control-phy-omap4-otghs	(assuming same on omap4 & 5)
+> ti,control-phy-omap5-usb2
+> ti,control-phy-omap5-pipe3	(assuming same on omap5 & dra7)
+> ti,control-phy-dra7-usb2x
+> ti,control-phy-am437-usb2y
 
-What I quoted is not "new wording" apart from the addition of the interface
-which sets both masks.  This has been documented as a requirement since
-before there was a dma_* API (the pci_dma_* API predated that, and also
-had this requirement.)
+OK.
 
-It's something that has long been ignored on ARM because "oh we can do it
-in the platform code" - not anymore, not with DT.  This short-cut has
-finally bitten, and we now must conform.
+The last 2 can just be 
 
-So, in the interests of everything working as it should, it's something
-that needs to be fixed irrespective of anything else: all our drivers
-which perform DMA should make the appropriate DMA mask calls.
+ti,control-phy-dra7-usb2
+ti,control-phy-am437-usb2
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+cheers,
+-roger
