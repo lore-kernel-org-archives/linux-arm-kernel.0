@@ -1,60 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Mar 2014 18:12:49 +0530
-Subject: [PATCH v5 6/6] arm/dts: added dt properties to adapt to the new
- phy framwork
-In-Reply-To: <1393846695-14644-7-git-send-email-kishon@ti.com>
-References: <1393846695-14644-1-git-send-email-kishon@ti.com>
- <1393846695-14644-7-git-send-email-kishon@ti.com>
-Message-ID: <53171BC9.8050808@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 05 Mar 2014 13:44:34 +0100
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <53170EC2.6090908@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>	<1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+ <CAPDyKFqK1JqxeJ_L_bzduixRLGA5m_FFPq_of2r6y0aCpS7z9A@mail.gmail.com>
+ <53170EC2.6090908@gmail.com>
+Message-ID: <53171C32.20107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony/Benoit,
+On 05.03.2014 12:47, Tomasz Figa wrote:
+> Hi Ulf,
+>
+> On 05.03.2014 08:19, Ulf Hansson wrote:
+>>> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain
+>>> *genpd,
+>>>          list_add(&genpd->gpd_list_node, &gpd_list);
+>>>          mutex_unlock(&gpd_list_lock);
+>>>   }
+>>> +
+>>> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+>>
+>> Do we need a new config for this? Can't we just use CONFIG_OF?
+>>
+>
+> I guess we could, but initially it would have to be CONFIG_OF &&
+> !CONFIG_ARCH_EXYNOS until patch 03/11 converts Exynos to use the common
+> code.
+>
+>>> +       if (ret < 0) {
+>>> +               dev_err(dev, "failed to add to power domain %s: %d",
+>>> +                       pd->name, ret);
+>>> +               return ret;
+>>> +       }
+>>> +
+>>> +       pm_genpd_dev_need_restore(dev, true);
+>>
+>> So this will reflect the device as being inactive, which I think is
+>> the wrong approach.
+>>
+>> Usually we should expect drivers that's being probed successfully to
+>> leave their devices in active state, right?
+>
+> It depends on domain power state, but actually it seems to be already
+> handled in __pm_genpd_add_device(), so this line might be not needed
+> indeed.
+>
+> Strangely enough, it seemed to be needed on Exynos for correct
+> operation, but maybe in the meantime some fixes in genpd code showed up.
+> This will need some extra testing.
 
-On Monday 03 March 2014 05:08 PM, Kishon Vijay Abraham I wrote:
-> Added device tree bindings for dwc3, usb2 and usb3 PHYs. The documentation
-> of these can be found at Documentation/devicetree/bindings/phy/phy-bindings.txt
-> and Documentation/devicetree/bindings/phy/ti-phy.txt.
+Hmm, after removing this line, power domains no longer work correctly on 
+Exynos (thanks Marek for testing). Unfortunately I'm on a sick leave 
+right now and I won't be able to debug this issue on Exynos for some 
+time, but I'll see if I can reproduce it on s3c64xx board I have here at 
+home.
 
-Can this patch be queued for 3.15 merge window?
-
-Thanks
-Kishon
-
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->   arch/arm/boot/dts/omap5.dtsi |    5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index a72813a..1c68558 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -732,7 +732,8 @@
->   				compatible = "snps,dwc3";
->   				reg = <0x4a030000 0x10000>;
->   				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
-> -				usb-phy = <&usb2_phy>, <&usb3_phy>;
-> +				phys = <&usb2_phy>, <&usb3_phy>;
-> +				phy-names = "usb2-phy", "usb3-phy";
->   				dr_mode = "peripheral";
->   				tx-fifo-resize;
->   			};
-> @@ -749,6 +750,7 @@
->   				compatible = "ti,omap-usb2";
->   				reg = <0x4a084000 0x7c>;
->   				ctrl-module = <&omap_control_usb2phy>;
-> +				#phy-cells = <0>;
->   			};
->
->   			usb3_phy: usb3phy at 4a084400 {
-> @@ -758,6 +760,7 @@
->   				      <0x4a084c00 0x40>;
->   				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
->   				ctrl-module = <&omap_control_usb3phy>;
-> +				#phy-cells = <0>;
->   			};
->   		};
->
->
+Best regards,
+Tomasz
