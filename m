@@ -1,40 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 04 Mar 2014 19:59:16 -0700
-Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
-In-Reply-To: <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>	<1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>	<530D218E.9010007@wwwdotorg.org>	<CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>	<53168976.7000008@wwwdotorg.org>
- <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
-Message-ID: <53169304.9080002@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Mar 2014 11:22:14 +0800
+Subject: [PATCH 1/2] spi: atmel: adopt pinctrl support
+In-Reply-To: <1393984730-14828-2-git-send-email-wenyou.yang@atmel.com>
+References: <1393984730-14828-1-git-send-email-wenyou.yang@atmel.com>
+ <1393984730-14828-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20140305032214.GU13126@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 07:37 PM, Linus Walleij wrote:
-> On Wed, Mar 5, 2014 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 03/04/2014 06:43 PM, Linus Walleij wrote:
-> 
->>> If I understand the situation correctly it's like ACPI does not have named
->>> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
->>> to the work of abstracting the access to GPIO handlers so that drivers
->>> need not know whether ACPI or DT is used for describing the hardware.
->>
->> For devices that already have both ACPI and DT bindings, we can't
->> pretend they can be the same; they are already potentially different. We
->> simply need to parse DT and ACPI differently, since that's the sway
->> their bindings are defined.
->>
->> For any devices that don't have both ACPI and DT bindings, I agree we
->> should certainly strive to make any new bindings aligned so we don't
->> have to deal with this for them.
->>
->> However, we can't change the past.
-> 
-> Yeah, right, so for this very driver there are no bindings defined (yet)
-> and the only device tree I can find referencing it is the Tegra20-paz00
-> and it just use gpios = <>;
-> 
-> So in this case I think this patch is the right way forward, but I admit
-> I'm really uncertain in the general case.
+On Wed, Mar 05, 2014 at 09:58:49AM +0800, Wenyou Yang wrote:
+> Amend the spi atmel pin controller to optionally take a pin control
+> handle and set the state of the pins to:
 
-If there are no bindings defined at all yet, then we can define both DT
-and ACPI bindings to use name-based GPIOs. Index-based lookups aren't a
-good way forward.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/af470c89/attachment.sig>
