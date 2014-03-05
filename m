@@ -1,226 +1,222 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed,  5 Mar 2014 16:59:33 +0800
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-Message-ID: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+Date: Wed,  5 Mar 2014 16:59:34 +0800
+Subject: [PATCH 2/3] arm64: topology: Tell the scheduler about the relative
+ power of cores
+In-Reply-To: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+Message-ID: <1394009975-28655-2-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-Add support for parsing the explicit topology bindings to discover the
-topology of the system.
+In heterogeneous systems like big.LITTLE systems the scheduler will be
+able to make better use of the available cores if we provide power numbers
+to it indicating their relative performance. Do this by parsing the CPU
+nodes in the DT.
 
-Since it is not currently clear how to map multi-level clusters for the
-scheduler all leaf clusters are presented to the scheduler at the same
-level. This should be enough to provide good support for current systems.
+This code currently has no effect as no information on the relative
+performance of the cores is provided.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
-
-This revision of the patch changes the parsing code to error out on any
-failures it detects and discard any information already obtained,
-reverting to the default flat topology.
-
- arch/arm64/kernel/topology.c | 172 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 167 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/topology.c | 146 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 145 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 3e06b0b..8e0f29a 100644
+index 8e0f29a..3a80979 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -17,10 +17,161 @@
- #include <linux/percpu.h>
- #include <linux/node.h>
+@@ -19,9 +19,33 @@
  #include <linux/nodemask.h>
-+#include <linux/of.h>
+ #include <linux/of.h>
  #include <linux/sched.h>
++#include <linux/slab.h>
  
  #include <asm/topology.h>
  
-+#ifdef CONFIG_OF
-+static int __init get_cpu_for_node(struct device_node *node)
++/*
++ * cpu power table
++ * This per cpu data structure describes the relative capacity of each core.
++ * On a heteregenous system, cores don't have the same computation capacity
++ * and we reflect that difference in the cpu_power field so the scheduler can
++ * take this difference into account during load balance. A per cpu structure
++ * is preferred because each CPU updates its own cpu_power field during the
++ * load balance except for idle cores. One idle core is selected to run the
++ * rebalance_domains for all idle cores and the cpu_power can be updated
++ * during this sequence.
++ */
++static DEFINE_PER_CPU(unsigned long, cpu_scale);
++
++unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
 +{
-+	struct device_node *cpu_node;
-+	int cpu;
-+
-+	cpu_node = of_parse_phandle(node, "cpu", 0);
-+	if (!cpu_node)
-+		return -1;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (of_get_cpu_node(cpu, NULL) == cpu_node)
-+			return cpu;
-+	}
-+
-+	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
-+	return -1;
++	return per_cpu(cpu_scale, cpu);
 +}
 +
-+static int __init parse_core(struct device_node *core, int cluster_id,
-+			     int core_id)
++static void set_power_scale(unsigned int cpu, unsigned long power)
 +{
-+	char name[10];
-+	bool leaf = true;
-+	int i = 0;
-+	int cpu;
-+	struct device_node *t;
-+
-+	do {
-+		snprintf(name, sizeof(name), "thread%d", i);
-+		t = of_get_child_by_name(core, name);
-+		if (t) {
-+			leaf = false;
-+			cpu = get_cpu_for_node(t);
-+			if (cpu >= 0) {
-+				cpu_topology[cpu].cluster_id = cluster_id;
-+				cpu_topology[cpu].core_id = core_id;
-+				cpu_topology[cpu].thread_id = i;
-+			} else {
-+				pr_err("%s: Can't get CPU for thread\n",
-+				       t->full_name);
-+				return -EINVAL;
-+			}
-+		}
-+		i++;
-+	} while (t);
-+
-+	cpu = get_cpu_for_node(core);
-+	if (cpu >= 0) {
-+		if (!leaf) {
-+			pr_err("%s: Core has both threads and CPU\n",
-+			       core->full_name);
-+			return -EINVAL;
-+		}
-+
-+		cpu_topology[cpu].cluster_id = cluster_id;
-+		cpu_topology[cpu].core_id = core_id;
-+	} else if (leaf) {
-+		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
++	per_cpu(cpu_scale, cpu) = power;
 +}
 +
-+static int __init parse_cluster(struct device_node *cluster, int depth)
-+{
-+	char name[10];
-+	bool leaf = true;
-+	bool has_cores = false;
-+	struct device_node *c;
-+	static int __initdata cluster_id;
-+	int core_id = 0;
-+	int i, ret;
-+
-+	/*
-+	 * First check for child clusters; we currently ignore any
-+	 * information about the nesting of clusters and present the
-+	 * scheduler with a flat list of them.
-+	 */
-+	i = 0;
-+	do {
-+		snprintf(name, sizeof(name), "cluster%d", i);
-+		c = of_get_child_by_name(cluster, name);
-+		if (c) {
-+			parse_cluster(c, depth + 1);
-+			leaf = false;
-+		}
-+		i++;
-+	} while (c);
-+
-+	/* Now check for cores */
-+	i = 0;
-+	do {
-+		snprintf(name, sizeof(name), "core%d", i);
-+		c = of_get_child_by_name(cluster, name);
-+		if (c) {
-+			has_cores = true;
-+
-+			if (depth == 0)
-+				pr_err("%s: cpu-map children should be clusters\n",
-+				       c->full_name);
-+
-+			if (leaf) {
-+				ret = parse_core(c, cluster_id, core_id++);
-+				if (ret != 0) {
-+					return ret;
-+				}
-+			} else {
-+				pr_err("%s: Non-leaf cluster with core %s\n",
-+				       cluster->full_name, name);
-+				return -EINVAL;
-+			}
-+		}
-+		i++;
-+	} while (c);
-+
-+	if (leaf && !has_cores)
-+		pr_warn("%s: empty cluster\n", cluster->full_name);
-+
-+	if (leaf)
-+		cluster_id++;
-+
-+	return 0;
-+}
-+
-+static int __init parse_dt_topology(void)
-+{
-+	struct device_node *cn;
-+
-+	cn = of_find_node_by_path("/cpus");
-+	if (!cn) {
-+		pr_err("No CPU information found in DT\n");
-+		return 0;
-+	}
-+
-+	/*
-+	 * When topology is provided cpu-map is essentially a root
-+	 * cluster with restricted subnodes.
-+	 */
-+	cn = of_get_child_by_name(cn, "cpu-map");
-+	if (!cn)
-+		return 0;
-+	return parse_cluster(cn, 0);
-+}
-+
-+#else
-+static inline int parse_dt_topology(void) { return 0; }
-+#endif
-+
- /*
-  * cpu topology table
-  */
-@@ -74,11 +225,7 @@ void store_cpu_topology(unsigned int cpuid)
- 	update_siblings_masks(cpuid);
- }
- 
--/*
-- * init_cpu_topology is called at boot when only one cpu is running
-- * which prevent simultaneous write access to cpu_topology array
-- */
--void __init init_cpu_topology(void)
-+static void __init reset_cpu_topology(void)
+ #ifdef CONFIG_OF
+ static int __init get_cpu_for_node(struct device_node *node)
  {
- 	unsigned int cpu;
- 
-@@ -93,3 +240,18 @@ void __init init_cpu_topology(void)
- 		cpumask_clear(&cpu_topo->thread_sibling);
- 	}
+@@ -148,9 +172,49 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+ 	return 0;
  }
+ 
++struct cpu_efficiency {
++	const char *compatible;
++	unsigned long efficiency;
++};
 +
 +/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
++ * Table of relative efficiency of each processors
++ * The efficiency value must fit in 20bit and the final
++ * cpu_scale value must be in the range
++ *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
++ * in order to return@most 1 when DIV_ROUND_CLOSEST
++ * is used to compute the capacity of a CPU.
++ * Processors that are not defined in the table,
++ * use the default SCHED_POWER_SCALE value for cpu_scale.
 + */
-+void __init init_cpu_topology(void)
-+{
-+	int ret;
++static const struct cpu_efficiency table_efficiency[] = {
++	{ NULL, },
++};
 +
-+	reset_cpu_topology();
++static unsigned long *__cpu_capacity;
++#define cpu_capacity(cpu)	__cpu_capacity[cpu]
 +
-+	ret = parse_dt_topology();
++static unsigned long middle_capacity = 1;
++
++/*
++ * Iterate all CPUs' descriptor in DT and compute the efficiency
++ * (as per table_efficiency). Also calculate a middle efficiency
++ * as close as possible to  (max{eff_i} - min{eff_i}) / 2
++ * This is later used to scale the cpu_power field such that an
++ * 'average' CPU is of middle power. Also see the comments near
++ * table_efficiency[] and update_cpu_power().
++ */
+ static int __init parse_dt_topology(void)
+ {
++	const struct cpu_efficiency *cpu_eff;
+ 	struct device_node *cn;
++	unsigned long min_capacity = ULONG_MAX;
++	unsigned long max_capacity = 0;
++	unsigned long capacity = 0;
++	int cpu, ret;
++
++	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
++				 GFP_NOWAIT);
+ 
+ 	cn = of_find_node_by_path("/cpus");
+ 	if (!cn) {
+@@ -165,11 +229,88 @@ static int __init parse_dt_topology(void)
+ 	cn = of_get_child_by_name(cn, "cpu-map");
+ 	if (!cn)
+ 		return 0;
+-	return parse_cluster(cn, 0);
++
++	ret = parse_cluster(cn, 0);
 +	if (ret != 0)
-+		reset_cpu_topology();
++		return ret;
++
++	for_each_possible_cpu(cpu) {
++		const u32 *rate;
++		int len;
++
++		/* Too early to use cpu->of_node */
++		cn = of_get_cpu_node(cpu, NULL);
++		if (!cn) {
++			pr_err("Missing device node for CPU %d\n", cpu);
++			continue;
++		}
++
++		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
++			if (of_device_is_compatible(cn, cpu_eff->compatible))
++				break;
++
++		if (cpu_eff->compatible == NULL) {
++			pr_warn("%s: Unknown CPU type\n", cn->full_name);
++			continue;
++		}
++
++		rate = of_get_property(cn, "clock-frequency", &len);
++		if (!rate || len != 4) {
++			pr_err("%s: Missing clock-frequency property\n",
++				cn->full_name);
++			continue;
++		}
++
++		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++
++		/* Save min capacity of the system */
++		if (capacity < min_capacity)
++			min_capacity = capacity;
++
++		/* Save max capacity of the system */
++		if (capacity > max_capacity)
++			max_capacity = capacity;
++
++		cpu_capacity(cpu) = capacity;
++	}
++
++	/* If min and max capacities are equal we bypass the update of the
++	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
++	 * compute a middle_capacity factor that will ensure that the capacity
++	 * of an 'average' CPU of the system will be as close as possible to
++	 * SCHED_POWER_SCALE, which is the default value, but with the
++	 * constraint explained near table_efficiency[].
++	 */
++	if (min_capacity == max_capacity)
++		return 0;
++	else if (4 * max_capacity < (3 * (max_capacity + min_capacity)))
++		middle_capacity = (min_capacity + max_capacity)
++				>> (SCHED_POWER_SHIFT+1);
++	else
++		middle_capacity = ((max_capacity / 3)
++				>> (SCHED_POWER_SHIFT-1)) + 1;
++
 +}
++
++/*
++ * Look for a customed capacity of a CPU in the cpu_topo_data table during the
++ * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
++ * function returns directly for SMP system.
++ */
++static void update_cpu_power(unsigned int cpu)
++{
++	if (!cpu_capacity(cpu))
++		return;
++
++	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
++
++	pr_info("CPU%u: update cpu_power %lu\n",
++		cpu, arch_scale_freq_power(NULL, cpu));
+ }
+ 
+ #else
+ static inline int parse_dt_topology(void) { return 0; }
++static inline void update_cpu_power(unsigned int cpuid) {}
+ #endif
+ 
+ /*
+@@ -223,6 +364,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ void store_cpu_topology(unsigned int cpuid)
+ {
+ 	update_siblings_masks(cpuid);
++	update_cpu_power(cpuid);
+ }
+ 
+ static void __init reset_cpu_topology(void)
+@@ -238,6 +380,8 @@ static void __init reset_cpu_topology(void)
+ 		cpu_topo->cluster_id = -1;
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++
++		set_power_scale(cpu, SCHED_POWER_SCALE);
+ 	}
+ }
+ 
 -- 
 1.9.0
