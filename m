@@ -1,35 +1,91 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 05 Mar 2014 14:02:24 +0100
-Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
- suspend
-In-Reply-To: <20140305061647.GS13126@sirena.org.uk>
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
- <7021741.2WcVMr4q95@vostro.rjw.lan> <20140305061647.GS13126@sirena.org.uk>
-Message-ID: <2429070.qaGktSfi2s@vostro.rjw.lan>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 5 Mar 2014 15:07:01 +0200
+Subject: [PATCH v4 4/4] ARM: OMAP2+: Add pdata quirk for sys_clkout2 for
+ omap3 DBB056
+In-Reply-To: <20140228223741.GM13624@atomide.com>
+References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
+ <1392387656-15186-5-git-send-email-chf.fritz@googlemail.com>
+ <20140228223741.GM13624@atomide.com>
+Message-ID: <53172175.5060603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 05, 2014 02:16:47 PM Mark Brown wrote:
-> On Sun, Mar 02, 2014 at 12:38:47AM +0100, Rafael J. Wysocki wrote:
-> 
-> > OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
-> > and I think it'd be better to push them through the respective subsystem trees
-> > later anyway.
-> 
-> Is there a tag we can pull to get those patches?  The driver changes
-> depend on the new API introduced in patch 2.
+On 03/01/2014 12:37 AM, Tony Lindgren wrote:
+> * Christoph Fritz <chf.fritz@googlemail.com> [140214 06:24]:
+>> Full device tree support for clock control, especially to set frequencies,
+>> is not yet accomplished. Until then, configure the 24Mhz of sys_clkout2 to
+>> feed an USB-Hub here.
+>
+> Hmm would like to see Tero's comments on this, I wonder if we should
+> wait on this to avoid extra churn?
 
-They are in the pm-drivers branch of linux-pm.git.
+Well, the set I posted that adds default clock parenting / default rate 
+support to DT hasn't actually moved forward, so you might want to take 
+this in as is now if it should be rushed. The clk-enable part isn't done 
+currently by anything anyway. Just wondering though, should you create 
+some sort of driver for your usb-hub which would control these clocks?
 
-Thanks!
+-Tero
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/e78e2525/attachment.sig>
+
+>
+> Regards,
+>
+> Tony
+>
+>> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+>> ---
+>>   arch/arm/mach-omap2/pdata-quirks.c |   37 ++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 37 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+>> index 435a823..e36ac3f 100644
+>> --- a/arch/arm/mach-omap2/pdata-quirks.c
+>> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+>> @@ -172,6 +172,43 @@ static void __init am3517_evm_legacy_init(void)
+>>
+>>   static void __init omap3_dbb056_legacy_init(void)
+>>   {
+>> +	struct clk *clkout2;
+>> +	struct clk *cm96fck;
+>> +
+>> +	/* Reparent clkout2 to 96M_FCK */
+>> +	pr_info("%s: Late Reparent clkout2 to 96M_FCK\n", __func__);
+>> +	clkout2 = clk_get(NULL, "clkout2_src_ck");
+>> +	if (clkout2 < 0) {
+>> +		pr_err("a83x-quirk: couldn't get clkout2_src_ck\n");
+>> +		return;
+>> +	}
+>> +	cm96fck = clk_get(NULL, "cm_96m_fck");
+>> +	if (cm96fck < 0) {
+>> +		pr_err("a83x-quirk: couldn't get cm_96m_fck\n");
+>> +		return;
+>> +	}
+>> +	if (clk_set_parent(clkout2, cm96fck) < 0) {
+>> +		pr_err("a83x-quirk: couldn't reparent clkout2_src_ck\n");
+>> +		return;
+>> +	}
+>> +
+>> +	/* Set clkout2 to 24MHz for internal usb hub*/
+>> +	pr_info("%s: Set clkout2 to 24MHz for internal usb hub\n", __func__);
+>> +	clkout2 = clk_get(NULL, "sys_clkout2");
+>> +	if (clkout2 < 0) {
+>> +		pr_err("%s: couldn't get sys_clkout2\n", __func__);
+>> +		return;
+>> +	}
+>> +	if (clk_set_rate(clkout2, 24000000) < 0) {
+>> +		pr_err("%s: couldn't set sys_clkout2 rate\n", __func__);
+>> +		return;
+>> +	}
+>> +	if (clk_prepare_enable(clkout2) < 0) {
+>> +		pr_err("%s: couldn't enable sys_clkout2\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	/* Initialize display */
+>>   	omap3_dbb056_display_init_of();
+>>   }
+>>   #endif /* CONFIG_ARCH_OMAP3 */
+>> --
+>> 1.7.10.4
+>>
