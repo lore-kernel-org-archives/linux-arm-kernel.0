@@ -1,47 +1,52 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  5 Mar 2014 14:25:50 +0100
-Subject: [PATCH v2 5/6] ARM: dts: imx6: add PCIe interrupt mapping properties
+Date: Wed,  5 Mar 2014 14:25:49 +0100
+Subject: [PATCH v2 4/6] ARM: dts: exynos5440: fix PCIe interrupt mapping
 In-Reply-To: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
 References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1394025951-32438-6-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1394025951-32438-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As defined by the common PCI bindings.
+So it actually works.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
-v2: drop blank lines
+v2: fix build breakage by including arm-gic.h
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/exynos5440.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index fb28b2ecb1db..c1c06d25decc 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -10,6 +10,8 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 02a0a1226cef..7628e2edf1b6 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -9,6 +9,8 @@
+  * published by the Free Software Foundation.
+ */
  
 +#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
  #include "skeleton.dtsi"
  
  / {
-@@ -127,6 +129,12 @@
- 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
- 			num-lanes = <1>;
- 			interrupts = <0 123 0x04>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
- 			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
- 			status = "disabled";
+@@ -274,7 +276,7 @@
+ 			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0x0 0 &gic 53>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+ 		num-lanes = <4>;
+ 		status = "disabled";
+ 	};
+@@ -295,7 +297,7 @@
+ 			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0x0 0 &gic 56>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 		num-lanes = <4>;
+ 		status = "disabled";
+ 	};
 -- 
 1.9.0
