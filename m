@@ -1,637 +1,494 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed,  5 Mar 2014 15:18:22 +0800
-Subject: [PATCH 2/6] sched: rework of sched_domain topology definition
-In-Reply-To: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1394003906-11630-3-git-send-email-vincent.guittot@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 5 Mar 2014 08:19:34 +0100
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CAPDyKFqK1JqxeJ_L_bzduixRLGA5m_FFPq_of2r6y0aCpS7z9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We replace the old way to configure the scheduler topology with a new method
-which enables a platform to declare additionnal level (if needed).
+On 3 March 2014 17:02, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> This patch introduces generic code to perform power domain look-up using
+> device tree and automatically bind devices to their power domains.
+> Generic device tree binding is introduced to specify power domains of
+> devices in their device tree nodes.
+>
+> Backwards compatibility with legacy Samsung-specific power domain
+> bindings is provided, but for now the new code is not compiled when
+> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+> will change as soon as Exynos power domain code gets converted to use
+> the generic framework in further patch.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+>  drivers/base/power/domain.c                        | 298 +++++++++++++++++++++
+>  include/linux/pm_domain.h                          |  46 ++++
+>  kernel/power/Kconfig                               |   4 +
+>  4 files changed, 399 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+>
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> new file mode 100644
+> index 0000000..93be5d9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -0,0 +1,51 @@
+> +* Generic power domains
+> +
+> +System on chip designs are often divided into multiple power domains that
+> +can be used for power gating of selected IP blocks for power saving by
+> +reduced leakage current.
+> +
+> +This device tree binding can be used to bind power domain consumer devices
+> +with their power domains provided by power domain providers. A power domain
+> +provider can be represented by any node in the device tree and can provide
+> +one or more power domains. A consumer node can refer to the provider by
+> +a phandle and a set of phandle arguments (so called power domain specifier)
+> +of length specified by #power-domain-cells property in the power domain
+> +provider node.
+> +
+> +==Power domain providers==
+> +
+> +Required properties:
+> + - #power-domain-cells : Number of cells in a power domain specifier;
+> +   Typically 0 for nodes representing a single power domain and 1 for nodes
+> +   providing multiple power domains (e.g. power controllers), but can be
+> +   any value as specified by device tree binding documentation of particular
+> +   provider.
+> +
+> +Example:
+> +
+> +       power: power-controller at 12340000 {
+> +               compatible = "foo,power-controller";
+> +               reg = <0x12340000 0x1000>;
+> +               #power-domain-cells = <1>;
+> +       };
+> +
+> +The node above defines a power controller that is a power domain provider
+> +and expects one cell as its phandle argument.
+> +
+> +==Power domain consumers==
+> +
+> +Required properties:
+> + - power-domain : A phandle and power domain specifier as defined by bindings
+> +                  of power controller specified by phandle.
+> +
+> +Example:
+> +
+> +       leaky-device at 12350000 {
+> +               compatible = "foo,i-leak-current";
+> +               reg = <0x12350000 0x1000>;
+> +               power-domain = <&power 0>;
+> +       };
+> +
+> +The node above defines a typical power domain consumer device, which is located
+> +inside power domain with index 0 of power controller represented by node with
+> +label "power".
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index dc127e5..006b455 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -3,12 +3,16 @@
+>   *
+>   * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
+>   *
+> + * Support for Device Tree based power domain providers:
+> + * Copyright (C) 2014 Tomasz Figa <tomasz.figa@gmail.com>
+> + *
+>   * This file is released under the GPLv2.
+>   */
+>
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/io.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_qos.h>
+> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>         list_add(&genpd->gpd_list_node, &gpd_list);
+>         mutex_unlock(&gpd_list_lock);
+>  }
+> +
+> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 
-We still have a default topology table definition that can be used by platform
-that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
-be overwritten by an arch which wants to add new level where a load balance
-make sense like BOOK or powergating level.
+Do we need a new config for this? Can't we just use CONFIG_OF?
 
-For each level, we need a function pointer that returns cpumask for each cpu,
-the flags configuration and a name. Each level must be a subset on
-the next one. The build sequence of the sched_domain will take care of
-removing useless levels like those with 1 CPU and those with the same CPU span
-and relevant information for load balancing than its child .
+> +/*
+> + * DEVICE TREE BASED POWER DOMAIN PROVIDERS
+> + *
+> + * The code below implements generic device tree based power domain providers
+> + * that bind device tree nodes with generic power domains registered in the
+> + * system.
+> + *
+> + * Any driver that registers generic power domains and need to support binding
+> + * of devices to these domains is supposed to register a power domain provider,
+> + * which maps a power domain specifier retrieved from device tree to a power
+> + * domain.
+> + *
+> + * Two simple mapping functions have been provided for convenience:
+> + *  - of_genpd_xlate_simple() for 1:1 device tree node to domain mapping,
+> + *  - of_genpd_xlate_onecell() for mapping of multiple domains per node
+> + *    by index.
+> + */
+> +
+> +/**
+> + * struct of_genpd_provider - Power domain provider registration structure
+> + * @link: Entry in global list of domain providers
+> + * @node: Pointer to device tree node of domain provider
+> + * @xlate: Provider-specific xlate callback mapping a set of specifier cells
+> + *         into a power domain.
+> + * @data: context pointer to be passed into @xlate callback
+> + */
+> +struct of_genpd_provider {
+> +       struct list_head link;
+> +
+> +       struct device_node *node;
+> +       genpd_xlate_t xlate;
+> +       void *data;
+> +};
+> +
+> +/* List of registered power domain providers. */
+> +static LIST_HEAD(of_genpd_providers);
+> +/* Mutex to protect the list above. */
+> +static DEFINE_MUTEX(of_genpd_mutex);
+> +
+> +/**
+> + * of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
+> + * @genpdspec: OF phandle args to map into a power domain
+> + * @data: xlate function private data - pointer to struct generic_pm_domain
+> + *
+> + * This is a generic xlate function that can be used to model power domains
+> + * that have their own device tree nodes. The private data of xlate function
+> + * needs to be a valid pointer to struct generic_pm_domain.
+> + */
+> +struct generic_pm_domain *of_genpd_xlate_simple(
+> +                                       struct of_phandle_args *genpdspec,
+> +                                       void *data)
+> +{
+> +       if (genpdspec->args_count != 0)
+> +               return ERR_PTR(-EINVAL);
+> +       return data;
+> +}
+> +EXPORT_SYMBOL_GPL(of_genpd_xlate_simple);
+> +
+> +/**
+> + * of_genpd_xlate_onecell() - Xlate function for providers using single index.
+> + * @genpdspec: OF phandle args to map into a power domain
+> + * @data: xlate function private data - pointer to struct genpd_onecell_data
+> + *
+> + * This is a generic xlate function that can be used to model simple power
+> + * domain controllers that have one device tree node and provide multiple
+> + * power domains. A single cell is used as an index to an array of power
+> + * domains specified in genpd_onecell_data struct when registering the
+> + * provider.
+> + */
+> +struct generic_pm_domain *of_genpd_xlate_onecell(
+> +                                       struct of_phandle_args *genpdspec,
+> +                                       void *data)
+> +{
+> +       struct genpd_onecell_data *genpd_data = data;
+> +       unsigned int idx = genpdspec->args[0];
+> +
+> +       if (genpdspec->args_count != 1)
+> +               return ERR_PTR(-EINVAL);
+> +
+> +       if (idx >= genpd_data->domain_num) {
+> +               pr_err("%s: invalid domain index %d\n", __func__, idx);
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       return genpd_data->domains[idx];
+> +}
+> +EXPORT_SYMBOL_GPL(of_genpd_xlate_onecell);
+> +
+> +/**
+> + * of_genpd_add_provider() - Register a domain provider for a node
+> + * @np: Device node pointer associated with domain provider.
+> + * @xlate: Callback for decoding domain from phandle arguments.
+> + * @data: Context pointer for @genpd_src_get callback.
+> + */
+> +int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
+> +                         void *data)
+> +{
+> +       struct of_genpd_provider *cp;
+> +
+> +       cp = kzalloc(sizeof(*cp), GFP_KERNEL);
+> +       if (!cp)
+> +               return -ENOMEM;
+> +
+> +       cp->node = of_node_get(np);
+> +       cp->data = data;
+> +       cp->xlate = xlate;
+> +
+> +       mutex_lock(&of_genpd_mutex);
+> +       list_add(&cp->link, &of_genpd_providers);
+> +       mutex_unlock(&of_genpd_mutex);
+> +       pr_debug("Added domain provider from %s\n", np->full_name);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_genpd_add_provider);
+> +
+> +/**
+> + * of_genpd_del_provider() - Remove a previously registered domain provider
+> + * @np: Device node pointer associated with domain provider
+> + */
+> +void of_genpd_del_provider(struct device_node *np)
+> +{
+> +       struct of_genpd_provider *cp;
+> +
+> +       mutex_lock(&of_genpd_mutex);
+> +       list_for_each_entry(cp, &of_genpd_providers, link) {
+> +               if (cp->node == np) {
+> +                       list_del(&cp->link);
+> +                       of_node_put(cp->node);
+> +                       kfree(cp);
+> +                       break;
+> +               }
+> +       }
+> +       mutex_unlock(&of_genpd_mutex);
+> +}
+> +EXPORT_SYMBOL_GPL(of_genpd_del_provider);
+> +
+> +/* See of_genpd_get_from_provider(). */
+> +static struct generic_pm_domain *__of_genpd_get_from_provider(
+> +                                       struct of_phandle_args *genpdspec)
+> +{
+> +       struct of_genpd_provider *provider;
+> +       struct generic_pm_domain *genpd = ERR_PTR(-EPROBE_DEFER);
+> +
+> +       /* Check if we have such a provider in our array */
+> +       list_for_each_entry(provider, &of_genpd_providers, link) {
+> +               if (provider->node == genpdspec->np)
+> +                       genpd = provider->xlate(genpdspec, provider->data);
+> +               if (!IS_ERR(genpd))
+> +                       break;
+> +       }
+> +
+> +       return genpd;
+> +}
+> +
+> +/**
+> + * of_genpd_get_from_provider() - Look-up power domain
+> + * @genpdspec: OF phandle args to use for look-up
+> + *
+> + * Looks for domain provider under node specified by @genpdspec and if found
+> + * uses xlate function of the provider to map phandle args to a power domain.
+> + *
+> + * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
+> + * on failure.
+> + */
+> +static struct generic_pm_domain *of_genpd_get_from_provider(
+> +                                       struct of_phandle_args *genpdspec)
+> +{
+> +       struct generic_pm_domain *genpd;
+> +
+> +       mutex_lock(&of_genpd_mutex);
+> +       genpd = __of_genpd_get_from_provider(genpdspec);
+> +       mutex_unlock(&of_genpd_mutex);
+> +
+> +       return genpd;
+> +}
+> +
+> +/*
+> + * DEVICE<->DOMAIN BINDING USING DEVICE TREE LOOK-UP
+> + *
+> + * The code below registers a notifier for platform bus devices'
+> + * BUS_NOTIFY_BIND_DRIVER events and tries to attach devices to their power
+> + * domains by looking them up using Device Tree.
+> + *
+> + * Similarly in BUS_NOTIFY_UNBOUND_DRIVER the device is detached from its
+> + * domain, since it no longer supports runtime PM without any driver bound
+> + * to it.
+> + *
+> + * Both generic and legacy Samsung-specific DT bindings are supported to
+> + * keep backwards compatibility with existing DTBs.
+> + */
+> +
+> +/**
+> + * genpd_bind_domain - Bind device to its power domain using Device Tree.
+> + * @dev: Device to bind to its power domain.
+> + *
+> + * Tries to parse power domain specifier from device's OF node and if succeeds
+> + * attaches the device to retrieved power domain.
+> + *
+> + * Returns 0 on success or negative error code otherwise.
+> + */
+> +int genpd_bind_domain(struct device *dev)
+> +{
+> +       struct of_phandle_args pd_args;
+> +       struct generic_pm_domain *pd;
+> +       int ret;
+> +
+> +       if (!dev->of_node)
+> +               return 0;
+> +
+> +       ret = of_parse_phandle_with_args(dev->of_node, "power-domain",
+> +                                       "#power-domain-cells", 0, &pd_args);
+> +       if (ret < 0) {
+> +               if (ret != -ENOENT)
+> +                       return ret;
+> +
+> +               /*
+> +                * Try legacy Samsung-specific bindings
+> +                * (for backwards compatibility of DT ABI)
+> +                */
+> +               pd_args.args_count = 0;
+> +               pd_args.np = of_parse_phandle(dev->of_node,
+> +                                               "samsung,power-domain", 0);
+> +               if (!pd_args.np)
+> +                       return 0;
+> +       }
+> +
+> +       pd = of_genpd_get_from_provider(&pd_args);
+> +       if (IS_ERR(pd)) {
+> +               if (PTR_ERR(pd) != -EPROBE_DEFER)
+> +                       dev_err(dev, "failed to find power domain: %ld\n",
+> +                               PTR_ERR(pd));
+> +               return PTR_ERR(pd);
+> +       }
+> +
+> +       dev_dbg(dev, "adding to power domain %s\n", pd->name);
+> +
+> +       while (1) {
+> +               ret = pm_genpd_add_device(pd, dev);
+> +               if (ret != -EAGAIN)
+> +                       break;
+> +               cond_resched();
+> +       }
+> +
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to add to power domain %s: %d",
+> +                       pd->name, ret);
+> +               return ret;
+> +       }
+> +
+> +       pm_genpd_dev_need_restore(dev, true);
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- arch/ia64/include/asm/topology.h |   24 ----
- arch/s390/include/asm/topology.h |    2 -
- arch/tile/include/asm/topology.h |   33 ------
- include/linux/sched.h            |   29 +++++
- include/linux/topology.h         |  128 +++------------------
- kernel/sched/core.c              |  227 +++++++++++++++++++-------------------
- 6 files changed, 156 insertions(+), 287 deletions(-)
+So this will reflect the device as being inactive, which I think is
+the wrong approach.
 
-diff --git a/arch/ia64/include/asm/topology.h b/arch/ia64/include/asm/topology.h
-index a2496e4..20d12fa 100644
---- a/arch/ia64/include/asm/topology.h
-+++ b/arch/ia64/include/asm/topology.h
-@@ -46,30 +46,6 @@
- 
- void build_cpu_to_node_map(void);
- 
--#define SD_CPU_INIT (struct sched_domain) {		\
--	.parent			= NULL,			\
--	.child			= NULL,			\
--	.groups			= NULL,			\
--	.min_interval		= 1,			\
--	.max_interval		= 4,			\
--	.busy_factor		= 64,			\
--	.imbalance_pct		= 125,			\
--	.cache_nice_tries	= 2,			\
--	.busy_idx		= 2,			\
--	.idle_idx		= 1,			\
--	.newidle_idx		= 0,			\
--	.wake_idx		= 0,			\
--	.forkexec_idx		= 0,			\
--	.flags			= SD_LOAD_BALANCE	\
--				| SD_BALANCE_NEWIDLE	\
--				| SD_BALANCE_EXEC	\
--				| SD_BALANCE_FORK	\
--				| SD_WAKE_AFFINE,	\
--	.last_balance		= jiffies,		\
--	.balance_interval	= 1,			\
--	.nr_balance_failed	= 0,			\
--}
--
- #endif /* CONFIG_NUMA */
- 
- #ifdef CONFIG_SMP
-diff --git a/arch/s390/include/asm/topology.h b/arch/s390/include/asm/topology.h
-index 05425b1..07763bd 100644
---- a/arch/s390/include/asm/topology.h
-+++ b/arch/s390/include/asm/topology.h
-@@ -64,8 +64,6 @@ static inline void s390_init_cpu_topology(void)
- };
- #endif
- 
--#define SD_BOOK_INIT	SD_CPU_INIT
--
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_S390_TOPOLOGY_H */
-diff --git a/arch/tile/include/asm/topology.h b/arch/tile/include/asm/topology.h
-index d15c0d8..9383118 100644
---- a/arch/tile/include/asm/topology.h
-+++ b/arch/tile/include/asm/topology.h
-@@ -44,39 +44,6 @@ static inline const struct cpumask *cpumask_of_node(int node)
- /* For now, use numa node -1 for global allocation. */
- #define pcibus_to_node(bus)		((void)(bus), -1)
- 
--/*
-- * TILE architecture has many cores integrated in one processor, so we need
-- * setup bigger balance_interval for both CPU/NODE scheduling domains to
-- * reduce process scheduling costs.
-- */
--
--/* sched_domains SD_CPU_INIT for TILE architecture */
--#define SD_CPU_INIT (struct sched_domain) {				\
--	.min_interval		= 4,					\
--	.max_interval		= 128,					\
--	.busy_factor		= 64,					\
--	.imbalance_pct		= 125,					\
--	.cache_nice_tries	= 1,					\
--	.busy_idx		= 2,					\
--	.idle_idx		= 1,					\
--	.newidle_idx		= 0,					\
--	.wake_idx		= 0,					\
--	.forkexec_idx		= 0,					\
--									\
--	.flags			= 1*SD_LOAD_BALANCE			\
--				| 1*SD_BALANCE_NEWIDLE			\
--				| 1*SD_BALANCE_EXEC			\
--				| 1*SD_BALANCE_FORK			\
--				| 0*SD_BALANCE_WAKE			\
--				| 0*SD_WAKE_AFFINE			\
--				| 0*SD_SHARE_CPUPOWER			\
--				| 0*SD_SHARE_PKG_RESOURCES		\
--				| 0*SD_SERIALIZE			\
--				,					\
--	.last_balance		= jiffies,				\
--	.balance_interval	= 32,					\
--}
--
- /* By definition, we create nodes based on online memory. */
- #define node_has_online_mem(nid) 1
- 
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 825ed83..dbc35dd 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -976,6 +976,35 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
- 
- bool cpus_share_cache(int this_cpu, int that_cpu);
- 
-+typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
-+
-+#define SDTL_OVERLAP	0x01
-+
-+struct sd_data {
-+	struct sched_domain **__percpu sd;
-+	struct sched_group **__percpu sg;
-+	struct sched_group_power **__percpu sgp;
-+};
-+
-+struct sched_domain_topology_level {
-+	sched_domain_mask_f mask;
-+	int		    sd_flags;
-+	int		    flags;
-+	int		    numa_level;
-+	struct sd_data      data;
-+#ifdef CONFIG_SCHED_DEBUG
-+	char                *name;
-+#endif
-+};
-+
-+extern struct sched_domain_topology_level *sched_domain_topology;
-+
-+#ifdef CONFIG_SCHED_DEBUG
-+# define SD_INIT_NAME(type)		.name = #type
-+#else
-+# define SD_INIT_NAME(type)
-+#endif
-+
- #else /* CONFIG_SMP */
- 
- struct sched_domain_attr;
-diff --git a/include/linux/topology.h b/include/linux/topology.h
-index 12ae6ce..3a9db05 100644
---- a/include/linux/topology.h
-+++ b/include/linux/topology.h
-@@ -66,121 +66,6 @@ int arch_update_cpu_topology(void);
- #define PENALTY_FOR_NODE_WITH_CPUS	(1)
- #endif
- 
--/*
-- * Below are the 3 major initializers used in building sched_domains:
-- * SD_SIBLING_INIT, for SMT domains
-- * SD_CPU_INIT, for SMP domains
-- *
-- * Any architecture that cares to do any tuning to these values should do so
-- * by defining their own arch-specific initializer in include/asm/topology.h.
-- * A definition there will automagically override these default initializers
-- * and allow arch-specific performance tuning of sched_domains.
-- * (Only non-zero and non-null fields need be specified.)
-- */
--
--#ifdef CONFIG_SCHED_SMT
--/* MCD - Do we really need this?  It is always on if CONFIG_SCHED_SMT is,
-- * so can't we drop this in favor of CONFIG_SCHED_SMT?
-- */
--#define ARCH_HAS_SCHED_WAKE_IDLE
--/* Common values for SMT siblings */
--#ifndef SD_SIBLING_INIT
--#define SD_SIBLING_INIT (struct sched_domain) {				\
--	.min_interval		= 1,					\
--	.max_interval		= 2,					\
--	.busy_factor		= 64,					\
--	.imbalance_pct		= 110,					\
--									\
--	.flags			= 1*SD_LOAD_BALANCE			\
--				| 1*SD_BALANCE_NEWIDLE			\
--				| 1*SD_BALANCE_EXEC			\
--				| 1*SD_BALANCE_FORK			\
--				| 0*SD_BALANCE_WAKE			\
--				| 1*SD_WAKE_AFFINE			\
--				| 1*SD_SHARE_CPUPOWER			\
--				| 1*SD_SHARE_PKG_RESOURCES		\
--				| 0*SD_SERIALIZE			\
--				| 0*SD_PREFER_SIBLING			\
--				| arch_sd_sibling_asym_packing()	\
--				,					\
--	.last_balance		= jiffies,				\
--	.balance_interval	= 1,					\
--	.smt_gain		= 1178,	/* 15% */			\
--	.max_newidle_lb_cost	= 0,					\
--	.next_decay_max_lb_cost	= jiffies,				\
--}
--#endif
--#endif /* CONFIG_SCHED_SMT */
--
--#ifdef CONFIG_SCHED_MC
--/* Common values for MC siblings. for now mostly derived from SD_CPU_INIT */
--#ifndef SD_MC_INIT
--#define SD_MC_INIT (struct sched_domain) {				\
--	.min_interval		= 1,					\
--	.max_interval		= 4,					\
--	.busy_factor		= 64,					\
--	.imbalance_pct		= 125,					\
--	.cache_nice_tries	= 1,					\
--	.busy_idx		= 2,					\
--	.wake_idx		= 0,					\
--	.forkexec_idx		= 0,					\
--									\
--	.flags			= 1*SD_LOAD_BALANCE			\
--				| 1*SD_BALANCE_NEWIDLE			\
--				| 1*SD_BALANCE_EXEC			\
--				| 1*SD_BALANCE_FORK			\
--				| 0*SD_BALANCE_WAKE			\
--				| 1*SD_WAKE_AFFINE			\
--				| 0*SD_SHARE_CPUPOWER			\
--				| 1*SD_SHARE_PKG_RESOURCES		\
--				| 0*SD_SERIALIZE			\
--				,					\
--	.last_balance		= jiffies,				\
--	.balance_interval	= 1,					\
--	.max_newidle_lb_cost	= 0,					\
--	.next_decay_max_lb_cost	= jiffies,				\
--}
--#endif
--#endif /* CONFIG_SCHED_MC */
--
--/* Common values for CPUs */
--#ifndef SD_CPU_INIT
--#define SD_CPU_INIT (struct sched_domain) {				\
--	.min_interval		= 1,					\
--	.max_interval		= 4,					\
--	.busy_factor		= 64,					\
--	.imbalance_pct		= 125,					\
--	.cache_nice_tries	= 1,					\
--	.busy_idx		= 2,					\
--	.idle_idx		= 1,					\
--	.newidle_idx		= 0,					\
--	.wake_idx		= 0,					\
--	.forkexec_idx		= 0,					\
--									\
--	.flags			= 1*SD_LOAD_BALANCE			\
--				| 1*SD_BALANCE_NEWIDLE			\
--				| 1*SD_BALANCE_EXEC			\
--				| 1*SD_BALANCE_FORK			\
--				| 0*SD_BALANCE_WAKE			\
--				| 1*SD_WAKE_AFFINE			\
--				| 0*SD_SHARE_CPUPOWER			\
--				| 0*SD_SHARE_PKG_RESOURCES		\
--				| 0*SD_SERIALIZE			\
--				| 1*SD_PREFER_SIBLING			\
--				,					\
--	.last_balance		= jiffies,				\
--	.balance_interval	= 1,					\
--	.max_newidle_lb_cost	= 0,					\
--	.next_decay_max_lb_cost	= jiffies,				\
--}
--#endif
--
--#ifdef CONFIG_SCHED_BOOK
--#ifndef SD_BOOK_INIT
--#error Please define an appropriate SD_BOOK_INIT in include/asm/topology.h!!!
--#endif
--#endif /* CONFIG_SCHED_BOOK */
--
- #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
- DECLARE_PER_CPU(int, numa_node);
- 
-@@ -295,4 +180,17 @@ static inline int cpu_to_mem(int cpu)
- #define topology_core_cpumask(cpu)		cpumask_of(cpu)
- #endif
- 
-+#ifdef CONFIG_SCHED_SMT
-+static inline const struct cpumask *cpu_smt_mask(int cpu)
-+{
-+	return topology_thread_cpumask(cpu);
-+}
-+#endif
-+
-+static inline const struct cpumask *cpu_cpu_mask(int cpu)
-+{
-+	return cpumask_of_node(cpu_to_node(cpu));
-+}
-+
-+
- #endif /* _LINUX_TOPOLOGY_H */
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index ee8004c..6f6a8f0 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -5588,17 +5588,6 @@ static int __init isolated_cpu_setup(char *str)
- 
- __setup("isolcpus=", isolated_cpu_setup);
- 
--static const struct cpumask *cpu_cpu_mask(int cpu)
--{
--	return cpumask_of_node(cpu_to_node(cpu));
--}
--
--struct sd_data {
--	struct sched_domain **__percpu sd;
--	struct sched_group **__percpu sg;
--	struct sched_group_power **__percpu sgp;
--};
--
- struct s_data {
- 	struct sched_domain ** __percpu sd;
- 	struct root_domain	*rd;
-@@ -5611,21 +5600,6 @@ enum s_alloc {
- 	sa_none,
- };
- 
--struct sched_domain_topology_level;
--
--typedef struct sched_domain *(*sched_domain_init_f)(struct sched_domain_topology_level *tl, int cpu);
--typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
--
--#define SDTL_OVERLAP	0x01
--
--struct sched_domain_topology_level {
--	sched_domain_init_f init;
--	sched_domain_mask_f mask;
--	int		    flags;
--	int		    numa_level;
--	struct sd_data      data;
--};
--
- /*
-  * Build an iteration mask that can exclude certain CPUs from the upwards
-  * domain traversal.
-@@ -5854,34 +5828,6 @@ int __weak arch_sd_sibling_asym_packing(void)
-  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
-  */
- 
--#ifdef CONFIG_SCHED_DEBUG
--# define SD_INIT_NAME(sd, type)		sd->name = #type
--#else
--# define SD_INIT_NAME(sd, type)		do { } while (0)
--#endif
--
--#define SD_INIT_FUNC(type)						\
--static noinline struct sched_domain *					\
--sd_init_##type(struct sched_domain_topology_level *tl, int cpu) 	\
--{									\
--	struct sched_domain *sd = *per_cpu_ptr(tl->data.sd, cpu);	\
--	*sd = SD_##type##_INIT;						\
--	SD_INIT_NAME(sd, type);						\
--	sd->private = &tl->data;					\
--	return sd;							\
--}
--
--SD_INIT_FUNC(CPU)
--#ifdef CONFIG_SCHED_SMT
-- SD_INIT_FUNC(SIBLING)
--#endif
--#ifdef CONFIG_SCHED_MC
-- SD_INIT_FUNC(MC)
--#endif
--#ifdef CONFIG_SCHED_BOOK
-- SD_INIT_FUNC(BOOK)
--#endif
--
- static int default_relax_domain_level = -1;
- int sched_domain_level_max;
- 
-@@ -5969,97 +5915,148 @@ static void claim_allocations(int cpu, struct sched_domain *sd)
- 		*per_cpu_ptr(sdd->sgp, cpu) = NULL;
- }
- 
--#ifdef CONFIG_SCHED_SMT
--static const struct cpumask *cpu_smt_mask(int cpu)
--{
--	return topology_thread_cpumask(cpu);
--}
--#endif
--
--/*
-- * Topology list, bottom-up.
-- */
--static struct sched_domain_topology_level default_topology[] = {
--#ifdef CONFIG_SCHED_SMT
--	{ sd_init_SIBLING, cpu_smt_mask, },
--#endif
--#ifdef CONFIG_SCHED_MC
--	{ sd_init_MC, cpu_coregroup_mask, },
--#endif
--#ifdef CONFIG_SCHED_BOOK
--	{ sd_init_BOOK, cpu_book_mask, },
--#endif
--	{ sd_init_CPU, cpu_cpu_mask, },
--	{ NULL, },
--};
--
--static struct sched_domain_topology_level *sched_domain_topology = default_topology;
--
--#define for_each_sd_topology(tl)			\
--	for (tl = sched_domain_topology; tl->init; tl++)
-+static int sched_domains_curr_level;
- 
- #ifdef CONFIG_NUMA
--
- static int sched_domains_numa_levels;
- static int *sched_domains_numa_distance;
- static struct cpumask ***sched_domains_numa_masks;
--static int sched_domains_curr_level;
--
--static inline int sd_local_flags(int level)
--{
--	if (sched_domains_numa_distance[level] > RECLAIM_DISTANCE)
--		return 0;
-+#endif
- 
--	return SD_BALANCE_EXEC | SD_BALANCE_FORK | SD_WAKE_AFFINE;
--}
-+/*
-+ * SD_flags allowed in topology descriptions.
-+ *
-+ * SD_SHARE_CPUPOWER      - describes SMT topologies
-+ * SD_SHARE_PKG_RESOURCES - describes shared caches
-+ * SD_NUMA                - describes NUMA topologies
-+ *
-+ * Odd one out:
-+ * SD_ASYM_PACKING        - describes SMT quirks
-+ */
-+#define TOPOLOGY_SD_FLAGS		\
-+	(SD_SHARE_CPUPOWER |		\
-+	 SD_SHARE_PKG_RESOURCES |	\
-+	 SD_NUMA |			\
-+	 SD_ASYM_PACKING)
- 
- static struct sched_domain *
--sd_numa_init(struct sched_domain_topology_level *tl, int cpu)
-+sd_init(struct sched_domain_topology_level *tl, int cpu)
- {
- 	struct sched_domain *sd = *per_cpu_ptr(tl->data.sd, cpu);
--	int level = tl->numa_level;
--	int sd_weight = cpumask_weight(
--			sched_domains_numa_masks[level][cpu_to_node(cpu)]);
-+	int sd_weight;
-+
-+	/*
-+	 * Ugly hack to pass state to sd_numa_mask()...
-+	 */
-+	sched_domains_curr_level = tl->numa_level;
-+
-+	sd_weight = cpumask_weight(tl->mask(cpu));
-+
-+	if (WARN_ONCE(tl->sd_flags & ~TOPOLOGY_SD_FLAGS,
-+			"wrong sd_flags in topology description\n"))
-+		tl->sd_flags &= ~TOPOLOGY_SD_FLAGS;
- 
- 	*sd = (struct sched_domain){
- 		.min_interval		= sd_weight,
- 		.max_interval		= 2*sd_weight,
- 		.busy_factor		= 32,
- 		.imbalance_pct		= 125,
--		.cache_nice_tries	= 2,
--		.busy_idx		= 3,
--		.idle_idx		= 2,
-+
-+		.cache_nice_tries	= 0,
-+		.busy_idx		= 0,
-+		.idle_idx		= 0,
- 		.newidle_idx		= 0,
- 		.wake_idx		= 0,
- 		.forkexec_idx		= 0,
- 
- 		.flags			= 1*SD_LOAD_BALANCE
- 					| 1*SD_BALANCE_NEWIDLE
--					| 0*SD_BALANCE_EXEC
--					| 0*SD_BALANCE_FORK
-+					| 1*SD_BALANCE_EXEC
-+					| 1*SD_BALANCE_FORK
- 					| 0*SD_BALANCE_WAKE
--					| 0*SD_WAKE_AFFINE
-+					| 1*SD_WAKE_AFFINE
- 					| 0*SD_SHARE_CPUPOWER
- 					| 0*SD_SHARE_PKG_RESOURCES
--					| 1*SD_SERIALIZE
-+					| 0*SD_SERIALIZE
- 					| 0*SD_PREFER_SIBLING
--					| 1*SD_NUMA
--					| sd_local_flags(level)
-+					| 0*SD_NUMA
-+					| tl->sd_flags
- 					,
-+
- 		.last_balance		= jiffies,
- 		.balance_interval	= sd_weight,
-+		.smt_gain		= 0,
-+		.max_newidle_lb_cost	= 0,
-+		.next_decay_max_lb_cost	= jiffies,
-+#ifdef CONFIG_SCHED_DEBUG
-+		.name			= tl->name,
-+#endif
- 	};
--	SD_INIT_NAME(sd, NUMA);
--	sd->private = &tl->data;
- 
- 	/*
--	 * Ugly hack to pass state to sd_numa_mask()...
-+	 * Convert topological properties into behaviour.
- 	 */
--	sched_domains_curr_level = tl->numa_level;
-+
-+	if (sd->flags & SD_SHARE_CPUPOWER) {
-+		sd->imbalance_pct = 110;
-+		sd->smt_gain = 1178; /* ~15% */
-+		sd->flags |= arch_sd_sibling_asym_packing();
-+
-+	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
-+		sd->imbalance_pct = 117;
-+		sd->cache_nice_tries = 1;
-+		sd->busy_idx = 2;
-+
-+#ifdef CONFIG_NUMA
-+	} else if (sd->flags & SD_NUMA) {
-+		sd->cache_nice_tries = 2;
-+		sd->busy_idx = 3;
-+		sd->idle_idx = 2;
-+
-+		sd->flags |= SD_SERIALIZE;
-+		if (sched_domains_numa_distance[tl->numa_level] > RECLAIM_DISTANCE) {
-+			sd->flags &= ~(SD_BALANCE_EXEC |
-+				       SD_BALANCE_FORK |
-+				       SD_WAKE_AFFINE);
-+		}
-+
-+#endif
-+	} else {
-+		sd->flags |= SD_PREFER_SIBLING;
-+		sd->cache_nice_tries = 1;
-+		sd->busy_idx = 2;
-+		sd->idle_idx = 1;
-+	}
-+
-+	sd->private = &tl->data;
- 
- 	return sd;
- }
- 
-+/*
-+ * Topology list, bottom-up.
-+ */
-+static struct sched_domain_topology_level default_topology[] = {
-+#ifdef CONFIG_SCHED_SMT
-+	{ cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES, SD_INIT_NAME(SMT) },
-+#endif
-+#ifdef CONFIG_SCHED_MC
-+	{ cpu_coregroup_mask, SD_SHARE_PKG_RESOURCES, SD_INIT_NAME(MC) },
-+#endif
-+#ifdef CONFIG_SCHED_BOOK
-+	{ cpu_book_mask, SD_INIT_NAME(BOOK) },
-+#endif
-+	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
-+	{ NULL, },
-+};
-+
-+struct sched_domain_topology_level *sched_domain_topology = default_topology;
-+
-+#define for_each_sd_topology(tl)			\
-+	for (tl = sched_domain_topology; tl->mask; tl++)
-+
-+#ifdef CONFIG_NUMA
-+
- static const struct cpumask *sd_numa_mask(int cpu)
- {
- 	return sched_domains_numa_masks[sched_domains_curr_level][cpu_to_node(cpu)];
-@@ -6203,7 +6200,10 @@ static void sched_init_numa(void)
- 		}
- 	}
- 
--	tl = kzalloc((ARRAY_SIZE(default_topology) + level) *
-+	/* Compute default topology size */
-+	for (i = 0; sched_domain_topology[i].mask; i++);
-+
-+	tl = kzalloc((i + level) *
- 			sizeof(struct sched_domain_topology_level), GFP_KERNEL);
- 	if (!tl)
- 		return;
-@@ -6211,18 +6211,19 @@ static void sched_init_numa(void)
- 	/*
- 	 * Copy the default topology bits..
- 	 */
--	for (i = 0; default_topology[i].init; i++)
--		tl[i] = default_topology[i];
-+	for (i = 0; sched_domain_topology[i].mask; i++)
-+		tl[i] = sched_domain_topology[i];
- 
- 	/*
- 	 * .. and append 'j' levels of NUMA goodness.
- 	 */
- 	for (j = 0; j < level; i++, j++) {
- 		tl[i] = (struct sched_domain_topology_level){
--			.init = sd_numa_init,
- 			.mask = sd_numa_mask,
-+			.sd_flags = SD_NUMA,
- 			.flags = SDTL_OVERLAP,
- 			.numa_level = j,
-+			SD_INIT_NAME(NUMA)
- 		};
- 	}
- 
-@@ -6380,7 +6381,7 @@ struct sched_domain *build_sched_domain(struct sched_domain_topology_level *tl,
- 		const struct cpumask *cpu_map, struct sched_domain_attr *attr,
- 		struct sched_domain *child, int cpu)
- {
--	struct sched_domain *sd = tl->init(tl, cpu);
-+	struct sched_domain *sd = sd_init(tl, cpu);
- 	if (!sd)
- 		return child;
- 
--- 
-1.7.9.5
+Usually we should expect drivers that's being probed successfully to
+leave their devices in active state, right?
+
+Kind regards
+Ulf Hansson
+
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * genpd_unbind_domain - Unbind device from its power domain.
+> + * @dev: Device to unbind from its power domain.
+> + *
+> + * Unbinds device from power domain previously bound to it.
+> + *
+> + * Returns 0 on success or negative error code otherwise.
+> + */
+> +int genpd_unbind_domain(struct device *dev)
+> +{
+> +       struct generic_pm_domain *pd = dev_to_genpd(dev);
+> +       int ret;
+> +
+> +       if (!dev->of_node || IS_ERR(pd))
+> +               return 0;
+> +
+> +       dev_dbg(dev, "removing from power domain %s\n", pd->name);
+> +
+> +       while (1) {
+> +               ret = pm_genpd_remove_device(pd, dev);
+> +               if (ret != -EAGAIN)
+> +                       break;
+> +               cond_resched();
+> +       }
+> +
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to remove from power domain %s: %d",
+> +                       pd->name, ret);
+> +               return ret;
+> +       }
+> +
+> +       /* Check if domain can be powered off after removing this device. */
+> +       genpd_queue_power_off_work(pd);
+> +
+> +       return 0;
+> +}
+> +#endif
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 7c1d252..04473d4 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -310,4 +310,50 @@ static inline void pm_genpd_syscore_poweron(struct device *dev)
+>         pm_genpd_syscore_switch(dev, false);
+>  }
+>
+> +/* OF power domain providers */
+> +struct of_device_id;
+> +
+> +struct genpd_onecell_data {
+> +       struct generic_pm_domain **domains;
+> +       unsigned int domain_num;
+> +};
+> +
+> +typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
+> +                                                  void *data);
+> +
+> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+> +int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
+> +                         void *data);
+> +void of_genpd_del_provider(struct device_node *np);
+> +
+> +struct generic_pm_domain *of_genpd_xlate_simple(
+> +                                       struct of_phandle_args *genpdspec,
+> +                                       void *data);
+> +struct generic_pm_domain *of_genpd_xlate_onecell(
+> +                                       struct of_phandle_args *genpdspec,
+> +                                       void *data);
+> +
+> +int genpd_bind_domain(struct device *dev);
+> +int genpd_unbind_domain(struct device *dev);
+> +#else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+> +static inline int of_genpd_add_provider(struct device_node *np,
+> +                                       genpd_xlate_t xlate, void *data)
+> +{
+> +       return 0;
+> +}
+> +static inline void of_genpd_del_provider(struct device_node *np) {}
+> +
+> +#define of_genpd_xlate_simple          NULL
+> +#define of_genpd_xlate_onecell         NULL
+> +
+> +static inline int genpd_bind_domain(struct device *dev)
+> +{
+> +       return 0;
+> +}
+> +static inline int genpd_unbind_domain(struct device *dev)
+> +{
+> +       return 0;
+> +}
+> +#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+> +
+>  #endif /* _LINUX_PM_DOMAIN_H */
+> diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+> index 2fac9cc..45aa98e 100644
+> --- a/kernel/power/Kconfig
+> +++ b/kernel/power/Kconfig
+> @@ -306,6 +306,10 @@ config PM_GENERIC_DOMAINS_RUNTIME
+>         def_bool y
+>         depends on PM_RUNTIME && PM_GENERIC_DOMAINS
+>
+> +config PM_GENERIC_DOMAINS_OF
+> +       def_bool y
+> +       depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
+> +
+>  config CPU_PM
+>         bool
+>         depends on SUSPEND || CPU_IDLE
+> --
+> 1.9.0
+>
