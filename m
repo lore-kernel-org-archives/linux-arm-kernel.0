@@ -1,81 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 5 Mar 2014 15:48:22 +0800
-Subject: [GIT PULL 1/2] ARM: Keystone DTS updates for 3.15
-Message-ID: <1394005703-6624-1-git-send-email-santosh.shilimkar@ti.com>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Wed, 5 Mar 2014 08:53:11 +0100
+Subject: [PATCH 0/2]: ixp4xx: Fix 3.7 regression for IXP4xx ethernet driver
+Message-ID: <20140305085311.07b3922a@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arm-soc folks,
+Hi!
 
-Please pull below keystone DTS updates for 3.15. It merges cleanly with
-arm-soc 'for-next' and 'next/dt' heads.
+These two patches fixes the regression introduced in 3.7 by commit
+1a4901177574083c35fafc24c4d151c2a7c7647c,
 
-Please note that you get a trivial merge conflict while merging to the
-latest Linus tip, because of bug fix commit 565bbdcd3b{ARM: keystone:
-dts: fix clkvcp3 control register address} which got merged post
-3.14-rc5. If it needs to be avoided then I need to rebase the PULL
-request on top of 3.14-rc6 when it gets tagged. Do let me know if
-thats needed.
+  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+The patch above is not incorrect itself, but causes the driver to fail
+with
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+  [   33.055473] net eth1: coherent DMA mask is unset
+  [   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
 
-are available in the git repository at:
+The two patches fix this by generalizing and correcting the ixp4xx
+dma_set_coherent_mask(), which earlier only dealt with the PCI case.
+The second patch simply sets up the mask for the ixp4xx ethernet device.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
 
-for you to fetch changes up to 82c04f71ecacf225cdd0ea96ec91f28ca9db70a1:
+The patches have been verified on a board with 256MiB memory, one
+ipx4xx_eth device and a e100 PCI device, running Linus' tip.
 
-  ARM: dts: keystone: add AEMIF/NAND device entry (2014-02-28 21:05:24 -0500)
 
-----------------------------------------------------------------
-Keystone DTS updates for 3.15
+This issue has been discussed before:
 
-- Add watchdog timer, timer64 and gpio device nodes
-- Add LED device nodes
-- Fixes for debugss, msmc clock nodes
-- Add support for Keystone Lamarr and Edision SOC/EVM support
-- Add NAND and AEMIF device nodes
+   https://lkml.org/lkml/2014/1/2/46
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148811.html
 
-----------------------------------------------------------------
-Grygorii Strashko (3):
-      ARM: dts: keystone: add gpio device entry
-      ARM: dts: k2hk-evm: add leds supports
-      ARM: dts: k2hk-evm: rename clock node to clocks
-
-Ivan Khoronzhuk (4):
-      ARM: dts: keystone: add watchdog entry
-      ARM: dts: keystone: add keystone timer entry
-      ARM: dts: keystone: drop msmcsram clock node
-      ARM: dts: keystone: add AEMIF/NAND device entry
-
-Murali Karicheri (5):
-      ARM: dts: keystone: fix domain id for clkdebugsstrc
-      ARM: dts: keystone: update for supporting K2L/K2E EVMs
-      ARM: dts: keystone: preparatory patch to support K2L and K2E SOCs
-      ARM: dts: keystone: add support for K2 Lamarr SoC and EVM
-      ARM: dts: keystone: add support for k2 Edison SoC and EVM
-
- .../devicetree/bindings/arm/keystone/keystone.txt  |   10 +
- arch/arm/boot/dts/k2e-clocks.dtsi                  |   78 ++++
- arch/arm/boot/dts/k2e-evm.dts                      |   60 +++
- arch/arm/boot/dts/k2e.dtsi                         |   80 ++++
- arch/arm/boot/dts/k2hk-clocks.dtsi                 |  426 +++++++++++++++++++
- arch/arm/boot/dts/k2hk-evm.dts                     |   83 +++-
- arch/arm/boot/dts/k2hk.dtsi                        |   46 +++
- arch/arm/boot/dts/k2l-clocks.dtsi                  |  267 ++++++++++++
- arch/arm/boot/dts/k2l-evm.dts                      |   37 ++
- arch/arm/boot/dts/k2l.dtsi                         |   55 +++
- arch/arm/boot/dts/keystone-clocks.dtsi             |  427 +-------------------
- arch/arm/boot/dts/keystone.dtsi                    |  102 +++--
- arch/arm/mach-keystone/keystone.c                  |    3 +
- 13 files changed, 1224 insertions(+), 450 deletions(-)
- create mode 100644 arch/arm/boot/dts/k2e-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/k2e-evm.dts
- create mode 100644 arch/arm/boot/dts/k2e.dtsi
- create mode 100644 arch/arm/boot/dts/k2hk-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/k2hk.dtsi
- create mode 100644 arch/arm/boot/dts/k2l-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/k2l-evm.dts
- create mode 100644 arch/arm/boot/dts/k2l.dtsi
+// Simon
