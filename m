@@ -1,484 +1,493 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 5 Mar 2014 00:41:38 -0600
-Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
- <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CAL_JsqK4-zJ31VnV6qqYu8-AbD0VCeaJuc59HZ5ZWR6X=qWjbg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 4 Mar 2014 22:46:01 -0800
+Subject: [PATCH 1/5] drivers: input: keyboard: st-keyscan: add keyscan
+ driver
+In-Reply-To: <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
+References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
+ <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20140305064601.GB1834@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 3, 2014 at 10:02 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> This patch introduces generic code to perform power domain look-up using
-> device tree and automatically bind devices to their power domains.
-> Generic device tree binding is introduced to specify power domains of
-> devices in their device tree nodes.
->
-> Backwards compatibility with legacy Samsung-specific power domain
-> bindings is provided, but for now the new code is not compiled when
-> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
-> will change as soon as Exynos power domain code gets converted to use
-> the generic framework in further patch.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Hi Gabriel,
 
-Acked-by: Rob Herring <robh@kernel.org>
-
+On Wed, Mar 05, 2014 at 04:39:28AM +0100, Gabriel FERNANDEZ wrote:
+> This patch adds ST Keyscan driver to use the keypad hw a subset
+> of ST boards provide. Specific board setup will be put in the
+> given dt.
+> 
+> Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
->  .../devicetree/bindings/power/power_domain.txt     |  51 ++++
->  drivers/base/power/domain.c                        | 298 +++++++++++++++++++++
->  include/linux/pm_domain.h                          |  46 ++++
->  kernel/power/Kconfig                               |   4 +
->  4 files changed, 399 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>  .../devicetree/bindings/input/st-keypad.txt        |  50 ++++
+>  drivers/input/keyboard/Kconfig                     |  12 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/st-keyscan.c                | 323 +++++++++++++++++++++
+>  4 files changed, 386 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/st-keypad.txt
+>  create mode 100644 drivers/input/keyboard/st-keyscan.c
+> 
+> diff --git a/Documentation/devicetree/bindings/input/st-keypad.txt b/Documentation/devicetree/bindings/input/st-keypad.txt
 > new file mode 100644
-> index 0000000..93be5d9
+> index 0000000..63eb07a
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
-> @@ -0,0 +1,51 @@
-> +* Generic power domains
+> +++ b/Documentation/devicetree/bindings/input/st-keypad.txt
+> @@ -0,0 +1,50 @@
+> +* ST Keypad controller device tree bindings
 > +
-> +System on chip designs are often divided into multiple power domains that
-> +can be used for power gating of selected IP blocks for power saving by
-> +reduced leakage current.
-> +
-> +This device tree binding can be used to bind power domain consumer devices
-> +with their power domains provided by power domain providers. A power domain
-> +provider can be represented by any node in the device tree and can provide
-> +one or more power domains. A consumer node can refer to the provider by
-> +a phandle and a set of phandle arguments (so called power domain specifier)
-> +of length specified by #power-domain-cells property in the power domain
-> +provider node.
-> +
-> +==Power domain providers==
+> +The ST keypad controller device tree binding is based on the
+> +matrix-keymap.
 > +
 > +Required properties:
-> + - #power-domain-cells : Number of cells in a power domain specifier;
-> +   Typically 0 for nodes representing a single power domain and 1 for nodes
-> +   providing multiple power domains (e.g. power controllers), but can be
-> +   any value as specified by device tree binding documentation of particular
-> +   provider.
+> +
+> +- compatible: "st,keypad"
+> +
+> +- reg: Register base address of st-keypad controler.
+> +
+> +- interrupts: Interrupt numberof st-keypad controler.
+> +
+> +- clocks: Must contain one entry, for the module clock.
+> +  See ../clocks/clock-bindings.txt for details.
+> +
+> +- pinctrl-0: Should specify pin control groups used for this controller.
+> +
+> +- pinctrl-names: Should contain only one value - "default".
+> +
+> +- linux,keymap: The keymap for keys as described in the binding document
+> +  devicetree/bindings/input/matrix-keymap.txt.
+> +
+> +- keypad,num-rows: Number of row lines connected to the keypad controller.
+> +
+> +- keypad,num-columns: Number of column lines connected to the keypad
+> +  controller.
+> +
+> +- st,debounce_us: Debouncing interval time in microseconds
+> +
 > +
 > +Example:
 > +
-> +       power: power-controller at 12340000 {
-> +               compatible = "foo,power-controller";
-> +               reg = <0x12340000 0x1000>;
-> +               #power-domain-cells = <1>;
-> +       };
+> +keyscan: keyscan at fe4b0000 {
+> +	compatible = "st,keypad";
+> +	reg = <0xfe4b0000 0x2000>;
+> +	interrupts = <GIC_SPI 212 IRQ_TYPE_NONE>;
+> +	clocks	= <&CLK_SYSIN>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_keyscan>;
 > +
-> +The node above defines a power controller that is a power domain provider
-> +and expects one cell as its phandle argument.
+> +	keypad,num-rows = <4>;
+> +	keypad,num-columns = <4>;
+> +	st,debounce_us = <5000>;
+> +	linux,keymap = < /* in0	in1	in2	in3 */
+> +		KEY_F13 KEY_F9  KEY_F5 KEY_F1		/* out0 */
+> +		KEY_F14 KEY_F10 KEY_F6 KEY_F2		/* out1 */
+> +		KEY_F15 KEY_F11 KEY_F7 KEY_F3		/* out2 */
+> +		KEY_F16 KEY_F12 KEY_F8 KEY_F4 >;	/* out3 */
+> +};
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index a673c9f..9e29125 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -512,6 +512,18 @@ config KEYBOARD_STOWAWAY
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called stowaway.
+>  
+> +config KEYBOARD_ST_KEYSCAN
+> +	tristate "STMicroelectronics keyscan support"
+> +	depends on ARCH_STI
+> +	select INPUT_EVDEV
+> +	select INPUT_MATRIXKMAP
+> +	help
+> +	  Say Y here if you want to use a keypad attached to the keyscan block
+> +	  on some STMicroelectronics SoC devices.
 > +
-> +==Power domain consumers==
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called stm-keyscan.
 > +
-> +Required properties:
-> + - power-domain : A phandle and power domain specifier as defined by bindings
-> +                  of power controller specified by phandle.
-> +
-> +Example:
-> +
-> +       leaky-device at 12350000 {
-> +               compatible = "foo,i-leak-current";
-> +               reg = <0x12350000 0x1000>;
-> +               power-domain = <&power 0>;
-> +       };
-> +
-> +The node above defines a typical power domain consumer device, which is located
-> +inside power domain with index 0 of power controller represented by node with
-> +label "power".
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index dc127e5..006b455 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -3,12 +3,16 @@
->   *
->   * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
->   *
-> + * Support for Device Tree based power domain providers:
-> + * Copyright (C) 2014 Tomasz Figa <tomasz.figa@gmail.com>
+>  config KEYBOARD_SUNKBD
+>  	tristate "Sun Type 4 and Type 5 keyboard"
+>  	select SERIO
+> diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+> index a699b61..5fd020a 100644
+> --- a/drivers/input/keyboard/Makefile
+> +++ b/drivers/input/keyboard/Makefile
+> @@ -50,6 +50,7 @@ obj-$(CONFIG_KEYBOARD_SH_KEYSC)		+= sh_keysc.o
+>  obj-$(CONFIG_KEYBOARD_SPEAR)		+= spear-keyboard.o
+>  obj-$(CONFIG_KEYBOARD_STMPE)		+= stmpe-keypad.o
+>  obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
+> +obj-$(CONFIG_KEYBOARD_ST_KEYSCAN)	+= st-keyscan.o
+>  obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
+>  obj-$(CONFIG_KEYBOARD_TC3589X)		+= tc3589x-keypad.o
+>  obj-$(CONFIG_KEYBOARD_TEGRA)		+= tegra-kbc.o
+> diff --git a/drivers/input/keyboard/st-keyscan.c b/drivers/input/keyboard/st-keyscan.c
+> new file mode 100644
+> index 0000000..606cc19
+> --- /dev/null
+> +++ b/drivers/input/keyboard/st-keyscan.c
+> @@ -0,0 +1,323 @@
+> +/*
+> + * STMicroelectronics Key Scanning driver
 > + *
->   * This file is released under the GPLv2.
->   */
->
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/io.h>
+> + * Copyright (c) 2014 STMicroelectonics Ltd.
+> + * Author: Stuart Menefy <stuart.menefy@st.com>
+> + *
+> + * Based on sh_keysc.c, copyright 2008 Magnus Damm
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
 > +#include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pm_domain.h>
->  #include <linux/pm_qos.h>
-> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->         list_add(&genpd->gpd_list_node, &gpd_list);
->         mutex_unlock(&gpd_list_lock);
->  }
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/input/matrix_keypad.h>
 > +
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-> +/*
-> + * DEVICE TREE BASED POWER DOMAIN PROVIDERS
-> + *
-> + * The code below implements generic device tree based power domain providers
-> + * that bind device tree nodes with generic power domains registered in the
-> + * system.
-> + *
-> + * Any driver that registers generic power domains and need to support binding
-> + * of devices to these domains is supposed to register a power domain provider,
-> + * which maps a power domain specifier retrieved from device tree to a power
-> + * domain.
-> + *
-> + * Two simple mapping functions have been provided for convenience:
-> + *  - of_genpd_xlate_simple() for 1:1 device tree node to domain mapping,
-> + *  - of_genpd_xlate_onecell() for mapping of multiple domains per node
-> + *    by index.
-> + */
+> +#define ST_KEYSCAN_MAXKEYS 16
 > +
-> +/**
-> + * struct of_genpd_provider - Power domain provider registration structure
-> + * @link: Entry in global list of domain providers
-> + * @node: Pointer to device tree node of domain provider
-> + * @xlate: Provider-specific xlate callback mapping a set of specifier cells
-> + *         into a power domain.
-> + * @data: context pointer to be passed into @xlate callback
-> + */
-> +struct of_genpd_provider {
-> +       struct list_head link;
+> +#define KEYSCAN_CONFIG_OFF		0x000
+> +#define KEYSCAN_CONFIG_ENABLE		1
+> +#define KEYSCAN_DEBOUNCE_TIME_OFF	0x004
+> +#define KEYSCAN_MATRIX_STATE_OFF	0x008
+> +#define KEYSCAN_MATRIX_DIM_OFF		0x00c
+> +#define KEYSCAN_MATRIX_DIM_X_SHIFT	0
+> +#define KEYSCAN_MATRIX_DIM_Y_SHIFT	2
 > +
-> +       struct device_node *node;
-> +       genpd_xlate_t xlate;
-> +       void *data;
+> +struct keypad_platform_data {
+> +	const struct matrix_keymap_data *keymap_data;
+> +	unsigned int num_out_pads;
+> +	unsigned int num_in_pads;
+> +	unsigned int debounce_us;
 > +};
 > +
-> +/* List of registered power domain providers. */
-> +static LIST_HEAD(of_genpd_providers);
-> +/* Mutex to protect the list above. */
-> +static DEFINE_MUTEX(of_genpd_mutex);
-> +
-> +/**
-> + * of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
-> + * @genpdspec: OF phandle args to map into a power domain
-> + * @data: xlate function private data - pointer to struct generic_pm_domain
-> + *
-> + * This is a generic xlate function that can be used to model power domains
-> + * that have their own device tree nodes. The private data of xlate function
-> + * needs to be a valid pointer to struct generic_pm_domain.
-> + */
-> +struct generic_pm_domain *of_genpd_xlate_simple(
-> +                                       struct of_phandle_args *genpdspec,
-> +                                       void *data)
-> +{
-> +       if (genpdspec->args_count != 0)
-> +               return ERR_PTR(-EINVAL);
-> +       return data;
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_xlate_simple);
-> +
-> +/**
-> + * of_genpd_xlate_onecell() - Xlate function for providers using single index.
-> + * @genpdspec: OF phandle args to map into a power domain
-> + * @data: xlate function private data - pointer to struct genpd_onecell_data
-> + *
-> + * This is a generic xlate function that can be used to model simple power
-> + * domain controllers that have one device tree node and provide multiple
-> + * power domains. A single cell is used as an index to an array of power
-> + * domains specified in genpd_onecell_data struct when registering the
-> + * provider.
-> + */
-> +struct generic_pm_domain *of_genpd_xlate_onecell(
-> +                                       struct of_phandle_args *genpdspec,
-> +                                       void *data)
-> +{
-> +       struct genpd_onecell_data *genpd_data = data;
-> +       unsigned int idx = genpdspec->args[0];
-> +
-> +       if (genpdspec->args_count != 1)
-> +               return ERR_PTR(-EINVAL);
-> +
-> +       if (idx >= genpd_data->domain_num) {
-> +               pr_err("%s: invalid domain index %d\n", __func__, idx);
-> +               return ERR_PTR(-EINVAL);
-> +       }
-> +
-> +       return genpd_data->domains[idx];
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_xlate_onecell);
-> +
-> +/**
-> + * of_genpd_add_provider() - Register a domain provider for a node
-> + * @np: Device node pointer associated with domain provider.
-> + * @xlate: Callback for decoding domain from phandle arguments.
-> + * @data: Context pointer for @genpd_src_get callback.
-> + */
-> +int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> +                         void *data)
-> +{
-> +       struct of_genpd_provider *cp;
-> +
-> +       cp = kzalloc(sizeof(*cp), GFP_KERNEL);
-> +       if (!cp)
-> +               return -ENOMEM;
-> +
-> +       cp->node = of_node_get(np);
-> +       cp->data = data;
-> +       cp->xlate = xlate;
-> +
-> +       mutex_lock(&of_genpd_mutex);
-> +       list_add(&cp->link, &of_genpd_providers);
-> +       mutex_unlock(&of_genpd_mutex);
-> +       pr_debug("Added domain provider from %s\n", np->full_name);
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_add_provider);
-> +
-> +/**
-> + * of_genpd_del_provider() - Remove a previously registered domain provider
-> + * @np: Device node pointer associated with domain provider
-> + */
-> +void of_genpd_del_provider(struct device_node *np)
-> +{
-> +       struct of_genpd_provider *cp;
-> +
-> +       mutex_lock(&of_genpd_mutex);
-> +       list_for_each_entry(cp, &of_genpd_providers, link) {
-> +               if (cp->node == np) {
-> +                       list_del(&cp->link);
-> +                       of_node_put(cp->node);
-> +                       kfree(cp);
-> +                       break;
-> +               }
-> +       }
-> +       mutex_unlock(&of_genpd_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_del_provider);
-> +
-> +/* See of_genpd_get_from_provider(). */
-> +static struct generic_pm_domain *__of_genpd_get_from_provider(
-> +                                       struct of_phandle_args *genpdspec)
-> +{
-> +       struct of_genpd_provider *provider;
-> +       struct generic_pm_domain *genpd = ERR_PTR(-EPROBE_DEFER);
-> +
-> +       /* Check if we have such a provider in our array */
-> +       list_for_each_entry(provider, &of_genpd_providers, link) {
-> +               if (provider->node == genpdspec->np)
-> +                       genpd = provider->xlate(genpdspec, provider->data);
-> +               if (!IS_ERR(genpd))
-> +                       break;
-> +       }
-> +
-> +       return genpd;
-> +}
-> +
-> +/**
-> + * of_genpd_get_from_provider() - Look-up power domain
-> + * @genpdspec: OF phandle args to use for look-up
-> + *
-> + * Looks for domain provider under node specified by @genpdspec and if found
-> + * uses xlate function of the provider to map phandle args to a power domain.
-> + *
-> + * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
-> + * on failure.
-> + */
-> +static struct generic_pm_domain *of_genpd_get_from_provider(
-> +                                       struct of_phandle_args *genpdspec)
-> +{
-> +       struct generic_pm_domain *genpd;
-> +
-> +       mutex_lock(&of_genpd_mutex);
-> +       genpd = __of_genpd_get_from_provider(genpdspec);
-> +       mutex_unlock(&of_genpd_mutex);
-> +
-> +       return genpd;
-> +}
-> +
-> +/*
-> + * DEVICE<->DOMAIN BINDING USING DEVICE TREE LOOK-UP
-> + *
-> + * The code below registers a notifier for platform bus devices'
-> + * BUS_NOTIFY_BIND_DRIVER events and tries to attach devices to their power
-> + * domains by looking them up using Device Tree.
-> + *
-> + * Similarly in BUS_NOTIFY_UNBOUND_DRIVER the device is detached from its
-> + * domain, since it no longer supports runtime PM without any driver bound
-> + * to it.
-> + *
-> + * Both generic and legacy Samsung-specific DT bindings are supported to
-> + * keep backwards compatibility with existing DTBs.
-> + */
-> +
-> +/**
-> + * genpd_bind_domain - Bind device to its power domain using Device Tree.
-> + * @dev: Device to bind to its power domain.
-> + *
-> + * Tries to parse power domain specifier from device's OF node and if succeeds
-> + * attaches the device to retrieved power domain.
-> + *
-> + * Returns 0 on success or negative error code otherwise.
-> + */
-> +int genpd_bind_domain(struct device *dev)
-> +{
-> +       struct of_phandle_args pd_args;
-> +       struct generic_pm_domain *pd;
-> +       int ret;
-> +
-> +       if (!dev->of_node)
-> +               return 0;
-> +
-> +       ret = of_parse_phandle_with_args(dev->of_node, "power-domain",
-> +                                       "#power-domain-cells", 0, &pd_args);
-> +       if (ret < 0) {
-> +               if (ret != -ENOENT)
-> +                       return ret;
-> +
-> +               /*
-> +                * Try legacy Samsung-specific bindings
-> +                * (for backwards compatibility of DT ABI)
-> +                */
-> +               pd_args.args_count = 0;
-> +               pd_args.np = of_parse_phandle(dev->of_node,
-> +                                               "samsung,power-domain", 0);
-> +               if (!pd_args.np)
-> +                       return 0;
-> +       }
-> +
-> +       pd = of_genpd_get_from_provider(&pd_args);
-> +       if (IS_ERR(pd)) {
-> +               if (PTR_ERR(pd) != -EPROBE_DEFER)
-> +                       dev_err(dev, "failed to find power domain: %ld\n",
-> +                               PTR_ERR(pd));
-> +               return PTR_ERR(pd);
-> +       }
-> +
-> +       dev_dbg(dev, "adding to power domain %s\n", pd->name);
-> +
-> +       while (1) {
-> +               ret = pm_genpd_add_device(pd, dev);
-> +               if (ret != -EAGAIN)
-> +                       break;
-> +               cond_resched();
-> +       }
-> +
-> +       if (ret < 0) {
-> +               dev_err(dev, "failed to add to power domain %s: %d",
-> +                       pd->name, ret);
-> +               return ret;
-> +       }
-> +
-> +       pm_genpd_dev_need_restore(dev, true);
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * genpd_unbind_domain - Unbind device from its power domain.
-> + * @dev: Device to unbind from its power domain.
-> + *
-> + * Unbinds device from power domain previously bound to it.
-> + *
-> + * Returns 0 on success or negative error code otherwise.
-> + */
-> +int genpd_unbind_domain(struct device *dev)
-> +{
-> +       struct generic_pm_domain *pd = dev_to_genpd(dev);
-> +       int ret;
-> +
-> +       if (!dev->of_node || IS_ERR(pd))
-> +               return 0;
-> +
-> +       dev_dbg(dev, "removing from power domain %s\n", pd->name);
-> +
-> +       while (1) {
-> +               ret = pm_genpd_remove_device(pd, dev);
-> +               if (ret != -EAGAIN)
-> +                       break;
-> +               cond_resched();
-> +       }
-> +
-> +       if (ret < 0) {
-> +               dev_err(dev, "failed to remove from power domain %s: %d",
-> +                       pd->name, ret);
-> +               return ret;
-> +       }
-> +
-> +       /* Check if domain can be powered off after removing this device. */
-> +       genpd_queue_power_off_work(pd);
-> +
-> +       return 0;
-> +}
-> +#endif
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 7c1d252..04473d4 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -310,4 +310,50 @@ static inline void pm_genpd_syscore_poweron(struct device *dev)
->         pm_genpd_syscore_switch(dev, false);
->  }
->
-> +/* OF power domain providers */
-> +struct of_device_id;
-> +
-> +struct genpd_onecell_data {
-> +       struct generic_pm_domain **domains;
-> +       unsigned int domain_num;
+> +struct keyscan_priv {
+> +	void __iomem *base;
+> +	int irq;
+> +	struct clk *clk;
+> +	struct input_dev *input_dev;
+> +	struct keypad_platform_data *config;
+> +	unsigned int last_state;
+> +	u32 keycodes[ST_KEYSCAN_MAXKEYS];
 > +};
 > +
-> +typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
-> +                                                  void *data);
-> +
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-> +int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> +                         void *data);
-> +void of_genpd_del_provider(struct device_node *np);
-> +
-> +struct generic_pm_domain *of_genpd_xlate_simple(
-> +                                       struct of_phandle_args *genpdspec,
-> +                                       void *data);
-> +struct generic_pm_domain *of_genpd_xlate_onecell(
-> +                                       struct of_phandle_args *genpdspec,
-> +                                       void *data);
-> +
-> +int genpd_bind_domain(struct device *dev);
-> +int genpd_unbind_domain(struct device *dev);
-> +#else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-> +static inline int of_genpd_add_provider(struct device_node *np,
-> +                                       genpd_xlate_t xlate, void *data)
+> +static irqreturn_t keyscan_isr(int irq, void *dev_id)
 > +{
-> +       return 0;
+> +	struct platform_device *pdev = dev_id;
+> +	struct keyscan_priv *priv = platform_get_drvdata(pdev);
+> +	int state;
+> +	int change;
+> +
+> +	state = readl(priv->base + KEYSCAN_MATRIX_STATE_OFF) & 0xffff;
+> +	change = priv->last_state ^ state;
+> +
+> +	while (change) {
+> +		int scancode = __ffs(change);
+> +		int down = state & (1 << scancode);
+> +
+> +		input_report_key(priv->input_dev, priv->keycodes[scancode],
+> +				 down);
+> +		change ^= 1 << scancode;
+> +	};
+> +
+> +	input_sync(priv->input_dev);
+> +
+> +	priv->last_state = state;
+> +
+> +	return IRQ_HANDLED;
 > +}
-> +static inline void of_genpd_del_provider(struct device_node *np) {}
 > +
-> +#define of_genpd_xlate_simple          NULL
-> +#define of_genpd_xlate_onecell         NULL
-> +
-> +static inline int genpd_bind_domain(struct device *dev)
+> +static void keyscan_start(struct keyscan_priv *priv)
 > +{
-> +       return 0;
+> +	clk_enable(priv->clk);
+> +
+> +	writel(priv->config->debounce_us * (clk_get_rate(priv->clk) / 1000000),
+> +	       priv->base + KEYSCAN_DEBOUNCE_TIME_OFF);
+> +
+> +	writel(((priv->config->num_in_pads - 1) << KEYSCAN_MATRIX_DIM_X_SHIFT) |
+> +	       ((priv->config->num_out_pads - 1) << KEYSCAN_MATRIX_DIM_Y_SHIFT),
+> +	       priv->base + KEYSCAN_MATRIX_DIM_OFF);
+> +
+> +	writel(KEYSCAN_CONFIG_ENABLE, priv->base + KEYSCAN_CONFIG_OFF);
 > +}
-> +static inline int genpd_unbind_domain(struct device *dev)
+> +
+> +static void keyscan_stop(struct keyscan_priv *priv)
 > +{
-> +       return 0;
+> +	writel(0, priv->base + KEYSCAN_CONFIG_OFF);
+> +
+> +	clk_disable(priv->clk);
 > +}
-> +#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 > +
->  #endif /* _LINUX_PM_DOMAIN_H */
-> diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-> index 2fac9cc..45aa98e 100644
-> --- a/kernel/power/Kconfig
-> +++ b/kernel/power/Kconfig
-> @@ -306,6 +306,10 @@ config PM_GENERIC_DOMAINS_RUNTIME
->         def_bool y
->         depends on PM_RUNTIME && PM_GENERIC_DOMAINS
->
-> +config PM_GENERIC_DOMAINS_OF
-> +       def_bool y
-> +       depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
+> +static int keypad_matrix_key_parse_dt(struct keyscan_priv *st_kp)
+> +{
+> +	struct device *dev = st_kp->input_dev->dev.parent;
+> +	struct device_node *np = dev->of_node;
+> +	struct keypad_platform_data *pdata;
+> +	int error;
 > +
->  config CPU_PM
->         bool
->         depends on SUSPEND || CPU_IDLE
-> --
+> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(dev, "failed to allocate driver pdata\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	error = matrix_keypad_parse_of_params(dev, &pdata->num_out_pads,
+> +			&pdata->num_in_pads);
+> +	if (error) {
+> +		dev_err(dev, "failed to parse keypad params\n");
+> +		return error;
+> +	}
+> +
+> +	of_property_read_u32(np, "st,debounce_us", &pdata->debounce_us);
+> +
+> +	st_kp->config = pdata;
+> +
+> +	dev_info(dev, "rows=%d col=%d debounce=%d\n",
+> +			pdata->num_out_pads,
+> +			pdata->num_in_pads,
+> +			pdata->debounce_us);
+> +
+> +	error = of_property_read_u32_array(np, "linux,keymap",
+> +					st_kp->keycodes, ST_KEYSCAN_MAXKEYS);
+> +	if (error) {
+> +		dev_err(dev, "failed to parse keymap\n");
+> +		return error;
+> +	}
+
+Please use standard format for matrix keymap so that you can use
+matrix_keypad_build_keymap().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init keyscan_probe(struct platform_device *pdev)
+> +{
+> +	struct keypad_platform_data *pdata =
+> +		dev_get_platdata(&pdev->dev);
+
+const struct ...
+
+> +	struct keyscan_priv *st_kp;
+> +	struct input_dev *input_dev;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	int len;
+> +	int error;
+> +	int i;
+> +
+> +	if (!pdata && !pdev->dev.of_node) {
+> +		dev_err(&pdev->dev, "no keymap defined\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	st_kp = devm_kzalloc(dev, sizeof(*st_kp), GFP_KERNEL);
+> +	if (!st_kp) {
+> +		dev_err(dev, "failed to allocate driver data\n");
+> +		return -ENOMEM;
+> +	}
+> +	st_kp->config = pdata;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(dev, "no I/O memory specified\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	len = resource_size(res);
+> +	if (!devm_request_mem_region(dev, res->start, len, pdev->name)) {
+> +		dev_err(dev, "failed to reserve I/O memory\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	st_kp->base = devm_ioremap_nocache(dev, res->start, len);
+> +	if (st_kp->base == NULL) {
+> +		dev_err(dev, "failed to remap I/O memory\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	st_kp->irq = platform_get_irq(pdev, 0);
+> +	if (st_kp->irq < 0) {
+> +		dev_err(dev, "no IRQ specified\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	error = devm_request_irq(dev, st_kp->irq, keyscan_isr, 0,
+> +				 pdev->name, pdev);
+> +	if (error) {
+> +		dev_err(dev, "failed to request IRQ\n");
+> +		return error;
+> +	}
+> +
+> +	input_dev = devm_input_allocate_device(&pdev->dev);
+> +	if (!input_dev) {
+> +		dev_err(&pdev->dev, "failed to allocate the input device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	st_kp->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(st_kp->clk)) {
+> +		dev_err(dev, "cannot get clock");
+> +		return PTR_ERR(st_kp->clk);
+> +	}
+> +
+> +	input_dev = input_allocate_device();
+> +	if (!input_dev) {
+> +		dev_err(dev, "failed to allocate input device\n");
+> +		return -ENOMEM;
+> +	}
+
+You already allocated it once a few lines above.
+
+> +	st_kp->input_dev = input_dev;
+> +
+> +	input_dev->name = pdev->name;
+> +	input_dev->phys = "keyscan-keys/input0";
+> +	input_dev->dev.parent = dev;
+> +
+> +	input_dev->id.bustype = BUS_HOST;
+> +	input_dev->id.vendor = 0x0001;
+> +	input_dev->id.product = 0x0001;
+> +	input_dev->id.version = 0x0100;
+> +
+> +	if (!pdata) {
+> +		error = keypad_matrix_key_parse_dt(st_kp);
+> +		if (error)
+> +			return error;
+> +		pdata = st_kp->config;
+> +	}
+> +
+> +	input_dev->keycode = st_kp->keycodes;
+> +	input_dev->keycodesize = sizeof(st_kp->keycodes[0]);
+> +	input_dev->keycodemax = ARRAY_SIZE(st_kp->keycodes);
+> +
+> +	for (i = 0; i < ST_KEYSCAN_MAXKEYS; i++)
+> +		input_set_capability(input_dev, EV_KEY, st_kp->keycodes[i]);
+> +	__clear_bit(KEY_RESERVED, input_dev->keybit);
+> +
+> +	error = input_register_device(input_dev);
+> +	if (error) {
+> +		dev_err(dev, "failed to register input device\n");
+> +		input_free_device(input_dev);
+> +		platform_set_drvdata(pdev, NULL);
+> +		return error;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, st_kp);
+> +
+> +	keyscan_start(st_kp);
+> +
+> +	device_set_wakeup_capable(&pdev->dev, 1);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __exit keyscan_remove(struct platform_device *pdev)
+
+Why is this marked as __exit? I can unbind device from driver without
+unloading module (via sysfs).
+
+> +{
+> +	struct keyscan_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	keyscan_stop(priv);
+
+Call to keyscan_stop() shoudl go into keyscan_close() implementation.
+
+> +
+> +	input_unregister_device(priv->input_dev);
+
+Not needed since you are trying to use devres-managed input device.
+
+> +	platform_set_drvdata(pdev, NULL);
+
+Not needed. In fact, if you move keyscan_stop() into keyscan_close() you
+should be able to get rid of keyscan_remove().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int keyscan_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct keyscan_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		enable_irq_wake(priv->irq);
+> +	else
+> +		keyscan_stop(priv);
+> +
+> +	return 0;
+> +}
+> +
+> +static int keyscan_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct keyscan_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		disable_irq_wake(priv->irq);
+> +	else
+> +		keyscan_start(priv);
+> +
+> +	return 0;
+> +}
+
+Guard suspend/resume with CONFIG_PM_SLEEP?
+
+> +
+> +static const struct dev_pm_ops keyscan_dev_pm_ops = {
+> +	.suspend = keyscan_suspend,
+> +	.resume = keyscan_resume,
+> +};
+
+Make it SIMPLE_DEV_PM_OPS().
+
+> +
+> +static const struct of_device_id keyscan_of_match[] = {
+> +	{ .compatible = "st,keypad" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, keyscan_of_match);
+> +
+> +__refdata struct platform_driver keyscan_device_driver = {
+
+What is this refdata business?
+
+> +	.probe		= keyscan_probe,
+> +	.remove		= __exit_p(keyscan_remove),
+> +	.driver		= {
+> +		.name	= "st-keyscan",
+> +		.pm	= &keyscan_dev_pm_ops,
+> +		.of_match_table = of_match_ptr(keyscan_of_match),
+> +	}
+> +};
+> +
+> +static int __init keyscan_init(void)
+> +{
+> +	return platform_driver_register(&keyscan_device_driver);
+> +}
+> +
+> +static void __exit keyscan_exit(void)
+> +{
+> +	platform_driver_unregister(&keyscan_device_driver);
+> +}
+> +
+> +module_init(keyscan_init);
+> +module_exit(keyscan_exit);
+
+I think we have module_platform_drriver() for this.
+
+> +
+> +MODULE_AUTHOR("Stuart Menefy <stuart.menefy@st.com>");
+> +MODULE_DESCRIPTION("STMicroelectronics keyscan device driver");
+> +MODULE_LICENSE("GPL");
+> -- 
 > 1.9.0
->
+> 
+
+Thanks.
+
+-- 
+Dmitry
