@@ -1,67 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  5 Mar 2014 23:07:48 +0100
-Subject: [PATCH v2] ARM: vf610: add UART choice for low-level debug
-Message-ID: <4031771265d98dad7b0cc15a1e523f026338b432.1394057216.git.stefan@agner.ch>
+Date: Wed,  5 Mar 2014 23:11:08 +0100
+Subject: [PATCH] clocksource: vf_pit_timer: use complement for sched_clock
+ reading
+Message-ID: <d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add choice for low-level debug UART. Similar to i.MX6, there is a
-numeric configuration, valid choices are 0 to 3.
-Note that the kernel assumes that the boot loader initialized clock
-properly.
+Vybrids PIT register is monitonic decreasing. However, sched_clock
+reading needs to be monitonic increasing. Use bitwise not to get
+the complement of the clock register. This fixes the clock going
+backward. Also, the clock now starts at 0 since we load the
+register with the maximum value at start.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Kconfig.debug      |  9 +++++++++
- arch/arm/include/debug/vf.S | 15 +++++++++++++--
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/clocksource/vf_pit_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0531da8..c2005a7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -946,6 +946,15 @@ config DEBUG_IMX_UART_PORT
- 	  Choose UART port on which kernel low-level debug messages
- 	  should be output.
+diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+index 02821b0..a918bc4 100644
+--- a/drivers/clocksource/vf_pit_timer.c
++++ b/drivers/clocksource/vf_pit_timer.c
+@@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
  
-+config DEBUG_VF_UART_PORT
-+	int "Vybrid Debug UART Port Selection" if DEBUG_VF_UART
-+	default 1
-+	range 0 3
-+	depends on SOC_VF610
-+	help
-+	  Choose UART port on which kernel low-level debug messages
-+	  should be output.
-+
- config DEBUG_TEGRA_UART
- 	bool
- 	depends on ARCH_TEGRA
-diff --git a/arch/arm/include/debug/vf.S b/arch/arm/include/debug/vf.S
-index ba12cc4..b889338 100644
---- a/arch/arm/include/debug/vf.S
-+++ b/arch/arm/include/debug/vf.S
-@@ -7,9 +7,20 @@
-  *
-  */
+ static u64 pit_read_sched_clock(void)
+ {
+-	return __raw_readl(clksrc_base + PITCVAL);
++	return ~__raw_readl(clksrc_base + PITCVAL);
+ }
  
-+#define VF_UART0_BASE_ADDR	0x40027000
-+#define VF_UART1_BASE_ADDR	0x40028000
-+#define VF_UART2_BASE_ADDR	0x40029000
-+#define VF_UART3_BASE_ADDR	0x4002a000
-+#define VF_UART_BASE_ADDR(n)	VF_UART##n##_BASE_ADDR
-+#define VF_UART_BASE(n)		VF_UART_BASE_ADDR(n)
-+#define VF_UART_PHYSICAL_BASE	VF_UART_BASE(CONFIG_DEBUG_VF_UART_PORT)
-+
-+#define VF_UART_VIRTUAL_BASE	0xfe000000
-+
- 	.macro	addruart, rp, rv, tmp
--	ldr	\rp, =0x40028000	@ physical
--	ldr	\rv, =0xfe028000	@ virtual
-+	ldr	\rp, =VF_UART_PHYSICAL_BASE 	@ physical
-+	and	\rv, \rp, #0xffffff		@ offset within 16MB section
-+	add	\rv, \rv, #VF_UART_VIRTUAL_BASE
- 	.endm
- 
- 	.macro	senduart, rd, rx
+ static int __init pit_clocksource_init(unsigned long rate)
 -- 
 1.9.0
