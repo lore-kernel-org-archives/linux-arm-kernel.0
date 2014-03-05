@@ -1,78 +1,96 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 5 Mar 2014 15:12:57 +0200
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <1394018461-757-1-git-send-email-holler@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <531722D9.9020904@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 5 Mar 2014 14:23:06 +0200
+Subject: [PATCH 02/12] phy: omap-control: Update DT binding information
+In-Reply-To: <20140304162855.GB3376@atomide.com>
+References: <1393859254-10937-1-git-send-email-rogerq@ti.com>
+ <1393859254-10937-3-git-send-email-rogerq@ti.com>
+ <20140303190247.GD25804@atomide.com> <5315995F.5050206@ti.com>
+ <20140304162855.GB3376@atomide.com>
+Message-ID: <5317172A.1050803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
++ George
 
-On 03/05/2014 01:21 PM, Alexander Holler wrote:
-> The driver missed an of_xlate function to translate gpio numbers
-> as found in the DT to the correct chip and number.
->
-> While there I've set #gpio_cells to a fixed value of 2.
->
-> I've used gpio-pxa.c as template for those changes and tested my changes
-> successfully on a da850 board using entries for gpio-leds in a DT. So I didn't
-> reinvent the wheel but just copied and tested stuff.
->
-> Thanks to Grygorii Strashko for the hint to the existing code in gpio-pxa.
->
-> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Tony,
 
-Looks good to me now. Thanks.
+On 03/04/2014 06:28 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [140304 01:17]:
+>> Hi Tony,
+>>
+>> On 03/03/2014 09:02 PM, Tony Lindgren wrote:
+>>> * Roger Quadros <rogerq@ti.com> [140303 07:10]:
+>>>> Move omap-control binding information to the right location.
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt   | 25 ++++++++++++++++++++++
+>>>>  Documentation/devicetree/bindings/usb/omap-usb.txt | 24 ---------------------
+>>>>  2 files changed, 25 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> index 207e14c..41dc132 100644
+>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>> @@ -1,5 +1,30 @@
+>>>>  TI PHY: DT DOCUMENTATION FOR PHYs in TI PLATFORMs
+>>>>  
+>>>> +OMAP CONTROL PHY
+>>>> +
+>>>> +Required properties:
+>>>> + - compatible: Should be one of
+>>>> + "ti,control-phy-otghs" - if it has otghs_control mailbox register as on OMAP4.
+>>>> + "ti,control-phy-usb2" - if it has Power down bit in control_dev_conf register
+>>>> +                        e.g. USB2_PHY on OMAP5.
+>>>> + "ti,control-phy-pipe3" - if it has DPLL and individual Rx & Tx power control
+>>>> +                        e.g. USB3 PHY and SATA PHY on OMAP5.
+>>>> + "ti,control-phy-dra7usb2" - if it has power down register like USB2 PHY on
+>>>> +                        DRA7 platform.
+>>>> + "ti,control-phy-am437usb2" - if it has power down register like USB2 PHY on
+>>>> +                        AM437 platform.
+>>>
+>>> To me it seems that you can leave out all the above. You can set these falgs
+>>> flags directly in the driver based on the compatible flag. Then just initialize
+>>> the .data in the driver based on the compatible flag.
+>>
+>> I'm not sure if I got you. A single platform can have different type of phys.
+>>
+>> e.g. OMAP5 has both usb2 and pipe3 PHYs,
+>> DRA7 has both pipe3 and usb2 PHYs, but this usb2 PHY is not compatible with OMAP5 one
+>> so we need a new compatible id for that.
+>>
+>> To add to the woes, the designers were creative enough to make another mutation to
+>> the USB2 PHY for AM437x, :(
+> 
+> Oh OK, in that case the compatible flag may not be enough for configuring the
+> various instances.
+>  
+>> What do you suggest the compatible ids should look like for these 5 types of PHY control?
+>> OTGHS	(OMAP4 & 5)
+>> USB2	(OMAP5)
+>> PIPE3	(OMAP5 & DRA7)
+>> USB2x	(DRA7)
+>> USB2y	(AM437)
+> 
+> I think in that case having the various instances fully configurable from
+> device tree is OK if you prefer that. But if you wanted to use the
+> compatible flag, then you could do something like this:
+> 
+> ti,control-phy-omap4-otghs	(assuming same on omap4 & 5)
+> ti,control-phy-omap5-usb2
+> ti,control-phy-omap5-pipe3	(assuming same on omap5 & dra7)
+> ti,control-phy-dra7-usb2x
+> ti,control-phy-am437-usb2y
+> ...
+> 
 
-> ---
->   drivers/gpio/gpio-davinci.c | 24 ++++++++++++++++++++++++
->   1 file changed, 24 insertions(+)
->
->   Changes in v2: replaced static variables by indirections.
->
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 7629b4f..92574a0 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -172,6 +172,27 @@ of_err:
->   	return NULL;
->   }
->
-> +#ifdef CONFIG_OF_GPIO
-> +static int davinci_gpio_of_xlate(struct gpio_chip *gc,
-> +			     const struct of_phandle_args *gpiospec,
-> +			     u32 *flags)
-> +{
-> +	struct davinci_gpio_controller *chips = dev_get_drvdata(gc->dev);
-> +	struct davinci_gpio_platform_data *pdata = dev_get_platdata(gc->dev);
-> +
-> +	if (gpiospec->args[0] > pdata->ngpio)
-> +		return -EINVAL;
-> +
-> +	if (gc != &chips[gpiospec->args[0] / 32].chip)
-> +		return -EINVAL;
-> +
-> +	if (flags)
-> +		*flags = gpiospec->args[1];
-> +
-> +	return gpiospec->args[0] % 32;
-> +}
-> +#endif
-> +
->   static int davinci_gpio_probe(struct platform_device *pdev)
->   {
->   	int i, base;
-> @@ -236,6 +257,9 @@ static int davinci_gpio_probe(struct platform_device *pdev)
->   			chips[i].chip.ngpio = 32;
->
->   #ifdef CONFIG_OF_GPIO
-> +		chips[i].chip.of_gpio_n_cells = 2;
-> +		chips[i].chip.of_xlate = davinci_gpio_of_xlate;
-> +		chips[i].chip.dev = dev;
->   		chips[i].chip.of_node = dev->of_node;
->   #endif
->   		spin_lock_init(&chips[i].lock);
->
+Please note that the original bindings were added in v3.13 and I'm just moving the documentation
+to the right location. So I don't think we should change the bindings now.
+
+"ti,control-phy-dra7usb2" and "ti,control-phy-am437usb2" have no users still so we could probably
+change those to "ti,control-phy-dra7-usb2" and "ti,control-phy-am437-usb2".
+
+What do you say?
+
+cheers,
+-roger
