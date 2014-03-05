@@ -1,63 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Mar 2014 09:31:42 +0800
-Subject: pinctrl: pinctrl-single vs custom driver
-In-Reply-To: <530BFEC0.2070805@broadcom.com>
-References: <530BFEC0.2070805@broadcom.com>
-Message-ID: <CACRpkdYhCDpKxkMxcHHLyp2mTf8-3mhioZkNqQACHcKjL+3erQ@mail.gmail.com>
+Date: Wed, 5 Mar 2014 09:43:16 +0800
+Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
+In-Reply-To: <530D218E.9010007@wwwdotorg.org>
+References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
+ <530D218E.9010007@wwwdotorg.org>
+Message-ID: <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 10:24 AM, Sherman Yin <syin@broadcom.com> wrote:
+On Wed, Feb 26, 2014 at 7:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
->> Your driver defining pins and functions is better.
+>> -     gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
+>> +     gpio = devm_gpiod_get_index(&pdev->dev, NULL, 0);
 >
-> Like the bcm281xx, in this SoC, each pin is also controlled by 1 register,
-> so pinctrl-single should work.
-
-One other deciding factor is what kind of information you have available
-on these pin registers and what format they are in. If your system is
-well documented and not delivered in some register map description
-format you should typically open code the hardware information in the
-driver.
-
->  The difference between this SoC and bcm281xx
-> is that the pin registers in this SoC are only accessible via a messaging
-> mechanism (send a command then wait for a reply), not a simple register
-> read-write.  We have defined one message for reading the register and one
-> for writing to it.
-
-This is no different from e.g. drivers/pinctrl/pinctrl-abx500.c which marshals
-register writes to an MFD device. (Which in turn is on I2C.)
-
-> In a driver like pinctrl-bcm281xx, pinmux and pin configs are separately
-> applied and on a per-pin basis.  A simple update of 1 pin will thus result
-> in numerous messages:
+> I think the correct fix here is to look up the GPIO by name rather than
+> by index, but simply hard-code the name rather than generating it with
+> sprintf(). Index lookups are hard to expand compatibly, but named-based
+> lookups scale much better.
 >
->  1. Send cmd to read register, block for reply
->  2. Rcv reply with value
->  3. Modify pinmux portion
->  4. Send cmd to write register
->  5. Send cmd to read register, block for reply
->  6. Rcv reply with value
->  7. Modify pin configs portion
->  8. Send cmd to write register
->
-> With pinctrl-single, updating pins will be much simpler with just 1 message
-> to directly write the whole register.
+> In other words, I rather specifically disagree with using a plain
+> "gpios" property in any future DT binding, but would strongly prefer
+> e.g. reset-gpios/shutdown-gpios or gpios/gpio-names.
 
-OK I see the point, however... which solution is easiest for a developer
-to understand?
+If I understand the situation correctly it's like ACPI does not have named
+GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
+to the work of abstracting the access to GPIO handlers so that drivers
+need not know whether ACPI or DT is used for describing the hardware.
 
-> Is this efficiency enough to warrant using pinctrl-single over a "normal"
-> pinctrl driver in this case?
+We could do worse. Like putting the GPIOs in a differently indexed order
+in DT vs ACPI.
 
-So I would say that this code execution is likely not on the time-critical
-path?
-
-Also take the debuggability and understandability of the code as a
-very important factor. Which driver will be easiest for a developer to
-cope with, and which will be easiest to use when debugging the
-system?
+I have no strong opinion really, I just see that people doing DT and ACPI
+HW descriptions need to cooperate if they want to share infrastructure
+or we have to give up that pipe dream and let each HW description
+method have its own unique probe()-runpath. Which would be the result
+in this driver if we persist on using named GPIOs.
 
 Yours,
 Linus Walleij
