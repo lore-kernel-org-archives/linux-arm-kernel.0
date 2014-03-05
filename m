@@ -1,33 +1,37 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Wed,  5 Mar 2014 17:34:13 +0100
-Subject: [PATCH 2/4] ARM: ux500: storage class should be before const qualifier
-Message-ID: <1394037253-1702-1-git-send-email-tklauser@distanz.ch>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 5 Mar 2014 17:34:30 +0100
+Subject: [PATCH v3 2/5] i2c: mv64xxx: Add support for the Allwinner A31
+ I2C driver
+In-Reply-To: <1393950521-4173-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393950521-4173-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140305163430.GC9228@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C99 specification states in section 6.11.5:
+On Tue, Mar 04, 2014 at 05:28:38PM +0100, Maxime Ripard wrote:
+> The Allwinner A31 I2C controller is almost identical to the one used in the
+> other Allwinner SoCs, except for the fact that it needs to clear the interrupt
+> by setting the INT_FLAGS bit in the control register, instead of clearing it.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The placement of a storage-class specifier other than at the beginning
-of the declaration specifiers in a declaration is an obsolescent
-feature.
+Applied to for-next, thanks!
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- arch/arm/mach-ux500/timer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Still...
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 87efda0..ff28d8a 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -16,7 +16,7 @@
- #include "db8500-regs.h"
- #include "id.h"
- 
--const static struct of_device_id prcmu_timer_of_match[] __initconst = {
-+static const struct of_device_id prcmu_timer_of_match[] __initconst = {
- 	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
- 	{ },
- };
--- 
-1.7.9.5
+> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-i2c"))
+> +		drv_data->irq_clear_inverted = true;
+
+... next time an errata is needed, I think it makes sense to refactor all
+these checks into one struct which can be used as match->data directly.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/ac325c78/attachment-0001.sig>
