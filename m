@@ -1,177 +1,95 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 5 Mar 2014 05:31:58 +0000
-Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
-In-Reply-To: <635C1A75-4651-4B2C-AB64-E1D170A1F5F9@jcrosoft.com>
-References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
- <635C1A75-4651-4B2C-AB64-E1D170A1F5F9@jcrosoft.com>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172FF4EC4@penmbx01>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Mar 2014 13:33:49 +0800
+Subject: [PATCH v2] ARM: dts: vf610-twr: Add support for sdhc1
+In-Reply-To: <1393860573-16615-1-git-send-email-cosminstefan.stoica@freescale.com>
+References: <1393591611-3147-1-git-send-email-cosminstefan.stoica@freescale.com>
+ <1393860573-16615-1-git-send-email-cosminstefan.stoica@freescale.com>
+Message-ID: <20140305053348.GE8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JC,
+On Mon, Mar 03, 2014 at 05:29:33PM +0200, Stoica Cosmin Stefan wrote:
+> From: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> 
+> The kernel was not able to boot from SD card because sdhc support
+> was not present into the dts.
+> 
+> A new entry for sdhc1 was added for vf610-twr board based on the
+> compatible entry present on imx53.
+> 
+> After applying these changes, the kernel is able to boot successfully
+> from SD card.
+> 
+> Changes v1-v2:
+> According to Shawn Guo's comments:
+> - moved esdhc1 node before fec0 in board dts file;
+> - reformatted clocks line;
+> - removed duplicate property (bus-width) in dtsi file.
+> 
+> Signed-off-by: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> Signed-off-by: Chircu Bogdan <Bogdan.Chircu@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts |    8 ++++++++
+>  arch/arm/boot/dts/vf610.dtsi    |   11 +++++++++++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index 7dd1d6e..e77c98e 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -111,6 +111,13 @@
+>  	};
+>  };
+>  
+> +&esdhc1 {
+> +   pinctrl-names = "default";
+> +   pinctrl-0 = <&pinctrl_esdhc1_1>;
 
-> -----Original Message-----
-> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> Sent: Wednesday, March 05, 2014 12:58 PM
-> To: Yang, Wenyou
-> Cc: Jean-Christophe PLAGNIOL-VILLARD; linus.walleij at linaro.org;
-> b.brezillon at overkiz.com; <linux-arm-kernel@lists.infradead.org> mailing
-> list; Linux Kernel list; devicetree at vger.kernel.org; robh+dt at kernel.org;
-> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
-> galak at codeaurora.org
-> Subject: Re: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
+Please base the patch on my for-next branch below, where stuff
+like pinctrl_esdhc1_1 have gone into board dts.
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
+
+> +   bus-width = <4>;
+> +   status = "okay";
+> +};
+> +
+>  &fec0 {
+>  	phy-mode = "rmii";
+>  	pinctrl-names = "default";
+> @@ -227,3 +234,4 @@
+>  	pinctrl-0 = <&pinctrl_uart1>;
+>  	status = "okay";
+>  };
+> +
+
+You shouldn't add this new line.
+
+Shawn
+
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index c63d26d..70de377 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -344,6 +344,17 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			esdhc1: esdhc at 400b2000 {
+> +				   compatible = "fsl,imx53-esdhc";
+> +				   reg = <0x400b2000 0x4000>;
+> +				   interrupts = <0 28 0x04>;
+> +				   clocks = <&clks VF610_CLK_IPG_BUS>,
+> +                                           <&clks VF610_CLK_PLATFORM_BUS>,
+> +                                           <&clks VF610_CLK_ESDHC1>;
+> +				   clock-names = "ipg", "ahb", "per";
+> +				   status = "disabled";
+> +			};
+> +
+>  			fec0: ethernet at 400d0000 {
+>  				compatible = "fsl,mvf600-fec";
+>  				reg = <0x400d0000 0x1000>;
+> -- 
+> 1.7.9.5
 > 
 > 
-> On Mar 5, 2014, at 9:53 AM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> 
-> > In order to support the pinctrl sleep state.
-> 
-> As I said before NACK
-> 
-> this is not the job of the pinctrl to describe gpio output or input
-> state
-But according to what said in the section "GPIO mode pitfalls" of Documentation/pinctrl.txt.
-It should be handle by the pinctrl.
-
-If not, to deal with the sleep state will be very complicated. 
-Muxing the pins for FUNCTION to enable peripheral, then twist them over to GPIO mode
-and use gpio_direction_output() to drive it HIGH or LOW during sleep.
-
---->8 ------------
-The solution is to not think that what the datasheet calls "GPIO mode"
-has to be handled by the <linux/gpio.h> interface. Instead view this as
-a certain pin config setting. Look in e.g. <linux/pinctrl/pinconf-generic.h>
-and you find this in the documentation:
-
-  PIN_CONFIG_OUTPUT: this will configure the pin in output, use argument
-     1 to indicate high level, argument 0 to indicate low level.
-
-So it is perfectly possible to push a pin into "GPIO mode" and drive the
-line low as part of the usual pin control map.
----<8 ------------
-
-Best Regards,
-Wenyou Yang
-
-> 
-> Best Regards,
-> J.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> > Hi Linus,
-> >
-> > The patch is based on branch: for-next
-> > git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl
-> >
-> > Best Regards,
-> > Wenyou Yang
-> >
-> > drivers/pinctrl/pinctrl-at91.c     |   31
-> +++++++++++++++++++++++++++++++
-> > include/dt-bindings/pinctrl/at91.h |    2 ++
-> > 2 files changed, 33 insertions(+)
-> >
-> > diff --git a/drivers/pinctrl/pinctrl-at91.c
-> > b/drivers/pinctrl/pinctrl-at91.c index 5d24aae..fc51e59 100644
-> > --- a/drivers/pinctrl/pinctrl-at91.c
-> > +++ b/drivers/pinctrl/pinctrl-at91.c
-> > @@ -62,6 +62,8 @@ static int gpio_banks;
-> > #define DEGLITCH	(1 << 2)
-> > #define PULL_DOWN	(1 << 3)
-> > #define DIS_SCHMIT	(1 << 4)
-> > +#define GPIO_OUTPUT_HIGH	(1 << 5)
-> > +#define GPIO_OUTPUT_LOW		(1 << 6)
-> > #define DEBOUNCE	(1 << 16)
-> > #define DEBOUNCE_VAL_SHIFT	17
-> > #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
-> > @@ -152,12 +154,15 @@ struct at91_pinctrl_mux_ops {
-> > 	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
-> > 	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
-> > 	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
-> > +	bool (*get_gpio_output)(void __iomem *pio, unsigned mask);
-> > +	void (*set_gpio_output)(void __iomem *pio, unsigned mask, bool
-> > +is_high);
-> > 	/* irq */
-> > 	int (*irq_type)(struct irq_data *d, unsigned type); };
-> >
-> > static int gpio_irq_type(struct irq_data *d, unsigned type); static
-> > int alt_gpio_irq_type(struct irq_data *d, unsigned type);
-> > +static void at91_mux_gpio_enable(void __iomem *pio, unsigned mask,
-> > +bool input);
-> >
-> > struct at91_pinctrl {
-> > 	struct device		*dev;
-> > @@ -472,6 +477,20 @@ static bool at91_mux_pio3_get_schmitt_trig(void
-> __iomem *pio, unsigned pin)
-> > 	return (__raw_readl(pio + PIO_SCHMITT) >> pin) & 0x1; }
-> >
-> > +static bool at91_mux_pio3_get_gpio_output(void __iomem *pio, unsigned
-> > +pin) {
-> > +	return (__raw_readl(pio + PIO_ODSR) >> pin) & 0x1; }
-> > +
-> > +static void at91_mux_pio3_set_gpio_output(void __iomem *pio,
-> > +						unsigned mask,
-> > +						bool is_high)
-> > +{
-> > +	at91_mux_gpio_enable(pio, mask, 0);
-> > +	writel_relaxed(mask, pio + (is_high ? PIO_SODR : PIO_CODR)); }
-> > +
-> > +
-> > static struct at91_pinctrl_mux_ops at91rm9200_ops = {
-> > 	.get_periph	= at91_mux_get_periph,
-> > 	.mux_A_periph	= at91_mux_set_A_periph,
-> > @@ -495,6 +514,8 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops
-> = {
-> > 	.set_pulldown	= at91_mux_pio3_set_pulldown,
-> > 	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
-> > 	.disable_schmitt_trig = at91_mux_pio3_disable_schmitt_trig,
-> > +	.get_gpio_output = at91_mux_pio3_get_gpio_output,
-> > +	.set_gpio_output = at91_mux_pio3_set_gpio_output,
-> > 	.irq_type	= alt_gpio_irq_type,
-> > };
-> >
-> > @@ -741,6 +762,10 @@ static int at91_pinconf_get(struct pinctrl_dev
-> *pctldev,
-> > 		*config |= PULL_DOWN;
-> > 	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio,
-> pin))
-> > 		*config |= DIS_SCHMIT;
-> > +	if (info->ops->get_gpio_output) {
-> > +		*config |= info->ops->get_gpio_output(pio, pin) ?
-> > +					GPIO_OUTPUT_HIGH : GPIO_OUTPUT_LOW;
-> > +	}
-> >
-> > 	return 0;
-> > }
-> > @@ -778,6 +803,12 @@ static int at91_pinconf_set(struct pinctrl_dev
-> *pctldev,
-> > 			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
-> > 		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
-> > 			info->ops->disable_schmitt_trig(pio, mask);
-> > +		if (info->ops->set_gpio_output) {
-> > +			if (config & GPIO_OUTPUT_HIGH)
-> > +				info->ops->set_gpio_output(pio, mask, 1);
-> > +			if (config & GPIO_OUTPUT_LOW)
-> > +				info->ops->set_gpio_output(pio, mask, 0);
-> > +		};
-> >
-> > 	} /* for each config */
-> >
-> > diff --git a/include/dt-bindings/pinctrl/at91.h
-> > b/include/dt-bindings/pinctrl/at91.h
-> > index 0fee6ff..e799268 100644
-> > --- a/include/dt-bindings/pinctrl/at91.h
-> > +++ b/include/dt-bindings/pinctrl/at91.h
-> > @@ -15,6 +15,8 @@
-> > #define AT91_PINCTRL_DEGLITCH		(1 << 2)
-> > #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
-> > #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
-> > +#define AT91_PINCTRL_OUTPUT_HIGH	(1 << 5)
-> > +#define AT91_PINCTRL_OUTPUT_LOW		(1 << 6)
-> > #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
-> > #define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
-> >
-> > --
-> > 1.7.9.5
-> >
