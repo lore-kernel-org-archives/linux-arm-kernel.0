@@ -1,41 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Mar 2014 10:37:50 +0800
-Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
-In-Reply-To: <53168976.7000008@wwwdotorg.org>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
- <530D218E.9010007@wwwdotorg.org>
- <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
- <53168976.7000008@wwwdotorg.org>
-Message-ID: <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
+Date: Wed, 5 Mar 2014 10:45:30 +0800
+Subject: [PATCH 2/5] gpio: remove obsolete tnetv107x driver
+In-Reply-To: <CACRpkdaBMozNayXXyn8Ag+GUU_+C2j4X7aVuaZjgV_krCvSy0A@mail.gmail.com>
+References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
+ <1393418614-3968549-3-git-send-email-arnd@arndb.de>
+ <CACRpkdaBMozNayXXyn8Ag+GUU_+C2j4X7aVuaZjgV_krCvSy0A@mail.gmail.com>
+Message-ID: <CACRpkdZOpym2bit=kRE3F3rhuFQd=U2A=RynxwDfXNbsditS7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 03/04/2014 06:43 PM, Linus Walleij wrote:
-
->> If I understand the situation correctly it's like ACPI does not have named
->> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
->> to the work of abstracting the access to GPIO handlers so that drivers
->> need not know whether ACPI or DT is used for describing the hardware.
+On Wed, Mar 5, 2014 at 9:52 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Feb 26, 2014 at 8:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >
-> For devices that already have both ACPI and DT bindings, we can't
-> pretend they can be the same; they are already potentially different. We
-> simply need to parse DT and ACPI differently, since that's the sway
-> their bindings are defined.
+>> The tnetv107x platform is getting removed, so this driver won't
+>> be needed any more.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Alexandre Courbot <gnurou@gmail.com>
+>> Cc: linux-gpio at vger.kernel.org
 >
-> For any devices that don't have both ACPI and DT bindings, I agree we
-> should certainly strive to make any new bindings aligned so we don't
-> have to deal with this for them.
->
-> However, we can't change the past.
+> Can I have an ACK from some Sekhar to apply this
+> to the GPIO tree, so we are all aligned?
 
-Yeah, right, so for this very driver there are no bindings defined (yet)
-and the only device tree I can find referencing it is the Tegra20-paz00
-and it just use gpios = <>;
-
-So in this case I think this patch is the right way forward, but I admit
-I'm really uncertain in the general case.
+Bah I found the ACK on patch 0, sorry about the fuzz.
+Patch applied.
 
 Yours,
 Linus Walleij
