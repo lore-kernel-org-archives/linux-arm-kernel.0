@@ -1,82 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 5 Mar 2014 08:22:48 +0100
-Subject: [PATCH v2 02/11] drivercore: Bind/unbind power domain on
- probe/remove
-In-Reply-To: <1393862536-9842-3-git-send-email-tomasz.figa@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
- <1393862536-9842-3-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CAPDyKFpMSwXG0e1Q38wMwBocXgMb4_v9y=1kNeNi6t0GXDGN2A@mail.gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Wed, 5 Mar 2014 07:24:21 +0000
+Subject: [PATCH v5 1/8] mtd: spi-nor: copy the SPI NOR commands to a new
+ header file
+In-Reply-To: <5316B9F2.8050301@freescale.com>
+References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
+ <201403042313.14353.marex@denx.de> <5316932C.5040405@freescale.com>
+ <201403050443.19529.marex@denx.de> <5316B9F2.8050301@freescale.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAAFCDB@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2014 17:02, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On a number of platforms, devices are part of controllable power
-> domains, which need to be enabled before such devices can be accessed
-> and may be powered down when the device is idle to save some power.
-> This means that on systems that support power domain control using
-> generic power domains subsystem, it is necessary to add device to its
-> power domain before binding a driver to it and remove it from its power
-> domain after its driver is unbound to make sure that an unused device
-> does not affect power domain state.
->
-> Since this is not limited to particular busses and specific
-> archs/platforms, it is more convenient to do the above directly in
-> driver core, just as done with pinctrl default configuration. This patch
-> adds necessary code to really_probe() and __device_release_driver() to
-> achieve this and maintain consistent stack-like ordering of operations
-> happening when binding and unbinding a driver.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Hi Marek, Shijie,
 
-This definitely makes sense to me!
+>From: Huang Shijie [mailto:b32955 at freescale.com]
+>
+>? 2014?03?05? 11:43, Marek Vasut ??:
+>> Why didn't you keep it like that? Was there some reason for that ?
+>http://marc.info/?l=linux-arm-kernel&m=138545182232220&w=4
+>
+>Pekon suggestted  do not touch the m25p80.c.
+>So i just copy these commands to a new header.
+>Anyway, it's really not an important issue for me. :)
+>
+My opinion was that we should not touch m25p80.c because:
+(1)  As m25p80 is already working for various vendors. So unless multiple
+   platforms start using SPI NOR framework, m25p80.c should remain untouched.
+(2) we should not clutter header file with vendor specific op-codes as used in m25p80.
+   I was of the opinion that instead of hard-coding the vendor specific info as
+   MACROs, such information should be taken from DT or platform-data.
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+However, this was my thought during initial versions of SPI NOR patches.
+But now if you think that SPI NOR is stable enough that same header info
+can be reused without conflicts, then no problems.
 
-> ---
->  drivers/base/dd.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 0605176..78e5b36 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -23,6 +23,7 @@
->  #include <linux/kthread.h>
->  #include <linux/wait.h>
->  #include <linux/async.h>
-> +#include <linux/pm_domain.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
->
-> @@ -273,6 +274,11 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->
->         dev->driver = drv;
->
-> +       /* If using genpd, bind power domain now before probing */
-> +       ret = genpd_bind_domain(dev);
-> +       if (ret)
-> +               goto probe_failed;
-> +
->         /* If using pinctrl, bind pins now before probing */
->         ret = pinctrl_bind_pins(dev);
->         if (ret)
-> @@ -303,6 +309,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  probe_failed:
->         devres_release_all(dev);
->         driver_sysfs_remove(dev);
-> +       genpd_unbind_domain(dev);
->         dev->driver = NULL;
->         dev_set_drvdata(dev, NULL);
->
-> @@ -513,7 +520,7 @@ static void __device_release_driver(struct device *dev)
->                         blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
->                                                      BUS_NOTIFY_UNBOUND_DRIVER,
->                                                      dev);
-> -
-> +               genpd_unbind_domain(dev);
->         }
->  }
->
-> --
-> 1.9.0
->
+(Apologies to Huang Shijie for re-work :-) ).
+
+with regards, pekon
