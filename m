@@ -1,25 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Mar 2014 11:40:36 -0800
-Subject: [PATCH v5 6/6] arm/dts: added dt properties to adapt to the new
- phy framwork
-In-Reply-To: <53171BC9.8050808@ti.com>
-References: <1393846695-14644-1-git-send-email-kishon@ti.com>
- <1393846695-14644-7-git-send-email-kishon@ti.com>
- <53171BC9.8050808@ti.com>
-Message-ID: <20140305194036.GC7599@atomide.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed,  5 Mar 2014 20:45:28 +0100
+Subject: [PATCH v5 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
+Message-ID: <1394048731-4570-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [140305 04:46]:
-> Tony/Benoit,
-> 
-> On Monday 03 March 2014 05:08 PM, Kishon Vijay Abraham I wrote:
-> >Added device tree bindings for dwc3, usb2 and usb3 PHYs. The documentation
-> >of these can be found at Documentation/devicetree/bindings/phy/phy-bindings.txt
-> >and Documentation/devicetree/bindings/phy/ti-phy.txt.
-> 
-> Can this patch be queued for 3.15 merge window?
+Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
+Three register are present to (un)mask, control and acknowledge NMI.
+These two patches add a new irqchip driver in cascade with GIC.
 
-Thanks applying this patch into omap-for-v3.15/dt.
+Changes since v1:
+	- added binding document
 
-Tony
+Changes since v2:
+	- fixed trigger type in DTS
+	- new explanations in binding documentation
+	- added support for A31 (sun6i)
+
+Changes since v3:
+	- changed compatibles
+
+Changes since v4:
+	- fixed binding documentation
+
+Carlo Caione (3):
+  ARM: sun7i/sun6i: irqchip: Add irqchip driver for NMI controller
+  ARM: sun7i/sun6i: dts: Add NMI irqchip support
+  ARM: sun7i/sun6i: irqchip: Update the documentation
+
+ .../allwinner,sun67i-sc-nmi.txt                    |  27 +++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   9 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   9 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-sunxi-nmi.c                    | 228 +++++++++++++++++++++
+ 5 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ create mode 100644 drivers/irqchip/irq-sunxi-nmi.c
+
+-- 
+1.8.3.2
