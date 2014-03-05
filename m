@@ -1,59 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 5 Mar 2014 07:55:48 +0000
-Subject: [PATCH 4/4] phy: miphy365x: Provide support for the MiPHY356x
- Generic PHY
-In-Reply-To: <1392377036-12816-4-git-send-email-lee.jones@linaro.org>
-References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
- <1392377036-12816-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140305075548.GG20016@e106331-lin.cambridge.arm.com>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Wed, 5 Mar 2014 08:55:49 +0100
+Subject: [PATCH 2/2] ixp4xx_eth: Setup coherent_dma_mask
+In-Reply-To: <20140305085311.07b3922a@marrow.netinsight.se>
+References: <20140305085311.07b3922a@marrow.netinsight.se>
+Message-ID: <20140305085549.3eb22236@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 11:23:56AM +0000, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
-> 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/phy/Kconfig         |  10 +
->  drivers/phy/Makefile        |   1 +
->  drivers/phy/phy-miphy365x.c | 614 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 625 insertions(+)
->  create mode 100644 drivers/phy/phy-miphy365x.c
+This driver has been broken since commit 1a4901177574083c35fafc24c4d151c2a7c7647c
 
-[...]
+  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
 
-> +enum miphy_sata_gen {
-> +       SATA_GEN1 = 1,
-> +       SATA_GEN2,
-> +       SATA_GEN3
-> +};
+in 3.7 and would fail with
 
-It would be nice to have a comment here that these values are ABI and
-cannot change.
+[   33.055473] net eth1: coherent DMA mask is unset
+[   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
 
-[...]
+Fix by setting up the DMA mask to the entire 32-bit range.
 
-> +static struct phy *miphy365x_phy_xlate(struct device *dev,
-> +                                      struct of_phandle_args *args)
-> +{
-> +       struct miphy365x_dev *state = dev_get_drvdata(dev);
-> +       u8 port = args->args[0];
-> +       u8 type = args->args[1];
+Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+---
+ drivers/net/ethernet/xscale/ixp4xx_eth.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-In case of a bad dt, it would be nice to check args->arg_count == 2.
-
-ALso, we throw away the top 24 bits, which may have been set
-erroneously. If we want to make use of those in future we should test
-they are clear here to force people to do the right thing.
-
-Otherwise, this looks fine to me.
-
-With those additions:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Cheers,
-Mark.
+diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+index 25283f1..e540e51 100644
+--- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
++++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+@@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
+ 	port->netdev = dev;
+ 	port->id = pdev->id;
+ 
++	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
++	if (err < 0)
++		goto err_free;
++
+ 	switch (port->id) {
+ 	case IXP4XX_ETH_NPEA:
+ 		port->regs = (struct eth_regs __iomem *)IXP4XX_EthA_BASE_VIRT;
+-- 
+1.7.9.6
