@@ -1,142 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 5 Mar 2014 12:58:12 +0800
-Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
-In-Reply-To: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
-References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <635C1A75-4651-4B2C-AB64-E1D170A1F5F9@jcrosoft.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Mar 2014 13:03:29 +0800
+Subject: [GIT PULL] ARM: i.MX6 device tree changes for 3.15, take 2
+Message-ID: <20140305050326.GD8784@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Mar 5, 2014, at 9:53 AM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+This is the second batch of i.MX6 device tree changes for 3.15, which is
+based on the 'take 1' - tag imx6-dt-3.15.  Please pull, thanks.
 
-> In order to support the pinctrl sleep state.
+Shawn
 
-As I said before NACK
+The following changes since commit 69144bd74456ede4a92a4f6be5782c96dc569737:
 
-this is not the job of the pinctrl to describe gpio output or input state
+  ARM: dts: imx6q: Add support for Zealz GK802 (2014-02-10 16:27:41 +0800)
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> Hi Linus,
-> 
-> The patch is based on branch: for-next
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl
-> 
-> Best Regards,
-> Wenyou Yang
-> 
-> drivers/pinctrl/pinctrl-at91.c     |   31 +++++++++++++++++++++++++++++++
-> include/dt-bindings/pinctrl/at91.h |    2 ++
-> 2 files changed, 33 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 5d24aae..fc51e59 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -62,6 +62,8 @@ static int gpio_banks;
-> #define DEGLITCH	(1 << 2)
-> #define PULL_DOWN	(1 << 3)
-> #define DIS_SCHMIT	(1 << 4)
-> +#define GPIO_OUTPUT_HIGH	(1 << 5)
-> +#define GPIO_OUTPUT_LOW		(1 << 6)
-> #define DEBOUNCE	(1 << 16)
-> #define DEBOUNCE_VAL_SHIFT	17
-> #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
-> @@ -152,12 +154,15 @@ struct at91_pinctrl_mux_ops {
-> 	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
-> 	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
-> 	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
-> +	bool (*get_gpio_output)(void __iomem *pio, unsigned mask);
-> +	void (*set_gpio_output)(void __iomem *pio, unsigned mask, bool is_high);
-> 	/* irq */
-> 	int (*irq_type)(struct irq_data *d, unsigned type);
-> };
-> 
-> static int gpio_irq_type(struct irq_data *d, unsigned type);
-> static int alt_gpio_irq_type(struct irq_data *d, unsigned type);
-> +static void at91_mux_gpio_enable(void __iomem *pio, unsigned mask, bool input);
-> 
-> struct at91_pinctrl {
-> 	struct device		*dev;
-> @@ -472,6 +477,20 @@ static bool at91_mux_pio3_get_schmitt_trig(void __iomem *pio, unsigned pin)
-> 	return (__raw_readl(pio + PIO_SCHMITT) >> pin) & 0x1;
-> }
-> 
-> +static bool at91_mux_pio3_get_gpio_output(void __iomem *pio, unsigned pin)
-> +{
-> +	return (__raw_readl(pio + PIO_ODSR) >> pin) & 0x1;
-> +}
-> +
-> +static void at91_mux_pio3_set_gpio_output(void __iomem *pio,
-> +						unsigned mask,
-> +						bool is_high)
-> +{
-> +	at91_mux_gpio_enable(pio, mask, 0);
-> +	writel_relaxed(mask, pio + (is_high ? PIO_SODR : PIO_CODR));
-> +}
-> +
-> +
-> static struct at91_pinctrl_mux_ops at91rm9200_ops = {
-> 	.get_periph	= at91_mux_get_periph,
-> 	.mux_A_periph	= at91_mux_set_A_periph,
-> @@ -495,6 +514,8 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
-> 	.set_pulldown	= at91_mux_pio3_set_pulldown,
-> 	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
-> 	.disable_schmitt_trig = at91_mux_pio3_disable_schmitt_trig,
-> +	.get_gpio_output = at91_mux_pio3_get_gpio_output,
-> +	.set_gpio_output = at91_mux_pio3_set_gpio_output,
-> 	.irq_type	= alt_gpio_irq_type,
-> };
-> 
-> @@ -741,6 +762,10 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
-> 		*config |= PULL_DOWN;
-> 	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
-> 		*config |= DIS_SCHMIT;
-> +	if (info->ops->get_gpio_output) {
-> +		*config |= info->ops->get_gpio_output(pio, pin) ?
-> +					GPIO_OUTPUT_HIGH : GPIO_OUTPUT_LOW;
-> +	}
-> 
-> 	return 0;
-> }
-> @@ -778,6 +803,12 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
-> 			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
-> 		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
-> 			info->ops->disable_schmitt_trig(pio, mask);
-> +		if (info->ops->set_gpio_output) {
-> +			if (config & GPIO_OUTPUT_HIGH)
-> +				info->ops->set_gpio_output(pio, mask, 1);
-> +			if (config & GPIO_OUTPUT_LOW)
-> +				info->ops->set_gpio_output(pio, mask, 0);
-> +		};
-> 
-> 	} /* for each config */
-> 
-> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
-> index 0fee6ff..e799268 100644
-> --- a/include/dt-bindings/pinctrl/at91.h
-> +++ b/include/dt-bindings/pinctrl/at91.h
-> @@ -15,6 +15,8 @@
-> #define AT91_PINCTRL_DEGLITCH		(1 << 2)
-> #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
-> #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
-> +#define AT91_PINCTRL_OUTPUT_HIGH	(1 << 5)
-> +#define AT91_PINCTRL_OUTPUT_LOW		(1 << 6)
-> #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
-> #define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
-> 
-> -- 
-> 1.7.9.5
-> 
+are available in the git repository at:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 842 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/4929bae4/attachment.sig>
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6-dt-3.15-2
+
+for you to fetch changes up to 55b0ef4e1d90b3d05a24f6897da1739ef9b13f75:
+
+  ARM: dts: imx6q-phytec: Added SATA Support (2014-02-21 10:14:02 +0800)
+
+----------------------------------------------------------------
+i.MX6 device tree changes for 3.15, take 2:
+ - Add USB, GPMI and SATA support for imx6q-phytec board
+ - Update imx6sl-evk board support regarding PFUZE100, audio and
+   LED etc.
+ - Minor updates on a few imx6qdl boards
+
+----------------------------------------------------------------
+Anson Huang (2):
+      ARM: dts: imx6qdl-sabresd: correct gpio key's active state
+      ARM: dts: imx6q: add 852MHz setpoint for CPU freq
+
+Ashutosh singh (4):
+      ARM: dts: imx6q-phytec: Added USB_OTG Support
+      ARM: dts: imx6q-phytec: Added USB_HOST Support
+      ARM: dts: imx6q-phytec: Added GPMI-NAND Support
+      ARM: dts: imx6q-phytec: Added SATA Support
+
+Fabio Estevam (5):
+      ARM: dts: imx6sl-evk: Add PFUZE100 support
+      ARM: dts: imx6sl-evk: Add audio support
+      ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
+      ARM: dts: imx6sl-evk: Add debug LED support
+      ARM: dts: imx6sl-evk: Keep VGEN1 regulator always enabled
+
+Liu Ying (1):
+      ARM: dts: imx6qdl-sabreauto: Support debug LED
+
+Sascha Silbe (1):
+      ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
+
+ arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |   16 ++
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   82 +++++++++++
+ arch/arm/boot/dts/imx6q.dtsi               |    2 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi   |  132 +++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |    7 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi   |    3 +
+ arch/arm/boot/dts/imx6sl-evk.dts           |  217 ++++++++++++++++++++++++++++
+ 7 files changed, 456 insertions(+), 3 deletions(-)
