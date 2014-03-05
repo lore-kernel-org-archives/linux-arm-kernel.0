@@ -1,44 +1,141 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Wed, 5 Mar 2014 21:46:38 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/7] mfd: AXP20x: Add support for AXP202
- and AXP209
-In-Reply-To: <531782DF.6090209@redhat.com>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <53121151.9050804@redhat.com>
- <CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>
- <53123507.6020607@redhat.com> <531782DF.6090209@redhat.com>
-Message-ID: <CAOQ7t2bx1u73kxQVa3AeQ-hZ9nP3GSukEdXk-jRNwbT0vUH4+A@mail.gmail.com>
+Date: Wed,  5 Mar 2014 22:11:29 +0100
+Subject: [PATCH] regulator: helpers: Modify helpers enabling multi-bit control
+Message-ID: <1394053889-7273-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 9:02 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->
-> So I've added your patches to my sunxi-devel tree and they work as advertised :)
+This patch extends the regulator helpers to account for device that use
+multiple bits for control when using regmap enable/disable/bypass ops.
 
-Thank you for keeping the tree updated :)
+The actual regulator helpers wrongly assume that the regulator control
+is always performed using single bits, using in the regulator_desc
+struct only two parameters *_reg and *_mask defining register and mask
+for control.
 
-> I've also added dt support for the axp209 to the cubietruck dts file, to avoid
-> things becoming a copy and paste fest I've introduced a new axp209.dtsi file,
-> as well as did some fixes to the existing sun?i-a*.dtsi files, see my tree here:
-> https://github.com/jwrdegoede/linux-sunxi/commits/sunxi-devel
+This patch extends this struct and introduces the helpers to take into
+account devices where control is performed using multiple bits and
+specific multi-bit values are used for enabling/disabling/bypassing the
+regulator.
 
-That was also my idea (creating a new axp20x.dtsi) but it has been
-turned down by Maxime and Lee
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ drivers/regulator/helpers.c      | 48 ++++++++++++++++++++++++++--------------
+ include/linux/regulator/driver.h |  8 +++++++
+ 2 files changed, 40 insertions(+), 16 deletions(-)
 
-> If you agree this is a good idea feel free to steal it all for the next
-> revision of your patch-set :)
-
-I will do for sure, thanks
-
-> Note that I've still left some copy-paste parts inside the per board dts files,
-> specifically things which may differ per board, ie we know already that A10
-> boards will have a different interrupt parent for the interrupt.
-
-Yep, no prob.
-
-> Thanks for your work on this!
-
-Thank you!
-
+diff --git a/drivers/regulator/helpers.c b/drivers/regulator/helpers.c
+index e221a27..cbc3909 100644
+--- a/drivers/regulator/helpers.c
++++ b/drivers/regulator/helpers.c
+@@ -37,10 +37,17 @@ int regulator_is_enabled_regmap(struct regulator_dev *rdev)
+ 	if (ret != 0)
+ 		return ret;
+ 
+-	if (rdev->desc->enable_is_inverted)
+-		return (val & rdev->desc->enable_mask) == 0;
+-	else
+-		return (val & rdev->desc->enable_mask) != 0;
++	val &= rdev->desc->enable_mask;
++
++	if (rdev->desc->enable_is_inverted) {
++		if (rdev->desc->enable_val)
++			return val != rdev->desc->enable_val;
++		return val == 0;
++	} else {
++		if (rdev->desc->enable_val)
++			return val == rdev->desc->enable_val;
++		return val != 0;
++	}
+ }
+ EXPORT_SYMBOL_GPL(regulator_is_enabled_regmap);
+ 
+@@ -57,10 +64,13 @@ int regulator_enable_regmap(struct regulator_dev *rdev)
+ {
+ 	unsigned int val;
+ 
+-	if (rdev->desc->enable_is_inverted)
+-		val = 0;
+-	else
+-		val = rdev->desc->enable_mask;
++	if (rdev->desc->enable_is_inverted) {
++		val = rdev->desc->disable_val;
++	} else {
++		val = rdev->desc->enable_val;
++		if (!val)
++			val = rdev->desc->enable_mask;
++	}
+ 
+ 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+ 				  rdev->desc->enable_mask, val);
+@@ -80,10 +90,13 @@ int regulator_disable_regmap(struct regulator_dev *rdev)
+ {
+ 	unsigned int val;
+ 
+-	if (rdev->desc->enable_is_inverted)
+-		val = rdev->desc->enable_mask;
+-	else
+-		val = 0;
++	if (rdev->desc->enable_is_inverted) {
++		val = rdev->desc->enable_val;
++		if (!val)
++			val = rdev->desc->enable_mask;
++	} else {
++		val = rdev->desc->disable_val;
++	}
+ 
+ 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+ 				  rdev->desc->enable_mask, val);
+@@ -419,10 +432,13 @@ int regulator_set_bypass_regmap(struct regulator_dev *rdev, bool enable)
+ {
+ 	unsigned int val;
+ 
+-	if (enable)
+-		val = rdev->desc->bypass_mask;
+-	else
+-		val = 0;
++	if (enable) {
++		val = rdev->desc->bypass_val_on;
++		if (!val)
++			val = rdev->desc->bypass_mask;
++	} else {
++		val = rdev->desc->bypass_val_off;
++	}
+ 
+ 	return regmap_update_bits(rdev->regmap, rdev->desc->bypass_reg,
+ 				  rdev->desc->bypass_mask, val);
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index 9370e65..bbe03a1 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -228,10 +228,14 @@ enum regulator_type {
+  *                output when using regulator_set_voltage_sel_regmap
+  * @enable_reg: Register for control when using regmap enable/disable ops
+  * @enable_mask: Mask for control when using regmap enable/disable ops
++ * @enable_val: Enabling value for control when using regmap enable/disable ops
++ * @disable_val: Disabling value for control when using regmap enable/disable ops
+  * @enable_is_inverted: A flag to indicate set enable_mask bits to disable
+  *                      when using regulator_enable_regmap and friends APIs.
+  * @bypass_reg: Register for control when using regmap set_bypass
+  * @bypass_mask: Mask for control when using regmap set_bypass
++ * @bypass_val_on: Enabling value for control when using regmap set_bypass
++ * @bypass_val_off: Disabling value for control when using regmap set_bypass
+  *
+  * @enable_time: Time taken for initial enable of regulator (in uS).
+  */
+@@ -263,9 +267,13 @@ struct regulator_desc {
+ 	unsigned int apply_bit;
+ 	unsigned int enable_reg;
+ 	unsigned int enable_mask;
++	unsigned int enable_val;
++	unsigned int disable_val;
+ 	bool enable_is_inverted;
+ 	unsigned int bypass_reg;
+ 	unsigned int bypass_mask;
++	unsigned int bypass_val_on;
++	unsigned int bypass_val_off;
+ 
+ 	unsigned int enable_time;
+ };
 -- 
-Carlo Caione
+1.8.3.2
