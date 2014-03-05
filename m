@@ -1,105 +1,64 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Wed, 5 Mar 2014 08:33:12 +0000
-Subject: [PATCH v5 7/7] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
-References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
- <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
- <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
-Message-ID: <20140305083311.GD13582@bart.dudau.co.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 5 Mar 2014 10:35:02 +0200
+Subject: [PATCH 0/8] OMAP: OMAP3 DSS related clock patches
+In-Reply-To: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <5316E1B6.4060007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 10:20:28AM +0900, Jingoo Han wrote:
-> On Wednesday, March 05, 2014 12:50 AM, Liviu Dudau wrote:
-> > 
-> > Several platforms use a rather generic version of parsing
-> > the device tree to find the host bridge ranges. Move the common code
-> > into the generic PCI code and use it to create a pci_host_bridge
-> > structure that can be used by arch code.
-> > 
-> > Based on early attempts by Andrew Murray to unify the code.
-> > Used powerpc and microblaze PCI code as starting point.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> > index 8708b652..800678a 100644
-> > --- a/drivers/pci/host-bridge.c
-> > +++ b/drivers/pci/host-bridge.c
-> 
-> [.....]
-> 
-> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> 
-> It makes build error with exynos_defconfig. (ARM32)
-> Thus, 'slab.h' is necessary in order to fix the build error.
-> 
-> ./drivers/pci/host-bridge.c
-> @@ -8,6 +8,7 @@
->  #include <linux/module.h>
->  #include <linux/of_address.h>
->  #include <linux/of_pci.h>
-> +#include <linux/slab.h>
+Hi Tero,
 
-Will add, thanks!
+What about the dts fixes in this series? DSS DT depends on those fixes.
+I'd like the dts fixes to be either merged for v3.14, or I can add them
+to my DSS DT series (with acks).
 
-> 
->  #include "pci.h"
-> 
-> 
-> > +		if (!res) {
-> > +			err = -ENOMEM;
-> > +			goto bridge_ranges_nomem;
-> > +		}
-> > +
-> > +		of_pci_range_to_resource(&range, dev, res);
-> > +
-> > +		if (resource_type(res) == IORESOURCE_IO)
-> > +			*io_base = range.cpu_addr;
-> > +
-> > +		pci_add_resource_offset(resources, res,
-> > +				res->start - range.pci_addr);
-> > +	}
-> > +
-> > +	/* Apply architecture specific fixups for the ranges */
-> > +	pcibios_fixup_bridge_ranges(resources);
-> 
-> It also makes compile problem with exynos_defconfig as below:
-> 
-> drivers/built-in.o: In function `pci_host_bridge_of_get_ranges':
-> drivers/pci/host-bridge.c:157: undefined reference to `pcibios_fixup_bridge_ranges'
+ Tomi
 
-Does that mean that exynos_defconfig doesn't define CONFIG_OF? How do you
-compile all the .dts files then? Should CONFIG_OF not be added to the default config
-file?
-
-Other than that, your comment is correct. drivers/pci/host-bridge.c gets compiled
-in regardless of CONFIG_OF and I need to provide an empty implementation for
-pcibios_fixup_bridge_ranges().
-
-Thanks!
-
-Liviu
-
+On 13/02/14 12:03, Tomi Valkeinen wrote:
+> Hi,
 > 
-> Best regards,
-> Jingoo Han
+> I've been debugging OMAP3 related issues with DSS clocks, and I hopefully have
+> them all fixed with this series. This fixes the problems for both non-DT boot,
+> but also for DT boot with DSS DT support (which is not merged yet).
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> The non-DT boot related fixes should be merged for 3.14, but I'd like the DT
+> boot related fixes to be merged for 3.14 also, as that'll make handling the DSS
+> DT support easier.
+> 
+> This is based on v3.14-rc2.
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (8):
+>   clk: divider: fix rate calculation for fractional rates
+>   clk: ti/divider: fix rate calculation for fractional rates
+>   ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+>   ARM: dts: fix omap3 dss clock handle names
+>   ARM: dts: fix DPLL4 x2 clkouts on 3630
+>   ARM: dts: use ti,fixed-factor-clock for dpll4_m4x2_mul_ck
+>   ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
+>   OMAPDSS: fix rounding when calculating fclk rate
+> 
+>  arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  6 +--
+>  .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  6 +--
+>  arch/arm/boot/dts/omap36xx-clocks.dtsi             | 20 +++++++
+>  arch/arm/boot/dts/omap36xx.dtsi                    |  2 +-
+>  arch/arm/boot/dts/omap3xxx-clocks.dtsi             |  8 +--
+>  arch/arm/mach-omap2/cclock3xxx_data.c              |  2 +
+>  arch/arm/mach-omap2/dpll3xxx.c                     | 62 ++++++++++++++++++++++
+>  drivers/clk/clk-divider.c                          | 10 ++--
+>  drivers/clk/ti/divider.c                           |  8 +--
+>  drivers/video/omap2/dss/dss.c                      |  4 +-
+>  include/linux/clk/ti.h                             |  4 ++
+>  11 files changed, 111 insertions(+), 21 deletions(-)
 > 
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
 
- One small step
-   for me ...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/c929fbc3/attachment.sig>
