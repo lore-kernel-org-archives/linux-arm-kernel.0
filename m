@@ -1,29 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Mar 2014 08:28:37 -0800
-Subject: [PATCHv2 14/14] ARM: OMAP3: clock: remove legacy clock data
-In-Reply-To: <5316D318.8080405@ti.com>
-References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
- <1393924700-6510-15-git-send-email-t-kristo@ti.com>
- <20140304173242.GB17470@atomide.com> <5316D318.8080405@ti.com>
-Message-ID: <20140305162837.GB4983@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 5 Mar 2014 17:31:31 +0100
+Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
+In-Reply-To: <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140305163131.GB9228@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140304 23:35]:
-> On 03/04/2014 07:32 PM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [140304 01:22]:
-> >>This is no longer needed as clock data is provided through DT.
-> >
-> >And this one we cannot apply yet until omap3 is booting in device tree
-> >only mode.
+On Tue, Mar 04, 2014 at 05:28:37PM +0100, Maxime Ripard wrote:
+> The Allwinner A31 SoC using that IP has a reset controller maintaining
+> it reset unless told otherwise.
 > 
-> What is missing to achieve this? Some boards are not booting in DT
-> mode yet or?
+> Add some optional reset support to the driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-It seems that the last missing pieces are the DSS bindings and
-.dts file for the pandora. At least I can't think of anything
-else that's missing or could not be done using pdata-quirks.c.
+Applied to for-next, thanks!
 
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/b8068a23/attachment.sig>
