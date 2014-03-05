@@ -1,37 +1,68 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Wed, 05 Mar 2014 14:25:32 +0100
-Subject: [PATCH v4 4/4] ARM: OMAP2+: Add pdata quirk for sys_clkout2
- for omap3 DBB056
-In-Reply-To: <53172175.5060603@ti.com>
-References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
- <1392387656-15186-5-git-send-email-chf.fritz@googlemail.com>
- <20140228223741.GM13624@atomide.com>  <53172175.5060603@ti.com>
-Message-ID: <1394025932.16566.44.camel@mars>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed,  5 Mar 2014 14:25:48 +0100
+Subject: [PATCH v2 3/6] PCI: rcar: use new OF interrupt mapping when possible
+In-Reply-To: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1394025951-32438-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-05 at 15:07 +0200, Tero Kristo wrote:
-> On 03/01/2014 12:37 AM, Tony Lindgren wrote:
-> > * Christoph Fritz <chf.fritz@googlemail.com> [140214 06:24]:
-> >> Full device tree support for clock control, especially to set frequencies,
-> >> is not yet accomplished. Until then, configure the 24Mhz of sys_clkout2 to
-> >> feed an USB-Hub here.
-> >
-> > Hmm would like to see Tero's comments on this, I wonder if we should
-> > wait on this to avoid extra churn?
-> 
-> Well, the set I posted that adds default clock parenting / default rate 
-> support to DT hasn't actually moved forward, so you might want to take 
-> this in as is now if it should be rushed. The clk-enable part isn't done 
-> currently by anything anyway. Just wondering though, should you create 
-> some sort of driver for your usb-hub which would control these clocks?
+This is the recommended method of doing the IRQ
+mapping. Still fall back to the old method in order
+to not break the just submitted board files.
 
-The USB-Hub, a USB2512 is wired as non-configurable. Its pin
-'XTAL1/CLKIN' can be connected to either a crystal or an external clock
-input. To economise the crystal, the clock-out of the omap is wired
-here.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: pass in parent device to pci_common_init(), to
+    make DT parsing work.
+---
+ drivers/pci/host/pci-rcar-gen2.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-So in my view, a driver is unnecessary.
-
- Thanks
-  -- Christoph
+diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+index ceec147baec3..3a0914163ad0 100644
+--- a/drivers/pci/host/pci-rcar-gen2.c
++++ b/drivers/pci/host/pci-rcar-gen2.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_pci.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -160,8 +161,13 @@ static int __init rcar_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	struct pci_sys_data *sys = dev->bus->sysdata;
+ 	struct rcar_pci_priv *priv = sys->private_data;
++	int irq;
++
++	irq = of_irq_parse_and_map_pci(dev, slot, pin);
++	if (!irq)
++		irq = priv->irq;
+ 
+-	return priv->irq;
++	return irq;
+ }
+ 
+ /* PCI host controller setup */
+@@ -249,6 +255,8 @@ static int __init rcar_pci_add_controller(struct rcar_pci_priv *priv)
+ 	void **private_data;
+ 	int count;
+ 
++	pci_common_init_dev(priv->dev, &rcar_hw_pci);
++
+ 	if (rcar_hw_pci.nr_controllers < rcar_pci_count)
+ 		goto add_priv;
+ 
+@@ -322,8 +330,6 @@ static int __init rcar_pci_init(void)
+ 	int retval;
+ 
+ 	retval = platform_driver_probe(&rcar_pci_driver, rcar_pci_probe);
+-	if (!retval)
+-		pci_common_init(&rcar_hw_pci);
+ 
+ 	/* Private data pointer array is not needed any more */
+ 	kfree(rcar_hw_pci.private_data);
+-- 
+1.9.0
