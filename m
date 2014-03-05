@@ -1,61 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Mar 2014 17:02:01 -0800
-Subject: [PATCH] irqchip: gic: Silence sparse warnings
-Message-ID: <1393981321-25721-1-git-send-email-sboyd@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Mar 2014 09:15:30 +0800
+Subject: I2C dummy adapter driver ?
+In-Reply-To: <5315BB34.8080803@samsung.com>
+References: <5305382E.9050902@gmail.com>
+ <CAJe_ZhcMMVRTErH3ctbnZyn30_cp9XXjEfUZXdWaVWUHqs4CRw@mail.gmail.com>
+ <53073C51.5010401@samsung.com>
+ <20140228060728.GB29849@sirena.org.uk>
+ <5315BB34.8080803@samsung.com>
+Message-ID: <20140305011530.GN13126@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/irqchip/irq-gic.c:53:23: warning: duplicate [noderef]
-drivers/irqchip/irq-gic.c:651:6: warning: symbol 'gic_raise_softirq' was not declared. Should it be static?
-drivers/irqchip/irq-gic.c:872:29: warning: symbol 'gic_irq_domain_ops' was not declared. Should it be static?
-drivers/irqchip/irq-gic.c:977:12: warning: symbol 'gic_of_init' was not declared. Should it be static?
+On Tue, Mar 04, 2014 at 12:38:28PM +0100, Sylwester Nawrocki wrote:
+> On 28/02/14 07:07, Mark Brown wrote:
+> > On Fri, Feb 21, 2014 at 12:45:21PM +0100, Sylwester Nawrocki wrote:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/irqchip/irq-gic.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+> >> The I2C bus driver with empty i2c_algorithm.master_xfer() helps WRT to
+> >> using standard DT binding and v4l2_subdev interface.
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 500e533b9648..a917b144895e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -50,7 +50,7 @@
- 
- union gic_base {
- 	void __iomem *common_base;
--	void __percpu __iomem **percpu_base;
-+	void __percpu * __iomem *percpu_base;
- };
- 
- struct gic_chip_data {
-@@ -648,7 +648,7 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
- #endif
- 
- #ifdef CONFIG_SMP
--void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
-+static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
- 	unsigned long flags, map = 0;
-@@ -869,7 +869,7 @@ static struct notifier_block gic_cpu_notifier = {
- };
- #endif
- 
--const struct irq_domain_ops gic_irq_domain_ops = {
-+static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.map = gic_irq_domain_map,
- 	.xlate = gic_irq_domain_xlate,
- };
-@@ -974,7 +974,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- #ifdef CONFIG_OF
- static int gic_cnt __initdata;
- 
--int __init gic_of_init(struct device_node *node, struct device_node *parent)
-+static int __init
-+gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	void __iomem *cpu_base;
- 	void __iomem *dist_base;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> > Wouldn't a platform device do just as well here if there's no actual
+> > control?
+
+> Then the I2C client devices would have to be instantiated manually, 
+> I think it's more trouble.
+
+I2C is not that much more enumerable than platform bus, I don't see the
+difference here?  To the extent I2C is enumerable a dummy adaptor isn't
+going to support that.
+
+> I could as well create custom I2C client drivers per ISP, but then the 
+> I2C devices would have to be represented somehow in DT, to pass stuff 
+> like voltage regulators and GPIOs. Anyway, it's not something could be 
+> done in mainline.
+
+Why not?
+
+> Even if there is no actual I2C communication on the host CPU side, the 
+> power up/down sequence is handled there. The intention is to keep this 
+> common per an I2C client, regardless of whether I2C communication is 
+> done by firmware or the host the CPU.
+
+The way you're talking it sounds like your code is very hard coded to
+use I2C here.  What happens if someone uses SPI or some other bus to
+control an ISP?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/38a5366d/attachment.sig>
