@@ -1,43 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Mar 2014 10:05:17 +0000
-Subject: [PATCH v5 01/11] staging: imx-drm-core: Use OF graph to find
- components and connections between encoder and crtcs
-In-Reply-To: <1394011262-16849-2-git-send-email-p.zabel@pengutronix.de>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <1394011262-16849-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140305100516.GV21483@n2100.arm.linux.org.uk>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Wed, 5 Mar 2014 11:07:10 +0100
+Subject: [PATCH 2/2] ixp4xx_eth: Setup coherent_dma_mask
+In-Reply-To: <m38uspas21.fsf@t19.piap.pl>
+References: <20140305085311.07b3922a@marrow.netinsight.se>
+ <20140305085549.3eb22236@marrow.netinsight.se>
+ <m3d2i1atmq.fsf@t19.piap.pl>
+ <20140305094330.GU21483@n2100.arm.linux.org.uk>
+ <m38uspas21.fsf@t19.piap.pl>
+Message-ID: <20140305110710.0e92f4ca@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 10:20:52AM +0100, Philipp Zabel wrote:
-> +struct imx_drm_component {
-> +	struct device_node *of_node;
-> +	struct list_head list;
-> +};
-> +
+On Wed, 5 Mar 2014 10:55:02 +0100
+Krzysztof Ha?asa <khalasa@piap.pl> wrote:
 
-The only thing this structure appears to be doing is ensuring that a
-single component doesn't get added twice - is that correct?  If so,
-(and the troublesome problem with the IPU crtcs is now gone)
-we can modify the core component code such that it does this:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-                if (c->master && c->master != master)
-                        continue;
+> > If you have drivers missing this call, that's part of the problem:
+> >
+> > | For correct operation, you must interrogate the kernel in your device
+> > | probe routine to see if the DMA controller on the machine can properly
+> > | support the DMA addressing limitation your device has.
+> 
+> Well, we already know it can. Actually, the DMA controller is a part of
+> the CPU + RAM controller chip :-)
+> 
+> But I guess with this new wording it's something the drivers can use.
 
-                if (compare(c->dev, compare_data)) {
-			if (!c->master)
-	                        component_attach_master(master, c);
-                        ret = 0;
-                        break;
-                }
+With that wording, I would say these two patches should be applicable:
+The first corrects dma_set_coherent_mask() to actually setup the
+coherent_dma_mask (and make it applicable outside of the PCI domain)
+and the second sets it up in the driver, as per
 
-which will mean that you don't need to build this list anymore to track
-what will be added - though I'd like to think a little more about that
-before making that change.  Please confirm whether this will eliminate
-your list generation.
+> > | support the DMA addressing limitation your device has.  It is good
+> > | style to do this even if your device holds the default setting,
+> > | because this shows that you did think about these issues wrt. your
+> > | device.
 
-Thanks.
+Without these patches (or Krzysztofs patch), the ixp4xx platform is
+broken for many common configurations.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+// Simon
