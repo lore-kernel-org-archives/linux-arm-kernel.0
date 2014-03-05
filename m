@@ -1,51 +1,53 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  5 Mar 2014 01:03:08 +0100
-Subject: [PATCH 1/3] ARM: dove: drop pinctrl PMU reg property
-In-Reply-To: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393977790-29110-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 04 Mar 2014 16:16:43 -0800
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+In-Reply-To: <5315B328.9030306@gmail.com>
+References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
+ <20140128141458.GD8713@xo-6d-61-c0.localdomain>
+ <20140128182245.18840.51279@capellas-linux>
+ <loom.20140216T140206-196@post.gmane.org>
+ <20140224215443.9748.65580@capellas-linux> <5312E46B.8020900@gmail.com>
+ <531560aa.e7d5440a.0e5f.5f57@mx.google.com> <5315B328.9030306@gmail.com>
+Message-ID: <53166cef.43bd440a.2ff1.472e@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Dove's pinctrl does require some PMU regs for muxing PMU
-functions to MPP pins. Recently, a discussion started about consolidating
-Power Management Unit (PMU) into a single DT node. As we don't want
-anymore DT ABI in the way, drop the corresponding reg property from
-pinctrl node now. The driver will derive the registers from existing
-reg properties.
+Quoting TonyHo (2014-03-04 03:04:08)
+> Hi Sebastian:
+>      Thank you. And I'm in Shanghai, it's not far from the Macao, both 
+> in China, ha.
+> The system can boot up normal now. And I want to make the hibernation, 
+> but error occurs. I want to save the hibernation image in 
+> /dev/mmcblk0p3(device id 179:3), and I configure this in menuconfig:
+> / # cat /sys/power/resume 179:3
+> When I echo a disk to /sys/power/state , it hints(partly log):
+> [ 49.426656] omap_uart 44e09000.serial: no wakeirq for uart0
+> [ 49.594385] PM: thaw of devices complete after 171.291 msecs
+> [ 49.661876] PM: Cannot find swap device, try swapon -a.
+> [ 49.667356] PM: Cannot get swap writer
+> [ 49.722677] Restarting tasks ... done. ash: write error: No such device
+> 
+> But I can find my device /dev/mmcblk0p3, and its size is about 2GB, and 
+> it's not mounted in system,it can be mounted with ext4 filesystem.
+> / # ls -l /dev/mmcblk*
+> brw-rw---- 1 0 0 179, 3 Jan 1 00:01 /dev/mmcblk0p3
+> 
+> It says cannot find swap device, but the CONFIG_SWAP=y is checked.
+> It seems I miss something?
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Rob Herring <robh+dt@kernel.org> 
-Cc: Pawel Moll <pawel.moll@arm.com> 
-Cc: Mark Rutland <mark.rutland@arm.com> 
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
-Cc: Kumar Gala <galak@codeaurora.org> 
-Cc: Russell King <linux@arm.linux.org.uk> 
-Cc: Jason Cooper <jason@lakedaemon.net> 
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: devicetree at vger.kernel.org 
-Cc: linux-arm-kernel at lists.infradead.org 
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/dove.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Hi tony,
+          
+Two things are?missing:
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index b6fc27f8ed66..3b891dd20993 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -395,8 +395,7 @@
- 			pinctrl: pin-ctrl at d0200 {
- 				compatible = "marvell,dove-pinctrl";
- 				reg = <0xd0200 0x14>,
--				      <0xd0440 0x04>,
--				      <0xd802c 0x08>;
-+				      <0xd0440 0x04>;
- 				clocks = <&gate_clk 22>;
- 
- 				pmx_gpio_0: pmx-gpio-0 {
--- 
-1.8.5.3
+1) you must format the partition as swap using the mkswap command. ?This can be
+   done on target or on your laptop. ?
+
+2) after booting, on target you have to add the swap to the system using the
+   swapon command. ?I usually do:
+
+    swapon /dev/mmcblk0p3
+
+If you want to do swapon -a you may have to modify the
+/etc/fstab or mnttab but I don't do it?this way. ?
+
+Sebastian
