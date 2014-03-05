@@ -1,64 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Mar 2014 09:23:22 +0800
-Subject: [PATCHv9][ 2/2] ARM: dts: mbimxsd35: Add sound support.
-In-Reply-To: <1389806606-21521-2-git-send-email-denis@eukrea.com>
-References: <1389806606-21521-1-git-send-email-denis@eukrea.com>
- <1389806606-21521-2-git-send-email-denis@eukrea.com>
-Message-ID: <20140305012319.GA8784@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Mar 2014 09:31:42 +0800
+Subject: pinctrl: pinctrl-single vs custom driver
+In-Reply-To: <530BFEC0.2070805@broadcom.com>
+References: <530BFEC0.2070805@broadcom.com>
+Message-ID: <CACRpkdYhCDpKxkMxcHHLyp2mTf8-3mhioZkNqQACHcKjL+3erQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 06:23:26PM +0100, Denis Carikli wrote:
-> Cc: Eric B?nard <eric@eukrea.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+On Tue, Feb 25, 2014 at 10:24 AM, Sherman Yin <syin@broadcom.com> wrote:
 
-Applied, thanks.
+>> Your driver defining pins and functions is better.
+>
+> Like the bcm281xx, in this SoC, each pin is also controlled by 1 register,
+> so pinctrl-single should work.
 
-Shawn
+One other deciding factor is what kind of information you have available
+on these pin registers and what format they are in. If your system is
+well documented and not delivered in some register map description
+format you should typically open code the hardware information in the
+driver.
 
-> ---
-> ChangeLog v8->v9:
-> - Better Cc list.
-> 
-> ChangeLog v7->v8:
-> - Ajusted to match the driver changes.
-> ---
->  .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-> index 23f6fe1..3e207df 100644
-> --- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-> +++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-> @@ -46,6 +46,14 @@
->  			linux,default-trigger = "heartbeat";
->  		};
->  	};
-> +
-> +	sound {
-> +		compatible = "eukrea,asoc-tlv320";
-> +		eukrea,model = "imx35-eukrea-tlv320aic23";
-> +		ssi-controller = <&ssi1>;
-> +		fsl,mux-int-port = <1>;
-> +		fsl,mux-ext-port = <4>;
-> +	};
->  };
->  
->  &audmux {
-> @@ -118,6 +126,7 @@
->  };
->  
->  &ssi1 {
-> +	codec-handle = <&tlv320aic23>;
->  	fsl,mode = "i2s-slave";
->  	status = "okay";
->  };
-> -- 
-> 1.7.9.5
-> 
+>  The difference between this SoC and bcm281xx
+> is that the pin registers in this SoC are only accessible via a messaging
+> mechanism (send a command then wait for a reply), not a simple register
+> read-write.  We have defined one message for reading the register and one
+> for writing to it.
+
+This is no different from e.g. drivers/pinctrl/pinctrl-abx500.c which marshals
+register writes to an MFD device. (Which in turn is on I2C.)
+
+> In a driver like pinctrl-bcm281xx, pinmux and pin configs are separately
+> applied and on a per-pin basis.  A simple update of 1 pin will thus result
+> in numerous messages:
+>
+>  1. Send cmd to read register, block for reply
+>  2. Rcv reply with value
+>  3. Modify pinmux portion
+>  4. Send cmd to write register
+>  5. Send cmd to read register, block for reply
+>  6. Rcv reply with value
+>  7. Modify pin configs portion
+>  8. Send cmd to write register
+>
+> With pinctrl-single, updating pins will be much simpler with just 1 message
+> to directly write the whole register.
+
+OK I see the point, however... which solution is easiest for a developer
+to understand?
+
+> Is this efficiency enough to warrant using pinctrl-single over a "normal"
+> pinctrl driver in this case?
+
+So I would say that this code execution is likely not on the time-critical
+path?
+
+Also take the debuggability and understandability of the code as a
+very important factor. Which driver will be easiest for a developer to
+cope with, and which will be easiest to use when debugging the
+system?
+
+Yours,
+Linus Walleij
