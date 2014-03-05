@@ -1,37 +1,36 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed,  5 Mar 2014 11:35:35 +0800
-Subject: [PATCH 2/2] ARM: dts: atlas6: add cortex-a9-pmu compatible PMU node
-In-Reply-To: <1393990536-9306-1-git-send-email-21cnbao@gmail.com>
-References: <1393990536-9306-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1393990536-9306-2-git-send-email-21cnbao@gmail.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed,  5 Mar 2014 04:39:27 +0100
+Subject: [PATCH 0/5] Add ST Keyscan driver
+Message-ID: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ye He <Ye.He@csr.com>
+The goal of this series is to add ST Keyscan support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 board.
 
-add cortex-a9-pmu node to make the performance monitor unit work on atlas6.
+Gabriel Fernandez (4):
+  drivers: input: keyboard: st-keyscan: add keyscan driver
+  ARM: STi: DT: add keyscan for stih416
+  ARM: STi: DT: add keyscan for stih41x-b2000
+  ARM: multi_v7_defconfig: add st-keyscan driver
 
-Signed-off-by: Ye He <Ye.He@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/atlas6.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+Giuseppe CONDORELLI (1):
+  ARM: STi: DT: add keyscan for stih415
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index 14495c4..82fcf66 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -39,6 +39,11 @@
- 		};
- 	};
- 
-+	arm-pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <29>;
-+	};
-+
- 	axi {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+ .../devicetree/bindings/input/st-keypad.txt        |  50 ++++
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 +
+ arch/arm/boot/dts/stih415.dtsi                     |  10 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 +
+ arch/arm/boot/dts/stih416.dtsi                     |  10 +
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |  12 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ drivers/input/keyboard/Kconfig                     |  12 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/st-keyscan.c                | 323 +++++++++++++++++++++
+ 10 files changed, 451 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/st-keypad.txt
+ create mode 100644 drivers/input/keyboard/st-keyscan.c
+
 -- 
-1.7.9.5
+1.9.0
