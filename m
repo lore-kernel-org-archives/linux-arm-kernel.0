@@ -1,48 +1,117 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 05 Mar 2014 16:19:54 +0000
-Subject: [PATCH 0/6] ARM: integrator: multiplatform advancements
-In-Reply-To: <CACRpkdYfbgi_PY_OJpifzaS9x1fgLhGir05VS7BAw4QT5ZGMmQ@mail.gmail.com>
-References: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
- <20140214134756.GI30257@n2100.arm.linux.org.uk>
- <CACRpkdYfbgi_PY_OJpifzaS9x1fgLhGir05VS7BAw4QT5ZGMmQ@mail.gmail.com>
-Message-ID: <1394036394.4160.12.camel@hornet>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 05 Mar 2014 17:20:05 +0100
+Subject: [PATCH v2 03/11] ARM: exynos: Move to generic power domain
+ bindings
+In-Reply-To: <1713847.uSatLFRtJj@amdc1032>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-4-git-send-email-tomasz.figa@gmail.com>
+ <1713847.uSatLFRtJj@amdc1032>
+Message-ID: <53174EB5.1090803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-24 at 09:37 +0000, Linus Walleij wrote:
-> On Fri, Feb 14, 2014 at 2:47 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Feb 14, 2014 at 11:29:25AM +0100, Linus Walleij wrote:
-> >> The *real* solution, one might argue is to convert the CLCD
-> >> driver to DRM and add device tree bindings, but it appears that
-> >> this is an orthogonal goal that has been attempted by other with
-> >> mixed results.
-> >
-> > What mixed results?  You know, I find it rather sick that people run
-> > around trying to do this to a driver that I authored and maintain
-> > without one comment to me about it.  It sometimes feels like people
-> > think I don't exist anymore.
-> 
-> Sorry, I was referring to this driver for PL111:
-> http://marc.info/?l=linux-arm-kernel&m=137477285809710&w=2
-> 
-> So I take it that the PL111 is a totally different beast from
-> PL110 except for the single digit difference in the name.
-> Whereas PL180 and PL181 are essentially the same piece
-> of hardware...
-> 
-> Then there is this patch set for DT support for the CLCD which
-> appears to be orthogonal:
-> http://marc.info/?l=linux-arm-kernel&m=137968689722364&w=2
-> 
-> Pawel, is this coming along?
+Hi Bartek,
 
-Last week I was about to answer that this was my last word in the
-subject ;-) but then I decided to give it another go, trying to address
-the last - I think - controversial bit, being the pads property. Made it
-much simpler and optional, so it should be in anybody's (namely the DRM
-driver and bindings) way.
+On 05.03.2014 17:15, Bartlomiej Zolnierkiewicz wrote:
+>
+> Hi Tomek,
+>
+> On Monday, March 03, 2014 05:02:08 PM Tomasz Figa wrote:
+>> This patch moves Exynos power domain code to use the new generic power
+>> domain look-up framework introduced by previous patch, allowing the new
+>> code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
+>>
+>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>> ---
+>>   .../bindings/arm/exynos/power_domain.txt           | 12 ++--
+>>   arch/arm/mach-exynos/pm_domains.c                  | 80 +---------------------
+>>   kernel/power/Kconfig                               |  2 +-
+>>   3 files changed, 7 insertions(+), 87 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>> index 5216b41..60f26a8 100644
+>> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+>> @@ -8,6 +8,8 @@ Required Properties:
+>>       * samsung,exynos4210-pd - for exynos4210 type power domain.
+>>   - reg: physical base address of the controller and length of memory mapped
+>>       region.
+>> +- #power-domain-cells: number of cells in power domain specifier;
+>> +    must be 0.
+>>
+>>   Node of a device using power domains must have a samsung,power-domain property
+>>   defined with a phandle to respective power domain.
+>> @@ -17,12 +19,8 @@ Example:
+>>   	lcd0: power-domain-lcd0 {
+>>   		compatible = "samsung,exynos4210-pd";
+>>   		reg = <0x10023C00 0x10>;
+>> +		#power-domain-cells = <0>;
+>>   	};
+>>
+>> -Example of the node using power domain:
+>> -
+>> -	node {
+>> -		/* ... */
+>> -		samsung,power-domain = <&lcd0>;
+>> -		/* ... */
+>> -	};
+>> +See Documentation/devicetree/bindings/power/power_domain.txt for description
+>> +of consumer-side bindings.
+>> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+>> index 8fd2488..48ee6c9 100644
+>> --- a/arch/arm/mach-exynos/pm_domains.c
+>> +++ b/arch/arm/mach-exynos/pm_domains.c
+>> @@ -75,78 +75,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+>>   	return exynos_pd_power(domain, false);
+>>   }
+>>
+>> -static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+>> -					 struct device *dev)
+>> -{
+>> -	int ret;
+>> -
+>> -	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+>> -
+>> -	while (1) {
+>> -		ret = pm_genpd_add_device(&pd->pd, dev);
+>> -		if (ret != -EAGAIN)
+>> -			break;
+>> -		cond_resched();
+>> -	}
+>> -
+>> -	pm_genpd_dev_need_restore(dev, true);
+>> -}
+>> -
+>> -static void exynos_remove_device_from_domain(struct device *dev)
+>> -{
+>> -	struct generic_pm_domain *genpd = dev_to_genpd(dev);
+>> -	int ret;
+>> -
+>> -	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
+>> -
+>> -	while (1) {
+>> -		ret = pm_genpd_remove_device(genpd, dev);
+>> -		if (ret != -EAGAIN)
+>> -			break;
+>> -		cond_resched();
+>> -	}
+>> -}
+>> -
+>> -static void exynos_read_domain_from_dt(struct device *dev)
+>> -{
+>> -	struct platform_device *pd_pdev;
+>> -	struct exynos_pm_domain *pd;
+>> -	struct device_node *node;
+>> -
+>> -	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
+>
+> This removes "samsung,power-domain" phandle handling but I cannot find
+> in your patch series updates to existing EXYNOS dts files converting
+> them to use the new "power-domain" property.  Am I missing something?
 
-Will post in a second.
+Patch 01/11 adds generic parsing code along with fallback to the legacy 
+"samsung,power-domain" property, if the generic one is not present, as 
+it was pretty straightforward to implement it there.
 
-Pawel
+Best regards,
+Tomasz
