@@ -1,62 +1,25 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 4 Mar 2014 23:17:29 +0100
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <1393238262-8622-1-git-send-email-b32955@freescale.com>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
-Message-ID: <201403042317.29722.marex@denx.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 5 Mar 2014 09:58:27 +0800
+Subject: spear-cpufreq + multiplatform?
+In-Reply-To: <20140303180809.GA28282@joshc.qualcomm.com>
+References: <20140303180809.GA28282@joshc.qualcomm.com>
+Message-ID: <CAOh2x=k6uo23O23RFE5Ld__q=FtQUnbNyJA1O72yf3r_dd8f-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, February 24, 2014 at 11:37:34 AM, Huang Shijie wrote:
-> 1.) Why add a new framework for SPI NOR?
->   The SPI-NOR controller such as Freescale's Quadspi controller is working
->   in a different way from the SPI bus. It should knows the NOR commands to
->   find the right LUT sequence. Unfortunately, the current code can not meet
->   this requirement.
-> 
-> 2.) How does this patch set do?
->    This patch set adds a new spi-nor layer.
->    Before this patch, the layer is like:
-> 
->                    MTD
->          ------------------------
->                   m25p80
->          ------------------------
-> 	       spi bus driver
->          ------------------------
-> 	        SPI NOR chip
-> 
->    After this patch, the layer is like:
->                    MTD
->          ------------------------
->                   spi-nor
->          ------------------------
->                   m25p80
->          ------------------------
-> 	       spi bus driver
->          ------------------------
-> 	       SPI NOR chip
-> 
->   With the spi-nor controller driver(Freescale Quadspi), it looks like:
->                    MTD
->          ------------------------
->                   spi-nor
->          ------------------------
->                 fsl-quadspi
->          ------------------------
-> 	       SPI NOR chip
-> 
-> 3.) more details
->     This patch set adds a new data structrue spi_nor{}, clones most the
-> common code to spi-nor.c. Add spi_nor_xfer_cfg {} for the fundamental
-> primitives: read_xfer/write_xfer.
-> 
->     Make the m25p80.c/fsl_quaspi.c use the new APIs.
-> 
-> 4.) Change log:
-> v4 --> v5:
-> 	[1] rebase the patch set on the l2-mtd tree.
-> 	[2] fixed bugs in the fsl-quadspi driver.
-> 	[3] tested the fsl-quadspi with imx6sx board.
+On Tue, Mar 4, 2014 at 2:08 AM, Josh Cartwright <joshc@codeaurora.org> wrote:
+> Hey folks-
+>
+> I noticed booting today's next on a non-spear platform, that I'm seeing
+> the following in my logs:
+>
+>         [    2.126494] spear_cpufreq: Invalid cpufreq_tbl
+>
+> Looking closer, it looks like the spear-cpufreq driver has a
+> late_initcall() that's not too multiplatform friendly.  Perhaps the
+> spear cpufreq initialization routine should be called explicitly from
+> some platform-specific code, or explicitly check to ensure it's running
+> on SPEAr?
 
-It's starting to take a really nice shape, I really like it :)
+So sorry for that. I can't get it fixed right now as am busy with some
+conferences but will mark that in my todo list. Thanks for reporting it.
