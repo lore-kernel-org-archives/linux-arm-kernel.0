@@ -1,34 +1,30 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Wed,  5 Mar 2014 17:35:09 +0100
-Subject: [PATCH 3/4] ARM: vexpress: storage class should be before const
- qualifier
-Message-ID: <1394037309-1805-1-git-send-email-tklauser@distanz.ch>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 05 Mar 2014 11:38:44 -0500
+Subject: [PATCH 5/5] arm64: add early_ioremap support
+In-Reply-To: <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
+References: <1393963738-9210-1-git-send-email-msalter@redhat.com>
+ <1393963738-9210-6-git-send-email-msalter@redhat.com>
+ <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
+Message-ID: <1394037524.5094.35.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C99 specification states in section 6.11.5:
+On Tue, 2014-03-04 at 17:31 -0600, Rob Herring wrote:
+> On Tue, Mar 4, 2014 at 2:08 PM, Mark Salter <msalter@redhat.com> wrote:
+> > Add support for early IO or memory mappings which are needed
+> > before the normal ioremap() is usable. This also adds fixmap
+> > support for permanent fixed mappings such as that used by the
+> > earlyprintk device register region.
+> 
+> One minor comment:
+> 
+> > +enum fixed_addresses {
+> > +       FIX_EARLYCON,
+> 
+> Can you align this name with x86 and rename to FIX_EARLYCON_MEM_BASE.
+> Doing that will help enable the earlycon driver in 8250_early.c.
 
-The placement of a storage-class specifier other than at the beginning
-of the declaration specifiers in a declaration is an obsolescent
-feature.
-
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- arch/arm/mach-vexpress/platsmp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 993c9ae..5310d5c 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -42,7 +42,7 @@ static struct map_desc vexpress_dt_cortex_a9_scu_map __initdata = {
- 
- static void *vexpress_dt_cortex_a9_scu_base __initdata;
- 
--const static char *vexpress_dt_cortex_a9_match[] __initconst = {
-+static const char *vexpress_dt_cortex_a9_match[] __initconst = {
- 	"arm,cortex-a5-scu",
- 	"arm,cortex-a9-scu",
- 	NULL
--- 
-1.7.9.5
+Is there any advantage to earlycon=uart8250 vs. earlyprintk=uart8250?
+I don't mind using FIX_EARLYCON_MEM_BASE, but CONFIG_FIX_EARLYCON_MEM
+is X86 only right now and I think changing that should be a separate
+patch.
