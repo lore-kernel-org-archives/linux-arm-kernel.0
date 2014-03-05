@@ -1,39 +1,32 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Mar 2014 14:34:32 +0900
-Subject: [PATCH 1/2] arm64: debug: make local symbols static
-Message-ID: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
+Date: Wed, 05 Mar 2014 14:35:45 +0900
+Subject: [PATCH 2/2] arm64: smp: make local symbol static
+In-Reply-To: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
+References: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
+Message-ID: <000101cf3834$c1a5ff10$44f1fd30$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make local symbols static, because these are used only in this
-file.
+Make smp_spin_table_cpu_postboot() static, because this function
+is used only in this file.
 
 Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm64/kernel/debug-monitors.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/smp_spin_table.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 13f87de..14ba23c 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -189,7 +189,7 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
+diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+index 44c2280..7a530d2 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -128,7 +128,7 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
+ 	return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
+ }
  
- /* EL1 Single Step Handler hooks */
- static LIST_HEAD(step_hook);
--DEFINE_RWLOCK(step_hook_lock);
-+static DEFINE_RWLOCK(step_hook_lock);
- 
- void register_step_hook(struct step_hook *hook)
+-void smp_spin_table_cpu_postboot(void)
++static void smp_spin_table_cpu_postboot(void)
  {
-@@ -276,7 +276,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
-  * Use reader/writer locks instead of plain spinlock.
-  */
- static LIST_HEAD(break_hook);
--DEFINE_RWLOCK(break_hook_lock);
-+static DEFINE_RWLOCK(break_hook_lock);
- 
- void register_break_hook(struct break_hook *hook)
- {
+ 	/*
+ 	 * Let the primary processor know we're out of the pen.
 -- 
 1.7.10.4
