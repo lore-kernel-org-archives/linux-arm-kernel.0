@@ -1,48 +1,19 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Mar 2014 17:12:12 +0800
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <20140305084039.GB14902@lee--X1>
-References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
- <20140305073422.GD20016@e106331-lin.cambridge.arm.com>
- <20140305084039.GB14902@lee--X1>
-Message-ID: <20140305091212.GA10380@lee--X1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Mar 2014 17:13:01 +0800
+Subject: [PATCH] pinctrl: sirf: fix kernel panic in gpio_lock_as_irq
+In-Reply-To: <1394002503-2614-1-git-send-email-21cnbao@gmail.com>
+References: <1394002503-2614-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdaiBn0OzaW9E7092j+34NzD5-Bf8hrix1kJXBksF1rGSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +Specifying phy control of devices
-> > > +=================================
-> > > +
-> > > +Device nodes should specify the configuration required in their "phys"
-> > > +property, containing a phandle to the miphy device node, a port number
-> > > +and a device type.
-> > > +
-> > > +Example:
-> > > +
-> > > +#include <dt-bindings/phy/phy-miphy365x.h>
-> > > +
-> > > +	sata0: sata at fe380000 {
-> > > +		...
-> > > +		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-> > > +		...
-> > > +	};
-> > 
-> > Is there not a generic phy binding we can point to? It seems a bit
-> > redundant to do this in each phy binding.
-> 
-> Sure, but that wouldn't make much of an example.
-> 
->   Documentation/devicetree/bindings/phy/phy-bindings.txt
+On Wed, Mar 5, 2014 at 2:55 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-Ah sorry, I see what you mean now.
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> commit 655dada6277991 causes kernel panic, this patch fixes it.
 
-No, not yet. That's the next thing to go up into Mainline.
+Ufff sorry my fault. Patch applied for fixes.
 
-I will replace this second example with a link when the other
-documentation document has been accepted.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
