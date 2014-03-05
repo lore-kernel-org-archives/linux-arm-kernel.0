@@ -1,67 +1,47 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  5 Mar 2014 04:39:30 +0100
-Subject: [PATCH 3/5] ARM: STi: DT: add keyscan for stih416
+Date: Wed,  5 Mar 2014 04:39:31 +0100
+Subject: [PATCH 4/5] ARM: STi: DT: add keyscan for stih41x-b2000
 In-Reply-To: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393990772-9567-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393990772-9567-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keyscan support for stih416.
-It is disabled by default given that it is not enabled on all boards.
-Also there are PIOs conflict with already claimed lines.
+Add keyscan setup for stih415/h416 b2000.
+Both have same raw/column lines number, debounce time and keymap.
 
 Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi         | 10 ++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/boot/dts/stih41x-b2000.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index b29ff4b..4e0ebed 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -98,6 +98,22 @@
- 				};
- 			};
+diff --git a/arch/arm/boot/dts/stih41x-b2000.dtsi b/arch/arm/boot/dts/stih41x-b2000.dtsi
+index 1e6aa92..cf06beb 100644
+--- a/arch/arm/boot/dts/stih41x-b2000.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2000.dtsi
+@@ -6,6 +6,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * publishhed by the Free Software Foundation.
+  */
++#include <dt-bindings/input/input.h>
+ / {
  
-+			keyscan {
-+				pinctrl_keyscan: keyscan {
-+					st,pins {
-+						keyin0	= <&PIO0 2 ALT2 IN>;
-+						keyin1	= <&PIO0 3 ALT2 IN>;
-+						keyin2	= <&PIO0 4 ALT2 IN>;
-+						keyin3	= <&PIO2 6 ALT2 IN>;
-+
-+						keyout0 = <&PIO1 6 ALT2 OUT>;
-+						keyout1 = <&PIO1 7 ALT2 OUT>;
-+						keyout2 = <&PIO0 6 ALT2 OUT>;
-+						keyout3 = <&PIO2 7 ALT2 OUT>;
-+					};
-+				};
-+			};
-+
- 			sbc_i2c0 {
- 				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
- 					st,pins {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index b7ab47b..9f20b21 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -145,5 +145,15 @@
+ 	memory{
+@@ -46,5 +47,16 @@
  
- 			status		= "disabled";
+ 			status = "okay";
  		};
 +
 +		keyscan: keyscan at fe4b0000 {
-+			compatible = "st,keypad";
-+			status = "disabled";
-+			reg = <0xfe4b0000 0x2000>;
-+			interrupts = <GIC_SPI 212 IRQ_TYPE_NONE>;
-+			clocks	= <&CLK_SYSIN>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_keyscan>;
++			keypad,num-rows = <4>;
++			keypad,num-columns = <4>;
++			st,debounce_us = <5000>;
++			linux,keymap = < /* in0	in1	in2	in3 */
++				KEY_F13 KEY_F9  KEY_F5 KEY_F1		/* out0 */
++				KEY_F14 KEY_F10 KEY_F6 KEY_F2		/* out1 */
++				KEY_F15 KEY_F11 KEY_F7 KEY_F3		/* out2 */
++				KEY_F16 KEY_F12 KEY_F8 KEY_F4 >;	/* out3 */
 +		};
  	};
  };
