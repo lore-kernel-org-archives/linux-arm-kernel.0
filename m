@@ -1,60 +1,59 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  5 Mar 2014 18:35:34 +0100
-Subject: [PATCH 09/15] ARM: at91: sam9rlek add touchscreen support through
- at91_adc
+Date: Wed,  5 Mar 2014 18:35:32 +0100
+Subject: [PATCH 07/15] iio: adc: at91: add sam9rl support
 In-Reply-To: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394040940-18246-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394040940-18246-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_adc now supports reading a touchscreen for ADCs without a TSMR register.
-Enable touchscreen support through at91_adc. This allows to use both a
-touchscreen and the remaining ADC channel at the same time.
-
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/board-sam9rlek.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/iio/adc/at91_adc.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 604eecf6cd70..35d420247e25 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/platform_data/at91_adc.h>
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index c3ea34025749..c47dcbaa56ef 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -1343,6 +1343,20 @@ static struct at91_adc_caps at91sam9260_caps = {
+ 	},
+ };
  
- #include <video/atmel_lcdc.h>
- 
-@@ -239,6 +240,17 @@ static struct at91_tsadcc_data ek_tsadcc_data = {
- 
- 
- /*
-+ * ADC + Touchscreen
-+ */
-+static struct at91_adc_data ek_adc_data = {
-+	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5),
-+	.use_external_triggers = true,
-+	.vref = 3300,
-+	.touchscreen_type = ATMEL_ADC_TOUCHSCREEN_4WIRE,
++static struct at91_adc_caps at91sam9rl_caps = {
++	.has_ts = true,
++	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
++	.num_channels = 6,
++	.registers = {
++		.channel_base = AT91_ADC_CHR(0),
++		.drdy_mask = AT91_ADC_DRDY,
++		.status_register = AT91_ADC_SR,
++		.trigger_register = AT91_ADC_TRGR_9G45,
++		.mr_prescal_mask = AT91_ADC_PRESCAL_9260,
++		.mr_startup_mask = AT91_ADC_STARTUP_9G45,
++	},
 +};
 +
-+
-+/*
-  * GPIO Buttons
-  */
- #if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-@@ -312,6 +324,8 @@ static void __init ek_board_init(void)
- 	at91_add_device_ac97(&ek_ac97_data);
- 	/* Touch Screen Controller */
- 	at91_add_device_tsadcc(&ek_tsadcc_data);
-+	/* Touch Screen Controller + ADC */
-+	at91_add_device_adc(&ek_adc_data);
- 	/* LEDs */
- 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
- 	/* Push Buttons */
+ static struct at91_adc_caps at91sam9g45_caps = {
+ 	.has_ts = true,
+ 	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
+@@ -1377,6 +1391,7 @@ static struct at91_adc_caps at91sam9x5_caps = {
+ 
+ static const struct of_device_id at91_adc_dt_ids[] = {
+ 	{ .compatible = "atmel,at91sam9260-adc", .data = &at91sam9260_caps },
++	{ .compatible = "atmel,at91sam9rl-adc", .data = &at91sam9rl_caps },
+ 	{ .compatible = "atmel,at91sam9g45-adc", .data = &at91sam9g45_caps },
+ 	{ .compatible = "atmel,at91sam9x5-adc", .data = &at91sam9x5_caps },
+ 	{},
+@@ -1388,6 +1403,9 @@ static const struct platform_device_id at91_adc_ids[] = {
+ 		.name = "at91sam9260-adc",
+ 		.driver_data = (unsigned long)&at91sam9260_caps,
+ 	}, {
++		.name = "at91sam9rl-adc",
++		.driver_data = (unsigned long)&at91sam9rl_caps,
++	}, {
+ 		.name = "at91sam9g45-adc",
+ 		.driver_data = (unsigned long)&at91sam9g45_caps,
+ 	}, {
 -- 
 1.8.3.2
