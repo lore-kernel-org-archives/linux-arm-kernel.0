@@ -1,70 +1,77 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  5 Mar 2014 14:25:51 +0100
-Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping when
- possible
+Date: Wed,  5 Mar 2014 14:25:46 +0100
+Subject: [PATCH v2 1/6] ARM: dts: tegra: add PCIe interrupt mapping properties
 In-Reply-To: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
 References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1394025951-32438-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the recommended method of doing the IRQ
-mapping. For old devicetrees we fall back to the
-previous practice.
+Those are defined by the common PCI binding.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
-v2: pass in parent dev to relevant functions, to make DT parsing
-    work (spotted by Tim Harvey <tharvey@gateworks.com>)
----
- drivers/pci/host/pcie-designware.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt | 8 ++++++++
+ arch/arm/boot/dts/tegra20.dtsi                                | 4 ++++
+ arch/arm/boot/dts/tegra30.dtsi                                | 4 ++++
+ 3 files changed, 16 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 17ce88f79d2b..98c118e04dba 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/msi.h>
- #include <linux/of_address.h>
-+#include <linux/of_pci.h>
- #include <linux/pci.h>
- #include <linux/pci_regs.h>
- #include <linux/types.h>
-@@ -492,7 +493,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	dw_pci.nr_controllers = 1;
- 	dw_pci.private_data = (void **)&pp;
+diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
+index 24cee06915c9..c300391e8d3e 100644
+--- a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
+@@ -42,6 +42,10 @@ Required properties:
+     - 0xc2000000: prefetchable memory region
+   Please refer to the standard PCI bus binding document for a more detailed
+   explanation.
++- #interrupt-cells: Size representation for interrupts (must be 1)
++- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
++  Please refer to the standard PCI bus binding document for a more detailed
++  explanation.
+ - clocks: Must contain an entry for each entry in clock-names.
+   See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must include the following entries:
+@@ -86,6 +90,10 @@ SoC DTSI:
+ 		              0 99 0x04>; /* MSI interrupt */
+ 		interrupt-names = "intr", "msi";
  
--	pci_common_init(&dw_pci);
-+	pci_common_init_dev(pp->dev, &dw_pci);
- 	pci_assign_unassigned_resources();
- #ifdef CONFIG_PCI_DOMAINS
- 	dw_pci.domain++;
-@@ -725,7 +726,7 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 
- 	if (pp) {
- 		pp->root_bus_nr = sys->busnr;
--		bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
-+		bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
- 					sys, &sys->resources);
- 	} else {
- 		bus = NULL;
-@@ -738,8 +739,13 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- {
- 	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-+	int irq;
- 
--	return pp->irq;
-+	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-+	if (!irq)
-+		irq = pp->irq;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &intc GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
 +
-+	return irq;
- }
+ 		bus-range = <0x00 0xff>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 480ecda3416b..52ef2cf0b142 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -552,6 +552,10 @@
+ 			      GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>; /* MSI interrupt */
+ 		interrupt-names = "intr", "msi";
  
- static void dw_pcie_add_bus(struct pci_bus *bus)
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &intc GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++
+ 		bus-range = <0x00 0xff>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index ed8e7700b46d..e5ab7adbc28a 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -28,6 +28,10 @@
+ 			      GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>; /* MSI interrupt */
+ 		interrupt-names = "intr", "msi";
+ 
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &intc GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++
+ 		bus-range = <0x00 0xff>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
 -- 
 1.9.0
