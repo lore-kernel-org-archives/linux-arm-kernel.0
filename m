@@ -1,61 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 05 Mar 2014 13:44:34 +0100
-Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <53170EC2.6090908@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>	<1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
- <CAPDyKFqK1JqxeJ_L_bzduixRLGA5m_FFPq_of2r6y0aCpS7z9A@mail.gmail.com>
- <53170EC2.6090908@gmail.com>
-Message-ID: <53171C32.20107@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 05 Mar 2014 14:02:24 +0100
+Subject: [PATCH V3 0/8] PM / Sleep / Runtime: Fixup some driver's system
+ suspend
+In-Reply-To: <20140305061647.GS13126@sirena.org.uk>
+References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
+ <7021741.2WcVMr4q95@vostro.rjw.lan> <20140305061647.GS13126@sirena.org.uk>
+Message-ID: <2429070.qaGktSfi2s@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.03.2014 12:47, Tomasz Figa wrote:
-> Hi Ulf,
->
-> On 05.03.2014 08:19, Ulf Hansson wrote:
->>> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain
->>> *genpd,
->>>          list_add(&genpd->gpd_list_node, &gpd_list);
->>>          mutex_unlock(&gpd_list_lock);
->>>   }
->>> +
->>> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
->>
->> Do we need a new config for this? Can't we just use CONFIG_OF?
->>
->
-> I guess we could, but initially it would have to be CONFIG_OF &&
-> !CONFIG_ARCH_EXYNOS until patch 03/11 converts Exynos to use the common
-> code.
->
->>> +       if (ret < 0) {
->>> +               dev_err(dev, "failed to add to power domain %s: %d",
->>> +                       pd->name, ret);
->>> +               return ret;
->>> +       }
->>> +
->>> +       pm_genpd_dev_need_restore(dev, true);
->>
->> So this will reflect the device as being inactive, which I think is
->> the wrong approach.
->>
->> Usually we should expect drivers that's being probed successfully to
->> leave their devices in active state, right?
->
-> It depends on domain power state, but actually it seems to be already
-> handled in __pm_genpd_add_device(), so this line might be not needed
-> indeed.
->
-> Strangely enough, it seemed to be needed on Exynos for correct
-> operation, but maybe in the meantime some fixes in genpd code showed up.
-> This will need some extra testing.
+On Wednesday, March 05, 2014 02:16:47 PM Mark Brown wrote:
+> On Sun, Mar 02, 2014 at 12:38:47AM +0100, Rafael J. Wysocki wrote:
+> 
+> > OK, I've queued up [1-2/8] for 3.15.  The rest generally didn't apply for me
+> > and I think it'd be better to push them through the respective subsystem trees
+> > later anyway.
+> 
+> Is there a tag we can pull to get those patches?  The driver changes
+> depend on the new API introduced in patch 2.
 
-Hmm, after removing this line, power domains no longer work correctly on 
-Exynos (thanks Marek for testing). Unfortunately I'm on a sick leave 
-right now and I won't be able to debug this issue on Exynos for some 
-time, but I'll see if I can reproduce it on s3c64xx board I have here at 
-home.
+They are in the pm-drivers branch of linux-pm.git.
 
-Best regards,
-Tomasz
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/e78e2525/attachment.sig>
