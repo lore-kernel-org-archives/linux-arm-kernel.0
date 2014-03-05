@@ -1,117 +1,137 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 05 Mar 2014 17:20:05 +0100
-Subject: [PATCH v2 03/11] ARM: exynos: Move to generic power domain
- bindings
-In-Reply-To: <1713847.uSatLFRtJj@amdc1032>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
- <1393862536-9842-4-git-send-email-tomasz.figa@gmail.com>
- <1713847.uSatLFRtJj@amdc1032>
-Message-ID: <53174EB5.1090803@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed,  5 Mar 2014 16:23:26 +0000
+Subject: [PATCH v5 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
+References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1394036606-17784-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartek,
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-On 05.03.2014 17:15, Bartlomiej Zolnierkiewicz wrote:
->
-> Hi Tomek,
->
-> On Monday, March 03, 2014 05:02:08 PM Tomasz Figa wrote:
->> This patch moves Exynos power domain code to use the new generic power
->> domain look-up framework introduced by previous patch, allowing the new
->> code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
->>
->> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
->> ---
->>   .../bindings/arm/exynos/power_domain.txt           | 12 ++--
->>   arch/arm/mach-exynos/pm_domains.c                  | 80 +---------------------
->>   kernel/power/Kconfig                               |  2 +-
->>   3 files changed, 7 insertions(+), 87 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> index 5216b41..60f26a8 100644
->> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> @@ -8,6 +8,8 @@ Required Properties:
->>       * samsung,exynos4210-pd - for exynos4210 type power domain.
->>   - reg: physical base address of the controller and length of memory mapped
->>       region.
->> +- #power-domain-cells: number of cells in power domain specifier;
->> +    must be 0.
->>
->>   Node of a device using power domains must have a samsung,power-domain property
->>   defined with a phandle to respective power domain.
->> @@ -17,12 +19,8 @@ Example:
->>   	lcd0: power-domain-lcd0 {
->>   		compatible = "samsung,exynos4210-pd";
->>   		reg = <0x10023C00 0x10>;
->> +		#power-domain-cells = <0>;
->>   	};
->>
->> -Example of the node using power domain:
->> -
->> -	node {
->> -		/* ... */
->> -		samsung,power-domain = <&lcd0>;
->> -		/* ... */
->> -	};
->> +See Documentation/devicetree/bindings/power/power_domain.txt for description
->> +of consumer-side bindings.
->> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
->> index 8fd2488..48ee6c9 100644
->> --- a/arch/arm/mach-exynos/pm_domains.c
->> +++ b/arch/arm/mach-exynos/pm_domains.c
->> @@ -75,78 +75,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
->>   	return exynos_pd_power(domain, false);
->>   }
->>
->> -static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
->> -					 struct device *dev)
->> -{
->> -	int ret;
->> -
->> -	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
->> -
->> -	while (1) {
->> -		ret = pm_genpd_add_device(&pd->pd, dev);
->> -		if (ret != -EAGAIN)
->> -			break;
->> -		cond_resched();
->> -	}
->> -
->> -	pm_genpd_dev_need_restore(dev, true);
->> -}
->> -
->> -static void exynos_remove_device_from_domain(struct device *dev)
->> -{
->> -	struct generic_pm_domain *genpd = dev_to_genpd(dev);
->> -	int ret;
->> -
->> -	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
->> -
->> -	while (1) {
->> -		ret = pm_genpd_remove_device(genpd, dev);
->> -		if (ret != -EAGAIN)
->> -			break;
->> -		cond_resched();
->> -	}
->> -}
->> -
->> -static void exynos_read_domain_from_dt(struct device *dev)
->> -{
->> -	struct platform_device *pd_pdev;
->> -	struct exynos_pm_domain *pd;
->> -	struct device_node *node;
->> -
->> -	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
->
-> This removes "samsung,power-domain" phandle handling but I cannot find
-> in your patch series updates to existing EXYNOS dts files converting
-> them to use the new "power-domain" property.  Am I missing something?
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 21 ++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 21 ++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 18 ++++++++++++++++++
+ 3 files changed, 58 insertions(+), 2 deletions(-)
 
-Patch 01/11 adds generic parsing code along with fallback to the legacy 
-"samsung,power-domain" property, if the generic one is not present, as 
-it was pretty straightforward to implement it there.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index ac870fb..c95a4cb 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -230,9 +230,28 @@
+ 			clcd at 1f0000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f0000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				arm,pl11x,framebuffer-base = <0x18000000 0x00800000>;
++				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -282,7 +301,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index f142036..9224834 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -229,9 +229,28 @@
+ 			clcd at 1f000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				arm,pl11x,framebuffer-base = <0x4c000000 0x00800000>;
++				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -281,7 +300,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..ed4f223 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -70,9 +70,27 @@
+ 	clcd at 10020000 {
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
++		interrupt-names = "combined";
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++
++		arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
++		display-timings {
++			native-mode = <&clcd_timing0>;
++			clcd_timing0: xga {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.8.3.2
