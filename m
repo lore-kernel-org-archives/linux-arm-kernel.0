@@ -1,102 +1,73 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed,  5 Mar 2014 14:55:02 +0800
-Subject: [PATCH] pinctrl: sirf: fix kernel panic in gpio_lock_as_irq
-Message-ID: <1394002503-2614-1-git-send-email-21cnbao@gmail.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Wed, 05 Mar 2014 07:56:04 +0100
+Subject: [BUG] atmel: spi: scheduling while atomic
+In-Reply-To: <20140304214039.GA4441@piout.net>
+References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
+Message-ID: <5316CA84.4080907@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Hi Alex,
+I have a bad news, disabling dma does not help.
 
-commit 655dada6277991 causes kernel panic, this patch fixes it.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.14.0-rc4_cpm9g25+ (prchal at prchal) (gcc version 4.5.2 (GCC) ) #1 PREEMPT Tue Mar 4 
+14:28:23 CET 2014
+[    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+...
+[    0.878906] atmel_spi f0000000.spi: version: 0x212
+[    0.882812] of_dma_request_slave_channel: dma-names property of node '/ahb/apb/spi at f0000000' missing or empty
+[    0.886718] atmel_spi f0000000.spi: DMA TX channel not available, SPI unable to use DMA
+[    0.890625] atmel_spi f0000000.spi: Atmel SPI Controller using PIO only
+[    0.894531] atmel_spi f0000000.spi: Atmel SPI Controller at 0xf0000000 (irq 28)
+...
+[    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
+[    0.906250] Modules linked in:
+[    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-rc4_cpm9g25+ #1
+[    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>] (show_stack+0x10/0x14)
+[    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>] (__schedule_bug+0x48/0x60)
+[    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>] (__schedule+0x60/0x484)
+[    0.906250] [<c0390294>] (__schedule) from [<c038feac>] (schedule_timeout+0x17c/0x1ac)
+[    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>] (wait_for_common+0x10c/0x1f0)
+[    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>] (atmel_spi_transfer_one_message+0x71c/0xa48)
+[    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from [<c0246624>] (spi_pump_messages+0x210/0x238)
+[    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>] (kthread_worker_fn+0x15c/0x1b4)
+[    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>] (kthread+0xb8/0xcc)
+[    0.906250] [<c0034534>] (kthread) from [<c0009510>] (ret_from_fork+0x14/0x24)
+[    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
+...
+[   62.527343] BUG: scheduling while atomic: spi0/383/0x00000002
+[   62.531250] Modules linked in:
+[   62.531250] CPU: 0 PID: 383 Comm: spi0 Tainted: G        W    3.14.0-rc4_cpm9g25+ #1
+[   62.531250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>] (show_stack+0x10/0x14)
+[   62.531250] [<c000bdc0>] (show_stack) from [<c003a224>] (__schedule_bug+0x48/0x60)
+[   62.531250] [<c003a224>] (__schedule_bug) from [<c0390294>] (__schedule+0x60/0x484)
+[   62.531250] [<c0390294>] (__schedule) from [<c038feac>] (schedule_timeout+0x17c/0x1ac)
+[   62.531250] [<c038feac>] (schedule_timeout) from [<c039111c>] (wait_for_common+0x10c/0x1f0)
+[   62.531250] [<c039111c>] (wait_for_common) from [<c0249228>] (atmel_spi_transfer_one_message+0x71c/0xa48)
+[   62.531250] [<c0249228>] (atmel_spi_transfer_one_message) from [<c0246624>] (spi_pump_messages+0x210/0x238)
+[   62.531250] [<c0246624>] (spi_pump_messages) from [<c00343d0>] (kthread_worker_fn+0x15c/0x1b4)
+[   62.531250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>] (kthread+0xb8/0xcc)
+[   62.531250] [<c0034534>] (kthread) from [<c0009510>] (ret_from_fork+0x14/0x24)
 
-    [    1.197816] [ffffffee] *pgd=0d7fd821, *pte=00000000, *ppte=00000000
-    [    1.204070] Internal error: Oops: 17 [#1] PREEMPT SMP ARM
-    [    1.209447] Modules linked in:
-    [    1.212490] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.0-rc1 #3
-    [    1.218737] task: cd03c000 ti: cd040000 task.ti: cd040000
-    [    1.224127] PC is at gpiod_lock_as_irq+0xc/0x64
-    [    1.228634] LR is at sirfsoc_gpio_irq_startup+0x18/0x44
-    [    1.233842] pc : [<c01d3990>]    lr : [<c01d1c38>]    psr: a0000193
-    [    1.233842] sp : cd041d30  ip : 00000000  fp : 00000000
-    [    1.245296] r10: 00000000  r9 : cd023db4  r8 : 60000113
-    [    1.250505] r7 : 0000003e  r6 : cd023dd4  r5 : c06bfa54  r4 : cd023d80
-    [    1.257014] r3 : 00000020  r2 : 00000000  r1 : ffffffea  r0 : ffffffea
-    [    1.263526] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-    [    1.270903] Control: 10c53c7d  Table: 00004059  DAC: 00000015
-    [    1.276631] Process swapper/0 (pid: 1, stack limit = 0xcd040240)
-    [    1.282620] Stack: (0xcd041d30 to 0xcd042000)
-    [    1.286963] 1d20:                                     cd023d80 c01d1c38 c01d1c20 cd023d80
-    [    1.295124] 1d40: 00000001 c0068438 cd023d80 ccb6d880 cd023dd4 c0067044 0000718e c006719c
-    [    1.286963] 1d20:                                     cd023d80 c01d1c38 c01d1c20 cd023d80
-    [    1.295124] 1d40: 00000001 c0068438 cd023d80 ccb6d880 cd023dd4 c0067044 0000718e c006719c
-    [    1.295124] 1d40: 00000001 c0068438 cd023d80 ccb6d880 cd023dd4 c0067044 0000718e c006719c
-    [    1.303283] 1d60: 00000800 00000083 ccb6d880 cd023d80 c02b41d8 00000083 0000003e ccb7c410
-    [    1.311442] 1d80: 00000000 c00671dc 00000083 0000003e c02b41d8 cd3dd5c0 0000003e ccb7c634
-    [    1.319601] 1da0: cd040030 c00672a8 cd3dd5c0 ccb7c410 ccb6d340 ccb7c410 ccb6d340 cd3dd400
-    [    1.327760] 1dc0: cd3dd410 c02b4434 ccb7c410 c01265a8 00000001 cd3dd410 c0687108 00000000
-    [    1.335919] 1de0: c0687108 00000000 00000000 c0240170 c0240158 cd3dd410 c06c30d0 c023e8bc
-    [    1.344079] 1e00: c023e9d4 00000000 cd3dd410 c023e9d4 c0682150 c023cf88 cd003e98 cd2d50c4
-    [    1.352238] 1e20: cd3dd410 cd3dd444 c06822f0 c023e768 cd3dd418 cd3dd410 c06822f0 c023de14
-    [    1.360397] 1e40: cd3dd418 00000000 cd3dd410 c023c398 cd041e78 cd041ea8 cd3dd400 cd3dd410
-    [    1.368556] 1e60: 00000083 00000000 cd3dd400 cd3dd410 00000083 000000c8 c04e00c8 c023fee8
-    [    1.376715] 1e80: 00000000 cd041ea8 cd3dd400 00000001 00000083 c024048c c0435ef8 c0434dec
-    [    1.384874] 1ea0: c068da58 c04c6d04 c0682150 c0435ef8 ffffffff 00000000 00000000 c068da58
-    [    1.393033] 1ec0: 00000020 00000000 00000000 00000000 c05dabb8 00000007 c068d640 c068d640
-    [    1.401193] 1ee0: c04c247c c04c249c 00000000 c00088e8 cd004c00 c043bbb8 cd029180 c03812a0
-    [    1.409352] 1f00: 00000000 00000000 60000113 c0673728 60000113 c0673728 00000000 00000000
-    [    1.417511] 1f20: cd7fce01 c0390a54 00000065 c003a81c c049e8bc 00000007 cd7fce0e 00000007
-    [    1.425670] 1f40: 00000000 c05dabb8 00000007 c068d640 c068d640 c04c050c c04e00c8 00000065
-    [    1.433829] 1f60: c04e00c0 c04c0c54 00000007 00000007 c04c050c c037d8fc cd03c000 c004322c
-    [    1.441988] 1f80: c0662b40 0000d640 c03737c0 00000000 00000000 00000000 00000000 00000000
-    [    1.450147] 1fa0: 00000000 c03737cc 00000000 c000e478 00000000 00000000 00000000 00000000
-    [    1.458307] 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-    [    1.466467] 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000 0002d481 05014092
-    [    1.474640] [<c01d3990>] (gpiod_lock_as_irq) from [<c01d1c38>] (sirfsoc_gpio_irq_startup+0x18/0x44)
-    [    1.483661] [<c01d1c38>] (sirfsoc_gpio_irq_startup) from [<c0068438>] (irq_startup+0x34/0x6c)
-    [    1.492163] [<c0068438>] (irq_startup) from [<c0067044>] (__setup_irq+0x450/0x4b8)
-    [    1.499714] [<c0067044>] (__setup_irq) from [<c00671dc>] (request_threaded_irq+0xa8/0x128)
-    [    1.507960] [<c00671dc>] (request_threaded_irq) from [<c00672a8>] (request_any_context_irq+0x4c/0x7c)
-    [    1.517164] [<c00672a8>] (request_any_context_irq) from [<c02b4434>] (gpio_extcon_probe+0x144/0x1d4)
-    [    1.526279] [<c02b4434>] (gpio_extcon_probe) from [<c0240170>] (platform_drv_probe+0x18/0x48)
-    [    1.534783] [<c0240170>] (platform_drv_probe) from [<c023e8bc>] (driver_probe_device+0x120/0x238)
-    [    1.543641] [<c023e8bc>] (driver_probe_device) from [<c023cf88>] (bus_for_each_drv+0x58/0x8c)
-    [    1.552143] [<c023cf88>] (bus_for_each_drv) from [<c023e768>] (device_attach+0x74/0x88)
-    [    1.560126] [<c023e768>] (device_attach) from [<c023de14>] (bus_probe_device+0x84/0xa8)
-    [    1.568113] [<c023de14>] (bus_probe_device) from [<c023c398>] (device_add+0x440/0x520)
-    [    1.576012] [<c023c398>] (device_add) from [<c023fee8>] (platform_device_add+0xb4/0x214)
-    [    1.584084] [<c023fee8>] (platform_device_add) from [<c024048c>] (platform_device_register_full+0xb8/0xdc)
-    [    1.593719] [<c024048c>] (platform_device_register_full) from [<c04c6d04>] (sirfsoc_init_late+0xec/0xf4)
-    [    1.603185] [<c04c6d04>] (sirfsoc_init_late) from [<c04c249c>] (init_machine_late+0x20/0x28)
-    [    1.611603] [<c04c249c>] (init_machine_late) from [<c00088e8>] (do_one_initcall+0xf8/0x144)
-    [    1.619934] [<c00088e8>] (do_one_initcall) from [<c04c0c54>] (kernel_init_freeable+0x13c/0x1dc)
-    [    1.628620] [<c04c0c54>] (kernel_init_freeable) from [<c03737cc>] (kernel_init+0xc/0x118)
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index 38c94b2..4978ed1 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -598,7 +598,7 @@ static unsigned int sirfsoc_gpio_irq_startup(struct irq_data *d)
- {
- 	struct sirfsoc_gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
--	if (gpio_lock_as_irq(&bank->chip.gc, d->hwirq))
-+	if (gpio_lock_as_irq(&bank->chip.gc, d->hwirq % SIRFSOC_GPIO_BANK_SIZE))
- 		dev_err(bank->chip.gc.dev,
- 			"unable to lock HW IRQ %lu for IRQ\n",
- 			d->hwirq);
-@@ -611,7 +611,7 @@ static void sirfsoc_gpio_irq_shutdown(struct irq_data *d)
- 	struct sirfsoc_gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
- 	sirfsoc_gpio_irq_mask(d);
--	gpio_unlock_as_irq(&bank->chip.gc, d->hwirq);
-+	gpio_unlock_as_irq(&bank->chip.gc, d->hwirq % SIRFSOC_GPIO_BANK_SIZE);
- }
- 
- static struct irq_chip sirfsoc_irq_chip = {
--- 
-1.7.5.4
+Dne 4.3.2014 22:40, Alexandre Belloni napsal(a):
+> Hi Ji??,
+>
+> Thank you for that report.
+>
+> On 04/03/2014 at 15:29:16 +0100, Ji?? Prchal wrote :
+>> Hi,
+>> I discovered some problem when I access anything on SPI. But it
+>> seems to work correctly, only log is full of this messages. I've
+>> tried kernels 3.13.0 and 3.14.0, both are the same.
+>>
+>> [    0.875000] atmel_spi f0000000.spi: version: 0x212
+>> [    0.878906] atmel_spi f0000000.spi: Using dma0chan0 (tx) and dma0chan1 (rx) for DMA transfers
+>> [    0.882812] atmel_spi f0000000.spi: Atmel SPI Controller at 0xf0000000 (irq 28)
+>> ...
+>
+> For now, as a work around, I would suggest disabling dma. I believe it
+> will solve that particular issue but I didn't try. I would be grateful
+> if you could post the result.
+>
