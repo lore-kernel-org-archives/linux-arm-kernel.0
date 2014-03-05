@@ -1,95 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Mar 2014 13:33:49 +0800
-Subject: [PATCH v2] ARM: dts: vf610-twr: Add support for sdhc1
-In-Reply-To: <1393860573-16615-1-git-send-email-cosminstefan.stoica@freescale.com>
-References: <1393591611-3147-1-git-send-email-cosminstefan.stoica@freescale.com>
- <1393860573-16615-1-git-send-email-cosminstefan.stoica@freescale.com>
-Message-ID: <20140305053348.GE8784@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 05 Mar 2014 14:34:32 +0900
+Subject: [PATCH 1/2] arm64: debug: make local symbols static
+Message-ID: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 05:29:33PM +0200, Stoica Cosmin Stefan wrote:
-> From: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> 
-> The kernel was not able to boot from SD card because sdhc support
-> was not present into the dts.
-> 
-> A new entry for sdhc1 was added for vf610-twr board based on the
-> compatible entry present on imx53.
-> 
-> After applying these changes, the kernel is able to boot successfully
-> from SD card.
-> 
-> Changes v1-v2:
-> According to Shawn Guo's comments:
-> - moved esdhc1 node before fec0 in board dts file;
-> - reformatted clocks line;
-> - removed duplicate property (bus-width) in dtsi file.
-> 
-> Signed-off-by: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> Signed-off-by: Chircu Bogdan <Bogdan.Chircu@freescale.com>
-> ---
->  arch/arm/boot/dts/vf610-twr.dts |    8 ++++++++
->  arch/arm/boot/dts/vf610.dtsi    |   11 +++++++++++
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index 7dd1d6e..e77c98e 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -111,6 +111,13 @@
->  	};
->  };
->  
-> +&esdhc1 {
-> +   pinctrl-names = "default";
-> +   pinctrl-0 = <&pinctrl_esdhc1_1>;
+Make local symbols static, because these are used only in this
+file.
 
-Please base the patch on my for-next branch below, where stuff
-like pinctrl_esdhc1_1 have gone into board dts.
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+ arch/arm64/kernel/debug-monitors.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
-
-> +   bus-width = <4>;
-> +   status = "okay";
-> +};
-> +
->  &fec0 {
->  	phy-mode = "rmii";
->  	pinctrl-names = "default";
-> @@ -227,3 +234,4 @@
->  	pinctrl-0 = <&pinctrl_uart1>;
->  	status = "okay";
->  };
-> +
-
-You shouldn't add this new line.
-
-Shawn
-
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index c63d26d..70de377 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -344,6 +344,17 @@
->  				status = "disabled";
->  			};
->  
-> +			esdhc1: esdhc at 400b2000 {
-> +				   compatible = "fsl,imx53-esdhc";
-> +				   reg = <0x400b2000 0x4000>;
-> +				   interrupts = <0 28 0x04>;
-> +				   clocks = <&clks VF610_CLK_IPG_BUS>,
-> +                                           <&clks VF610_CLK_PLATFORM_BUS>,
-> +                                           <&clks VF610_CLK_ESDHC1>;
-> +				   clock-names = "ipg", "ahb", "per";
-> +				   status = "disabled";
-> +			};
-> +
->  			fec0: ethernet at 400d0000 {
->  				compatible = "fsl,mvf600-fec";
->  				reg = <0x400d0000 0x1000>;
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 13f87de..14ba23c 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -189,7 +189,7 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
+ 
+ /* EL1 Single Step Handler hooks */
+ static LIST_HEAD(step_hook);
+-DEFINE_RWLOCK(step_hook_lock);
++static DEFINE_RWLOCK(step_hook_lock);
+ 
+ void register_step_hook(struct step_hook *hook)
+ {
+@@ -276,7 +276,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+  * Use reader/writer locks instead of plain spinlock.
+  */
+ static LIST_HEAD(break_hook);
+-DEFINE_RWLOCK(break_hook_lock);
++static DEFINE_RWLOCK(break_hook_lock);
+ 
+ void register_break_hook(struct break_hook *hook)
+ {
+-- 
+1.7.10.4
