@@ -1,65 +1,50 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Mar 2014 17:58:22 +0900
-Subject: [PATCH v5 7/7] pci: Add support for creating a generic host_bridge
- from device tree
-In-Reply-To: <20140305083311.GD13582@bart.dudau.co.uk>
-References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
- <1393948204-11555-8-git-send-email-Liviu.Dudau@arm.com>
- <001f01cf3811$18463ed0$48d2bc70$%han@samsung.com>
- <20140305083311.GD13582@bart.dudau.co.uk>
-Message-ID: <000b01cf3851$0fe55d30$2fb01790$%han@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed,  5 Mar 2014 16:59:35 +0800
+Subject: [PATCH 3/3] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+Message-ID: <1394009975-28655-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 05, 2014 5:33 PM, Liviu Dudau wrote:
-> On Wed, Mar 05, 2014 at 10:20:28AM +0900, Jingoo Han wrote:
-> > On Wednesday, March 05, 2014 12:50 AM, Liviu Dudau wrote:
-> > >
-> > > Several platforms use a rather generic version of parsing
-> > > the device tree to find the host bridge ranges. Move the common code
-> > > into the generic PCI code and use it to create a pci_host_bridge
-> > > structure that can be used by arch code.
-> > >
-> > > Based on early attempts by Andrew Murray to unify the code.
-> > > Used powerpc and microblaze PCI code as starting point.
-> > >
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > >
-> > > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> > > index 8708b652..800678a 100644
-> > > --- a/drivers/pci/host-bridge.c
-> > > +++ b/drivers/pci/host-bridge.c
+From: Mark Brown <broonie@linaro.org>
 
-[.....]
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-> > > +
-> > > +	/* Apply architecture specific fixups for the ranges */
-> > > +	pcibios_fixup_bridge_ranges(resources);
-> >
-> > It also makes compile problem with exynos_defconfig as below:
-> >
-> > drivers/built-in.o: In function `pci_host_bridge_of_get_ranges':
-> > drivers/pci/host-bridge.c:157: undefined reference to `pcibios_fixup_bridge_ranges'
-> 
-> Does that mean that exynos_defconfig doesn't define CONFIG_OF? How do you
-> compile all the .dts files then? Should CONFIG_OF not be added to the default config
-> file?
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-Now, I am testing your patches with ARM32 platform such as
-Exynos SoCs. And the default 'exynos_defconfig' already defines
-CONFIG_OF=y. (./arch/arm/configs/exynos_defconfig)
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
 
-> 
-> Other than that, your comment is correct. drivers/pci/host-bridge.c gets compiled
-> in regardless of CONFIG_OF and I need to provide an empty implementation for
-> pcibios_fixup_bridge_ranges().
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-There is no pcibios_fixup_bridge_ranges() in ./arch/arm/ directory.
-So, it makes the compile problem.
-
-I think that the empty implementation for pcibios_fixup_bridge_ranges()
-may be necessary, in order to the compile problem.
-Or, __weak pcibios_fixup_bridge_ranges() would be used.
-
-Best regards,
-Jingoo Han
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 3a80979..69a5bf1 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -188,6 +188,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.9.0
