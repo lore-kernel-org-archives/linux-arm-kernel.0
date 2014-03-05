@@ -1,43 +1,46 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 5 Mar 2014 14:07:01 -0600
-Subject: [PATCHv3 00/13] OMAP IOMMU DT adaptation for 3.15
-In-Reply-To: <20140305193326.GA7599@atomide.com>
-References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
- <20140228230000.GW13624@atomide.com> <20140304160432.GG2799@8bytes.org>
- <5316068F.3020003@ti.com> <20140305193326.GA7599@atomide.com>
-Message-ID: <531783E5.4090302@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 05 Mar 2014 12:33:07 -0800
+Subject: [PATCH] ARM: kernel: respect device tree status of cpu nodes
+In-Reply-To: <1393240960-31846-1-git-send-email-j@bitron.ch>
+References: <1393240960-31846-1-git-send-email-j@bitron.ch>
+Message-ID: <53178A03.3090004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
++Lorenzo
 
-On 03/05/2014 01:33 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [140304 09:03]:
->> On 03/04/2014 10:04 AM, Joerg Roedel wrote:
->>>
->>> Applied patches 1-7 to my arm/omap branch.
->>>
->>> Tony, you can pull that branch into your tree if needed (when I pushed
->>> it, which will happen today or tomorrow).
+On 02/24/14 03:22, J?rg Billeter wrote:
+> Skip 'disabled' cpu nodes when building the cpu logical map. This avoids
+> booting cpus that have been disabled in the device tree.
 >
-> OK thanks, looks like remaining patches compile just fine even without
-> it which is nice.
-
-Yes, I did test the boot specifically for this both with and without the 
-corresponding DTS nodes.
-
+> Signed-off-by: J?rg Billeter <j@bitron.ch>
+> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/kernel/devtree.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 >
->> Tony,
->> Can you also pull in the corresponding DTS node patches as well that
->> go along with this series.
->> http://marc.info/?l=linux-omap&m=139362062805816&w=2
->
-> They look OK to me, but looks like Benoit and Paul are not Cc:ed
-> on the hwmod changes. I suggest you resend just patches 8 - 13 and
-> the .dts changes as a new series with Benoit and Paul on Cc for
-> them so they have a chance to review and ack them.
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 739c3df..9aed299 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -95,6 +95,10 @@ void __init arm_dt_init_cpu_maps(void)
+>  		if (of_node_cmp(cpu->type, "cpu"))
+>  			continue;
+>  
+> +		/* Check if CPU is enabled */
+> +		if (!of_device_is_available(cpu))
+> +			continue;
+> +
+>  		pr_debug(" * %s...\n", cpu->full_name);
+>  		/*
+>  		 * A device tree containing CPU nodes with missing "reg"
 
-OK, will do.
+This doesn't follow the ePAPR spec. According to ePAPR status="disabled"
+in a cpu node means "the cpu is in a quiescent state" and one can enable
+it by using the "enable-method". At the least, we should document this
+in bindings/arm/cpus.txt if we can all agree that we want this
+definition of disabled.
 
-Thanks
-Suman
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
