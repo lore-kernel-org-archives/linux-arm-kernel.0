@@ -1,59 +1,54 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 5 Mar 2014 10:41:03 +0200
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <20140228162327.GT21483@n2100.arm.linux.org.uk>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk> <5310B567.7040605@ti.com>
- <20140228162327.GT21483@n2100.arm.linux.org.uk>
-Message-ID: <5316E31F.9050308@ti.com>
+Date: Wed, 5 Mar 2014 10:42:36 +0200
+Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <CAMuHMdVpT2Y-KQO46o=zbRSgqgx2mbBsPjGgoTDDwwfCOxUCmw@mail.gmail.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	<1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>	<20140228160612.GR21483@n2100.arm.linux.org.uk>	<5310B609.1010105@ti.com>	<20140228163431.GV21483@n2100.arm.linux.org.uk>
+ <CAMuHMdVpT2Y-KQO46o=zbRSgqgx2mbBsPjGgoTDDwwfCOxUCmw@mail.gmail.com>
+Message-ID: <5316E37C.4070400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 18:23, Russell King - ARM Linux wrote:
-
-> That's rather a lot of compatible strings.  Another possibility is:
+On 01/03/14 20:58, Geert Uytterhoeven wrote:
+> On Fri, Feb 28, 2014 at 5:34 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> There's actually three HDMI connectors:
+>>
+>>   All three connectors carry all required HDMI signals, including a TMDS
+>>   link. The Type B connector is slightly larger and carries a second TMDS
+>>   link, which is necessary to support very high resolution displays using
+>>   dual link. The Type C connector carries the same signals as the Type A
+>>   but is more compact and intended for mobile applications.
+>>
+>> So, Type C and Type A are electrically the same.
 > 
-> 	compatible = "dvi-connector";
-> 	analog;
-> 	digital;
-> 	single-link;
-> 	dual-link;
+> There's also D (e.g. on BeagleBone Black) and E:
+> 
+> http://en.wikipedia.org/wiki/HDMI#Connectors
+> 
+> Electrically they seem to be the same as A/C.
 
-I made the following changes compared to the posted version. I decided
-to leave the "single-link" out, as it's implied if "digital" is set.
+I made the following change compared to the posted version.
 
  Tomi
 
-@@ -6,11 +6,16 @@ Required properties:
+@@ -3,6 +3,7 @@ HDMI Connector
+
+ Required properties:
+ - compatible: "hdmi-connector"
++- type: the HDMI connector type: "a", "b", "c", "d" or "e"
 
  Optional properties:
  - label: a symbolic name for the connector
--- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-+- ddc-i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-+- analog: the connector has DVI analog pins
-+- digital: the connector has DVI digital pins
-+- dual-link: the connector has pins for DVI dual-link
+@@ -17,6 +18,8 @@ hdmi0: connector at 1 {
+        compatible = "hdmi-connector";
+        label = "hdmi";
 
- Required nodes:
- - Video port for DVI input
-
-+Note: One (or both) of 'analog' or 'digital' must be set.
++       type = "a";
 +
- Example
- -------
-
-@@ -18,7 +23,9 @@ dvi0: connector at 0 {
-        compatible = "dvi-connector";
-        label = "dvi";
-
--       i2c-bus = <&i2c3>;
-+       digital;
-+
-+       ddc-i2c-bus = <&i2c3>;
-
-        dvi_connector_in: endpoint {
-                remote-endpoint = <&tfp410_out>;
+        hdmi_connector_in: endpoint {
+                remote-endpoint = <&tpd12s015_out>;
+        };
 
 
 -------------- next part --------------
@@ -62,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 901 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/4868fdb2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140305/ce46cb06/attachment.sig>
