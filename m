@@ -1,59 +1,156 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  5 Mar 2014 18:35:32 +0100
-Subject: [PATCH 07/15] iio: adc: at91: add sam9rl support
+Date: Wed,  5 Mar 2014 18:35:33 +0100
+Subject: [PATCH 08/15] ARM: at91: sam9rl: add at91_adc to support adc and
+ touchscreen
 In-Reply-To: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394040940-18246-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394040940-18246-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ADC clock needs to be defined to enable the at91_adc driver. It is defined
+to the same speed that is used for atmel_tsadcc.
+
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/iio/adc/at91_adc.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/mach-at91/at91sam9rl.c         |  7 +++
+ arch/arm/mach-at91/at91sam9rl_devices.c | 85 +++++++++++++++++++++++++++++++++
+ 2 files changed, 92 insertions(+)
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index c3ea34025749..c47dcbaa56ef 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -1343,6 +1343,20 @@ static struct at91_adc_caps at91sam9260_caps = {
- 	},
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 3651517abedf..753ba4893836 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -151,6 +151,11 @@ static struct clk ac97_clk = {
+ 	.pmc_mask	= 1 << AT91SAM9RL_ID_AC97C,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
++static struct clk adc_op_clk = {
++	.name		= "adc_op_clk",
++	.type		= CLK_TYPE_PERIPHERAL,
++	.rate_hz	= 1000000,
++};
+ 
+ static struct clk *periph_clocks[] __initdata = {
+ 	&pioA_clk,
+@@ -176,6 +181,7 @@ static struct clk *periph_clocks[] __initdata = {
+ 	&udphs_clk,
+ 	&lcdc_clk,
+ 	&ac97_clk,
++	&adc_op_clk,
+ 	// irq0
  };
  
-+static struct at91_adc_caps at91sam9rl_caps = {
-+	.has_ts = true,
-+	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
-+	.num_channels = 6,
-+	.registers = {
-+		.channel_base = AT91_ADC_CHR(0),
-+		.drdy_mask = AT91_ADC_DRDY,
-+		.status_register = AT91_ADC_SR,
-+		.trigger_register = AT91_ADC_TRGR_9G45,
-+		.mr_prescal_mask = AT91_ADC_PRESCAL_9260,
-+		.mr_startup_mask = AT91_ADC_STARTUP_9G45,
+@@ -196,6 +202,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
+ 	CLKDEV_CON_ID("pioD", &pioD_clk),
++	CLKDEV_CON_ID("adc_clk", &tsc_clk),
+ };
+ 
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index a698bdab2cce..b836dada942c 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -22,6 +22,7 @@
+ #include <mach/at91_matrix.h>
+ #include <mach/at91sam9_smc.h>
+ #include <linux/platform_data/dma-atmel.h>
++#include <linux/platform_data/at91_adc.h>
+ 
+ #include "board.h"
+ #include "generic.h"
+@@ -656,6 +657,90 @@ void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data)
+ void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data) {}
+ #endif
+ 
++/* --------------------------------------------------------------------
++ *  ADC and Touchscreen
++ * -------------------------------------------------------------------- */
++
++#if IS_ENABLED(CONFIG_AT91_ADC)
++static struct at91_adc_data adc_data;
++
++static struct resource adc_resources[] = {
++	[0] = {
++		.start	= AT91SAM9RL_BASE_TSC,
++		.end	= AT91SAM9RL_BASE_TSC + SZ_16K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TSC,
++		.end	= NR_IRQS_LEGACY + AT91SAM9RL_ID_TSC,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++static struct platform_device at91_adc_device = {
++	.name           = "at91sam9rl-adc",
++	.id             = -1,
++	.dev            = {
++		.platform_data  = &adc_data,
++	},
++	.resource       = adc_resources,
++	.num_resources  = ARRAY_SIZE(adc_resources),
++};
++
++static struct at91_adc_trigger at91_adc_triggers[] = {
++	[0] = {
++		.name = "external-rising",
++		.value = 1,
++		.is_external = true,
++	},
++	[1] = {
++		.name = "external-falling",
++		.value = 2,
++		.is_external = true,
++	},
++	[2] = {
++		.name = "external-any",
++		.value = 3,
++		.is_external = true,
++	},
++	[3] = {
++		.name = "continuous",
++		.value = 6,
++		.is_external = false,
 +	},
 +};
 +
- static struct at91_adc_caps at91sam9g45_caps = {
- 	.has_ts = true,
- 	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
-@@ -1377,6 +1391,7 @@ static struct at91_adc_caps at91sam9x5_caps = {
++void __init at91_add_device_adc(struct at91_adc_data *data)
++{
++	if (!data)
++		return;
++
++	if (test_bit(0, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PA17, 0);
++	if (test_bit(1, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PA18, 0);
++	if (test_bit(2, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PA19, 0);
++	if (test_bit(3, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PA20, 0);
++	if (test_bit(4, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PD6, 0);
++	if (test_bit(5, &data->channels_used))
++		at91_set_A_periph(AT91_PIN_PD7, 0);
++
++	if (data->use_external_triggers)
++		at91_set_A_periph(AT91_PIN_PB15, 0);
++
++	data->startup_time = 40;
++	data->trigger_number = 4;
++	data->trigger_list = at91_adc_triggers;
++
++	adc_data = *data;
++	platform_device_register(&at91_adc_device);
++}
++#else
++void __init at91_add_device_adc(struct at91_adc_data *data) {}
++#endif
  
- static const struct of_device_id at91_adc_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9260-adc", .data = &at91sam9260_caps },
-+	{ .compatible = "atmel,at91sam9rl-adc", .data = &at91sam9rl_caps },
- 	{ .compatible = "atmel,at91sam9g45-adc", .data = &at91sam9g45_caps },
- 	{ .compatible = "atmel,at91sam9x5-adc", .data = &at91sam9x5_caps },
- 	{},
-@@ -1388,6 +1403,9 @@ static const struct platform_device_id at91_adc_ids[] = {
- 		.name = "at91sam9260-adc",
- 		.driver_data = (unsigned long)&at91sam9260_caps,
- 	}, {
-+		.name = "at91sam9rl-adc",
-+		.driver_data = (unsigned long)&at91sam9rl_caps,
-+	}, {
- 		.name = "at91sam9g45-adc",
- 		.driver_data = (unsigned long)&at91sam9g45_caps,
- 	}, {
+ /* --------------------------------------------------------------------
+  *  RTC
 -- 
 1.8.3.2
