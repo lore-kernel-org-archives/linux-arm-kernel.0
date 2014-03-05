@@ -1,43 +1,68 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Wed, 5 Mar 2014 07:07:03 +0000
-Subject: [PATCH 01/15] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <20140305062114.GT13126@sirena.org.uk>
-References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
- <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
- <6dc5873dcdf54e13aecbf7c6be03f8bf@BY2PR03MB505.namprd03.prod.outlook.com>
- <20140305062114.GT13126@sirena.org.uk>
-Message-ID: <6c950194cf4b40f0a07335a7732290da@BY2PR03MB505.namprd03.prod.outlook.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 5 Mar 2014 09:11:19 +0200
+Subject: [PATCH v3 5/5] drivers: bus: omap_l3: Change pr_crit() to
+ dev_err() when IRQ request fails
+In-Reply-To: <5315E522.9090606@ti.com>
+References: <1393937293-6036-1-git-send-email-peter.ujfalusi@ti.com>
+ <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
+ <5315E522.9090606@ti.com>
+Message-ID: <5316CE17.6010201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH 01/15] ASoC: fsl-ssi: Use regmap
-> 
-> On Thu, Feb 27, 2014 at 02:08:45AM +0000, Li.Xiubo at freescale.com wrote:
-> 
-> > > +static const struct regmap_config fsl_ssi_regconfig = {
-> > > +	.max_register = CCSR_SSI_SACCDIS,
-> > > +	.reg_bits = 32,
-> > > +	.val_bits = 32,
-> > > +	.reg_stride = 4,
-> > > +#ifdef PPC
-> > > +	.val_format_endian = REGMAP_ENDIAN_BIG,
-> > > +#endif
-> 
-> > Is this really needed for your PPC platforms?
-> 
-> > If so, I think this should depend on one specified platform, which
-> > the CPU is in LE mode while the SSI is in BE mode...
-> 
-> Since the entire series depends on this patch due to the fact that it
-> makes changes throughout the driver we need this resolving to make any
-> progress here.  Perhaps it makes sense to restructure the series so that
-> this is at the end rather than start of the series?
+On 03/04/2014 04:37 PM, Santosh Shilimkar wrote:
+> On Tuesday 04 March 2014 08:48 PM, Peter Ujfalusi wrote:
+>> Use dev_err() which will going to print the driver's name as well and the
+>> KERN_ERR level is sufficient in this case (we also print via dev_err when
+>> there is an error with the mem resources)
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  drivers/bus/omap_l3_noc.c | 7 +++----
+>>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+>> index 0eff48585ae3..972691a668a3 100644
+>> --- a/drivers/bus/omap_l3_noc.c
+>> +++ b/drivers/bus/omap_l3_noc.c
+>> @@ -158,8 +158,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
+>>  	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
+>>  			       IRQF_DISABLED, "l3-dbg-irq", l3);
+>>  	if (ret) {
+>> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
+>> -						l3->debug_irq);
+>> +		dev_err(&pdev->dev, "request_irq failed for %d\n",
+>> +			l3->debug_irq);
+>>  		return ret;
+>>  	}
+>>  
+>> @@ -167,8 +167,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
+>>  	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
+>>  			       IRQF_DISABLED, "l3-app-irq", l3);
+>>  	if (ret)
+>> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
+>> -						l3->app_irq);
+>> +		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
+>>  
+>>  	return ret;
+>>  }
+>>
+> So this one change in the log level. If I look at now, may be dev_err
+> is fine but the change is not same.
 
-Yes, that's better, maybe this one need further discussing. 
+Not sure what you mean by 'the change is not same'?
+I just picked the old series and rebased it on linux-next, the patch is the
+same as it was back in May 2013:
+https://lkml.org/lkml/2013/5/2/205
 
+And yes, I have shortened the texts in the print, but the meaning of the
+prints have not changed.
 
-Thanks,
+> Apart from above comment, rest of the series looks fine to me.
+> Feel free to add my ack...
 
---
-Best Regards,
-Xiubo
+Thanks.
+
+-- 
+P?ter
