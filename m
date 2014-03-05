@@ -1,78 +1,44 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 05 Mar 2014 23:17:38 +0000
-Subject: [RFC 0/6] rework sched_domain topology description
-In-Reply-To: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <5317B092.7070805@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Mar 2014 23:31:35 +0000
+Subject: [PATCH v6 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+In-Reply-To: <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140305233135.GZ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/14 07:18, Vincent Guittot wrote:
-> This patchset was previously part of the larger tasks packing patchset [1].
-> I have splitted the latter in 3 different patchsets (at least) to make the
-> thing easier.
-> -configuration of sched_domain topology (this patchset)
-> -update and consolidation of cpu_power
-> -tasks packing algorithm
->
-> Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
-> the sched_domain level in order to let architectures to add specific level like
-> the current BOOK level or the proposed power gating level for ARM architecture.
->
-> [1] https://lkml.org/lkml/2013/10/18/121
-> [2] https://lkml.org/lkml/2013/11/5/239
-> [3] https://lkml.org/lkml/2013/11/5/449
->
-> Vincent Guittot (6):
->    sched: remove unused SCHED_INIT_NODE
->    sched: rework of sched_domain topology definition
->    sched: s390: create a dedicated topology table
->    sched: powerpc: create a dedicated topology table
->    sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
->    sched: ARM: create a dedicated scheduler topology table
->
->   arch/arm/kernel/topology.c        |   26 ++++
->   arch/ia64/include/asm/topology.h  |   24 ----
->   arch/metag/include/asm/topology.h |   27 -----
->   arch/powerpc/kernel/smp.c         |   35 ++++--
->   arch/s390/include/asm/topology.h  |   13 +-
->   arch/s390/kernel/topology.c       |   25 ++++
->   arch/tile/include/asm/topology.h  |   33 ------
->   include/linux/sched.h             |   30 +++++
->   include/linux/topology.h          |  128 ++------------------
->   kernel/sched/core.c               |  235 ++++++++++++++++++-------------------
->   10 files changed, 237 insertions(+), 339 deletions(-)
->
+On Wed, Mar 05, 2014 at 11:49:08AM +0000, Liviu Dudau wrote:
+> The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
+> is wrong. It returns a mapped (i.e. virtual) address that can start from
+> zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
+> architectures that use !CONFIG_GENERIC_MAP define.
 
-Hi Vincent,
+What value does PCI_IOBASE and IO_SPACE_LIMIT have on other architectures
+who make use of asm-generic/io.h ?
 
-I reviewed your patch-set carefully (including test runs on TC2), 
-especially due to the fact that we want to build our sd_energy stuff on 
-top of it.
+$ git grep asm-generic/io.h arch/
+arch/arc/include/asm/io.h:#include <asm-generic/io.h>
+arch/blackfin/include/asm/io.h:#include <asm-generic/io.h>
+arch/metag/include/asm/io.h:#include <asm-generic/io.h>
+arch/microblaze/include/asm/io.h:/* from asm-generic/io.h */
+arch/openrisc/include/asm/io.h:#include <asm-generic/io.h>
+arch/s390/include/asm/io.h:#include <asm-generic/io.h>
+arch/score/include/asm/io.h:#include <asm-generic/io.h>
+arch/unicore32/include/asm/io.h:#include <asm-generic/io.h>
+arch/xtensa/include/asm/io.h:#include <asm-generic/io.h>
+$ arch/arc/include/asm/io.h:#define PCI_IOBASE ((void __iomem *)0)
+arch/arm64/include/asm/io.h:#define PCI_IOBASE          ((void __iomem *)(MODULES_VADDR - SZ_2M))
+arch/arm64/include/asm/io.h:    return readb(addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:    return readw(addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:    return readl(addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:    writeb(b, addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:    writew(b, addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:    writel(b, addr + PCI_IOBASE);
+arch/arm64/include/asm/io.h:            *buf++ = __raw_readb(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            *buf++ = __raw_readw(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            *buf++ = __raw_readl(addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writeb(*buf++, addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writew(*buf++, addr + PCI_IOBASE);arch/arm64/include/asm/io.h:            __raw_writel(*buf++, addr + PCI_IOBASE);arch/unicore32/include/asm/io.h:#define PCI_IOBASE      PKUNITY_PCILIO_BASE
+arch/unicore32/include/asm/io.h:#define PIO_OFFSET              (unsigned int)(PCI_IOBASE)
 
 
-One thing I'm still not convinced of is the fact that specifying 
-additional sd levels in the struct sched_domain_topology_level table has 
-an advantage over a function pointer for sd topology flags similar to 
-the one we're already using for the cpu mask in struct 
-sched_domain_topology_level.
-
-   int (*sched_domain_flags_f)(int cpu);
-
-This function pointer would be simply another member of struct 
-sched_domain_topology_level and would replace int sd_flags.  AFAICS, you 
-have to create additional cpu mask functions anyway for the additional 
-sd levels, like cpu_corepower_mask() for the  GMC level in the ARM case. 
-  There could be a set of standard sd topology flags function for the 
-default sd layer and archs which want to pass in something special 
-define those function locally since they will use them only in their 
-arch specific struct sched_domain_topology_level table anyway.  I know 
-that you use the existing sd degenerate functionality for this and that 
-the freeing of the redundant data structures (sched_domain, sched_group 
-and sched_group_power) is there too but it still doesn't seem to me to 
-be the right thing to do.
-
-The problem that we now expose internal data structures (struct sd_data 
-and struct sched_domain_topology_level) could be dealt with later.
-
--- Dietmar
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
