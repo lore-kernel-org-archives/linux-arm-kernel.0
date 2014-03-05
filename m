@@ -1,71 +1,29 @@
-From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
-Date: Wed, 5 Mar 2014 16:27:42 +0000
-Subject: [PATCH v2] ARM64: Kernel managed pages are only flushed
-In-Reply-To: <20140305161255.GG29309@mudshark.cambridge.arm.com>
-References: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
- <20140305161255.GG29309@mudshark.cambridge.arm.com>
-Message-ID: <06b7685849ef4682878556ea1ea8f9d6@BN1PR03MB266.namprd03.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Mar 2014 08:28:37 -0800
+Subject: [PATCHv2 14/14] ARM: OMAP3: clock: remove legacy clock data
+In-Reply-To: <5316D318.8080405@ti.com>
+References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
+ <1393924700-6510-15-git-send-email-t-kristo@ti.com>
+ <20140304173242.GB17470@atomide.com> <5316D318.8080405@ti.com>
+Message-ID: <20140305162837.GB4983@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, March 05, 2014 9:43 PM
-> To: Bhushan Bharat-R65777
-> Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; Bhushan Bharat-R65777
-> Subject: Re: [PATCH v2] ARM64: Kernel managed pages are only flushed
-> 
-> On Wed, Mar 05, 2014 at 11:25:16AM +0000, Bharat Bhushan wrote:
-> > Kernel can only access pages which maps to managed memory.
-> > So flush only valid kernel pages.
+* Tero Kristo <t-kristo@ti.com> [140304 23:35]:
+> On 03/04/2014 07:32 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [140304 01:22]:
+> >>This is no longer needed as clock data is provided through DT.
 > >
-> > I observed kernel crash direct assigning a device using VFIO and found
-> > that it was caused because of accessing invalid page
-> >
-> > Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> > ---
-> > v1->v2
-> >  Getting pfn usin pte_pfn() in pfn_valid.
-> >
-> >  arch/arm64/mm/flush.c |   13 ++++++++++++-
-> >  1 files changed, 12 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c index
-> > e4193e3..319826a 100644
-> > --- a/arch/arm64/mm/flush.c
-> > +++ b/arch/arm64/mm/flush.c
-> > @@ -72,7 +72,18 @@ void copy_to_user_page(struct vm_area_struct *vma,
-> > struct page *page,
-> >
-> >  void __sync_icache_dcache(pte_t pte, unsigned long addr)  {
-> > -	struct page *page = pte_page(pte);
-> > +	struct page *page;
-> > +
-> > +#ifdef CONFIG_HAVE_ARCH_PFN_VALID
-> > +	/*
-> > +	 * We can only access pages that the kernel maps
-> > +	 * as memory. Bail out for unmapped ones.
-> > +	 */
-> > +	if (!pfn_valid(pte_pfn(pte)))
-> > +		return;
-> > +
-> > +#endif
-> > +	page = pte_page(pte);
+> >And this one we cannot apply yet until omap3 is booting in device tree
+> >only mode.
 > 
-> How do you get into this function without a valid, userspace, executable pte?
-> 
-> I suspect you've got changes elsewhere and are calling this function in a
-> context where it's not supposed to be called.
+> What is missing to achieve this? Some boards are not booting in DT
+> mode yet or?
 
-Below I will describe the context in which this function is called:
+It seems that the last missing pieces are the DSS bindings and
+.dts file for the pandora. At least I can't think of anything
+else that's missing or could not be done using pdata-quirks.c.
 
-When we direct assign a bus device (we have a different freescale specific bus device but we can take PCI device for discussion as this logic applies equally for PCI device I think) to user space using VFIO. Then userspace needs to mmap(PCI_BARx_offset: this PCI bar offset in not a kernel visible memory). Then VFIO-kernel mmap() ioctl code calls remap_pfn_range() for mapping the requested address. While remap_pfn_range() internally calls this function.
+Regards,
 
-Thanks
--Bharat
-
-> 
-> Will
-> 
+Tony
