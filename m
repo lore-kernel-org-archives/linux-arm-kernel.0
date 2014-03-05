@@ -1,118 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 5 Mar 2014 07:42:52 +0000
-Subject: [PATCH 3/4] ARM: DT: STi: Add DT node for MiPHY365x
-In-Reply-To: <1392377036-12816-3-git-send-email-lee.jones@linaro.org>
-References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
- <1392377036-12816-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140305074252.GF20016@e106331-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 5 Mar 2014 15:48:23 +0800
+Subject: [GIT PULL 2/2] ARM: Keystone SOC updates for 3.15
+In-Reply-To: <1394005703-6624-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1394005703-6624-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1394005703-6624-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 11:23:55AM +0000, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih416-b2020-revE.dts |  6 +++++-
->  arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
->  arch/arm/boot/dts/stih416.dtsi           | 13 +++++++++++++
->  3 files changed, 24 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> index a874570..dbe67fa 100644
-> --- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> @@ -32,6 +32,10 @@
->  		ethernet1: ethernet at fef08000 {
->  			snps,reset-gpio 	= <&PIO0 7>;
->  		};
-> -	};
->  
-> +		miphy365x_phy: miphy365x at 0 {
+Hi Arm-soc folks,
 
-This has registers at 0x0? Or is the unit-address wrong?
+Please pull below keystone SOC updates for 3.15. It merges cleanly with
+arm-soc 'for-next' and 'next/soc' heads.
 
-> +			st,pcie_tx_pol_inv = <1>;
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-This is a boolean. The '= <1>' is not required and is confusing.
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-> +			st,sata_gen = "gen3";
+are available in the git repository at:
 
-s/"gen3"/<3>/
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
 
-Both these properties need s/_/-/ applied.
+for you to fetch changes up to d6bb841291c44575e23ca0b6bb6b441661b0843f:
 
-All these apply to the other dts too.
+  ARM: config: keystone: enable AEMIF/NAND support (2014-02-28 21:06:46 -0500)
 
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> index 276f28d..fd9cbad 100644
-> --- a/arch/arm/boot/dts/stih416-b2020.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020.dts
-> @@ -13,4 +13,10 @@
->  	model = "STiH416 B2020";
->  	compatible = "st,stih416", "st,stih416-b2020";
+----------------------------------------------------------------
+Keystone SOC updates for 3.15
 
-This compatible list is the wrong way around. Left to right should go
-from most specific to most general / oldest variant.
+- Enable Watchdog and GPIO config
+- Enable LED driver config
+- Enable NAND and EMIF driver config
 
->  
-> +	soc {
-> +		miphy365x_phy: miphy365x at 0 {
+----------------------------------------------------------------
+Grygorii Strashko (2):
+      ARM: config: keystone: enable gpio support
+      ARM: config: keystone: enable led support
 
-> +			st,pcie_tx_pol_inv = <1>;
-> +			st,sata_gen = "gen3";
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index 85b8063..9fd8efb 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -9,6 +9,8 @@
->  #include "stih41x.dtsi"
->  #include "stih416-clock.dtsi"
->  #include "stih416-pinctrl.dtsi"
-> +
-> +#include <dt-bindings/phy/phy-miphy365x.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/reset-controller/stih416-resets.h>
->  / {
-> @@ -140,5 +142,16 @@
->  			clocks		= <&CLK_S_ICN_REG_0>;
->  		};
->  
-> +		miphy365x_phy: miphy365x at 0 {
+Ivan Khoronzhuk (2):
+      ARM: config: keystone: enable watchdog support
+      ARM: config: keystone: enable AEMIF/NAND support
 
-The unit-address should be fe382000 rather than 0 to match the first reg
-entry.
-
-Cheers,
-Mark.
-
-> +			compatible      = "st,miphy365x-phy";
-> +			reg        	= <0xfe382000 0x100>,
-> +					  <0xfe38a000 0x100>,
-> +					  <0xfe394000 0x100>,
-> +					  <0xfe804000 0x100>;
-> +			reg-names  	= "sata0", "sata1", "pcie0", "pcie1";
-> +
-> +			#phy-cells 	= <2>;
-> +			st,syscfg  	= <&syscfg_rear>;
-> +		};
->  	};
->  };
-> -- 
-> 1.8.3.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ arch/arm/configs/keystone_defconfig |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
