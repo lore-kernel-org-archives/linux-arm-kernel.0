@@ -1,20 +1,121 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 05 Mar 2014 15:36:18 +1100
-Subject: [PATCH 1/2] sched: Remove unused mc_capable() and smt_capable()
-In-Reply-To: <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20140304210621.16893.8772.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20140304210737.16893.54289.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1393994178.11372.2.camel@pasglop>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 05 Mar 2014 13:41:35 +0900
+Subject: [PATCH v5 3/7] pci: Create pci_host_bridge before its associated
+ bus in pci_create_root_bus.
+In-Reply-To: <53169E86.1090609@huawei.com>
+References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393948204-11555-4-git-send-email-Liviu.Dudau@arm.com>
+ <53169E86.1090609@huawei.com>
+Message-ID: <002401cf382d$3062aa50$9127fef0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-04 at 14:07 -0700, Bjorn Helgaas wrote:
-> Remove mc_capable() and smt_capable().  Neither is used.
+On Wednesday, March 05, 2014 12:48 PM, Yijing Wang wrote:
+> On 2014/3/4 23:50, Liviu Dudau wrote:
+> > Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
+> > As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
+> > the creation order has been changed for no good reason. Revert the order of
+> > creation as we are going to depend on the pci_host_bridge structure to retrieve the
+> > domain number of the root bus.
+> >
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 6e34498..78ccba0 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -505,7 +505,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
+> >  	kfree(bridge);
+> >  }
+> >
+> > -static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
+> > +static struct pci_host_bridge *pci_alloc_host_bridge(void)
+> >  {
+> >  	struct pci_host_bridge *bridge;
+> >
+> > @@ -514,7 +514,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
+> >  		return NULL;
+> >
+> >  	INIT_LIST_HEAD(&bridge->windows);
+> > -	bridge->bus = b;
+> >  	return bridge;
+> >  }
+> >
+> > @@ -1727,9 +1726,21 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> >  	char bus_addr[64];
+> >  	char *fmt;
+> >
+> > +	bridge = pci_alloc_host_bridge();
+> > +	if (!bridge)
+> > +		return NULL;
+> > +
+> > +	bridge->dev.parent = parent;
+> > +	bridge->dev.release = pci_release_host_bridge_dev;
+> > +	error = pcibios_root_bridge_prepare(bridge);
+> > +	if (error) {
+> > +		kfree(bridge);
+> > +		return NULL;
 > 
-> Both were added by 5c45bf279d37 ("sched: mc/smt power savings sched
-> policy").  Uses of both were removed by 8e7fbcbc22c1 ("sched: Remove stale
-> power aware scheduling remnants and dysfunctional knobs").
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> What about use goto err_out?
 
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
++1
+
+I agree with your opinion.
+It makes the code simpler.
+
+Best regards,
+Jingoo Han
+
+> 
+> > +	}
+> > +
+> >  	b = pci_alloc_bus();
+> >  	if (!b)
+> > -		return NULL;
+> > +		goto err_out;
+> >
+> >  	b->sysdata = sysdata;
+> >  	b->ops = ops;
+> > @@ -1738,26 +1749,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> >  	if (b2) {
+> >  		/* If we already got to this bus through a different bridge, ignore it */
+> >  		dev_dbg(&b2->dev, "bus already known\n");
+> > -		goto err_out;
+> > +		goto err_bus_out;
+> >  	}
+> >
+> > -	bridge = pci_alloc_host_bridge(b);
+> > -	if (!bridge)
+> > -		goto err_out;
+> > -
+> > -	bridge->dev.parent = parent;
+> > -	bridge->dev.release = pci_release_host_bridge_dev;
+> > +	bridge->bus = b;
+> >  	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+> > -	error = pcibios_root_bridge_prepare(bridge);
+> > -	if (error) {
+> > -		kfree(bridge);
+> > -		goto err_out;
+> > -	}
+> > -
+> >  	error = device_register(&bridge->dev);
+> >  	if (error) {
+> >  		put_device(&bridge->dev);
+> > -		goto err_out;
+> > +		goto err_bus_out;
+> >  	}
+> >  	b->bridge = get_device(&bridge->dev);
+> >  	device_enable_async_suspend(b->bridge);
+> > @@ -1814,8 +1814,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> >  class_dev_reg_err:
+> >  	put_device(&bridge->dev);
+> >  	device_unregister(&bridge->dev);
+> > -err_out:
+> > +err_bus_out:
+> >  	kfree(b);
+> > +err_out:
+> > +	kfree(bridge);
+> >  	return NULL;
+> >  }
+> >
+> >
