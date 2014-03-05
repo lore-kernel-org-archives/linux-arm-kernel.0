@@ -1,336 +1,67 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed,  5 Mar 2014 11:49:10 +0000
-Subject: [PATCH v6 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1394020150-1875-4-git-send-email-Liviu.Dudau@arm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 5 Mar 2014 12:52:07 +0100
+Subject: [PATCH] Revert "irqchip: irq-dove: Add PMU interrupt controller."
+In-Reply-To: <20140305004139.GT21483@n2100.arm.linux.org.uk>
+References: <20140304030838.GA1872@titan.lakedaemon.net>
+ <1393911160-7688-1-git-send-email-jason@lakedaemon.net>
+ <20140305004139.GT21483@n2100.arm.linux.org.uk>
+Message-ID: <CAOQ7t2bWx+ogSDiqQBabxD2BsbePnFfUSpAVVWFThix=m4dhrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic host bridge functions to provide support for
-PCI Express on arm64. There is no support for ISA memory.
+On Wed, Mar 5, 2014 at 1:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Mar 04, 2014 at 05:32:40AM +0000, Jason Cooper wrote:
+>
+> Jason, Thomas,
+>
+> I've just been giving the above a whirl here with the RTC, and it
+> doesn't seem to quite work as it should.  Not your problem, because it's
+> as the code is originally.
+>
+> Let's say you set an alarm for 10sec time.  When the alarm fires:
+>
+> - we read the PMU interrupt status, mask it with the mask register,
+>   and find the RTC pending.
+> - we call the genirq layer for this interrupt.
+> - genirq does the mask + ack thing.
+> - the RTC interrupt handler is called, and there's the RTC says there's
+>   an interrupt pending.
+> - the RTC handler clears the interrupt, and returns.
+> - genirq unmasks the interrupt, and returns.
+> - dove_pmu_irq_handler() is re-entered, and again, we find that the
+>   RTC interrupt is pending.
+> - follow the above...
+> - the RTC interrupt handler is called, but this time there's no interrupt
+>   pending, so returns IRQ_NONE
+> - genirq unmasks the interrupt, and returns.
+>
+> The reason this happens is that the attempt to "ack" - rather "clear" the
+> interrupt the first time around has no effect - the RTC is still asserting
+> the interrupt, so the write to clear the register results in the bit
+> remaining set.
+>
+> The second time around, we've already cleared the RTC interrupt, so this
+> time, the ack clears the interrupt down properly.
+>
+> In some ways, this is good news - it shows that the bits in this register
+> latch '1' when an interrupt is pending, and remain '1' while the block
+> continues to assert its interrupt signal - but can we say that the other
+> interrupt functions in this register have that behaviour?
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
----
- arch/arm64/Kconfig            |  19 +++-
- arch/arm64/include/asm/Kbuild |   1 +
- arch/arm64/include/asm/io.h   |   3 +-
- arch/arm64/include/asm/pci.h  |  49 +++++++++
- arch/arm64/kernel/Makefile    |   1 +
- arch/arm64/kernel/pci.c       | 173 ++++++++++++++++++++++++++++++++
- 6 files changed, 244 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/pci.c
+I don't know if this could help but I have a very similar problem with
+the NMI controller found on sun6i/sun7i for which is pending the
+patchset http://comments.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7554
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc..d1c8568 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -62,7 +62,7 @@ config MMU
- 	def_bool y
- 
- config NO_IOPORT
--	def_bool y
-+	def_bool y if !PCI
- 
- config STACKTRACE_SUPPORT
- 	def_bool y
-@@ -134,6 +134,23 @@ menu "Bus support"
- config ARM_AMBA
- 	bool
- 
-+config PCI
-+	bool "PCI support"
-+	help
-+	  This feature enables support for PCIe bus system. If you say Y
-+	  here, the kernel will include drivers and infrastructure code
-+	  to support PCIe bus devices.
-+
-+config PCI_DOMAINS
-+	def_bool PCI
-+
-+config PCI_SYSCALL
-+	def_bool PCI
-+
-+source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
-+source "drivers/pci/hotplug/Kconfig"
-+
- endmenu
- 
- menu "Kernel Features"
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 71c53ec..46924bc 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -26,6 +26,7 @@ generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
- generic-y += pci.h
-+generic-y += pci-bridge.h
- generic-y += poll.h
- generic-y += posix_types.h
- generic-y += resource.h
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 7846a6b..67463a5 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -120,7 +120,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- /*
-  *  I/O port access primitives.
-  */
--#define IO_SPACE_LIMIT		0xffff
-+#define arch_has_dev_port()	(1)
-+#define IO_SPACE_LIMIT		0x1ffffff
- #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-new file mode 100644
-index 0000000..6f1fb3d
---- /dev/null
-+++ b/arch/arm64/include/asm/pci.h
-@@ -0,0 +1,49 @@
-+#ifndef __ASM_PCI_H
-+#define __ASM_PCI_H
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/io.h>
-+#include <asm-generic/pci-bridge.h>
-+#include <asm-generic/pci-dma-compat.h>
-+
-+#define PCIBIOS_MIN_IO		0x1000
-+#define PCIBIOS_MIN_MEM		0
-+
-+struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
-+
-+/*
-+ * Set to 1 if the kernel should re-assign all PCI bus numbers
-+ */
-+#define pcibios_assign_all_busses() \
-+	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
-+
-+/*
-+ * PCI address space differs from physical memory address space
-+ */
-+#define PCI_DMA_BUS_IS_PHYS	(0)
-+
-+extern int isa_dma_bridge_buggy;
-+
-+static inline int pci_domain_nr(struct pci_bus *bus)
-+{
-+	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-+
-+	if (bridge)
-+		return bridge->domain_nr;
-+
-+	return 0;
-+}
-+
-+static inline int pci_proc_domain(struct pci_bus *bus)
-+{
-+	return 1;
-+}
-+
-+extern unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr);
-+
-+#endif  /* __KERNEL__ */
-+#endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b..64fc479 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -20,6 +20,7 @@ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
-+arm64-obj-$(CONFIG_PCI)			+= pci.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-new file mode 100644
-index 0000000..9f29c9a
---- /dev/null
-+++ b/arch/arm64/kernel/pci.c
-@@ -0,0 +1,173 @@
-+/*
-+ * Code borrowed from powerpc/kernel/pci-common.c
-+ *
-+ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+
-+#include <asm/pci-bridge.h>
-+
-+struct ioresource {
-+	struct list_head list;
-+	phys_addr_t start;
-+	resource_size_t size;
-+};
-+
-+static LIST_HEAD(io_list);
-+
-+int pci_register_io_range(phys_addr_t address, resource_size_t size)
-+{
-+	struct ioresource *res;
-+	resource_size_t allocated_size = 0;
-+
-+	/* find if the range has not been already allocated */
-+	list_for_each_entry(res, &io_list, list) {
-+		if (address >= res->start &&
-+			address + size <= res->start + size)
-+			return 0;
-+		allocated_size += res->size;
-+	}
-+
-+	/* range not already registered, check for space */
-+	if (allocated_size + size > IO_SPACE_LIMIT)
-+		return -E2BIG;
-+
-+	/* add the range in the list */
-+	res = kzalloc(sizeof(*res), GFP_KERNEL);
-+	if (!res)
-+		return -ENOMEM;
-+	res->start = address;
-+	res->size = size;
-+
-+	list_add_tail(&res->list, &io_list);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pci_register_io_range);
-+
-+unsigned long pci_address_to_pio(phys_addr_t address)
-+{
-+	struct ioresource *res;
-+
-+	list_for_each_entry(res, &io_list, list) {
-+		if (address >= res->start &&
-+			address < res->start + res->size) {
-+			return res->start - address;
-+		}
-+	}
-+
-+	return (unsigned long)-1;
-+}
-+EXPORT_SYMBOL_GPL(pci_address_to_pio);
-+
-+/*
-+ * Called after each bus is probed, but before its children are examined
-+ */
-+void pcibios_fixup_bus(struct pci_bus *bus)
-+{
-+	struct pci_dev *dev;
-+	struct resource *res;
-+	int i;
-+
-+	if (!pci_is_root_bus(bus)) {
-+		pci_read_bridge_bases(bus);
-+
-+		pci_bus_for_each_resource(bus, res, i) {
-+			if (!res || !res->flags || res->parent)
-+				continue;
-+
-+			/*
-+			 * If we are going to reassign everything, we can
-+			 * shrink the P2P resource to have zero size to
-+			 * save space
-+			 */
-+			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
-+				res->flags |= IORESOURCE_UNSET;
-+				res->start = 0;
-+				res->end = -1;
-+				continue;
-+			}
-+		}
-+	}
-+
-+	list_for_each_entry(dev, &bus->devices, bus_list) {
-+		/* Ignore fully discovered devices */
-+		if (dev->is_added)
-+			continue;
-+
-+		set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
-+
-+		/* Read default IRQs and fixup if necessary */
-+		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+	}
-+}
-+EXPORT_SYMBOL(pcibios_fixup_bus);
-+
-+/*
-+ * We don't have to worry about legacy ISA devices, so nothing to do here
-+ */
-+resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-+				resource_size_t size, resource_size_t align)
-+{
-+	return res->start;
-+}
-+
-+int pcibios_enable_device(struct pci_dev *dev, int mask)
-+{
-+	return pci_enable_resources(dev, mask);
-+}
-+
-+#define IO_SPACE_PAGES	((IO_SPACE_LIMIT + 1) / PAGE_SIZE)
-+static DECLARE_BITMAP(pci_iospace, IO_SPACE_PAGES);
-+
-+unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
-+{
-+	unsigned long start, len, virt_start;
-+	int err;
-+
-+	if (res->end > IO_SPACE_LIMIT)
-+		return -EINVAL;
-+
-+	/*
-+	 * try finding free space for the whole size first,
-+	 * fall back to 64K if not available
-+	 */
-+	len = resource_size(res);
-+	start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-+				res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
-+	if (start == IO_SPACE_PAGES && len > SZ_64K) {
-+		len = SZ_64K;
-+		start = 0;
-+		start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-+					start, len / PAGE_SIZE, 0);
-+	}
-+
-+	/* no 64K area found */
-+	if (start == IO_SPACE_PAGES)
-+		return -ENOMEM;
-+
-+	/* ioremap physical aperture to virtual aperture */
-+	virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
-+	err = ioremap_page_range(virt_start, virt_start + len,
-+				phys_addr, __pgprot(PROT_DEVICE_nGnRE));
-+	if (err)
-+		return err;
-+
-+	bitmap_set(pci_iospace, start, len / PAGE_SIZE);
-+
-+	/* return io_offset */
-+	return start * PAGE_SIZE - res->start;
-+}
+Also in that case the first ACK has no effect and in the end I use the
+unmask hook in the irqchip driver to ACK again the line before
+unmasking it (the whole discussion about this problem among me, Maxime
+and Hans is in this thread
+http://www.spinics.net/lists/arm-kernel/msg299952.html )
+
+I also proposed a small (and as it turned out incomplete) patch here
+http://www.spinics.net/lists/arm-kernel/msg305616.html but in the end
+I preferred to use the unmask hook.
+
 -- 
-1.9.0
+Carlo Caione
