@@ -1,102 +1,76 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  6 Mar 2014 17:01:41 +0100
-Subject: [PATCH v9][ 2/8] staging: imx-drm: Add RGB666 support for parallel
- display.
-In-Reply-To: <1394121702-13257-1-git-send-email-denis@eukrea.com>
-References: <1394121702-13257-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394121702-13257-2-git-send-email-denis@eukrea.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Mar 2014 16:08:18 +0000
+Subject: [RFC PATCH] arm64: Fix __addr_ok and __range_ok macros
+In-Reply-To: <20140306082023.GA4160@redhat.com>
+References: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
+ <20140306082023.GA4160@redhat.com>
+Message-ID: <20140306160817.GJ5202@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-- Rebased.
+On Thu, Mar 06, 2014 at 08:20:23AM +0000, Michael S. Tsirkin wrote:
+> On Wed, Mar 05, 2014 at 05:41:28PM -0500, Christopher Covington wrote:
+> > Without this, the following scenario is incorrectly determined
+> > to be invalid.
+> > 
+> > addr 0x7f_ffffe000 size 8192 addr_limit 0x80_00000000
+> > 
+> > This behavior was observed while trying to vmsplice the stack
+> > as part of a CRIU dump of a process.
+> > 
+> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> > ---
+> >  arch/arm64/include/asm/uaccess.h | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > index edb3d5c..9309024 100644
+> > --- a/arch/arm64/include/asm/uaccess.h
+> > +++ b/arch/arm64/include/asm/uaccess.h
+> > @@ -66,12 +66,12 @@ static inline void set_fs(mm_segment_t fs)
+> >  #define segment_eq(a,b)	((a) == (b))
+> >  
+> >  /*
+> > - * Return 1 if addr < current->addr_limit, 0 otherwise.
+> > + * Return 1 if addr <= current->addr_limit, 0 otherwise.
+> >   */
+> >  #define __addr_ok(addr)							\
+> >  ({									\
+> >  	unsigned long flag;						\
+> > -	asm("cmp %1, %0; cset %0, lo"					\
+> > +	asm("cmp %1, %0; cset %0, ls"					\
+> >  		: "=&r" (flag)						\
+> >  		: "r" (addr), "0" (current_thread_info()->addr_limit)	\
+> >  		: "cc");						\
 
-ChangeLog v7->v8:
-- Shrinked even more the Cc list.
+I don't think this is correct, since __addr_ok will now return true for
+TASK_SIZE_64.
 
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
+> BTW can this use mov %0, #0 like arch/arm/include/asm/uaccess.h does?
+> Would make it more portable ...
 
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
+How/why should this be made portable?
 
-ChangeLog v3->v5:
-- Use the correct RGB order.
+> > @@ -83,7 +83,7 @@ static inline void set_fs(mm_segment_t fs)
+> >   * Returns 1 if the range is valid, 0 otherwise.
+> >   *
+> >   * This is equivalent to the following test:
+> > - * (u65)addr + (u65)size < (u65)current->addr_limit
+> > + * (u65)addr + (u65)size <= current->addr_limit
+> >   *
+> >   * This needs 65-bit arithmetic.
+> >   */
+> > @@ -91,7 +91,7 @@ static inline void set_fs(mm_segment_t fs)
+> >  ({									\
+> >  	unsigned long flag, roksum;					\
+> >  	__chk_user_ptr(addr);						\
+> > -	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, cc"		\
+> > +	asm("adds %1, %1, %3; ccmp %1, %4, #3, cc; cset %0, ls"		\
+> >  		: "=&r" (flag), "=&r" (roksum)				\
+> >  		: "1" (addr), "Ir" (size),				\
+> >  		  "r" (current_thread_info()->addr_limit)		\
 
-ChangeLog v2->v3:
-- Added some interested people in the Cc list.
-- Removed the commit message long desciption that was just a copy of the short
-  description.
-- Rebased the patch.
-- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
----
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
- drivers/staging/imx-drm/parallel-display.c         |    2 ++
- 3 files changed, 12 insertions(+), 1 deletion(-)
+Can't you just pass current_thread_info()->addr_limit) - 1 here and be done
+with it?
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index b876d49..2d24425 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -29,7 +29,7 @@ Required properties:
- - crtc: the crtc this display is connected to, see below
- Optional properties:
- - interface_pix_fmt: How this display is connected to the
--  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
-+  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
- - edid: verbatim EDID data block describing attached display.
- - ddc: phandle describing the i2c bus handling the display data
-   channel
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index d5de8bb..6f9abe8 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -92,6 +92,7 @@ enum ipu_dc_map {
- 	IPU_DC_MAP_GBR24, /* TVEv2 */
- 	IPU_DC_MAP_BGR666,
- 	IPU_DC_MAP_BGR24,
-+	IPU_DC_MAP_RGB666,
- };
- 
- struct ipu_dc {
-@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
- 		return IPU_DC_MAP_BGR666;
- 	case V4L2_PIX_FMT_BGR24:
- 		return IPU_DC_MAP_BGR24;
-+	case V4L2_PIX_FMT_RGB666:
-+		return IPU_DC_MAP_RGB666;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
- 
-+	/* rgb666 */
-+	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
-+
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index c60b6c6..01b7ce5 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -219,6 +219,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
- 		else if (!strcmp(fmt, "bgr666"))
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
-+		else if (!strcmp(fmt, "rgb666"))
-+			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
- 	}
- 
- 	panel_node = of_parse_phandle(np, "fsl,panel", 0);
--- 
-1.7.9.5
+Will
