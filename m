@@ -1,84 +1,139 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 06 Mar 2014 12:28:33 +0900
-Subject: [PATCH 02/02] ARM: shmobile: Use shmobile_init_delay() on
- r8a7791/Koelsch
-In-Reply-To: <20140306032814.10814.2949.sendpatchset@w520>
-References: <20140306032814.10814.2949.sendpatchset@w520>
-Message-ID: <20140306032833.10814.12191.sendpatchset@w520>
+From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
+Date: Thu, 6 Mar 2014 03:38:49 +0000
+Subject: [PATCH v2] ARM64: Kernel managed pages are only flushed
+In-Reply-To: <5317832E.9020809@codeaurora.org>
+References: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
+ <20140305161255.GG29309@mudshark.cambridge.arm.com>
+ <06b7685849ef4682878556ea1ea8f9d6@BN1PR03MB266.namprd03.prod.outlook.com>
+ <5317832E.9020809@codeaurora.org>
+Message-ID: <93f096142bd64a7b8f51930277d82c55@BN1PR03MB266.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
 
-Prototype to convert Koelsch and r8a7791 to using
-shmobile_init_delay() and by that allow removing
-CPU frequency information from the C code.
 
-Needs to be reworked to fit ARM SoC board/SoC branch style.
+> -----Original Message-----
+> From: Laura Abbott [mailto:lauraa at codeaurora.org]
+> Sent: Thursday, March 06, 2014 1:34 AM
+> To: Bhushan Bharat-R65777; Will Deacon
+> Cc: Wood Scott-B07421; Catalin Marinas; Yoder Stuart-B08248; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2] ARM64: Kernel managed pages are only flushed
+> 
+> On 3/5/2014 8:27 AM, Bharat.Bhushan at freescale.com wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Will Deacon [mailto:will.deacon at arm.com]
+> >> Sent: Wednesday, March 05, 2014 9:43 PM
+> >> To: Bhushan Bharat-R65777
+> >> Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; Bhushan
+> >> Bharat-R65777
+> >> Subject: Re: [PATCH v2] ARM64: Kernel managed pages are only flushed
+> >>
+> >> On Wed, Mar 05, 2014 at 11:25:16AM +0000, Bharat Bhushan wrote:
+> >>> Kernel can only access pages which maps to managed memory.
+> >>> So flush only valid kernel pages.
+> >>>
+> >>> I observed kernel crash direct assigning a device using VFIO and
+> >>> found that it was caused because of accessing invalid page
+> >>>
+> >>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+> >>> ---
+> >>> v1->v2
+> >>>   Getting pfn usin pte_pfn() in pfn_valid.
+> >>>
+> >>>   arch/arm64/mm/flush.c |   13 ++++++++++++-
+> >>>   1 files changed, 12 insertions(+), 1 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c index
+> >>> e4193e3..319826a 100644
+> >>> --- a/arch/arm64/mm/flush.c
+> >>> +++ b/arch/arm64/mm/flush.c
+> >>> @@ -72,7 +72,18 @@ void copy_to_user_page(struct vm_area_struct
+> >>> *vma, struct page *page,
+> >>>
+> >>>   void __sync_icache_dcache(pte_t pte, unsigned long addr)  {
+> >>> -	struct page *page = pte_page(pte);
+> >>> +	struct page *page;
+> >>> +
+> >>> +#ifdef CONFIG_HAVE_ARCH_PFN_VALID
+> >>> +	/*
+> >>> +	 * We can only access pages that the kernel maps
+> >>> +	 * as memory. Bail out for unmapped ones.
+> >>> +	 */
+> >>> +	if (!pfn_valid(pte_pfn(pte)))
+> >>> +		return;
+> >>> +
+> >>> +#endif
+> >>> +	page = pte_page(pte);
+> >>
+> >> How do you get into this function without a valid, userspace, executable pte?
+> >>
+> >> I suspect you've got changes elsewhere and are calling this function
+> >> in a context where it's not supposed to be called.
+> >
+> > Below I will describe the context in which this function is called:
+> >
+> > When we direct assign a bus device (we have a different freescale
+> > specific bus
+>  > device but we can take PCI device for discussion as this logic applies
+> equally  > for PCI device I think) to user space using VFIO. Then userspace
+> needs to  > mmap(PCI_BARx_offset: this PCI bar offset in not a kernel visible
+> memory).
+> > Then VFIO-kernel mmap() ioctl code calls remap_pfn_range()  for
+> > mapping the
+>  >requested address. While remap_pfn_range() internally calls this function.
+> >
+> 
+> As someone who likes calling functions in context where they aren't supposed to
+> be called, I took a look a this because I was curious.
 
-Not-yet-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Are we saying that remap_pfn_range() should not be called in such case (described earlier the case of direct assigning PCI device to user space using VFIO) ? But x86/powerpc calls this function only.
 
- arch/arm/mach-shmobile/board-koelsch-reference.c |    2 +-
- arch/arm/mach-shmobile/board-koelsch.c           |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7791.h    |    1 -
- arch/arm/mach-shmobile/setup-r8a7791.c           |    9 +--------
- 4 files changed, 3 insertions(+), 11 deletions(-)
+> 
+> I can confirm the same problem trying to mmap arbitrary io address space with
+> remap_pfn_range. We should only be hitting this if the pte is marked as exec per
+> set_pte_at. With my test case, even mmaping with only PROT_READ and PROT_WRITE
+> was setting PROT_EXEC as well which was triggering the bug. This seems to be
+> because READ_IMPLIES_EXEC personality was set which was derived from
+> 
+> #define elf_read_implies_exec(ex,stk)   (stk != EXSTACK_DISABLE_X)
+> 
+> and none of the binaries I'm generating seem to be setting the stack execute bit
+> either way (all are EXECSTACK_DEFAULT).
 
---- 0001/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2014-03-06 12:08:22.000000000 +0900
-@@ -139,7 +139,7 @@ static const char * const koelsch_boards
- 
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.smp		= smp_ops(r8a7791_smp_ops),
--	.init_early	= r8a7791_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_add_standard_devices,
- 	.init_late	= shmobile_init_late,
---- 0001/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2014-03-06 12:08:22.000000000 +0900
-@@ -522,7 +522,7 @@ static const char * const koelsch_boards
- 
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.smp		= smp_ops(r8a7791_smp_ops),
--	.init_early	= r8a7791_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_init,
- 	.init_late	= shmobile_init_late,
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2014-03-06 12:08:22.000000000 +0900
-@@ -5,7 +5,6 @@ void r8a7791_add_standard_devices(void);
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
- void r8a7791_pinmux_init(void);
--void r8a7791_init_early(void);
- extern struct smp_operations r8a7791_smp_ops;
- 
- #endif /* __ASM_R8A7791_H__ */
---- 0003/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2014-03-06 12:08:22.000000000 +0900
-@@ -210,13 +210,6 @@ void __init r8a7791_add_standard_devices
- 	r8a7791_register_thermal();
- }
- 
--void __init r8a7791_init_early(void)
--{
--#ifndef CONFIG_ARM_ARCH_TIMER
--	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
--#endif
--}
--
- #ifdef CONFIG_USE_OF
- static const char *r8a7791_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7791",
-@@ -225,7 +218,7 @@ static const char *r8a7791_boards_compat
- 
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
- 	.smp		= smp_ops(r8a7791_smp_ops),
--	.init_early	= r8a7791_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
+Yes I agree that even if we set PROT_READ and PROT_WRITE but it internally end up setting PROT_EXEC, so we enter in flow. But I see this as a second issue. I am not sure but theoretically it can still happen that we set PROT_EXEC for anonymous page.
+
+
+So either __sync_icache_dcache() should check that it does not access anonymous struct page (which this patch is doing) or __sync_icache_dcache() should not be called for anonymous page. Maybe something like this:
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index f0bebc5..9493f3e 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -167,7 +167,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+                              pte_t *ptep, pte_t pte)
+ {
+        if (pte_valid_user(pte)) {
+-               if (pte_exec(pte))
++               if (pte_exec(pte) && pfn_valid(pte_pfn(pte)))
+                        __sync_icache_dcache(pte, addr);
+                if (!pte_dirty(pte))
+                        pte = pte_wrprotect(pte);
+
+Please suggest if some other solution.
+
+Thanks
+-Bharat
+
+> 
+> It's not obvious what the best solution is here.
+> 
+> Thanks,
+> Laura
+> 
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The
+> Linux Foundation
+> 
