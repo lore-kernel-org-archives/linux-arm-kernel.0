@@ -1,101 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Mar 2014 16:47:30 +0100
-Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
-In-Reply-To: <53188B73.4000109@free-electrons.com>
-References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
- <20140306131429.GJ4780@lunn.ch> <5318779C.8030901@free-electrons.com>
- <20140306142117.GL4780@lunn.ch> <531886B4.2070002@free-electrons.com>
- <20140306144600.GM4780@lunn.ch> <53188B73.4000109@free-electrons.com>
-Message-ID: <53189892.5090502@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 6 Mar 2014 09:56:14 -0600
+Subject: [PATCH v2 01/13] phy: rename struct omap_control_usb to struct
+ omap_control_phy
+In-Reply-To: <53189654.2090406@ti.com>
+References: <1394116729-28811-1-git-send-email-rogerq@ti.com>
+ <1394116729-28811-2-git-send-email-rogerq@ti.com>
+ <53189654.2090406@ti.com>
+Message-ID: <20140306155614.GD25648@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 15:51, Gregory CLEMENT wrote:
-> On 06/03/2014 15:46, Andrew Lunn wrote:
->>>>>> I think you can use aliases to get the order correct, independent of
->>>>>> how you list them in DT. That should be a lot safer than assuming
->>>>>> things are instantiated from top to bottom.
->>>>>
->>>>> It sounds interesting, how would you do this?
->>>>
->>>> As there already is in armada-370-xp.dtsi
->>>>
->>>>         aliases {
->>>>                 eth0 = &eth0;
->>>>                 eth1 = &eth1;
->>>>         };
->>>>
->>>>
->>>> 	eth0: ethernet at 70000 {
->>>> 	}
->>>>         eth1: ethernet at 74000 {
->>>> 	}
->>>>
->>>> This at least works for i2c devices. The pdev->id is set using the
->>>> alias number.
->>>
->>> Well I think it doesn't work with ethernet devices because we already do
->>> this in aramda-38x.dtsi:
->>>
->>> 	aliases {
->>> 		gpio0 = &gpio0;
->>> 		gpio1 = &gpio1;
->>> 		eth0 = &eth0;
->>> 		eth1 = &eth1;
->>> 		eth2 = &eth2;
->>> 	};
->>>
->>> 	eth1: ethernet at 30000 {
->>> 	}
->>> 	eth2: ethernet at 34000 {
->>> 	}
->>> 	eth0: ethernet at 70000 {
->>> 	}
->>
->> Ah, Erm, O.K. 
->>
->> It seems to be an i2c thing. Take a look at i2c_add_adapter().
->>
->>         if (dev->of_node) {
->>                 id = of_alias_get_id(dev->of_node, "i2c");
->>  
->> You could put something similar into the ethernet driver.
->>
+On Thu, Mar 06, 2014 at 09:07:56PM +0530, Kishon Vijay Abraham I wrote:
+> Felipe,
 > 
+> On Thursday 06 March 2014 08:08 PM, Roger Quadros wrote:
+> >From: Kishon Vijay Abraham I <kishon@ti.com>
+> >
+> >Rename struct omap_control_usb to struct omap_control_phy since it can
+> >be used to control PHY of USB, SATA and PCIE. Also move the driver and
+> >include files under *phy* and made the corresponding changes in the users
+> >of phy-omap-control.
+> >
+> >Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >---
+> >  drivers/phy/Kconfig                                |  14 +-
+> >  drivers/phy/Makefile                               |   1 +
+> >  drivers/{usb => }/phy/phy-omap-control.c           | 165 +++++++++++----------
+> >  drivers/phy/phy-omap-usb2.c                        |   8 +-
+> >  drivers/phy/phy-ti-pipe3.c                         |   8 +-
+> >  drivers/usb/musb/omap2430.c                        |   2 +-
+> >  drivers/usb/phy/Kconfig                            |  10 --
+> >  drivers/usb/phy/Makefile                           |   1 -
 > 
-> Actually even what I did, didn't work as I expected. The order should have been changed in
-> the dsi file.
-> 
-> I will have a look on the ethernet driver.
+> Hope you are fine with the changes in drivers/usb/? Can you give your
+> Acked-by?
 
-Well the naming is done in __dev_alloc_name() and it depends on
-the probe order.
+sure thing:
 
-So I really wonder if we should not put the ethernet at 70000 before the othe
-Ethernet node in the armada-38x.dts file. Otherwise it is very misleading to
-have eth0 for the second interface, eth1 for the third one, and eth2 for
-the first one.
-
-
-Thanks,
-
-Gregory
-
-> 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
->>     Andrew
->>
-> 
-> 
-
+Acked-by: Felipe Balbi <balbi@ti.com>
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/745ad81c/attachment.sig>
