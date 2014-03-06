@@ -1,42 +1,59 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 5 Mar 2014 18:24:16 -0600
-Subject: [PATCH 07/10] ARM: dts: OMAP3: Update ISP IOMMU node
+Date: Wed, 5 Mar 2014 18:24:11 -0600
+Subject: [PATCH 02/10] ARM: OMAP3: fix iva mmu programming issues
 In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
 References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-Message-ID: <1394065459-16409-8-git-send-email-s-anna@ti.com>
+Message-ID: <1394065459-16409-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
+The IVA MMU is not functional when used through the hwmod and
+omap_device layers. Add fixes to clockdomain and hwmod data
+to have it functional. The hwmod changes are needed to enable
+the clock, and the SWSUP change is needed to wakeup the domain
+because the power domain is programmed to be in RET, and there
+is no automatic power domain switching to ON.
 
-Update the IOMMU node for the camera subsystem as per the
-OMAP IOMMU bindings.
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: corrected interrupt number]
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/omap3.dtsi | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/clockdomains3xxx_data.c | 2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b..f7a47e3 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -411,10 +411,11 @@
- 		};
- 
- 		mmu_isp: mmu at 480bd400 {
--			compatible = "ti,omap3-mmu-isp";
--			ti,hwmods = "mmu_isp";
-+			compatible = "ti,omap2-iommu";
- 			reg = <0x480bd400 0x80>;
--			interrupts = <8>;
-+			interrupts = <24>;
-+			ti,hwmods = "mmu_isp";
-+			ti,#tlb-entries = <8>;
- 		};
- 
- 		wdt2: wdt at 48314000 {
+diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+index e6b91e5..f03dc97 100644
+--- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+@@ -247,7 +247,7 @@ static struct clockdomain neon_clkdm = {
+ static struct clockdomain iva2_clkdm = {
+ 	.name		= "iva2_clkdm",
+ 	.pwrdm		= { .name = "iva2_pwrdm" },
+-	.flags		= CLKDM_CAN_HWSUP_SWSUP,
++	.flags		= CLKDM_CAN_SWSUP,
+ 	.dep_bit	= OMAP3430_PM_WKDEP_MPU_EN_IVA2_SHIFT,
+ 	.wkdep_srcs	= iva2_wkdeps,
+ 	.clktrctrl_mask = OMAP3430_CLKTRCTRL_IVA2_MASK,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 81dd071..9c7e23a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3068,12 +3068,16 @@ static struct omap_hwmod omap3xxx_mmu_iva_hwmod = {
+ 	.name		= "mmu_iva",
+ 	.class		= &omap3xxx_mmu_hwmod_class,
+ 	.mpu_irqs	= omap3xxx_mmu_iva_irqs,
++	.clkdm_name	= "iva2_clkdm",
+ 	.rst_lines	= omap3xxx_mmu_iva_resets,
+ 	.rst_lines_cnt	= ARRAY_SIZE(omap3xxx_mmu_iva_resets),
+ 	.main_clk	= "iva2_ck",
+ 	.prcm = {
+ 		.omap2 = {
+ 			.module_offs = OMAP3430_IVA2_MOD,
++			.module_bit = OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_SHIFT,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_IVA2_SHIFT,
+ 		},
+ 	},
+ 	.dev_attr	= &mmu_iva_dev_attr,
 -- 
 1.9.0
