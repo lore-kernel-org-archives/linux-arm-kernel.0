@@ -1,37 +1,123 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 6 Mar 2014 09:29:09 +0200
-Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
-In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <531823C5.1020008@ti.com>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 06 Mar 2014 03:10:02 -0500
+Subject: [PATCH v6 00/14] uprobes: Add uprobes support for ARM
+In-Reply-To: <20140304173134.GA18830@redhat.com>
+References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+ <20140301123026.GD21483@n2100.arm.linux.org.uk> <53131DBE.7020500@linaro.org>
+ <20140303205039.GA8949@redhat.com>
+ <20140304005306.GO21483@n2100.arm.linux.org.uk>
+ <20140304173134.GA18830@redhat.com>
+Message-ID: <53182D5A.7020600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 03/04/14 12:31, Oleg Nesterov wrote:
+> On 03/04, Russell King - ARM Linux wrote:
+>>
+>> On Mon, Mar 03, 2014 at 09:50:39PM +0100, Oleg Nesterov wrote:
+>>>
+>>> And why CONFIG_UPROBES should depend on PERF_EVENTS? uprobes can be
+>>> used by (say) systemtap without UPROBE_EVENT/PERF_EVENTS.
+>>>
+>>> But as Russell pointed out the events directory is only built if
+>>> CONFIG_PERF_EVENTS=y, so it should depend on it or select...
+>>>
+>>>
+>>> I dunno. Personally I vote for the patch from Srikar in
+>>>
+>>> 	http://article.gmane.org/gmane.linux.kernel/1017186
+>>>
+>>> This is what we currently have, currently CONFIG_UPROBES is not
+>>> user-selectable anyway.
+>>
+>> Yes, me too, but with the proviso that UPROBE_EVENT also sorts itself
+>> out with PERF_EVENTS in some way too (either by selecting it, which
+>> IMHO isn't nice, or by depending on it, or the build dependency itself
+>> gets sorted.)
+>
+> OK... what do you think about the patch below for now?
+>
+>> Maybe a simpler answer would be to change the build stuff (hand-crafted):
+>>
+>> kernel/Makefile
+>> -obj-$(CONFIG_PERF_EVENTS) += events/
+>> +obj-y += events/
+>>
+>> and kernel/events/Makefile:
+>>
+>> -obj-y := core.o ring_buffer.o callchain.o
+>> +perf-y := core.o ring_buffer.o callchain.o
+>>
+>> -obj-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
+>> +perf-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
+>> +
+>> +obj-${CONFIG_PERF_EVENTS) += $(perf-y)
+>
+> I fully agree. Except I can't review this change ;) But hopefully I
+> can understand what it should do.
+>
+> But personally I'd prefer to start with the simple/safe change which
+> allows us to merge this series. If nothing else, even if I think that
+> kernel/events/uprobes.c doesn't need CONFIG_PERF_EVENTS, this should
+> be verified and discussed with perf maintainers.
+>
+> If you agree with the patch below, how should we route it? I won't
+> argue if you push it along with other patches from David.
+>
 
-On 21/01/14 12:56, Tomi Valkeinen wrote:
-> Hi,
-> 
-> Here's version 3 of the DSS DT series.
+Oleg, I'll put you down as the author and add a signed-off line for you 
+if that is OK?  Not sure who should ack it.
 
-Can you have a look at the arch/arm/ parts in the series and ack if
-they're ok, i.e, patches 1, 2, 32.
+> BTW... why UPROBE_EVENT depends on MMU? I think that ARCH_SUPPORTS_UPROBES
+> should not be true if !CONFIG_MMU.
+>
+> Oleg.
+> ---
+>
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index 80bbb8c..97ff872 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -86,9 +86,7 @@ config KPROBES_ON_FTRACE
+>   	 optimize on top of function tracing.
+>
+>   config UPROBES
+> -	bool "Transparent user-space probes (EXPERIMENTAL)"
+> -	depends on UPROBE_EVENT && PERF_EVENTS
+> -	default n
+> +	def_bool n
+>   	select PERCPU_RWSEM
+>   	help
+>   	  Uprobes is the user-space counterpart to kprobes: they
+> @@ -101,8 +99,6 @@ config UPROBES
+>   	    managed by the kernel and kept transparent to the probed
+>   	    application. )
+>
+> -	  If in doubt, say "N".
+> -
+>   config HAVE_64BIT_ALIGNED_ACCESS
+>   	def_bool 64BIT && !HAVE_EFFICIENT_UNALIGNED_ACCESS
+>   	help
+> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+> index 015f85a..8639819 100644
+> --- a/kernel/trace/Kconfig
+> +++ b/kernel/trace/Kconfig
+> @@ -424,6 +424,7 @@ config UPROBE_EVENT
+>   	bool "Enable uprobes-based dynamic events"
+>   	depends on ARCH_SUPPORTS_UPROBES
+>   	depends on MMU
+> +	depends on PERF_EVENTS
+>   	select UPROBES
+>   	select PROBE_EVENTS
+>   	select TRACING
+>
 
-Then there are the .dts patches, 22-30, for which I haven't been able to
-get any acks. I'm not sure who I should get acks from for those, but I
-don't mind adding yours if you want to give it.
+Can we agree Oleg's patch above is the best way to go in the short term? 
+  I've tested it and it addresses the problem, although of course one 
+has to know to enable PERF_EVENTS to even see the UPROBE_EVENT option 
+(not a problem on x86 as they always set PERF_EVENTS).
 
-The .dts patches have had minor changes compared to the ones posted
-here, according to the DT bindings review comments, but nothing much has
-changed.
+I'm continuing to test the above with my new include file changes, using 
+Arnd's randconfig patches.  Looks good so far.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/a2c3b74e/attachment-0001.sig>
+-dl
