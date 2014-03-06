@@ -1,88 +1,33 @@
-From: herve.codina@celad.com (Herve Codina)
-Date: Thu, 6 Mar 2014 18:42:05 +0100
-Subject: nand pmecc crash detected
-In-Reply-To: <5313FACC.8030202@atmel.com>
-References: <5310B108.8040800@celad.com> <5313FACC.8030202@atmel.com>
-Message-ID: <5318B36D.4020700@celad.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 6 Mar 2014 09:45:55 -0800
+Subject: [PATCH 2/6] ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
+In-Reply-To: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1394127959-3159-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Josh
+Low-level debugging using the Broadcom Kona UART only makes sense on the
+ARCH_BCM_MOBILE platform and would otherwise prevent ARCH_BCM_63XX from
+picking up the right UART implementation by default.
 
-As suggested, i made a patch and sent it this week to
-linux-mtd at lists.infradead.org and linux-arm-kernel at lists.infradead.org.
-Hope you have seen it. Is subject is : "[PATCH] Disable Subpage nand
-write when using Atmel PMECC".
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best regards,
-Herve
-
-
-
-
-Le 03/03/2014 04:45, Josh Wu a ?crit :
-> Dear Herve
-> 
-> On 2/28/2014 11:53 PM, Herve Codina wrote:
->> Hi,
->>
->> I am using an sam5d35 and its pmecc nand ecc controller.
->>
->> In barebox, using similar atmel_nand.c the system crashes.
->>
->> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
->> (nand_base.c) when we write a sub page.
->>
->> chip->ecc.hwctl function is not set when we are using PMECC controller.
->>
->> As a workaround, i set NAND_NO_SUBPAGE_WRITE for PMECC controller in
->> order to disable sub page access in nand_write_page.
->>
->> I think we can have the same problem in Linux. I do not performed
->> subpage nand writes from Linux but i made the following patch according
->> to my Barebox defect.
-> 
-> Thank you for catching this crash bug. The fix is fine for me. But I 
-> think it's better to send out the Linux kernel patch alone.
-> 
-> You can rebase your patch on the top of Linux-mtd git 
-> repo(git://git.infradead.org/l2-mtd.git) instead of your local Linux.
-> Then use 'git send-email' send to linux-mtd at lists.infradead.org and 
-> linux-arm-kernel at lists.infradead.org. I will ack your patch.
-> 
-> If the patch is merged in Linux-mtd, it should be easier port to barebox 
-> then.
-> 
->>
->> Here after are my patches (same modification) for 1st my local Barebox
->> and 2nd my local Linux :
->>
->> ---8<-------------------
->>  From 757e8dbf141619a55b7a5b1ca11780b2589eacc1 Mon Sep 17 00:00:00 2001
->> From: Herve Codina <Herve.CODINA@celad.com>
->> Date: Fri, 28 Feb 2014 08:39:08 +0100
->> Subject: [PATCH 5/5] Disable Subpage nand write when using Atmel PMECC.
->>
->>
->> Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
->> ---
->>   drivers/mtd/nand/atmel_nand.c |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
->> index 2ff7427..cdbe685 100644
->> --- a/drivers/mtd/nand/atmel_nand.c
->> +++ b/drivers/mtd/nand/atmel_nand.c
->> @@ -837,6 +837,7 @@ static int __init
->> atmel_pmecc_nand_init_params(struct device_d *dev,
->>   		return err_no;
->>   	}
->>
->> +	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
->>   	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
->>   	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
->>
-> 
-> Best Regards,
-> Josh Wu
-> 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0531da8e5216..c23f52445308 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -108,7 +108,7 @@ choice
+ 
+ 	config DEBUG_BCM_KONA_UART
+ 		bool "Kernel low-level debugging messages via BCM KONA UART"
+-		depends on ARCH_BCM
++		depends on ARCH_BCM_MOBILE
+ 		select DEBUG_UART_8250
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-- 
+1.8.3.2
