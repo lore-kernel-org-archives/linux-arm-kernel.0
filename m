@@ -1,66 +1,60 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 6 Mar 2014 05:41:21 +0100
-Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <1c0c5f2ce69849d4bf482601ac431da6@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
- <201403060339.45611.marex@denx.de>
- <1c0c5f2ce69849d4bf482601ac431da6@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201403060541.21665.marex@denx.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  6 Mar 2014 13:44:28 +0900
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for v3.15
+Message-ID: <cover.1394080829.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
-> On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
-> > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
-> > > Add dma support for i2c. This function depend on DMA driver.
-> > > You can turn on it by write both the dmas and dma-name properties in
-> > > dts node.
-> > > 
-> > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > > ---
-> > 
-> > [...]
-> > 
-> > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct platform_device
-> > 
-> > *pdev)
-> > 
-> > >  	void __iomem *base;
-> > >  	int irq, ret;
-> > >  	u32 bitrate;
-> > > 
-> > > +	u32 phy_addr;
-> > > 
-> > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
-> > > 
-> > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct platform_device
-> > 
-> > *pdev)
-> > 
-> > >  	}
-> > >  	
-> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > 
-> > > +	phy_addr = res->start;
-> > 
-> > Uh ... Shawn, I really think I am lost here. Don't you need to map this
-> > memory before you can use it for DMA ? The DMA mapping function should
-> > give you the physical address and is the right way to go about this
-> > instead of pulling the address from here, no ?
-> > 
-> > I might be wrong here, I am rather uncertain, so please help me out.
-> > Thanks!
-> 
-> Hi, Marek, Thanks for your suggestion.
-> Here you can review the code in include/linux/ioport.h
-> The resource->start describes the entity on the CPU bus as a starting
-> physical address. So I thinks it can used for dma directly.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This doesn't feel right for some reason. If this is a register area, you should 
-ioremap() it. If it's a memory area you do DMA to/from, you need to make sure 
-you correctly flush/invalidate caches and properly handle the effects the write 
-buffer might have. But I have a feeling you actually do DMA to/from register 
-space here ?
+Please consider this fourth round of Renesas ARM based SoC DT updates for v3.15.
 
-Best regards,
-Marek Vasut
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt3-for-v3.15,
+which I have already sent a pull-request for.
+
+
+The following changes since commit 367aaaea1d6c6496695ffd06b49590b8cfcb8aa5:
+
+  ARM: shmobile: genmai: adapt dts to use native i2c driver (2014-02-18 11:35:30 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt4-for-v3.15
+
+for you to fetch changes up to 2c60a7df72711fb8b4be1e6aa651ab166a8931bc:
+
+  ARM: shmobile: Add SDHI devices for Koelsch DTS (2014-02-26 15:11:41 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM Based SoC DT Updates for v3.15
+
+* r8a7791 (R-Car M2) based koelsch board
+  - Add SDHI devices
+  - Add ethernet
+
+* r8a7791 (R-Car M2) SoC
+  - Correct clock index for i2c5
+
+* r8a7790 (R-Car H2) based lager board
+  - Add ethernet
+
+----------------------------------------------------------------
+Magnus Damm (2):
+      ARM: shmobile: Add SDHI devices to r8a7791 DTSI
+      ARM: shmobile: Add SDHI devices for Koelsch DTS
+
+Sergei Shtylyov (4):
+      ARM: shmobile: r8a7790: add Ether DT support
+      ARM: shmobile: lager: add Ether DT support
+      ARM: shmobile: r8a7791: add Ether DT support
+      ARM: shmobile: koelsch: add Ether DT support
+
+Wolfram Sang (1):
+      ARM: shmobile: r8a7791: fix clock index for i2c5
+
+ arch/arm/boot/dts/r8a7790-lager.dts   |  28 ++++++-
+ arch/arm/boot/dts/r8a7790.dtsi        |  14 +++-
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 147 +++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/r8a7791.dtsi        |  43 +++++++++-
+ 4 files changed, 227 insertions(+), 5 deletions(-)
