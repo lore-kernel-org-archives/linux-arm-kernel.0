@@ -1,85 +1,34 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 06 Mar 2014 11:47:03 +0900
-Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping when
- possible
-In-Reply-To: <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
- <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
-Message-ID: <000201cf38e6$5b02d6e0$110884a0$%han@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 5 Mar 2014 20:50:18 -0600
+Subject: [RESEND Patch 2/3] DT: Vendors: Add vendor prefix for Macronix
+In-Reply-To: <1394055207-4639-3-git-send-email-andrew@lunn.ch>
+References: <1394055207-4639-1-git-send-email-andrew@lunn.ch>
+ <1394055207-4639-3-git-send-email-andrew@lunn.ch>
+Message-ID: <CAL_JsqLexnTBPLzDJHsXFGQe_hY6cE7LVtPYTaG9T59FJ2Ec6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 05, 2014 10:26 PM, Lucas Stach wrote:
-> 
-> This is the recommended method of doing the IRQ
-> mapping. For old devicetrees we fall back to the
-> previous practice.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-(+cc Mohit KUMAR, Richard Zhu, Pratyush Anand, Marek Vasut,
-       Kishon Vijay Abraham I)
-
-Acked-by: Jingoo Han <jg1.han@samsung.com>
-
-It works properly on Exynos platform.
-Thank you.
-
-Best regards,
-Jingoo Han
-
+On Wed, Mar 5, 2014 at 3:33 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> Add vendor prefix mxicy for Macronix International Co., Ltd.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
-> v2: pass in parent dev to relevant functions, to make DT parsing
->     work (spotted by Tim Harvey <tharvey@gateworks.com>)
-> ---
->  drivers/pci/host/pcie-designware.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 17ce88f79d2b..98c118e04dba 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -17,6 +17,7 @@
->  #include <linux/module.h>
->  #include <linux/msi.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci.h>
->  #include <linux/pci_regs.h>
->  #include <linux/types.h>
-> @@ -492,7 +493,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->  	dw_pci.nr_controllers = 1;
->  	dw_pci.private_data = (void **)&pp;
-> 
-> -	pci_common_init(&dw_pci);
-> +	pci_common_init_dev(pp->dev, &dw_pci);
->  	pci_assign_unassigned_resources();
->  #ifdef CONFIG_PCI_DOMAINS
->  	dw_pci.domain++;
-> @@ -725,7 +726,7 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> 
->  	if (pp) {
->  		pp->root_bus_nr = sys->busnr;
-> -		bus = pci_scan_root_bus(NULL, sys->busnr, &dw_pcie_ops,
-> +		bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
->  					sys, &sys->resources);
->  	} else {
->  		bus = NULL;
-> @@ -738,8 +739,13 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->  {
->  	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-> +	int irq;
-> 
-> -	return pp->irq;
-> +	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-> +	if (!irq)
-> +		irq = pp->irq;
-> +
-> +	return irq;
->  }
-> 
->  static void dw_pcie_add_bus(struct pci_bus *bus)
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 860c467374fe..f4599aea1f7d 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -63,4 +63,5 @@ microchip     Microchip Technology Inc.
+>  mosaixtech     Mosaix Technologies, Inc.
+>  mpl    MPL AG
+> +mxicy  Macronix International Co., Ltd.
+>  national       National Semiconductor
+>  netgear        Netgear, Inc.
 > --
 > 1.9.0
+>
