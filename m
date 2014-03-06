@@ -1,68 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 6 Mar 2014 13:44:11 +0100
-Subject: [RESEND Patch 2/2] DT: bindings: add missing Marvell Kirkwood
- SoC documentation
-In-Reply-To: <20140306122300.GW1872@titan.lakedaemon.net>
-References: <1394054474-4310-1-git-send-email-andrew@lunn.ch>
- <1394054474-4310-3-git-send-email-andrew@lunn.ch>
- <20140306122300.GW1872@titan.lakedaemon.net>
-Message-ID: <20140306124411.GH4780@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Mar 2014 13:03:20 +0000
+Subject: [PATCH v5 06/11] imx-drm: imx-tve: Fix DDC I2C bus property
+In-Reply-To: <1394011262-16849-7-git-send-email-p.zabel@pengutronix.de>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <1394011262-16849-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140306130320.GA21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 07:23:00AM -0500, Jason Cooper wrote:
-> On Wed, Mar 05, 2014 at 10:21:14PM +0100, Andrew Lunn wrote:
-> > Marvell Dove SoC binding was not documented, yet. Add the
-> 
-> s/Dove/Kirkwood/
+On Wed, Mar 05, 2014 at 10:20:57AM +0100, Philipp Zabel wrote:
+> This patch fixes the TV Encoder DDC I2C bus property to use the common
+> 'ddc-i2c-bus' property name instead of 'ddc'.
 
-Doh. I cut/paste from the Dove file.
- 
-> > documentation including the supported SoCs and boards.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
-> >  1 file changed, 97 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> > new file mode 100644
-> > index 000000000000..925ecbf6e7b7
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> > @@ -0,0 +1,97 @@
-> > +Marvell Kirkwood SoC Family Device Tree Bindings
-> > +------------------------------------------------
-> > +
-> > +Boards with a SoC of the Marvell Kirkwook family, eg 88f6281
-> 
-> s/Kirkwook/Kirkwood/
+Looking at both hdmi and tve, the ddc part is very similar.  The difference
+is how the probe is handled:
 
-I really need to add Kirkwood to my dictionary.
- 
-> > +
-> > +* Required root node properties:
-> > +compatible: must contain "marvell,kirkwood"
-> > +
-> > +In addition, the above compatible shall be extended with the specific
-> > +SoC. Currently known SoC compatibles are:
-> > +
-> > +"marvell,kirkwood-88f6192"
-> > +"marvell,kirkwood-88f6281"
-> > +"marvell,kirkwood-88f6282"
-> > +"marvell,kirkwood-88f6283"
-> > +"marvell,kirkwood-88f6702"
-> > +"marvell,kirkwood-98DX4122"
-> > +
-> > +And in addition, the compatible shall be extended with the specific
-> > +board. Currently known boards are:
-> 
-> This is more a question for Grant and the other DT maintainers: Do we
-> really need this?
+imx-hdmi:
+        ddc_node = of_parse_phandle(np, "ddc", 0);
+        if (ddc_node) {
+                hdmi->ddc = of_find_i2c_adapter_by_node(ddc_node);
+                if (!hdmi->ddc)
+                        dev_dbg(hdmi->dev, "failed to read ddc node\n");
 
-checkpatch.pl says yes, we need this. It gives warnings for every
-unknown compatible string. I would say it is up to Grant and the other
-DT maintainers to decide if checkpatch.pl is wrong.
+                of_node_put(ddc_node);
+        } else {
+                dev_dbg(hdmi->dev, "no ddc property found\n");
+        }
 
-       Andrew
+imx-tve:
+        ddc_node = of_parse_phandle(np, "ddc", 0);
+        if (ddc_node) {
+                tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
+                of_node_put(ddc_node);
+        }
+
+It appears to differ only by debug prints - is there any reason we
+couldn't unify the DDC backend part?  I've tinkered with this idea,
+and already have a patch, though it needs a little rework.
+
+Any thoughts?
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
