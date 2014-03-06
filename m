@@ -1,33 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Mar 2014 15:18:03 -0500
-Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
-In-Reply-To: <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140306201803.GL1872@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 6 Mar 2014 22:18:21 +0100
+Subject: [PATCH 07/10] ARM: mvebu: implement Armada 375 coherency
+ workaround
+In-Reply-To: <20140306183656.GE1872@titan.lakedaemon.net>
+References: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1394124395-20030-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140306183656.GE1872@titan.lakedaemon.net>
+Message-ID: <20140306221821.771a0d12@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 01:03:10AM +0100, Sebastian Hesselbarth wrote:
-> Pinctrl will WARN on missing DT resources, which is a little bit too
-> noisy. Use dev_warn with FW_BUG instead.
+Dear Jason Cooper,
+
+On Thu, 6 Mar 2014 13:36:56 -0500, Jason Cooper wrote:
+
+> On Thu, Mar 06, 2014 at 05:46:32PM +0100, Thomas Petazzoni wrote:
+> > The early revisions of Armada 375 SOCs (Z1 stepping) have a bug in the
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk> 
-> Cc: Jason Cooper <jason@lakedaemon.net> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: devicetree at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/pinctrl/mvebu/pinctrl-dove.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Do we have a way to determine that we are on a Z1 at runtime?  It seems
+> like we're consuming an XOR engine unconditionally.  I presume that
+> Marvell is going to fix this with the next stepping?
 
-Applied to mvebu/pinctrl
+Yes, we believe there will be a way to differentiate the Z1 stepping
+for the later steppings, using the mvebu-soc-id. However, since those
+later steppings are not available yet, we haven't been able to test
+this. Our plan is that as soon as we have newer steppings, we will
+improve this code to only apply the XOR workaround on the steppings for
+which it is needed. It is not clear at this point which stepping
+exactly will fix the problem, so we've written the code with the
+information that we have today.
 
-thx,
+Thanks for the feedback!
 
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
