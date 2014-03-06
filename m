@@ -1,99 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Mar 2014 16:28:26 +0100
-Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on
- r8a7790/lager and r8a7791/koelsch
-In-Reply-To: <CANqRtoSkHWGRypPymh87ikmcEWqMsn=eRoPkc2JpaSZVqP21Lw@mail.gmail.com>
-References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
- <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
- <20140306013824.GF13581@verge.net.au>
- <CANqRtoSkHWGRypPymh87ikmcEWqMsn=eRoPkc2JpaSZVqP21Lw@mail.gmail.com>
-Message-ID: <CAMuHMdX16VGZ=MjCj0St9spWGZo-bnQ6EXuiibZENTWKfASxEg@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 6 Mar 2014 17:31:22 +0200
+Subject: [PATCH v3 06/13] phy: ti-pipe3: Don't get 'wkupclk' and 'refclk' for
+ SATA PHY
+In-Reply-To: <1394116729-28811-7-git-send-email-rogerq@ti.com>
+References: <1394116729-28811-7-git-send-email-rogerq@ti.com>
+Message-ID: <1394119882-12859-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus, Simon,
+SATA PHY doesn't need 'wkupclk; and 'refclk' so don't
+try to get them for SATA PHY.
 
-On Thu, Mar 6, 2014 at 3:25 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On Thu, Mar 6, 2014 at 10:38 AM, Simon Horman <horms@verge.net.au> wrote:
->> On Wed, Mar 05, 2014 at 05:31:42PM +0900, Magnus Damm wrote:
->>> On Tue, Feb 25, 2014 at 7:30 PM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>> >         Hi Simon, Magnus,
->>> >
->>> > This patch series integrates support for the MSIOF module in the Renesas
->>> > R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
->>> > development boards.
->>> >
->>> > It was tested on Lager and Koelsch, both legacy and DT, using a dummy
->>> > driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
->>> > ID.
->>> >
->>> >     [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
->>> >     [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
->>> >     [03/11] ARM: shmobile: lager legacy: Add MSIOF support
->>> >     [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
->>> >     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
->>> >             spi0 alias
->>> >     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
->>> >             add spi0 alias
->>> >     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
->>> >     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
->>> >     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
->>> >     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
->>> >     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
->>> >
->>> > These are (reworked versions of) the remaining patches not taken from v1.
->>> > Changelogs are available in the individual patches.
->>>
->>> Hi Geert,
->>>
->>> Thanks for your efforts. All these look fine to me.
->>>
->>> Acked-by: Magnus Damm <damm@opensource.se>
->>>
->>> Exactly what to merge upstream depends on what the ARM SoC maintainers prefer.
->>
->> I wonder if for now we could move things forwards by merging the
->> non-legacy code. I think that would mean the following:
->>
->>     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
->>             spi0 alias
->>     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
->>             add spi0 alias
->>     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
->>     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
->>     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
->>     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
->>
->> And just the 'multi' portion of:
->>
->>     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
->>
->>
->> Would that result in working MSIOF support for koelsch and lager
->> when using multiplatform?
->
-> I believe so, but I rely on Geert to point out if this assumption is wrong.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+v3 - Fixed checkpatch warning
 
-Yes, that should work.
+ drivers/phy/phy-ti-pipe3.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
->> Then later, if appropriate, in accordance with discussions with the
->> ARM SoC maintainers, we could merge the remaining changes in
->> this series: the legacy code.
->
-> Sure, sounds good.
-
-Indeed.
-
-Thanks a lot!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+index f141237..f925f60 100644
+--- a/drivers/phy/phy-ti-pipe3.c
++++ b/drivers/phy/phy-ti-pipe3.c
+@@ -294,16 +294,21 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 
+ 	phy->dev		= &pdev->dev;
+ 
+-	phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
+-	if (IS_ERR(phy->wkupclk)) {
+-		dev_err(&pdev->dev, "unable to get wkupclk\n");
+-		return PTR_ERR(phy->wkupclk);
+-	}
++	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
++		phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
++		if (IS_ERR(phy->wkupclk)) {
++			dev_err(&pdev->dev, "unable to get wkupclk\n");
++			return PTR_ERR(phy->wkupclk);
++		}
+ 
+-	phy->refclk = devm_clk_get(phy->dev, "refclk");
+-	if (IS_ERR(phy->refclk)) {
+-		dev_err(&pdev->dev, "unable to get refclk\n");
+-		return PTR_ERR(phy->refclk);
++		phy->refclk = devm_clk_get(phy->dev, "refclk");
++		if (IS_ERR(phy->refclk)) {
++			dev_err(&pdev->dev, "unable to get refclk\n");
++			return PTR_ERR(phy->refclk);
++		}
++	} else {
++		phy->wkupclk = ERR_PTR(-ENODEV);
++		phy->refclk = ERR_PTR(-ENODEV);
+ 	}
+ 
+ 	phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
+-- 
+1.8.3.2
