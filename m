@@ -1,69 +1,55 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 06 Mar 2014 17:20:19 +0100
-Subject: [PATCH v6 10/10] ARM: dts: exynos4: Update camera clk provider and
- s5k6a3 sensor node
-In-Reply-To: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
-References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1394122819-9582-11-git-send-email-s.nawrocki@samsung.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Thu,  6 Mar 2014 20:23:33 +0400
+Subject: [PATCH 2/2] ARM: i.MX: mx21ads: Cleanup board
+In-Reply-To: <1394123013-28562-1-git-send-email-shc_work@mail.ru>
+References: <1394123013-28562-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1394123013-28562-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused /camera/clock-controller node and required clock properties
-to the camera node. This is required for a clock provider that will be
-referenced by image sensor devices.
-Also add required clock related changes to s5k6a3 device node and afvdd
-regulator supply.
+- Remove unused <asm/mach/time.h> inclusion.
+- Use predefined constant for CS8900A base address.
+- Use DEFINE_RES_MEM() macro for NOR flash resource.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
-Changes since v5:
-  - none.
+ arch/arm/mach-imx/mach-mx21ads.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-Changes since v4:
-  - added changes at the s5k6a3 device node.
-  - clock output names adjusted to better match documentation.
----
- arch/arm/boot/dts/exynos4.dtsi          |    6 ++----
- arch/arm/boot/dts/exynos4412-trats2.dts |    5 +++--
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 08452e1..6430a0e 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -109,12 +109,10 @@
- 		status = "disabled";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		#clock-cells = <1>;
-+		clock-output-names = "cam_a_clkout", "cam_b_clkout";
- 		ranges;
+diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
+index 0b8e63f..30c30fd 100644
+--- a/arch/arm/mach-imx/mach-mx21ads.c
++++ b/arch/arm/mach-imx/mach-mx21ads.c
+@@ -23,7 +23,6 @@
+ #include <linux/regulator/machine.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
  
--		clock_cam: clock-controller {
--			 #clock-cells = <1>;
--		};
--
- 		fimc_0: fimc at 11800000 {
- 			compatible = "samsung,exynos4210-fimc";
- 			reg = <0x11800000 0x1000>;
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 0c6afbe..d7e13a4 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -647,10 +647,11 @@
- 					reg = <0x10>;
- 					svdda-supply = <&cam_io_reg>;
- 					svddio-supply = <&ldo19_reg>;
-+					afvdd-supply = <&ldo19_reg>;
- 					clock-frequency = <24000000>;
- 					/* CAM_B_CLKOUT */
--					clocks = <&clock_cam 1>;
--					clock-names = "mclk";
-+					clocks = <&camera 1>;
-+					clock-names = "extclk";
- 					samsung,camclk-out = <1>;
- 					gpios = <&gpm1 6 0>;
+ #include "common.h"
+ #include "devices-imx21.h"
+@@ -139,11 +138,8 @@ static struct physmap_flash_data mx21ads_flash_data = {
+ 	.width = 4,
+ };
  
+-static struct resource mx21ads_flash_resource = {
+-	.start = MX21_CS0_BASE_ADDR,
+-	.end = MX21_CS0_BASE_ADDR + 0x02000000 - 1,
+-	.flags = IORESOURCE_MEM,
+-};
++static struct resource mx21ads_flash_resource =
++	DEFINE_RES_MEM(MX21_CS0_BASE_ADDR, SZ_32M);
+ 
+ static struct platform_device mx21ads_nor_mtd_device = {
+ 	.name = "physmap-flash",
+@@ -156,7 +152,7 @@ static struct platform_device mx21ads_nor_mtd_device = {
+ };
+ 
+ static struct resource mx21ads_cs8900_resources[] __initdata = {
+-	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, SZ_1K),
++	DEFINE_RES_MEM(MX21ADS_CS8900A_REG, SZ_1K),
+ 	/* irq number is run-time assigned */
+ 	DEFINE_RES_IRQ(-1),
+ };
 -- 
-1.7.9.5
+1.8.3.2
