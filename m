@@ -1,39 +1,41 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Thu, 06 Mar 2014 19:16:28 +0000
-Subject: [PATCH 2/3] ARM: at91: at91sam9g45: change at91_adc name
-In-Reply-To: <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5318C98C.1070702@kernel.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 6 Mar 2014 16:17:47 -0300
+Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
+In-Reply-To: <20140306172339.GP4780@lunn.ch>
+References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140306131429.GJ4780@lunn.ch>
+ <5318779C.8030901@free-electrons.com>
+ <20140306142117.GL4780@lunn.ch>
+ <531886B4.2070002@free-electrons.com>
+ <20140306144600.GM4780@lunn.ch>
+ <53188B73.4000109@free-electrons.com>
+ <53189892.5090502@free-electrons.com>
+ <20140306160213.GA4327@arch.cereza> <20140306172339.GP4780@lunn.ch>
+Message-ID: <20140306191747.GA32655@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/14 16:57, Alexandre Belloni wrote:
-> We can't use "at91_adc" to refer to the at91_adc driver anymore as the name is
-> used to match an id_table.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-As stated in previous email, I'll take this along with the fix that 'broke'
-this, if I get an Ack from one of the at91 maintainers.
+On Mar 06, Andrew Lunn wrote:
+> > Can't we fix this so the probe order doesn't affect the name?
+> > 
+> > Is that sane?
+> 
+> You are not supposed to trust the device name, since probing can
+> happen in parallel, on different buses. udev should have rules to name
+> the interfaces based on the MAC address. On my Debian system i have:
+> 
+> /etc/udev/rules.d/70-persistent-net.rules
+> 
+> So what is important is that the MAC addresses are assigned correctly
+> to the device. And DT does that based on MMIO address, so should be
+> reliable, independent of probe order.
+> 
 
-Thanks,
+Right, makes perfect sense!
 
-Jonathan
-> ---
->   arch/arm/mach-at91/at91sam9g45_devices.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index cb36fa872d30..88554024eb2d 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -1203,7 +1203,7 @@ static struct resource adc_resources[] = {
->   };
->
->   static struct platform_device at91_adc_device = {
-> -	.name		= "at91_adc",
-> +	.name		= "at91sam9g45-adc",
->   	.id		= -1,
->   	.dev		= {
->   				.platform_data	= &adc_data,
->
+So we can just keep the nodes address-ordered, without caring about the name?
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
