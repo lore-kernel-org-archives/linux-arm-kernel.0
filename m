@@ -1,48 +1,46 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 6 Mar 2014 18:01:34 +0530
-Subject: [RESEND PATCH 1/1] arm: dts: am33xx: correcting dt node unit address
- for usb
-Message-ID: <1394109094-19205-1-git-send-email-mugunthanvnm@ti.com>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Thu, 6 Mar 2014 13:34:02 +0100
+Subject: imx-drm: ldb and display power on sequence
+Message-ID: <CAH9NwWcE=4OVHSMKCEuTrFA7JMGEdkxrbX_0OORZ96N1Roi2HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT node's unit address should be its own register offset address to make it a
-unique across the system. This patch corrects the incorrect USB entries with
-correct register offset for unit address.
+Hi all.
 
-Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
-This patch was posted long back (Aug. 30, 2013), below is the archive of the
-orginal patch.
-https://patchwork.kernel.org/patch/2852163/
+On our custom board design (imx6d) we are using a TFT-display
+connceted via LVDS.
+The datasheet [0] says that the display needs a defined power up
+sequence. I need
+to control the following stuff:
 
----
- arch/arm/boot/dts/am33xx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+- LCD_ON (gpio2 3)
+- Backlight ON (gpio2 0)
+- PMW for dimm
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 7073429..9770e35 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -453,7 +453,7 @@
- 			ti,hwmods = "usb_otg_hs";
- 			status = "disabled";
- 
--			usb_ctrl_mod: control at 44e10000 {
-+			usb_ctrl_mod: control at 44e10620 {
- 				compatible = "ti,am335x-usb-ctrl-module";
- 				reg = <0x44e10620 0x10
- 					0x44e10648 0x4>;
-@@ -556,7 +556,7 @@
- 					"tx14", "tx15";
- 			};
- 
--			cppi41dma: dma-controller at 07402000 {
-+			cppi41dma: dma-controller at 47402000 {
- 				compatible = "ti,am3359-cppi41";
- 				reg =  <0x47400000 0x1000
- 					0x47402000 0x1000
--- 
-1.9.0
+At the moment I have the backlight suff ready:
+
+       backlight {
+               compatible = "pwm-backlight";
+               pwms = <&pwm4 0 50000>;
+               enable-gpios = <&gpio2 0 0>;
+
+               brightness-levels = <0 1 2 3 4>;
+               default-brightness-level = <4>;
+       };
+
+Now I only need to enable the LCD_ON and wait 40ms before turning on
+the LVDS clocks and data. For this I tought
+to add a regulator support in imx_ldb_encoder_commit(..) of imx-ldb.c.
+That should give me the correct sequence for
+LVDS on to LVDS data/clock. Now I only need to get the pwm-backlight
+driver doing its work after ldb is ready.
+
+Are there some other and better solutions to this problem?
+
+[0] http://www.hy-line.de/fileadmin/hy-line/computer/csv/datasheets/FG050722DSSWDG01.pdf
+
+thanks
+--
+Christian Gmeiner, MSc
+
+https://soundcloud.com/christian-gmeiner
