@@ -1,22 +1,20 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 6 Mar 2014 17:19:57 +0800
-Subject: [PATCH 6/7] ARM: dma: Use dma_pfn_offset for dma address translation
+Date: Thu, 6 Mar 2014 17:19:56 +0800
+Subject: [PATCH 5/7] of: Add set_arch_dma_coherent_ops() and setup coherent
+ dma_ops
 In-Reply-To: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1394097598-17622-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1394097598-17622-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Add set_arch_dma_coherent_ops() for architectures to setup coherent dma_ops.
+Update dt_dma_configure() to look for a "dma-coherent" property in the
+device's node, and its ancestors If this property is found, we call
+set_arch_dma_coherent_ops() per device to apply coherent DMA configuartion.
 
-In most of cases DMA addresses can be performed using offset value of
- Bus address space relatively to physical address space as following:
-
-PFN->DMA:
- __pfn_to_phys(pfn + [-]dma_pfn_offset)
-
-DMA->PFN:
- __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+The set_arch_dma_coherent_ops() is declared as __weak and it's expected
+that the arch's needing it will imlepment it.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -29,48 +27,43 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/include/asm/dma-mapping.h |   17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ drivers/of/platform.c       |    5 +++++
+ include/linux/dma-mapping.h |    7 +++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index e701a4d..8c12149 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -58,22 +58,31 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #ifndef __arch_pfn_to_dma
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
--	return (dma_addr_t)__pfn_to_bus(pfn);
-+	if (!dev)
-+		return DMA_ERROR_CODE;
-+	return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 53bb12f..272e390 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -255,6 +255,11 @@ static void dt_dma_configure(struct device *dev)
+ 		dev_err(dev, "failed to set coherent DMA mask %pad\n",
+ 			&dma_mask);
+ 	}
++
++	if (of_dma_is_coherent(dev->of_node)) {
++		set_arch_dma_coherent_ops(dev);
++		dev_dbg(dev, "device is dma coherent\n");
++	}
  }
  
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __bus_to_pfn(addr);
-+	if (!dev)
-+		return 0;
-+	return __bus_to_pfn(addr) + dev->dma_pfn_offset;
- }
+ /**
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index fd4aee2..c7d9b1b 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -123,6 +123,13 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
  
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
- {
--	return (void *)__bus_to_virt((unsigned long)addr);
-+	if (!dev)
-+		return NULL;
-+	return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
- }
+ extern u64 dma_get_required_mask(struct device *dev);
  
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
++#ifndef set_arch_dma_coherent_ops
++static inline int set_arch_dma_coherent_ops(struct device *dev)
++{
++	return 0;
++}
++#endif
++
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
  {
--	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-+	if (!dev)
-+		return DMA_ERROR_CODE;
-+	return pfn_to_dma(dev,
-+			   __bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
- }
- 
- #else
+ 	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
 -- 
 1.7.9.5
