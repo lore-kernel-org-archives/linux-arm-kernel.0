@@ -1,51 +1,83 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 6 Mar 2014 07:58:43 +0100
-Subject: [PATCHv8][ 4/7] staging: imx-drm: Use de-active and
- pixelclk-active display-timings.
-In-Reply-To: <1393437097-25129-4-git-send-email-denis@eukrea.com>
-References: <1393437097-25129-1-git-send-email-denis@eukrea.com>
- <1393437097-25129-4-git-send-email-denis@eukrea.com>
-Message-ID: <20140306075843.55e51951@ipc1.ka-ro>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Mar 2014 08:10:43 +0100
+Subject: [PATCH 5/8] i2c: nomadik: Fixup system suspend
+In-Reply-To: <1393671371-2398-6-git-send-email-ulf.hansson@linaro.org>
+References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
+ <1393671371-2398-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFr7znu0ZM2Pqv1zNbG9366VXCM8FV=t0umEsF0R6ZeyEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 1 March 2014 11:56, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> For !CONFIG_PM_RUNTIME, the device were never put back into active
+> state while resuming.
+>
+> For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
+> while we were about to handle it at suspend late, which is just too
+> optimistic.
+>
+> Even if the driver uses pm_runtime_put_sync() after each tranfer to
+> return it's runtime PM resources, there are no guarantees this will
+> actually mean the device will inactivated. The reason is that the PM
+> core will prevent runtime suspend during system suspend, and thus when
+> a transfer occurs during the early phases of system suspend the device
+> will be kept active after the transfer.
+>
+> To handle both issues above, use pm_runtime_force_suspend|resume() from
+> the system suspend|resume callbacks.
+>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Denis Carikli wrote:
-> If de-active and/or pixelclk-active properties were set in the
-> display-timings DT node, they were not used.
-> 
-> Instead the data-enable and the pixel data clock polarity
-> were hardcoded.
-> 
-> This change is needed for making the eukrea-cpuimx51
->   QVGA display work.
-> 
-I just tried this patch on our hardware and found that the pixelclock
-polarity is inverse to what the documentation says.
+Hi Wolfram,
 
-Your patch sets the 'clk_pol' variable in positive logic, while it is
-interpreted in negative logic when converted to the final register
-value in drivers/staging/imx-drm/ipu-v3/ipu-di.c:
+The pm-drivers branch of the linux-pm.git, contains the helper
+functions this patch depends on.
 
-	if (!(sig->clk_pol))
-		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+If you decide to pull that branch to your tree, to be able to apply
+this patch, please let me know. Otherwise I will repost this patch
+once 3.15 rc1 is available.
 
-IMO this should be
-	if (sig->clk_pol)
-		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+Kind regards
+Ulf Hansson
 
-Did you actually measure the resulting clock signal and LCD data?
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> ---
+>  drivers/i2c/busses/i2c-nomadik.c |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> index 8082f5c..519f5b8 100644
+> --- a/drivers/i2c/busses/i2c-nomadik.c
+> +++ b/drivers/i2c/busses/i2c-nomadik.c
+> @@ -879,19 +879,19 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int nmk_i2c_suspend_late(struct device *dev)
+>  {
+> -       pinctrl_pm_select_sleep_state(dev);
+> +       int ret;
+>
+> +       ret = pm_runtime_force_suspend(dev);
+> +       if (ret)
+> +               return ret;
+> +
+> +       pinctrl_pm_select_sleep_state(dev);
+>         return 0;
+>  }
+>
+>  static int nmk_i2c_resume_early(struct device *dev)
+>  {
+> -       /* First go to the default state */
+> -       pinctrl_pm_select_default_state(dev);
+> -       /* Then let's idle the pins until the next transfer happens */
+> -       pinctrl_pm_select_idle_state(dev);
+> -
+> -       return 0;
+> +       return pm_runtime_force_resume(dev);
+>  }
+>  #endif
+>
+> --
+> 1.7.9.5
+>
