@@ -1,38 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  6 Mar 2014 12:12:46 +0800
-Subject: [PATCH 0/2] arm64: SHA1 using ARM v8 Crypto Extensions 
-Message-ID: <1394079168-27666-1-git-send-email-ard.biesheuvel@linaro.org>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 6 Mar 2014 10:03:39 +0530
+Subject: [RESEND Patch 0/9] dts pending patches for TI omap
+In-Reply-To: <20140305195053.GG7599@atomide.com>
+References: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
+ <20140305195053.GG7599@atomide.com>
+Message-ID: <5317FAA3.9020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the SHA1 hash using ARM v8 Crypto Instructions.
+On Thursday 06 March 2014 01:20 AM, Tony Lindgren wrote:
+> * Mugunthan V N <mugunthanvnm@ti.com> [140303 06:53]:
+>> Benoit/Tony
+>>
+>> Here I am send all the pending dt patches that can go into 3.15 merge window,
+>> all the patches were already posted to mailing list and has beed reviewed.
+>>
+>> I have rebased the patches on top of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.15/dt
+>> and fixed all the merge conflicts.
+>>
+>> Pasting the mail archive for the patches series
+>>
+>> * Add ABB device nodes
+>> http://linux-kernel.2935.n7.nabble.com/PATCH-0-4-ARM-dts-OMAP3630-Add-ABB-device-nodes-td794852.html
+>>
+>> * MMC hot plug support
+>> http://mail.blameitonlove.com/lists/linux-omap/msg101933.html
+>> Dropped [PATCH 2/3] ARM: dts: am335x-evmsk: add SD card hotplug support as this
+>> is already merged with commit id 29ea5efb0bb612d352aa360de26e2095cb230e4a
+>>
+>> * DRA7 Cross bar DTS patches
+>> Cross bar driver has been pulled for next merge, so the dts patches can also
+>> be pulled for next merge window.
+>>
+>> Here is the pull request for the same patch series.
+>>
+>> The following changes since commit f777ba1780584b100ab9664cc06d04f3bb273a84:
+>>
+>>   Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git omapdt-for-3.15
+>>
+>> for you to fetch changes up to 5f78b45aa45c5b2c4de895c3b0740fda4684dae4:
+>>
+>>   ARM: DTS: DRA7: Add routable-irqs property for gic node (2014-03-03 19:53:25 +0530)
+> 
+> Thanks applying all except for the crossbar ones into
+> omap-for-v3.15/dt.
+> 
+> Please resend the last three patches once the dependencies
+> are merged to mainline kernel as otherwise the interrupt
+> nubers are all wrong without the crossbar driver related
+> code.
+ 
+   Ok, i will resend when the dependencies are merged
 
-Note that these patches depend on the modalias patch and NEON optimization
-patches posted to the list over the past weeks. 
-
-The first patch is included for reference *only*. It implements emulation of
-the SHA1 instructions in the kernel. (You need this patch to test the code if
-your emulator or hardware has no support for Crypto Extensions)
-
-Ard Biesheuvel (2):
-  arm64: add kernel emulation for AES and SHA1 instructions
-  arm64: Add support for SHA1 using ARMv8 Crypto Extensions
-
- arch/arm64/Makefile              |   1 +
- arch/arm64/crypto/Makefile       |   2 +
- arch/arm64/crypto/sha1-ce-core.S | 121 +++++++++++
- arch/arm64/crypto/sha1-ce-glue.c | 149 ++++++++++++++
- arch/arm64/emu/Makefile          |  11 +
- arch/arm64/emu/ce-emu.c          | 430 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/traps.h   |  10 +
- arch/arm64/kernel/entry.S        |   4 +-
- arch/arm64/kernel/traps.c        |  49 +++++
- crypto/Kconfig                   |   6 +
- 10 files changed, 782 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/crypto/sha1-ce-core.S
- create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
- create mode 100644 arch/arm64/emu/Makefile
- create mode 100644 arch/arm64/emu/ce-emu.c
-
--- 
-1.8.3.2
+Regards,
+ Sricharan
