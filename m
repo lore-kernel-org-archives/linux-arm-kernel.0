@@ -1,97 +1,64 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 6 Mar 2014 16:17:13 +0000
-Subject: [PATCH v5 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <201403042328.51361.arnd@arndb.de>
-References: <1393948216-11599-1-git-send-email-Liviu.Dudau@arm.com>
- <1393948216-11599-4-git-send-email-Liviu.Dudau@arm.com>
- <201403042328.51361.arnd@arndb.de>
-Message-ID: <20140306161713.GH6457@e106497-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Mar 2014 16:18:58 +0000
+Subject: [PATCH v2] ARM64: Kernel managed pages are only flushed
+In-Reply-To: <5317832E.9020809@codeaurora.org>
+References: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
+ <20140305161255.GG29309@mudshark.cambridge.arm.com>
+ <06b7685849ef4682878556ea1ea8f9d6@BN1PR03MB266.namprd03.prod.outlook.com>
+ <5317832E.9020809@codeaurora.org>
+Message-ID: <20140306161857.GK5202@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 10:28:51PM +0000, Arnd Bergmann wrote:
-> On Tuesday 04 March 2014, Liviu Dudau wrote:
+Hi Laura,
+
+On Wed, Mar 05, 2014 at 08:03:58PM +0000, Laura Abbott wrote:
+> On 3/5/2014 8:27 AM, Bharat.Bhushan at freescale.com wrote:
+> >> On Wed, Mar 05, 2014 at 11:25:16AM +0000, Bharat Bhushan wrote:
+> >>> Kernel can only access pages which maps to managed memory.
+> >>> So flush only valid kernel pages.
+> >>>
+> >> How do you get into this function without a valid, userspace, executable pte?
+> >>
+> >> I suspect you've got changes elsewhere and are calling this function in a
+> >> context where it's not supposed to be called.
+> >
+> > Below I will describe the context in which this function is called:
+> >
+> > When we direct assign a bus device (we have a different freescale specific bus
+>  > device but we can take PCI device for discussion as this logic 
+> applies equally
+>  > for PCI device I think) to user space using VFIO. Then userspace needs to
+>  > mmap(PCI_BARx_offset: this PCI bar offset in not a kernel visible 
+> memory).
+> > Then VFIO-kernel mmap() ioctl code calls remap_pfn_range()  for mapping the
+>  >requested address. While remap_pfn_range() internally calls this function.
+> >
 > 
-> > +extern int isa_dma_bridge_buggy;
+> As someone who likes calling functions in context where they aren't 
+> supposed to be called, I took a look a this because I was curious.
+
+Somebody should hide your keyboard. Stephen?
+
+> I can confirm the same problem trying to mmap arbitrary io address space 
+> with remap_pfn_range. We should only be hitting this if the pte is 
+> marked as exec per set_pte_at. With my test case, even mmaping with only 
+> PROT_READ and PROT_WRITE was setting PROT_EXEC as well which was 
+> triggering the bug. This seems to be because READ_IMPLIES_EXEC 
+> personality was set which was derived from
 > 
-> As commented before, I still think we can hardcode this to off
-
-Unfortunately that doesn't work when you have CONFIG_PCI=y. drivers/pci/pci.c has:
-
-drivers/pci/pci.c:int isa_dma_bridge_buggy;
-drivers/pci/pci.c:EXPORT_SYMBOL(isa_dma_bridge_buggy);
-
-and drivers/pci/quirks.c does:
-
-drivers/pci/quirks.c:   if (!isa_dma_bridge_buggy) {
-drivers/pci/quirks.c:           isa_dma_bridge_buggy=1;
-drivers/pci/quirks.c-           dev_info(&dev->dev, "Activating ISA DMA hang workarounds\n");
-drivers/pci/quirks.c-   }
-
-
+> #define elf_read_implies_exec(ex,stk)   (stk != EXSTACK_DISABLE_X)
 > 
-> > +unsigned long pci_address_to_pio(phys_addr_t address)
-> > +{
-> > +	struct ioresource *res;
-> > +
-> > +	list_for_each_entry(res, &io_list, list) {
-> > +		if (address >= res->start &&
-> > +			address < res->start + res->size) {
-> > +			return res->start - address;
-> > +		}
-> > +	}
-> > +
-> > +	return (unsigned long)-1;
-> > +}
-> > +EXPORT_SYMBOL_GPL(pci_address_to_pio);
+> and none of the binaries I'm generating seem to be setting the stack 
+> execute bit either way (all are EXECSTACK_DEFAULT).
 > 
-> This has two problems:
-> 
-> - You return the address in bus space not the logical Linux
->   port number as powerpc and microblaze do.
-> - You imply that the window starts at bus address zero, which
->   might not be the case.
+> It's not obvious what the best solution is here.
 
-That's definitely not the intention here. I want to return the
-logical port number and I want that port number to start from
-zero for every registered IO range. 
+It would be nice if something like phys_mem_access_prot was used by the
+callers, since this is used by the /dev/mem driver to make sure that the
+pgprot is sane for the underlying pfn. In the absence of that, I guess we
+could add the pfn_valid check (we have it already on arch/arm/) but if that
+means we end up with executable devices, we're still entering a world of
+looks-like-my-instruction-fetcher-just-acked-an-irq style pain.
 
-> 
-> > +EXPORT_SYMBOL(pcibios_fixup_bus);
-> 
-> no need for this export.
-
-OK.
-
-> 
-> > +/*
-> > + * We don't have to worry about legacy ISA devices, so nothing to do here
-> > + */
-> > +resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> > +				resource_size_t size, resource_size_t align)
-> > +{
-> > +	return ALIGN(res->start, align);
-> > +}
-> > +EXPORT_SYMBOL(pcibios_align_resource);
-> 
-> or this one. Also, the ALIGN() is already done by the PCI core.
-
-This has been fix in v6 already.
-
-Thanks for reviewing this!
-
-Liviu
-
-> 
-> 	Arnd
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Will
