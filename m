@@ -1,138 +1,113 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 06 Mar 2014 17:20:11 +0100
-Subject: [PATCH v6 02/10] Documentation: dt: Add binding documentation for
- S5C73M3 camera
+Date: Thu, 06 Mar 2014 17:20:12 +0100
+Subject: [PATCH v6 03/10] Documentation: devicetree: Update Samsung FIMC DT
+ binding
 In-Reply-To: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
 References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1394122819-9582-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1394122819-9582-4-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds DT binding documentation for Samsung S5C73M3 camera sensor
-with an embedded ISP.
+This patch documents following updates of the Exynos4 SoC camera subsystem
+devicetree binding:
+
+ - addition of #clock-cells property to 'camera' node - the #clock-cells
+   property is needed when the sensor sub-devices use clock provided by
+   the camera host interface,
+ - addition of an optional clock-output-names property,
+ - change of the clock-frequency at image sensor node from mandatory to
+   an optional property - the sensor devices can now control their clock
+   themselves and there should be no need to require this property by the
+   camera host device binding, a default frequency value can often be used.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
 Changes since v5:
  - none.
 
 Changes since v4:
- - added missing unit-address at the example SPI device node;
-
-Changes since v3:
- - DT binding documentation separated into this patch;
-
-Changes since v2:
- - rephrased 'clocks' and 'clock-names' properties' description;
+ - dropped a requirement of specific order of values in clocks/
+   clock-names properties (Mark) and reference to clock-names in
+   clock-output-names property description (Mark).
 ---
- .../devicetree/bindings/media/samsung-s5c73m3.txt  |   97 ++++++++++++++++++++
- 1 file changed, 97 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
+ .../devicetree/bindings/media/samsung-fimc.txt     |   34 +++++++++++++++-----
+ 1 file changed, 26 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt b/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
-new file mode 100644
-index 0000000..2c85c45
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
-@@ -0,0 +1,97 @@
-+Samsung S5C73M3 8Mp camera ISP
-+------------------------------
-+
-+The S5C73M3 camera ISP supports MIPI CSI-2 and parallel (ITU-R BT.656) video
-+data busses. The I2C bus is the main control bus and additionally the SPI bus
-+is used, mostly for transferring the firmware to and from the device. Two
-+slave device nodes corresponding to these control bus interfaces are required
-+and should be placed under respective bus controller nodes.
-+
-+I2C slave device node
-+---------------------
-+
-+Required properties:
-+
-+- compatible	    : "samsung,s5c73m3";
-+- reg		    : I2C slave address of the sensor;
-+- vdd-int-supply    : digital power supply (1.2V);
-+- vdda-supply	    : analog power supply (1.2V);
-+- vdd-reg-supply    : regulator input power supply (2.8V);
-+- vddio-host-supply : host I/O power supply (1.8V to 2.8V);
-+- vddio-cis-supply  : CIS I/O power supply (1.2V to 1.8V);
-+- vdd-af-supply     : lens power supply (2.8V);
-+- xshutdown-gpios   : specifier of GPIO connected to the XSHUTDOWN pin;
-+- standby-gpios     : specifier of GPIO connected to the STANDBY pin;
-+- clocks	    : should contain list of phandle and clock specifier pairs
-+		      according to common clock bindings for the clocks described
-+		      in the clock-names property;
-+- clock-names	    : should contain "cis_extclk" entry for the CIS_EXTCLK clock;
-+
+diff --git a/Documentation/devicetree/bindings/media/samsung-fimc.txt b/Documentation/devicetree/bindings/media/samsung-fimc.txt
+index 96312f6..dbd4020 100644
+--- a/Documentation/devicetree/bindings/media/samsung-fimc.txt
++++ b/Documentation/devicetree/bindings/media/samsung-fimc.txt
+@@ -32,6 +32,21 @@ way around.
+ 
+ The 'camera' node must include at least one 'fimc' child node.
+ 
 +Optional properties:
 +
-+- clock-frequency   : the frequency at which the "cis_extclk" clock should be
-+		      configured to operate, in Hz; if this property is not
-+		      specified default 24 MHz value will be used.
++- #clock-cells: from the common clock bindings (../clock/clock-bindings.txt),
++  must be 1. A clock provider is associated with the 'camera' node and it should
++  be referenced by external sensors that use clocks provided by the SoC on
++  CAM_*_CLKOUT pins. The clock specifier cell stores an index of a clock.
++  The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks respectively.
 +
-+The common video interfaces bindings (see video-interfaces.txt) should be used
-+to specify link from the S5C73M3 to an external image data receiver. The S5C73M3
-+device node should contain one 'port' child node with an 'endpoint' subnode for
-+this purpose. The data link from a raw image sensor to the S5C73M3 can be
-+similarly specified, but it is optional since the S5C73M3 ISP and a raw image
-+sensor are usually inseparable and form a hybrid module.
++- clock-output-names: from the common clock bindings, should contain names of
++  clocks registered by the camera subsystem corresponding to CAM_A_CLKOUT,
++  CAM_B_CLKOUT output clocks respectively.
 +
-+Following properties are valid for the endpoint node(s):
++Note: #clock-cells and clock-output-names are mandatory properties if external
++image sensor devices reference 'camera' device node as a clock provider.
 +
-+endpoint subnode
-+----------------
-+
-+- data-lanes : (optional) specifies MIPI CSI-2 data lanes as covered in
-+  video-interfaces.txt. This sensor doesn't support data lane remapping
-+  and physical lane indexes in subsequent elements of the array should
-+  be only consecutive ascending values.
-+
-+SPI device node
-+---------------
-+
-+Required properties:
-+
-+- compatible	    : "samsung,s5c73m3";
-+
-+For more details see description of the SPI busses bindings
-+(../spi/spi-bus.txt) and bindings of a specific bus controller.
-+
-+Example:
-+
-+i2c at 138A000000 {
-+	...
-+	s5c73m3 at 3c {
-+		compatible = "samsung,s5c73m3";
-+		reg = <0x3c>;
-+		vdd-int-supply = <&buck9_reg>;
-+		vdda-supply = <&ldo17_reg>;
-+		vdd-reg-supply = <&cam_io_reg>;
-+		vddio-host-supply = <&ldo18_reg>;
-+		vddio-cis-supply = <&ldo9_reg>;
-+		vdd-af-supply = <&cam_af_reg>;
-+		clock-frequency = <24000000>;
-+		clocks = <&clk 0>;
-+		clock-names = "cis_extclk";
-+		reset-gpios = <&gpf1 3 1>;
-+		standby-gpios = <&gpm0 1 1>;
-+		port {
-+			s5c73m3_ep: endpoint {
-+				remote-endpoint = <&csis0_ep>;
-+				data-lanes = <1 2 3 4>;
-+			};
-+		};
-+	};
-+};
-+
-+spi at 1392000 {
-+	...
-+	s5c73m3_spi: s5c73m3 at 0 {
-+		compatible = "samsung,s5c73m3";
-+		reg = <0>;
-+		...
-+	};
-+};
+ 'fimc' device nodes
+ -------------------
+ 
+@@ -97,8 +112,8 @@ Image sensor nodes
+ The sensor device nodes should be added to their control bus controller (e.g.
+ I2C0) nodes and linked to a port node in the csis or the parallel-ports node,
+ using the common video interfaces bindings, defined in video-interfaces.txt.
+-The implementation of this bindings requires clock-frequency property to be
+-present in the sensor device nodes.
++An optional clock-frequency property needs to be present in the sensor device
++nodes. Default value when this property is not present is 24 MHz.
+ 
+ Example:
+ 
+@@ -114,7 +129,7 @@ Example:
+ 			vddio-supply = <...>;
+ 
+ 			clock-frequency = <24000000>;
+-			clocks = <...>;
++			clocks = <&camera 1>;
+ 			clock-names = "mclk";
+ 
+ 			port {
+@@ -135,7 +150,7 @@ Example:
+ 			vddio-supply = <...>;
+ 
+ 			clock-frequency = <24000000>;
+-			clocks = <...>;
++			clocks = <&camera 0>;
+ 			clock-names = "mclk";
+ 
+ 			port {
+@@ -149,12 +164,15 @@ Example:
+ 
+ 	camera {
+ 		compatible = "samsung,fimc", "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		status = "okay";
+-
++		clocks = <&clock 132>, <&clock 133>;
++		clock-names = "sclk_cam0", "sclk_cam1";
++		#clock-cells = <1>;
++		clock-output-names = "cam_mclk_a", "cam_mclk_b";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&cam_port_a_clk_active>;
++		status = "okay";
++		#address-cells = <1>;
++		#size-cells = <1>;
+ 
+ 		/* parallel camera ports */
+ 		parallel-ports {
 -- 
 1.7.9.5
