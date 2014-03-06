@@ -1,43 +1,61 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu,  6 Mar 2014 12:32:24 +0100
-Subject: [PATCH V2 04/12] ARM: shmobile: r7s72100: genmai: populate nodes for
- external clocks
+Date: Thu,  6 Mar 2014 12:32:25 +0100
+Subject: [PATCH V2 05/12] ARM: shmobile: r7s72100: use workaround for non
+ DT-clocks
 In-Reply-To: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
 References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1394105552-9744-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <1394105552-9744-6-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
+SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
+workaround via clkdev for now.
+
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
 
-Changes since V1:
+No changes since V1.
 
-* activate usb_x1, too
+ arch/arm/mach-shmobile/board-genmai-reference.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
- arch/arm/boot/dts/r7s72100-genmai-reference.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-index e664611a47c8..941e72ce7c82 100644
---- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-@@ -30,6 +30,14 @@
- 	};
- };
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index 7630c1053e32..91dcdd0e026d 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -18,18 +18,29 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
  
-+&extal_clk {
-+	clock-frequency = <13330000>;
+-#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++#ifdef CONFIG_COMMON_CLK
++/*
++ * This is a really crude hack to provide clkdev support to platform
++ * devices until they get moved to DT.
++ */
++static const struct clk_name clk_names[] = {
++	{ "mtu2", NULL, "sh_mtu2.0" },
++	{ "scif2", NULL, "sh-sci.2" },
 +};
++#endif
 +
-+&usb_x1_clk {
-+	clock-frequency = <48000000>;
-+};
-+
- &i2c2 {
- 	status = "okay";
- 	clock-frequency = <400000>;
+ static void __init genmai_add_standard_devices(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+-	of_clk_init(NULL);
++	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
+ #else
+ 	r7s72100_clock_init();
+ #endif
 -- 
 1.9.0
