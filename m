@@ -1,62 +1,50 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 6 Mar 2014 10:03:39 +0530
-Subject: [RESEND Patch 0/9] dts pending patches for TI omap
-In-Reply-To: <20140305195053.GG7599@atomide.com>
-References: <1393858226-32595-1-git-send-email-mugunthanvnm@ti.com>
- <20140305195053.GG7599@atomide.com>
-Message-ID: <5317FAA3.9020409@ti.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 6 Mar 2014 04:36:14 +0000
+Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201403060339.45611.marex@denx.de>
+References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
+ <1394002352-8380-2-git-send-email-yao.yuan@freescale.com>
+ <201403060339.45611.marex@denx.de>
+Message-ID: <1c0c5f2ce69849d4bf482601ac431da6@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 March 2014 01:20 AM, Tony Lindgren wrote:
-> * Mugunthan V N <mugunthanvnm@ti.com> [140303 06:53]:
->> Benoit/Tony
->>
->> Here I am send all the pending dt patches that can go into 3.15 merge window,
->> all the patches were already posted to mailing list and has beed reviewed.
->>
->> I have rebased the patches on top of
->> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.15/dt
->> and fixed all the merge conflicts.
->>
->> Pasting the mail archive for the patches series
->>
->> * Add ABB device nodes
->> http://linux-kernel.2935.n7.nabble.com/PATCH-0-4-ARM-dts-OMAP3630-Add-ABB-device-nodes-td794852.html
->>
->> * MMC hot plug support
->> http://mail.blameitonlove.com/lists/linux-omap/msg101933.html
->> Dropped [PATCH 2/3] ARM: dts: am335x-evmsk: add SD card hotplug support as this
->> is already merged with commit id 29ea5efb0bb612d352aa360de26e2095cb230e4a
->>
->> * DRA7 Cross bar DTS patches
->> Cross bar driver has been pulled for next merge, so the dts patches can also
->> be pulled for next merge window.
->>
->> Here is the pull request for the same patch series.
->>
->> The following changes since commit f777ba1780584b100ab9664cc06d04f3bb273a84:
->>
->>   Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
->>
->> are available in the git repository at:
->>
->>
->>   git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git omapdt-for-3.15
->>
->> for you to fetch changes up to 5f78b45aa45c5b2c4de895c3b0740fda4684dae4:
->>
->>   ARM: DTS: DRA7: Add routable-irqs property for gic node (2014-03-03 19:53:25 +0530)
+On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
+> On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
+> > Add dma support for i2c. This function depend on DMA driver.
+> > You can turn on it by write both the dmas and dma-name properties in
+> > dts node.
+> >
+> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > ---
 > 
-> Thanks applying all except for the crossbar ones into
-> omap-for-v3.15/dt.
+> [...]
 > 
-> Please resend the last three patches once the dependencies
-> are merged to mainline kernel as otherwise the interrupt
-> nubers are all wrong without the crossbar driver related
-> code.
- 
-   Ok, i will resend when the dependencies are merged
+> > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct platform_device
+> *pdev)
+> >  	void __iomem *base;
+> >  	int irq, ret;
+> >  	u32 bitrate;
+> > +	u32 phy_addr;
+> >
+> >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+> >
+> > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct platform_device
+> *pdev)
+> >  	}
+> >
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	phy_addr = res->start;
+> 
+> Uh ... Shawn, I really think I am lost here. Don't you need to map this
+> memory before you can use it for DMA ? The DMA mapping function should
+> give you the physical address and is the right way to go about this
+> instead of pulling the address from here, no ?
+> 
+> I might be wrong here, I am rather uncertain, so please help me out.
+> Thanks!
 
-Regards,
- Sricharan
+Hi, Marek, Thanks for your suggestion. 
+Here you can review the code in include/linux/ioport.h
+The resource->start describes the entity on the CPU bus as a starting physical address.
+So I thinks it can used for dma directly.
