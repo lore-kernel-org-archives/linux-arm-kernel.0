@@ -1,36 +1,40 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 6 Mar 2014 16:23:00 +0200
-Subject: [PATCH v2 08/13] phy: ti-pipe3: Fix suspend/resume and module reload
+Date: Thu, 6 Mar 2014 16:23:01 +0200
+Subject: [PATCH v2 09/13] phy: omap: Depend on OMAP_OCP2SCP bus driver
 In-Reply-To: <1394115785-28301-1-git-send-email-rogerq@ti.com>
 References: <1394115785-28301-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394115785-28301-9-git-send-email-rogerq@ti.com>
+Message-ID: <1394115785-28301-10-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to Errata i783, SATA breaks if its DPLL is idled. The recommeded
-workaround to issue a softreset to the SATA controller doesn't seem to
-work. Here we just prevent SATA DPLL from Idling and hence avoid
-the issue altogether.
+The OMAP_USB2 and OMAP_PIPE3 PHY devices will not be
+detected if the OMAP_OCP2SCP bus driver is not present.
+Make them depend on it.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/phy/phy-ti-pipe3.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/phy/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index 12cc900..5913676 100644
---- a/drivers/phy/phy-ti-pipe3.c
-+++ b/drivers/phy/phy-ti-pipe3.c
-@@ -238,6 +238,10 @@ static int ti_pipe3_exit(struct phy *x)
- 	u32 val;
- 	unsigned long timeout;
- 
-+	/* SATA DPLL can't be powered down due to Errata i783 */
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata"))
-+		return 0;
-+
- 	/* Put DPLL in IDLE mode */
- 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
- 	val |= PLL_IDLE;
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index fe8c009..2aead8b 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -47,6 +47,7 @@ config OMAP_USB2
+ 	depends on USB_PHY
+ 	select GENERIC_PHY
+ 	select OMAP_CONTROL_PHY
++	depends on OMAP_OCP2SCP
+ 	help
+ 	  Enable this to support the transceiver that is part of SOC. This
+ 	  driver takes care of all the PHY functionality apart from comparator.
+@@ -58,6 +59,7 @@ config TI_PIPE3
+ 	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+ 	select GENERIC_PHY
+ 	select OMAP_CONTROL_PHY
++	depends on OMAP_OCP2SCP
+ 	help
+ 	  Enable this to support the PIPE3 PHY that is part of TI SOCs. This
+ 	  driver takes care of all the PHY functionality apart from comparator.
 -- 
 1.8.3.2
