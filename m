@@ -1,44 +1,64 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 06 Mar 2014 12:05:50 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/7] mfd: AXP20x: Add support for AXP202
- and AXP209
-In-Reply-To: <CAOQ7t2aVchEe0Mtbp8KV4ZTzE_0C0BeO15S7aF4nJx6PaBno=w@mail.gmail.com>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>	<53121151.9050804@redhat.com>	<CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>	<53123507.6020607@redhat.com>	<531782DF.6090209@redhat.com>	<CAOQ7t2bx1u73kxQVa3AeQ-hZ9nP3GSukEdXk-jRNwbT0vUH4+A@mail.gmail.com>	<531848E5.4050704@redhat.com>
- <CAOQ7t2aVchEe0Mtbp8KV4ZTzE_0C0BeO15S7aF4nJx6PaBno=w@mail.gmail.com>
-Message-ID: <5318568E.4040405@redhat.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Thu,  6 Mar 2014 16:48:35 +0530
+Subject: [PATCH v4 0/2] Add Xilinx AXI Video DMA Engine driver
+Message-ID: <1394104717-3100-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 03/06/2014 11:10 AM, Carlo Caione wrote:
-> On Thu, Mar 6, 2014 at 11:07 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 03/05/2014 09:46 PM, Carlo Caione wrote:
->>> On Wed, Mar 5, 2014 at 9:02 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>
->>>> So I've added your patches to my sunxi-devel tree and they work as advertised :)
->>>
->>> Thank you for keeping the tree updated :)
->>>
->>>> I've also added dt support for the axp209 to the cubietruck dts file, to avoid
->>>> things becoming a copy and paste fest I've introduced a new axp209.dtsi file,
->>>> as well as did some fixes to the existing sun?i-a*.dtsi files, see my tree here:
->>>> https://github.com/jwrdegoede/linux-sunxi/commits/sunxi-devel
->>>
->>> That was also my idea (creating a new axp20x.dtsi) but it has been
->>> turned down by Maxime and Lee
->>
->> Hmm, do you have a pointer to the mailinglist discussion about this ?
-> 
-> Sure, http://www.spinics.net/lists/arm-kernel/msg306497.html
+This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+It is a soft IP core, which provides high-bandwidth direct memory
+access between memory and AXI4-Stream video type target peripherals
+including peripherals which support AXI4-Stream Video Protocol. The
+core provides efficient two dimensional DMA operations with independent
+asynchronous read and write channel operation.
 
-Ah, yes but that is before you added all the regulators, which are a fixed part
-of the chip. Once you get long dts bits like that having a dtsi file makes a lot
-of sense IMHO. Note that the part of the dts this was discussing is actually the part
-I did not put in the dtis, since it can vary per board :)
+For more information on the IP, please refer to
+http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
+
+This patch also provides a test client, which assumes read and write channels
+of the core are configured in a back-to-back connection.  It transfers
+data on the write channel, read and verify the data on the read channel.
+
+Use cases:
+++++++++++
+1. Xilinx Video Targeted Reference design
+   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
+2. Common Display Framework
+   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
 
 Regards,
+Srikanth
 
-Hans
+Changes in v4:
+- Rebased on v3.14.0-rc5
+- Reverted the changes that were done for the earlier patch series,
+  1/3 - 'Support multiple interleaved frames with non-contiguous memory' as
+  suggested by Jaswinder, Thanks.
+
+Changes in v3:
+- Created a separate patch for the DT binding documentation as suggested by
+  Vinod, Thanks.
+- Added support for interleaved frames with non-contiguous memory as suggested
+  by Lars, Thanks.
+- Rebased on v3.14.0-rc2
+
+Srikanth Thokala (2):
+  dma: Add Xilinx Video DMA DT Binding Documentation
+  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
+
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++
+ drivers/dma/Kconfig                                |   14 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xilinx/Makefile                        |    1 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1390 ++++++++++++++++++++
+ include/linux/amba/xilinx_dma.h                    |   47 +
+ 6 files changed, 1528 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+ create mode 100644 drivers/dma/xilinx/Makefile
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
+ create mode 100644 include/linux/amba/xilinx_dma.h
+
+-- 
+1.7.4
