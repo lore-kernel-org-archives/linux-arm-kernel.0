@@ -1,98 +1,44 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu,  6 Mar 2014 11:34:43 +0530
-Subject: [PATCH 1/2] dt-bindings: clock: Move at91.h to dt-bindigs/clock
-In-Reply-To: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
-References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1394085884-13081-2-git-send-email-tushar.behera@linaro.org>
+From: mporter@linaro.org (Matt Porter)
+Date: Thu, 6 Mar 2014 01:20:40 -0500
+Subject: [GIT PULL] ARM: mach-bcm soc updates for 3.15
+Message-ID: <20140306062040.GA29526@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the clock related dt-binding header files are located in
-dt-bindings/clock folder. It would be good to keep all the similar
-header files at a single location.
+The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-CC: Rob Landley <rob@landley.net>
-CC: Andrew Victor <linux@maxim.org.za>
-CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
----
- .../devicetree/bindings/clock/at91-clock.txt       |    2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |    2 +-
- arch/arm/boot/dts/sama5d3_mci2.dtsi                |    2 +-
- arch/arm/boot/dts/sama5d3_tcb1.dtsi                |    2 +-
- arch/arm/boot/dts/sama5d3_uart.dtsi                |    2 +-
- include/dt-bindings/{clk => clock}/at91.h          |    0
- 6 files changed, 5 insertions(+), 5 deletions(-)
- rename include/dt-bindings/{clk => clock}/at91.h (100%)
+  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
 
-diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
-index cd5e239..6794cdc 100644
---- a/Documentation/devicetree/bindings/clock/at91-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
-@@ -62,7 +62,7 @@ Required properties for PMC node:
- - interrupt-controller : tell that the PMC is an interrupt controller.
- - #interrupt-cells : must be set to 1. The first cell encodes the interrupt id,
- 	and reflect the bit position in the PMC_ER/DR/SR registers.
--	You can use the dt macros defined in dt-bindings/clk/at91.h.
-+	You can use the dt macros defined in dt-bindings/clock/at91.h.
- 	0 (AT91_PMC_MOSCS) -> main oscillator ready
- 	1 (AT91_PMC_LOCKA) -> PLL A ready
- 	2 (AT91_PMC_LOCKB) -> PLL B ready
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 3d5faf8..8c977b5 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -13,7 +13,7 @@
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/clk/at91.h>
-+#include <dt-bindings/clock/at91.h>
- 
- / {
- 	model = "Atmel SAMA5D3 family SoC";
-diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-index b029fe7..1b02208 100644
---- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-@@ -9,7 +9,7 @@
- 
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
--#include <dt-bindings/clk/at91.h>
-+#include <dt-bindings/clock/at91.h>
- 
- / {
- 	ahb {
-diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-index 382b044..0284845 100644
---- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-@@ -9,7 +9,7 @@
- 
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
--#include <dt-bindings/clk/at91.h>
-+#include <dt-bindings/clock/at91.h>
- 
- / {
- 	aliases {
-diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
-index a9fa75e..7a8d4c6 100644
---- a/arch/arm/boot/dts/sama5d3_uart.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
-@@ -9,7 +9,7 @@
- 
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
--#include <dt-bindings/clk/at91.h>
-+#include <dt-bindings/clock/at91.h>
- 
- / {
- 	aliases {
-diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clock/at91.h
-similarity index 100%
-rename from include/dt-bindings/clk/at91.h
-rename to include/dt-bindings/clock/at91.h
--- 
-1.7.9.5
+are available in the git repository at:
+
+  git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/soc-2
+
+for you to fetch changes up to fdf4850cb5b2e5e549a18b8b41abb001bfb19e9c:
+
+  ARM: BCM5301X: workaround suppress fault (2014-03-06 00:36:04 -0500)
+
+----------------------------------------------------------------
+ARM: mach-bcm soc updates for 3.15
+
+- add BCM5301x support
+- remove GENERIC_TIME
+
+----------------------------------------------------------------
+Hauke Mehrtens (3):
+      ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM CPU
+      ARM: BCM5301X: add early debugging support
+      ARM: BCM5301X: workaround suppress fault
+
+Richard Weinberger (1):
+      ARM: mach-bcm: Remove GENERIC_TIME
+
+ Documentation/devicetree/bindings/arm/bcm4708.txt |  8 +++
+ MAINTAINERS                                       |  8 +++
+ arch/arm/Kconfig.debug                            |  7 +++
+ arch/arm/configs/multi_v7_defconfig               |  1 +
+ arch/arm/mach-bcm/Kconfig                         | 27 +++++++++-
+ arch/arm/mach-bcm/Makefile                        |  1 +
+ arch/arm/mach-bcm/bcm_5301x.c                     | 61 +++++++++++++++++++++++
+ 7 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
+ create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
