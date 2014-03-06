@@ -1,238 +1,162 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 06 Mar 2014 13:12:52 +0100
-Subject: [PATCH V2 01/12] clk: shmobile: add CPG driver for rz-platforms
-In-Reply-To: <1394105552-9744-2-git-send-email-wsa@the-dreams.de>
-References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
- <1394105552-9744-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <1434755.d9svPEINg5@avalon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  6 Mar 2014 13:11:08 +0100
+Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
+Message-ID: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+The Armada 385 RD board is the reference design board from Marvell
+for the Armada 385 SoC. This commit adds a Device Tree description for
+this board, which enables the following features:
 
-Thank you for the patch.
+ * Network interfaces
+ * I2C bus
+ * Serial port
+ * SPI bus, with a SPI flash
+ * PCIe interface
 
-On Thursday 06 March 2014 12:32:21 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
-> 
-> Changes since V1:
-> * added docs
-> * preparation for usb_x1 support by documenting two input clocks
-> * static-consted frqcr_tab
-> * bail out if num_clks == 0
-> * cosmetic fixes
-> 
-> Mike: if you are fine with this driver, it would be good if you could apply
-> it. Then, we can deal with the orthogonal dependencies in mach-shmobile
-> seperately and know that the driver is already in place when the rest gets
-> resolved. Thanks!
-> 
->  .../bindings/clock/renesas,rz-cpg-clocks.txt       |  29 ++++++
->  drivers/clk/shmobile/Makefile                      |   1 +
->  drivers/clk/shmobile/clk-rz.c                      | 113 ++++++++++++++++++
->  3 files changed, 143 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt create
-> mode 100644 drivers/clk/shmobile/clk-rz.c
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-> b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt new
-> file mode 100644
-> index 000000000000..c8e8821f08f6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-> @@ -0,0 +1,29 @@
-> +* Renesas RZ Clock Pulse Generator (CPG)
-> +
-> +The CPG generates core clocks for the RZ SoCs. It includes the PLL,
-> variable +CPU and GPU clocks, and several fixed ratio dividers.
-> +
-> +Required Properties:
-> +
-> +  - compatible: Must be one of
-> +    - "renesas,r7s72100-cpg-clocks" for the r7s72100 CPG
-> +    - "renesas,rz-cpg-clocks" for the generic RZ CPG
-> +  - reg: Base address and length of the memory resource used by the CPG
-> +  - clocks: References to possible parent clocks. Order must match clock
-> modes
-> +    in the datasheet.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi,
 
-I believe the order should be documented explicitly instead of referring to 
-the datasheet.
+I have received this board only recently, so that why its device tree
+comes only now. This patch should not cause any trouble to other part
+of the kernel, so that's why I think it is reasonable to have it in
+3.15.
 
-> +  - #clock-cells: Must be 1
-> +  - clock-output-names: The names of the clocks. Supported clocks are
-> "pll",
-> +    "i", and "g"
-> +
-> +
-> +Example
-> +-------
-> +
-> +	cpg_clocks: cpg_clocks at fcfe0000 {
-> +		#clock-cells = <1>;
-> +		compatible = "renesas,r7s72100-cpg-clocks",
-> +			     "renesas,rz-cpg-clocks";
-> +		reg = <0xfcfe0000 0x18>;
-> +		clocks = <&extal_clk>, <&usb_x1_clk>;
-> +		clock-output-names = "pll", "i", "g";
-> +	};
-> diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-> index 9ecef140dba7..5404cb931ebf 100644
-> --- a/drivers/clk/shmobile/Makefile
-> +++ b/drivers/clk/shmobile/Makefile
-> @@ -1,4 +1,5 @@
->  obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
-> +obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
->  obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
->  obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
->  obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
-> diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
-> new file mode 100644
-> index 000000000000..2901db3ac5d3
-> --- /dev/null
-> +++ b/drivers/clk/shmobile/clk-rz.c
-> @@ -0,0 +1,113 @@
-> +/*
-> + * rz Core CPG Clocks
-> + *
-> + * Copyright (C) 2013 Ideas On Board SPRL
-> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering
-> <wsa@sang-engineering.com> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +struct rz_cpg {
-> +	struct clk_onecell_data data;
-> +	void __iomem *reg;
-> +};
-> +
-> +#define CPG_FRQCR	0x10
-> +#define CPG_FRQCR2	0x14
-> +
-> +/*
-> ---------------------------------------------------------------------------
-> -- + * Initialization
-> + */
-> +
-> +static struct clk * __init
-> +rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const
-> char *name)
-> +{
-> +	u32 val;
-> +	unsigned mult;
-> +	static const unsigned frqcr_tab[4] = { 3, 2, 0, 1 };
-> +
-> +	if (strcmp(name, "pll") == 0) {
-> +		/* FIXME: cpg_mode should be read from GPIO. But no GPIO support yet
-> */
-> +		unsigned cpg_mode = 0; /* hardcoded to EXTAL for now */
-> +		const char *parent_name = of_clk_get_parent_name(np, cpg_mode);
-> +
-> +		mult = cpg_mode ? (32 / 4) : 30;
-> +
-> +		return clk_register_fixed_factor(NULL, name, parent_name, 0, mult,
-> 1);
-> +	}
-> +
-> +	/* FIXME:"i" and "g" are variable clocks with non-integer dividers (e.g.
-> 2/3)
-> +	 * and the constraint that always g <= i. To get the rz platform started,
-> +	 * let them run at fixed current speed and implement the details later.
-> +	 */
-> +	if (strcmp(name, "i") == 0)
-> +		val = (clk_readl(cpg->reg + CPG_FRQCR) >> 8) & 3;
-> +	else if (strcmp(name, "g") == 0)
-> +		val = clk_readl(cpg->reg + CPG_FRQCR2) & 3;
-> +	else
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	mult = frqcr_tab[val];
-> +	return clk_register_fixed_factor(NULL, name, "pll", 0, mult, 3);
-> +}
-> +
-> +static void __init rz_cpg_clocks_init(struct device_node *np)
-> +{
-> +	struct rz_cpg *cpg;
-> +	struct clk **clks;
-> +	unsigned i;
-> +	int num_clks;
-> +
-> +	num_clks = of_property_count_strings(np, "clock-output-names");
-> +	if (WARN(num_clks <= 0, "can't count CPG clocks\n"))
-> +		goto out;
+Thanks,
 
-You can return directly instead of goto out.
+Gregory
 
-> +
-> +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-> +	if (WARN(!cpg, "out of memory!\n"))
 
-kmalloc() warns already when it can't allocate memory, so you can remove the 
-warning here.
+ arch/arm/boot/dts/Makefile          |   3 +-
+ arch/arm/boot/dts/armada-385-rd.dts | 104 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 106 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armada-385-rd.dts
 
-> +		goto out;
-
-You can return directly here too.
-
-> +
-> +	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
-> +	if (WARN(!clks, "out of memory!\n"))
-
-You can remove this warning too.
-
-> +		goto free_cpg;
-> +
-> +	cpg->data.clks = clks;
-> +	cpg->data.clk_num = num_clks;
-> +
-> +	cpg->reg = of_iomap(np, 0);
-> +	if (WARN(!cpg->reg, "can't remap CPG registers!\n"))
-> +		goto free_clks;
-> +
-> +	for (i = 0; i < num_clks; ++i) {
-> +		const char *name;
-> +		struct clk *clk;
-> +
-> +		of_property_read_string_index(np, "clock-output-names", i, &name);
-> +
-> +		clk = rz_cpg_register_clock(np, cpg, name);
-> +		if (IS_ERR(clk))
-> +			pr_err("%s: failed to register %s %s clock (%ld)\n",
-> +			       __func__, np->name, name, PTR_ERR(clk));
-> +		else
-> +			cpg->data.clks[i] = clk;
-> +	}
-> +
-> +	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
-> +	return;
-> +
-> +free_clks:
-> +	kfree(clks);
-> +free_cpg:
-> +	kfree(cpg);
-> +out:
-> +	return;
-
-No need for an explicit return.
-
-> +}
-> +CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f7d678808122..9155cf48e1b1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -153,7 +153,8 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
+ dtb-$(CONFIG_MACH_ARMADA_375) += \
+ 	armada-375-db.dtb
+ dtb-$(CONFIG_MACH_ARMADA_38X) += \
+-	armada-385-db.dtb
++	armada-385-db.dtb \
++	armada-385-rd.dtb
+ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+ 	armada-xp-axpwifiap.dtb \
+ 	armada-xp-db.dtb \
+diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+new file mode 100644
+index 000000000000..951bd91059e1
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-385-rd.dts
+@@ -0,0 +1,104 @@
++/*
++ * Device Tree file for Marvell Armada 385 Reference Design board
++ * (RD-88F6820-AP)
++ *
++ *  Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "armada-385.dtsi"
++
++/ {
++	model = "Marvell Armada 385 Reference Design";
++	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada38x";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>; /* 256 MB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
++
++		internal-regs {
++			spi at 10600 {
++				status = "okay";
++
++				spi-flash at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "m25p128";
++					reg = <0>; /* Chip select 0 */
++					spi-max-frequency = <108000000>;
++				};
++			};
++
++			i2c at 11000 {
++				status = "okay";
++				clock-frequency = <100000>;
++			};
++
++			serial at 12000 {
++				clock-frequency = <200000000>;
++				status = "okay";
++			};
++
++
++			/*
++			 * The Ethernet nodes are not ordered by
++			 * address on purpose. Indeed the first
++			 * Ethernet port of the board (Giga0) is
++			 * located at 0x70000 whereas the the second
++			 * Ethernet(Giga 1) port is located at
++			 * 0x30000.
++			 */
++
++			ethernet at 70000 {
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "rgmii";
++			};
++
++			ethernet at 30000 {
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "rgmii";
++			};
++
++
++			mdio {
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++
++				phy1: ethernet-phy at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		pcie-controller {
++			status = "okay";
++			/*
++			 * One PCIe units is accessible through
++			 * standard PCIe slot on the board.
++			 */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++		};
++	};
++};
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.2
