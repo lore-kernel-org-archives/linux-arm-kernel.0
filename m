@@ -1,55 +1,111 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu,  6 Mar 2014 20:23:33 +0400
-Subject: [PATCH 2/2] ARM: i.MX: mx21ads: Cleanup board
-In-Reply-To: <1394123013-28562-1-git-send-email-shc_work@mail.ru>
-References: <1394123013-28562-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1394123013-28562-2-git-send-email-shc_work@mail.ru>
+Date: Thu,  6 Mar 2014 20:23:32 +0400
+Subject: [PATCH 1/2] ARM: i.MX: mx21ads: Use fixed voltage regulator for LCD
+ power
+Message-ID: <1394123013-28562-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Remove unused <asm/mach/time.h> inclusion.
-- Use predefined constant for CS8900A base address.
-- Use DEFINE_RES_MEM() macro for NOR flash resource.
+Instead of using init() and exit() hooks from framebuffer driver
+to control power of LCD, introduce fixed voltage regulator for
+this purpose.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/mach-mx21ads.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-imx/mach-mx21ads.c | 45 +++++++++++++++++++++++++---------------
+ 1 file changed, 28 insertions(+), 17 deletions(-)
 
 diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index 0b8e63f..30c30fd 100644
+index 8742594..0b8e63f 100644
 --- a/arch/arm/mach-imx/mach-mx21ads.c
 +++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -23,7 +23,6 @@
- #include <linux/regulator/machine.h>
+@@ -19,6 +19,8 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/basic_mmio_gpio.h>
+ #include <linux/gpio.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
--#include <asm/mach/time.h>
- 
- #include "common.h"
- #include "devices-imx21.h"
-@@ -139,11 +138,8 @@ static struct physmap_flash_data mx21ads_flash_data = {
- 	.width = 4,
+ #include <asm/mach/time.h>
+@@ -191,22 +193,32 @@ static struct platform_device mx21ads_mmgpio = {
+ 	},
  };
  
--static struct resource mx21ads_flash_resource = {
--	.start = MX21_CS0_BASE_ADDR,
--	.end = MX21_CS0_BASE_ADDR + 0x02000000 - 1,
--	.flags = IORESOURCE_MEM,
--};
-+static struct resource mx21ads_flash_resource =
-+	DEFINE_RES_MEM(MX21_CS0_BASE_ADDR, SZ_32M);
+-static int mx21ads_fb_init(struct platform_device *pdev)
+-{
+-	int ret;
++static struct regulator_consumer_supply mx21ads_lcd_regulator_consumer =
++	REGULATOR_SUPPLY("lcd", "imx-fb.0");
  
- static struct platform_device mx21ads_nor_mtd_device = {
- 	.name = "physmap-flash",
-@@ -156,7 +152,7 @@ static struct platform_device mx21ads_nor_mtd_device = {
+-	ret = gpio_request(MX21ADS_IO_LCDON, "fb-lcdon");
+-	if (ret)
+-		return ret;
++static struct regulator_init_data mx21ads_lcd_regulator_init_data = {
++	.constraints = {
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.consumer_supplies	= &mx21ads_lcd_regulator_consumer,
++	.num_consumer_supplies	= 1,
++};
+ 
+-	return gpio_direction_output(MX21ADS_IO_LCDON, 1);
+-}
++static struct fixed_voltage_config mx21ads_lcd_regulator_pdata = {
++	.supply_name	= "LCD",
++	.microvolts	= 3300000,
++	.gpio		= MX21ADS_IO_LCDON,
++	.enable_high	= 1,
++	.init_data	= &mx21ads_lcd_regulator_init_data,
++};
+ 
+-static void mx21ads_fb_exit(struct platform_device *pdev)
+-{
+-	gpio_set_value(MX21ADS_IO_LCDON, 0);
+-	gpio_free(MX21ADS_IO_LCDON);
+-}
++static struct platform_device mx21ads_lcd_regulator = {
++	.name = "reg-fixed-voltage",
++	.id = PLATFORM_DEVID_AUTO,
++	.dev = {
++		.platform_data = &mx21ads_lcd_regulator_pdata,
++	},
++};
+ 
+ /*
+  * Connected is a portrait Sharp-QVGA display
+@@ -239,9 +251,6 @@ static const struct imx_fb_platform_data mx21ads_fb_data __initconst = {
+ 	.pwmr		= 0x00a903ff,
+ 	.lscr1		= 0x00120300,
+ 	.dmacr		= 0x00020008,
+-
+-	.init = mx21ads_fb_init,
+-	.exit = mx21ads_fb_exit,
  };
  
- static struct resource mx21ads_cs8900_resources[] __initdata = {
--	DEFINE_RES_MEM(MX21_CS1_BASE_ADDR, SZ_1K),
-+	DEFINE_RES_MEM(MX21ADS_CS8900A_REG, SZ_1K),
- 	/* irq number is run-time assigned */
- 	DEFINE_RES_IRQ(-1),
+ static int mx21ads_sdhc_get_ro(struct device *dev)
+@@ -283,6 +292,7 @@ mx21ads_nand_board_info __initconst = {
+ 
+ static struct platform_device *platform_devices[] __initdata = {
+ 	&mx21ads_mmgpio,
++	&mx21ads_lcd_regulator,
+ 	&mx21ads_nor_mtd_device,
  };
+ 
+@@ -296,12 +306,13 @@ static void __init mx21ads_board_init(void)
+ 	imx21_add_imx_uart0(&uart_pdata_rts);
+ 	imx21_add_imx_uart2(&uart_pdata_norts);
+ 	imx21_add_imx_uart3(&uart_pdata_rts);
+-	imx21_add_imx_fb(&mx21ads_fb_data);
+ 	imx21_add_mxc_mmc(0, &mx21ads_sdhc_pdata);
+ 	imx21_add_mxc_nand(&mx21ads_nand_board_info);
+ 
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 
++	imx21_add_imx_fb(&mx21ads_fb_data);
++
+ 	mx21ads_cs8900_resources[1].start =
+ 			gpio_to_irq(MX21ADS_CS8900A_IRQ_GPIO);
+ 	mx21ads_cs8900_resources[1].end =
 -- 
 1.8.3.2
