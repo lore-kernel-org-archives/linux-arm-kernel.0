@@ -1,29 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Mar 2014 14:03:56 +0100
-Subject: [PATCH V2 11/12] ARM: shmobile: r7s72100: add spi clocks to dtsi
-In-Reply-To: <1394105552-9744-12-git-send-email-wsa@the-dreams.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 6 Mar 2014 14:06:55 +0100
+Subject: [PATCH V2 01/12] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <1434755.d9svPEINg5@avalon>
 References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
- <1394105552-9744-12-git-send-email-wsa@the-dreams.de>
-Message-ID: <CAMuHMdW2hd6xmr1=CzBk3oZFKJPoX9YRwaK5W3NxNNmynW5z6w@mail.gmail.com>
+ <1394105552-9744-2-git-send-email-wsa@the-dreams.de>
+ <1434755.d9svPEINg5@avalon>
+Message-ID: <20140306130655.GA10657@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 12:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
 
-Thanks for your patch!
+> > +  - clocks: References to possible parent clocks. Order must match clock
+> > modes
+> > +    in the datasheet.
+> 
+> I believe the order should be documented explicitly instead of referring to 
+> the datasheet.
 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+I wanted to keep it generic in case future SoCs want to use the driver.
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > +	num_clks = of_property_count_strings(np, "clock-output-names");
+> > +	if (WARN(num_clks <= 0, "can't count CPG clocks\n"))
+> > +		goto out;
+> 
+> You can return directly instead of goto out.
 
-Gr{oetje,eeting}s,
+I personally don't prefer the mixture of goto and direct return. Please
+say if you insist on that.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/2817bf52/attachment-0001.sig>
