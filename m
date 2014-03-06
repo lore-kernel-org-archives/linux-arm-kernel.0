@@ -1,20 +1,18 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  6 Mar 2014 17:01:42 +0100
-Subject: [PATCH v9][ 3/8] staging: imx-drm: Correct BGR666 and the board's dts
- that use them.
+Date: Thu,  6 Mar 2014 17:01:41 +0100
+Subject: [PATCH v9][ 2/8] staging: imx-drm: Add RGB666 support for parallel
+ display.
 In-Reply-To: <1394121702-13257-1-git-send-email-denis@eukrea.com>
 References: <1394121702-13257-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394121702-13257-3-git-send-email-denis@eukrea.com>
+Message-ID: <1394121702-13257-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-The current BGR666 is not consistent with the other color mapings like BGR24.
-BGR666 should be in the same byte order than BGR24.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v8->v9:
 - Removed the Cc. They are now set in git-send-email directly.
+- Rebased.
 
 ChangeLog v7->v8:
 - Shrinked even more the Cc list.
@@ -24,57 +22,81 @@ ChangeLog v6->v7:
 
 ChangeLog v5->v6:
 - Remove people not concerned by this patch from the Cc list.
-- Added a better explanation of the change.
 
-ChangeLog v5:
-- New patch.
+ChangeLog v3->v5:
+- Use the correct RGB order.
+
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Removed the commit message long desciption that was just a copy of the short
+  description.
+- Rebased the patch.
+- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
 ---
- arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
- arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
+ drivers/staging/imx-drm/parallel-display.c         |    2 ++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index c29cfa9..bff3201 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -19,7 +19,7 @@
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 0>;
--		interface-pix-fmt = "bgr666";
-+		interface-pix-fmt = "rgb666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1>;
- 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index d939ba8..4250e74 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -24,7 +24,7 @@
- 		display1: display at di1 {
- 			compatible = "fsl,imx-parallel-display";
- 			crtcs = <&ipu 1>;
--			interface-pix-fmt = "bgr666";
-+			interface-pix-fmt = "rgb666";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ipu_disp1>;
- 
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index b876d49..2d24425 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -29,7 +29,7 @@ Required properties:
+ - crtc: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
++  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
 diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 6f9abe8..154d293 100644
+index d5de8bb..6f9abe8 100644
 --- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
 +++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+@@ -92,6 +92,7 @@ enum ipu_dc_map {
+ 	IPU_DC_MAP_GBR24, /* TVEv2 */
+ 	IPU_DC_MAP_BGR666,
+ 	IPU_DC_MAP_BGR24,
++	IPU_DC_MAP_RGB666,
+ };
  
- 	/* bgr666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+ struct ipu_dc {
+@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
+ 		return IPU_DC_MAP_BGR666;
+ 	case V4L2_PIX_FMT_BGR24:
+ 		return IPU_DC_MAP_BGR24;
++	case V4L2_PIX_FMT_RGB666:
++		return IPU_DC_MAP_RGB666;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
  
- 	/* bgr24 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
++	/* rgb666 */
++	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index c60b6c6..01b7ce5 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -219,6 +219,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
+ 		else if (!strcmp(fmt, "bgr666"))
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
++		else if (!strcmp(fmt, "rgb666"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
+ 	}
+ 
+ 	panel_node = of_parse_phandle(np, "fsl,panel", 0);
 -- 
 1.7.9.5
