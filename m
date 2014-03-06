@@ -1,162 +1,188 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  6 Mar 2014 13:11:08 +0100
-Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
-Message-ID: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 06 Mar 2014 13:16:45 +0100
+Subject: [PATCH V2 03/12] ARM: shmobile: r7s72100: add essential clock
+ nodes to dtsi
+In-Reply-To: <1394105552-9744-4-git-send-email-wsa@the-dreams.de>
+References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
+ <1394105552-9744-4-git-send-email-wsa@the-dreams.de>
+Message-ID: <31686239.1N332dKyCy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 385 RD board is the reference design board from Marvell
-for the Armada 385 SoC. This commit adds a Device Tree description for
-this board, which enables the following features:
+Hi Wolfram,
 
- * Network interfaces
- * I2C bus
- * Serial port
- * SPI bus, with a SPI flash
- * PCIe interface
+Thank you for the patch.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Hi,
+On Thursday 06 March 2014 12:32:23 Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
+> 
+> Only essential clocks are added for now. Other clocks will be added when
+> needed.
+> 
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> ---
+> 
+> Changes since V1:
+> * add usb_x1 clock
+> * reference usb_x1 to cpg
+> * improved wording
+> * #clock-cells consistently first property
+> 
+>  arch/arm/boot/dts/r7s72100.dtsi            | 86 ++++++++++++++++++++++++++-
+>  include/dt-bindings/clock/r7s72100-clock.h | 25 +++++++++
+>  2 files changed, 110 insertions(+), 1 deletion(-)
+>  create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
+> 
+> diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> b/arch/arm/boot/dts/r7s72100.dtsi index ee700717a34b..2429b5be2e56 100644
+> --- a/arch/arm/boot/dts/r7s72100.dtsi
+> +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> @@ -1,13 +1,15 @@
+>  /*
+>   * Device Tree Source for the r7s72100 SoC
+>   *
+> - * Copyright (C) 2013 Renesas Solutions Corp.
+> + * Copyright (C) 2013-14 Renesas Solutions Corp.
+> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering
+> <wsa@sang-engineering.com>
+>   *
+>   * This file is licensed under the terms of the GNU General Public License
+>   * version 2.  This program is licensed "as is" without any warranty of any
+>   * kind, whether express or implied.
+>   */
+> 
+> +#include <dt-bindings/clock/r7s72100-clock.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> 
+>  / {
+> @@ -28,6 +30,88 @@
+>  		spi4 = &spi4;
+>  	};
+> 
+> +	clocks {
+> +		ranges;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		/* External clocks */
+> +		extal_clk: extal_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			/* If clk present, value must be set by board */
+> +			clock-frequency = <0>;
+> +			clock-output-names = "extal";
+> +		};
+> +
+> +		usb_x1_clk: usb_x1_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			/* If clk present, value must be set by board */
+> +			clock-frequency = <0>;
+> +			clock-output-names = "usb_x1";
+> +		};
+> +
+> +		/* Special CPG clocks */
+> +		cpg_clocks: cpg_clocks at fcfe0000 {
+> +			#clock-cells = <1>;
+> +			compatible = "renesas,r7s72100-cpg-clocks",
+> +				     "renesas,rz-cpg-clocks";
+> +			reg = <0xfcfe0000 0x18>;
+> +			clocks = <&extal_clk>, <&usb_x1_clk>;
+> +			clock-output-names = "pll", "i", "g";
+> +		};
+> +
+> +		/* Fixed factor clocks */
+> +		b_clk: b_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks 0>;
 
-I have received this board only recently, so that why its device tree
-comes only now. This patch should not cause any trouble to other part
-of the kernel, so that's why I think it is reasonable to have it in
-3.15.
+What about adding #define's for the CPG clocks to include/dt-
+bindings/clock/r7s72100-clock.h like is done for the R8A7790 and R8A7791 ?
 
-Thanks,
+> +			clock-mult = <1>;
+> +			clock-div = <3>;
+> +			clock-output-names = "b";
+> +		};
+> +		p1_clk: p1_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks 0>;
+> +			clock-mult = <1>;
+> +			clock-div = <6>;
+> +			clock-output-names = "p1";
+> +		};
+> +		p0_clk: p0_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks 0>;
+> +			clock-mult = <1>;
+> +			clock-div = <12>;
+> +			clock-output-names = "p0";
+> +		};
+> +
+> +		/* MSTP clocks */
+> +		mstp3_clks: mstp3_clks at fcfe0420 {
+> +			#clock-cells = <1>;
+> +			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0xfcfe0420 4>;
+> +			clocks = <&p0_clk>;
+> +			renesas,clock-indices = <R7S72100_CLK_MTU2>;
+> +			clock-output-names = "mtu2";
+> +		};
+> +
+> +		mstp4_clks: mstp4_clks at fcfe0424 {
+> +			#clock-cells = <1>;
+> +			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0xfcfe0424 4>;
+> +			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
+> +				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
+> +			renesas,clock-indices = <
+> +				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2
+> R7S72100_CLK_SCIF3 +				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5
+> R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7 +			>;
+> +			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4",
+> "scif5", "scif6", "scif7"; +		};
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> diff --git a/include/dt-bindings/clock/r7s72100-clock.h
+> b/include/dt-bindings/clock/r7s72100-clock.h new file mode 100644
+> index 000000000000..eced0a8382b0
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/r7s72100-clock.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering
+> <wsa@sang-engineering.com> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + */
+> +
+> +#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
+> +#define __DT_BINDINGS_CLOCK_R7S72100_H__
+> +
+> +/* MSTP3 */
+> +#define R7S72100_CLK_MTU2	3
+> +
+> +/* MSTP4 */
+> +#define R7S72100_CLK_SCIF0	7
+> +#define R7S72100_CLK_SCIF1	6
+> +#define R7S72100_CLK_SCIF2	5
+> +#define R7S72100_CLK_SCIF3	4
+> +#define R7S72100_CLK_SCIF4	3
+> +#define R7S72100_CLK_SCIF5	2
+> +#define R7S72100_CLK_SCIF6	1
+> +#define R7S72100_CLK_SCIF7	0
+> +
+> +#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 
-Gregory
-
-
- arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/armada-385-rd.dts | 104 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 106 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/armada-385-rd.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f7d678808122..9155cf48e1b1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -153,7 +153,8 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
- dtb-$(CONFIG_MACH_ARMADA_375) += \
- 	armada-375-db.dtb
- dtb-$(CONFIG_MACH_ARMADA_38X) += \
--	armada-385-db.dtb
-+	armada-385-db.dtb \
-+	armada-385-rd.dtb
- dtb-$(CONFIG_MACH_ARMADA_XP) += \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
-diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
-new file mode 100644
-index 000000000000..951bd91059e1
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-385-rd.dts
-@@ -0,0 +1,104 @@
-+/*
-+ * Device Tree file for Marvell Armada 385 Reference Design board
-+ * (RD-88F6820-AP)
-+ *
-+ *  Copyright (C) 2014 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "armada-385.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 385 Reference Design";
-+	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada38x";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+			spi at 10600 {
-+				status = "okay";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "m25p128";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <108000000>;
-+				};
-+			};
-+
-+			i2c at 11000 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+			};
-+
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+
-+			/*
-+			 * The Ethernet nodes are not ordered by
-+			 * address on purpose. Indeed the first
-+			 * Ethernet port of the board (Giga0) is
-+			 * located at 0x70000 whereas the the second
-+			 * Ethernet(Giga 1) port is located at
-+			 * 0x30000.
-+			 */
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii";
-+			};
-+
-+			ethernet at 30000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii";
-+			};
-+
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 {
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * One PCIe units is accessible through
-+			 * standard PCIe slot on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
