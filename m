@@ -1,99 +1,146 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 6 Mar 2014 17:04:57 +0800
-Subject: [RFC 0/6] rework sched_domain topology description
-In-Reply-To: <5317B092.7070805@arm.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <5317B092.7070805@arm.com>
-Message-ID: <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 6 Mar 2014 10:05:07 +0100
+Subject: [RESEND Patch 3/3] ARM: Kirkwood: DT: Add missing vendor prefix
+In-Reply-To: <CAL_JsqKGGgA_bGLXsBV7QrEjEvzupXBPNegWyxMhMGeoiWQ++Q@mail.gmail.com>
+References: <1394055207-4639-1-git-send-email-andrew@lunn.ch>
+ <1394055207-4639-4-git-send-email-andrew@lunn.ch>
+ <CAL_JsqKGGgA_bGLXsBV7QrEjEvzupXBPNegWyxMhMGeoiWQ++Q@mail.gmail.com>
+Message-ID: <20140306090507.GB4780@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2014 07:17, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 05/03/14 07:18, Vincent Guittot wrote:
->>
->> This patchset was previously part of the larger tasks packing patchset
->> [1].
->> I have splitted the latter in 3 different patchsets (at least) to make the
->> thing easier.
->> -configuration of sched_domain topology (this patchset)
->> -update and consolidation of cpu_power
->> -tasks packing algorithm
->>
->> Based on Peter Z's proposal [2][3], this patchset modifies the way to
->> configure
->> the sched_domain level in order to let architectures to add specific level
->> like
->> the current BOOK level or the proposed power gating level for ARM
->> architecture.
->>
->> [1] https://lkml.org/lkml/2013/10/18/121
->> [2] https://lkml.org/lkml/2013/11/5/239
->> [3] https://lkml.org/lkml/2013/11/5/449
->>
->> Vincent Guittot (6):
->>    sched: remove unused SCHED_INIT_NODE
->>    sched: rework of sched_domain topology definition
->>    sched: s390: create a dedicated topology table
->>    sched: powerpc: create a dedicated topology table
->>    sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
->>    sched: ARM: create a dedicated scheduler topology table
->>
->>   arch/arm/kernel/topology.c        |   26 ++++
->>   arch/ia64/include/asm/topology.h  |   24 ----
->>   arch/metag/include/asm/topology.h |   27 -----
->>   arch/powerpc/kernel/smp.c         |   35 ++++--
->>   arch/s390/include/asm/topology.h  |   13 +-
->>   arch/s390/kernel/topology.c       |   25 ++++
->>   arch/tile/include/asm/topology.h  |   33 ------
->>   include/linux/sched.h             |   30 +++++
->>   include/linux/topology.h          |  128 ++------------------
->>   kernel/sched/core.c               |  235
->> ++++++++++++++++++-------------------
->>   10 files changed, 237 insertions(+), 339 deletions(-)
->>
->
-> Hi Vincent,
->
-> I reviewed your patch-set carefully (including test runs on TC2), especially
-> due to the fact that we want to build our sd_energy stuff on top of it.
+On Wed, Mar 05, 2014 at 08:53:25PM -0600, Rob Herring wrote:
+> On Wed, Mar 5, 2014 at 3:33 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > Add vendor prefixes to compatible strings where they are missing.
+> 
+> Please explain why you are breaking the ABI and why that is okay.
+> Normally, you should just leave this as is or add the new compatible
+> string rather than change it.
 
-Thanks
+Ah, sorry, thought it was well known. Both I2C and MTD ignore the
+vendor prefix. I'm adding them for consistency, and to keep checkpatch
+happy.
 
->
->
-> One thing I'm still not convinced of is the fact that specifying additional
-> sd levels in the struct sched_domain_topology_level table has an advantage
-> over a function pointer for sd topology flags similar to the one we're
-> already using for the cpu mask in struct sched_domain_topology_level.
->
->   int (*sched_domain_flags_f)(int cpu);
->
+I can respin and add a comment about this.
 
-We have to create additional level for some kind of topology as
-described in my trial https://lkml.org/lkml/2013/12/18/279 which is
-not possible with function pointer.
+  Andrew
 
-Have you got a situation in mind where it will be necessary to use the
-function pointer with cpu number as an argument ?
-
-In the current example of this patchset, the flags are statically set
-in the table but nothing prevents an architecture to update the flags
-value before being given to the scheduler
-
-> This function pointer would be simply another member of struct
-> sched_domain_topology_level and would replace int sd_flags.  AFAICS, you
-> have to create additional cpu mask functions anyway for the additional sd
-> levels, like cpu_corepower_mask() for the  GMC level in the ARM case.  There
-> could be a set of standard sd topology flags function for the default sd
-> layer and archs which want to pass in something special define those
-> function locally since they will use them only in their arch specific struct
-> sched_domain_topology_level table anyway.  I know that you use the existing
-> sd degenerate functionality for this and that the freeing of the redundant
-> data structures (sched_domain, sched_group and sched_group_power) is there
-> too but it still doesn't seem to me to be the right thing to do.
->
-> The problem that we now expose internal data structures (struct sd_data and
-> struct sched_domain_topology_level) could be dealt with later.
->
-> -- Dietmar
->
+> 
+> Rob
+> 
+> >
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
+> >  arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
+> >  arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
+> >  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
+> >  arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
+> >  arch/arm/boot/dts/kirkwood-nsa310.dts          | 2 +-
+> >  arch/arm/boot/dts/kirkwood-nsa310a.dts         | 2 +-
+> >  arch/arm/boot/dts/kirkwood-openblocks_a6.dts   | 2 +-
+> >  arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 2 +-
+> >  9 files changed, 9 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
+> > index 40791053106b..6becedebaa4e 100644
+> > --- a/arch/arm/boot/dts/kirkwood-b3.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-b3.dts
+> > @@ -76,5 +76,5 @@
+> >                                 #address-cells = <1>;
+> >                                 #size-cells = <1>;
+> > -                               compatible = "m25p16";
+> > +                               compatible = "st,m25p16";
+> >                                 reg = <0>;
+> >                                 spi-max-frequency = <40000000>;
+> > diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+> > index 0e06fd3cee4d..3b62aeeaa3a2 100644
+> > --- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+> > @@ -47,5 +47,5 @@
+> >                                 #address-cells = <1>;
+> >                                 #size-cells = <1>;
+> > -                               compatible = "mx25l4005a";
+> > +                               compatible = "mxicy,mx25l4005a";
+> >                                 reg = <0>;
+> >                                 spi-max-frequency = <20000000>;
+> > diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+> > index ef3463e0ae19..28b3ee369778 100644
+> > --- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+> > @@ -44,5 +44,5 @@
+> >                                 #address-cells = <1>;
+> >                                 #size-cells = <1>;
+> > -                               compatible = "mx25l1606e";
+> > +                               compatible = "mxicy,mx25l1606e";
+> >                                 reg = <0>;
+> >                                 spi-max-frequency = <50000000>;
+> > diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+> > index 2cb0dc529165..32c6fb4a1162 100644
+> > --- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+> > @@ -57,5 +57,5 @@
+> >                                 #address-cells = <1>;
+> >                                 #size-cells = <1>;
+> > -                               compatible = "mx25l12805d";
+> > +                               compatible = "mxicy,mx25l12805d";
+> >                                 reg = <0>;
+> >                                 spi-max-frequency = <50000000>;
+> > diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > index 743152f31a81..594bad0e386e 100644
+> > --- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > @@ -33,5 +33,5 @@
+> >                                 #address-cells = <1>;
+> >                                 #size-cells = <1>;
+> > -                               compatible = "mx25l4005a";
+> > +                               compatible = "mxicy,mx25l4005a";
+> >                                 reg = <0>;
+> >                                 spi-max-frequency = <20000000>;
+> > diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> > index 03fa24cf3344..0a07af9d8e58 100644
+> > --- a/arch/arm/boot/dts/kirkwood-nsa310.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> > @@ -105,5 +105,5 @@
+> >
+> >                         adt7476: adt7476a at 2e {
+> > -                               compatible = "adt7476";
+> > +                               compatible = "adi,adt7476";
+> >                                 reg = <0x2e>;
+> >                         };
+> > diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+> > index a5e779452867..27ca6a79c48a 100644
+> > --- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+> > @@ -95,5 +95,5 @@
+> >
+> >                         lm85: lm85 at 2e {
+> > -                               compatible = "lm85";
+> > +                               compatible = "national,lm85";
+> >                                 reg = <0x2e>;
+> >                         };
+> > diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> > index b88da9392c32..0650beafc1de 100644
+> > --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> > @@ -41,5 +41,5 @@
+> >
+> >                         s35390a: s35390a at 30 {
+> > -                               compatible = "s35390a";
+> > +                               compatible = "sii,s35390a";
+> >                                 reg = <0x30>;
+> >                         };
+> > diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+> > index b2f7cae06839..895506743e4d 100644
+> > --- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+> > @@ -53,5 +53,5 @@
+> >
+> >                         s24c02: s24c02 at 50 {
+> > -                               compatible = "24c02";
+> > +                               compatible = "at,24c02";
+> >                                 reg = <0x50>;
+> >                         };
+> > --
+> > 1.9.0
+> >
