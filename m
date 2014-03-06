@@ -1,58 +1,18 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 06 Mar 2014 15:45:53 -0800
-Subject: [PATCH v7 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <1394016605-24120-2-git-send-email-sebastian.capella@linaro.org>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-2-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <531908b6.44f8440a.03ab.0cce@mx.google.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 7 Mar 2014 08:57:10 +0900
+Subject: [PATCH] ARM: shmobile: Update r8a7791 CPU freq to 1500MHz in DTS
+In-Reply-To: <20140306031536.10779.98781.sendpatchset@w520>
+References: <20140306031536.10779.98781.sendpatchset@w520>
+Message-ID: <20140306235706.GA24411@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2014-03-05 02:50:04)
-> Use of tracers in local_irq_disable is causes recursive aborts when
-> called with irqs disabled and using a temporary stack (hibernation).
-> Replace local_irq_disable with raw_local_irq_disable instead to
-> avoid tracers.
+On Thu, Mar 06, 2014 at 12:15:36PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Holt <robin.m.holt@gmail.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> Cc: Steven Capper <steve.capper@linaro.org>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> ---
->  arch/arm/kernel/process.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> The correct maximum CPU frequency for r8a7791 is 1500 MHz
+> so update the r8a7791 SoC DTS to reflect this.
 > 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 92f7b15..f58b723 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
->         u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
->  
->         /* Disable interrupts first */
-> -       local_irq_disable();
-> +       raw_local_irq_disable();
->         local_fiq_disable();
->  
->         /* Disable the L2 if we're the last man standing. */
-> -- 
-> 1.7.9.5
-Hi,
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I have not heard any feedback on this change, since V3 of the
-patchset.
-
-Is everyone ok with this as it is?
-
-Thomas, thanks for proposing this, is this looking ok to you?
-
-Thanks!
-
-Sebastian
+Thanks, I have queued this up.
