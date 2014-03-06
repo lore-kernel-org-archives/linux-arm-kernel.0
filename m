@@ -1,47 +1,108 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 6 Mar 2014 09:45:53 -0800
-Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
-Message-ID: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu,  6 Mar 2014 10:54:56 -0700
+Subject: [PATCH v14 1/3] Documentation: Add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver binding documentation
+In-Reply-To: <1394128498-28420-1-git-send-email-lho@apm.com>
+References: <1394128498-28420-1-git-send-email-lho@apm.com>
+Message-ID: <1394128498-28420-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds the APM X-Gene SoC 15Gbps Multi-purpose PHY driver binding 
+documentation.
 
-This patchset adds very minimal support for the BCM63138 SoC which is
-a xDSL SoC using a dual Cortex A9 CPU complex.
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+ .../devicetree/bindings/phy/apm-xgene-phy.txt      |   79 ++++++++++++++++++++
+ 1 files changed, 79 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
 
-Future work will focus on:
-
-- clock device/driver/providers
-- SMP support (already working)
-- DT'fying drivers/tty/serial/bcm63xx_uart.c to be usable
-
-Florian Fainelli (6):
-  ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
-  ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
-  ARM: BCM63XX: add low-level UART debug support
-  ARM: BCM63XX: add BCM63138 minimal Device Tree
-  ARM: BCM63XX: add BCM963138DVT Reference platform DTS
-  MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
-
- .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
- MAINTAINERS                                        |  10 ++
- arch/arm/Kconfig.debug                             |  20 +++-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/bcm63138.dtsi                    | 109 +++++++++++++++++++++
- arch/arm/boot/dts/bcm63138dvt.dts                  |  18 ++++
- arch/arm/include/debug/bcm63xxx.S                  |  33 +++++++
- arch/arm/mach-bcm/Kconfig                          |  20 ++++
- arch/arm/mach-bcm/Makefile                         |   2 +
- arch/arm/mach-bcm/bcm63xx.h                        |  29 ++++++
- arch/arm/mach-bcm/board_bcm63xx.c                  |  94 ++++++++++++++++++
- 11 files changed, 342 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
- create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
- create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
- create mode 100644 arch/arm/include/debug/bcm63xxx.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx.h
- create mode 100644 arch/arm/mach-bcm/board_bcm63xx.c
-
+diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+new file mode 100644
+index 0000000..5f3a65a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+@@ -0,0 +1,79 @@
++* APM X-Gene 15Gbps Multi-purpose PHY nodes
++
++PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
++PHY (pair of lanes) has its own node.
++
++Required properties:
++- compatible		: Shall be "apm,xgene-phy".
++- reg			: PHY memory resource is the SDS PHY access resource.
++- #phy-cells		: Shall be 1 as it expects one argument for setting
++			  the mode of the PHY. Possible values are 0 (SATA),
++			  1 (SGMII), 2 (PCIe), 3 (USB), and 4 (XFI).
++
++Optional properties:
++- status		: Shall be "ok" if enabled or "disabled" if disabled.
++			  Default is "ok".
++- clocks		: Reference to the clock entry.
++- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
++			  bit lines from the automatic calibrated position.
++			  Two set of 3-tuple setting for each (up to 3)
++			  supported link speed on the host. Range from 0 to
++			  127 in unit of one bit period. Default is 10.
++- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
++			  data earlier than the nominal sampling point. 1 means
++			  sample data later than the nominal sampling point.
++			  Two set of 3-tuple setting for each (up to 3)
++			  supported link speed on the host. Default is 0.
++- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
++			  gain control. Two set of 3-tuple setting for each
++			  (up to 3) supported link speed on the host. Range is
++			  between 0 to 31 in unit of dB. Default is 3.
++- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
++			  each (up to 3) supported link speed on the host.
++			  Range is between 0 to 199500 in unit of uV.
++			  Default is 199500 uV.
++- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
++			  3-tuple setting for each (up to 3) supported link
++			  speed on the host. Range is 0 to 273000 in unit of
++			  uV. Default is 0.
++- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
++			  3-tuple setting for each (up to 3) supported link
++			  speed on the host. Range is 0 to 127400 in unit uV.
++			  Default is 0x0.
++- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
++			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
++			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
++- apm,tx-speed		: Tx operating speed. One set of 3-tuple for each
++			  supported link speed on the host.
++			   0 = 1-2Gbps
++			   1 = 2-4Gbps (1st tuple default)
++			   2 = 4-8Gbps
++			   3 = 8-15Gbps (2nd tuple default)
++			   4 = 2.5-4Gbps
++			   5 = 4-5Gbps
++			   6 = 5-6Gbps
++			   7 = 6-16Gbps (3rd tuple default)
++
++NOTE: PHY override parameters are board specific setting.
++
++Example:
++		phy1: phy at 1f21a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f21a000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
++		phy2: phy at 1f22a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f22a000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "ok";
++		};
++
++		phy3: phy at 1f23a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f23a000 0x0 0x100>;
++			#phy-cells = <1>;
++			status = "ok";
++		};
 -- 
-1.8.3.2
+1.5.5
