@@ -1,31 +1,44 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Thu, 6 Mar 2014 11:51:54 +0100
-Subject: [PATCH v4 0/8] wilink: add device tree support
-In-Reply-To: <20140228092203.GA2974@piout.net>
-References: <1375189476-21557-1-git-send-email-coelho@ti.com>
- <CAGm1_kvdzkvzEEymQ+H0XiKugifHF27KDz3jwX5Frg_U=S7KgA@mail.gmail.com>
- <20140228092203.GA2974@piout.net>
-Message-ID: <CAGm1_kv_byZMme0amziQt57Wng+b342hPf5MKrJn2iFRvdyR5Q@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 06 Mar 2014 12:05:50 +0100
+Subject: [linux-sunxi] Re: [PATCH 0/7] mfd: AXP20x: Add support for AXP202
+ and AXP209
+In-Reply-To: <CAOQ7t2aVchEe0Mtbp8KV4ZTzE_0C0BeO15S7aF4nJx6PaBno=w@mail.gmail.com>
+References: <1393692352-10839-1-git-send-email-carlo@caione.org>	<53121151.9050804@redhat.com>	<CAOQ7t2ae35E-eiQW4DFspdTe3H7AWGzRpw4B_1t27p0OSkX_Uw@mail.gmail.com>	<53123507.6020607@redhat.com>	<531782DF.6090209@redhat.com>	<CAOQ7t2bx1u73kxQVa3AeQ-hZ9nP3GSukEdXk-jRNwbT0vUH4+A@mail.gmail.com>	<531848E5.4050704@redhat.com>
+ <CAOQ7t2aVchEe0Mtbp8KV4ZTzE_0C0BeO15S7aF4nJx6PaBno=w@mail.gmail.com>
+Message-ID: <5318568E.4040405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 10:22 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 28/02/2014 at 08:26:46 +0100, Yegor Yefremov wrote :
+Hi,
+
+On 03/06/2014 11:10 AM, Carlo Caione wrote:
+> On Thu, Mar 6, 2014 at 11:07 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
 >>
->> What is the state of the series? Who is now responsible for the
->> patches? What issues were still not handled?
+>> On 03/05/2014 09:46 PM, Carlo Caione wrote:
+>>> On Wed, Mar 5, 2014 at 9:02 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>
+>>>> So I've added your patches to my sunxi-devel tree and they work as advertised :)
+>>>
+>>> Thank you for keeping the tree updated :)
+>>>
+>>>> I've also added dt support for the axp209 to the cubietruck dts file, to avoid
+>>>> things becoming a copy and paste fest I've introduced a new axp209.dtsi file,
+>>>> as well as did some fixes to the existing sun?i-a*.dtsi files, see my tree here:
+>>>> https://github.com/jwrdegoede/linux-sunxi/commits/sunxi-devel
+>>>
+>>> That was also my idea (creating a new axp20x.dtsi) but it has been
+>>> turned down by Maxime and Lee
 >>
->
-> We probably want to end that discussion before taking those bindings in:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232185.html
->
-> I've hit the issue, precisely using those bindings.
+>> Hmm, do you have a pointer to the mailinglist discussion about this ?
+> 
+> Sure, http://www.spinics.net/lists/arm-kernel/msg306497.html
 
-The discussion seems to flow down. The last message was about "Mon Feb
-17 18:25:11 EST 2014".
+Ah, yes but that is before you added all the regulators, which are a fixed part
+of the chip. Once you get long dts bits like that having a dtsi file makes a lot
+of sense IMHO. Note that the part of the dts this was discussing is actually the part
+I did not put in the dtis, since it can vary per board :)
 
-Btw is TI going to assign a new maintainer for Wilink stuff? As Luca
-has left TI, the driver is marked as "Orphan".
+Regards,
 
-Yegor
+Hans
