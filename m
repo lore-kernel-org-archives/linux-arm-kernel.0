@@ -1,19 +1,29 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 6 Mar 2014 17:19:54 +0800
-Subject: [PATCH 3/7] of: introduce of_dma_is_coherent() helper
+Date: Thu, 6 Mar 2014 17:19:55 +0800
+Subject: [PATCH 4/7] of: configure the platform device dma_mask and
+ dma_pfn_offset
 In-Reply-To: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1394097598-17622-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1394097598-17622-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_dma_is_coherent() helper parses the given DT device
-node to see if the "dma-coherent" property is supported and
-returns true or false accordingly.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-For the architectures which are fully dma coherent and don't need per device
-property, it can enable CONFIG_ARCH_IS_DMA_COHERENT config option which
-enables DMA coherent for all devices by default.
+Retrieve DMA configuration from DT and setup platform device's DMA
+parameters.
+
+The DMA configuration in DT has to be specified using "dma-ranges"
+property if supported. The DMA configuration applied
+by dt_dma_configure() as following:
+ - call of_get_dma_range() and get supported DMA range info
+   (dma_addr, cpu_addr, dma_size);
+ - if "not found" then fill dma_mask as DMA_BIT_MASK(32)
+   (this is default behaviour);
+ - if "failed" then clean up dma_mask (DMA not supported)
+ - if ok then update devices DMA configuration:
+      set dma_mask to (dma_addr + dma_size - 1)
+      set dma_pfn_offset to PFN_DOWN(cpu_addr - dma_addr)
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -23,75 +33,104 @@ Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/of/platform.c       |   31 +++++++++++++++++++++++++++++++
- include/linux/of_platform.h |    6 ++++++
- 2 files changed, 37 insertions(+)
+ drivers/of/platform.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 72 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 2265a55..bd080db 100644
+index bd080db..53bb12f 100644
 --- a/drivers/of/platform.c
 +++ b/drivers/of/platform.c
-@@ -570,4 +570,35 @@ out:
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(of_dma_get_range);
+@@ -187,6 +187,77 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ EXPORT_SYMBOL(of_device_alloc);
+ 
+ /**
++ * dt_dma_configure - apply default DMA configuration from dt
++ * @dev:	Device to apply DMA configuration
++ *
++ * Try to get devices's DMA configuration from DT and apply it.
++ * The DMA configuration is represented in DT by "dma-ranges" property.
++ * It configures:
++ *	dma_pfn_offset, dma_mask and coherent_dma_mask.
++ *
++ * In case if DMA configuration can't be acquired from DT the default one is
++ * applied:
++ *	dma_pfn_offset = 0,
++ *	dma_mask = DMA_BIT_MASK(32)
++ *	coherent_dma_mask = DMA_BIT_MASK(32).
++ *
++ * In case if platform code need to use own DMA configuration - it can use
++ * Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event to fix up
++ * DMA configuration.
++ */
++static void dt_dma_configure(struct device *dev)
++{
++	dma_addr_t dma_addr;
++	phys_addr_t paddr, size;
++	dma_addr_t dma_mask;
++	int ret;
++
++	/*
++	 * if dma-ranges property doesn't exist - use 32 bits DMA mask
++	 * by default and don't set skip archdata.dma_pfn_offset
++	 */
++	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
++	if (ret == -ENODEV) {
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
++		if (!dev->dma_mask)
++			dev->dma_mask = &dev->coherent_dma_mask;
++		return;
++	}
++
++	/* if failed - disable DMA for device */
++	if (ret < 0) {
++		dev_err(dev, "failed to configure DMA\n");
++		return;
++	}
++
++	/* DMA ranges found. Calculate and set dma_pfn_offset */
++	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
++
++	/* Configure DMA mask */
++	dev->dma_mask = &dev->coherent_dma_mask;
++	if (!dev->dma_mask)
++		return;
++
++	dma_mask = dma_addr + size - 1;
++
++	ret = dma_set_mask(dev, dma_mask);
++	if (ret < 0) {
++		dev_err(dev, "failed to set DMA mask %pad\n", &dma_mask);
++		dev->dma_mask = NULL;
++		return;
++	}
++
++	dev_dbg(dev, "dma_pfn_offset(%#08lx) dma_mask(%pad)\n",
++		dev->dma_pfn_offset, dev->dma_mask);
++
++	ret = dma_set_coherent_mask(dev, dma_mask);
++	if (ret < 0) {
++		dev_err(dev, "failed to set coherent DMA mask %pad\n",
++			&dma_mask);
++	}
++}
 +
 +/**
-+ * of_dma_is_coherent - Check if device is coherent
-+ * @np:	device node
-+ *
-+ * It returns true if "dma-coherent" property was found
-+ * for this device in DT.
-+ */
-+#ifndef CONFIG_ARCH_IS_DMA_COHERENT
-+bool of_dma_is_coherent(struct device_node *np)
-+{
-+	struct device_node *node = np;
-+
-+	while (node) {
-+		if (of_property_read_bool(node, "dma-coherent")) {
-+			of_node_put(node);
-+			return true;
-+		}
-+		node = of_get_next_parent(node);
-+	}
-+	return false;
-+}
-+EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-+#else
-+inline bool of_dma_is_coherent(struct device_node *np)
-+{
-+	/* ARCH is fully dma coherent and don't need per device control */
-+	return true;
-+}
-+EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-+#endif
- #endif /* CONFIG_OF_ADDRESS */
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index ba7d3dc..48e0748 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -74,6 +74,7 @@ extern int of_platform_populate(struct device_node *root,
- 				struct device *parent);
- extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
- 				phys_addr_t *paddr, phys_addr_t *size);
-+extern bool of_dma_is_coherent(struct device_node *np);
- #else
- static inline int of_platform_populate(struct device_node *root,
- 					const struct of_device_id *matches,
-@@ -88,6 +89,11 @@ static inline int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
- {
- 	return -ENODEV;
- }
-+
-+static inline bool of_dma_is_coherent(struct device_node *np)
-+{
-+	return false;
-+}
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+  * @bus_id: name to assign device
+@@ -214,9 +285,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ #if defined(CONFIG_MICROBLAZE)
+ 	dev->archdata.dma_mask = 0xffffffffUL;
  #endif
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-	if (!dev->dev.dma_mask)
+-		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
++	dt_dma_configure(&dev->dev);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
  
- #endif	/* _LINUX_OF_PLATFORM_H */
 -- 
 1.7.9.5
