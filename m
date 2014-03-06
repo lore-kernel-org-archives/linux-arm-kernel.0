@@ -1,96 +1,107 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 6 Mar 2014 16:23:04 +0200
-Subject: [PATCH v2 12/13] ARM: DRA7: hwmod: Add ocp2scp3 and sata hwmods
+Date: Thu, 6 Mar 2014 16:27:56 +0200
+Subject: [PATCH v2 00/13] ARM: OMAP: SATA support for OMAP5 & DRA7
 In-Reply-To: <1394115785-28301-1-git-send-email-rogerq@ti.com>
 References: <1394115785-28301-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394115785-28301-13-git-send-email-rogerq@ti.com>
+Message-ID: <531885EC.50706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nikhil Devshatwar <nikhil.nd@ti.com>
+On 03/06/2014 04:22 PM, Roger Quadros wrote:
+> Hi,
+> 
+> This series adds SATA support for OMAP5 uevm and DRA7-evm boards.
+> 
+> - Cleans up the ti-pipe3 PHY driver
+> - Adds SATA DPLL support to ti-pipe3 PHY driver
+> - Adds SATA nodes to hwmod and SoC DT data
+> 
+> Patches are based on 3.14-rc4 with balbi/next, linux-phy/next and
+> omap-for-v3.15/dt merged on top..
+> 
+> To test SATA you will also need [1].
+> 
+> [1] - http://article.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7285
+> 
+> Changelog:
+> 
+> v2
+> - use 'depends on' instead of 'select' OCP2SCP bus driver.
+> - Changed DT bindings for dra7-usb2 and am437-usb2 phy.
+> 
+> cheers,
+> -roger
+> 
+> ---
+> Balaji T K (2):
+>   ARM: dts: omap5: add sata node
+>   ARM: dts: dra7: add OCP2SCP3 and SATA nodes
+> 
+> Keshava Munegowda (1):
+>   ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
+> 
+> Kishon Vijay Abraham I (1):
+>   phy: rename struct omap_control_usb to struct omap_control_phy
+> 
+> Nikhil Devshatwar (1):
+>   ARM: DRA7: hwmod: Add ocp2scp3 and sata hwmods
+> 
+> Roger Quadros (8):
+>   phy: omap-control: Update DT binding information
+>   phy: omap-control: update dra7 and am437 usb2 bindings
+>   phy: ti-pipe3: cleanup clock handling
+>   phy: ti-pipe3: Add SATA DPLL support
+>   phy: ti-pipe3: Don't get 'wkupclk' and 'refclk' for SATA PHY
+>   phy: ti-pipe3: streamline PHY operations
+>   phy: ti-pipe3: Fix suspend/resume and module reload
+>   phy: omap: Depend on OMAP_OCP2SCP bus driver
+> 
+>  Documentation/devicetree/bindings/phy/ti-phy.txt   |  40 ++-
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |  24 --
+>  arch/arm/boot/dts/dra7.dtsi                        |  39 +++
+>  arch/arm/boot/dts/omap5.dtsi                       |  47 ++-
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  73 +++++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  31 +-
+>  drivers/phy/Kconfig                                |  16 +-
+>  drivers/phy/Makefile                               |   1 +
+>  drivers/phy/phy-omap-control.c                     | 320 +++++++++++++++++++++
+>  drivers/phy/phy-omap-usb2.c                        |   8 +-
+>  drivers/phy/phy-ti-pipe3.c                         | 269 ++++++++++-------
+>  drivers/usb/musb/omap2430.c                        |   2 +-
+>  drivers/usb/phy/Kconfig                            |  10 -
+>  drivers/usb/phy/Makefile                           |   1 -
+>  drivers/usb/phy/phy-omap-control.c                 | 319 --------------------
+>  include/linux/phy/omap_control_phy.h               |  89 ++++++
+>  include/linux/usb/omap_control_usb.h               |  89 ------
+>  17 files changed, 815 insertions(+), 563 deletions(-)
+>  create mode 100644 drivers/phy/phy-omap-control.c
+>  delete mode 100644 drivers/usb/phy/phy-omap-control.c
+>  create mode 100644 include/linux/phy/omap_control_phy.h
+>  delete mode 100644 include/linux/usb/omap_control_usb.h
+> 
+oops. forgot to add -M :(.
 
-Add hwmods for ocp2scp3 and sata modules.
+I'll resend just the 1st patch since it contains the file rename.
+updated diffstat is below.
 
-[Roger Q] Clean up.
+ Documentation/devicetree/bindings/phy/ti-phy.txt   |  40 ++-
+ Documentation/devicetree/bindings/usb/omap-usb.txt |  24 --
+ arch/arm/boot/dts/dra7.dtsi                        |  39 +++
+ arch/arm/boot/dts/omap5.dtsi                       |  47 +++-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  73 ++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  31 ++-
+ drivers/phy/Kconfig                                |  16 +-
+ drivers/phy/Makefile                               |   1 +
+ drivers/{usb => }/phy/phy-omap-control.c           | 169 ++++++-------
+ drivers/phy/phy-omap-usb2.c                        |   8 +-
+ drivers/phy/phy-ti-pipe3.c                         | 269 +++++++++++++--------
+ drivers/usb/musb/omap2430.c                        |   2 +-
+ drivers/usb/phy/Kconfig                            |  10 -
+ drivers/usb/phy/Makefile                           |   1 -
+ .../omap_control_usb.h => phy/omap_control_phy.h}  |  36 +--
+ 15 files changed, 509 insertions(+), 257 deletions(-)
+ rename drivers/{usb => }/phy/phy-omap-control.c (53%)
+ rename include/linux/{usb/omap_control_usb.h => phy/omap_control_phy.h} (68%)
 
-CC: Benoit Cousson <bcousson@baylibre.com>
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Signed-off-by: Nikhil Devshatwar <nikhil.nd@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 18f333c..3c9a430 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1215,6 +1215,30 @@ static struct omap_hwmod dra7xx_ocp2scp1_hwmod = {
- 	},
- };
- 
-+/* ocp2scp3 */
-+static struct omap_hwmod dra7xx_ocp2scp3_hwmod;
-+
-+/* l4_cfg -> ocp2scp3 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp3 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_ocp2scp3_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
-+	.name		= "ocp2scp3",
-+	.class		= &dra7xx_ocp2scp_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
- /*
-  * 'qspi' class
-  *
-@@ -1268,9 +1292,6 @@ static struct omap_hwmod_class dra7xx_sata_hwmod_class = {
- };
- 
- /* sata */
--static struct omap_hwmod_opt_clk sata_opt_clks[] = {
--	{ .role = "ref_clk", .clk = "sata_ref_clk" },
--};
- 
- static struct omap_hwmod dra7xx_sata_hwmod = {
- 	.name		= "sata",
-@@ -1278,6 +1299,7 @@ static struct omap_hwmod dra7xx_sata_hwmod = {
- 	.clkdm_name	= "l3init_clkdm",
- 	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
- 	.main_clk	= "func_48m_fclk",
-+	.mpu_rt_idx	= 1,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L3INIT_SATA_CLKCTRL_OFFSET,
-@@ -1285,8 +1307,6 @@ static struct omap_hwmod dra7xx_sata_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.opt_clks	= sata_opt_clks,
--	.opt_clks_cnt	= ARRAY_SIZE(sata_opt_clks),
- };
- 
- /*
-@@ -2683,6 +2703,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__mmc4,
- 	&dra7xx_l4_cfg__mpu,
- 	&dra7xx_l4_cfg__ocp2scp1,
-+	&dra7xx_l4_cfg__ocp2scp3,
- 	&dra7xx_l3_main_1__qspi,
- 	&dra7xx_l4_cfg__sata,
- 	&dra7xx_l4_cfg__smartreflex_core,
--- 
-1.8.3.2
+cheers,
+-roger
