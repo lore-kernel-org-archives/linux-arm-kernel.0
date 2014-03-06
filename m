@@ -1,51 +1,24 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Thu, 6 Mar 2014 01:36:05 -0500
-Subject: ARM: mach-bcm dt updates for 3.15
-Message-ID: <20140306063605.GA30045@beef>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Mar 2014 06:53:39 +0000
+Subject: [PATCH] ARM64: Kernel managed pages are only flushed
+In-Reply-To: <1394018446-16738-1-git-send-email-Bharat.Bhushan@freescale.com>
+References: <1394018446-16738-1-git-send-email-Bharat.Bhushan@freescale.com>
+Message-ID: <20140306065339.GA2975@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+On Wed, Mar 05, 2014 at 04:50:46PM +0530, Bharat Bhushan wrote:
+> Kernel can only access pages which maps to managed memory.
+> So flush only valid kernel pages.
+> 
+> I observed kernel crash direct assigning a device using VFIO
+> and found that it was caused because of accessing invalid page
 
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+I don't get this. Could you please share some kernel crash message to
+see the backtrace? The __sync_icache_dcache() function is called from
+set_pte_at() if the pte is valid, user and exec. If these are correct,
+why does it crash? Actually, does the cache maintenance crash or
+page_mapping()?
 
-are available in the git repository at:
-
-  git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/dt
-
-for you to fetch changes up to a33705ee8a8af40bbaa379e4567ca451c38fc0d6:
-
-  ARM: dts: remove bcm11351-brt.dts (2014-03-05 01:28:56 -0500)
-
-----------------------------------------------------------------
-ARM: mach-bcm dt updates for 3.15
-
-- add BCM4708 dt support
-- remove bcm11351-brt
-- bcm281xx common clock support
-
-----------------------------------------------------------------
-Alex Elder (1):
-      ARM: dts: bcm281xx: define real clocks
-
-Hauke Mehrtens (1):
-      ARM: BCM5301X: add dts files for BCM4708 SoC
-
-Matt Porter (1):
-      ARM: dts: remove bcm11351-brt.dts
-
-Tim Kryger (1):
-      ARM: dts: Leave sdio1 as disabled on bcm28155-ap
-
- arch/arm/boot/dts/Makefile                  |   4 +-
- arch/arm/boot/dts/bcm11351-brt.dts          |  54 --------
- arch/arm/boot/dts/bcm11351.dtsi             | 192 ++++++++++++++++++++--------
- arch/arm/boot/dts/bcm28155-ap.dts           |   5 -
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts |  35 +++++
- arch/arm/boot/dts/bcm4708.dtsi              |  34 +++++
- arch/arm/boot/dts/bcm5301x.dtsi             |  95 ++++++++++++++
- 7 files changed, 306 insertions(+), 113 deletions(-)
- delete mode 100644 arch/arm/boot/dts/bcm11351-brt.dts
- create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
- create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
- create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
+-- 
+Catalin
