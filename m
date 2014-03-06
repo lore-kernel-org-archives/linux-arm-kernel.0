@@ -1,36 +1,100 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 6 Mar 2014 12:21:34 +0200
-Subject: [PATCH v5 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
-References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <53184C2E.3000807@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 6 Mar 2014 10:36:20 +0000
+Subject: [PATCH v6 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP	cases.
+In-Reply-To: <20140305233135.GZ21483@n2100.arm.linux.org.uk>
+References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
+ <20140305233135.GZ21483@n2100.arm.linux.org.uk>
+Message-ID: <20140306103620.GB6457@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+On Wed, Mar 05, 2014 at 11:31:35PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 05, 2014 at 11:49:08AM +0000, Liviu Dudau wrote:
+> > The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
+> > is wrong. It returns a mapped (i.e. virtual) address that can start from
+> > zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
+> > architectures that use !CONFIG_GENERIC_MAP define.
+> 
+> What value does PCI_IOBASE and IO_SPACE_LIMIT have on other architectures
+> who make use of asm-generic/io.h ?
 
-On 05/03/14 18:23, Pawel Moll wrote:
-> This patch adds basic DT bindings for the PL11x CLCD cells
-> and make their fbdev driver use them.
+Hi Russell,
 
-Is this an old HW, and presumably there won't be new users for it? If
-yes, this is probably fine. If not, you might want to look at the video
-ports and endpoints, which is used by at least three not-yet-merged series:
+Sorry for being a bit opaque in the commit message, I probably conflated two
+issues into one. The first issue is that ioport_map() is supposed to return
+a virtual address for the IO port. I struggle to believe that a virtual address
+of zero for IO is valid for most architectures other than x86. My guess is that
+most of the architectures that you have listed as including asm-generic/io.h
+have no support for PCI whatsoever. The other issue is that *if* you specify an
+PCI_IOBASE and don't come up with your own version of ioport_map() then you
+get the wrong virtual addresses back.
 
-[PATCHv3 00/41] OMAPDSS: DT support v3
-[PATCH v5 00/11] imx-drm dt bindings
-[RFC PATCH v2 00/21] Add DSI display support for Exynos based boards
+One way to fix all this is to use PCI_IOBASE inside the generic version and to
+define it to a non-zero values for architectures that have memory mapped IO.
+That should reduce the number of custom versions of ioport_map() that we currently
+have.
 
-Using bindings like that would be more future proof, even if the current
-driver doesn't use them.
+The other implied message that I'm getting is that you are suggesting that the
+commit message is generalising a bit too much? With that I agree, in light of
+your analysis. I can change it to something like:
 
- Tomi
+   The inline version of ioport_map() that gets used for !CONFIG_GENERIC_IOMAP is
+   wrong when PCI_IOBASE has a non-zero value. The function is supposed to return
+   a virtual address for IO ports and for architectures that memory map the IO
+   areas that is giving incorrect results as it ignores PCI_IOBASE. Fix this and
+   also limit the port range to the IO_SPACE_LIMIT mask.
 
+> 
+> $ git grep asm-generic/io.h arch/
+> arch/arc/include/asm/io.h:#include <asm-generic/io.h>
+> arch/blackfin/include/asm/io.h:#include <asm-generic/io.h>
+> arch/metag/include/asm/io.h:#include <asm-generic/io.h>
+> arch/microblaze/include/asm/io.h:/* from asm-generic/io.h */
+> arch/openrisc/include/asm/io.h:#include <asm-generic/io.h>
+> arch/s390/include/asm/io.h:#include <asm-generic/io.h>
+> arch/score/include/asm/io.h:#include <asm-generic/io.h>
+> arch/unicore32/include/asm/io.h:#include <asm-generic/io.h>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/96146f79/attachment.sig>
+PCI_IOBASE = PKUNITY_PCILIO_BASE = PKUNITY_PCI_BASE + 0x00030000 = 
+    io_p2v(0x80000000) + 0x00030000
+
+All other ones bar arm64 are either happy with PCI_IOBASE being zero (proxy for
+"no PCI support") or define their own version of ioport_map().
+
+Best regards,
+Liviu
+
+> arch/xtensa/include/asm/io.h:#include <asm-generic/io.h>
+> $ arch/arc/include/asm/io.h:#define PCI_IOBASE ((void __iomem *)0)
+> arch/arm64/include/asm/io.h:#define PCI_IOBASE          ((void __iomem *)(MODULES_VADDR - SZ_2M))
+> arch/arm64/include/asm/io.h:    return readb(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:    return readw(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:    return readl(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:    writeb(b, addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:    writew(b, addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:    writel(b, addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            *buf++ = __raw_readb(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            *buf++ = __raw_readw(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            *buf++ = __raw_readl(addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            __raw_writeb(*buf++, addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            __raw_writew(*buf++, addr + PCI_IOBASE);
+> arch/arm64/include/asm/io.h:            __raw_writel(*buf++, addr + PCI_IOBASE);
+> arch/unicore32/include/asm/io.h:#define PCI_IOBASE      PKUNITY_PCILIO_BASE
+> arch/unicore32/include/asm/io.h:#define PIO_OFFSET              (unsigned int)(PCI_IOBASE)
+> 
+> 
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
