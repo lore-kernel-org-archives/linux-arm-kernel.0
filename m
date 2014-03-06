@@ -1,84 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Mar 2014 15:51:31 +0100
-Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
-In-Reply-To: <20140306144600.GM4780@lunn.ch>
-References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
- <20140306131429.GJ4780@lunn.ch> <5318779C.8030901@free-electrons.com>
- <20140306142117.GL4780@lunn.ch> <531886B4.2070002@free-electrons.com>
- <20140306144600.GM4780@lunn.ch>
-Message-ID: <53188B73.4000109@free-electrons.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 6 Mar 2014 20:44:40 +0530
+Subject: [PATCH] dma: fsl-edma: fix static checker warning of NULL
+ dereference
+In-Reply-To: <1392965406-10112-1-git-send-email-b35083@freescale.com>
+References: <1392965406-10112-1-git-send-email-b35083@freescale.com>
+Message-ID: <20140306151440.GH1976@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 15:46, Andrew Lunn wrote:
->>>>> I think you can use aliases to get the order correct, independent of
->>>>> how you list them in DT. That should be a lot safer than assuming
->>>>> things are instantiated from top to bottom.
->>>>
->>>> It sounds interesting, how would you do this?
->>>
->>> As there already is in armada-370-xp.dtsi
->>>
->>>         aliases {
->>>                 eth0 = &eth0;
->>>                 eth1 = &eth1;
->>>         };
->>>
->>>
->>> 	eth0: ethernet at 70000 {
->>> 	}
->>>         eth1: ethernet at 74000 {
->>> 	}
->>>
->>> This at least works for i2c devices. The pdev->id is set using the
->>> alias number.
->>
->> Well I think it doesn't work with ethernet devices because we already do
->> this in aramda-38x.dtsi:
->>
->> 	aliases {
->> 		gpio0 = &gpio0;
->> 		gpio1 = &gpio1;
->> 		eth0 = &eth0;
->> 		eth1 = &eth1;
->> 		eth2 = &eth2;
->> 	};
->>
->> 	eth1: ethernet at 30000 {
->> 	}
->> 	eth2: ethernet at 34000 {
->> 	}
->> 	eth0: ethernet at 70000 {
->> 	}
+On Fri, Feb 21, 2014 at 02:50:06PM +0800, Jingchang Lu wrote:
+> The static checker reports following warning:
+> 	drivers/dma/fsl-edma.c:732 fsl_edma_xlate()
+> 	error: we previously assumed 'chan' could be null (see line 737)
+> The changes of the loop cursor in the iteration may result in
+> NULL dereference when dma_get_slave_channel failed but loop
+> will continue. So use list_for_each_entry_safe() instead of
+> list_for_each_entry() to against this.
 > 
-> Ah, Erm, O.K. 
-> 
-> It seems to be an i2c thing. Take a look at i2c_add_adapter().
-> 
->         if (dev->of_node) {
->                 id = of_alias_get_id(dev->of_node, "i2c");
->  
-> You could put something similar into the ethernet driver.
-> 
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-
-Actually even what I did, didn't work as I expected. The order should have been changed in
-the dsi file.
-
-I will have a look on the ethernet driver.
-
-
-Thanks,
-
-Gregory
-
-
->     Andrew
-> 
-
+Applied, thanks
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+~Vinod
+> ---
+>  drivers/dma/fsl-edma.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index 9025300..381e793 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -723,13 +723,13 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+>  		struct of_dma *ofdma)
+>  {
+>  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+> -	struct dma_chan *chan;
+> +	struct dma_chan *chan, *_chan;
+>  
+>  	if (dma_spec->args_count != 2)
+>  		return NULL;
+>  
+>  	mutex_lock(&fsl_edma->fsl_edma_mutex);
+> -	list_for_each_entry(chan, &fsl_edma->dma_dev.channels, device_node) {
+> +	list_for_each_entry_safe(chan, _chan, &fsl_edma->dma_dev.channels, device_node) {
+>  		if (chan->client_count)
+>  			continue;
+>  		if ((chan->chan_id / DMAMUX_NR) == dma_spec->args[0]) {
+> -- 
+> 1.8.0
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
