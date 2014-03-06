@@ -1,46 +1,92 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 5 Mar 2014 18:24:19 -0600
-Subject: [PATCH 10/10] ARM: dts: OMAP5: Add IOMMU nodes
+Date: Wed, 5 Mar 2014 18:24:13 -0600
+Subject: [PATCH 04/10] ARM: OMAP2+: use pdata quirks for iommu reset lines
 In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
 References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-Message-ID: <1394065459-16409-11-git-send-email-s-anna@ti.com>
+Message-ID: <1394065459-16409-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU DT nodes have been added for the DSP and IPU
-subsystems. The MMUs in OMAP5 are identical to those in
-OMAP4, including the bus error back capability on IPU.
+The OMAP iommu driver performs the reset management for the
+iommu instances in processor sub-systems using the omap_device
+API which are currently supplied as platform data ops. Use pdata
+quirks to maintain the functionality as the OMAP iommu driver
+gets converted to use DT nodes, until the reset portions are
+decoupled from omap_hwmod/omap_device into a separate reset
+driver.
+
+This patch adds the pdata quirks for the reset management of
+iommus within the DSP (OMAP3 & OMAP4) and IPU subsystems (OMAP4).
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/mach-omap2/pdata-quirks.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index a72813a..4c16255 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -513,6 +513,21 @@
- 			dma-names = "tx", "rx";
- 		};
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 3d5b24d..74e094a 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -16,12 +16,14 @@
+ #include <linux/wl12xx.h>
  
-+		mmu_dsp: mmu at 4a066000 {
-+			compatible = "ti,omap4-iommu";
-+			reg = <0x4a066000 0x100>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu_dsp";
-+		};
+ #include <linux/platform_data/pinctrl-single.h>
++#include <linux/platform_data/iommu-omap.h>
+ 
+ #include "am35xx.h"
+ #include "common.h"
+ #include "common-board-devices.h"
+ #include "dss-common.h"
+ #include "control.h"
++#include "omap_device.h"
+ 
+ struct pdata_init {
+ 	const char *compatible;
+@@ -92,6 +94,12 @@ static void __init hsmmc2_internal_input_clk(void)
+ 	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
+ }
+ 
++static struct iommu_platform_data omap3_iommu_pdata = {
++	.reset_name = "mmu",
++	.assert_reset = omap_device_assert_hardreset,
++	.deassert_reset = omap_device_deassert_hardreset,
++};
 +
-+		mmu_ipu: mmu at 55082000 {
-+			compatible = "ti,omap4-iommu";
-+			reg = <0x55082000 0x100>;
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu_ipu";
-+			ti,iommu-bus-err-back;
-+		};
+ static int omap3_sbc_t3730_twl_callback(struct device *dev,
+ 					   unsigned gpio,
+ 					   unsigned ngpio)
+@@ -185,6 +193,12 @@ static void __init omap4_panda_legacy_init(void)
+ 	legacy_init_ehci_clk("auxclk3_ck");
+ 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
+ }
 +
- 		keypad: keypad at 4ae1c000 {
- 			compatible = "ti,omap4-keypad";
- 			reg = <0x4ae1c000 0x400>;
++static struct iommu_platform_data omap4_iommu_pdata = {
++	.reset_name = "mmu_cache",
++	.assert_reset = omap_device_assert_hardreset,
++	.deassert_reset = omap_device_deassert_hardreset,
++};
+ #endif
+ 
+ #ifdef CONFIG_SOC_OMAP5
+@@ -240,6 +254,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP3
+ 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
++		       &omap3_iommu_pdata),
+ 	/* Only on am3517 */
+ 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
+ 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+@@ -248,6 +264,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP4
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
++		       &omap4_iommu_pdata),
++	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
++		       &omap4_iommu_pdata),
+ #endif
+ 	{ /* sentinel */ },
+ };
 -- 
 1.9.0
