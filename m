@@ -1,43 +1,39 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Mar 2014 15:10:59 -0500
-Subject: [PATCH v2] ARM: mvebu: add Device Tree for the Armada 385 RD board
-In-Reply-To: <1394119075-18657-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1394119075-18657-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140306201059.GI1872@titan.lakedaemon.net>
+Date: Thu, 6 Mar 2014 15:15:10 -0500
+Subject: [PATCH 1/3] ARM: dove: drop pinctrl PMU reg property
+In-Reply-To: <1393977790-29110-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393977790-29110-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140306201510.GJ1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 04:17:55PM +0100, Gregory CLEMENT wrote:
-> The Armada 385 RD board is the reference design board from Marvell
-> for the Armada 385 SoC. This commit adds a Device Tree description for
-> this board, which enables the following features:
+On Wed, Mar 05, 2014 at 01:03:08AM +0100, Sebastian Hesselbarth wrote:
+> Marvell Dove's pinctrl does require some PMU regs for muxing PMU
+> functions to MPP pins. Recently, a discussion started about consolidating
+> Power Management Unit (PMU) into a single DT node. As we don't want
+> anymore DT ABI in the way, drop the corresponding reg property from
+> pinctrl node now. The driver will derive the registers from existing
+> reg properties.
 > 
->  * Network interfaces
->  * I2C bus
->  * Serial port
->  * SPI bus, with a SPI flash
->  * PCIe interface
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
-> Changelog:
-> v1 -> v2:
-> 
-> - used the phy-mode "rgmii-id" to be able to work with the Marvell PHY
->   driver enabled
-> 
-> - put the ethernet nodes in the address order, as it has no effect to
->   change ti at this level (should be done at dtsi level)
-> 
-> - inverted the phy devices (which was improperly assigned in v1)
-> 
-> - added the vendor prefix for the SPI flash
-> 
-> 
->  arch/arm/boot/dts/Makefile          |  3 +-
->  arch/arm/boot/dts/armada-385-rd.dts | 94 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 96 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/armada-385-rd.dts
+> Cc: Rob Herring <robh+dt@kernel.org> 
+> Cc: Pawel Moll <pawel.moll@arm.com> 
+> Cc: Mark Rutland <mark.rutland@arm.com> 
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
+> Cc: Kumar Gala <galak@codeaurora.org> 
+> Cc: Russell King <linux@arm.linux.org.uk> 
+> Cc: Jason Cooper <jason@lakedaemon.net> 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: devicetree at vger.kernel.org 
+> Cc: linux-arm-kernel at lists.infradead.org 
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
 Applied to mvebu/dt
 
