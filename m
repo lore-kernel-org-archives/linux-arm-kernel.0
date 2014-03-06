@@ -1,66 +1,64 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 06 Mar 2014 11:34:46 +0900
-Subject: [PATCH v2 2/3] arm64: Add seccomp support
-In-Reply-To: <20140228172006.GF30996@mudshark.cambridge.arm.com>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
- <1393320025-2855-3-git-send-email-takahiro.akashi@linaro.org>
- <20140228172006.GF30996@mudshark.cambridge.arm.com>
-Message-ID: <5317DEC6.4060103@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 06 Mar 2014 11:38:07 +0900
+Subject: [PATCH v2 4/6] ARM: dts: exynos5440: fix PCIe interrupt mapping
+In-Reply-To: <1394025951-32438-5-git-send-email-l.stach@pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <000101cf38e5$1b9fd6c0$52df8440$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2014 02:20 AM, Will Deacon wrote:
-> On Tue, Feb 25, 2014 at 09:20:24AM +0000, AKASHI Takahiro wrote:
->> secure_computing() should always be called first in syscall_trace(), and
->> if it returns non-zero, we should stop further handling. Then that system
->> call may eventually fail, be trapped or the process itself be killed
->> depending on loaded rules.
->
-> [...]
->
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index d4ce70e..f2a74bc 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -20,12 +20,14 @@
->>    */
->>
->>   #include <linux/audit.h>
->> +#include <linux/errno.h>
->>   #include <linux/kernel.h>
->>   #include <linux/sched.h>
->>   #include <linux/mm.h>
->>   #include <linux/smp.h>
->>   #include <linux/ptrace.h>
->>   #include <linux/user.h>
->> +#include <linux/seccomp.h>
->>   #include <linux/security.h>
->>   #include <linux/init.h>
->>   #include <linux/signal.h>
->> @@ -1064,6 +1066,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->>   {
->>   	unsigned long saved_reg;
->>
->> +	if (!dir && secure_computing((int)regs->syscallno))
->
-> Why do you need this cast to (int)?
+On Wednesday, March 05, 2014 10:26 PM, Lucas Stach wrote:
+> 
+> So it actually works.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-OK. I will remove it because gcc doesn't complain about it anyway.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-> Also, it's probably better to check for
-> -1 explicitly here.
+It works properly on Exynos platform.
+Thank you.
 
-I wil fix it.
+Best regards,
+Jingoo Han
 
-> I'm slightly surprised that we do the secure computing check first. Doesn't
-> this allow a debugger to change the syscall to something else after we've
-> decided that it's ok?
-
-To be honest, I just followed other architectures' implementation.
-Can you elaborate any use case that you have in your mind?
-
--Takahiro AKASHI
-
-> Will
->
+> ---
+> v2: fix build breakage by including arm-gic.h
+> ---
+>  arch/arm/boot/dts/exynos5440.dtsi | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> index 02a0a1226cef..7628e2edf1b6 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -9,6 +9,8 @@
+>   * published by the Free Software Foundation.
+>  */
+> 
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+>  #include "skeleton.dtsi"
+> 
+>  / {
+> @@ -274,7 +276,7 @@
+>  			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
+>  		#interrupt-cells = <1>;
+>  		interrupt-map-mask = <0 0 0 0>;
+> -		interrupt-map = <0x0 0 &gic 53>;
+> +		interrupt-map = <0 0 0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+>  		num-lanes = <4>;
+>  		status = "disabled";
+>  	};
+> @@ -295,7 +297,7 @@
+>  			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
+>  		#interrupt-cells = <1>;
+>  		interrupt-map-mask = <0 0 0 0>;
+> -		interrupt-map = <0x0 0 &gic 56>;
+> +		interrupt-map = <0 0 0 0 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+>  		num-lanes = <4>;
+>  		status = "disabled";
+>  	};
+> --
+> 1.9.0
