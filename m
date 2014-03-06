@@ -1,100 +1,38 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 6 Mar 2014 10:36:20 +0000
-Subject: [PATCH v6 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP	cases.
-In-Reply-To: <20140305233135.GZ21483@n2100.arm.linux.org.uk>
-References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
- <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
- <20140305233135.GZ21483@n2100.arm.linux.org.uk>
-Message-ID: <20140306103620.GB6457@e106497-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Mar 2014 10:37:19 +0000
+Subject: [RFC PATCH 1/1] arm64: Add boot time configuration of
+ Intermediate Physical Address size
+In-Reply-To: <CAC8NTUVjMGKXWxVWqa0=CS0EDxRwD1yfB_VoMHE0FSOHD7dNeg@mail.gmail.com>
+References: <1393830037-25499-1-git-send-email-mohun106@gmail.com>
+ <1393830037-25499-2-git-send-email-mohun106@gmail.com>
+ <CAC8NTUVjMGKXWxVWqa0=CS0EDxRwD1yfB_VoMHE0FSOHD7dNeg@mail.gmail.com>
+Message-ID: <20140306103719.GB5202@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 11:31:35PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 05, 2014 at 11:49:08AM +0000, Liviu Dudau wrote:
-> > The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
-> > is wrong. It returns a mapped (i.e. virtual) address that can start from
-> > zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
-> > architectures that use !CONFIG_GENERIC_MAP define.
+On Thu, Mar 06, 2014 at 06:06:07AM +0000, Radha Mohan wrote:
+> Hi all,
 > 
-> What value does PCI_IOBASE and IO_SPACE_LIMIT have on other architectures
-> who make use of asm-generic/io.h ?
+> Any comments?
 
-Hi Russell,
+[...]
 
-Sorry for being a bit opaque in the commit message, I probably conflated two
-issues into one. The first issue is that ioport_map() is supposed to return
-a virtual address for the IO port. I struggle to believe that a virtual address
-of zero for IO is valid for most architectures other than x86. My guess is that
-most of the architectures that you have listed as including asm-generic/io.h
-have no support for PCI whatsoever. The other issue is that *if* you specify an
-PCI_IOBASE and don't come up with your own version of ioport_map() then you
-get the wrong virtual addresses back.
+> > diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> > index 2b0244d..642fec9 100644
+> > --- a/arch/arm64/kvm/hyp-init.S
+> > +++ b/arch/arm64/kvm/hyp-init.S
+> > @@ -68,6 +68,13 @@ __do_hyp_init:
+> >         msr     tcr_el2, x4
+> >
+> >         ldr     x4, =VTCR_EL2_FLAGS
+> > +       /*
+> > +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> > +        * VTCR_EL2.
+> > +        */
+> > +       mrs     x5, ID_AA64MMFR0_EL1
+> > +       ubfiz   x5, x5, #16, #3
+> > +       orr     x4, x4, x5
 
-One way to fix all this is to use PCI_IOBASE inside the generic version and to
-define it to a non-zero values for architectures that have memory mapped IO.
-That should reduce the number of custom versions of ioport_map() that we currently
-have.
+Can you use BFI instead of UBFIZ + ORR?
 
-The other implied message that I'm getting is that you are suggesting that the
-commit message is generalising a bit too much? With that I agree, in light of
-your analysis. I can change it to something like:
-
-   The inline version of ioport_map() that gets used for !CONFIG_GENERIC_IOMAP is
-   wrong when PCI_IOBASE has a non-zero value. The function is supposed to return
-   a virtual address for IO ports and for architectures that memory map the IO
-   areas that is giving incorrect results as it ignores PCI_IOBASE. Fix this and
-   also limit the port range to the IO_SPACE_LIMIT mask.
-
-> 
-> $ git grep asm-generic/io.h arch/
-> arch/arc/include/asm/io.h:#include <asm-generic/io.h>
-> arch/blackfin/include/asm/io.h:#include <asm-generic/io.h>
-> arch/metag/include/asm/io.h:#include <asm-generic/io.h>
-> arch/microblaze/include/asm/io.h:/* from asm-generic/io.h */
-> arch/openrisc/include/asm/io.h:#include <asm-generic/io.h>
-> arch/s390/include/asm/io.h:#include <asm-generic/io.h>
-> arch/score/include/asm/io.h:#include <asm-generic/io.h>
-> arch/unicore32/include/asm/io.h:#include <asm-generic/io.h>
-
-PCI_IOBASE = PKUNITY_PCILIO_BASE = PKUNITY_PCI_BASE + 0x00030000 = 
-    io_p2v(0x80000000) + 0x00030000
-
-All other ones bar arm64 are either happy with PCI_IOBASE being zero (proxy for
-"no PCI support") or define their own version of ioport_map().
-
-Best regards,
-Liviu
-
-> arch/xtensa/include/asm/io.h:#include <asm-generic/io.h>
-> $ arch/arc/include/asm/io.h:#define PCI_IOBASE ((void __iomem *)0)
-> arch/arm64/include/asm/io.h:#define PCI_IOBASE          ((void __iomem *)(MODULES_VADDR - SZ_2M))
-> arch/arm64/include/asm/io.h:    return readb(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:    return readw(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:    return readl(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:    writeb(b, addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:    writew(b, addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:    writel(b, addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            *buf++ = __raw_readb(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            *buf++ = __raw_readw(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            *buf++ = __raw_readl(addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            __raw_writeb(*buf++, addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            __raw_writew(*buf++, addr + PCI_IOBASE);
-> arch/arm64/include/asm/io.h:            __raw_writel(*buf++, addr + PCI_IOBASE);
-> arch/unicore32/include/asm/io.h:#define PCI_IOBASE      PKUNITY_PCILIO_BASE
-> arch/unicore32/include/asm/io.h:#define PIO_OFFSET              (unsigned int)(PCI_IOBASE)
-> 
-> 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Will
