@@ -1,292 +1,485 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 5 Mar 2014 20:38:31 -0600
-Subject: [PATCH v2 1/1] arm64: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAC8NTUWpU4vq7=Jotmb1+-c7xNBct+0vdb8496yx03iDso-V7w@mail.gmail.com>
-References: <1393831142-27952-1-git-send-email-mohun106@gmail.com>
- <1393831142-27952-2-git-send-email-mohun106@gmail.com>
- <CAL_JsqLn2uJCcjB9D_xw8Y7om0F0JPp87niwjCjYxVUEfYwAtw@mail.gmail.com>
- <CAC8NTUWpU4vq7=Jotmb1+-c7xNBct+0vdb8496yx03iDso-V7w@mail.gmail.com>
-Message-ID: <CAL_JsqJgJJ7TFyO4=o_MPsC4tYSXcAe1g-dG+=iQtgUq6RaCyw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 6 Mar 2014 03:39:45 +0100
+Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <1394002352-8380-2-git-send-email-yao.yuan@freescale.com>
+References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
+ <1394002352-8380-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <201403060339.45611.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 2:46 AM, Radha Mohan <mohun106@gmail.com> wrote:
-> On Tue, Mar 4, 2014 at 4:26 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On Mon, Mar 3, 2014 at 1:19 AM,  <mohun106@gmail.com> wrote:
->>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>>
->>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>> ---
->>>  arch/arm64/boot/dts/Makefile    |    1 +
->>>  arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 159 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->>> index c52bdb0..d339343 100644
->>> --- a/arch/arm64/boot/dts/Makefile
->>> +++ b/arch/arm64/boot/dts/Makefile
->>> @@ -1,5 +1,6 @@
->>>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->>>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->>> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
->>>
->>>  targets += dtbs
->>>  targets += $(dtb-y)
->>> diff --git a/arch/arm64/boot/dts/thunder.dts b/arch/arm64/boot/dts/thunder.dts
->>> new file mode 100644
->>> index 0000000..7e8c7d5
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/thunder.dts
->>> @@ -0,0 +1,158 @@
->>> +/*
->>> + * Cavium Thunder 8xxx DTS file
->>> + *
->>> + * Copyright (C) 2013, Cavium Inc.
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation; either version 2 of
->>> + * the License, or (at your option) any later version.
->>
->> DTS files should really be BSD licensed for use on other OSs.
->>
->
-> Is this a new requirement? I haven't seen any DTS (atleast in
-> ARM/ARM64) that uses BSD license.
+On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
+> Add dma support for i2c. This function depend on DMA driver.
+> You can turn on it by write both the dmas and dma-name properties in dts
+> node.
+> 
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
 
-I'm not saying you have to. Considering the DTB should come from the
-firmware and you could want to boot other OS's, BSD license makes more
-sense. Also at some point, we plan to move dts files out of the kernel
-to better support other projects like u-boot or FreeBSD. It may become
-more of an issue then and dts files could need to be re-licensed. I'd
-rather avoid the whole issue of trying to re-license things.
+[...]
 
+>  struct imx_i2c_struct {
+>  	struct i2c_adapter	adapter;
+>  	struct clk		*clk;
+> @@ -184,6 +205,9 @@ struct imx_i2c_struct {
+>  	int			stopped;
+>  	unsigned int		ifdr; /* IMX_I2C_IFDR */
+>  	const struct imx_i2c_hwdata	*hwdata;
+> +
+> +	bool			use_dma;
+> +	struct imx_i2c_dma	*dma;
 
->>> + */
->>> +/dts-v1/;
->>> +/ {
->>> +       model="Thunder";
->>
->> whitespace around the =.
->>
->>> +       compatible = "cavium, thunder";
->>
->> Please document compatible strings. There should not be a space in the
->> string. This should be more specific. The comments refer to 8xxx so I
->> assume there is a part number.
->
-> OK will do.
->
->>
->>> +       interrupt-parent = <&gic0>;
->>> +       #address-cells = <2>;
->>> +       #size-cells = <2>;
->>> +
->>> +       aliases {
->>> +               serial0 = &uaa0;
->>> +               serial1 = &uaa1;
->>> +       };
->>> +
->>> +       cpus {
->>> +               #address-cells = <2>;
->>> +               #size-cells = <0>;
->>> +               cpu at 0 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>
->> Custom core right? Add a compatible string for the core name.
->
-> OK, I guess that should be also documented, right?
-> But I didn't find other ARM64 platforms doing it.
+I'd suggest you check how big this structure would be if you swapped the 
+'bool...' and 'struct imx_i2c_dma...' entries and compare it to the original. I 
+think due to natural alignment, having the bool first would create more slop 
+[1].
 
-arm,potenza for APM. Everything else is models, so they don't really count.
+>  };
+> 
+>  static const struct imx_i2c_hwdata imx1_i2c_hwdata  = {
+> @@ -254,9 +278,120 @@ static inline unsigned char imx_i2c_read_reg(struct
+> imx_i2c_struct *i2c_imx, return readb(i2c_imx->base + (reg <<
+> i2c_imx->hwdata->regshift)); }
+> 
+> +/** Functions for DMA support
+> ************************************************
+> +*************************************************************************
+> *****/
 
->
->>
->>> +                       reg = <0x0 0x0>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 1 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x1>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>
->> Same address for all cores? I don't see how that will work for hotplug.
->
-> Hotplug will work if we use PSCI boot-method. For spin-table there is
-> no hotplug support. And we don't enable it too.
->
->>
->>> +               };
->>> +               cpu at 2 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x2>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 3 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x3>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 4 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x4>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 5 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x5>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 6 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x6>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +               cpu at 7 {
->>> +                       device_type = "cpu";
->>> +                       compatible = "arm,armv8";
->>> +                       reg = <0x0 0x7>;
->>> +                       enable-method = "spin-table";
->>> +                       cpu-release-addr = <0x0 0xfff8>;
->>> +               };
->>> +
->>> +       };
->>> +       memory at 0x0 {
->>
->> Drop the '0x'
->>> +               device_type = "memory";
->>> +               reg = <0x0 0x0 0x0 0x80000000>;
->>> +       };
->>> +
->>> +       gic0: interrupt-controller at 0x801000000000 {
->>
->> Ditto
->>
->>> +               compatible = "arm,gic-v3";
->>> +               #interrupt-cells = <3>;
->>> +               #address-cells = <0>;
->>> +               interrupt-controller;
->>> +               reg = <0x8010 0x0 0x0 0x10000>,         // GICD
->>> +                     <0x8010 0x80000000 0x0 0x100000>; // GICR
->>
->> Umm, so no virtualization support?
->
-> Why do you think there is no virtualization support? Our platform is
-> not backward compatible with GICv2
+I can't say I am too fond of this style of comment, especially since it violates 
+coding style (it's not a kernel-doc style comment either). Just use
 
-Okay.
+/*
+ * Functions for DMA
+ */
 
->
->>
->> This should be under a bus node.
->
-> Why GIC should be under a bus node?
+if you really want to make the comment big.
 
-Because it is on some bus.
+> +static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx, u32
+> phy_addr) +{
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> +	struct dma_slave_config dma_sconfig;
+> +	int ret;
+> +
+> +	dma->chan_tx = dma_request_slave_channel(&i2c_imx->adapter.dev, "tx");
 
->
->>
->>> +               interrupts = <1 9 0xf04>;
->>> +       };
->>> +
->>> +       timer {
->>> +               compatible = "arm,armv8-timer";
->>> +               interrupts = <1 13 0xff01>,
->>> +                            <1 14 0xff01>,
->>> +                            <1 11 0xff01>,
->>> +                            <1 10 0xff01>;
->>> +       };
->>> +
->>> +       on-chip-devices {
->>> +               compatible = "simple-bus";
->>> +               #address-cells = <2>;
->>> +               #size-cells = <2>;
->>> +               ranges;
->>> +
->>> +               ahci0: host-bus-adapter at 810000000000 {
->>> +                       compatible = "snps,spear-ahci";
->>> +                       reg-io-width = <4>;
->>
->> This property is not used for this binding.
->>
->>> +                       reg = <0x8100 0x0 0x0 0x1100>;
->>> +                       interrupts = <1 32 4>;
->>> +               };
->>> +
->>> +               nic0: ethernet at 843000000000 {
->>> +                       compatible = "smsc,lan9115";
->>> +                       reg-io-width = <4>;
->>> +                       reg = <0x8430 0x0 0x0 0x1000>;
->>> +                       interrupts = <1 31 4>;
->>> +               };
->>> +       };
->>> +
->>> +       amba {
->>> +               compatible = "arm,amba-bus";
->>
->> should be "simple-bus"
->
-> PL011 will not get probed if not "amba-bus"
+Why don't you define a new variable for this dev pointer ?
 
-Yes, it will. It is "arm,primecell" on the devices that is used for
-probing. There is really no such thing as an AMBA bus from a software
-view. There are no registers to program the bus (typically) or
-discovery mechanism. The ID registers within devices give you device
-type, but nothing describes where devices are.
+struct device *dev = &i2c_imx->adapter.dev;
 
->
->>
->>> +               #address-cells = <2>;
->>> +               #size-cells = <2>;
->>> +               ranges;
->>> +
->>> +               refclk24mhz: refclk24mhz {
->>
->> move to top level or a clocks node.
->
-> OK.
->
->>
->>> +                       compatible = "fixed-clock";
->>> +                       #clock-cells = <0>;
->>> +                       clock-frequency = <24000000>;
->>> +                       clock-output-names = "refclk24mhz";
->>> +               };
->>> +
->>> +               uaa0: uart at 87e024000000 {
->>
->> use ranges so the bus address is 0x87e0_00000000.
->>
->
-> OK, I need to look at this.
->
->>> +                       compatible = "arm,pl011", "arm,primecell";
->>> +                       reg = <0x87e0 0x24000000 0x0 0x1000>;
->>> +                       interrupts = <1 21 4>;
->>> +                       clocks = <&refclk24mhz>;
->>> +                       clock-names = "apb_pclk";
->>
->> Your APB bus frequency is really only 24MHz? There should 2 clocks defined here.
->>
->
-> This clock is a dummy one as this DTS is based on a simulator.
-> Is 2 clocks really a necessity? Then don't the drivers needs to do
-> something if we don't define 2 clocks?
+Then use this 'dev' all around isntead of spelling the entire path everywhere. 
+That'd trim the amount of code down too, not to mention you'd be able to avoid 
+multi-line function args more often.
 
-Accurately describing the h/w is a necessity.
+> +	if (!dma->chan_tx) {
+> +		dev_err(&i2c_imx->adapter.dev,
+> +				"Dma tx channel request failed!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	dma_sconfig.dst_addr = (dma_addr_t)phy_addr +
 
-Rob
+Why don't you pass the 'phy_addr' as 'dma_addr_t' into this function in the 
+first place ?
+
+> +				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
+> +	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	dma_sconfig.dst_maxburst = 1;
+> +	dma_sconfig.direction = DMA_MEM_TO_DEV;
+> +	ret = dmaengine_slave_config(dma->chan_tx, &dma_sconfig);
+> +	if (ret < 0) {
+> +		dev_err(&i2c_imx->adapter.dev,
+> +				"Dma slave config failed, err = %d\n", ret);
+> +		dma_release_channel(dma->chan_tx);
+
+Use 'goto fail' or such here to implement a failpath. Then handle the release of 
+tx channel in the failpath. You do duplicate this call below.
+
+> +		return ret;
+> +	}
+> +
+> +	dma->chan_rx = dma_request_slave_channel(&i2c_imx->adapter.dev, "rx");
+> +	if (!dma->chan_rx) {
+> +		dev_err(&i2c_imx->adapter.dev,
+> +				"Dma rx channel request failed!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	dma_sconfig.src_addr = (dma_addr_t)phy_addr +
+> +				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
+> +	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	dma_sconfig.src_maxburst = 1;
+> +	dma_sconfig.direction = DMA_DEV_TO_MEM;
+> +	ret = dmaengine_slave_config(dma->chan_rx, &dma_sconfig);
+> +	if (ret < 0) {
+> +		dev_err(&i2c_imx->adapter.dev,
+> +				"Dma slave config failed, err = %d\n", ret);
+> +		dma_release_channel(dma->chan_rx);
+> +		return ret;
+> +	}
+> +
+> +	init_completion(&dma->cmd_complete);
+> +
+> +	return 0;
+> +}
+> +
+> +static void i2c_imx_dma_callback(void *arg)
+> +{
+> +	struct imx_i2c_struct *i2c_imx = (struct imx_i2c_struct *)arg;
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> +
+> +	dma_unmap_single(dma->chan_using->device->dev, dma->dma_buf,
+> +			dma->dma_len, dma->dma_data_dir);
+> +	complete(&dma->cmd_complete);
+> +}
+> +
+> +static int i2c_imx_dma_xfer(struct imx_i2c_struct *i2c_imx,
+> +				struct i2c_msg *msgs)
+> +{
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> +	struct dma_async_tx_descriptor *txdesc;
+> +
+> +	dma->dma_buf = dma_map_single(dma->chan_using->device->dev, msgs->buf,
+> +					dma->dma_len, dma->dma_data_dir);
+> +	if (dma_mapping_error(dma->chan_using->device->dev, dma->dma_buf)) {
+> +		dev_err(&i2c_imx->adapter.dev, "dma_map_single failed\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	txdesc = dmaengine_prep_slave_single(dma->chan_using, dma->dma_buf,
+> +					dma->dma_len, dma->dma_transfer_dir,
+> +					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+> +	if (!txdesc) {
+> +		dev_err(&i2c_imx->adapter.dev,
+> +				"Not able to get desc for dma xfer\n");
+> +		return -EINVAL;
+
+If we fail here, we will still have dma_buf mapped , right ?
+
+> +	}
+> +
+> +	txdesc->callback = i2c_imx_dma_callback;
+> +	txdesc->callback_param = i2c_imx;
+> +	dmaengine_submit(txdesc);
+> +	dma_async_issue_pending(dma->chan_using);
+> +
+> +	return 0;
+> +}
+> +
+> +static void i2c_imx_dma_free(struct imx_i2c_struct *i2c_imx)
+> +{
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> +	struct dma_chan *dma_chan;
+> +
+> +	dma->dma_buf = 0;
+> +	dma->dma_len = 0;
+> +
+> +	dma_chan = dma->chan_tx;
+> +	dma_release_channel(dma_chan);
+> +	dma->chan_tx = NULL;
+
+Here you can just drop the special variable.
+
+> +	dma_chan = dma->chan_rx;
+> +	dma_release_channel(dma_chan);
+> +	dma->chan_rx = NULL;
+> +
+> +	dma->chan_using = NULL;
+> +}
+> +
+>  /** Functions for IMX I2C adapter driver
+> ***************************************
+> **************************************************************************
+> *****/ -
+>  static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
+>  {
+>  	unsigned long orig_jiffies = jiffies;
+> @@ -427,46 +562,98 @@ static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
+> 
+>  static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg
+> *msgs) {
+> -	int i, result;
+> +	int i, result, timeout = IMX_I2C_DMA_TIMEOUT;
+> +	unsigned int temp = 0;
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> 
+>  	dev_dbg(&i2c_imx->adapter.dev, "<%s> write slave address: addr=0x%x\n",
+>  		__func__, msgs->addr << 1);
+> 
+> -	/* write slave address */
+> -	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> -	result = i2c_imx_trx_complete(i2c_imx);
+> -	if (result)
+> -		return result;
+> -	result = i2c_imx_acked(i2c_imx);
+> -	if (result)
+> -		return result;
+> -	dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
+> +	if (i2c_imx->use_dma && msgs->len >= IMX_I2C_DMA_THRESHOLD) {
+> +		reinit_completion(&i2c_imx->dma->cmd_complete);
+> +		dma->chan_using = dma->chan_tx;
+> +		dma->dma_transfer_dir = DMA_MEM_TO_DEV;
+> +		dma->dma_data_dir = DMA_TO_DEVICE;
+> +		dma->dma_len = msgs->len - 1;
+> +		result = i2c_imx_dma_xfer(i2c_imx, msgs);
+> +		if (result)
+> +			return result;
+> 
+> -	/* write data */
+> -	for (i = 0; i < msgs->len; i++) {
+> -		dev_dbg(&i2c_imx->adapter.dev,
+> -			"<%s> write byte: B%d=0x%X\n",
+> -			__func__, i, msgs->buf[i]);
+> -		imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp |= I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +		/* write slave address */
+> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> +		result = wait_for_completion_interruptible_timeout(
+> +					&i2c_imx->dma->cmd_complete,
+> +					msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
+> +		if (result == 0)
+> +			return  -ETIMEDOUT;
+
+You need to handle result < 0 as well, since that happens if this was 
+interrupted.
+
+> +
+> +		/* waiting for Transfer complete. */
+> +		while (timeout--) {
+> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> +			if (temp & 0x80)
+
+What's this magic value of 0x80 here ?
+
+> +				break;
+> +			udelay(10);
+> +		}
+> +
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp &= ~I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +		/* write the last byte */
+> +		imx_i2c_write_reg(msgs->buf[msgs->len-1],
+> +					i2c_imx, IMX_I2C_I2DR);
+>  		result = i2c_imx_trx_complete(i2c_imx);
+>  		if (result)
+>  			return result;
+> +
+>  		result = i2c_imx_acked(i2c_imx);
+>  		if (result)
+>  			return result;
+> +	} else {
+> +		/* write slave address */
+> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> +		result = i2c_imx_trx_complete(i2c_imx);
+> +		if (result)
+> +			return result;
+> +
+> +		result = i2c_imx_acked(i2c_imx);
+> +		if (result)
+> +			return result;
+> +
+> +		dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
+
+Define and use 'dev' variable here, as mentioned above.
+
+> +		/* write data */
+> +		for (i = 0; i < msgs->len; i++) {
+> +			dev_dbg(&i2c_imx->adapter.dev,
+> +				"<%s> write byte: B%d=0x%X\n",
+> +				__func__, i, msgs->buf[i]);
+> +			imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
+> +			result = i2c_imx_trx_complete(i2c_imx);
+> +			if (result)
+> +				return result;
+> +			result = i2c_imx_acked(i2c_imx);
+> +			if (result)
+> +				return result;
+> +		}
+>  	}
+>  	return 0;
+>  }
+> 
+>  static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg
+> *msgs) {
+> -	int i, result;
+> +	int i, result, timeout = IMX_I2C_DMA_TIMEOUT;
+>  	unsigned int temp;
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> 
+>  	dev_dbg(&i2c_imx->adapter.dev,
+>  		"<%s> write slave address: addr=0x%x\n",
+>  		__func__, (msgs->addr << 1) | 0x01);
+> 
+> +
+>  	/* write slave address */
+>  	imx_i2c_write_reg((msgs->addr << 1) | 0x01, i2c_imx, IMX_I2C_I2DR);
+>  	result = i2c_imx_trx_complete(i2c_imx);
+> @@ -488,33 +675,71 @@ static int i2c_imx_read(struct imx_i2c_struct
+> *i2c_imx, struct i2c_msg *msgs)
+> 
+>  	dev_dbg(&i2c_imx->adapter.dev, "<%s> read data\n", __func__);
+> 
+> -	/* read data */
+> -	for (i = 0; i < msgs->len; i++) {
+> -		result = i2c_imx_trx_complete(i2c_imx);
+> +	if (i2c_imx->use_dma && msgs->len >= IMX_I2C_DMA_THRESHOLD) {
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp |= I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +		reinit_completion(&i2c_imx->dma->cmd_complete);
+> +		dma->chan_using = dma->chan_rx;
+> +		dma->dma_transfer_dir = DMA_DEV_TO_MEM;
+> +		dma->dma_data_dir = DMA_FROM_DEVICE;
+> +		dma->dma_len = msgs->len - 2;
+> +		result = i2c_imx_dma_xfer(i2c_imx, msgs);
+>  		if (result)
+>  			return result;
+> -		if (i == (msgs->len - 1)) {
+> -			/* It must generate STOP before read I2DR to prevent
+> -			   controller from generating another clock cycle */
+> -			dev_dbg(&i2c_imx->adapter.dev,
+> -				"<%s> clear MSTA\n", __func__);
+> -			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> -			temp &= ~(I2CR_MSTA | I2CR_MTX);
+> -			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> -			i2c_imx_bus_busy(i2c_imx, 0);
+> -			i2c_imx->stopped = 1;
+> -		} else if (i == (msgs->len - 2)) {
+> +
+> +		result = wait_for_completion_interruptible_timeout(
+> +					&i2c_imx->dma->cmd_complete,
+> +					msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
+> +		if (result == 0)
+> +			return  -ETIMEDOUT;
+> +
+> +		/* waiting for Transfer complete. */
+> +		while (timeout--) {
+> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> +			if (temp & 0x80)
+
+Magic value here, please fix.
+
+> +				break;
+> +			udelay(10);
+> +		}
+> +
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp &= ~I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +	} else {
+> +		/* read data */
+> +		for (i = 0; i < msgs->len - 2; i++) {
+> +			result = i2c_imx_trx_complete(i2c_imx);
+> +			if (result)
+> +				return result;
+> +			msgs->buf[i] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
+>  			dev_dbg(&i2c_imx->adapter.dev,
+> -				"<%s> set TXAK\n", __func__);
+> -			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> -			temp |= I2CR_TXAK;
+> -			imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +				"<%s> read byte: B%d=0x%X\n",
+> +				__func__, i, msgs->buf[i]);
+>  		}
+> -		msgs->buf[i] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
+> -		dev_dbg(&i2c_imx->adapter.dev,
+> -			"<%s> read byte: B%d=0x%X\n",
+> -			__func__, i, msgs->buf[i]);
+> +		result = i2c_imx_trx_complete(i2c_imx);
+>  	}
+> +
+> +	/* read n-1 byte data */
+> +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +	temp |= I2CR_TXAK;
+> +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +	msgs->buf[msgs->len-2] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
+> +	/* read n byte data */
+> +	result = i2c_imx_trx_complete(i2c_imx);
+> +	if (result)
+> +		return result;
+> +
+> +	/* It must generate STOP before read I2DR to prevent
+> +	   controller from generating another clock cycle */
+
+Again, comment style is wrong. For multiline comments, use this:
+
+/*
+ * foo bar
+ * baz quux
+ */
+
+> +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +	temp &= ~(I2CR_MSTA | I2CR_MTX);
+> +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +	i2c_imx_bus_busy(i2c_imx, 0);
+> +	i2c_imx->stopped = 1;
+> +	msgs->buf[msgs->len-1] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
+> +
+>  	return 0;
+>  }
+> 
+> @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  	void __iomem *base;
+>  	int irq, ret;
+>  	u32 bitrate;
+> +	u32 phy_addr;
+> 
+>  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+> 
+> @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  	}
+> 
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	phy_addr = res->start;
+
+Uh ... Shawn, I really think I am lost here. Don't you need to map this memory 
+before you can use it for DMA ? The DMA mapping function should give you the 
+physical address and is the right way to go about this instead of pulling the 
+address from here, no ?
+
+I might be wrong here, I am rather uncertain, so please help me out. Thanks!
+
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+> @@ -696,6 +923,21 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  		i2c_imx->adapter.name);
+>  	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
+> 
+> +	/* Init DMA config if support*/
+> +	i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
+> +					GFP_KERNEL);
+> +	if (!i2c_imx->dma) {
+> +		dev_info(&pdev->dev,
+> +				"can't allocate dma struct faild use dma.\n");
+> +		i2c_imx->use_dma = false;
+> +	} else if (i2c_imx_dma_request(i2c_imx, phy_addr)) {
+> +		dev_info(&pdev->dev,
+> +				"can't request dma chan, faild use dma.\n");
+> +		i2c_imx->use_dma = false;
+> +	} else {
+> +		i2c_imx->use_dma = true;
+> +	}
+> +
+>  	return 0;   /* Return OK */
+>  }
+> 
+> @@ -707,6 +949,9 @@ static int i2c_imx_remove(struct platform_device *pdev)
+>  	dev_dbg(&i2c_imx->adapter.dev, "adapter removed\n");
+>  	i2c_del_adapter(&i2c_imx->adapter);
+> 
+> +	if (i2c_imx->use_dma)
+> +		i2c_imx_dma_free(i2c_imx);
+> +
+>  	/* setup chip registers to defaults */
+>  	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IADR);
+>  	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IFDR);
+
+[1] http://www.catb.org/esr/structure-packing/
