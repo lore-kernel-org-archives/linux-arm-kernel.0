@@ -1,38 +1,99 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 06 Mar 2014 20:33:27 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2OV1bIDYvOF0gc3RhZ2luZzogaW14LWRybTogcGFyYWxs?=
- =?UTF-8?B?ZWwgZGlzcGxheTogYWRkIHJlZ3VsYXRvciBzdXBwb3J0Lg==?=
-In-Reply-To: <1394123369.3622.54.camel@paszta.hi.pengutronix.de>
-References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
- <1394121869-13387-3-git-send-email-denis@eukrea.com>
- <1394123369.3622.54.camel@paszta.hi.pengutronix.de>
-Message-ID: <1394123607.101743380@f103.i.mail.ru>
+From: cosminstefan.stoica@freescale.com (Stoica Cosmin Stefan)
+Date: Thu, 6 Mar 2014 18:40:34 +0200
+Subject: [PATCH v3] ARM: dts: vf610-twr: Add support for sdhc1
+Message-ID: <1394124034-21452-1-git-send-email-cosminstefan.stoica@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????,  6 ????? 2014, 17:29 +01:00 ?? Philipp Zabel <p.zabel@pengutronix.de>:
-> Hi Denis,
-> 
-> Am Donnerstag, den 06.03.2014, 17:04 +0100 schrieb Denis Carikli:
-> > diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> > index 2d24425..4dd7ce5 100644
-> > --- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> > +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> > @@ -28,6 +28,7 @@ Required properties:
-> >  - compatible: Should be "fsl,imx-parallel-display"
-> >  - crtc: the crtc this display is connected to, see below
-> >  Optional properties:
-> > +- display-supply : phandle to the regulator device tree node if needed.
-> 
-> I'd very much prefer to not do this here. I have submitted a patch to
-> add drm_display support to this driver, so you can connect a drm_panel
-> compatible driver as output. The simple-panel driver already supports
-> supply regulator and backlight control.
-...
-> > +	imxpd->disp_reg = devm_regulator_get(dev, "display");
-> > +	if (IS_ERR(imxpd->disp_reg))
-> > +		return PTR_ERR(imxpd->disp_reg);
+From: Cosmin Stoica <cosminstefan.stoica@freescale.com>
 
-And here we can see that this regulator is not optional.
+The kernel was not able to boot from SD card because sdhc support
+was not present into the dts.
 
+A new entry for sdhc1 was added for vf610-twr board based on the
+compatible entry present on imx53.
+
+After applying these changes, the kernel is able to boot successfully
+from SD card.
+
+Changes v2-v3:
+Use tabs instead of spaces for identaion
+Changes according to Shawn Guo's comments:
+- rebased on Shawn Guo's latest for-next tree
+- remove EOL at EOF
+
+Changes v1-v2:
+According to Shawn Guo's comments:
+- moved esdhc1 node before fec0 in board dts file;
+- reformatted clocks line;
+- removed duplicate property (bus-width) in dtsi file.
+
+Signed-off-by: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+Signed-off-by: Chircu Bogdan <Bogdan.Chircu@freescale.com>
+Signed-off-by: Eddy Petrisor <eddy.petrisor@freescale.com>
 ---
+ arch/arm/boot/dts/vf610-twr.dts |   19 +++++++++++++++++++
+ arch/arm/boot/dts/vf610.dtsi    |   11 +++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 7dd1d6e..f3af8ea 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -111,6 +111,13 @@
+ 	};
+ };
+ 
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &fec0 {
+ 	phy-mode = "rmii";
+ 	pinctrl-names = "default";
+@@ -158,6 +165,18 @@
+ 			>;
+ 		};
+ 
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,fsl,pins = <
++				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
++				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
++				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
++				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
++				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
++				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
++				VF610_PAD_PTA7__GPIO_134	0x219d
++			>;
++		};
++
+ 		pinctrl_fec0: fec0grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTA6__RMII_CLKIN		0x30d1
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 8048733..acf544e 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -347,6 +347,17 @@
+ 				status = "disabled";
+ 			};
+ 
++			esdhc1: esdhc@400b2000 {
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x400b2000 0x4000>;
++				interrupts = <0 28 0x04>;
++				clocks = <&clks VF610_CLK_IPG_BUS>,
++					<&clks VF610_CLK_PLATFORM_BUS>,
++					<&clks VF610_CLK_ESDHC1>;
++				clock-names = "ipg", "ahb", "per";
++				status = "disabled";
++			};
++
+ 			fec0: ethernet at 400d0000 {
+ 				compatible = "fsl,mvf600-fec";
+ 				reg = <0x400d0000 0x1000>;
+-- 
+1.7.9.5
