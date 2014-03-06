@@ -1,42 +1,73 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 5 Mar 2014 18:24:15 -0600
-Subject: [PATCH 06/10] ARM: OMAP2+: extend iommu pdata-quirks to OMAP5
-In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-Message-ID: <1394065459-16409-7-git-send-email-s-anna@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Mar 2014 10:38:27 +0900
+Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on
+ r8a7790/lager and r8a7791/koelsch
+In-Reply-To: <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
+References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
+ <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
+Message-ID: <20140306013824.GF13581@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 has the same iommus as OMAP4, so extend the OMAP4
-iommu pdata quirks for OMAP5 as well.
+On Wed, Mar 05, 2014 at 05:31:42PM +0900, Magnus Damm wrote:
+> On Tue, Feb 25, 2014 at 7:30 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> >         Hi Simon, Magnus,
+> >
+> > This patch series integrates support for the MSIOF module in the Renesas
+> > R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
+> > development boards.
+> >
+> > It was tested on Lager and Koelsch, both legacy and DT, using a dummy
+> > driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
+> > ID.
+> >
+> >     [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
+> >     [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
+> >     [03/11] ARM: shmobile: lager legacy: Add MSIOF support
+> >     [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
+> >     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
+> >             spi0 alias
+> >     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
+> >             add spi0 alias
+> >     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
+> >     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
+> >     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
+> >     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
+> >     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
+> >
+> > These are (reworked versions of) the remaining patches not taken from v1.
+> > Changelogs are available in the individual patches.
+> 
+> Hi Geert,
+> 
+> Thanks for your efforts. All these look fine to me.
+> 
+> Acked-by: Magnus Damm <damm@opensource.se>
+> 
+> Exactly what to merge upstream depends on what the ARM SoC maintainers prefer.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 4 ++++
- 1 file changed, 4 insertions(+)
+I wonder if for now we could move things forwards by merging the
+non-legacy code. I think that would mean the following:
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 74e094a..551877f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -193,7 +193,9 @@ static void __init omap4_panda_legacy_init(void)
- 	legacy_init_ehci_clk("auxclk3_ck");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
-+#endif
- 
-+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct iommu_platform_data omap4_iommu_pdata = {
- 	.reset_name = "mmu_cache",
- 	.assert_reset = omap_device_assert_hardreset,
-@@ -264,6 +266,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
-+#endif
-+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
- 		       &omap4_iommu_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
--- 
-1.9.0
+    [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
+            spi0 alias
+    [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
+            add spi0 alias
+    [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
+    [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
+    [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
+    [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
+
+And just the 'multi' portion of:
+
+    [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
+
+
+Would that result in working MSIOF support for koelsch and lager
+when using multiplatform?
+
+
+Then later, if appropriate, in accordance with discussions with the
+ARM SoC maintainers, we could merge the remaining changes in
+this series: the legacy code.
