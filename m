@@ -1,480 +1,468 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 06 Mar 2014 17:20:13 +0100
-Subject: [PATCH v6 04/10] V4L: Add driver for s5k6a3 image sensor
+Date: Thu, 06 Mar 2014 17:20:17 +0100
+Subject: [PATCH v6 08/10] exynos4-is: Add support for asynchronous subdevices
+ registration
 In-Reply-To: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
 References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1394122819-9582-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1394122819-9582-9-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds subdev driver for Samsung S5K6A3 raw image sensor.
-As it is intended at the moment to be used only with the Exynos
-FIMC-IS (camera ISP) subsystem it is pretty minimal subdev driver.
-It doesn't do any I2C communication since the sensor is controlled
-by the ISP and its own firmware.
-This driver, if needed, can be updated in future into a regular
-subdev driver where the main CPU communicates with the sensor
-directly.
+Add support for registering external sensor subdevs using
+v4l2-async API. The async API is used only for sensor subdevs
+and only for booting from DT.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
 Changes since v5:
- - added missing sd->internal_ops assignment (addressing comments
-   from Baruch Siach),
- - removed dependency on OF from Kconfig.
+  - removed erroneous introduction of a redundant media_device_unregister()
+    call.
 
 Changes since v4:
+ - call v4l2_async_notifier_register() only if any camera sensor
+   is specified in devicetree, so the driver can initialize even if
+   only mem-to-mem functionality is used.
+
+Changes since v2:
   - none.
 
-Changes since v3:
- - clk_get() called moved from s_power() to driver probe() callback.
-
 Changes since v1:
- - added missing pm_runtime_disable(),
- - removed subdev name overriding,
- - s/S5K6A3_DEF_PIX/S5K6A3_DEFAULT_,
- - merged patch adding v4l2-async API support,
- - clock-frequency property is now optional and a default frequency
-   value will be used when it is missing, rather than bailing out,
- - reset GPIO made mandatory as it is required for proper power
-   on/off sequences and all known boards use it,
- - maximum image size is now 1412x1412 pixels, as specified in
-   in the S5K6A3YX datasheet.
- - regulator_enable()/disable() used instead of the regulator bulk
-   API to ensure proper regulators enable/disable sequences.
+ - register clock provider after registering FIMC devices so the clock
+   can be actually used right after it is registered.Changes since v1:
+ - register clock provider after registering FIMC devices so the clock
+   can be actually used right after it is registered.
 ---
- drivers/media/i2c/Kconfig  |    8 +
- drivers/media/i2c/Makefile |    1 +
- drivers/media/i2c/s5k6a3.c |  389 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 398 insertions(+)
- create mode 100644 drivers/media/i2c/s5k6a3.c
+ drivers/media/platform/exynos4-is/media-dev.c |  238 ++++++++++++++-----------
+ drivers/media/platform/exynos4-is/media-dev.h |   13 +-
+ 2 files changed, 147 insertions(+), 104 deletions(-)
 
-diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
-index 4aa9c531..a68522f 100644
---- a/drivers/media/i2c/Kconfig
-+++ b/drivers/media/i2c/Kconfig
-@@ -579,6 +579,14 @@ config VIDEO_S5K6AA
- 	  This is a V4L2 sensor-level driver for Samsung S5K6AA(FX) 1.3M
- 	  camera sensor with an embedded SoC image signal processor.
- 
-+config VIDEO_S5K6A3
-+	tristate "Samsung S5K6A3 sensor support"
-+	depends on MEDIA_CAMERA_SUPPORT
-+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-+	---help---
-+	  This is a V4L2 sensor-level driver for Samsung S5K6A3 raw
-+	  camera sensor.
-+
- config VIDEO_S5K4ECGX
-         tristate "Samsung S5K4ECGX sensor support"
-         depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-diff --git a/drivers/media/i2c/Makefile b/drivers/media/i2c/Makefile
-index 48888ae..ab5aa34 100644
---- a/drivers/media/i2c/Makefile
-+++ b/drivers/media/i2c/Makefile
-@@ -66,6 +66,7 @@ obj-$(CONFIG_VIDEO_MT9V032) += mt9v032.o
- obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
- obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
- obj-$(CONFIG_VIDEO_S5K6AA)	+= s5k6aa.o
-+obj-$(CONFIG_VIDEO_S5K6A3)	+= s5k6a3.o
- obj-$(CONFIG_VIDEO_S5K4ECGX)	+= s5k4ecgx.o
- obj-$(CONFIG_VIDEO_S5K5BAF)	+= s5k5baf.o
- obj-$(CONFIG_VIDEO_S5C73M3)	+= s5c73m3/
-diff --git a/drivers/media/i2c/s5k6a3.c b/drivers/media/i2c/s5k6a3.c
-new file mode 100644
-index 0000000..7bc2271
---- /dev/null
-+++ b/drivers/media/i2c/s5k6a3.c
-@@ -0,0 +1,389 @@
-+/*
-+ * Samsung S5K6A3 image sensor driver
-+ *
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/errno.h>
-+#include <linux/gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_gpio.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+#include <linux/videodev2.h>
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index f047a9f..c670d67 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -26,6 +26,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
+ #include <linux/slab.h>
 +#include <media/v4l2-async.h>
-+#include <media/v4l2-subdev.h>
+ #include <media/v4l2-ctrls.h>
+ #include <media/v4l2-of.h>
+ #include <media/media-device.h>
+@@ -220,6 +221,7 @@ static int __fimc_pipeline_open(struct exynos_media_pipeline *ep,
+ 		if (ret < 0)
+ 			return ret;
+ 	}
 +
-+#define S5K6A3_SENSOR_MAX_WIDTH		1412
-+#define S5K6A3_SENSOR_MAX_HEIGHT	1412
-+#define S5K6A3_SENSOR_MIN_WIDTH		32
-+#define S5K6A3_SENSOR_MIN_HEIGHT	32
+ 	ret = fimc_md_set_camclk(sd, true);
+ 	if (ret < 0)
+ 		goto err_wbclk;
+@@ -380,77 +382,18 @@ static void fimc_md_unregister_sensor(struct v4l2_subdev *sd)
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct i2c_adapter *adapter;
+ 
+-	if (!client)
++	if (!client || client->dev.of_node)
+ 		return;
+ 
+ 	v4l2_device_unregister_subdev(sd);
+ 
+-	if (!client->dev.of_node) {
+-		adapter = client->adapter;
+-		i2c_unregister_device(client);
+-		if (adapter)
+-			i2c_put_adapter(adapter);
+-	}
++	adapter = client->adapter;
++	i2c_unregister_device(client);
++	if (adapter)
++		i2c_put_adapter(adapter);
+ }
+ 
+ #ifdef CONFIG_OF
+-/* Register I2C client subdev associated with @node. */
+-static int fimc_md_of_add_sensor(struct fimc_md *fmd,
+-				 struct device_node *node, int index)
+-{
+-	struct fimc_sensor_info *si;
+-	struct i2c_client *client;
+-	struct v4l2_subdev *sd;
+-	int ret;
+-
+-	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor)))
+-		return -EINVAL;
+-	si = &fmd->sensor[index];
+-
+-	client = of_find_i2c_device_by_node(node);
+-	if (!client)
+-		return -EPROBE_DEFER;
+-
+-	device_lock(&client->dev);
+-
+-	if (!client->dev.driver ||
+-	    !try_module_get(client->dev.driver->owner)) {
+-		ret = -EPROBE_DEFER;
+-		v4l2_info(&fmd->v4l2_dev, "No driver found for %s\n",
+-						node->full_name);
+-		goto dev_put;
+-	}
+-
+-	/* Enable sensor's master clock */
+-	ret = __fimc_md_set_camclk(fmd, &si->pdata, true);
+-	if (ret < 0)
+-		goto mod_put;
+-	sd = i2c_get_clientdata(client);
+-
+-	ret = v4l2_device_register_subdev(&fmd->v4l2_dev, sd);
+-	__fimc_md_set_camclk(fmd, &si->pdata, false);
+-	if (ret < 0)
+-		goto mod_put;
+-
+-	v4l2_set_subdev_hostdata(sd, &si->pdata);
+-	if (si->pdata.fimc_bus_type == FIMC_BUS_TYPE_ISP_WRITEBACK)
+-		sd->grp_id = GRP_ID_FIMC_IS_SENSOR;
+-	else
+-		sd->grp_id = GRP_ID_SENSOR;
+-
+-	si->subdev = sd;
+-	v4l2_info(&fmd->v4l2_dev, "Registered sensor subdevice: %s (%d)\n",
+-		  sd->name, fmd->num_sensors);
+-	fmd->num_sensors++;
+-
+-mod_put:
+-	module_put(client->dev.driver->owner);
+-dev_put:
+-	device_unlock(&client->dev);
+-	put_device(&client->dev);
+-	return ret;
+-}
+-
+ /* Parse port node and register as a sub-device any sensor specified there. */
+ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 				   struct device_node *port,
+@@ -459,7 +402,6 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 	struct device_node *rem, *ep, *np;
+ 	struct fimc_source_info *pd;
+ 	struct v4l2_of_endpoint endpoint;
+-	int ret;
+ 	u32 val;
+ 
+ 	pd = &fmd->sensor[index].pdata;
+@@ -487,6 +429,8 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 
+ 	if (!of_property_read_u32(rem, "clock-frequency", &val))
+ 		pd->clk_frequency = val;
++	else
++		pd->clk_frequency = DEFAULT_SENSOR_CLK_FREQ;
+ 
+ 	if (pd->clk_frequency == 0) {
+ 		v4l2_err(&fmd->v4l2_dev, "Wrong clock frequency at node %s\n",
+@@ -526,10 +470,17 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 	else
+ 		pd->fimc_bus_type = pd->sensor_bus_type;
+ 
+-	ret = fimc_md_of_add_sensor(fmd, rem, index);
+-	of_node_put(rem);
++	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor)))
++		return -EINVAL;
+ 
+-	return ret;
++	fmd->sensor[index].asd.match_type = V4L2_ASYNC_MATCH_OF;
++	fmd->sensor[index].asd.match.of.node = rem;
++	fmd->async_subdevs[index] = &fmd->sensor[index].asd;
 +
-+#define S5K6A3_DEFAULT_WIDTH		1296
-+#define S5K6A3_DEFAULT_HEIGHT		732
++	fmd->num_sensors++;
 +
-+#define S5K6A3_DRV_NAME			"S5K6A3"
-+#define S5K6A3_CLK_NAME			"extclk"
-+#define S5K6A3_DEFAULT_CLK_FREQ		24000000U
++	of_node_put(rem);
++	return 0;
+ }
+ 
+ /* Register all SoC external sub-devices */
+@@ -885,11 +836,13 @@ static void fimc_md_unregister_entities(struct fimc_md *fmd)
+ 		v4l2_device_unregister_subdev(fmd->csis[i].sd);
+ 		fmd->csis[i].sd = NULL;
+ 	}
+-	for (i = 0; i < fmd->num_sensors; i++) {
+-		if (fmd->sensor[i].subdev == NULL)
+-			continue;
+-		fimc_md_unregister_sensor(fmd->sensor[i].subdev);
+-		fmd->sensor[i].subdev = NULL;
++	if (fmd->pdev->dev.of_node == NULL) {
++		for (i = 0; i < fmd->num_sensors; i++) {
++			if (fmd->sensor[i].subdev == NULL)
++				continue;
++			fimc_md_unregister_sensor(fmd->sensor[i].subdev);
++			fmd->sensor[i].subdev = NULL;
++		}
+ 	}
+ 
+ 	if (fmd->fimc_is)
+@@ -1224,6 +1177,14 @@ static int __fimc_md_set_camclk(struct fimc_md *fmd,
+ 	struct fimc_camclk_info *camclk;
+ 	int ret = 0;
+ 
++	/*
++	 * When device tree is used the sensor drivers are supposed to
++	 * control the clock themselves. This whole function will be
++	 * removed once S5PV210 platform is converted to the device tree.
++	 */
++	if (fmd->pdev->dev.of_node)
++		return 0;
 +
-+enum {
-+	S5K6A3_SUPP_VDDA,
-+	S5K6A3_SUPP_VDDIO,
-+	S5K6A3_SUPP_AFVDD,
-+	S5K6A3_NUM_SUPPLIES,
-+};
-+
-+/**
-+ * struct s5k6a3 - fimc-is sensor data structure
-+ * @dev: pointer to this I2C client device structure
-+ * @subdev: the image sensor's v4l2 subdev
-+ * @pad: subdev media source pad
-+ * @supplies: image sensor's voltage regulator supplies
-+ * @gpio_reset: GPIO connected to the sensor's reset pin
-+ * @lock: mutex protecting the structure's members below
-+ * @format: media bus format at the sensor's source pad
-+ */
-+struct s5k6a3 {
-+	struct device *dev;
-+	struct v4l2_subdev subdev;
-+	struct media_pad pad;
-+	struct regulator_bulk_data supplies[S5K6A3_NUM_SUPPLIES];
-+	int gpio_reset;
-+	struct mutex lock;
-+	struct v4l2_mbus_framefmt format;
-+	struct clk *clock;
-+	u32 clock_frequency;
-+	int power_count;
-+};
-+
-+static const char * const s5k6a3_supply_names[] = {
-+	[S5K6A3_SUPP_VDDA]	= "svdda",
-+	[S5K6A3_SUPP_VDDIO]	= "svddio",
-+	[S5K6A3_SUPP_AFVDD]	= "afvdd",
-+};
-+
-+static inline struct s5k6a3 *sd_to_s5k6a3(struct v4l2_subdev *sd)
+ 	if (WARN_ON(si->clk_id >= FIMC_MAX_CAMCLKS) || !fmd || !fmd->pmf)
+ 		return -EINVAL;
+ 
+@@ -1544,6 +1505,56 @@ err:
+ #define fimc_md_unregister_clk_provider(fmd) (0)
+ #endif
+ 
++static int subdev_notifier_bound(struct v4l2_async_notifier *notifier,
++				 struct v4l2_subdev *subdev,
++				 struct v4l2_async_subdev *asd)
 +{
-+	return container_of(sd, struct s5k6a3, subdev);
-+}
-+
-+static const struct v4l2_mbus_framefmt s5k6a3_formats[] = {
-+	{
-+		.code = V4L2_MBUS_FMT_SGRBG10_1X10,
-+		.colorspace = V4L2_COLORSPACE_SRGB,
-+		.field = V4L2_FIELD_NONE,
-+	}
-+};
-+
-+static const struct v4l2_mbus_framefmt *find_sensor_format(
-+	struct v4l2_mbus_framefmt *mf)
-+{
++	struct fimc_md *fmd = notifier_to_fimc_md(notifier);
++	struct fimc_sensor_info *si = NULL;
 +	int i;
 +
-+	for (i = 0; i < ARRAY_SIZE(s5k6a3_formats); i++)
-+		if (mf->code == s5k6a3_formats[i].code)
-+			return &s5k6a3_formats[i];
++	/* Find platform data for this sensor subdev */
++	for (i = 0; i < ARRAY_SIZE(fmd->sensor); i++)
++		if (fmd->sensor[i].asd.match.of.node == subdev->dev->of_node)
++			si = &fmd->sensor[i];
 +
-+	return &s5k6a3_formats[0];
-+}
-+
-+static int s5k6a3_enum_mbus_code(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_mbus_code_enum *code)
-+{
-+	if (code->index >= ARRAY_SIZE(s5k6a3_formats))
++	if (si == NULL)
 +		return -EINVAL;
 +
-+	code->code = s5k6a3_formats[code->index].code;
-+	return 0;
-+}
++	v4l2_set_subdev_hostdata(subdev, &si->pdata);
 +
-+static void s5k6a3_try_format(struct v4l2_mbus_framefmt *mf)
-+{
-+	const struct v4l2_mbus_framefmt *fmt;
++	if (si->pdata.fimc_bus_type == FIMC_BUS_TYPE_ISP_WRITEBACK)
++		subdev->grp_id = GRP_ID_FIMC_IS_SENSOR;
++	else
++		subdev->grp_id = GRP_ID_SENSOR;
 +
-+	fmt = find_sensor_format(mf);
-+	mf->code = fmt->code;
-+	v4l_bound_align_image(&mf->width, S5K6A3_SENSOR_MIN_WIDTH,
-+			      S5K6A3_SENSOR_MAX_WIDTH, 0,
-+			      &mf->height, S5K6A3_SENSOR_MIN_HEIGHT,
-+			      S5K6A3_SENSOR_MAX_HEIGHT, 0, 0);
-+}
++	si->subdev = subdev;
 +
-+static struct v4l2_mbus_framefmt *__s5k6a3_get_format(
-+		struct s5k6a3 *sensor, struct v4l2_subdev_fh *fh,
-+		u32 pad, enum v4l2_subdev_format_whence which)
-+{
-+	if (which == V4L2_SUBDEV_FORMAT_TRY)
-+		return fh ? v4l2_subdev_get_try_format(fh, pad) : NULL;
++	v4l2_info(&fmd->v4l2_dev, "Registered sensor subdevice: %s (%d)\n",
++		  subdev->name, fmd->num_sensors);
 +
-+	return &sensor->format;
-+}
-+
-+static int s5k6a3_set_fmt(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_format *fmt)
-+{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	struct v4l2_mbus_framefmt *mf;
-+
-+	s5k6a3_try_format(&fmt->format);
-+
-+	mf = __s5k6a3_get_format(sensor, fh, fmt->pad, fmt->which);
-+	if (mf) {
-+		mutex_lock(&sensor->lock);
-+		if (fmt->which == V4L2_SUBDEV_FORMAT_ACTIVE)
-+			*mf = fmt->format;
-+		mutex_unlock(&sensor->lock);
-+	}
-+	return 0;
-+}
-+
-+static int s5k6a3_get_fmt(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_format *fmt)
-+{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	struct v4l2_mbus_framefmt *mf;
-+
-+	mf = __s5k6a3_get_format(sensor, fh, fmt->pad, fmt->which);
-+
-+	mutex_lock(&sensor->lock);
-+	fmt->format = *mf;
-+	mutex_unlock(&sensor->lock);
-+	return 0;
-+}
-+
-+static struct v4l2_subdev_pad_ops s5k6a3_pad_ops = {
-+	.enum_mbus_code	= s5k6a3_enum_mbus_code,
-+	.get_fmt	= s5k6a3_get_fmt,
-+	.set_fmt	= s5k6a3_set_fmt,
-+};
-+
-+static int s5k6a3_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-+{
-+	struct v4l2_mbus_framefmt *format = v4l2_subdev_get_try_format(fh, 0);
-+
-+	*format		= s5k6a3_formats[0];
-+	format->width	= S5K6A3_DEFAULT_WIDTH;
-+	format->height	= S5K6A3_DEFAULT_HEIGHT;
++	fmd->num_sensors++;
 +
 +	return 0;
 +}
 +
-+static const struct v4l2_subdev_internal_ops s5k6a3_sd_internal_ops = {
-+	.open = s5k6a3_open,
-+};
-+
-+static int __s5k6a3_power_on(struct s5k6a3 *sensor)
++static int subdev_notifier_complete(struct v4l2_async_notifier *notifier)
 +{
-+	int i = S5K6A3_SUPP_VDDA;
++	struct fimc_md *fmd = notifier_to_fimc_md(notifier);
 +	int ret;
 +
-+	ret = clk_set_rate(sensor->clock, sensor->clock_frequency);
++	mutex_lock(&fmd->media_dev.graph_mutex);
++
++	ret = fimc_md_create_links(fmd);
 +	if (ret < 0)
-+		return ret;
++		goto unlock;
 +
-+	ret = pm_runtime_get(sensor->dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = regulator_enable(sensor->supplies[i].consumer);
-+	if (ret < 0)
-+		goto error_rpm_put;
-+
-+	ret = clk_prepare_enable(sensor->clock);
-+	if (ret < 0)
-+		goto error_reg_dis;
-+
-+	for (i++; i < S5K6A3_NUM_SUPPLIES; i++) {
-+		ret = regulator_enable(sensor->supplies[i].consumer);
-+		if (ret < 0)
-+			goto error_reg_dis;
-+	}
-+
-+	gpio_set_value(sensor->gpio_reset, 1);
-+	usleep_range(600, 800);
-+	gpio_set_value(sensor->gpio_reset, 0);
-+	usleep_range(600, 800);
-+	gpio_set_value(sensor->gpio_reset, 1);
-+
-+	/* Delay needed for the sensor initialization */
-+	msleep(20);
-+	return 0;
-+
-+error_reg_dis:
-+	for (--i; i >= 0; --i)
-+		regulator_disable(sensor->supplies[i].consumer);
-+error_rpm_put:
-+	pm_runtime_put(sensor->dev);
++	ret = v4l2_device_register_subdev_nodes(&fmd->v4l2_dev);
++unlock:
++	mutex_unlock(&fmd->media_dev.graph_mutex);
 +	return ret;
 +}
 +
-+static int __s5k6a3_power_off(struct s5k6a3 *sensor)
-+{
-+	int i;
+ static int fimc_md_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1571,12 +1582,6 @@ static int fimc_md_probe(struct platform_device *pdev)
+ 
+ 	fmd->use_isp = fimc_md_is_isp_available(dev->of_node);
+ 
+-	ret = fimc_md_register_clk_provider(fmd);
+-	if (ret < 0) {
+-		v4l2_err(v4l2_dev, "clock provider registration failed\n");
+-		return ret;
+-	}
+-
+ 	ret = v4l2_device_register(dev, &fmd->v4l2_dev);
+ 	if (ret < 0) {
+ 		v4l2_err(v4l2_dev, "Failed to register v4l2_device: %d\n", ret);
+@@ -1586,64 +1591,88 @@ static int fimc_md_probe(struct platform_device *pdev)
+ 	ret = media_device_register(&fmd->media_dev);
+ 	if (ret < 0) {
+ 		v4l2_err(v4l2_dev, "Failed to register media device: %d\n", ret);
+-		goto err_md;
++		goto err_v4l2_dev;
+ 	}
+ 
+ 	ret = fimc_md_get_clocks(fmd);
+ 	if (ret)
+-		goto err_clk;
++		goto err_md;
+ 
+ 	fmd->user_subdev_api = (dev->of_node != NULL);
+ 
+-	/* Protect the media graph while we're registering entities */
+-	mutex_lock(&fmd->media_dev.graph_mutex);
+-
+ 	ret = fimc_md_get_pinctrl(fmd);
+ 	if (ret < 0) {
+ 		if (ret != EPROBE_DEFER)
+ 			dev_err(dev, "Failed to get pinctrl: %d\n", ret);
+-		goto err_unlock;
++		goto err_clk;
+ 	}
+ 
++	platform_set_drvdata(pdev, fmd);
 +
-+	gpio_set_value(sensor->gpio_reset, 0);
++	/* Protect the media graph while we're registering entities */
++	mutex_lock(&fmd->media_dev.graph_mutex);
 +
-+	for (i = S5K6A3_NUM_SUPPLIES - 1; i >= 0; i--)
-+		regulator_disable(sensor->supplies[i].consumer);
-+
-+	clk_disable_unprepare(sensor->clock);
-+	pm_runtime_put(sensor->dev);
-+	return 0;
-+}
-+
-+static int s5k6a3_s_power(struct v4l2_subdev *sd, int on)
-+{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	int ret = 0;
-+
-+	mutex_lock(&sensor->lock);
-+
-+	if (sensor->power_count == !on) {
-+		if (on)
-+			ret = __s5k6a3_power_on(sensor);
-+		else
-+			ret = __s5k6a3_power_off(sensor);
-+
-+		if (ret == 0)
-+			sensor->power_count += on ? 1 : -1;
+ 	if (dev->of_node)
+ 		ret = fimc_md_register_of_platform_entities(fmd, dev->of_node);
+ 	else
+ 		ret = bus_for_each_dev(&platform_bus_type, NULL, fmd,
+ 						fimc_md_pdev_match);
+-	if (ret)
+-		goto err_unlock;
++	if (ret) {
++		mutex_unlock(&fmd->media_dev.graph_mutex);
++		goto err_clk;
 +	}
-+
-+	mutex_unlock(&sensor->lock);
-+	return ret;
-+}
-+
-+static struct v4l2_subdev_core_ops s5k6a3_core_ops = {
-+	.s_power = s5k6a3_s_power,
-+};
-+
-+static struct v4l2_subdev_ops s5k6a3_subdev_ops = {
-+	.core = &s5k6a3_core_ops,
-+	.pad = &s5k6a3_pad_ops,
-+};
-+
-+static int s5k6a3_probe(struct i2c_client *client,
-+				const struct i2c_device_id *id)
-+{
-+	struct device *dev = &client->dev;
-+	struct s5k6a3 *sensor;
-+	struct v4l2_subdev *sd;
-+	int gpio, i, ret;
-+
-+	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
-+	if (!sensor)
-+		return -ENOMEM;
-+
-+	mutex_init(&sensor->lock);
-+	sensor->gpio_reset = -EINVAL;
-+	sensor->clock = ERR_PTR(-EINVAL);
-+	sensor->dev = dev;
-+
-+	sensor->clock = devm_clk_get(sensor->dev, S5K6A3_CLK_NAME);
-+	if (IS_ERR(sensor->clock))
-+		return PTR_ERR(sensor->clock);
-+
-+	gpio = of_get_gpio_flags(dev->of_node, 0, NULL);
-+	if (!gpio_is_valid(gpio))
-+		return gpio;
-+
-+	ret = devm_gpio_request_one(dev, gpio, GPIOF_OUT_INIT_LOW,
-+						S5K6A3_DRV_NAME);
-+	if (ret < 0)
-+		return ret;
-+
-+	sensor->gpio_reset = gpio;
-+
-+	if (of_property_read_u32(dev->of_node, "clock-frequency",
-+				 &sensor->clock_frequency)) {
-+		sensor->clock_frequency = S5K6A3_DEFAULT_CLK_FREQ;
-+		dev_info(dev, "using default %u Hz clock frequency\n",
-+					sensor->clock_frequency);
-+	}
-+
-+	for (i = 0; i < S5K6A3_NUM_SUPPLIES; i++)
-+		sensor->supplies[i].supply = s5k6a3_supply_names[i];
-+
-+	ret = devm_regulator_bulk_get(&client->dev, S5K6A3_NUM_SUPPLIES,
-+				      sensor->supplies);
-+	if (ret < 0)
-+		return ret;
-+
-+	sd = &sensor->subdev;
-+	v4l2_i2c_subdev_init(sd, client, &s5k6a3_subdev_ops);
-+	sensor->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-+	sd->internal_ops = &s5k6a3_sd_internal_ops;
-+
-+	sensor->format.code = s5k6a3_formats[0].code;
-+	sensor->format.width = S5K6A3_DEFAULT_WIDTH;
-+	sensor->format.height = S5K6A3_DEFAULT_HEIGHT;
-+
-+	sensor->pad.flags = MEDIA_PAD_FL_SOURCE;
-+	ret = media_entity_init(&sd->entity, 1, &sensor->pad, 0);
-+	if (ret < 0)
-+		return ret;
-+
-+	pm_runtime_no_callbacks(dev);
-+	pm_runtime_enable(dev);
-+
-+	ret = v4l2_async_register_subdev(sd);
-+
+ 
+ 	if (dev->platform_data || dev->of_node) {
+ 		ret = fimc_md_register_sensor_entities(fmd);
+-		if (ret)
+-			goto err_unlock;
++		if (ret) {
++			mutex_unlock(&fmd->media_dev.graph_mutex);
++			goto err_m_ent;
++		}
+ 	}
+ 
+-	ret = fimc_md_create_links(fmd);
+-	if (ret)
+-		goto err_unlock;
+-
+-	ret = v4l2_device_register_subdev_nodes(&fmd->v4l2_dev);
+-	if (ret)
+-		goto err_unlock;
++	mutex_unlock(&fmd->media_dev.graph_mutex);
+ 
+ 	ret = device_create_file(&pdev->dev, &dev_attr_subdev_conf_mode);
+ 	if (ret)
+-		goto err_unlock;
++		goto err_m_ent;
++	/*
++	 * FIMC platform devices need to be registered before the sclk_cam
++	 * clocks provider, as one of these devices needs to be activated
++	 * to enable the clock.
++	 */
++	ret = fimc_md_register_clk_provider(fmd);
 +	if (ret < 0) {
-+		pm_runtime_disable(&client->dev);
-+		media_entity_cleanup(&sd->entity);
++		v4l2_err(v4l2_dev, "clock provider registration failed\n");
++		goto err_attr;
 +	}
 +
-+	return ret;
-+}
++	if (fmd->num_sensors > 0) {
++		fmd->subdev_notifier.subdevs = fmd->async_subdevs;
++		fmd->subdev_notifier.num_subdevs = fmd->num_sensors;
++		fmd->subdev_notifier.bound = subdev_notifier_bound;
++		fmd->subdev_notifier.complete = subdev_notifier_complete;
++		fmd->num_sensors = 0;
 +
-+static int s5k6a3_remove(struct i2c_client *client)
++		ret = v4l2_async_notifier_register(&fmd->v4l2_dev,
++						&fmd->subdev_notifier);
++		if (ret)
++			goto err_clk_p;
++	}
+ 
+-	platform_set_drvdata(pdev, fmd);
+-	mutex_unlock(&fmd->media_dev.graph_mutex);
+ 	return 0;
+ 
+-err_unlock:
+-	mutex_unlock(&fmd->media_dev.graph_mutex);
++err_clk_p:
++	fimc_md_unregister_clk_provider(fmd);
++err_attr:
++	device_remove_file(&pdev->dev, &dev_attr_subdev_conf_mode);
+ err_clk:
+ 	fimc_md_put_clocks(fmd);
++err_m_ent:
+ 	fimc_md_unregister_entities(fmd);
+-	media_device_unregister(&fmd->media_dev);
+ err_md:
++	media_device_unregister(&fmd->media_dev);
++err_v4l2_dev:
+ 	v4l2_device_unregister(&fmd->v4l2_dev);
+-	fimc_md_unregister_clk_provider(fmd);
+ 	return ret;
+ }
+ 
+@@ -1655,12 +1684,15 @@ static int fimc_md_remove(struct platform_device *pdev)
+ 		return 0;
+ 
+ 	fimc_md_unregister_clk_provider(fmd);
++	v4l2_async_notifier_unregister(&fmd->subdev_notifier);
++
+ 	v4l2_device_unregister(&fmd->v4l2_dev);
+ 	device_remove_file(&pdev->dev, &dev_attr_subdev_conf_mode);
+ 	fimc_md_unregister_entities(fmd);
+ 	fimc_md_pipelines_free(fmd);
+ 	media_device_unregister(&fmd->media_dev);
+ 	fimc_md_put_clocks(fmd);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/media/platform/exynos4-is/media-dev.h b/drivers/media/platform/exynos4-is/media-dev.h
+index a88cee5..ee1e251 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.h
++++ b/drivers/media/platform/exynos4-is/media-dev.h
+@@ -32,8 +32,9 @@
+ 
+ #define PINCTRL_STATE_IDLE	"idle"
+ 
+-#define FIMC_MAX_SENSORS	8
++#define FIMC_MAX_SENSORS	4
+ #define FIMC_MAX_CAMCLKS	2
++#define DEFAULT_SENSOR_CLK_FREQ	24000000U
+ 
+ /* LCD/ISP Writeback clocks (PIXELASYNCMx) */
+ enum {
+@@ -79,6 +80,7 @@ struct fimc_camclk_info {
+ /**
+  * struct fimc_sensor_info - image data source subdev information
+  * @pdata: sensor's atrributes passed as media device's platform data
++ * @asd: asynchronous subdev registration data structure
+  * @subdev: image sensor v4l2 subdev
+  * @host: fimc device the sensor is currently linked to
+  *
+@@ -86,6 +88,7 @@ struct fimc_camclk_info {
+  */
+ struct fimc_sensor_info {
+ 	struct fimc_source_info pdata;
++	struct v4l2_async_subdev asd;
+ 	struct v4l2_subdev *subdev;
+ 	struct fimc_dev *host;
+ };
+@@ -145,6 +148,9 @@ struct fimc_md {
+ 		int num_clocks;
+ 	} clk_provider;
+ 
++	struct v4l2_async_notifier subdev_notifier;
++	struct v4l2_async_subdev *async_subdevs[FIMC_MAX_SENSORS];
++
+ 	bool user_subdev_api;
+ 	spinlock_t slock;
+ 	struct list_head pipelines;
+@@ -162,6 +168,11 @@ static inline struct fimc_md *entity_to_fimc_mdev(struct media_entity *me)
+ 		container_of(me->parent, struct fimc_md, media_dev);
+ }
+ 
++static inline struct fimc_md *notifier_to_fimc_md(struct v4l2_async_notifier *n)
 +{
-+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-+
-+	pm_runtime_disable(&client->dev);
-+	v4l2_async_unregister_subdev(sd);
-+	media_entity_cleanup(&sd->entity);
-+	return 0;
++	return container_of(n, struct fimc_md, subdev_notifier);
 +}
 +
-+static const struct i2c_device_id s5k6a3_ids[] = {
-+	{ }
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id s5k6a3_of_match[] = {
-+	{ .compatible = "samsung,s5k6a3" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, s5k6a3_of_match);
-+#endif
-+
-+static struct i2c_driver s5k6a3_driver = {
-+	.driver = {
-+		.of_match_table	= of_match_ptr(s5k6a3_of_match),
-+		.name		= S5K6A3_DRV_NAME,
-+		.owner		= THIS_MODULE,
-+	},
-+	.probe		= s5k6a3_probe,
-+	.remove		= s5k6a3_remove,
-+	.id_table	= s5k6a3_ids,
-+};
-+
-+module_i2c_driver(s5k6a3_driver);
-+
-+MODULE_DESCRIPTION("S5K6A3 image sensor subdev driver");
-+MODULE_AUTHOR("Sylwester Nawrocki <s.nawrocki@samsung.com>");
-+MODULE_LICENSE("GPL v2");
+ static inline void fimc_md_graph_lock(struct exynos_video_entity *ve)
+ {
+ 	mutex_lock(&ve->vdev.entity.parent->graph_mutex);
 -- 
 1.7.9.5
