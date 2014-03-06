@@ -1,77 +1,84 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 06 Mar 2014 12:28:24 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add shared shmobile_init_delay()
+Date: Thu, 06 Mar 2014 12:28:33 +0900
+Subject: [PATCH 02/02] ARM: shmobile: Use shmobile_init_delay() on
+ r8a7791/Koelsch
 In-Reply-To: <20140306032814.10814.2949.sendpatchset@w520>
 References: <20140306032814.10814.2949.sendpatchset@w520>
-Message-ID: <20140306032824.10814.21953.sendpatchset@w520>
+Message-ID: <20140306032833.10814.12191.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Introduce shmobile_init_delay() that gets CPU specific
-parameters from DT and sets up the early delay from
-there. This allows us to both remove frequency information
-from the C code and consolidate existing code.
+Prototype to convert Koelsch and r8a7791 to using
+shmobile_init_delay() and by that allow removing
+CPU frequency information from the C code.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Needs to be reworked to fit ARM SoC board/SoC branch style.
+
+Not-yet-Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/include/mach/common.h |    1 
- arch/arm/mach-shmobile/timer.c               |   28 ++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch-reference.c |    2 +-
+ arch/arm/mach-shmobile/board-koelsch.c           |    2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7791.h    |    1 -
+ arch/arm/mach-shmobile/setup-r8a7791.c           |    9 +--------
+ 4 files changed, 3 insertions(+), 11 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2014-03-06 12:06:03.000000000 +0900
-@@ -4,6 +4,7 @@
- extern void shmobile_earlytimer_init(void);
- extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
- 			 unsigned int mult, unsigned int div);
-+extern void shmobile_init_delay(void);
- struct twd_local_timer;
- extern void shmobile_setup_console(void);
- extern void shmobile_boot_vector(void);
---- 0001/arch/arm/mach-shmobile/timer.c
-+++ work/arch/arm/mach-shmobile/timer.c	2014-03-06 12:06:03.000000000 +0900
-@@ -21,6 +21,7 @@
- #include <linux/platform_device.h>
- #include <linux/clocksource.h>
- #include <linux/delay.h>
-+#include <linux/of_address.h>
+--- 0001/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2014-03-06 12:08:22.000000000 +0900
+@@ -139,7 +139,7 @@ static const char * const koelsch_boards
  
- void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
- 				 unsigned int mult, unsigned int div)
-@@ -39,6 +40,33 @@ void __init shmobile_setup_delay(unsigne
- 		preset_lpj = max_cpu_core_mhz * value;
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= r8a7791_init_early,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= koelsch_add_standard_devices,
+ 	.init_late	= shmobile_init_late,
+--- 0001/arch/arm/mach-shmobile/board-koelsch.c
++++ work/arch/arm/mach-shmobile/board-koelsch.c	2014-03-06 12:08:22.000000000 +0900
+@@ -522,7 +522,7 @@ static const char * const koelsch_boards
+ 
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= r8a7791_init_early,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= koelsch_init,
+ 	.init_late	= shmobile_init_late,
+--- 0001/arch/arm/mach-shmobile/include/mach/r8a7791.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2014-03-06 12:08:22.000000000 +0900
+@@ -5,7 +5,6 @@ void r8a7791_add_standard_devices(void);
+ void r8a7791_add_dt_devices(void);
+ void r8a7791_clock_init(void);
+ void r8a7791_pinmux_init(void);
+-void r8a7791_init_early(void);
+ extern struct smp_operations r8a7791_smp_ops;
+ 
+ #endif /* __ASM_R8A7791_H__ */
+--- 0003/arch/arm/mach-shmobile/setup-r8a7791.c
++++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2014-03-06 12:08:22.000000000 +0900
+@@ -210,13 +210,6 @@ void __init r8a7791_add_standard_devices
+ 	r8a7791_register_thermal();
  }
  
-+void __init shmobile_init_delay(void)
-+{
-+	struct device_node *np, *parent;
-+	u32 max_freq, freq;
-+
-+	max_freq = 0;
-+
-+	parent = of_find_node_by_path("/cpus");
-+	if (parent) {
-+		for_each_child_of_node(parent, np) {
-+			if (!of_property_read_u32(np, "clock-frequency", &freq))
-+				max_freq = max(max_freq, freq);
-+		}
-+		of_node_put(parent);
-+	}
-+
-+	if (max_freq) {
-+		if (of_find_compatible_node(NULL, NULL, "arm,cortex-a8"))
-+			shmobile_setup_delay(max_freq, 1, 3);
-+		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
-+			shmobile_setup_delay(max_freq, 1, 3);
-+		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a15"))
-+			if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
-+				shmobile_setup_delay(max_freq, 2, 4);
-+	}
-+}
-+
- static void __init shmobile_late_time_init(void)
- {
- 	/*
+-void __init r8a7791_init_early(void)
+-{
+-#ifndef CONFIG_ARM_ARCH_TIMER
+-	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
+-#endif
+-}
+-
+ #ifdef CONFIG_USE_OF
+ static const char *r8a7791_boards_compat_dt[] __initdata = {
+ 	"renesas,r8a7791",
+@@ -225,7 +218,7 @@ static const char *r8a7791_boards_compat
+ 
+ DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= r8a7791_init_early,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= r8a7791_boards_compat_dt,
+ MACHINE_END
