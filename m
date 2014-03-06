@@ -1,38 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Mar 2014 15:09:36 -0500
-Subject: [PATCH] ARM: mvebu: use the correct phy connection mode on
- Armada 385 DB
-In-Reply-To: <1394116915-14424-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1394116915-14424-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140306200936.GH1872@titan.lakedaemon.net>
+Date: Thu, 6 Mar 2014 15:10:59 -0500
+Subject: [PATCH v2] ARM: mvebu: add Device Tree for the Armada 385 RD board
+In-Reply-To: <1394119075-18657-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1394119075-18657-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140306201059.GI1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 03:41:55PM +0100, Thomas Petazzoni wrote:
-> On Armada 385 DB, while the "rgmii" PHY connection mode works fine
-> with the generic PHY driver, it fails to work when the Marvell PHY
-> driver is enabled in the kernel configuration, due to a finer handling
-> of the PHY configuration. This is due to the fact that the phy
-> connection mode should instead be "rgmii-id", i.e with the TX/RX delay
-> mechanisms enabled.
+On Thu, Mar 06, 2014 at 04:17:55PM +0100, Gregory CLEMENT wrote:
+> The Armada 385 RD board is the reference design board from Marvell
+> for the Armada 385 SoC. This commit adds a Device Tree description for
+> this board, which enables the following features:
 > 
-> This fixes the network operation on Armada 385 DB with
-> CONFIG_MARVELL_PHY=y. Without this patch and this option enabled, one
-> would only get messages such as:
+>  * Network interfaces
+>  * I2C bus
+>  * Serial port
+>  * SPI bus, with a SPI flash
+>  * PCIe interface
 > 
->   mvneta f1070000.ethernet eth1: bad rx status 0cc10000 (crc error), size=70
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
-> Jason, this commit is based on mvebu/dt-3xx
+> Changelog:
+> v1 -> v2:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-385-db.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> - used the phy-mode "rgmii-id" to be able to work with the Marvell PHY
+>   driver enabled
+> 
+> - put the ethernet nodes in the address order, as it has no effect to
+>   change ti at this level (should be done at dtsi level)
+> 
+> - inverted the phy devices (which was improperly assigned in v1)
+> 
+> - added the vendor prefix for the SPI flash
+> 
+> 
+>  arch/arm/boot/dts/Makefile          |  3 +-
+>  arch/arm/boot/dts/armada-385-rd.dts | 94 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 96 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/armada-385-rd.dts
 
-Applied to mvebu/dt (I merged mvebu/dt-3xx into mvebu/dt once it
-appeared stable)
+Applied to mvebu/dt
 
 thx,
 
