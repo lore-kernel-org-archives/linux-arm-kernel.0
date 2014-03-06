@@ -1,123 +1,44 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 06 Mar 2014 03:10:02 -0500
-Subject: [PATCH v6 00/14] uprobes: Add uprobes support for ARM
-In-Reply-To: <20140304173134.GA18830@redhat.com>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <20140301123026.GD21483@n2100.arm.linux.org.uk> <53131DBE.7020500@linaro.org>
- <20140303205039.GA8949@redhat.com>
- <20140304005306.GO21483@n2100.arm.linux.org.uk>
- <20140304173134.GA18830@redhat.com>
-Message-ID: <53182D5A.7020600@linaro.org>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 6 Mar 2014 13:47:31 +0530
+Subject: [PATCH 2/2] dt-bindings: clock: Move exynos-audss-clk.h to
+ dt-bindings/clock
+In-Reply-To: <CAK9yfHwLRV_Wj+O=tNEGWw2g4oR9t1-O9bNwozfwv+WOPkjpoQ@mail.gmail.com>
+References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
+ <1394085884-13081-3-git-send-email-tushar.behera@linaro.org>
+ <CAK9yfHwLRV_Wj+O=tNEGWw2g4oR9t1-O9bNwozfwv+WOPkjpoQ@mail.gmail.com>
+Message-ID: <CAHbNUh0ty7ZiLkQLX6tDN3tojN9feOudkr=jgPHwP26OR6Yosw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/14 12:31, Oleg Nesterov wrote:
-> On 03/04, Russell King - ARM Linux wrote:
+On 6 March 2014 12:04, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> On 6 March 2014 11:34, Tushar Behera <tushar.behera@linaro.org> wrote:
+>> Most of the clock related dt-binding header files are located in
+>> dt-bindings/clock folder. It would be good to keep all the similar
+>> header files at a single location.
 >>
->> On Mon, Mar 03, 2014 at 09:50:39PM +0100, Oleg Nesterov wrote:
->>>
->>> And why CONFIG_UPROBES should depend on PERF_EVENTS? uprobes can be
->>> used by (say) systemtap without UPROBE_EVENT/PERF_EVENTS.
->>>
->>> But as Russell pointed out the events directory is only built if
->>> CONFIG_PERF_EVENTS=y, so it should depend on it or select...
->>>
->>>
->>> I dunno. Personally I vote for the patch from Srikar in
->>>
->>> 	http://article.gmane.org/gmane.linux.kernel/1017186
->>>
->>> This is what we currently have, currently CONFIG_UPROBES is not
->>> user-selectable anyway.
->>
->> Yes, me too, but with the proviso that UPROBE_EVENT also sorts itself
->> out with PERF_EVENTS in some way too (either by selecting it, which
->> IMHO isn't nice, or by depending on it, or the build dependency itself
->> gets sorted.)
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> CC: Kukjin Kim <kgene.kim@samsung.com>
+>> CC: Tomasz Figa <t.figa@samsung.com>
+>> ---
 >
-> OK... what do you think about the patch below for now?
->
->> Maybe a simpler answer would be to change the build stuff (hand-crafted):
->>
->> kernel/Makefile
->> -obj-$(CONFIG_PERF_EVENTS) += events/
->> +obj-y += events/
->>
->> and kernel/events/Makefile:
->>
->> -obj-y := core.o ring_buffer.o callchain.o
->> +perf-y := core.o ring_buffer.o callchain.o
->>
->> -obj-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
->> +perf-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
->> +
->> +obj-${CONFIG_PERF_EVENTS) += $(perf-y)
->
-> I fully agree. Except I can't review this change ;) But hopefully I
-> can understand what it should do.
->
-> But personally I'd prefer to start with the simple/safe change which
-> allows us to merge this series. If nothing else, even if I think that
-> kernel/events/uprobes.c doesn't need CONFIG_PERF_EVENTS, this should
-> be verified and discussed with perf maintainers.
->
-> If you agree with the patch below, how should we route it? I won't
-> argue if you push it along with other patches from David.
+> Sensible move.
+> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
 >
 
-Oleg, I'll put you down as the author and add a signed-off line for you 
-if that is OK?  Not sure who should ack it.
+Thanks for the review.
 
-> BTW... why UPROBE_EVENT depends on MMU? I think that ARCH_SUPPORTS_UPROBES
-> should not be true if !CONFIG_MMU.
->
-> Oleg.
-> ---
->
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 80bbb8c..97ff872 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -86,9 +86,7 @@ config KPROBES_ON_FTRACE
->   	 optimize on top of function tracing.
->
->   config UPROBES
-> -	bool "Transparent user-space probes (EXPERIMENTAL)"
-> -	depends on UPROBE_EVENT && PERF_EVENTS
-> -	default n
-> +	def_bool n
->   	select PERCPU_RWSEM
->   	help
->   	  Uprobes is the user-space counterpart to kprobes: they
-> @@ -101,8 +99,6 @@ config UPROBES
->   	    managed by the kernel and kept transparent to the probed
->   	    application. )
->
-> -	  If in doubt, say "N".
-> -
->   config HAVE_64BIT_ALIGNED_ACCESS
->   	def_bool 64BIT && !HAVE_EFFICIENT_UNALIGNED_ACCESS
->   	help
-> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-> index 015f85a..8639819 100644
-> --- a/kernel/trace/Kconfig
-> +++ b/kernel/trace/Kconfig
-> @@ -424,6 +424,7 @@ config UPROBE_EVENT
->   	bool "Enable uprobes-based dynamic events"
->   	depends on ARCH_SUPPORTS_UPROBES
->   	depends on MMU
-> +	depends on PERF_EVENTS
->   	select UPROBES
->   	select PROBE_EVENTS
->   	select TRACING
+> Now that the dt-bindings/clk folder is empty (with these 2 patches
+> applied), it can be deleted as well.
 >
 
-Can we agree Oleg's patch above is the best way to go in the short term? 
-  I've tested it and it addresses the problem, although of course one 
-has to know to enable PERF_EVENTS to even see the UPROBE_EVENT option 
-(not a problem on x86 as they always set PERF_EVENTS).
+Sure, I will wait till both these patches are merged and send another
+patch for that later.
 
-I'm continuing to test the above with my new include file changes, using 
-Arnd's randconfig patches.  Looks good so far.
+> --
+> With warm regards,
+> Sachin
 
--dl
+
+
+-- 
+Tushar Behera
