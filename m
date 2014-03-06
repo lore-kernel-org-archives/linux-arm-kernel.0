@@ -1,43 +1,31 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Thu, 6 Mar 2014 16:14:45 +0530
-Subject: [RFC PATCH 1/1] arm64: Add boot time configuration of
- Intermediate Physical Address size
-In-Reply-To: <20140306103719.GB5202@mudshark.cambridge.arm.com>
-References: <1393830037-25499-1-git-send-email-mohun106@gmail.com>
- <1393830037-25499-2-git-send-email-mohun106@gmail.com>
- <CAC8NTUVjMGKXWxVWqa0=CS0EDxRwD1yfB_VoMHE0FSOHD7dNeg@mail.gmail.com>
- <20140306103719.GB5202@mudshark.cambridge.arm.com>
-Message-ID: <CAC8NTUW9X9ZwANoJcvHvEfLTw9=MCiUyxeTehcN3CGp4C20M-w@mail.gmail.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Thu, 6 Mar 2014 11:51:54 +0100
+Subject: [PATCH v4 0/8] wilink: add device tree support
+In-Reply-To: <20140228092203.GA2974@piout.net>
+References: <1375189476-21557-1-git-send-email-coelho@ti.com>
+ <CAGm1_kvdzkvzEEymQ+H0XiKugifHF27KDz3jwX5Frg_U=S7KgA@mail.gmail.com>
+ <20140228092203.GA2974@piout.net>
+Message-ID: <CAGm1_kv_byZMme0amziQt57Wng+b342hPf5MKrJn2iFRvdyR5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 4:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Mar 06, 2014 at 06:06:07AM +0000, Radha Mohan wrote:
->> Hi all,
+On Fri, Feb 28, 2014 at 10:22 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 28/02/2014 at 08:26:46 +0100, Yegor Yefremov wrote :
 >>
->> Any comments?
+>> What is the state of the series? Who is now responsible for the
+>> patches? What issues were still not handled?
+>>
 >
-> [...]
+> We probably want to end that discussion before taking those bindings in:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232185.html
 >
->> > diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->> > index 2b0244d..642fec9 100644
->> > --- a/arch/arm64/kvm/hyp-init.S
->> > +++ b/arch/arm64/kvm/hyp-init.S
->> > @@ -68,6 +68,13 @@ __do_hyp_init:
->> >         msr     tcr_el2, x4
->> >
->> >         ldr     x4, =VTCR_EL2_FLAGS
->> > +       /*
->> > +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
->> > +        * VTCR_EL2.
->> > +        */
->> > +       mrs     x5, ID_AA64MMFR0_EL1
->> > +       ubfiz   x5, x5, #16, #3
->> > +       orr     x4, x4, x5
->
-> Can you use BFI instead of UBFIZ + ORR?
+> I've hit the issue, precisely using those bindings.
 
-OK.
+The discussion seems to flow down. The last message was about "Mon Feb
+17 18:25:11 EST 2014".
 
->
-> Will
+Btw is TI going to assign a new maintainer for Wilink stuff? As Luca
+has left TI, the driver is marked as "Orphan".
+
+Yegor
