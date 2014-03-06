@@ -1,40 +1,59 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Thu, 6 Mar 2014 04:13:03 -0500
-Subject: [GIT PULL] ARM: mach-bcm: cleanups for 3.15
-Message-ID: <20140306091303.GG25092@beef>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 6 Mar 2014 17:19:52 +0800
+Subject: [PATCH 1/7] device: introduce per device dma_pfn_offset
+In-Reply-To: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1394097598-17622-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+On few architectures, there are few restrictions on DMAble area of system
+RAM. That also means that devices needs to know about this restrictions so
+that the dma_masks can be updated accordingly and dma address translation
+helpers can add/subtract the dma offset.
 
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+In most of cases DMA addresses can be performed using offset value of
+Bus address space relatively to physical address space as following:
 
-are available in the git repository at:
+PFN->DMA:  __pfn_to_phys(pfn + [-]dma_pfn_offset)
+DMA->PFN:  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
 
-  git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/cleanup
+So we introduce per device dma_pfn_offset which can be popullated
+by architectures init code while creating the devices.
 
-for you to fetch changes up to 0e8b860ac6d65209beea03ee9b718089838476ef:
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ include/linux/device.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-  ARM: bcm281xx: Rename board_init() function (2014-03-06 03:18:01 -0500)
-
-----------------------------------------------------------------
-ARM: mach-bcm: cleanups for 3.15
-
-- make bcm281xx symbol naming consistent with SoC name
-- remove unneeded and reorder bcm281xx header files
-- consolidate bcm281xx reboot and l2 cache code
-
-----------------------------------------------------------------
-Alex Elder (1):
-      ARM: bcm281xx: symbol cleanup
-
-Markus Mayer (4):
-      ARM: bcm281xx: Move kona_l2_cache_init() so it can be shared
-      ARM: bcm281xx: Consolidate reboot code
-      ARM: bcm281xx: Re-order hearder files
-      ARM: bcm281xx: Rename board_init() function
-
- arch/arm/mach-bcm/board_bcm281xx.c | 83 +++++++++++++++++++-------------------
- arch/arm/mach-bcm/kona.c           | 64 ++++++++++-------------------
- arch/arm/mach-bcm/kona.h           |  7 +---
- 3 files changed, 65 insertions(+), 89 deletions(-)
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 952b010..6940b25 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -688,6 +688,7 @@ struct acpi_dev_node {
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+  * 		hardware supports 64-bit addresses for consistent allocations
+  * 		such descriptors.
++ * @dma_pfn_offset: offset of DMA memory range relatively of RAM
+  * @dma_parms:	A low level driver may set these to teach IOMMU code about
+  * 		segment limitations.
+  * @dma_pools:	Dma pools (if dma'ble device).
+@@ -753,6 +754,7 @@ struct device {
+ 					     not all hardware supports
+ 					     64 bit addresses for consistent
+ 					     allocations such descriptors. */
++	unsigned long	dma_pfn_offset;
+ 
+ 	struct device_dma_parameters *dma_parms;
+ 
+-- 
+1.7.9.5
