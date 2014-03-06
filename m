@@ -1,42 +1,84 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 6 Mar 2014 20:20:12 +0530
-Subject: [GIT PULL] DaVinci SoC updates for v3.15
-Message-ID: <53188B24.4090708@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Mar 2014 15:51:31 +0100
+Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
+In-Reply-To: <20140306144600.GM4780@lunn.ch>
+References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140306131429.GJ4780@lunn.ch> <5318779C.8030901@free-electrons.com>
+ <20140306142117.GL4780@lunn.ch> <531886B4.2070002@free-electrons.com>
+ <20140306144600.GM4780@lunn.ch>
+Message-ID: <53188B73.4000109@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+On 06/03/2014 15:46, Andrew Lunn wrote:
+>>>>> I think you can use aliases to get the order correct, independent of
+>>>>> how you list them in DT. That should be a lot safer than assuming
+>>>>> things are instantiated from top to bottom.
+>>>>
+>>>> It sounds interesting, how would you do this?
+>>>
+>>> As there already is in armada-370-xp.dtsi
+>>>
+>>>         aliases {
+>>>                 eth0 = &eth0;
+>>>                 eth1 = &eth1;
+>>>         };
+>>>
+>>>
+>>> 	eth0: ethernet at 70000 {
+>>> 	}
+>>>         eth1: ethernet at 74000 {
+>>> 	}
+>>>
+>>> This at least works for i2c devices. The pdev->id is set using the
+>>> alias number.
+>>
+>> Well I think it doesn't work with ethernet devices because we already do
+>> this in aramda-38x.dtsi:
+>>
+>> 	aliases {
+>> 		gpio0 = &gpio0;
+>> 		gpio1 = &gpio1;
+>> 		eth0 = &eth0;
+>> 		eth1 = &eth1;
+>> 		eth2 = &eth2;
+>> 	};
+>>
+>> 	eth1: ethernet at 30000 {
+>> 	}
+>> 	eth2: ethernet at 34000 {
+>> 	}
+>> 	eth0: ethernet at 70000 {
+>> 	}
+> 
+> Ah, Erm, O.K. 
+> 
+> It seems to be an i2c thing. Take a look at i2c_add_adapter().
+> 
+>         if (dev->of_node) {
+>                 id = of_alias_get_id(dev->of_node, "i2c");
+>  
+> You could put something similar into the ethernet driver.
+> 
 
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
 
-are available in the git repository at:
+Actually even what I did, didn't work as I expected. The order should have been changed in
+the dsi file.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.15/soc
+I will have a look on the ethernet driver.
 
-for you to fetch changes up to 4b9e44f8d7c9cd166d8304b8f619741c1d59b836:
 
-  ARM: davinci: remove da8xx_omapl_defconfig (2014-03-06 19:08:30 +0530)
+Thanks,
 
-----------------------------------------------------------------
-This pull request removes da8xx_omapl_defconfig
-enabling all ARMv5 davinci devices to be built
-using davinci_all_defconfig
+Gregory
 
-----------------------------------------------------------------
-Sekhar Nori (4):
-      ARM: davinci: enable da8xx build concurrently with older devices
-      ARM: davinci: add da8xx specific configs to davinci_all_defconfig
-      ARM: davinci: da8xx: fix multiple watchdog device registration
-      ARM: davinci: remove da8xx_omapl_defconfig
 
- arch/arm/configs/da8xx_omapl_defconfig |  139 --------------------------------
- arch/arm/configs/davinci_all_defconfig |   20 +++++
- arch/arm/mach-davinci/Makefile.boot    |   20 ++---
- arch/arm/mach-davinci/davinci.h        |    2 +
- arch/arm/mach-davinci/devices.c        |   17 +---
- arch/arm/mach-davinci/dm355.c          |    8 +-
- arch/arm/mach-davinci/dm365.c          |    8 +-
- arch/arm/mach-davinci/dm644x.c         |    8 +-
- arch/arm/mach-davinci/dm646x.c         |    8 +-
- 9 files changed, 59 insertions(+), 171 deletions(-)
- delete mode 100644 arch/arm/configs/da8xx_omapl_defconfig
+>     Andrew
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
