@@ -1,92 +1,145 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 5 Mar 2014 18:24:13 -0600
-Subject: [PATCH 04/10] ARM: OMAP2+: use pdata quirks for iommu reset lines
+Date: Wed, 5 Mar 2014 18:24:14 -0600
+Subject: [PATCH 05/10] ARM: OMAP5: hwmod data: add mmu data for ipu & dsp
 In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
 References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-Message-ID: <1394065459-16409-5-git-send-email-s-anna@ti.com>
+Message-ID: <1394065459-16409-6-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP iommu driver performs the reset management for the
-iommu instances in processor sub-systems using the omap_device
-API which are currently supplied as platform data ops. Use pdata
-quirks to maintain the functionality as the OMAP iommu driver
-gets converted to use DT nodes, until the reset portions are
-decoupled from omap_hwmod/omap_device into a separate reset
-driver.
+A new MMU hwmod class and data structures are created
+to represent the MMUs within the IPU and DSP processor
+subsystems in OMAP5. The MMUs in OMAP5 are identical to
+those in OMAP4.
 
-This patch adds the pdata quirks for the reset management of
-iommus within the DSP (OMAP3 & OMAP4) and IPU subsystems (OMAP4).
-
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 83 ++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 3d5b24d..74e094a 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -16,12 +16,14 @@
- #include <linux/wl12xx.h>
- 
- #include <linux/platform_data/pinctrl-single.h>
-+#include <linux/platform_data/iommu-omap.h>
- 
- #include "am35xx.h"
- #include "common.h"
- #include "common-board-devices.h"
- #include "dss-common.h"
- #include "control.h"
-+#include "omap_device.h"
- 
- struct pdata_init {
- 	const char *compatible;
-@@ -92,6 +94,12 @@ static void __init hsmmc2_internal_input_clk(void)
- 	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
- }
- 
-+static struct iommu_platform_data omap3_iommu_pdata = {
-+	.reset_name = "mmu",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
-+
- static int omap3_sbc_t3730_twl_callback(struct device *dev,
- 					   unsigned gpio,
- 					   unsigned ngpio)
-@@ -185,6 +193,12 @@ static void __init omap4_panda_legacy_init(void)
- 	legacy_init_ehci_clk("auxclk3_ck");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
-+
-+static struct iommu_platform_data omap4_iommu_pdata = {
-+	.reset_name = "mmu_cache",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
- #endif
- 
- #ifdef CONFIG_SOC_OMAP5
-@@ -240,6 +254,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP3
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
-+	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
-+		       &omap3_iommu_pdata),
- 	/* Only on am3517 */
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
- 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
-@@ -248,6 +264,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
-+	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
-+		       &omap4_iommu_pdata),
-+	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
-+		       &omap4_iommu_pdata),
- #endif
- 	{ /* sentinel */ },
+diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+index e297d62..8923172 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+@@ -1122,6 +1122,71 @@ static struct omap_hwmod omap54xx_mmc5_hwmod = {
  };
+ 
+ /*
++ * 'mmu' class
++ * The memory management unit performs virtual to physical address translation
++ * for its requestors.
++ */
++
++static struct omap_hwmod_class_sysconfig omap54xx_mmu_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.syss_offs	= 0x0014,
++	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
++			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
++			   SYSS_HAS_RESET_STATUS),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
++
++static struct omap_hwmod_class omap54xx_mmu_hwmod_class = {
++	.name = "mmu",
++	.sysc = &omap54xx_mmu_sysc,
++};
++
++static struct omap_hwmod_rst_info omap54xx_mmu_dsp_resets[] = {
++	{ .name = "mmu_cache", .rst_shift = 1 },
++};
++
++static struct omap_hwmod omap54xx_mmu_dsp_hwmod = {
++	.name		= "mmu_dsp",
++	.class		= &omap54xx_mmu_hwmod_class,
++	.clkdm_name	= "dsp_clkdm",
++	.rst_lines	= omap54xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_mmu_dsp_resets),
++	.main_clk	= "dpll_iva_h11x2_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP54XX_CM_DSP_DSP_CLKCTRL_OFFSET,
++			.rstctrl_offs = OMAP54XX_RM_DSP_RSTCTRL_OFFSET,
++			.context_offs = OMAP54XX_RM_DSP_DSP_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/* mmu ipu */
++static struct omap_hwmod_rst_info omap54xx_mmu_ipu_resets[] = {
++	{ .name = "mmu_cache", .rst_shift = 2 },
++};
++
++static struct omap_hwmod omap54xx_mmu_ipu_hwmod = {
++	.name		= "mmu_ipu",
++	.class		= &omap54xx_mmu_hwmod_class,
++	.clkdm_name	= "ipu_clkdm",
++	.rst_lines	= omap54xx_mmu_ipu_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_mmu_ipu_resets),
++	.main_clk	= "dpll_core_h22x2_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP54XX_CM_IPU_IPU_CLKCTRL_OFFSET,
++			.rstctrl_offs = OMAP54XX_RM_IPU_RSTCTRL_OFFSET,
++			.context_offs = OMAP54XX_RM_IPU_IPU_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/*
+  * 'mpu' class
+  * mpu sub-system
+  */
+@@ -1763,6 +1828,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_1 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_cfg -> mmu_dsp */
++static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mmu_dsp = {
++	.master		= &omap54xx_l4_cfg_hwmod,
++	.slave		= &omap54xx_mmu_dsp_hwmod,
++	.clk		= "l4_root_clk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* mpu -> l3_main_1 */
+ static struct omap_hwmod_ocp_if omap54xx_mpu__l3_main_1 = {
+ 	.master		= &omap54xx_mpu_hwmod,
+@@ -1787,6 +1860,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_2 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l3_main_2 -> mmu_ipu */
++static struct omap_hwmod_ocp_if omap54xx_l3_main_2__mmu_ipu = {
++	.master		= &omap54xx_l3_main_2_hwmod,
++	.slave		= &omap54xx_mmu_ipu_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l3_main_1 -> l3_main_3 */
+ static struct omap_hwmod_ocp_if omap54xx_l3_main_1__l3_main_3 = {
+ 	.master		= &omap54xx_l3_main_1_hwmod,
+@@ -2345,6 +2426,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap54xx_l4_wkup__counter_32k,
+ 	&omap54xx_l4_cfg__dma_system,
+ 	&omap54xx_l4_abe__dmic,
++	&omap54xx_l4_cfg__mmu_dsp,
+ 	&omap54xx_mpu__emif1,
+ 	&omap54xx_mpu__emif2,
+ 	&omap54xx_l4_wkup__gpio1,
+@@ -2360,6 +2442,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap54xx_l4_per__i2c3,
+ 	&omap54xx_l4_per__i2c4,
+ 	&omap54xx_l4_per__i2c5,
++	&omap54xx_l3_main_2__mmu_ipu,
+ 	&omap54xx_l4_wkup__kbd,
+ 	&omap54xx_l4_cfg__mailbox,
+ 	&omap54xx_l4_abe__mcbsp1,
 -- 
 1.9.0
