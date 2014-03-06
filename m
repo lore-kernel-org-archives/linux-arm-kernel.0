@@ -1,45 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Mar 2014 13:03:20 +0000
-Subject: [PATCH v5 06/11] imx-drm: imx-tve: Fix DDC I2C bus property
-In-Reply-To: <1394011262-16849-7-git-send-email-p.zabel@pengutronix.de>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <1394011262-16849-7-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140306130320.GA21483@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Mar 2014 14:03:56 +0100
+Subject: [PATCH V2 11/12] ARM: shmobile: r7s72100: add spi clocks to dtsi
+In-Reply-To: <1394105552-9744-12-git-send-email-wsa@the-dreams.de>
+References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
+ <1394105552-9744-12-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAMuHMdW2hd6xmr1=CzBk3oZFKJPoX9YRwaK5W3NxNNmynW5z6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 10:20:57AM +0100, Philipp Zabel wrote:
-> This patch fixes the TV Encoder DDC I2C bus property to use the common
-> 'ddc-i2c-bus' property name instead of 'ddc'.
+On Thu, Mar 6, 2014 at 12:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
 
-Looking at both hdmi and tve, the ddc part is very similar.  The difference
-is how the probe is handled:
+Thanks for your patch!
 
-imx-hdmi:
-        ddc_node = of_parse_phandle(np, "ddc", 0);
-        if (ddc_node) {
-                hdmi->ddc = of_find_i2c_adapter_by_node(ddc_node);
-                if (!hdmi->ddc)
-                        dev_dbg(hdmi->dev, "failed to read ddc node\n");
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 
-                of_node_put(ddc_node);
-        } else {
-                dev_dbg(hdmi->dev, "no ddc property found\n");
-        }
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-imx-tve:
-        ddc_node = of_parse_phandle(np, "ddc", 0);
-        if (ddc_node) {
-                tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
-                of_node_put(ddc_node);
-        }
+Gr{oetje,eeting}s,
 
-It appears to differ only by debug prints - is there any reason we
-couldn't unify the DDC backend part?  I've tinkered with this idea,
-and already have a patch, though it needs a little rework.
+                        Geert
 
-Any thoughts?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
