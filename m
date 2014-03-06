@@ -1,44 +1,42 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 6 Mar 2014 13:47:31 +0530
-Subject: [PATCH 2/2] dt-bindings: clock: Move exynos-audss-clk.h to
- dt-bindings/clock
-In-Reply-To: <CAK9yfHwLRV_Wj+O=tNEGWw2g4oR9t1-O9bNwozfwv+WOPkjpoQ@mail.gmail.com>
-References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
- <1394085884-13081-3-git-send-email-tushar.behera@linaro.org>
- <CAK9yfHwLRV_Wj+O=tNEGWw2g4oR9t1-O9bNwozfwv+WOPkjpoQ@mail.gmail.com>
-Message-ID: <CAHbNUh0ty7ZiLkQLX6tDN3tojN9feOudkr=jgPHwP26OR6Yosw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 6 Mar 2014 02:20:32 -0600
+Subject: [PATCH 5/5] arm64: add early_ioremap support
+In-Reply-To: <1394037524.5094.35.camel@deneb.redhat.com>
+References: <1393963738-9210-1-git-send-email-msalter@redhat.com>
+ <1393963738-9210-6-git-send-email-msalter@redhat.com>
+ <CAL_JsqLQ8gj4nkwh+67i58rQBARoh_CgZ+4D9uepdBQm-XBwJA@mail.gmail.com>
+ <1394037524.5094.35.camel@deneb.redhat.com>
+Message-ID: <CAL_JsqLSTMp4_OREGdGtah31HZmmMAgqi3eb3NZgM04dfqZNMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2014 12:04, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> On 6 March 2014 11:34, Tushar Behera <tushar.behera@linaro.org> wrote:
->> Most of the clock related dt-binding header files are located in
->> dt-bindings/clock folder. It would be good to keep all the similar
->> header files at a single location.
+On Wed, Mar 5, 2014 at 10:38 AM, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-03-04 at 17:31 -0600, Rob Herring wrote:
+>> On Tue, Mar 4, 2014 at 2:08 PM, Mark Salter <msalter@redhat.com> wrote:
+>> > Add support for early IO or memory mappings which are needed
+>> > before the normal ioremap() is usable. This also adds fixmap
+>> > support for permanent fixed mappings such as that used by the
+>> > earlyprintk device register region.
 >>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> CC: Kukjin Kim <kgene.kim@samsung.com>
->> CC: Tomasz Figa <t.figa@samsung.com>
->> ---
+>> One minor comment:
+>>
+>> > +enum fixed_addresses {
+>> > +       FIX_EARLYCON,
+>>
+>> Can you align this name with x86 and rename to FIX_EARLYCON_MEM_BASE.
+>> Doing that will help enable the earlycon driver in 8250_early.c.
 >
-> Sensible move.
-> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
->
+> Is there any advantage to earlycon=uart8250 vs. earlyprintk=uart8250?
 
-Thanks for the review.
+Functionally, they are pretty much the same. I'm working on a series
+to generalize earlycon and then we will be able to delete
+early_printk.c from arm64 and ultimately share with arm. Doing this
+alignment just saves a patch to change it later.
 
-> Now that the dt-bindings/clk folder is empty (with these 2 patches
-> applied), it can be deleted as well.
->
+> I don't mind using FIX_EARLYCON_MEM_BASE, but CONFIG_FIX_EARLYCON_MEM
+> is X86 only right now and I think changing that should be a separate
+> patch.
 
-Sure, I will wait till both these patches are merged and send another
-patch for that later.
+Yes, definitely.
 
-> --
-> With warm regards,
-> Sachin
-
-
-
--- 
-Tushar Behera
+Rob
