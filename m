@@ -1,32 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 6 Mar 2014 18:23:39 +0100
-Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
-In-Reply-To: <20140306160213.GA4327@arch.cereza>
-References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
- <20140306131429.GJ4780@lunn.ch>
- <5318779C.8030901@free-electrons.com>
- <20140306142117.GL4780@lunn.ch>
- <531886B4.2070002@free-electrons.com>
- <20140306144600.GM4780@lunn.ch>
- <53188B73.4000109@free-electrons.com>
- <53189892.5090502@free-electrons.com>
- <20140306160213.GA4327@arch.cereza>
-Message-ID: <20140306172339.GP4780@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Mar 2014 10:36:50 -0700
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <5318B232.2020507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Can't we fix this so the probe order doesn't affect the name?
-> 
-> Is that sane?
+On 03/05/2014 06:25 AM, Lucas Stach wrote:
+> This is the recommended method of doing the IRQ
+> mapping. For old devicetrees we fall back to the
+> previous practice.
 
-You are not supposed to trust the device name, since probing can
-happen in parallel, on different buses. udev should have rules to name
-the interfaces based on the MAC address. On my Debian system i have:
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-/etc/udev/rules.d/70-persistent-net.rules
+I tested both with and without patch 1/6, and the PCIe-based NIC on
+Beaver worked fine either way. Without patch 1/6, I do see:
 
-So what is important is that the MAC addresses are assigned correctly
-to the device. And DT does that based on MMIO address, so should be
-reliable, independent of probe order.
+pci 0000:00:01.0: of_irq_parse_pci() failed with rc=-22
 
-   Andrew
+... but that seems reasonable given that the DT that of_irq_parse_pci()
+parses is missing, and did correctly trigger the fallback path, so
+everything still worked.
