@@ -1,73 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Mar 2014 10:38:27 +0900
-Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on
- r8a7790/lager and r8a7791/koelsch
-In-Reply-To: <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
-References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
- <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
-Message-ID: <20140306013824.GF13581@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Mar 2014 09:45:36 +0800
+Subject: [PATCH] clocksource: vf_pit_timer: use complement for
+ sched_clock reading
+In-Reply-To: <d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan@agner.ch>
+References: <d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan@agner.ch>
+Message-ID: <20140306014530.GA11366@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 05:31:42PM +0900, Magnus Damm wrote:
-> On Tue, Feb 25, 2014 at 7:30 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> >         Hi Simon, Magnus,
-> >
-> > This patch series integrates support for the MSIOF module in the Renesas
-> > R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
-> > development boards.
-> >
-> > It was tested on Lager and Koelsch, both legacy and DT, using a dummy
-> > driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
-> > ID.
-> >
-> >     [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
-> >     [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
-> >     [03/11] ARM: shmobile: lager legacy: Add MSIOF support
-> >     [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
-> >     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
-> >             spi0 alias
-> >     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
-> >             add spi0 alias
-> >     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
-> >     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
-> >     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
-> >     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
-> >     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
-> >
-> > These are (reworked versions of) the remaining patches not taken from v1.
-> > Changelogs are available in the individual patches.
+On Wed, Mar 05, 2014 at 11:11:08PM +0100, Stefan Agner wrote:
+> Vybrids PIT register is monitonic decreasing. However, sched_clock
+> reading needs to be monitonic increasing. Use bitwise not to get
+> the complement of the clock register. This fixes the clock going
+> backward. Also, the clock now starts at 0 since we load the
+> register with the maximum value at start.
 > 
-> Hi Geert,
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+
+Looks correct to me, so
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+But I also copied the driver author Jingchang to see if he has any
+comment.
+
+Shawn
+
+> ---
+>  drivers/clocksource/vf_pit_timer.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Thanks for your efforts. All these look fine to me.
+> diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+> index 02821b0..a918bc4 100644
+> --- a/drivers/clocksource/vf_pit_timer.c
+> +++ b/drivers/clocksource/vf_pit_timer.c
+> @@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
+>  
+>  static u64 pit_read_sched_clock(void)
+>  {
+> -	return __raw_readl(clksrc_base + PITCVAL);
+> +	return ~__raw_readl(clksrc_base + PITCVAL);
+>  }
+>  
+>  static int __init pit_clocksource_init(unsigned long rate)
+> -- 
+> 1.9.0
 > 
-> Acked-by: Magnus Damm <damm@opensource.se>
-> 
-> Exactly what to merge upstream depends on what the ARM SoC maintainers prefer.
-
-I wonder if for now we could move things forwards by merging the
-non-legacy code. I think that would mean the following:
-
-    [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
-            spi0 alias
-    [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
-            add spi0 alias
-    [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
-    [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
-    [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
-    [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
-
-And just the 'multi' portion of:
-
-    [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
-
-
-Would that result in working MSIOF support for koelsch and lager
-when using multiplatform?
-
-
-Then later, if appropriate, in accordance with discussions with the
-ARM SoC maintainers, we could merge the remaining changes in
-this series: the legacy code.
