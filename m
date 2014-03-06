@@ -1,66 +1,32 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Thu, 6 Mar 2014 03:18:14 +0000
-Subject: [PATCH] clocksource: vf_pit_timer: use complement for
- sched_clock reading
-In-Reply-To: <20140306014530.GA11366@S2101-09.ap.freescale.net>
-References: <d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan@agner.ch>
- <20140306014530.GA11366@S2101-09.ap.freescale.net>
-Message-ID: <a821b61811ff4861b577ee17ff9f0448@BL2PR03MB467.namprd03.prod.outlook.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 06 Mar 2014 12:28:14 +0900
+Subject: [PATCH 00/02] ARM: shmobile: Consolidate early delay setup code
+Message-ID: <20140306032814.10814.2949.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM: shmobile: Consolidate early delay setup code
 
+[PATCH 01/02] ARM: shmobile: Add shared shmobile_init_delay()
+[PATCH 02/02] ARM: shmobile: Use shmobile_init_delay() on r8a7791/Koelsch
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Thursday, March 06, 2014 9:46 AM
-> To: Stefan Agner
-> Cc: daniel.lezcano at linaro.org; tglx at linutronix.de; linux at arm.linux.org.uk;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Lu
-> Jingchang-B35083
-> Subject: Re: [PATCH] clocksource: vf_pit_timer: use complement for
-> sched_clock reading
-> 
-> On Wed, Mar 05, 2014 at 11:11:08PM +0100, Stefan Agner wrote:
-> > Vybrids PIT register is monitonic decreasing. However, sched_clock
-> > reading needs to be monitonic increasing. Use bitwise not to get the
-> > complement of the clock register. This fixes the clock going backward.
-> > Also, the clock now starts at 0 since we load the register with the
-> > maximum value at start.
-> >
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Looks correct to me, so
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> But I also copied the driver author Jingchang to see if he has any
-> comment.
-> 
-> Shawn
-> 
-The fix is correct, thanks.
+Add code to retrieve early delay handling parameters from DT and
+as example convert r8a7791 and Koelsch. The first patch should be
+rather useful as-is but the second needs to be broken out into
+SoC and board specific bits to fit board/soc pull request style.
+Also, all mach-shmobile SoCs can be converted to use patch [1/1]
 
-Best Regards,
-Jingchang
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-> > ---
-> >  drivers/clocksource/vf_pit_timer.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/clocksource/vf_pit_timer.c
-> > b/drivers/clocksource/vf_pit_timer.c
-> > index 02821b0..a918bc4 100644
-> > --- a/drivers/clocksource/vf_pit_timer.c
-> > +++ b/drivers/clocksource/vf_pit_timer.c
-> > @@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
-> >
-> >  static u64 pit_read_sched_clock(void)  {
-> > -	return __raw_readl(clksrc_base + PITCVAL);
-> > +	return ~__raw_readl(clksrc_base + PITCVAL);
-> >  }
-> >
-> >  static int __init pit_clocksource_init(unsigned long rate)
-> > --
-> > 1.9.0
-> >
+ Written against renesas.git tag renesas-devel-v3.14-rc4-20140227
+ and patch [2/2] also depends on
+ [PATCH] ARM: shmobile: Update r8a7791 CPU freq to 1500MHz in C
+
+ arch/arm/mach-shmobile/board-koelsch-reference.c |    2 -
+ arch/arm/mach-shmobile/board-koelsch.c           |    2 -
+ arch/arm/mach-shmobile/include/mach/common.h     |    1 
+ arch/arm/mach-shmobile/include/mach/r8a7791.h    |    1 
+ arch/arm/mach-shmobile/setup-r8a7791.c           |    9 -------
+ arch/arm/mach-shmobile/timer.c                   |   28 ++++++++++++++++++++++
+ 6 files changed, 32 insertions(+), 11 deletions(-)
