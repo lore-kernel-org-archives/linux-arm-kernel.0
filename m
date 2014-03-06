@@ -1,83 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Mar 2014 08:10:43 +0100
-Subject: [PATCH 5/8] i2c: nomadik: Fixup system suspend
-In-Reply-To: <1393671371-2398-6-git-send-email-ulf.hansson@linaro.org>
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
- <1393671371-2398-6-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFr7znu0ZM2Pqv1zNbG9366VXCM8FV=t0umEsF0R6ZeyEg@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 6 Mar 2014 15:28:59 +0800
+Subject: [PATCH 0/3] iio: adc: at91 fixes
+In-Reply-To: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <531823BB.4080106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2014 11:56, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> For !CONFIG_PM_RUNTIME, the device were never put back into active
-> state while resuming.
->
-> For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
-> while we were about to handle it at suspend late, which is just too
-> optimistic.
->
-> Even if the driver uses pm_runtime_put_sync() after each tranfer to
-> return it's runtime PM resources, there are no guarantees this will
-> actually mean the device will inactivated. The reason is that the PM
-> core will prevent runtime suspend during system suspend, and thus when
-> a transfer occurs during the early phases of system suspend the device
-> will be kept active after the transfer.
->
-> To handle both issues above, use pm_runtime_force_suspend|resume() from
-> the system suspend|resume callbacks.
->
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Hi, Alexandre
 
-Hi Wolfram,
+On 3/6/2014 12:57 AM, Alexandre Belloni wrote:
+> This series fixes a kernel crash at probe time when using the at91_adc driver
+> through platform_data. This crash appeared in 3.13.
+>
+> The first patch fixes the crash. While it is already quite late, I think it
+> would be good to get it in 3.14.
+>
+> The next patches restore support for at91_adc on the at91sam9g45 and at91sam9260
+> based boards. It would be great if they could make it in 3.14. But I'm not sure
+> it is worth applying them to 3.13.
+>
+> Alexandre Belloni (3):
+>    iio: adc: at91_adc: Repair broken platform_data support
+>    ARM: at91: at91sam9g45: change at91_adc name
+>    ARM: at91: at91sam9260: change at91_adc name
+>
+>   arch/arm/mach-at91/at91sam9260_devices.c |  2 +-
+>   arch/arm/mach-at91/at91sam9g45_devices.c |  2 +-
+>   drivers/iio/adc/at91_adc.c               | 26 ++++++++++++++++++++++----
+>   3 files changed, 24 insertions(+), 6 deletions(-)
+>
 
-The pm-drivers branch of the linux-pm.git, contains the helper
-functions this patch depends on.
+Thank you for the fixes.
+I tested the patch series in at91sam9m10g45ek and works fine.
 
-If you decide to pull that branch to your tree, to be able to apply
-this patch, please let me know. Otherwise I will repost this patch
-once 3.15 rc1 is available.
+so here is my:
+Tested-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Josh Wu <josh.wu@atmel.com>
 
-Kind regards
-Ulf Hansson
-
-> ---
->  drivers/i2c/busses/i2c-nomadik.c |   14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-> index 8082f5c..519f5b8 100644
-> --- a/drivers/i2c/busses/i2c-nomadik.c
-> +++ b/drivers/i2c/busses/i2c-nomadik.c
-> @@ -879,19 +879,19 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
->  #ifdef CONFIG_PM_SLEEP
->  static int nmk_i2c_suspend_late(struct device *dev)
->  {
-> -       pinctrl_pm_select_sleep_state(dev);
-> +       int ret;
->
-> +       ret = pm_runtime_force_suspend(dev);
-> +       if (ret)
-> +               return ret;
-> +
-> +       pinctrl_pm_select_sleep_state(dev);
->         return 0;
->  }
->
->  static int nmk_i2c_resume_early(struct device *dev)
->  {
-> -       /* First go to the default state */
-> -       pinctrl_pm_select_default_state(dev);
-> -       /* Then let's idle the pins until the next transfer happens */
-> -       pinctrl_pm_select_idle_state(dev);
-> -
-> -       return 0;
-> +       return pm_runtime_force_resume(dev);
->  }
->  #endif
->
-> --
-> 1.7.9.5
->
+Best Regards,
+Josh Wu
