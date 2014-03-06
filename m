@@ -1,27 +1,19 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Mar 2014 15:17:28 -0500
-Subject: [PATCH 2/3] devicetree: bindings: drop pinctrl PMU reg property
-In-Reply-To: <1393977790-29110-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 6 Mar 2014 15:18:03 -0500
+Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
+In-Reply-To: <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393977790-29110-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140306201728.GK1872@titan.lakedaemon.net>
+ <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140306201803.GL1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 01:03:09AM +0100, Sebastian Hesselbarth wrote:
-> Marvell Dove's pinctrl does require some PMU regs for muxing PMU
-> functions to MPP pins. Recently, a discussion started about consolidating
-> Power Management Unit (PMU) into a single DT node. As we don't want
-> anymore DT ABI in the way, drop the corresponding reg property from
-> pinctrl binding documentation now.
+On Wed, Mar 05, 2014 at 01:03:10AM +0100, Sebastian Hesselbarth wrote:
+> Pinctrl will WARN on missing DT resources, which is a little bit too
+> noisy. Use dev_warn with FW_BUG instead.
 > 
 > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
-> Cc: Rob Herring <robh+dt@kernel.org> 
-> Cc: Pawel Moll <pawel.moll@arm.com> 
-> Cc: Mark Rutland <mark.rutland@arm.com> 
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
-> Cc: Kumar Gala <galak@codeaurora.org> 
 > Cc: Russell King <linux@arm.linux.org.uk> 
 > Cc: Jason Cooper <jason@lakedaemon.net> 
 > Cc: Andrew Lunn <andrew@lunn.ch>
@@ -31,9 +23,8 @@ On Wed, Mar 05, 2014 at 01:03:09AM +0100, Sebastian Hesselbarth wrote:
 > Cc: linux-arm-kernel at lists.infradead.org 
 > Cc: linux-kernel at vger.kernel.org
 > ---
->  Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt  | 2 +-
->  Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  drivers/pinctrl/mvebu/pinctrl-dove.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
 Applied to mvebu/pinctrl
 
