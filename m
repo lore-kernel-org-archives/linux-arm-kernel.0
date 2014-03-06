@@ -1,48 +1,70 @@
-From: robie.basak@canonical.com (Robie Basak)
-Date: Thu, 6 Mar 2014 08:52:13 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140301152756.67A02C40238@trevor.secretlab.ca>
-References: <20140226183454.GA14639@cbox>
- <20140301152756.67A02C40238@trevor.secretlab.ca>
-Message-ID: <20140306085213.GU643@mal.justgohome.co.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 6 Mar 2014 10:52:00 +0200
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <CAMuHMdWVSfKrudBhE7FW-ZWBvMOLWjrQZvn1qZUfRt_H+P7A2w@mail.gmail.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	<1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>	<20140228155937.GQ21483@n2100.arm.linux.org.uk>	<5310B567.7040605@ti.com>	<20140228162327.GT21483@n2100.arm.linux.org.uk>	<5316E31F.9050308@ti.com>
+ <CAMuHMdWVSfKrudBhE7FW-ZWBvMOLWjrQZvn1qZUfRt_H+P7A2w@mail.gmail.com>
+Message-ID: <53183730.5060205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
-> I would also reference section 3.3 (Boot Option Variables Default Boot
-> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
-> restate the meaning of the requirement in this spec, but the UEFI spec
-> is the authoritative source. Distributed VM disk images fall under the
-> same scenario as the firmware not having any valid boot variables.
+On 06/03/14 10:39, Geert Uytterhoeven wrote:
+> On Wed, Mar 5, 2014 at 9:41 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> On 28/02/14 18:23, Russell King - ARM Linux wrote:
+>>
+>>> That's rather a lot of compatible strings.  Another possibility is:
+>>>
+>>>       compatible = "dvi-connector";
+>>>       analog;
+>>>       digital;
+>>>       single-link;
+>>>       dual-link;
+>>
+>> I made the following changes compared to the posted version. I decided
+>> to leave the "single-link" out, as it's implied if "digital" is set.
+>>
+>>  Tomi
+>>
+>> @@ -6,11 +6,16 @@ Required properties:
+>>
+>>  Optional properties:
+>>  - label: a symbolic name for the connector
+>> -- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+>> +- ddc-i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+>> +- analog: the connector has DVI analog pins
+>> +- digital: the connector has DVI digital pins
+>> +- dual-link: the connector has pins for DVI dual-link
+>>
+>>  Required nodes:
+>>  - Video port for DVI input
+>>
+>> +Note: One (or both) of 'analog' or 'digital' must be set.
+> 
+> So dual-link needs both "digital" and "dual-link"?
 
-What happens when the VM is first booted without boot variables, but
-then the OS expects to be able to set boot variables and see them on
-next boot?
+Yes. It is extra, but it felt clearer to me to have 'digital' as a
+matching property for 'analog'.
 
-AIUI, we don't have an implementation of this right now, and even if we
-did, there are implications for persistent storage of this data further
-up the stack (a required implementation in libvirt, OpenStack nova
-providing a storage area for it, etc).
+Alternatively we could have three options:
 
-If possible, I would prefer to mandate that the host implementation is
-permitted to no-op (or otherwise disable) boot variable write operations
-altogether to avoid having to deal with this. In the common case, I
-don't see why an OS installation shipped via a VM disk image would need
-to write boot variables anyway.
+analog;
+digital-single-link;
+digital-dual-link;
 
-Would there be any adverse consequences to doing this?
+My reasoning to the format I chose was basically that when a connector
+supports 'digital', it contains TMDS clock and TMDS data for link 1.
+Adding dual link to that adds only TMDS data for link 2, so the second
+data link is kind of an additional feature, marked with a flag.
 
-My reason is that this would save us from blocking a general OpenStack
-implementation on ARM by requiring that these pieces are implemented
-further up the stack first, when it would bring actual gain to doing so.
+Not a very big argument, and I'm fine with other format suggestions.
 
-This would not preclude host implementations from implementing writeable
-variables, or guests from using them. Just that for a _portable VM disk
-image_, the OS on it cannot assume that this functionality is present.
+ Tomi
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/6de98c9d/attachment-0001.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/65ecafc2/attachment.sig>
