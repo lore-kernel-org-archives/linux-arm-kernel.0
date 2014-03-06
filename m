@@ -1,79 +1,102 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 6 Mar 2014 14:45:55 +0100
-Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents
- and rates
-In-Reply-To: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
-References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <53187C13.3040202@st.com>
+From: mark.roszko@gmail.com (Mark Roszko)
+Date: Thu, 6 Mar 2014 08:48:33 -0500
+Subject: [PATCH v2] i2c:at91: Add device tree property to set
+ clock-frequency
+In-Reply-To: <20140228110506.GF11192@ldesroches-Latitude-E6320>
+References: <1393293045-31849-1-git-send-email-mark.roszko@gmail.com>
+ <20140228110506.GF11192@ldesroches-Latitude-E6320>
+Message-ID: <CAJjB1qLXnO-Zkte3vg_X5ktXmj1=tG+p5BcLX9vbCgzyfg_rWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+CCing the subsystem maintainer because I left him out on the initial send.
 
-	I like the principle of your implementation, but I have two questions:
-	1 - How can we manage PM with this solution, as the parent/rate will be 
-set only once at probe time?
-	2 - How to set the parent of a parent clock (which can be shared with 
-other devices)? Same question about the parent rates.
+On Fri, Feb 28, 2014 at 6:05 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Mon, Feb 24, 2014 at 08:50:45PM -0500, Marek Roszko wrote:
+>> This adds the ability to set "clock-frequency" in the device tree for the i2c bus following
+>> the naming of other i2c bus implementations. If the property is not set, the clock
+>> frequency will default to the previously used define of 100KHz.
+>>
+>> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Thanks
+>
+>> ---
+>> v2:
+>>       -fixed return code usage and check to not compare agaisnt less than zero
+>>
+>> ---
+>>  Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
+>>  drivers/i2c/busses/i2c-at91.c                      |   10 ++++++++--
+>>  2 files changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+>> index 4fade84..388f0a2 100644
+>> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+>> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+>> @@ -12,6 +12,7 @@ Required properties :
+>>  - clocks: phandles to input clocks.
+>>
+>>  Optional properties:
+>> +- clock-frequency: Desired I2C bus frequency in Hz, otherwise defaults to 100000
+>>  - Child nodes conforming to i2c bus binding
+>>
+>>  Examples :
+>> @@ -23,6 +24,7 @@ i2c0: i2c at fff84000 {
+>>       #address-cells = <1>;
+>>       #size-cells = <0>;
+>>       clocks = <&twi0_clk>;
+>> +     clock-frequency = <400000>;
+>>
+>>       24c512 at 50 {
+>>               compatible = "24c512";
+>> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+>> index 843d012..a407050 100644
+>> --- a/drivers/i2c/busses/i2c-at91.c
+>> +++ b/drivers/i2c/busses/i2c-at91.c
+>> @@ -32,7 +32,7 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/platform_data/dma-atmel.h>
+>>
+>> -#define TWI_CLK_HZ           100000                  /* max 400 Kbits/s */
+>> +#define DEFAULT_TWI_CLK_HZ           100000          /* max 400 Kbits/s */
+>>  #define AT91_I2C_TIMEOUT     msecs_to_jiffies(100)   /* transfer timeout */
+>>  #define AT91_I2C_DMA_THRESHOLD       8                       /* enable DMA if transfer size is bigger than this threshold */
+>>
+>> @@ -711,6 +711,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+>>       struct resource *mem;
+>>       int rc;
+>>       u32 phy_addr;
+>> +     int bus_clk_rate;
+>>
+>>       dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+>>       if (!dev)
+>> @@ -756,7 +757,12 @@ static int at91_twi_probe(struct platform_device *pdev)
+>>                       dev->use_dma = true;
+>>       }
+>>
+>> -     at91_calc_twi_clock(dev, TWI_CLK_HZ);
+>> +     rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
+>> +                     &bus_clk_rate);
+>> +     if (rc)
+>> +             bus_clk_rate = DEFAULT_TWI_CLK_HZ;
+>> +
+>> +     at91_calc_twi_clock(dev, bus_clk_rate);
+>>       at91_init_twi_bus(dev);
+>>
+>>       snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
+>> --
+>> 1.7.10.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-Thanks,
-Maxime
 
-On 03/03/2014 07:15 PM, Sylwester Nawrocki wrote:
-> This patch set adds a DT binding documentation for new 'clock-parents'
-> and 'clock-rates' DT properties and a helper function to parse them.
-> The helper is now being called from within the driver core, similarly
-> as it is done for the pins configuration binding to a device.
->
-> Patch 1/2 adds a variant of of_clk_get() function which accepts name of
-> a DT property containing list of phandle + clock specifier pairs, as
-> opposed to hard coded "clocks" property name in of_clk_get().
-> As Mike suggested I've renamed this function to of_clk_get_by_property().
->
-> Patch 2/2 actually adds the code searching for related DT properties at
-> device node and performing re-parenting and/or clock frequency setting
-> as specified.
->
-> Changes since v1:
->   - updated DT binding documentation,
->   - dropped the platform bus notifier, the clock setup routine is now
->     being called directly from the driver core before a driver probe() call;
->     this has an advantage such as all bus types are handled and any errors
->     are propagated, so that, for instance a driver probe() can be deferred
->     also when resources specified by clock-parents/clock-rates properties
->     are not yet available; an alternative would be to let drivers call
->     of_clk_device_setup() directly,
->   - dropped the patch adding a macro definition for maximum DT property
->     name length for now.
->
-> Open issues:
->   - handling of errors from of_clk_get_by_property() could be improved,
->     currently ENOENT is returned by this function not only for a null
->     entry.
->
-> This series has been tested on ARM, on Exynos4412 Trats2 board.
-> RFC v1 can be found at:
-> http://www.spinics.net/lists/arm-kernel/msg309241.html
->
-> Sylwester Nawrocki (2):
->    clk: Add function parsing arbitrary clock list DT property
->    clk: Add handling of clk parent and rate assigned from DT
->
->   .../devicetree/bindings/clock/clock-bindings.txt   |   23 ++++++
->   drivers/base/dd.c                                  |    5 ++
->   drivers/clk/clk.c                                  |   77 ++++++++++++++++++++
->   drivers/clk/clk.h                                  |    3 +
->   drivers/clk/clkdev.c                               |   25 ++++++-
->   include/linux/clk-provider.h                       |    6 ++
->   6 files changed, 135 insertions(+), 4 deletions(-)
->
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Mark
