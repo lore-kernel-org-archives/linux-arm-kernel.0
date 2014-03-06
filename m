@@ -1,59 +1,68 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 06 Mar 2014 17:20:09 +0100
-Subject: [PATCH v6 00/10] Add device tree support for Exynos4 camera interface
-Message-ID: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
+Date: Thu, 06 Mar 2014 17:20:10 +0100
+Subject: [PATCH v6 01/10] Documentation: dt: Add binding documentation for
+ S5K6A3 image sensor
+In-Reply-To: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
+References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1394122819-9582-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds devicetree support for the front and rear camera of
-the Exynos4412 SoC Trats2 board. It converts related drivers to use
-the v4l2-async API. The SoC output clocks are provided to external image
-image sensors through the common clock API.
+This patch adds binding documentation for the Samsung S5K6A3(YX)
+raw image sensor.
 
-This iteration includes three small fixes, detailed description can
-be found in patches 7/10, 8/10.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+Changes since v5:
+  - none.
 
-I'd like to ask for a DT binding maintainer review/Ack of patch 3/10.
-I'm  going to push this series to the media tree on beginning of next
-week.
-
-Thanks,
-Sylwester
-
-Sylwester Nawrocki (10):
-  Documentation: dt: Add binding documentation for S5K6A3 image sensor
-  Documentation: dt: Add binding documentation for S5C73M3 camera
-  Documentation: devicetree: Update Samsung FIMC DT binding
-  V4L: Add driver for s5k6a3 image sensor
-  V4L: s5c73m3: Add device tree support
-  exynos4-is: Use external s5k6a3 sensor driver
-  exynos4-is: Add clock provider for the SCLK_CAM clock outputs
-  exynos4-is: Add support for asynchronous subdevices registration
-  ARM: dts: Add rear camera nodes for Exynos4412 TRATS2 board
-  ARM: dts: exynos4: Update camera clk provider and s5k6a3 sensor node
-
- .../devicetree/bindings/media/samsung-fimc.txt     |   34 +-
- .../devicetree/bindings/media/samsung-s5c73m3.txt  |   97 +++++
- .../devicetree/bindings/media/samsung-s5k6a3.txt   |   33 ++
- arch/arm/boot/dts/exynos4.dtsi                     |    6 +-
- arch/arm/boot/dts/exynos4412-trats2.dts            |   86 ++++-
- drivers/media/i2c/Kconfig                          |    8 +
- drivers/media/i2c/Makefile                         |    1 +
- drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  207 ++++++++---
- drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
- drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
- drivers/media/i2c/s5k6a3.c                         |  389 ++++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
- drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +-------------
- drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
- drivers/media/platform/exynos4-is/fimc-is.c        |   97 ++---
- drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
- drivers/media/platform/exynos4-is/media-dev.c      |  340 ++++++++++++-----
- drivers/media/platform/exynos4-is/media-dev.h      |   32 +-
- 18 files changed, 1136 insertions(+), 544 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
+Changes since v2:
+ - rephrased 'clocks' and 'clock-names' properties' description;
+---
+ .../devicetree/bindings/media/samsung-s5k6a3.txt   |   33 ++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
- create mode 100644 drivers/media/i2c/s5k6a3.c
 
---
+diff --git a/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt b/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+new file mode 100644
+index 0000000..cce01e8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+@@ -0,0 +1,33 @@
++Samsung S5K6A3(YX) raw image sensor
++---------------------------------
++
++S5K6A3(YX) is a raw image sensor with MIPI CSI-2 and CCP2 image data interfaces
++and CCI (I2C compatible) control bus.
++
++Required properties:
++
++- compatible	: "samsung,s5k6a3";
++- reg		: I2C slave address of the sensor;
++- svdda-supply	: core voltage supply;
++- svddio-supply	: I/O voltage supply;
++- afvdd-supply	: AF (actuator) voltage supply;
++- gpios		: specifier of a GPIO connected to the RESET pin;
++- clocks	: should contain list of phandle and clock specifier pairs
++		  according to common clock bindings for the clocks described
++		  in the clock-names property;
++- clock-names	: should contain "extclk" entry for the sensor's EXTCLK clock;
++
++Optional properties:
++
++- clock-frequency : the frequency at which the "extclk" clock should be
++		    configured to operate, in Hz; if this property is not
++		    specified default 24 MHz value will be used.
++
++The common video interfaces bindings (see video-interfaces.txt) should be
++used to specify link to the image data receiver. The S5K6A3(YX) device
++node should contain one 'port' child node with an 'endpoint' subnode.
++
++Following properties are valid for the endpoint node:
++
++- data-lanes : (optional) specifies MIPI CSI-2 data lanes as covered in
++  video-interfaces.txt.  The sensor supports only one data lane.
+-- 
 1.7.9.5
