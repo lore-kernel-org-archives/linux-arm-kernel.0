@@ -1,57 +1,80 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu,  6 Mar 2014 17:04:29 +0100
-Subject: [PATCH v9][ 8/8] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
-In-Reply-To: <1394121869-13387-1-git-send-email-denis@eukrea.com>
-References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
- <1394121869-13387-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394121869-13387-5-git-send-email-denis@eukrea.com>
+Date: Thu,  6 Mar 2014 17:01:42 +0100
+Subject: [PATCH v9][ 3/8] staging: imx-drm: Correct BGR666 and the board's dts
+ that use them.
+In-Reply-To: <1394121702-13257-1-git-send-email-denis@eukrea.com>
+References: <1394121702-13257-1-git-send-email-denis@eukrea.com>
+Message-ID: <1394121702-13257-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The current BGR666 is not consistent with the other color mapings like BGR24.
+BGR666 should be in the same byte order than BGR24.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v8->v9:
 - Removed the Cc. They are now set in git-send-email directly.
-- The backlight is now on at boot.
+
+ChangeLog v7->v8:
+- Shrinked even more the Cc list.
 
 ChangeLog v6->v7:
 - Shrinked even more the Cc list.
 
 ChangeLog v5->v6:
-- Reordered the Cc list.
+- Remove people not concerned by this patch from the Cc list.
+- Added a better explanation of the change.
 
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
-
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
+ChangeLog v5:
+- New patch.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
+ arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index dbf1083..59c6038 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,6 +17,15 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+		default-on;
-+	};
-+
- 	reg_lcd_3v3: lcd-en {
- 		compatible = "regulator-fixed";
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index c29cfa9..bff3201 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -19,7 +19,7 @@
+ 	display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+ 		crtcs = <&ipu 0>;
+-		interface-pix-fmt = "bgr666";
++		interface-pix-fmt = "rgb666";
  		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index d939ba8..4250e74 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -24,7 +24,7 @@
+ 		display1: display at di1 {
+ 			compatible = "fsl,imx-parallel-display";
+ 			crtcs = <&ipu 1>;
+-			interface-pix-fmt = "bgr666";
++			interface-pix-fmt = "rgb666";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+index 6f9abe8..154d293 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 
+ 	/* bgr666 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+ 
+ 	/* bgr24 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
 -- 
 1.7.9.5
