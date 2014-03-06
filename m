@@ -1,82 +1,66 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 6 Mar 2014 11:25:03 +0900
-Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on
- r8a7790/lager and r8a7791/koelsch
-In-Reply-To: <20140306013824.GF13581@verge.net.au>
-References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
- <CANqRtoSM-51NRVAtYOOAzZQ-pagC2JteC+M=SKMuBYniLFfhLA@mail.gmail.com>
- <20140306013824.GF13581@verge.net.au>
-Message-ID: <CANqRtoSkHWGRypPymh87ikmcEWqMsn=eRoPkc2JpaSZVqP21Lw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 06 Mar 2014 11:34:46 +0900
+Subject: [PATCH v2 2/3] arm64: Add seccomp support
+In-Reply-To: <20140228172006.GF30996@mudshark.cambridge.arm.com>
+References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-3-git-send-email-takahiro.akashi@linaro.org>
+ <20140228172006.GF30996@mudshark.cambridge.arm.com>
+Message-ID: <5317DEC6.4060103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 10:38 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Mar 05, 2014 at 05:31:42PM +0900, Magnus Damm wrote:
->> On Tue, Feb 25, 2014 at 7:30 PM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->> >         Hi Simon, Magnus,
->> >
->> > This patch series integrates support for the MSIOF module in the Renesas
->> > R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
->> > development boards.
->> >
->> > It was tested on Lager and Koelsch, both legacy and DT, using a dummy
->> > driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
->> > ID.
->> >
->> >     [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
->> >     [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
->> >     [03/11] ARM: shmobile: lager legacy: Add MSIOF support
->> >     [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
->> >     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
->> >             spi0 alias
->> >     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
->> >             add spi0 alias
->> >     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
->> >     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
->> >     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
->> >     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
->> >     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
->> >
->> > These are (reworked versions of) the remaining patches not taken from v1.
->> > Changelogs are available in the individual patches.
+On 03/01/2014 02:20 AM, Will Deacon wrote:
+> On Tue, Feb 25, 2014 at 09:20:24AM +0000, AKASHI Takahiro wrote:
+>> secure_computing() should always be called first in syscall_trace(), and
+>> if it returns non-zero, we should stop further handling. Then that system
+>> call may eventually fail, be trapped or the process itself be killed
+>> depending on loaded rules.
+>
+> [...]
+>
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index d4ce70e..f2a74bc 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -20,12 +20,14 @@
+>>    */
 >>
->> Hi Geert,
+>>   #include <linux/audit.h>
+>> +#include <linux/errno.h>
+>>   #include <linux/kernel.h>
+>>   #include <linux/sched.h>
+>>   #include <linux/mm.h>
+>>   #include <linux/smp.h>
+>>   #include <linux/ptrace.h>
+>>   #include <linux/user.h>
+>> +#include <linux/seccomp.h>
+>>   #include <linux/security.h>
+>>   #include <linux/init.h>
+>>   #include <linux/signal.h>
+>> @@ -1064,6 +1066,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>>   {
+>>   	unsigned long saved_reg;
 >>
->> Thanks for your efforts. All these look fine to me.
->>
->> Acked-by: Magnus Damm <damm@opensource.se>
->>
->> Exactly what to merge upstream depends on what the ARM SoC maintainers prefer.
+>> +	if (!dir && secure_computing((int)regs->syscallno))
 >
-> I wonder if for now we could move things forwards by merging the
-> non-legacy code. I think that would mean the following:
->
->     [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
->             spi0 alias
->     [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
->             add spi0 alias
->     [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
->     [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
->     [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
->     [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
->
-> And just the 'multi' portion of:
->
->     [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
->
->
-> Would that result in working MSIOF support for koelsch and lager
-> when using multiplatform?
+> Why do you need this cast to (int)?
 
-I believe so, but I rely on Geert to point out if this assumption is wrong.
+OK. I will remove it because gcc doesn't complain about it anyway.
 
-> Then later, if appropriate, in accordance with discussions with the
-> ARM SoC maintainers, we could merge the remaining changes in
-> this series: the legacy code.
+> Also, it's probably better to check for
+> -1 explicitly here.
 
-Sure, sounds good.
+I wil fix it.
 
-Thanks,
+> I'm slightly surprised that we do the secure computing check first. Doesn't
+> this allow a debugger to change the syscall to something else after we've
+> decided that it's ok?
 
-/ magnus
+To be honest, I just followed other architectures' implementation.
+Can you elaborate any use case that you have in your mind?
+
+-Takahiro AKASHI
+
+> Will
+>
