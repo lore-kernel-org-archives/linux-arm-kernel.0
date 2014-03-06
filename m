@@ -1,77 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 6 Mar 2014 12:57:42 +0100
-Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <50e0997786a0459eb08c9d92813253f9@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
- <201403060541.21665.marex@denx.de>
- <50e0997786a0459eb08c9d92813253f9@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201403061257.42755.marex@denx.de>
+From: robie.basak@canonical.com (Robie Basak)
+Date: Thu, 6 Mar 2014 12:04:50 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <53185FB9.1040308@redhat.com>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor.secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk>
+ <531843EE.8040102@redhat.com> <53185FB9.1040308@redhat.com>
+Message-ID: <20140306120449.GA29916@mal.justgohome.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 06, 2014 at 06:02:03 AM, Yao Yuan wrote:
-> On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
-> > On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
-> > > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
-> > > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
-> > > > > Add dma support for i2c. This function depend on DMA driver.
-> > > > > You can turn on it by write both the dmas and dma-name properties
-> > > > > in dts node.
-> > > > > 
-> > > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > > > > ---
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
-> > > > > platform_device
-> > > > 
-> > > > *pdev)
-> > > > 
-> > > > >  	void __iomem *base;
-> > > > >  	int irq, ret;
-> > > > >  	u32 bitrate;
-> > > > > 
-> > > > > +	u32 phy_addr;
-> > > > > 
-> > > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
-> > > > > 
-> > > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
-> > > > > platform_device
-> > > > 
-> > > > *pdev)
-> > > > 
-> > > > >  	}
-> > > > >  	
-> > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > > 
-> > > > > +	phy_addr = res->start;
-> > > > 
-> > > > Uh ... Shawn, I really think I am lost here. Don't you need to map
-> > > > this memory before you can use it for DMA ? The DMA mapping function
-> > > > should give you the physical address and is the right way to go
-> > > > about this instead of pulling the address from here, no ?
-> > > > 
-> > > > I might be wrong here, I am rather uncertain, so please help me out.
-> > > > Thanks!
-> > > 
-> > > Hi, Marek, Thanks for your suggestion.
-> > > Here you can review the code in include/linux/ioport.h The
-> > > resource->start describes the entity on the CPU bus as a starting
-> > > physical address. So I thinks it can used for dma directly.
-> > 
-> > This doesn't feel right for some reason. If this is a register area, you
-> > should
-> > ioremap() it. If it's a memory area you do DMA to/from, you need to make
-> > sure you correctly flush/invalidate caches and properly handle the
-> > effects the write buffer might have. But I have a feeling you actually do
-> > DMA to/from register space here ?
+On Thu, Mar 06, 2014 at 12:44:57PM +0100, Laszlo Ersek wrote:
+> If I understand correctly, the question is this:
 > 
-> Yes, It's a register area. But I don't know why I should ioremap() it? It's
-> a bus address and DMA can use it directly. Is there some problem for my
-> understanding ?
+>   Given a hypervisor that doesn't support non-volatile UEFI variables
+>   (including BootOrder and Boot####), is it possible to automatically
+>   boot a carefully prepared VM image, made available as a fixed media
+>   device?
+> 
+> The answer is "yes". See
 
-I am not too sure here, thus I am poking someone who can clearly answer this.
+Right, but I think there is a subsequent problem.
 
-Best regards,
-Marek Vasut
+>   It is expected that this default boot will load an operating system or
+>   a maintenance utility. If this is an operating system setup program it
+>   is then responsible for setting the requisite environment variables
+>   for subsequent boots. The platform firmware may also decide to recover
+        ^^^^^^^^^^^^^^^^
+>   or set to a known set of boot options.
+
+It seems to me that the guest OS is permitted to assume that persistent
+boot variables will work after first boot, for subsequent boots.
+
+So, for example, the guest OS might, on bootloader or kernel upgrade,
+completely replace the boot mechanism, dropping the removable path and
+replacing it with a fixed disk arrangement, setting boot variables
+appropriately, and assume that it can reboot and everything will
+continue to work.
+
+But if the host does not support non-volatile variables, then this will
+break.
+
+This is why I'm suggesting that the specification mandate that the guest
+OS shipped in a "portable disk image" as defined by the spec must not
+make this assumption.
+
+It's either this, or mandate that all hosts must support persistent
+variables. I have no objection to that in principle, but since we have
+no implementation currently, it seems easier to avoid this particular
+roadblock by tweaking the spec in a way that nobody seems to care about
+anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140306/72149884/attachment-0001.sig>
