@@ -1,207 +1,191 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 07 Mar 2014 00:24:33 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140226221939.GC21483@n2100.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1402262144190.10826@axis700.grange>
- <20140226221939.GC21483@n2100.arm.linux.org.uk>
-Message-ID: <16403654.Dg5ZqMop7H@avalon>
+Date: Fri, 07 Mar 2014 00:29:34 +0100
+Subject: [PATCH 2/2] ARM: dts: duovero-parlor: Add HDMI output
+In-Reply-To: <20140226132856.GB27282@n2100.arm.linux.org.uk>
+References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
+ <530DE192.9030506@ti.com> <20140226132856.GB27282@n2100.arm.linux.org.uk>
+Message-ID: <3690133.pBi4D5Na1C@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Russell,
 
-Time for me to jump in. The more, the merrier I suppose.
-
-On Wednesday 26 February 2014 22:19:39 Russell King - ARM Linux wrote:
-> On Wed, Feb 26, 2014 at 10:00:25PM +0100, Guennadi Liakhovetski wrote:
-> > Hi Russell
+On Wednesday 26 February 2014 13:28:56 Russell King - ARM Linux wrote:
+> On Wed, Feb 26, 2014 at 02:44:02PM +0200, Tomi Valkeinen wrote:
+> > > Also - DRM is not going to ever support hotplugging components - this
+> > > was discussed at kernel summit last year and David Airlie was quite
 > > 
-> > (I suspect this my email will be rejected by ALKML too like other my
-> > recent emails, but at least other MLs will pick it up and individual CCs
-> > too, so, if replying, maybe it would be good to keep my entire reply, all
-> > the more that it's going to be very short)
+> > Ok. Very odd stance. Maybe there's a reason for it that I just don't see.
+> 
+> DRM is like ALSA - it's a card level subsystem.  All components have
+> to be present before the card level is brought up for the subsystem to
+> function correctly.
+
+I agree with Tomi here, I believe hot-plug (without hot-unplug) would be 
+useful in case part of a video pipeline fails to probe. In a multi-output 
+system (let's say HDMI and DSI panel for instance) I'd like the HDMI output to 
+work if the DSI panel driver isn't loaded.
+
+DRM doesn't support this, and will not in the near future, but let's just keep 
+in mind that real use cases exist. I'm not asking anyone to implement DRM hot-
+plug support now, but the idea itself shouldn't be nacked if someone can come 
+up with a proper implementation.
+
+> > > adamant about that.  So, any "framework" which forces hotplugging of
+> > > components on subsystems isn't going to fly.
 > > 
-> > On Thu, 2 Jan 2014, Russell King wrote:
-> > > Subsystems such as ALSA, DRM and others require a single card-level
-> > > device structure to represent a subsystem.  However, firmware tends to
-> > > describe the individual devices and the connections between them.
-> > > 
-> > > Therefore, we need a way to gather up the individual component devices
-> > > together, and indicate when we have all the component devices.
-> > > 
-> > > We do this in DT by providing a "superdevice" node which specifies
-> > > the components, eg:
-> > > 	imx-drm {
-> > > 		compatible = "fsl,drm";
-> > > 		crtcs = <&ipu1>;
-> > > 		connectors = <&hdmi>;
-> > > 	};
+> > CDF doesn't force hotplugging.
 > > 
-> > It is a pity linux-media wasn't CC'ed and apparently V4L developers didn't
-> > notice this and other related patches in a "clean up" series, and now this
-> > patch is already in the mainline. But at least I'd like to ask whether the
-> > bindings, defined in
-> > Documentation/devicetree/bindings/media/video-interfaces.txt and
-> > implemented in drivers/media/v4l2-core/v4l2-of.c have been considered for
-> > this job, and - if so - why have they been found unsuitable? Wouldn't it
-> > have been better to use and - if needed - extend them to cover any
-> > deficiencies? Even though the implementation is currently located under
-> > drivers/media/v4l2-code/ it's pretty generic and should be easily
-> > transferable to a more generic location.
+> > Although without hotplugging (hot-unplug not needed), or at least some
+> > minimal form of it, the system is a bit crippled. Leave one kernel
+> > module out, or have one driver probe fail, the whole display subsystem
+> > fails, even if some display pipelines would work fine.
 > 
-> The component helpers have nothing to do with DT apart from solving
-> the problem of how to deal with subsystems which expect a single device,
-> but we have a group of devices and their individual drivers to cope with.
-> Subsystems like DRM and ALSA.
-
-(and V4L2)
-
-Point duly taken. First of all I want to mention that your proposal is 
-greatly appreciated. This is a problem that crosses subsystem boundaries, and 
-should thus be addressed centrally.
-
-However, we (as in the V4L2 community, and me personally) would have 
-appreciated to be CC'ed on the proposal. As you might know we already had a 
-solution for this problem, albeit V4L2-specific, in drivers/media/v4l2-
-core/v4l2-async.c. Whether or not this solution should have been made generic 
-instead of coming up with a new separate implementation would of course have 
-been debatable, but the most important point would have been to make sure that 
-v4l2-async could easily be implemented on top of the common component 
-architecture.
-
-The topic is particularly hot given that a similar solution was also proposed 
-as part of the now defunct (or at least hibernating) common display framework. 
-If I had replied to this mail thread without sleeping on it first I might not 
-have known better and have got half-paranoid, wondereding whether there had 
-been a deliberate attempt to fast-track this API before the V4L2 developers 
-noticed. To be perfectly clear, there is *NO* implicit or explicit such 
-accusation here, as I know better.
-
-Let's all take this as a positive opportunity to cooperate more closely, media 
-devices still need a huge effort to be cleanly supported on modern hardware, 
-and we'll need all the development power we can get.
-
-Accordingly, I would like to comment on the component API, despite the fact 
-that it has been merged in mainline already. The first thing that I believe is 
-missing is documentation. Do you have any pending patch for that, either as 
-kerneldoc or as a text file for Documentation/ ? As I've read the code to 
-understand it I might have missed so design goals, so please bear with the 
-stupid questions that may follow.
-
-I'll first provide a brief comparison of the two models to make the rest of 
-the comments easier to understand.
-
-v4l2-async calls the component master object v4l2_async_notifier. The base 
-component child object is a v4l2_subdev instance instead of being a plain 
-device. v4l2_subdev instances are stored in v4l2-async lists similarly to how 
-the component framework stores objects, except that the list head is directly 
-embedded inside the v4l2_subdev structure instead of being part of a separate 
-structure allocated by the framework.
-
-The notifier has three callback functions, bound, complete and unbind. The 
-bound function is called when one component has been bound to the master. 
-Similarly the unbind function is called when one component is about to be 
-unbound from the master. The complete function is called when all components 
-have been bound, and is thus equivalent to the bind function of the component 
-framework.
-
-Notifiers are registered along with a list of match entries. A match entry is 
-roughly equivalent to the compare function passed to 
-component_master_add_child, except that it includes built-in support for 
-matching on an OF node, dev_name or I2C bus number and child address.
-
-Whenever a subdev (component child) is registered with 
-v4l2_async_register_subdev (equivalent to component_add), the list of 
-notifiers (masters) is walked and their match entries are processed. If a 
-matching entry is found the subdev is bound to the notifier immediately, 
-otherwise it is added to a list of unbound subdevices (component_list). 
-Whenever a notifier (component master) is registered with 
-v4l2_async_notifier_register (component_master_add) the list of unbound 
-subdevs is walked and every match entry of the notifier is tested. If a 
-matching entry is found the subdev is bound to the notifier.
-
-I've seen a couple of core differences in concept between your component model 
-and the v4l2-async model:
-
-- The component framework uses private master and component structures. 
-Wouldn't it simplify the code from a memory management point of view to expose 
-the master structure (which would then be embedded in driver-specific 
-structures) and the component structure (which would be embedded in struct 
-device) ? The latter would be slightly more intrusive from a struct device 
-point of view, so I don't have a strong opinion there yet, exposing the master 
-structure only might be better.
-
-- The component framework requires the master to provide an add_components 
-operation that will call the component_master_add_child function for every 
-component it needs, with a compare function. The add child function is called 
-when the master is registered, and then for every component added to the 
-system. I'm not sure to understand the design decisions behind this, but these 
-two levels of indirection appear pretty complex and confusing. Wouldn't it be 
-simpler to pass an array of match entries to the master registration function 
-instead and remove the add_components operation ? A match entry would 
-basically be a structure with a compare function and a compare_data pointer.
-
-We could also extend the match entry with explicit support for OF node and I2C 
-bus number + address matching as those are the most common cases, or at least 
-provide a couple of standard compare functions for those cases.
-
-- The component framework doesn't provide partial bind support. Children are 
-bound to the master only when all children are available. This makes it 
-impossible in practice to implement v4l2-async on top of the component 
-framework. What would you think about adding optional partial bind support ? 
-The master operations would then have partial bind, complete bind, partial 
-unbind and complete unbind functions. Drivers that only need full bind support 
-could set the partial bind and unbind functions to NULL.
-
-> It is completely agnostic to whether you're using platform data, DT or
-> even ACPI - this code could *not* care less.  None of that comes anywhere
-> near what this patch does.  It merely provides a way to collect up
-> individual devices from co-operating drivers, and control their binding
-> such that a subsystem like DRM or ALSA can be presented with a "card"
-> level view of the hardware rather than a multi-device medusa with all
-> the buggy, racy, crap fsckage that people come up to make that kind of
-> thing work.
+> That is, unfortunately, one of the side effects of the policy - but that's
+> not a policy that's going to change any time soon.  As I said, that was
+> made very clear at the last kernel summit - we had a /specific/ session
+> on the issues around multi-device DRM chaired by David.
 > 
-> Now, as for the binding above, first, what does "eg" mean... and
-> secondly, how would a binding which refers to crtcs and connectors
-> have anything to do with ALSA?  Clearly this isn't an example of a
-> binding for an ALSA use, which was talked about in the very first
-> line of the above commit commentry.  So it's quite clear that what is
-> given there is an example of how it /could/ be used.
+> There are some DRM drivers which have tried to do this, but they're all
+> buggy in some regard, whether that be to the point of oopsing the kernel
+> if things don't quite go to plan, or whether it's races between different
+> parts.
 > 
-> I suppose I could have instead turned imx-drm into a completely unusable
-> mess by not coming up with some kind of binding, and instead submitted
-> a whole pile of completely untested code.  Alternatively, I could've
-> used the OF binding as you're suggesting, but that would mean radically
-> changing the /existing/ bindings for the IPU as a whole - something
-> which others are better suited at as they have a /much/ better
-> understanding of the complexities of this hardware than I.
+> > > This is why we now have the component helpers in the driver model -
+> > > to allow devices to be collected together into one logical subsystem
+> > > group, and bound/unbound as a group.
+> > 
+> > Yep, it's a good start. The component helpers could well be used with CDF.
+> > 
+> > But if I'm not mistaken, it suffers from the problems above, when there
+> > are multiple independent pipelines (simultaneous or non-simultaneous)
+> > handled by the same IPs.
 > 
-> So, what I have done is implemented - for a driver in staging which is
-> still subject to ongoing development and non-stable DT bindings -
-> something which allows forward progress with a *minimum* of disruption
-> to the existing DT bindings for everyone, while still allowing forward
-> progress.
+> It may "suffer from the problems above" that you've raised, but that's
+> by explicit design of it - because that's what subsystems like DRM and
+> ALSA require, and this is _precisely_ the problem it's solving.
 > 
-> Better bindings for imx-drm are currently being worked on.  Philipp
-> Zabel of Pengutronix is currently looking at it, and has posted many
-> RFC patches on this very subject, including moving the V4L2 OF helpers
-> to a more suitable location.  OF people have been involved in that
-> discussion over the preceding weeks, and there's a working implementation
-> of imx-drm using these helpers from v4l2.
+> It's solving the "subsystem requires a stable view of hardware components,
+> but we have multiple devices and drivers which need probing" problem.
 > 
-> I'm finding people who are working in the same area and trying to get
-> everyone talking to each other so that we /do/ end up with a set of
-> bindings for the display stuff which are suitable for everyone.  Tomi
-> from TI has already expressed his input to this ongoing discussion.
+> > And, while I may be mistaken, it sounds that the component helpers leave
+> > mostly everything up to the display drivers. Everyone devising their own
+> > way to describe the hardware in DT, and the connections between the
+> > components. Of course, the core component system shouldn't define
+> > anything DT related, as it doesn't. But that part is still needed, which
+> > is where CDF comes in.
 > 
-> You're welcome to get involved in those discussions too.
+> Sigh.  It's very easy for people to get the wrong end of the stick.
 > 
-> I hope this makes it clear, and clears up the confusion.
+> What the component helpers do is provide a _subsystem_ _independent_
+> method of collecting a set of devices together and binding them to the
+> drivers at an appropriate time, in a way that is _completely_ independent
+> of whether you're using platform data, DT, ACPI, or whatever other
+> hardware description language comes along.
+
+I think we all agree here, the component framework is required to implement 
+clean support for component-based, DT-based systems, but doesn't depend on DT 
+and doesn't imply any specific DT binding. What I believe bother people is 
+that the example you have goes in a direction that might not be future-proof, 
+and should thus not be used as an example to create display-related DT 
+bindings. My understanding is that it's just an example to illustrate the kind 
+of use case that the component framework can help with, not a proper DT 
+bindings example that should be followed to design now DT bindings.
+
+> It's up to the users of this to define how components are grouped
+> together, whether that be at the subsystem level or at the driver
+> level - whatever is appropriate.
 > 
-> Thanks.
+> If a subsystem (eg, a display subsystem) wants to define "this is how
+> you define in DT the bindings between all components" and provide its
+> own hook for the "add_components" callback which does this, then it's
+> at liberty to do that.
+> 
+> If we can come up with a generic way to describe how all the components
+> in a display subsystem should be connected together, then great - but
+> that needs to happen very quickly.  Philipp Zabel is working on replacing
+> the imx-drm binding method right now for 3.15, and is probably completely
+> unaware of anything that's been talked about here.  I need to sort out
+> Armada DRM at some point to use the component stuff, which includes
+> sorting out TDA998x for DT - which again needs to be done in such a way
+> that it follows a common theme.
+> 
+> > I need to ask Dave why he is so strongly opposed to hotplugging
+> > components.
+> 
+> I suspect one reason for it is because it means rewriting the XF86
+> backend to Xorg to cope with it...
+
+<troll>The world is moving to Wayland anyway</troll>
+
+;-)
+
+> > > Remember that "hotplugging" in this context does not mean that the
+> > > user can physically do something with the hardware.  It means that
+> > > they're separate devices which can be probed/removed at will.  Every
+> > > device in Linux can be bound and unbound from its driver at any time
+> > > by userspace, and that is something which is expected to be handled
+> > > gracefully.
+> > 
+> > Hmm, sorry, can you rephrase?
+> 
+> I'll do better than that.  Try running this script with the
+> /sys/bus/.../drivers/whatever for the drivers you wish to test:
+> 
+> #!/bin/sh
+> for driver in "$@"; do
+>    if [ -f "${driver}/unbind" ]; then
+>       for device in "${driver}"/*; do
+>          if [ -d "${device}" ]; then
+>             devname="$(basename "${device}")"
+>             echo "$devname" > "${driver}/unbind"
+>             echo "$devname" > "${driver}/bind"
+>          fi
+>       done
+>    fi
+> done
+> 
+> The system should survive that.
+
+I've kept this problem in the back of my head for some time now and I'm 
+curious to know whether you have thought about how to solve it for component-
+based systems. Given that DRM doesn't support hot-unplug, is the solution 
+based on preventing driver unbind by returning an error from the remove 
+handler ?
+
+> > So with hotplug, a new fbdev or a combination of drm crtcs, encoders,
+> > etc, could appear even after the initial probe of the display controller.
+> 
+> This is the exact situation that David is opposed to.  DRM, like ALSA,
+> whats to have a stable view of hardware - once the drm_device has been
+> created and probed, no further changes to it are allowed.
+> 
+> Certainly no changes to the CRTCs will _ever_ be permitted, because it
+> completely destroys the user API for referecing which encoders can be
+> associated with which CRTCs - not only at the kernel level, but also the
+> Xorg and Xrandr level too.  That's done via a bitmask of allowable CRTCs,
+> where bit 0 refers to the first CRTC, bit 1 to the second and so on.
+> That's propagated all the way through to userspace, right through the Xorg
+> interfaces to applications.
+> 
+> Connectors and encoders are fixed at the moment after initial probe time
+> in DRM due to the way the fbdev emulation layer works.  There's also issues
+> there concerning bitmasks for which connectors can be cloned onto other
+> connectors which follows the same pattern as above - and again, that
+> propagates all the way through userspace.
+> 
+> So, if this is going to get fixed, there has to be a desire to break
+> userspace quite badly, and there is no such desire to do that.
+> 
+> For instance, let's say that Xorg is up and running, and you have the
+> gnome applet for configuring your display open, and you have two CRTCs.
+> Then the first CRTC is removed from the system, resulting in CRTC 1
+> becoming CRTC 0 in the kernel.  What happens...
+> 
+> Think the same thing through for a system with three connectors, A, B, C
+> numbered 0, 1, and 2 respectively.  A and be cloned onto B.  Now connector
+> A is removed, meaning B and C appear to become numbers 0 and 1 in the
+> kernel...
 
 -- 
 Regards,
