@@ -1,41 +1,31 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 6 Mar 2014 16:17:47 -0300
-Subject: [PATCH] ARM: mvebu: add Device Tree for the Armada 385 RD board
-In-Reply-To: <20140306172339.GP4780@lunn.ch>
-References: <1394107868-26094-1-git-send-email-gregory.clement@free-electrons.com>
- <20140306131429.GJ4780@lunn.ch>
- <5318779C.8030901@free-electrons.com>
- <20140306142117.GL4780@lunn.ch>
- <531886B4.2070002@free-electrons.com>
- <20140306144600.GM4780@lunn.ch>
- <53188B73.4000109@free-electrons.com>
- <53189892.5090502@free-electrons.com>
- <20140306160213.GA4327@arch.cereza> <20140306172339.GP4780@lunn.ch>
-Message-ID: <20140306191747.GA32655@arch.cereza>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 6 Mar 2014 20:26:17 +0100
+Subject: mx6q csi driver ?
+In-Reply-To: <20140305223753.GA28522@frolo.macqel>
+References: <20140305223753.GA28522@frolo.macqel>
+Message-ID: <20140306192617.GK24339@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 06, Andrew Lunn wrote:
-> > Can't we fix this so the probe order doesn't affect the name?
-> > 
-> > Is that sane?
-> 
-> You are not supposed to trust the device name, since probing can
-> happen in parallel, on different buses. udev should have rules to name
-> the interfaces based on the MAC address. On my Debian system i have:
-> 
-> /etc/udev/rules.d/70-persistent-net.rules
-> 
-> So what is important is that the MAC addresses are assigned correctly
-> to the device. And DT does that based on MMIO address, so should be
-> reliable, independent of probe order.
-> 
+Hi,
 
-Right, makes perfect sense!
+On Wed, Mar 05, 2014 at 11:37:53PM +0100, Philippe De Muyter wrote:
+> I try to write a linux driver for a cmos sensor connected to a sabresd
+> board, but I wonder where to continue.
+> 
+> I first considered using the freescale 3.10.17 beta kernel,
+> which has already a csi v4l2 driver (but using deprecated v4l2 internals).
 
-So we can just keep the nodes address-ordered, without caring about the name?
+We already have patches for the CSI, for 3.14-rc+ and based on all the
+latest and greatest v4l2 stuff.
 
+Before posting those, we'd like to get the current move-ipu-out-of-
+staging effort patch series resolved, then the video part will be one of
+the next topics we'll address.
+
+rsc
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
