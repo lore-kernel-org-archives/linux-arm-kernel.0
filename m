@@ -1,57 +1,37 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 6 Mar 2014 17:31:22 +0200
-Subject: [PATCH v3 06/13] phy: ti-pipe3: Don't get 'wkupclk' and 'refclk' for
- SATA PHY
-In-Reply-To: <1394116729-28811-7-git-send-email-rogerq@ti.com>
-References: <1394116729-28811-7-git-send-email-rogerq@ti.com>
-Message-ID: <1394119882-12859-1-git-send-email-rogerq@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 6 Mar 2014 16:33:31 +0100
+Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping when
+ possible
+In-Reply-To: <000201cf38e6$5b02d6e0$110884a0$%han@samsung.com>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
+ <000201cf38e6$5b02d6e0$110884a0$%han@samsung.com>
+Message-ID: <201403061633.31260.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SATA PHY doesn't need 'wkupclk; and 'refclk' so don't
-try to get them for SATA PHY.
+On Thursday, March 06, 2014 at 03:47:03 AM, Jingoo Han wrote:
+> On Wednesday, March 05, 2014 10:26 PM, Lucas Stach wrote:
+> > This is the recommended method of doing the IRQ
+> > mapping. For old devicetrees we fall back to the
+> > previous practice.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> (+cc Mohit KUMAR, Richard Zhu, Pratyush Anand, Marek Vasut,
+>        Kishon Vijay Abraham I)
+> 
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> 
+> It works properly on Exynos platform.
+> Thank you.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
-v3 - Fixed checkpatch warning
+Looks reasonable,
 
- drivers/phy/phy-ti-pipe3.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index f141237..f925f60 100644
---- a/drivers/phy/phy-ti-pipe3.c
-+++ b/drivers/phy/phy-ti-pipe3.c
-@@ -294,16 +294,21 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 
- 	phy->dev		= &pdev->dev;
- 
--	phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
--	if (IS_ERR(phy->wkupclk)) {
--		dev_err(&pdev->dev, "unable to get wkupclk\n");
--		return PTR_ERR(phy->wkupclk);
--	}
-+	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
-+		phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
-+		if (IS_ERR(phy->wkupclk)) {
-+			dev_err(&pdev->dev, "unable to get wkupclk\n");
-+			return PTR_ERR(phy->wkupclk);
-+		}
- 
--	phy->refclk = devm_clk_get(phy->dev, "refclk");
--	if (IS_ERR(phy->refclk)) {
--		dev_err(&pdev->dev, "unable to get refclk\n");
--		return PTR_ERR(phy->refclk);
-+		phy->refclk = devm_clk_get(phy->dev, "refclk");
-+		if (IS_ERR(phy->refclk)) {
-+			dev_err(&pdev->dev, "unable to get refclk\n");
-+			return PTR_ERR(phy->refclk);
-+		}
-+	} else {
-+		phy->wkupclk = ERR_PTR(-ENODEV);
-+		phy->refclk = ERR_PTR(-ENODEV);
- 	}
- 
- 	phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
--- 
-1.8.3.2
++CC Troy if he wants to test it on SL/N6X .
+
+Best regards,
+Marek Vasut
