@@ -1,49 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Mar 2014 14:05:14 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clock Updates for
- v3.15
-Message-ID: <cover.1394082270.git.horms+renesas@verge.net.au>
+Date: Thu,  6 Mar 2014 14:05:16 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: Remove legacy clock aliases for
+ DT devices
+In-Reply-To: <cover.1394082270.git.horms+renesas@verge.net.au>
+References: <cover.1394082270.git.horms+renesas@verge.net.au>
+Message-ID: <a8a8266229787241e1dfdb075a416e31da2fa1d7.1394082270.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider this second round of Renesas ARM based SoC clock updates
-for v3.15.
+Now that the r8a7791 DT platforms use the common clock framework,
+there's no need to manually create clock aliases for devices
+instantiated through DT, as those devices will reference their clocks
+directly in the device tree. Remove those aliases.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-clock-for-v3.15,
-which I have already sent a pull-request for.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7791.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-
-The following changes since commit df55f6685a04a259cf59cd3fde02212b294461cc:
-
-  ARM: shmobile: Remove legacy r8a7790 DT clocks (2014-02-24 08:54:44 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock2-for-v3.15
-
-for you to fetch changes up to 9ced1d47719b5f32e4231338dd362c136518ed08:
-
-  ARM: shmobile: r8a7790: add sound SCU clock support (2014-02-24 10:03:02 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Clock Updates for v3.15
-
-r8a7790 (R-Car H2) SoC
-- Add sound SCU clock support
-
-r8a7791 (R-Car M2) SoC
-- Remove legacy clock aliases for DT devices
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ARM: shmobile: r8a7790: add sound SCU clock support
-
-Laurent Pinchart (1):
-      ARM: shmobile: r8a7791: Remove legacy clock aliases for DT devices
-
- arch/arm/mach-shmobile/clock-r8a7790.c | 25 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a7791.c |  1 -
- 2 files changed, 25 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index 3e1b6b6..605fc77 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -267,7 +267,6 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
+ 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+-	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
+-- 
+1.8.5.2
