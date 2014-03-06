@@ -1,29 +1,66 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 06 Mar 2014 12:16:58 +0900
-Subject: [PATCH] ARM: shmobile: Update r8a7791 CPU freq to 1500MHz in C
-Message-ID: <20140306031658.10787.30196.sendpatchset@w520>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Thu, 6 Mar 2014 03:18:14 +0000
+Subject: [PATCH] clocksource: vf_pit_timer: use complement for
+ sched_clock reading
+In-Reply-To: <20140306014530.GA11366@S2101-09.ap.freescale.net>
+References: <d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan@agner.ch>
+ <20140306014530.GA11366@S2101-09.ap.freescale.net>
+Message-ID: <a821b61811ff4861b577ee17ff9f0448@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
 
-The correct maximum CPU frequency for r8a7791 is 1500 MHz
-so update the r8a7791 SoC C code to reflect this.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawn.guo at linaro.org]
+> Sent: Thursday, March 06, 2014 9:46 AM
+> To: Stefan Agner
+> Cc: daniel.lezcano at linaro.org; tglx at linutronix.de; linux at arm.linux.org.uk;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Lu
+> Jingchang-B35083
+> Subject: Re: [PATCH] clocksource: vf_pit_timer: use complement for
+> sched_clock reading
+> 
+> On Wed, Mar 05, 2014 at 11:11:08PM +0100, Stefan Agner wrote:
+> > Vybrids PIT register is monitonic decreasing. However, sched_clock
+> > reading needs to be monitonic increasing. Use bitwise not to get the
+> > complement of the clock register. This fixes the clock going backward.
+> > Also, the clock now starts at 0 since we load the register with the
+> > maximum value at start.
+> >
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> Looks correct to me, so
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> But I also copied the driver author Jingchang to see if he has any
+> comment.
+> 
+> Shawn
+> 
+The fix is correct, thanks.
 
- arch/arm/mach-shmobile/setup-r8a7791.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Best Regards,
+Jingchang
 
---- 0001/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2014-03-06 11:33:58.000000000 +0900
-@@ -213,7 +213,7 @@ void __init r8a7791_add_standard_devices
- void __init r8a7791_init_early(void)
- {
- #ifndef CONFIG_ARM_ARCH_TIMER
--	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-+	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
- #endif
- }
- 
+> > ---
+> >  drivers/clocksource/vf_pit_timer.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/clocksource/vf_pit_timer.c
+> > b/drivers/clocksource/vf_pit_timer.c
+> > index 02821b0..a918bc4 100644
+> > --- a/drivers/clocksource/vf_pit_timer.c
+> > +++ b/drivers/clocksource/vf_pit_timer.c
+> > @@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
+> >
+> >  static u64 pit_read_sched_clock(void)  {
+> > -	return __raw_readl(clksrc_base + PITCVAL);
+> > +	return ~__raw_readl(clksrc_base + PITCVAL);
+> >  }
+> >
+> >  static int __init pit_clocksource_init(unsigned long rate)
+> > --
+> > 1.9.0
+> >
