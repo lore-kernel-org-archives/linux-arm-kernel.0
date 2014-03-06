@@ -1,82 +1,102 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Mar 2014 17:46:33 +0100
-Subject: [PATCH 08/10] ARM: mvebu: add Armada 38x support to the coherency code
+Date: Thu,  6 Mar 2014 17:46:31 +0100
+Subject: [PATCH 06/10] ARM: mvebu: add Armada 375 support to the coherency code
 In-Reply-To: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1394124395-20030-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1394124395-20030-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x has a coherency unit that is similar to the one of the
-Armada 375 SoC, except that it does not have the bug of the Armada 375
-coherency unit that requires the XOR based workaround.
+The Armada 375, like the Armada 370 and Armada XP, has a coherency
+unit. However, unlike the coherency unit of 370/XP which does both CPU
+and I/O coherency, the one on Armada 735 only does I/O
+coherency. Therefore, instead of having two sets of registers (the
+first one being used mainly to register each CPU in the coherency
+fabric, the second one being used for the I/O coherency barrier), it
+has only one set of register (for the I/O coherency barrier).
 
-This commit therefore extends the Marvell EBU coherency code with a
-new compatible string to support the Armada 38x coherency unit.
+This commit adds a new "marvell,armada-375-coherency-fabric"
+compatible string for this variant of the coherency fabric. The custom
+DMA operations, and the way of triggering an I/O barrier is the same
+as Armada 370/XP, so the code changes are minimal. However, the
+set_cpu_coherent() function is not needed on Armada 375 and will not
+work.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/coherency-fabric.txt |  7 ++++++-
- arch/arm/mach-mvebu/coherency.c                            | 14 ++++++++++++++
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/arm/coherency-fabric.txt   | 22 ++++++++++++++++++----
+ arch/arm/mach-mvebu/coherency.c                    | 14 ++++++++++++++
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-index dcd80d6..8dd4661 100644
+index f0bfa37..dcd80d6 100644
 --- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
 +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
 @@ -1,6 +1,6 @@
  Coherency fabric
  ----------------
--Available on Marvell SOCs: Armada 370, Armada 375 and Armada XP
-+Available on Marvell SOCs: Armada 370, Armada 375, Armada 38x and Armada XP
+-Available on Marvell SOCs: Armada 370 and Armada XP
++Available on Marvell SOCs: Armada 370, Armada 375 and Armada XP
  
  Required properties:
  
-@@ -12,6 +12,9 @@ Required properties:
-  * "marvell,armada-375-coherency-fabric", for the Armada 375 coherency
-    fabric.
+@@ -9,11 +9,20 @@ Required properties:
+  * "marvell,coherency-fabric", to be used for the coherency fabric of
+    the Armada 370 and Armada XP.
  
-+ * "marvell,armada-380-coherency-fabric", for the Armada 38x coherency
++ * "marvell,armada-375-coherency-fabric", for the Armada 375 coherency
 +   fabric.
 +
  - reg: Should contain coherency fabric registers location and
-   length.
- 
-@@ -21,6 +24,8 @@ Required properties:
-  * For "marvell,armada-375-coherency-fabric", only one pair is needed
-    for the per-CPU fabric registers.
- 
-+ * For "marvell,armada-380-coherency-fabric", only one pair is needed
+-  length. First pair for the coherency fabric registers, second pair
+-  for the per-CPU fabric registers registers.
++  length.
++
++ * For "marvell,coherency-fabric", the first pair for the coherency
++   fabric registers, second pair for the per-CPU fabric registers.
++
++ * For "marvell,armada-375-coherency-fabric", only one pair is needed
 +   for the per-CPU fabric registers.
  
- Examples:
+-Example:
++
++Examples:
  
+ coherency-fabric at d0020200 {
+ 	compatible = "marvell,coherency-fabric";
+@@ -22,3 +31,8 @@ coherency-fabric at d0020200 {
+ 
+ };
+ 
++coherency-fabric at 21810 {
++	compatible = "marvell,armada-375-coherency-fabric";
++	reg = <0x21810 0x1c>;
++};
++
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 73d56f2..1a54907 100644
+index 15b769d..f63c868 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -45,6 +45,7 @@ enum {
+@@ -41,11 +41,14 @@ static void __iomem *coherency_cpu_base;
+ enum {
  	COHERENCY_FABRIC_TYPE_NONE,
  	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
- 	COHERENCY_FABRIC_TYPE_ARMADA_375,
-+	COHERENCY_FABRIC_TYPE_ARMADA_380,
++	COHERENCY_FABRIC_TYPE_ARMADA_375,
  };
  
  static struct of_device_id of_coherency_table[] = {
-@@ -52,6 +53,8 @@ static struct of_device_id of_coherency_table[] = {
+ 	{.compatible = "marvell,coherency-fabric",
  	 .data = (void*) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
- 	{.compatible = "marvell,armada-375-coherency-fabric",
- 	 .data = (void*) COHERENCY_FABRIC_TYPE_ARMADA_375 },
-+	{.compatible = "marvell,armada-380-coherency-fabric",
-+	 .data = (void*) COHERENCY_FABRIC_TYPE_ARMADA_380 },
++	{.compatible = "marvell,armada-375-coherency-fabric",
++	 .data = (void*) COHERENCY_FABRIC_TYPE_ARMADA_375 },
  	{ /* end of list */ },
  };
  
-@@ -302,6 +305,11 @@ static void __init armada_375_coherency_init(struct device_node *np)
- 	armada_375_coherency_init_wa();
+@@ -144,6 +147,11 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
  }
  
-+static void __init armada_380_coherency_init(struct device_node *np)
++static void __init armada_375_coherency_init(struct device_node *np)
 +{
 +	coherency_cpu_base = of_iomap(np, 0);
 +}
@@ -84,23 +104,23 @@ index 73d56f2..1a54907 100644
  static int coherency_type(void)
  {
  	struct device_node *np;
-@@ -321,6 +329,10 @@ static int coherency_type(void)
- 		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
+@@ -159,6 +167,10 @@ static int coherency_type(void)
+ 		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
  			return type;
  
-+		/* Armada 380 coherency works only on SMP */
-+		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
++		/* Armada 375 coherency works only on SMP */
++		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
 +			return type;
 +
  		of_node_put(np);
  	}
  
-@@ -343,6 +355,8 @@ int __init coherency_init(void)
+@@ -179,6 +191,8 @@ int __init coherency_init(void)
+ 
+ 	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
  		armada_370_coherency_init(np);
- 	else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
- 		armada_375_coherency_init(np);
-+	else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380)
-+		armada_380_coherency_init(np);
++	else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
++		armada_375_coherency_init(np);
  
  	return 0;
  }
