@@ -1,44 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 6 Mar 2014 22:20:59 +0100
-Subject: [PATCH 0/4] ARM: mvebu: Device Tree updates for Armada XP boards
-In-Reply-To: <20140306200543.GG1872@titan.lakedaemon.net>
-References: <1393951022-18114-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140306200543.GG1872@titan.lakedaemon.net>
-Message-ID: <20140306222059.3f22a3c3@skate>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 06 Mar 2014 16:25:10 -0500
+Subject: [PATCH 2/5] mm: create generic early_ioremap() support
+In-Reply-To: <20140305142953.669fd030495e802b2e03879c@linux-foundation.org>
+References: <1393963738-9210-1-git-send-email-msalter@redhat.com>
+ <1393963738-9210-3-git-send-email-msalter@redhat.com>
+ <20140305142953.669fd030495e802b2e03879c@linux-foundation.org>
+Message-ID: <1394141110.5094.37.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Thu, 6 Mar 2014 15:05:43 -0500, Jason Cooper wrote:
-
-> Whole series applied to mvebu/dt.
+On Wed, 2014-03-05 at 14:29 -0800, Andrew Morton wrote:
+> On Tue,  4 Mar 2014 15:08:55 -0500 Mark Salter <msalter@redhat.com> wrote:
 > 
-> fyi - we only have one more day of -next (tonight, 7pm US East Coast
-> time) before -rc6 drops.
+> > This patch creates a generic implementation of early_ioremap() support
+> > based on the existing x86 implementation. early_ioremp() is useful for
+> > early boot code which needs to temporarily map I/O or memory regions
+> > before normal mapping functions such as ioremap() are available.
+> > 
+> > Some architectures have optional MMU. In the no-MMU case, the remap
+> > functions simply return the passed in physical address and the unmap
+> > functions do nothing.
+> > 
+> >
+> > ....
+> >
+> > --- /dev/null
+> > +++ b/mm/early_ioremap.c
+> > @@ -0,0 +1,271 @@
+> > +/*
+> > + * Provide common bits of early_ioremap() support for architectures needing
+> > + * temporary mappings during boot before ioremap() is available.
+> > + *
+> > + * This is mostly a direct copy of the x86 early_ioremap implementation.
+> > + *
+> > + * (C) Copyright 1995 1996, 2014 Linus Torvalds
+> > + *
+> > + */
 > 
-> I'm comfortable sending a lightly tested mvebu/dt pull request with all
-> the stuff submitted in the last couple days, but I fear there isn't
-> enough testing time before arm-soc stops taking pull requests.
+> I suppose one should include linux/kernel.h.
+
+Okay.
+
 > 
-> I'm particularly concerned about the watchdog changes and the coherency
-> fabric changes.  I'll take those in when ready, and send pull requests
-> when appropriate, but that will most likely fall after the cutoff.
-> Which means those changes will carry over to v3.16...
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/mm.h>
+> > +#include <linux/vmalloc.h>
+> > +#include <asm/fixmap.h>
+> > +
+> > +#ifdef CONFIG_MMU
+> > +static int early_ioremap_debug __initdata;
+> > +
+> > +static int __init early_ioremap_debug_setup(char *str)
+> > +{
+> > +	early_ioremap_debug = 1;
+> > +
+> > +	return 0;
+> > +}
+> > +early_param("early_ioremap_debug", early_ioremap_debug_setup);
+> 
+> Should be documented somewhere.  Documentation/kernel-parameters.txt?
 
-I'll let Ezequiel speak for the watchdog stuff.
+Okay.
 
-For the coherency fabric stuff, our plan was clearly to get it merged
-on 3.16, not in 3.15. I'm sending it right now because we will have
-other things (such as SMP support) to stack on top of it for 3.16. IOW:
-no problems with having this only in 3.16. Of course, if you feel
-comfortable about having it in 3.15, then that would be great, but it
-is clearly not mandatory.
+> 
+> > +static int after_paging_init __initdata;
+> > +
+> > +void __init __attribute__((weak)) early_ioremap_shutdown(void)
+> 
+> __weak
+> 
+> Do __init and __weak work together?  They should, but I don't recall
+> seeing it.
 
-Thanks!
+Yes. Will use __weak here and clean up the uses of WARN/WARN_ON
+as noted.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks.
