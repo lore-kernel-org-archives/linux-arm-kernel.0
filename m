@@ -1,188 +1,68 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 06 Mar 2014 13:16:45 +0100
-Subject: [PATCH V2 03/12] ARM: shmobile: r7s72100: add essential clock
- nodes to dtsi
-In-Reply-To: <1394105552-9744-4-git-send-email-wsa@the-dreams.de>
-References: <1394105552-9744-1-git-send-email-wsa@the-dreams.de>
- <1394105552-9744-4-git-send-email-wsa@the-dreams.de>
-Message-ID: <31686239.1N332dKyCy@avalon>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 06 Mar 2014 13:21:03 +0100
+Subject: [RESEND Patch 1/2] DT: Vendor: Add prefixes used by Kirkwood
+ devices
+In-Reply-To: <1394054474-4310-2-git-send-email-andrew@lunn.ch> (Andrew Lunn's
+ message of "Wed, 5 Mar 2014 22:21:13 +0100")
+References: <1394054474-4310-1-git-send-email-andrew@lunn.ch>
+ <1394054474-4310-2-git-send-email-andrew@lunn.ch>
+Message-ID: <8738ivy0uo.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi Andrew,
 
-Thank you for the patch.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-On Thursday 06 March 2014 12:32:23 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Only essential clocks are added for now. Other clocks will be added when
-> needed.
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> Add a number of vendor prefixes by kirkwood devices. These are not all
+> stock tickers, but have been in use for a while so changing would not
+> be easy.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
-> 
-> Changes since V1:
-> * add usb_x1 clock
-> * reference usb_x1 to cpg
-> * improved wording
-> * #clock-cells consistently first property
-> 
->  arch/arm/boot/dts/r7s72100.dtsi            | 86 ++++++++++++++++++++++++++-
->  include/dt-bindings/clock/r7s72100-clock.h | 25 +++++++++
->  2 files changed, 110 insertions(+), 1 deletion(-)
->  create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
-> 
-> diff --git a/arch/arm/boot/dts/r7s72100.dtsi
-> b/arch/arm/boot/dts/r7s72100.dtsi index ee700717a34b..2429b5be2e56 100644
-> --- a/arch/arm/boot/dts/r7s72100.dtsi
-> +++ b/arch/arm/boot/dts/r7s72100.dtsi
-> @@ -1,13 +1,15 @@
->  /*
->   * Device Tree Source for the r7s72100 SoC
->   *
-> - * Copyright (C) 2013 Renesas Solutions Corp.
-> + * Copyright (C) 2013-14 Renesas Solutions Corp.
-> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering
-> <wsa@sang-engineering.com>
->   *
->   * This file is licensed under the terms of the GNU General Public License
->   * version 2.  This program is licensed "as is" without any warranty of any
->   * kind, whether express or implied.
->   */
-> 
-> +#include <dt-bindings/clock/r7s72100-clock.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
-> 
->  / {
-> @@ -28,6 +30,88 @@
->  		spi4 = &spi4;
->  	};
-> 
-> +	clocks {
-> +		ranges;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		/* External clocks */
-> +		extal_clk: extal_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			/* If clk present, value must be set by board */
-> +			clock-frequency = <0>;
-> +			clock-output-names = "extal";
-> +		};
-> +
-> +		usb_x1_clk: usb_x1_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			/* If clk present, value must be set by board */
-> +			clock-frequency = <0>;
-> +			clock-output-names = "usb_x1";
-> +		};
-> +
-> +		/* Special CPG clocks */
-> +		cpg_clocks: cpg_clocks at fcfe0000 {
-> +			#clock-cells = <1>;
-> +			compatible = "renesas,r7s72100-cpg-clocks",
-> +				     "renesas,rz-cpg-clocks";
-> +			reg = <0xfcfe0000 0x18>;
-> +			clocks = <&extal_clk>, <&usb_x1_clk>;
-> +			clock-output-names = "pll", "i", "g";
-> +		};
-> +
-> +		/* Fixed factor clocks */
-> +		b_clk: b_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&cpg_clocks 0>;
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index c73b435f58f5..860c467374fe 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -20,2 +20,3 @@ bosch	Bosch Sensortec GmbH
+>  brcm	Broadcom Corporation
+> +buffalo	Buffalo, Inc.
+>  capella	Capella Microsystems, Inc
+> @@ -30,2 +31,3 @@ davicom	DAVICOM Semiconductor, Inc.
+>  denx	Denx Software Engineering
+> +dlink	D-Link Corporation
+>  edt	Emerging Display Technologies
+> @@ -35,2 +37,3 @@ epson	Seiko Epson Corp.
+>  est	ESTeem Wireless Modems
+> +excito	Excito
+>  fsl	Freescale Semiconductor
+> @@ -39,2 +42,3 @@ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  gmt	Global Mixed-mode Technology, Inc.
+> +globalscale	GlobalScale Technologies, Inc.
+>  gumstix	Gumstix, Inc.
+> @@ -45,2 +49,3 @@ ibm	International Business Machines (IBM)
+>  idt	Integrated Device Technologies, Inc.
+> +iom	Iomega Corporation
+>  img	Imagination Technologies Ltd.
+> @@ -49,2 +54,4 @@ isl	Intersil
+>  karo	Ka-Ro electronics GmbH
+> +keymile	Keymile GmbH
+> +lacie	LaCie
+>  lg	LG Corporation
+> @@ -56,3 +63,5 @@ microchip	Microchip Technology Inc.
+>  mosaixtech	Mosaix Technologies, Inc.
+> +mpl	MPL AG
+>  national	National Semiconductor
+> +netgear	Netgear, Inc.
 
-What about adding #define's for the CPG clocks to include/dt-
-bindings/clock/r7s72100-clock.h like is done for the R8A7790 and R8A7791 ?
+I do not have a strong opinion on it but I think I read on LAKML there
+was some kind of rule to use ticker symbol for a given vendor if it
+exists e.g. ntgr for netgear (like fsl for freescale, brcm for broadcom,
+etc).
 
-> +			clock-mult = <1>;
-> +			clock-div = <3>;
-> +			clock-output-names = "b";
-> +		};
-> +		p1_clk: p1_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&cpg_clocks 0>;
-> +			clock-mult = <1>;
-> +			clock-div = <6>;
-> +			clock-output-names = "p1";
-> +		};
-> +		p0_clk: p0_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&cpg_clocks 0>;
-> +			clock-mult = <1>;
-> +			clock-div = <12>;
-> +			clock-output-names = "p0";
-> +		};
-> +
-> +		/* MSTP clocks */
-> +		mstp3_clks: mstp3_clks at fcfe0420 {
-> +			#clock-cells = <1>;
-> +			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> +			reg = <0xfcfe0420 4>;
-> +			clocks = <&p0_clk>;
-> +			renesas,clock-indices = <R7S72100_CLK_MTU2>;
-> +			clock-output-names = "mtu2";
-> +		};
-> +
-> +		mstp4_clks: mstp4_clks at fcfe0424 {
-> +			#clock-cells = <1>;
-> +			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> +			reg = <0xfcfe0424 4>;
-> +			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
-> +				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
-> +			renesas,clock-indices = <
-> +				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2
-> R7S72100_CLK_SCIF3 +				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5
-> R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7 +			>;
-> +			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4",
-> "scif5", "scif6", "scif7"; +		};
-> +	};
-> +
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> diff --git a/include/dt-bindings/clock/r7s72100-clock.h
-> b/include/dt-bindings/clock/r7s72100-clock.h new file mode 100644
-> index 000000000000..eced0a8382b0
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/r7s72100-clock.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering
-> <wsa@sang-engineering.com> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + */
-> +
-> +#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
-> +#define __DT_BINDINGS_CLOCK_R7S72100_H__
-> +
-> +/* MSTP3 */
-> +#define R7S72100_CLK_MTU2	3
-> +
-> +/* MSTP4 */
-> +#define R7S72100_CLK_SCIF0	7
-> +#define R7S72100_CLK_SCIF1	6
-> +#define R7S72100_CLK_SCIF2	5
-> +#define R7S72100_CLK_SCIF3	4
-> +#define R7S72100_CLK_SCIF4	3
-> +#define R7S72100_CLK_SCIF5	2
-> +#define R7S72100_CLK_SCIF6	1
-> +#define R7S72100_CLK_SCIF7	0
-> +
-> +#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
+Cheers,
 
--- 
-Regards,
-
-Laurent Pinchart
+a+
