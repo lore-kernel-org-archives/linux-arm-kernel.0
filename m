@@ -1,71 +1,49 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 6 Mar 2014 05:02:03 +0000
-Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <201403060541.21665.marex@denx.de>
-References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
- <201403060339.45611.marex@denx.de>
- <1c0c5f2ce69849d4bf482601ac431da6@BL2PR03MB338.namprd03.prod.outlook.com>
- <201403060541.21665.marex@denx.de>
-Message-ID: <50e0997786a0459eb08c9d92813253f9@BL2PR03MB338.namprd03.prod.outlook.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  6 Mar 2014 14:05:14 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clock Updates for
+ v3.15
+Message-ID: <cover.1394082270.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
-> On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
-> > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
-> > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
-> > > > Add dma support for i2c. This function depend on DMA driver.
-> > > > You can turn on it by write both the dmas and dma-name properties
-> > > > in dts node.
-> > > >
-> > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > > > ---
-> > >
-> > > [...]
-> > >
-> > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
-> > > > platform_device
-> > >
-> > > *pdev)
-> > >
-> > > >  	void __iomem *base;
-> > > >  	int irq, ret;
-> > > >  	u32 bitrate;
-> > > >
-> > > > +	u32 phy_addr;
-> > > >
-> > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
-> > > >
-> > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
-> > > > platform_device
-> > >
-> > > *pdev)
-> > >
-> > > >  	}
-> > > >
-> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > >
-> > > > +	phy_addr = res->start;
-> > >
-> > > Uh ... Shawn, I really think I am lost here. Don't you need to map
-> > > this memory before you can use it for DMA ? The DMA mapping function
-> > > should give you the physical address and is the right way to go
-> > > about this instead of pulling the address from here, no ?
-> > >
-> > > I might be wrong here, I am rather uncertain, so please help me out.
-> > > Thanks!
-> >
-> > Hi, Marek, Thanks for your suggestion.
-> > Here you can review the code in include/linux/ioport.h The
-> > resource->start describes the entity on the CPU bus as a starting
-> > physical address. So I thinks it can used for dma directly.
-> 
-> This doesn't feel right for some reason. If this is a register area, you
-> should
-> ioremap() it. If it's a memory area you do DMA to/from, you need to make
-> sure you correctly flush/invalidate caches and properly handle the
-> effects the write buffer might have. But I have a feeling you actually do
-> DMA to/from register space here ?
-> 
-Yes, It's a register area. But I don't know why I should ioremap() it? It's a bus address and DMA can use it directly.
-Is there some problem for my understanding ?
+Hi Olof, Hi Kevin, Hi Arnd,
+
+Please consider this second round of Renesas ARM based SoC clock updates
+for v3.15.
+
+This pull request is based on the previous round of
+such requests, tagged as renesas-clock-for-v3.15,
+which I have already sent a pull-request for.
+
+
+The following changes since commit df55f6685a04a259cf59cd3fde02212b294461cc:
+
+  ARM: shmobile: Remove legacy r8a7790 DT clocks (2014-02-24 08:54:44 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock2-for-v3.15
+
+for you to fetch changes up to 9ced1d47719b5f32e4231338dd362c136518ed08:
+
+  ARM: shmobile: r8a7790: add sound SCU clock support (2014-02-24 10:03:02 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Clock Updates for v3.15
+
+r8a7790 (R-Car H2) SoC
+- Add sound SCU clock support
+
+r8a7791 (R-Car M2) SoC
+- Remove legacy clock aliases for DT devices
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: r8a7790: add sound SCU clock support
+
+Laurent Pinchart (1):
+      ARM: shmobile: r8a7791: Remove legacy clock aliases for DT devices
+
+ arch/arm/mach-shmobile/clock-r8a7790.c | 25 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a7791.c |  1 -
+ 2 files changed, 25 insertions(+), 1 deletion(-)
