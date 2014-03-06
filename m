@@ -1,52 +1,71 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 5 Mar 2014 23:48:16 -0500
-Subject: [GIT PULL] ARM: mach-bcm: bcm281xx clock driver
-Message-ID: <20140306044816.GA26681@beef>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 6 Mar 2014 05:02:03 +0000
+Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201403060541.21665.marex@denx.de>
+References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
+ <201403060339.45611.marex@denx.de>
+ <1c0c5f2ce69849d4bf482601ac431da6@BL2PR03MB338.namprd03.prod.outlook.com>
+ <201403060541.21665.marex@denx.de>
+Message-ID: <50e0997786a0459eb08c9d92813253f9@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
-
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
-
-are available in the git repository at:
-
-  git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/drivers
-
-for you to fetch changes up to 1a5823c9209f0435347fcc079cf9b0dc01882db0:
-
-  clk: bcm281xx: don't disable unused peripheral clocks (2014-02-24 13:50:36 -0500)
-
-----------------------------------------------------------------
-ARM: mach-bcm: bcm281xx clock driver
-
-This pull request contains the Broadcom bcm281xx
-clock driver series. This series is being merged
-through the arm-soc tree because there is an
-ordering dependency where the driver *must* be
-merged before the related dts changes. This is
-a result of the bcm281xx dts already containing
-dummy fixed clock nodes that must be updated.
-
-----------------------------------------------------------------
-Alex Elder (2):
-      clk: bcm281xx: add initial clock framework support
-      clk: bcm281xx: don't disable unused peripheral clocks
-
- drivers/clk/Kconfig                  |    1 +
- drivers/clk/Makefile                 |    1 +
- drivers/clk/bcm/Kconfig              |    9 +
- drivers/clk/bcm/Makefile             |    3 +
- drivers/clk/bcm/clk-bcm281xx.c       |  416 ++++++++++++++
- drivers/clk/bcm/clk-kona-setup.c     |  769 +++++++++++++++++++++++++
- drivers/clk/bcm/clk-kona.c           | 1033 ++++++++++++++++++++++++++++++++++
- drivers/clk/bcm/clk-kona.h           |  410 ++++++++++++++
- include/dt-bindings/clock/bcm281xx.h |   65 +++
- 9 files changed, 2707 insertions(+)
- create mode 100644 drivers/clk/bcm/Kconfig
- create mode 100644 drivers/clk/bcm/Makefile
- create mode 100644 drivers/clk/bcm/clk-bcm281xx.c
- create mode 100644 drivers/clk/bcm/clk-kona-setup.c
- create mode 100644 drivers/clk/bcm/clk-kona.c
- create mode 100644 drivers/clk/bcm/clk-kona.h
- create mode 100644 include/dt-bindings/clock/bcm281xx.h
+On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
+> On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
+> > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
+> > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
+> > > > Add dma support for i2c. This function depend on DMA driver.
+> > > > You can turn on it by write both the dmas and dma-name properties
+> > > > in dts node.
+> > > >
+> > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > > > ---
+> > >
+> > > [...]
+> > >
+> > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
+> > > > platform_device
+> > >
+> > > *pdev)
+> > >
+> > > >  	void __iomem *base;
+> > > >  	int irq, ret;
+> > > >  	u32 bitrate;
+> > > >
+> > > > +	u32 phy_addr;
+> > > >
+> > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+> > > >
+> > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
+> > > > platform_device
+> > >
+> > > *pdev)
+> > >
+> > > >  	}
+> > > >
+> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > >
+> > > > +	phy_addr = res->start;
+> > >
+> > > Uh ... Shawn, I really think I am lost here. Don't you need to map
+> > > this memory before you can use it for DMA ? The DMA mapping function
+> > > should give you the physical address and is the right way to go
+> > > about this instead of pulling the address from here, no ?
+> > >
+> > > I might be wrong here, I am rather uncertain, so please help me out.
+> > > Thanks!
+> >
+> > Hi, Marek, Thanks for your suggestion.
+> > Here you can review the code in include/linux/ioport.h The
+> > resource->start describes the entity on the CPU bus as a starting
+> > physical address. So I thinks it can used for dma directly.
+> 
+> This doesn't feel right for some reason. If this is a register area, you
+> should
+> ioremap() it. If it's a memory area you do DMA to/from, you need to make
+> sure you correctly flush/invalidate caches and properly handle the
+> effects the write buffer might have. But I have a feeling you actually do
+> DMA to/from register space here ?
+> 
+Yes, It's a register area. But I don't know why I should ioremap() it? It's a bus address and DMA can use it directly.
+Is there some problem for my understanding ?
