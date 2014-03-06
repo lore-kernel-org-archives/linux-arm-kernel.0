@@ -1,64 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Mar 2014 16:18:58 +0000
-Subject: [PATCH v2] ARM64: Kernel managed pages are only flushed
-In-Reply-To: <5317832E.9020809@codeaurora.org>
-References: <1394018716-17075-1-git-send-email-Bharat.Bhushan@freescale.com>
- <20140305161255.GG29309@mudshark.cambridge.arm.com>
- <06b7685849ef4682878556ea1ea8f9d6@BN1PR03MB266.namprd03.prod.outlook.com>
- <5317832E.9020809@codeaurora.org>
-Message-ID: <20140306161857.GK5202@mudshark.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 06 Mar 2014 17:20:09 +0100
+Subject: [PATCH v6 00/10] Add device tree support for Exynos4 camera interface
+Message-ID: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+This series adds devicetree support for the front and rear camera of
+the Exynos4412 SoC Trats2 board. It converts related drivers to use
+the v4l2-async API. The SoC output clocks are provided to external image
+image sensors through the common clock API.
 
-On Wed, Mar 05, 2014 at 08:03:58PM +0000, Laura Abbott wrote:
-> On 3/5/2014 8:27 AM, Bharat.Bhushan at freescale.com wrote:
-> >> On Wed, Mar 05, 2014 at 11:25:16AM +0000, Bharat Bhushan wrote:
-> >>> Kernel can only access pages which maps to managed memory.
-> >>> So flush only valid kernel pages.
-> >>>
-> >> How do you get into this function without a valid, userspace, executable pte?
-> >>
-> >> I suspect you've got changes elsewhere and are calling this function in a
-> >> context where it's not supposed to be called.
-> >
-> > Below I will describe the context in which this function is called:
-> >
-> > When we direct assign a bus device (we have a different freescale specific bus
->  > device but we can take PCI device for discussion as this logic 
-> applies equally
->  > for PCI device I think) to user space using VFIO. Then userspace needs to
->  > mmap(PCI_BARx_offset: this PCI bar offset in not a kernel visible 
-> memory).
-> > Then VFIO-kernel mmap() ioctl code calls remap_pfn_range()  for mapping the
->  >requested address. While remap_pfn_range() internally calls this function.
-> >
-> 
-> As someone who likes calling functions in context where they aren't 
-> supposed to be called, I took a look a this because I was curious.
+This iteration includes three small fixes, detailed description can
+be found in patches 7/10, 8/10.
 
-Somebody should hide your keyboard. Stephen?
+I'd like to ask for a DT binding maintainer review/Ack of patch 3/10.
+I'm  going to push this series to the media tree on beginning of next
+week.
 
-> I can confirm the same problem trying to mmap arbitrary io address space 
-> with remap_pfn_range. We should only be hitting this if the pte is 
-> marked as exec per set_pte_at. With my test case, even mmaping with only 
-> PROT_READ and PROT_WRITE was setting PROT_EXEC as well which was 
-> triggering the bug. This seems to be because READ_IMPLIES_EXEC 
-> personality was set which was derived from
-> 
-> #define elf_read_implies_exec(ex,stk)   (stk != EXSTACK_DISABLE_X)
-> 
-> and none of the binaries I'm generating seem to be setting the stack 
-> execute bit either way (all are EXECSTACK_DEFAULT).
-> 
-> It's not obvious what the best solution is here.
+Thanks,
+Sylwester
 
-It would be nice if something like phys_mem_access_prot was used by the
-callers, since this is used by the /dev/mem driver to make sure that the
-pgprot is sane for the underlying pfn. In the absence of that, I guess we
-could add the pfn_valid check (we have it already on arch/arm/) but if that
-means we end up with executable devices, we're still entering a world of
-looks-like-my-instruction-fetcher-just-acked-an-irq style pain.
+Sylwester Nawrocki (10):
+  Documentation: dt: Add binding documentation for S5K6A3 image sensor
+  Documentation: dt: Add binding documentation for S5C73M3 camera
+  Documentation: devicetree: Update Samsung FIMC DT binding
+  V4L: Add driver for s5k6a3 image sensor
+  V4L: s5c73m3: Add device tree support
+  exynos4-is: Use external s5k6a3 sensor driver
+  exynos4-is: Add clock provider for the SCLK_CAM clock outputs
+  exynos4-is: Add support for asynchronous subdevices registration
+  ARM: dts: Add rear camera nodes for Exynos4412 TRATS2 board
+  ARM: dts: exynos4: Update camera clk provider and s5k6a3 sensor node
 
-Will
+ .../devicetree/bindings/media/samsung-fimc.txt     |   34 +-
+ .../devicetree/bindings/media/samsung-s5c73m3.txt  |   97 +++++
+ .../devicetree/bindings/media/samsung-s5k6a3.txt   |   33 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |    6 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts            |   86 ++++-
+ drivers/media/i2c/Kconfig                          |    8 +
+ drivers/media/i2c/Makefile                         |    1 +
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  207 ++++++++---
+ drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
+ drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
+ drivers/media/i2c/s5k6a3.c                         |  389 ++++++++++++++++++++
+ drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
+ drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +-------------
+ drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
+ drivers/media/platform/exynos4-is/fimc-is.c        |   97 ++---
+ drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
+ drivers/media/platform/exynos4-is/media-dev.c      |  340 ++++++++++++-----
+ drivers/media/platform/exynos4-is/media-dev.h      |   32 +-
+ 18 files changed, 1136 insertions(+), 544 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+ create mode 100644 drivers/media/i2c/s5k6a3.c
+
+--
+1.7.9.5
