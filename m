@@ -1,35 +1,29 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 06 Mar 2014 15:23:51 +0000
-Subject: [PATCH v5 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <53184C2E.3000807@ti.com>
-References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
- <53184C2E.3000807@ti.com>
-Message-ID: <1394119431.4160.84.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Mar 2014 15:24:58 +0000
+Subject: [PATCH v2 2/3] arm64: Add seccomp support
+In-Reply-To: <5317DEC6.4060103@linaro.org>
+References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-3-git-send-email-takahiro.akashi@linaro.org>
+ <20140228172006.GF30996@mudshark.cambridge.arm.com>
+ <5317DEC6.4060103@linaro.org>
+Message-ID: <20140306152458.GG5202@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-06 at 10:21 +0000, Tomi Valkeinen wrote:
-> Is this an old HW, and presumably there won't be new users for it? If
-> yes, this is probably fine. 
-
-There is a DRM driver in the works, actually...
-
-> If not, you might want to look at the video
-> ports and endpoints, which is used by at least three not-yet-merged series:
+On Thu, Mar 06, 2014 at 02:34:46AM +0000, AKASHI Takahiro wrote:
+> On 03/01/2014 02:20 AM, Will Deacon wrote:
+> > On Tue, Feb 25, 2014 at 09:20:24AM +0000, AKASHI Takahiro wrote:
+> > I'm slightly surprised that we do the secure computing check first. Doesn't
+> > this allow a debugger to change the syscall to something else after we've
+> > decided that it's ok?
 > 
-> [PATCHv3 00/41] OMAPDSS: DT support v3
-> [PATCH v5 00/11] imx-drm dt bindings
-> [RFC PATCH v2 00/21] Add DSI display support for Exynos based boards
-> 
-> Using bindings like that would be more future proof, even if the current
-> driver doesn't use them.
+> To be honest, I just followed other architectures' implementation.
+> Can you elaborate any use case that you have in your mind?
 
-... and this makes me try to get out of its way. In other words, I fully
-agree with you, but I don't think this applies to this particular patch,
-as I'm not even trying to represent the display pipeline. The (optional)
-"display-timings" sub-node has been "borrowed" from other older drivers
-and can be easily deprecated in the future, replaced by standard ones
-(whatever final shape they will take :-). All other extra properties are
-CLCD-specific and orthogonal.
+My initial thought was that we should do the secure_computing check *after*
+the debugger has finished messing around with the registers. However, I
+suppose you'd have had to enable ptrace in your seccompd filter for that
+scenario to occur, so there's probably not an issue here after all.
 
-Pawel
+Will
