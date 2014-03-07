@@ -1,99 +1,87 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  7 Mar 2014 17:00:47 +0100
-Subject: [PATCH V3 11/12] ARM: shmobile: r7s72100: add spi clocks to dtsi
+Date: Fri,  7 Mar 2014 17:00:45 +0100
+Subject: [PATCH V3 09/12] ARM: shmobile: r7s72100: add i2c clocks to dtsi
 In-Reply-To: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
 References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1394208048-32495-12-git-send-email-wsa@the-dreams.de>
+Message-ID: <1394208048-32495-10-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 18 ++++++++++++++++++
- include/dt-bindings/clock/r7s72100-clock.h |  7 +++++++
- 2 files changed, 25 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi            | 15 +++++++++++++++
+ include/dt-bindings/clock/r7s72100-clock.h |  6 ++++++
+ 2 files changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 9f7a06dc5e30..3575c0f86eda 100644
+index d49afe30c1d7..9f7a06dc5e30 100644
 --- a/arch/arm/boot/dts/r7s72100.dtsi
 +++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -129,6 +129,19 @@
+@@ -118,6 +118,17 @@
  			>;
- 			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
+ 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
  		};
 +
-+		mstp10_clks: mstp10_clks at fcfe043c {
++		mstp9_clks: mstp9_clks at fcfe0438 {
 +			#clock-cells = <1>;
 +			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe043c 4>;
-+			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
-+				 <&p1_clk>;
++			reg = <0xfcfe0438 4>;
++			clocks = <&p0_clk>, <&p0_clk>, <&p0_clk>, <&p0_clk>;
 +			renesas,clock-indices = <
-+				R7S72100_CLK_SPI0 R7S72100_CLK_SPI1 R7S72100_CLK_SPI2 R7S72100_CLK_SPI3
-+				R7S72100_CLK_SPI4
++				R7S72100_CLK_I2C0 R7S72100_CLK_I2C1 R7S72100_CLK_I2C2 R7S72100_CLK_I2C3
 +			>;
-+			clock-output-names = "spi0", "spi1", "spi2", "spi3", "spi4";
++			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
 +		};
  	};
  
  	cpus {
-@@ -326,6 +339,7 @@
- 			     <0 239 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -339,6 +353,7 @@
- 			     <0 242 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -352,6 +367,7 @@
- 			     <0 245 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -365,6 +381,7 @@
- 			     <0 248 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -378,6 +395,7 @@
- 			     <0 251 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+@@ -153,6 +164,7 @@
+ 			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -170,6 +182,7 @@
+ 			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -187,6 +200,7 @@
+ 			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -204,6 +218,7 @@
+ 			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
 diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index b412bb2c93b1..5cb969fa4931 100644
+index d0e2d91025c2..b412bb2c93b1 100644
 --- a/include/dt-bindings/clock/r7s72100-clock.h
 +++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -30,4 +30,11 @@
- #define R7S72100_CLK_I2C2	5
- #define R7S72100_CLK_I2C3	4
+@@ -24,4 +24,10 @@
+ #define R7S72100_CLK_SCIF6	1
+ #define R7S72100_CLK_SCIF7	0
  
-+/* MSTP10 */
-+#define R7S72100_CLK_SPI0	7
-+#define R7S72100_CLK_SPI1	6
-+#define R7S72100_CLK_SPI2	5
-+#define R7S72100_CLK_SPI3	4
-+#define R7S72100_CLK_SPI4	3
++/* MSTP9 */
++#define R7S72100_CLK_I2C0	7
++#define R7S72100_CLK_I2C1	6
++#define R7S72100_CLK_I2C2	5
++#define R7S72100_CLK_I2C3	4
 +
  #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
