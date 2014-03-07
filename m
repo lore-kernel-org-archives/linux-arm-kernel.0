@@ -1,112 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 6 Mar 2014 21:13:26 -0600
-Subject: [PATCH 3/7] of: introduce of_dma_is_coherent() helper
-In-Reply-To: <1394097598-17622-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
- <1394097598-17622-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAL_JsqJnG1c0=+UgOmNOGs7a5jv2f3O074-TsXibiHsXapXhcQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Mar 2014 11:15:30 +0800
+Subject: [PATCH v2 5/7] ARM: of: introduce common routine for DMA
+ configuration
+In-Reply-To: <9618080.kpE3Kl6X8p@wuerfel>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-6-git-send-email-santosh.shilimkar@ti.com>
+ <9618080.kpE3Kl6X8p@wuerfel>
+Message-ID: <CACRpkdZ_V2e-HT0YSaM36qfLUOHpVCA6__6oYPeJTFRxe5kfAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 3:19 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> The of_dma_is_coherent() helper parses the given DT device
-> node to see if the "dma-coherent" property is supported and
-> returns true or false accordingly.
+On Fri, Feb 28, 2014 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 27 February 2014 16:17:50 Santosh Shilimkar wrote:
+>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>> index f751714..926b5dd 100644
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -235,3 +238,61 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>
+>>       return mdesc;
+>>  }
+>> +
+>> +void arm_dt_dma_configure(struct device *dev)
+>> +{
+>> +     dma_addr_t dma_addr;
+>> +     phys_addr_t paddr, size;
+>> +     dma_addr_t dma_mask;
+>> +     int ret;
+>> +
+>> +     /*
+>> +      * if dma-ranges property doesn't exist - use 32 bits DMA mask
+>> +      * by default and don't set skip archdata.dma_pfn_offset
+>> +      */
+>> +     ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>> +     if (ret == -ENODEV) {
+>> +             dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>> +             if (!dev->dma_mask)
+>> +                     dev->dma_mask = &dev->coherent_dma_mask;
+>> +             return;
+>> +     }
 >
-> For the architectures which are fully dma coherent and don't need per device
-> property, it can enable CONFIG_ARCH_IS_DMA_COHERENT config option which
-> enables DMA coherent for all devices by default.
+> I think this is a reasonable default, but I also want Russell's
+> opinion on this, since I suspect he will argue that we shouldn't
+> default to setting a DMA mask for devices that are not DMA capable.
 
-This worries me. I killed off arch_is_coherent() for arm. Now we're
-adding something back. Also, we already have HAVE_GENERIC_DMA_COHERENT
-which is different, but the names will be confusing. MIPS also has
-DMA_NONCOHERENT.
+of_platform_device_create_pdata() in drivers/of/platform.c
+does the same assumption since ages.
 
+> Maybe someone has an idea how we can detect all three important cases:
 >
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  drivers/of/platform.c       |   31 +++++++++++++++++++++++++++++++
->  include/linux/of_platform.h |    6 ++++++
->  2 files changed, 37 insertions(+)
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 2265a55..bd080db 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -570,4 +570,35 @@ out:
->         return ret;
->  }
->  EXPORT_SYMBOL_GPL(of_dma_get_range);
-> +
-> +/**
-> + * of_dma_is_coherent - Check if device is coherent
-> + * @np:        device node
-> + *
-> + * It returns true if "dma-coherent" property was found
-> + * for this device in DT.
-> + */
-> +#ifndef CONFIG_ARCH_IS_DMA_COHERENT
-> +bool of_dma_is_coherent(struct device_node *np)
-> +{
-> +       struct device_node *node = np;
-> +
-> +       while (node) {
+> a) A device is marked as DMA capable using a dma-ranges property
+> b) A device is known not to be DMA capable
+> c) we don't have any dma-ranges properties in an old dtb file
+>    but still want 32 bit masks by default.
 
-This screams for a for_each_parent_of_node helper.
+The exact same solution would apply to the of core right?
 
-> +               if (of_property_read_bool(node, "dma-coherent")) {
-> +                       of_node_put(node);
-> +                       return true;
-> +               }
-> +               node = of_get_next_parent(node);
-> +       }
-> +       return false;
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-> +#else
-> +inline bool of_dma_is_coherent(struct device_node *np)
-
-This is in the header and should not be here.
-
-> +{
-> +       /* ARCH is fully dma coherent and don't need per device control */
-> +       return true;
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-> +#endif
->  #endif /* CONFIG_OF_ADDRESS */
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index ba7d3dc..48e0748 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -74,6 +74,7 @@ extern int of_platform_populate(struct device_node *root,
->                                 struct device *parent);
->  extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
->                                 phys_addr_t *paddr, phys_addr_t *size);
-> +extern bool of_dma_is_coherent(struct device_node *np);
->  #else
->  static inline int of_platform_populate(struct device_node *root,
->                                         const struct of_device_id *matches,
-> @@ -88,6 +89,11 @@ static inline int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
->  {
->         return -ENODEV;
->  }
-> +
-> +static inline bool of_dma_is_coherent(struct device_node *np)
-> +{
-> +       return false;
-> +}
->  #endif
-
-I don't think you have the ifdefs right here.
-
-Rob
+Yours,
+Linus Walleij
