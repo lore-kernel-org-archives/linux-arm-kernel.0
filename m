@@ -1,97 +1,117 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  6 Mar 2014 22:44:45 -0800
-Subject: [PATCH 6/7] pinctrl: msm: Remove impossible WARN_ON()s
+Date: Thu,  6 Mar 2014 22:44:46 -0800
+Subject: [PATCH 7/7] pinctrl: msm: Simplify msm_config_reg() and callers
 In-Reply-To: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
 References: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1394174686-8358-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1394174686-8358-8-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All these functions are limited in what they can pass as the gpio
-or irq number to whatever is setup during probe. Remove the
-checks.
+We don't need to check for a negative reg here because reg is
+always the same and is always non-negative. Also, collapse the
+switch statement down for the duplicate cases.
 
 Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/pinctrl-msm.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+ drivers/pinctrl/pinctrl-msm.c | 29 +++++------------------------
+ 1 file changed, 5 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index 58c23f138d7a..bdfb697194f6 100644
+index bdfb697194f6..534dd117dab4 100644
 --- a/drivers/pinctrl/pinctrl-msm.c
 +++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -403,8 +403,6 @@ static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+@@ -202,28 +202,17 @@ static const struct pinmux_ops msm_pinmux_ops = {
+ static int msm_config_reg(struct msm_pinctrl *pctrl,
+ 			  const struct msm_pingroup *g,
+ 			  unsigned param,
+-			  s16 *reg,
+ 			  unsigned *mask,
+ 			  unsigned *bit)
+ {
+ 	switch (param) {
+ 	case PIN_CONFIG_BIAS_DISABLE:
+-		*reg = g->ctl_reg;
+-		*bit = g->pull_bit;
+-		*mask = 3;
+-		break;
+ 	case PIN_CONFIG_BIAS_PULL_DOWN:
+-		*reg = g->ctl_reg;
+-		*bit = g->pull_bit;
+-		*mask = 3;
+-		break;
+ 	case PIN_CONFIG_BIAS_PULL_UP:
+-		*reg = g->ctl_reg;
+ 		*bit = g->pull_bit;
+ 		*mask = 3;
+ 		break;
+ 	case PIN_CONFIG_DRIVE_STRENGTH:
+-		*reg = g->ctl_reg;
+ 		*bit = g->drv_bit;
+ 		*mask = 7;
+ 		break;
+@@ -232,12 +221,6 @@ static int msm_config_reg(struct msm_pinctrl *pctrl,
+ 		return -ENOTSUPP;
+ 	}
+ 
+-	if (*reg < 0) {
+-		dev_err(pctrl->dev, "Config param %04x not supported on group %s\n",
+-			param, g->name);
+-		return -ENOTSUPP;
+-	}
+-
+ 	return 0;
+ }
+ 
+@@ -275,17 +258,16 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
+ 	unsigned mask;
+ 	unsigned arg;
+ 	unsigned bit;
+-	s16 reg;
+ 	int ret;
  	u32 val;
  
- 	g = &pctrl->soc->groups[offset];
--	if (WARN_ON(g->io_reg < 0))
--		return -EINVAL;
+ 	g = &pctrl->soc->groups[group];
  
- 	spin_lock_irqsave(&pctrl->lock, flags);
+-	ret = msm_config_reg(pctrl, g, param, &reg, &mask, &bit);
++	ret = msm_config_reg(pctrl, g, param, &mask, &bit);
+ 	if (ret < 0)
+ 		return ret;
  
-@@ -425,8 +423,6 @@ static int msm_gpio_direction_output(struct gpio_chip *chip, unsigned offset, in
+-	val = readl(pctrl->regs + reg);
++	val = readl(pctrl->regs + g->ctl_reg);
+ 	arg = (val >> bit) & mask;
+ 
+ 	/* Convert register value to pinconf value */
+@@ -325,7 +307,6 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+ 	unsigned mask;
+ 	unsigned arg;
+ 	unsigned bit;
+-	s16 reg;
+ 	int ret;
  	u32 val;
+ 	int i;
+@@ -336,7 +317,7 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+ 		param = pinconf_to_config_param(configs[i]);
+ 		arg = pinconf_to_config_argument(configs[i]);
  
- 	g = &pctrl->soc->groups[offset];
--	if (WARN_ON(g->io_reg < 0))
--		return -EINVAL;
+-		ret = msm_config_reg(pctrl, g, param, &reg, &mask, &bit);
++		ret = msm_config_reg(pctrl, g, param, &mask, &bit);
+ 		if (ret < 0)
+ 			return ret;
  
- 	spin_lock_irqsave(&pctrl->lock, flags);
+@@ -371,10 +352,10 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+ 		}
  
-@@ -453,8 +449,6 @@ static int msm_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	u32 val;
- 
- 	g = &pctrl->soc->groups[offset];
--	if (WARN_ON(g->io_reg < 0))
--		return -EINVAL;
- 
- 	val = readl(pctrl->regs + g->io_reg);
- 	return !!(val & BIT(g->in_bit));
-@@ -468,8 +462,6 @@ static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 	u32 val;
- 
- 	g = &pctrl->soc->groups[offset];
--	if (WARN_ON(g->io_reg < 0))
--		return;
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
- 
-@@ -618,8 +610,6 @@ static void msm_gpio_irq_mask(struct irq_data *d)
- 
- 	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
--	if (WARN_ON(g->intr_cfg_reg < 0))
--		return;
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
- 
-@@ -641,8 +631,6 @@ static void msm_gpio_irq_unmask(struct irq_data *d)
- 
- 	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
--	if (WARN_ON(g->intr_status_reg < 0))
--		return;
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
- 
-@@ -668,8 +656,6 @@ static void msm_gpio_irq_ack(struct irq_data *d)
- 
- 	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
--	if (WARN_ON(g->intr_status_reg < 0))
--		return;
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
- 
-@@ -694,8 +680,6 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 
- 	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
--	if (WARN_ON(g->intr_cfg_reg < 0))
--		return -EINVAL;
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
+ 		spin_lock_irqsave(&pctrl->lock, flags);
+-		val = readl(pctrl->regs + reg);
++		val = readl(pctrl->regs + g->ctl_reg);
+ 		val &= ~(mask << bit);
+ 		val |= arg << bit;
+-		writel(val, pctrl->regs + reg);
++		writel(val, pctrl->regs + g->ctl_reg);
+ 		spin_unlock_irqrestore(&pctrl->lock, flags);
+ 	}
  
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
