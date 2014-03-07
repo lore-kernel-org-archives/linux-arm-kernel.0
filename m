@@ -1,140 +1,178 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  7 Mar 2014 17:00:42 +0100
-Subject: [PATCH V3 06/12] ARM: shmobile: r7s72100: add scif nodes to dtsi
+Date: Fri,  7 Mar 2014 17:00:39 +0100
+Subject: [PATCH V3 03/12] ARM: shmobile: r7s72100: add essential clock nodes
+ to dtsi
 In-Reply-To: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
 References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1394208048-32495-7-git-send-email-wsa@the-dreams.de>
+Message-ID: <1394208048-32495-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
+Only essential clocks are added for now. Other clocks will be added when
+needed.
+
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 104 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 104 insertions(+)
+
+Change since V2:
+
+* Use macro to reference the PLL
+
+Changes since V1:
+* add usb_x1 clock
+* reference usb_x1 to cpg
+* improved wording
+* #clock-cells consistently first property
+
+ arch/arm/boot/dts/r7s72100.dtsi            | 86 +++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r7s72100-clock.h | 27 ++++++++++
+ 2 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
 diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 6af5c28c670e..d49afe30c1d7 100644
+index ee700717a34b..6af5c28c670e 100644
 --- a/arch/arm/boot/dts/r7s72100.dtsi
 +++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -23,6 +23,14 @@
- 		i2c1 = &i2c1;
- 		i2c2 = &i2c2;
- 		i2c3 = &i2c3;
-+		serial0 = &scif0;
-+		serial1 = &scif1;
-+		serial2 = &scif2;
-+		serial3 = &scif3;
-+		serial4 = &scif4;
-+		serial5 = &scif5;
-+		serial6 = &scif6;
-+		serial7 = &scif7;
- 		spi0 = &spi0;
- 		spi1 = &spi1;
- 		spi2 = &spi2;
-@@ -200,6 +208,102 @@
- 		status = "disabled";
+@@ -1,13 +1,15 @@
+ /*
+  * Device Tree Source for the r7s72100 SoC
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
+  */
+ 
++#include <dt-bindings/clock/r7s72100-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -28,6 +30,88 @@
+ 		spi4 = &spi4;
  	};
  
-+	scif0: serial at e8007000 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8007000 64>;
-+		interrupts = <0 190 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 191 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 192 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
++	clocks {
++		ranges;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		/* External clocks */
++		extal_clk: extal_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			/* If clk present, value must be set by board */
++			clock-frequency = <0>;
++			clock-output-names = "extal";
++		};
++
++		usb_x1_clk: usb_x1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			/* If clk present, value must be set by board */
++			clock-frequency = <0>;
++			clock-output-names = "usb_x1";
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at fcfe0000 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-cpg-clocks",
++				     "renesas,rz-cpg-clocks";
++			reg = <0xfcfe0000 0x18>;
++			clocks = <&extal_clk>, <&usb_x1_clk>;
++			clock-output-names = "pll", "i", "g";
++		};
++
++		/* Fixed factor clocks */
++		b_clk: b_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <3>;
++			clock-output-names = "b";
++		};
++		p1_clk: p1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <6>;
++			clock-output-names = "p1";
++		};
++		p0_clk: p0_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <12>;
++			clock-output-names = "p0";
++		};
++
++		/* MSTP clocks */
++		mstp3_clks: mstp3_clks at fcfe0420 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0420 4>;
++			clocks = <&p0_clk>;
++			renesas,clock-indices = <R7S72100_CLK_MTU2>;
++			clock-output-names = "mtu2";
++		};
++
++		mstp4_clks: mstp4_clks at fcfe0424 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0424 4>;
++			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
++				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
++			renesas,clock-indices = <
++				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2 R7S72100_CLK_SCIF3
++				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5 R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7
++			>;
++			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
++		};
 +	};
 +
-+	scif1: serial at e8007800 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8007800 64>;
-+		interrupts = <0 194 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 195 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 196 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+new file mode 100644
+index 000000000000..d0e2d91025c2
+--- /dev/null
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
 +
-+	scif2: serial at e8008000 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8008000 64>;
-+		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 199 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 200 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
++#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
++#define __DT_BINDINGS_CLOCK_R7S72100_H__
 +
-+	scif3: serial at e8008800 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8008800 64>;
-+		interrupts = <0 202 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 203 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 204 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
++#define R7S72100_CLK_PLL	0
 +
-+	scif4: serial at e8009000 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8009000 64>;
-+		interrupts = <0 206 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 207 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 208 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
++/* MSTP3 */
++#define R7S72100_CLK_MTU2	3
 +
-+	scif5: serial at e8009800 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe8009800 64>;
-+		interrupts = <0 210 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 211 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 212 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
++/* MSTP4 */
++#define R7S72100_CLK_SCIF0	7
++#define R7S72100_CLK_SCIF1	6
++#define R7S72100_CLK_SCIF2	5
++#define R7S72100_CLK_SCIF3	4
++#define R7S72100_CLK_SCIF4	3
++#define R7S72100_CLK_SCIF5	2
++#define R7S72100_CLK_SCIF6	1
++#define R7S72100_CLK_SCIF7	0
 +
-+	scif6: serial at e800a000 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe800a000 64>;
-+		interrupts = <0 214 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 215 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 216 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif7: serial at e800a800 {
-+		compatible = "renesas,scif-r7s72100", "renesas,scif";
-+		reg = <0xe800a800 64>;
-+		interrupts = <0 218 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 219 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 220 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
- 	spi0: spi at e800c800 {
- 		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
- 		reg = <0xe800c800 0x24>;
++#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
 1.9.0
