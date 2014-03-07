@@ -1,117 +1,67 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 7 Mar 2014 11:51:30 +0800
-Subject: [PATCH v2] i2c:at91: Add device tree property to set
- clock-frequency
-In-Reply-To: <CAJjB1qLXnO-Zkte3vg_X5ktXmj1=tG+p5BcLX9vbCgzyfg_rWA@mail.gmail.com>
-References: <1393293045-31849-1-git-send-email-mark.roszko@gmail.com>
- <20140228110506.GF11192@ldesroches-Latitude-E6320>
- <CAJjB1qLXnO-Zkte3vg_X5ktXmj1=tG+p5BcLX9vbCgzyfg_rWA@mail.gmail.com>
-Message-ID: <4A1E236E-E048-4E37-AFE8-C0AC283B73D0@jcrosoft.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Mar 2014 11:54:47 +0800
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <20140307034747.GP1872@titan.lakedaemon.net>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+ <20140226000940.GF1872@titan.lakedaemon.net>
+ <CACRpkdYQa2BG_qxf5zY=7rks6O31ZF-BX0af3_u1MOgwfwxFSQ@mail.gmail.com>
+ <20140226145345.GG1872@titan.lakedaemon.net>
+ <CACRpkdZRJG-TzN4c3NSH9PqcQzpo6EbEn5_bM-P3sh4_vSjtaA@mail.gmail.com>
+ <20140307021633.GN1872@titan.lakedaemon.net>
+ <20140307034747.GP1872@titan.lakedaemon.net>
+Message-ID: <CACRpkdZnseVr8DZKu7Z_Q4uOvWybSs4uhM+JQK_L8u+KJ2myJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I never like that
+On Fri, Mar 7, 2014 at 11:47 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Thu, Mar 06, 2014 at 09:16:33PM -0500, Jason Cooper wrote:
+>> On Fri, Mar 07, 2014 at 09:26:48AM +0800, Linus Walleij wrote:
+>> > On Wed, Feb 26, 2014 at 10:53 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> ...
+>> > > I'm a little confused by this.  Once you merge the branch into one of
+>> > > yours, that merge commit is a part of the history.
+>> >
+>> > Yes this has been discussed in the past.
+>>
+>> Would you have a link handy?  My first thought was to create a tag, eg
+>> "Sent-through: subsystem <maintainer@example.com>" that I would add to
+>> patches as I pull them in.  After all, I know where I'm sending them.
+>> Or should at any rate.
+>>
+>> > But when a developer bisects down to a certain commit and just looks
+>> > at it with git log there is no telling which subsystem this thing came
+>> > from and who actually funnelled it to Torvalds.
+>>
+>> True.
+>>
+>> > I do know you *can* find that out with some git magic, the problem
+>> > is that it is so magic that most developers don't know it and just
+>> > look at the signoffs.
+>>
+>> It would be helpful if there were a complement to 'git merge-base', say
+>> 'git merge-tip' to point to the merge commit that joined the branch
+>> containing commit X.
+>>
+>> Run in succession, it would yield committers me (I merged pinctrl-dove
+>> into pinctrl), you, Torvalds.
+>
+> grrr.  Couldn't let it go.  If you add this alias:
+>
+>   merged-by-who = log --ancestry-path --reverse --merges --format=\"%h %cD \\\"%cN <%cE>\\\"\"
+>
+> to you ~/.gitconfig, then
+>
+> $ git merged-by-who 2c4b229bafcf..pinctrl/for-next
+> 08d4f0c8b131 Sat, 1 Mar 2014 07:03:36 +0000 "Jason Cooper <jason@lakedaemon.net>"
+> 7cab36e5eee9 Sat, 1 Mar 2014 07:03:52 +0000 "Jason Cooper <jason@lakedaemon.net>"
+> cdfe3175eb90 Mon, 3 Mar 2014 13:39:20 +0800 "Linus Walleij <linus.walleij@linaro.org>"
+> a9ea2ed45a22 Mon, 3 Mar 2014 13:40:22 +0800 "Linus Walleij <linus.walleij@linaro.org>"
+> 7bd0df13646d Wed, 5 Mar 2014 17:12:17 +0800 "Linus Walleij <linus.walleij@linaro.org>"
 
-the  clock-frequency = <400000>; need to be set on each i2c device
-and then the i2c subsystem need to choose the slowest
+nifty alias, I added it to my .gitconfig.
 
-Best Regards,
-J.
-On Mar 6, 2014, at 9:48 PM, Mark Roszko <mark.roszko@gmail.com> wrote:
-
-> CCing the subsystem maintainer because I left him out on the initial send.
-> 
-> On Fri, Feb 28, 2014 at 6:05 AM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
->> On Mon, Feb 24, 2014 at 08:50:45PM -0500, Marek Roszko wrote:
->>> This adds the ability to set "clock-frequency" in the device tree for the i2c bus following
->>> the naming of other i2c bus implementations. If the property is not set, the clock
->>> frequency will default to the previously used define of 100KHz.
->>> 
->>> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
->> 
->> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> 
->> Thanks
->> 
->>> ---
->>> v2:
->>>      -fixed return code usage and check to not compare agaisnt less than zero
->>> 
->>> ---
->>> Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
->>> drivers/i2c/busses/i2c-at91.c                      |   10 ++++++++--
->>> 2 files changed, 10 insertions(+), 2 deletions(-)
->>> 
->>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
->>> index 4fade84..388f0a2 100644
->>> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
->>> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
->>> @@ -12,6 +12,7 @@ Required properties :
->>> - clocks: phandles to input clocks.
->>> 
->>> Optional properties:
->>> +- clock-frequency: Desired I2C bus frequency in Hz, otherwise defaults to 100000
->>> - Child nodes conforming to i2c bus binding
->>> 
->>> Examples :
->>> @@ -23,6 +24,7 @@ i2c0: i2c at fff84000 {
->>>      #address-cells = <1>;
->>>      #size-cells = <0>;
->>>      clocks = <&twi0_clk>;
->>> +     clock-frequency = <400000>;
->>> 
->>>      24c512 at 50 {
->>>              compatible = "24c512";
->>> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
->>> index 843d012..a407050 100644
->>> --- a/drivers/i2c/busses/i2c-at91.c
->>> +++ b/drivers/i2c/busses/i2c-at91.c
->>> @@ -32,7 +32,7 @@
->>> #include <linux/slab.h>
->>> #include <linux/platform_data/dma-atmel.h>
->>> 
->>> -#define TWI_CLK_HZ           100000                  /* max 400 Kbits/s */
->>> +#define DEFAULT_TWI_CLK_HZ           100000          /* max 400 Kbits/s */
->>> #define AT91_I2C_TIMEOUT     msecs_to_jiffies(100)   /* transfer timeout */
->>> #define AT91_I2C_DMA_THRESHOLD       8                       /* enable DMA if transfer size is bigger than this threshold */
->>> 
->>> @@ -711,6 +711,7 @@ static int at91_twi_probe(struct platform_device *pdev)
->>>      struct resource *mem;
->>>      int rc;
->>>      u32 phy_addr;
->>> +     int bus_clk_rate;
->>> 
->>>      dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
->>>      if (!dev)
->>> @@ -756,7 +757,12 @@ static int at91_twi_probe(struct platform_device *pdev)
->>>                      dev->use_dma = true;
->>>      }
->>> 
->>> -     at91_calc_twi_clock(dev, TWI_CLK_HZ);
->>> +     rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
->>> +                     &bus_clk_rate);
->>> +     if (rc)
->>> +             bus_clk_rate = DEFAULT_TWI_CLK_HZ;
->>> +
->>> +     at91_calc_twi_clock(dev, bus_clk_rate);
->>>      at91_init_twi_bus(dev);
->>> 
->>>      snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
->>> --
->>> 1.7.10.4
->>> 
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
-> -- 
-> Mark
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yours,
+Linus Walleij
