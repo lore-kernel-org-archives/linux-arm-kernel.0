@@ -1,49 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Mar 2014 11:55:45 -0500
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15 (incr. #2)
-Message-ID: <20140307165545.GF18707@titan.lakedaemon.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 07 Mar 2014 17:59:04 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140307164741.GJ28943@katana>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <1552759.qGZNIXqrb1@avalon> <20140307164741.GJ28943@katana>
+Message-ID: <1725290.WIBK8uYmkH@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Friday 07 March 2014 17:47:41 Wolfram Sang wrote:
+> > > That would have saved only 2 lines since we need the workaround anyhow
+> > > (MTU2) and would break the incremental approach of this series somewhat.
+> > > I'd like to keep it.
+> > 
+> > It would have saved one patch. If Simon needs to apply CCF support
+> > separately I'm fine with that approach, but if both changes are applied
+> > at the same time the SCIF patches could go in first.
+> 
+> Which one would be saved? We need to workaround anyhow (patch 5) and
+> some scif cleanup besides the workaround is needed, too (patch 7). No?
 
-Nothing big here.  This is the last pull for mvebu/drivers for v3.15.
-As usual, this is an incremental pull request from
-tags/mvebu-drivers-3.15 in the mvebu/drivers branch up to
-tags/mvebu-drivers-3.15-2.
+Indeed, I got it wrong. We can leave it as-is then.
 
-After a week of silence, I let the power maintainers know that I'd like
-to take this and to speak up if that wasn't ok.  It's been a week since.
-This is also very isolated, so there shouldn't be any merge conflicts.
+-- 
+Regards,
 
-Please pull.
-
-thx,
-
-Jason.
-
-The following changes since commit ff1f0018cf66080d8e6f59791e552615648a033a:
-
-  drivers: Enable building of Kirkwood drivers for mach-mvebu (2014-02-24 17:28:31 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.15-2
-
-for you to fetch changes up to 200c0a3e404beab02be83e5cbf111d26b9f6ce22:
-
-  Power: Reset: Generalize qnap-poweroff to work on Synology devices. (2014-03-04 03:48:41 +0000)
-
-----------------------------------------------------------------
-mvebu driver changes for v3.15 (incremental pull #2)
-
- - reset
-    - re-use qnap-poweroff driver for Synology NASs
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      Power: Reset: Generalize qnap-poweroff to work on Synology devices.
-
- .../bindings/power_supply/qnap-poweroff.txt        |  5 ++-
- drivers/power/reset/qnap-poweroff.c                | 49 ++++++++++++++++------
- 2 files changed, 41 insertions(+), 13 deletions(-)
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/78845570/attachment-0001.sig>
