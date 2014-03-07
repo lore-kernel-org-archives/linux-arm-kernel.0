@@ -1,32 +1,19 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 11:38:24 +0900
-Subject: [PATCH] ARM: shmobile: Remove EMEV2 header file
-In-Reply-To: <CANqRtoSmphPAaxOFjAQcZ8RDigJpjYG3yCFMr5C_cw6JCHghkw@mail.gmail.com>
-References: <20140217073508.11156.21720.sendpatchset@w520>
- <20140218000926.GB4776@verge.net.au>
- <20140218023103.GA17063@verge.net.au>
- <CANqRtoSmphPAaxOFjAQcZ8RDigJpjYG3yCFMr5C_cw6JCHghkw@mail.gmail.com>
-Message-ID: <20140307023821.GH11702@verge.net.au>
+Date: Fri, 7 Mar 2014 11:38:32 +0900
+Subject: [PATCH] ARM: shmobile: Make use of r8a7790_add_standard_devices()
+In-Reply-To: <20140224054907.1803.88038.sendpatchset@w520>
+References: <20140224054907.1803.88038.sendpatchset@w520>
+Message-ID: <20140307023829.GI11702@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:35:25AM +0900, Magnus Damm wrote:
-> On Tue, Feb 18, 2014 at 11:31 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Feb 18, 2014 at 09:09:29AM +0900, Simon Horman wrote:
-> >> On Mon, Feb 17, 2014 at 04:35:08PM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm@opensource.se>
-> >> >
-> >> > There is no C board code left for the EMEV2 SoC, so
-> >> > get rid of the emev2.h include file to save some lines.
-> >> > While at it make functions static.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> >>
-> >> Thanks, I have queued this up.
-> >
-> > I have changed my mind and decided to defer this patch
-> > to avoid a tedious dependency of an SoC patch on a board patch.
+On Mon, Feb 24, 2014 at 02:49:07PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> That's fine. We can handle further cleanup later. Thanks for your help!
+> Move non-PFC and non-GPIO devices off from r8a7790_pinmux_init()
+> and into r8a7790_add_standard_devices() which is the normal place
+> to keep regular devices in the legacy case.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I have now queued it up again.
+Thanks, I have queued this up.
