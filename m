@@ -1,151 +1,91 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 07 Mar 2014 17:13:34 +0100
-Subject: [PATCH V3 06/12] ARM: shmobile: r7s72100: add scif nodes to dtsi
-In-Reply-To: <1394208048-32495-7-git-send-email-wsa@the-dreams.de>
+Date: Fri, 07 Mar 2014 17:14:01 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
 References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <1394208048-32495-7-git-send-email-wsa@the-dreams.de>
-Message-ID: <1930280.sZNcfhZEL8@avalon>
+Message-ID: <2368991.bjBJjms8qn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Wolfram,
 
-Thank you for the patch.
+Thank you for the patches.
 
-On Friday 07 March 2014 17:00:42 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
->  arch/arm/boot/dts/r7s72100.dtsi | 104 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 104 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r7s72100.dtsi
-> b/arch/arm/boot/dts/r7s72100.dtsi index 6af5c28c670e..d49afe30c1d7 100644
-> --- a/arch/arm/boot/dts/r7s72100.dtsi
-> +++ b/arch/arm/boot/dts/r7s72100.dtsi
-> @@ -23,6 +23,14 @@
->  		i2c1 = &i2c1;
->  		i2c2 = &i2c2;
->  		i2c3 = &i2c3;
-> +		serial0 = &scif0;
-> +		serial1 = &scif1;
-> +		serial2 = &scif2;
-> +		serial3 = &scif3;
-> +		serial4 = &scif4;
-> +		serial5 = &scif5;
-> +		serial6 = &scif6;
-> +		serial7 = &scif7;
+Beside the comment to patch 06/12, I would have moved patches 06/12 to 08/12 
+to the beginning of the series, in order to avoid adding a clock workaround 
+for the serial clock only to remove it a couple of patches later.
 
-As port usages is board specific, shouldn't this be moved to the board .dts 
-file, with only serial0 = &scif2 ?
+Oh, and one might ask you to fix the 80 columns checkpatch warnings for patch 
+01/12 :-) 
 
->  		spi0 = &spi0;
->  		spi1 = &spi1;
->  		spi2 = &spi2;
-> @@ -200,6 +208,102 @@
->  		status = "disabled";
->  	};
+On Friday 07 March 2014 17:00:36 Wolfram Sang wrote:
+> This series moves the r7s72100 platfrom from the legacy clock implementation
+> to the common clock framework.
 > 
-> +	scif0: serial at e8007000 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8007000 64>;
-> +		interrupts = <0 190 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 191 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 192 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif1: serial at e8007800 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8007800 64>;
-> +		interrupts = <0 194 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 195 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 196 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif2: serial at e8008000 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8008000 64>;
-> +		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 199 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 200 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif3: serial at e8008800 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8008800 64>;
-> +		interrupts = <0 202 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 203 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 204 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif4: serial at e8009000 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8009000 64>;
-> +		interrupts = <0 206 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 207 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 208 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif5: serial at e8009800 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe8009800 64>;
-> +		interrupts = <0 210 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 211 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 212 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif6: serial at e800a000 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe800a000 64>;
-> +		interrupts = <0 214 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 215 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 216 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
-> +	scif7: serial at e800a800 {
-> +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> +		reg = <0xe800a800 64>;
-> +		interrupts = <0 218 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 219 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 220 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
-> +		clock-names = "sci_ick";
-> +		status = "disabled";
-> +	};
-> +
->  	spi0: spi at e800c800 {
->  		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
->  		reg = <0xe800c800 0x24>;
+> This series has been tested with the renesas-devel-v3.14-rc5-20140307v2 tag.
+> If you want to boot into a console, you have a runtime dependency [1].
+> 
+> Patches 1-5 is the minimal set to activate CCF and get the board booting
+> into a console. Patches 6-8 add SCIF support, 9+10 I2C support, and 11+12
+> SPI support.
+> 
+> Changes since V2:
+> 
+> Patches 1+3 got updates, patch 12 was not send out last time due to sendmail
+> error.
+> 
+> Patch 1 should probably go via clock tree (it has no dependencies). The rest
+> via shmobile. Please apply.
+> 
+>    Wolfram
+> 
+> PS: A tree can be found here with this series only:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf
+> 
+> And here with a quick hack to make the system bootable:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git
+> renesas/r7s-ccf-bootable
+> 
+> [1] http://lkml.org/lkml/2014/2/20/205 ([PATCH V7 0/3] clocksource:
+> Consolidate SH and ARM mach-shmobile Kconfig bits)
+> 
+> 
+> Wolfram Sang (12):
+>   clk: shmobile: add CPG driver for rz-platforms
+>   ARM: shmobile: r7s72100: document MSTP clock support
+>   ARM: shmobile: r7s72100: add essential clock nodes to dtsi
+>   ARM: shmobile: r7s72100: genmai: populate nodes for external clocks
+>   ARM: shmobile: r7s72100: use workaround for non DT-clocks
+>   ARM: shmobile: r7s72100: add scif nodes to dtsi
+>   ARM: shmobile: r7s72100: genmai: activate scif2 for console output
+>   ARM: shmobile: r7s72100: genmai: platform scif devices only for legacy
+>     support
+>   ARM: shmobile: r7s72100: add i2c clocks to dtsi
+>   ARM: shmobile: r7s72100: remove I2C DT clocks from legacy clock
+>     support
+>   ARM: shmobile: r7s72100: add spi clocks to dtsi
+>   ARM: shmobile: r7s72100: remove SPI DT clocks from legacy clock
+>     support
+> 
+>  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
+>  .../bindings/clock/renesas,rz-cpg-clocks.txt       |  29 +++
+>  arch/arm/boot/dts/r7s72100-genmai-reference.dts    |  12 ++
+>  arch/arm/boot/dts/r7s72100.dtsi                    | 223
+> ++++++++++++++++++++- arch/arm/mach-shmobile/board-genmai-reference.c    | 
+> 14 +-
+>  arch/arm/mach-shmobile/board-genmai.c              |  44 ++++
+>  arch/arm/mach-shmobile/clock-r7s72100.c            |   9 -
+>  arch/arm/mach-shmobile/setup-r7s72100.c            |  43 ----
+>  drivers/clk/shmobile/Makefile                      |   1 +
+>  drivers/clk/shmobile/clk-rz.c                      | 103 ++++++++++
+>  include/dt-bindings/clock/r7s72100-clock.h         |  40 ++++
+>  11 files changed, 464 insertions(+), 55 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt create
+> mode 100644 drivers/clk/shmobile/clk-rz.c
+>  create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
 -- 
 Regards,
