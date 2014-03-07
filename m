@@ -1,39 +1,43 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Fri, 7 Mar 2014 15:37:05 +0000
-Subject: [PATCH v3 2/5] pinctrl: st: Enhance the controller to manage
- unavailable registers
-In-Reply-To: <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
-Message-ID: <5319E7A1.5060605@st.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 7 Mar 2014 12:51:09 -0300
+Subject: [PATCH 1/3] dma: mv_xor: take channel spinlock in mv_xor_status()
+In-Reply-To: <CAPcyv4hRP3o0=LTByvp8mg3x2iBo5fQ_pwmTzXnjHs4hxPXvkA@mail.gmail.com>
+References: <1388144314-1581-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1388144314-1581-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAPcyv4hRP3o0=LTByvp8mg3x2iBo5fQ_pwmTzXnjHs4hxPXvkA@mail.gmail.com>
+Message-ID: <20140307155109.GA12784@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/14 14:40, Maxime COQUELIN wrote:
-> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Hello Dan,
+
+Thomas is a bit busy right now, so I'm picking this where he left it.
+
+On Dec 31, Dan Williams wrote:
+> On Fri, Dec 27, 2013 at 3:38 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+[..]
+> > @@ -701,14 +701,20 @@ static enum dma_status mv_xor_status(struct dma_chan *chan,
+> >         struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+> >         enum dma_status ret;
+> >
+> > +       spin_lock_bh(&mv_chan->lock);
+> > +
+> >         ret = dma_cookie_status(chan, cookie, txstate);
+> >         if (ret == DMA_COMPLETE) {
+> >                 mv_xor_clean_completed_slots(mv_chan);
 > 
-> This patch adds a new logic inside the st pinctrl to manage
-> an unsupported scenario: some sysconfig are not available!
+> I think you can just delete this call to
+> mv_xor_clean_completed_slots().  The fact that the descriptors are
+> complete means that __mv_xor_slot_cleanup ran, and if that is the case
+> there should be nothing to cleanup.
 > 
-> This is the case of STiH407 where, although documented, the
-> following registers from SYSCFG_FLASH have been removed from the SoC.
-> 
-> SYSTEM_CONFIG3040
->    Output Enable pad control for all PIO Alternate Functions
-> and
-> SYSTEM_ CONFIG3050
->    Pull Up pad control for all PIO Alternate Functions
-> 
-> Without managing this condition an imprecise external abort
-> will be detect.
-> 
-> To do this the patch also reviews the st_parse_syscfgs
-> and other routines to manipulate the registers only if
-> actually available.
-> In any case, for example the st_parse_syscfgs detected
-> an error condition but no action was made in the
-> st_pctl_probe_dt.
-> 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+
+In that case, we don't need to take the lock anywhere in this function:
+
+1. It's not needed for dma_cookie_status() (as per Andy's comment).
+2. It's not needed for mv_xor_slot_cleanup(), which takes the lock.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
