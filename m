@@ -1,36 +1,33 @@
-From: cernekee@gmail.com (Kevin Cernekee)
-Date: Thu, 6 Mar 2014 20:44:57 -0800
-Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
-In-Reply-To: <53193FEE.4060002@ieee.org>
-References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
- <53193FEE.4060002@ieee.org>
-Message-ID: <CAJiQ=7BrCqo3VijjEvt2JLifM0MNGYmAA+VG_YQbSHfyBqsbtg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 7 Mar 2014 13:08:13 +0800
+Subject: [PATCH v2] i2c:at91: Add device tree property to set
+ clock-frequency
+In-Reply-To: <CAJjB1qKriEVAQyvMaYu_N+QWJ=dzTxK91Hi_OUM8h_4i78EvbA@mail.gmail.com>
+References: <1393293045-31849-1-git-send-email-mark.roszko@gmail.com>
+ <20140228110506.GF11192@ldesroches-Latitude-E6320>
+ <CAJjB1qLXnO-Zkte3vg_X5ktXmj1=tG+p5BcLX9vbCgzyfg_rWA@mail.gmail.com>
+ <4A1E236E-E048-4E37-AFE8-C0AC283B73D0@jcrosoft.com>
+ <CAJjB1qKriEVAQyvMaYu_N+QWJ=dzTxK91Hi_OUM8h_4i78EvbA@mail.gmail.com>
+Message-ID: <05EF9B59-7009-49D2-B57F-5612C39F1FF0@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 7:41 PM, Alex Elder <elder@ieee.org> wrote:
->> This patchset adds very minimal support for the BCM63138 SoC which is
->> a xDSL SoC using a dual Cortex A9 CPU complex.
->
->
-> Why do you use "63xx" for the generic name, when the specific
-> part you are defining here is 63138?  I would have expected
-> "63xxx".
 
-The product line has a mix of 4-digit and 5-digit part numbers.  The
-drivers for onchip peripherals all used "bcm63xx":
+On Mar 7, 2014, at 12:26 PM, Mark Roszko <mark.roszko@gmail.com> wrote:
 
-$ find drivers/ | grep 63xx
-drivers/tty/serial/bcm63xx_uart.c
-drivers/pcmcia/bcm63xx_pcmcia.h
-drivers/pcmcia/bcm63xx_pcmcia.c
-drivers/usb/gadget/bcm63xx_udc.c
-drivers/watchdog/max63xx_wdt.c
-drivers/watchdog/bcm63xx_wdt.c
-drivers/char/hw_random/bcm63xx-rng.c
-drivers/mtd/bcm63xxpart.c
-drivers/net/phy/bcm63xx.c
-drivers/net/ethernet/broadcom/bcm63xx_enet.h
-drivers/net/ethernet/broadcom/bcm63xx_enet.c
-drivers/spi/spi-bcm63xx.c
-drivers/spi/spi-bcm63xx-hsspi.c
+> Unless I'm misunderstanding your reply, it doesn't need to be set on
+> each i2c device. It's meant to be an option to override the currently
+> hardcoded 100khz for all the at91 devices.
+
+yes you do need to set it on each device
+
+as in the DT you describe the hw you set the speed of each device and then the bus
+based on the present device will use the appropriate one
+
+Best Regards,
+J.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
