@@ -1,47 +1,62 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 7 Mar 2014 12:18:48 +0800
-Subject: [PATCH 3/7] of: introduce of_dma_is_coherent() helper
-In-Reply-To: <CAL_JsqJ3QhRRNVAsvAPP=Ex_ptQcbpCXh7pf44K1xh+scFqiug@mail.gmail.com>
-References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>	<1394097598-17622-4-git-send-email-santosh.shilimkar@ti.com>	<CAL_JsqJnG1c0=+UgOmNOGs7a5jv2f3O074-TsXibiHsXapXhcQ@mail.gmail.com>	<53194092.7010809@ti.com>
- <CAL_JsqJ3QhRRNVAsvAPP=Ex_ptQcbpCXh7pf44K1xh+scFqiug@mail.gmail.com>
-Message-ID: <531948A8.9040106@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Mar 2014 21:22:23 -0700
+Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
+In-Reply-To: <CAGb2v65UQZoDJhjpX+kfa6HppXdhrCHG=A5m_WaQ_DimW-Lsbg@mail.gmail.com>
+References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
+ <530D218E.9010007@wwwdotorg.org>
+ <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
+ <53168976.7000008@wwwdotorg.org>
+ <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
+ <53169304.9080002@wwwdotorg.org>
+ <CACRpkdaYuZ5bXo7djOv04oyHPAFbO=pKfR7L7UBY+kZqZUHfmQ@mail.gmail.com>
+ <CAGb2v65UQZoDJhjpX+kfa6HppXdhrCHG=A5m_WaQ_DimW-Lsbg@mail.gmail.com>
+Message-ID: <5319497F.9080003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 March 2014 11:55 AM, Rob Herring wrote:
-> On Thu, Mar 6, 2014 at 9:44 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> On Friday 07 March 2014 11:13 AM, Rob Herring wrote:
->>> On Thu, Mar 6, 2014 at 3:19 AM, Santosh Shilimkar
->>> <santosh.shilimkar@ti.com> wrote:
->>>> The of_dma_is_coherent() helper parses the given DT device
->>>> node to see if the "dma-coherent" property is supported and
->>>> returns true or false accordingly.
+On 03/06/2014 08:43 PM, Chen-Yu Tsai wrote:
+> On Fri, Mar 7, 2014 at 11:41 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Mar 5, 2014 at 10:59 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 03/04/2014 07:37 PM, Linus Walleij wrote:
+>>>> On Wed, Mar 5, 2014 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>> On 03/04/2014 06:43 PM, Linus Walleij wrote:
 >>>>
->>>> For the architectures which are fully dma coherent and don't need per device
->>>> property, it can enable CONFIG_ARCH_IS_DMA_COHERENT config option which
->>>> enables DMA coherent for all devices by default.
+>>>>>> If I understand the situation correctly it's like ACPI does not have named
+>>>>>> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
+>>>>>> to the work of abstracting the access to GPIO handlers so that drivers
+>>>>>> need not know whether ACPI or DT is used for describing the hardware.
+>>>>>
+>>>>> For devices that already have both ACPI and DT bindings, we can't
+>>>>> pretend they can be the same; they are already potentially different. We
+>>>>> simply need to parse DT and ACPI differently, since that's the sway
+>>>>> their bindings are defined.
+>>>>>
+>>>>> For any devices that don't have both ACPI and DT bindings, I agree we
+>>>>> should certainly strive to make any new bindings aligned so we don't
+>>>>> have to deal with this for them.
+>>>>>
+>>>>> However, we can't change the past.
+>>>>
+>>>> Yeah, right, so for this very driver there are no bindings defined (yet)
+>>>> and the only device tree I can find referencing it is the Tegra20-paz00
+>>>> and it just use gpios = <>;
+>>>>
+>>>> So in this case I think this patch is the right way forward, but I admit
+>>>> I'm really uncertain in the general case.
 >>>
->>> This worries me. I killed off arch_is_coherent() for arm. Now we're
->>> adding something back. Also, we already have HAVE_GENERIC_DMA_COHERENT
->>> which is different, but the names will be confusing. MIPS also has
->>> DMA_NONCOHERENT.
->>>
->> Thanks for comments Rob. I will address them in next version.
->> Specifically about ARCH_IS_DMA_COHERENT, I wasn't very comfortable either
->> while adding it. But as Arnd mentioned, there is a need to have a way
->> for the arch's which are fully coherent to use coherent ops by default.
+>>> If there are no bindings defined at all yet, then we can define both DT
+>>> and ACPI bindings to use name-based GPIOs. Index-based lookups aren't a
+>>> good way forward.
 >>
->> Am not sure whats the best way to have such support without imposing
->> any special updates on such arches.
+>> After Mark clarifying that ACPI is going to have named GPIOs I'm
+>> totally aligned on this, so OK!
 > 
-> Thinking about this some more, if the arch is always coherent or
-> always non-coherent, then the default ops are always fine. In that
-> case set_arch_dma_coherent_ops is always a nop and of_dma_is_coherent
-> is a don't care.
-> 
-Hmmm.. I guess you are right. In that case we can drop the need of
-config option.
+> Glad to hear this, but is it possible to get rid of the index in current
+> drivers? Or change the behavior to name-based OR index-based lookups.
+> This might break any DTs that have multiple GPIOs defined under one
+> property though.
 
-Regards,
-Santosh
+For any bindings that are already defined to use index-based lookups, I
+think we have to continue using them, for backwards-compatibility with
+old DTs (and I assume old ACPI databases need the same thing).
