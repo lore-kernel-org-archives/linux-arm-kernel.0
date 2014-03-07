@@ -1,44 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 07 Mar 2014 17:36:25 +0100
-Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <20140307162946.GG28943@katana>
-References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <2368991.bjBJjms8qn@avalon> <20140307162946.GG28943@katana>
-Message-ID: <1552759.qGZNIXqrb1@avalon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Mar 2014 16:35:46 +0000
+Subject: [PATCH v9][ 4/8] imx-drm: Match ipu_di_signal_cfg's clk_pol
+ with its description.
+In-Reply-To: <1394121869-13387-1-git-send-email-denis@eukrea.com>
+References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
+ <1394121869-13387-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140307163546.GN21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Friday 07 March 2014 17:29:47 Wolfram Sang wrote:
-> Hi Laurent,
+On Thu, Mar 06, 2014 at 05:04:25PM +0100, Denis Carikli wrote:
+> According to the datasheet, setting the di0_polarity_disp_clk
+> field in the GENERAL di register sets the output clock polarity
+> to active high.
 > 
-> > Beside the comment to patch 06/12, I would have moved patches 06/12 to
-> > 08/12 to the beginning of the series, in order to avoid adding a clock
-> > workaround for the serial clock only to remove it a couple of patches
-> > later.
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v8->v9:
+> - New patch that is now needed by the
+>   "staging: imx-drm: Use de-active and pixelclk-active" patch.
+> ---
+>  drivers/staging/imx-drm/ipu-v3/ipu-di.c |    2 +-
+>  drivers/staging/imx-drm/ipuv3-crtc.c    |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> That would have saved only 2 lines since we need the workaround anyhow
-> (MTU2) and would break the incremental approach of this series somewhat.
-> I'd like to keep it.
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> index 82a9eba..849b3e1 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> @@ -595,7 +595,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+>  		}
+>  	}
+>  
+> -	if (!sig->clk_pol)
+> +	if (sig->clk_pol)
+>  		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+>  
+>  	ipu_di_write(di, di_gen, DI_GENERAL);
+> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+> index e646017..f506075 100644
+> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
+> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+> @@ -158,7 +158,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+>  		sig_cfg.Vsync_pol = 1;
+>  
+>  	sig_cfg.enable_pol = 1;
+> -	sig_cfg.clk_pol = 1;
+> +	sig_cfg.clk_pol = 0;
+>  	sig_cfg.width = mode->hdisplay;
+>  	sig_cfg.height = mode->vdisplay;
+>  	sig_cfg.pixel_fmt = out_pixel_fmt;
 
-It would have saved one patch. If Simon needs to apply CCF support separately 
-I'm fine with that approach, but if both changes are applied at the same time 
-the SCIF patches could go in first.
+I brought this up a while back:
 
-> > Oh, and one might ask you to fix the 80 columns checkpatch warnings for
-> > patch 01/12 :-)
-> 
-> Broken intentionally for the sake of readability :)
+http://archive.arm.linux.org.uk/lurker/message/20131015.103500.0c058eb9.en.html
+
+it looks like it was never properly addressed, so yes, I think this is
+the right solution, and brings the kernel inline with the code which
+was in uboot back in October, and the value of sig_cfg.clk_pol now
+matches the register bit.
+
+However, I think an even better solution would be to have the clk_pol
+values to be defined: CLK_POL_ACTIVE_HIGH and CLK_POL_ACTIVE_LOW.
+This makes the actual value used irrelevant, and helps readability.
+Maybe something to consider for a future patch?
 
 -- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/4351711a/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
