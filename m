@@ -1,104 +1,36 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Mar 2014 17:46:11 +0530
-Subject: [RFC PATCH 4/9] drivers: omap-dma: Add crossbar line as a resource to
- omap_chan structure
+Date: Fri, 7 Mar 2014 17:46:13 +0530
+Subject: [RFC PATCH 6/9] arm: dts: dra: Add dma crossbar node
 In-Reply-To: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
 References: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1394194576-23741-5-git-send-email-r.sricharan@ti.com>
+Message-ID: <1394194576-23741-7-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In socs which have crossbar to route the peripheral dma request
-line to the dma controller, only the peripheral crossbar request line
-number is fixed and this is passed through the DT nodes. The dma request
-channel to be used is allocated dynamically.
-
-The total number of crossbar channels are registered during probe a
-the dma request line free is mapped using the registered router's map function
-during the device_alloc_chan_resource callback and freed with free_resource.
-When a router is not registered, the dma request number is same as the
-crossbar number.
+Adding the crossbar node.
 
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/dma/omap-dma.c |   21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 38407f9..05ac480 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -47,6 +47,7 @@ struct omap_chan {
- 	struct dma_xbar_device *router;
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 1fd75aa..f84991b 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -170,6 +170,13 @@
+ 			#dma-requests = <127>;
+ 		};
  
- 	unsigned dma_sig;
-+	unsigned dma_xbar;
- 	bool cyclic;
- 	bool paused;
- 
-@@ -530,6 +531,11 @@ static int omap_dma_alloc_chan_resources(struct dma_chan *chan)
- 	struct omap_chan *c = to_omap_dma_chan(chan);
- 	int ret;
- 
-+	if (c->router)
-+		c->dma_sig = c->router->ops->map(c->dma_xbar, c->router);
-+	else
-+		c->dma_sig = c->dma_xbar;
++		dmacb: crossbar at 4a020000 {
++			compatible = "ti,dma-crossbar";
++			reg = <0x4a002b78 0x100>;
++			ti,dma-reqs = <160>;
++			ti,reg-size = <2>;
++		};
 +
- 	if (od->legacy) {
- 		ret = omap_request_dma(c->dma_sig, "DMA engine",
- 				       omap_dma_callback, c, &c->dma_ch);
-@@ -539,7 +545,7 @@ static int omap_dma_alloc_chan_resources(struct dma_chan *chan)
- 	}
- 
- 	dev_dbg(od->ddev.dev, "allocating channel %u for %u\n",
--		c->dma_ch, c->dma_sig);
-+		c->dma_ch, c->dma_xbar);
- 
- 	if (ret >= 0) {
- 		omap_dma_assign(od, c, c->dma_ch);
-@@ -594,9 +600,14 @@ static void omap_dma_free_chan_resources(struct dma_chan *chan)
- 	od->lch_map[c->dma_ch] = NULL;
- 	vchan_free_chan_resources(&c->vc);
- 
-+	if (c->router) {
-+		c->router->ops->unmap(c->dma_sig, c->router);
-+		c->dma_sig = 0;
-+	}
-+
- 	omap_free_dma(c->dma_ch);
- 
--	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_sig);
-+	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_xbar);
- }
- 
- static size_t omap_dma_sg_size(struct omap_sg *sg)
-@@ -1064,7 +1075,7 @@ static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	return ret;
- }
- 
--static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
-+static int omap_dma_chan_init(struct omap_dmadev *od, int dma_xbar)
- {
- 	struct omap_chan *c;
- 
-@@ -1073,7 +1084,7 @@ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
- 		return -ENOMEM;
- 
- 	c->reg_map = od->reg_map;
--	c->dma_sig = dma_sig;
-+	c->dma_xbar = dma_xbar;
- 	c->vc.desc_free = omap_dma_desc_free;
- 	vchan_init(&c->vc, &od->ddev);
- 	INIT_LIST_HEAD(&c->node);
-@@ -1263,7 +1274,7 @@ bool omap_dma_filter_fn(struct dma_chan *chan, void *param)
- 		struct omap_chan *c = to_omap_dma_chan(chan);
- 		unsigned req = args->chan;
- 
--		if (req == c->dma_sig) {
-+		if (req == c->dma_xbar) {
- 			c->router = args->router_data;
- 			return true;
- 		}
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
 -- 
 1.7.9.5
