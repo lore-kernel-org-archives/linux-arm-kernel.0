@@ -1,43 +1,120 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Mar 2014 17:46:08 +0530
-Subject: [RFC PATCH 1/9] drivers: dma: omap-dma: Avoid hard-coding of the
- dma-request channels
+Date: Fri, 7 Mar 2014 17:46:10 +0530
+Subject: [RFC PATCH 3/9] drivers: dma: omap-dma: Add a seperate xlate function
+ to get router data
 In-Reply-To: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
 References: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1394194576-23741-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <1394194576-23741-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The total number of dma-request channels is hard-coded. Instead read the
-data from DT.
+Each dma-request channel can be connected to the dma-controller either
+directly or through a crossbar router. In such cases request lines
+should be routed to the dma-controller. Adding a xlate function
+which would retrieve and store the router data associated with a particular
+channel in the dma-channel specific structure. This is used to map/unmap
+the dma request lines.
 
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/dma/omap-dma.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/dma/omap-dma.c |   47 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 44 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 64ceca2..a0d6639 100644
+index a0d6639..38407f9 100644
 --- a/drivers/dma/omap-dma.c
 +++ b/drivers/dma/omap-dma.c
-@@ -1093,6 +1093,7 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	struct omap_dmadev *od;
- 	struct resource *res;
- 	int rc, i, irq;
-+	u32 reqs;
+@@ -44,6 +44,8 @@ struct omap_chan {
+ 	uint32_t ccr;
  
- 	od = devm_kzalloc(&pdev->dev, sizeof(*od), GFP_KERNEL);
- 	if (!od)
-@@ -1126,7 +1127,9 @@ static int omap_dma_probe(struct platform_device *pdev)
- 
- 	tasklet_init(&od->task, omap_dma_sched, (unsigned long)od);
- 
--	for (i = 0; i < 127; i++) {
-+	of_property_read_u32(pdev->dev.of_node, "#dma-requests", &reqs);
+ 	struct dma_slave_config	cfg;
++	struct dma_xbar_device *router;
 +
-+	for (i = 0; i < reqs; i++) {
- 		rc = omap_dma_chan_init(od, i);
+ 	unsigned dma_sig;
+ 	bool cyclic;
+ 	bool paused;
+@@ -75,6 +77,11 @@ struct omap_desc {
+ 	struct omap_sg sg[0];
+ };
+ 
++struct omap_dma_filter_args {
++	void *router_data;
++	unsigned chan;
++};
++
+ enum {
+ 	CCR_FS			= BIT(5),
+ 	CCR_READ_PRIORITY	= BIT(6),
+@@ -586,6 +593,7 @@ static void omap_dma_free_chan_resources(struct dma_chan *chan)
+ 	c->channel_base = NULL;
+ 	od->lch_map[c->dma_ch] = NULL;
+ 	vchan_free_chan_resources(&c->vc);
++
+ 	omap_free_dma(c->dma_ch);
+ 
+ 	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_sig);
+@@ -1088,6 +1096,34 @@ static void omap_dma_free(struct omap_dmadev *od)
+ 	}
+ }
+ 
++static struct dma_chan *of_omap_dma_xlate(struct of_phandle_args *dma_spec,
++						 struct of_dma *ofdma)
++{
++	int count = dma_spec->args_count;
++	struct of_dma_filter_info *info = ofdma->of_dma_data;
++	struct omap_dma_filter_args args;
++	struct dma_xbar_device *c = NULL;
++
++	if (!info || !info->filter_fn)
++		return NULL;
++
++	if ((count != 1) && (count != 2))
++		return NULL;
++
++	args.chan = dma_spec->args[0];
++	args.router_data = NULL;
++
++	if (count == 2) {
++		c = of_dma_get_router_data(dma_spec->args[1]);
++
++		if (c && c->ops && c->ops->map && c->ops->unmap)
++			args.router_data = c;
++	}
++
++	return dma_request_channel(info->dma_cap, info->filter_fn,
++			&args);
++}
++
+ static int omap_dma_probe(struct platform_device *pdev)
+ {
+ 	struct omap_dmadev *od;
+@@ -1167,7 +1203,7 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 
+ 		/* Device-tree DMA controller registration */
+ 		rc = of_dma_controller_register(pdev->dev.of_node,
+-				of_dma_simple_xlate, &omap_dma_info);
++				of_omap_dma_xlate, &omap_dma_info);
  		if (rc) {
- 			omap_dma_free(od);
+ 			pr_warn("OMAP-DMA: failed to register DMA controller\n");
+ 			dma_async_device_unregister(&od->ddev);
+@@ -1221,11 +1257,16 @@ static struct platform_driver omap_dma_driver = {
+ 
+ bool omap_dma_filter_fn(struct dma_chan *chan, void *param)
+ {
++	struct omap_dma_filter_args *args = param;
++
+ 	if (chan->device->dev->driver == &omap_dma_driver.driver) {
+ 		struct omap_chan *c = to_omap_dma_chan(chan);
+-		unsigned req = *(unsigned *)param;
++		unsigned req = args->chan;
+ 
+-		return req == c->dma_sig;
++		if (req == c->dma_sig) {
++			c->router = args->router_data;
++			return true;
++		}
+ 	}
+ 	return false;
+ }
 -- 
 1.7.9.5
