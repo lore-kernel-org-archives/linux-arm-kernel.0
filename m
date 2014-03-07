@@ -1,50 +1,30 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri,  7 Mar 2014 18:04:23 +0100
-Subject: [PATCH 9/9] ARM: imx_v4_v5_defconfig: Enable drivers for
- i.MX25/i.MX35 USB Host support.
-In-Reply-To: <1394211863-7569-1-git-send-email-denis@eukrea.com>
-References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394211863-7569-9-git-send-email-denis@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Mar 2014 17:06:09 +0000
+Subject: [PATCH 2/2] imx-drm: imx-ldb: Use OF graph to find connected panel
+In-Reply-To: <1394114080-27223-2-git-send-email-p.zabel@pengutronix.de>
+References: <1394114080-27223-1-git-send-email-p.zabel@pengutronix.de>
+ <1394114080-27223-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140307170609.GP21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    8 ++++++++
- 1 file changed, 8 insertions(+)
+On Thu, Mar 06, 2014 at 02:54:40PM +0100, Philipp Zabel wrote:
+> @@ -566,9 +566,18 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
+>  			return -EINVAL;
+>  		}
+>  
+> -		panel_node = of_parse_phandle(child, "fsl,panel", 0);
+> -		if (panel_node)
+> -			channel->panel = of_drm_find_panel(panel_node);
+> +		/* The output port is port at 4 with mux or port at 1 without mux */
+> +		port = of_graph_get_port_by_id(child, imx_ldb->lvds_mux ? 4 : 1);
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index f1aeb7d..f7c4fbf 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -47,6 +47,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_FPE_NWFPE=y
- CONFIG_FPE_NWFPE_XP=y
- CONFIG_PM_DEBUG=y
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -80,6 +81,7 @@ CONFIG_MTD_UBI=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
- CONFIG_ATA=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- CONFIG_CS89x0=y
-@@ -153,6 +155,12 @@ CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_UDC=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_OTG_FSM=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_SDHCI=y
+I guess we're holding off on these two patches while the last bits of
+the of-graph get sorted - the above function doesn't currently exist
+so causes a build failure.
+
+Thanks.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
