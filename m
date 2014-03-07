@@ -1,49 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 7 Mar 2014 13:35:28 +0200
-Subject: [PATCH v5 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1394119431.4160.84.camel@hornet>
-References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>	
- <53184C2E.3000807@ti.com> <1394119431.4160.84.camel@hornet>
-Message-ID: <5319AF00.5030602@ti.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 7 Mar 2014 17:46:07 +0530
+Subject: [RFC PATCH 0/9] drivers: dma: Add support for dma-channel router
+Message-ID: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/14 17:23, Pawel Moll wrote:
-> On Thu, 2014-03-06 at 10:21 +0000, Tomi Valkeinen wrote:
->> Is this an old HW, and presumably there won't be new users for it? If
->> yes, this is probably fine. 
-> 
-> There is a DRM driver in the works, actually...
-> 
->> If not, you might want to look at the video
->> ports and endpoints, which is used by at least three not-yet-merged series:
->>
->> [PATCHv3 00/41] OMAPDSS: DT support v3
->> [PATCH v5 00/11] imx-drm dt bindings
->> [RFC PATCH v2 00/21] Add DSI display support for Exynos based boards
->>
->> Using bindings like that would be more future proof, even if the current
->> driver doesn't use them.
-> 
-> ... and this makes me try to get out of its way. In other words, I fully
-> agree with you, but I don't think this applies to this particular patch,
-> as I'm not even trying to represent the display pipeline. The (optional)
+In some SoCs the dma request lines from the peripherals are
+routed to the dma-controller through a crossbar. With this the
+dma controller's available request lines are shared between the
+peripherals.
 
-Right, you are not, at the moment. My point was, if the driver is
-extended later to support pipelines, or common panel/encoder drivers,
-you (most likely) need to have similar bindings than the other people use.
+This adds support to register the crossbar router associated with
+a dma-channel and let the dma-controller driver map/unmap
+the peripheral dma crossbar line to dma-controller's request
+line.
 
-Note that the same DT bindings you add here should also work for the DRM
-driver in the future. So, in fact, the question is extended to: will the
-fbdev or drm driver support common panels/encoders?
+This is on top of Russell's OMAP dma engine rework series
 
- Tomi
+	http://www.spinics.net/lists/linux-omap/msg102969.html
 
+Sricharan R (9):
+  drivers: dma: omap-dma: Avoid hard-coding of the dma-request channels
+  drivers: dma: of-dma: Add support for dma-request line routers
+  drivers: dma: omap-dma: Add a seperate xlate function to get router
+    data
+  drivers: omap-dma: Add crossbar line as a resource to omap_chan
+    structure
+  drivers: dma: Add dma crossbar driver
+  arm: dts: dra: Add dma crossbar node
+  arm: dts: dra: Add dma-request router phandle to dma-specs
+  arm: dra: Enable dma crossbar support on dra7xx
+  arm: dts: dra7: Change the total dma-req numbers to crossbar channels
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/91a78354/attachment-0001.sig>
+ .../devicetree/bindings/arm/omap/dma-crossbar.txt  |   26 +++
+ arch/arm/boot/dts/dra7.dtsi                        |   47 +++--
+ arch/arm/configs/omap2plus_defconfig               |    1 +
+ drivers/dma/Kconfig                                |    7 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/of-dma.c                               |   82 +++++++-
+ drivers/dma/omap-dma-xbar.c                        |  219 ++++++++++++++++++++
+ drivers/dma/omap-dma-xbar.h                        |   32 +++
+ drivers/dma/omap-dma.c                             |   72 ++++++-
+ include/linux/of_dma.h                             |   22 ++
+ 10 files changed, 479 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/dma-crossbar.txt
+ create mode 100644 drivers/dma/omap-dma-xbar.c
+ create mode 100644 drivers/dma/omap-dma-xbar.h
+
+-- 
+1.7.9.5
