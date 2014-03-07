@@ -1,100 +1,46 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri,  7 Mar 2014 11:13:31 -0800
-Subject: [PATCH RFC v2 08/11] tty: xuartps: Rename Kconfig symbols
+Date: Fri,  7 Mar 2014 11:13:33 -0800
+Subject: [PATCH RFC v2 10/11] tty: cadence: Document DT binding
 In-Reply-To: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1394219614-3197-9-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1394219614-3197-11-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the config symbols for the Cadence UART to reflect the driver
-rebranding:
-  SERIAL_XILINX_PS_UART(_CONSOLE) -> SERIAL_CADENCE_UART(_CONSOLE)
+Add binding documentation for the Cadence UART.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 ---
- drivers/tty/serial/Kconfig         | 6 +++---
- drivers/tty/serial/Makefile        | 2 +-
- drivers/tty/serial/xilinx_uartps.c | 8 ++++----
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/serial/cdns,uart.txt         | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 1294284342bc..8c340dbf9e53 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1367,7 +1367,7 @@ config SERIAL_MXS_AUART_CONSOLE
- 	help
- 	  Enable a MXS AUART port to be the system console.
- 
--config SERIAL_XILINX_PS_UART
-+config SERIAL_CADENCE_UART
- 	tristate "Cadence (Xilinx Zynq) UART support"
- 	depends on OF
- 	select SERIAL_CORE
-@@ -1375,9 +1375,9 @@ config SERIAL_XILINX_PS_UART
- 	  This driver supports the Cadence UART. It is found e.g. in Xilinx
- 	  Zynq.
- 
--config SERIAL_XILINX_PS_UART_CONSOLE
-+config SERIAL_CADENCE_UART_CONSOLE
- 	bool "Cadence UART console support"
--	depends on SERIAL_XILINX_PS_UART=y
-+	depends on SERIAL_CADENCE_UART=y
- 	select SERIAL_CORE_CONSOLE
- 	help
- 	  Enable a Cadence UART port to be the system console.
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index 3680854fef41..4b57523a34c7 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -79,7 +79,7 @@ obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
- obj-$(CONFIG_SERIAL_MSM_SMD)	+= msm_smd_tty.o
- obj-$(CONFIG_SERIAL_MXS_AUART) += mxs-auart.o
- obj-$(CONFIG_SERIAL_LANTIQ)	+= lantiq.o
--obj-$(CONFIG_SERIAL_XILINX_PS_UART) += xilinx_uartps.o
-+obj-$(CONFIG_SERIAL_CADENCE_UART) += xilinx_uartps.o
- obj-$(CONFIG_SERIAL_SIRFSOC) += sirfsoc_uart.o
- obj-$(CONFIG_SERIAL_TEGRA) += serial-tegra.o
- obj-$(CONFIG_SERIAL_AR933X)   += ar933x_uart.o
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 0b27efef1cb6..7bfd19a7273d 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -13,7 +13,7 @@
-  * still shows in the file name, function/symbol name prefixes.
-  */
- 
--#if defined(CONFIG_SERIAL_XILINX_PS_UART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#if defined(CONFIG_SERIAL_CADENCE_UART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
- #define SUPPORT_SYSRQ
- #endif
- 
-@@ -1030,7 +1030,7 @@ static struct uart_port *cdns_uart_get_port(void)
- 	return port;
- }
- 
--#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
-+#ifdef CONFIG_SERIAL_CADENCE_UART_CONSOLE
- /**
-  * cdns_uart_console_wait_tx - Wait for the TX to be full
-  * @port: Handle to the uart port structure
-@@ -1150,7 +1150,7 @@ static int __init cdns_uart_console_init(void)
- 
- console_initcall(cdns_uart_console_init);
- 
--#endif /* CONFIG_SERIAL_XILINX_PS_UART_CONSOLE */
-+#endif /* CONFIG_SERIAL_CADENCE_UART_CONSOLE */
- 
- static struct uart_driver cdns_uart_uart_driver = {
- 	.owner		= THIS_MODULE,
-@@ -1159,7 +1159,7 @@ static struct uart_driver cdns_uart_uart_driver = {
- 	.major		= CDNS_UART_MAJOR,
- 	.minor		= CDNS_UART_MINOR,
- 	.nr		= CDNS_UART_NR_PORTS,
--#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
-+#ifdef CONFIG_SERIAL_CADENCE_UART_CONSOLE
- 	.cons		= &cdns_uart_console,
- #endif
- };
+diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+new file mode 100644
+index 000000000000..a3eb154c32ca
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+@@ -0,0 +1,20 @@
++Binding for Cadence UART Controller
++
++Required properties:
++- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
++- reg: Should contain UART controller registers location and length.
++- interrupts: Should contain UART controller interrupts.
++- clocks: Must contain phandles to the UART clocks
++  See ../clocks/clock-bindings.txt for details.
++- clock-names: Tuple to identify input clocks, must contain "uart_clk" and "pclk"
++  See ../clocks/clock-bindings.txt for details.
++
++
++Example:
++	uart at e0000000 {
++		compatible = "cdns,uart-r1p8";
++		clocks = <&clkc 23>, <&clkc 40>;
++		clock-names = "uart_clk", "pclk";
++		reg = <0xE0000000 0x1000>;
++		interrupts = <0 27 4>;
++	};
 -- 
 1.9.0.1.g4196000
