@@ -1,48 +1,52 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 07 Mar 2014 12:31:37 +0900
-Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
- possible
-In-Reply-To: <201403070125.28582.arnd@arndb.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
- <5318B232.2020507@wwwdotorg.org>
- <1394127555.4582.1.camel@weser.hi.pengutronix.de>
- <201403070125.28582.arnd@arndb.de>
-Message-ID: <004b01cf39b5$bf13e690$3d3bb3b0$%han@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Mar 2014 11:41:11 +0800
+Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
+In-Reply-To: <53169304.9080002@wwwdotorg.org>
+References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
+ <530D218E.9010007@wwwdotorg.org>
+ <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
+ <53168976.7000008@wwwdotorg.org>
+ <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
+ <53169304.9080002@wwwdotorg.org>
+Message-ID: <CACRpkdaYuZ5bXo7djOv04oyHPAFbO=pKfR7L7UBY+kZqZUHfmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 07, 2014 9:25 AM, Arnd Bergmann wrote:
-> On Thursday 06 March 2014, Lucas Stach wrote:
-> > Am Donnerstag, den 06.03.2014, 10:36 -0700 schrieb Stephen Warren:
-> > > On 03/05/2014 06:25 AM, Lucas Stach wrote:
-> > > > This is the recommended method of doing the IRQ
-> > > > mapping. For old devicetrees we fall back to the
-> > > > previous practice.
-> > >
-> > > Tested-by: Stephen Warren <swarren@nvidia.com>
-> > >
-> > > I tested both with and without patch 1/6, and the PCIe-based NIC on
-> > > Beaver worked fine either way. Without patch 1/6, I do see:
-> > >
-> > > pci 0000:00:01.0: of_irq_parse_pci() failed with rc=-22
-> > >
-> > > ... but that seems reasonable given that the DT that of_irq_parse_pci()
-> > > parses is missing, and did correctly trigger the fallback path, so
-> > > everything still worked.
-> >
-> > Yes, this should be normal. It spits this error for old DTs, but keeps
-> > doing the right thing. I'm not sure if we should downgrade this to info
-> > or dbg.
-> 
-> No, I think printing an error like this is appropriate: it is an incentive
-> to update the dts files, but doesn't look too urgent as long as everything
-> still works.
+On Wed, Mar 5, 2014 at 10:59 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/04/2014 07:37 PM, Linus Walleij wrote:
+>> On Wed, Mar 5, 2014 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 03/04/2014 06:43 PM, Linus Walleij wrote:
+>>
+>>>> If I understand the situation correctly it's like ACPI does not have named
+>>>> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
+>>>> to the work of abstracting the access to GPIO handlers so that drivers
+>>>> need not know whether ACPI or DT is used for describing the hardware.
+>>>
+>>> For devices that already have both ACPI and DT bindings, we can't
+>>> pretend they can be the same; they are already potentially different. We
+>>> simply need to parse DT and ACPI differently, since that's the sway
+>>> their bindings are defined.
+>>>
+>>> For any devices that don't have both ACPI and DT bindings, I agree we
+>>> should certainly strive to make any new bindings aligned so we don't
+>>> have to deal with this for them.
+>>>
+>>> However, we can't change the past.
+>>
+>> Yeah, right, so for this very driver there are no bindings defined (yet)
+>> and the only device tree I can find referencing it is the Tegra20-paz00
+>> and it just use gpios = <>;
+>>
+>> So in this case I think this patch is the right way forward, but I admit
+>> I'm really uncertain in the general case.
+>
+> If there are no bindings defined at all yet, then we can define both DT
+> and ACPI bindings to use name-based GPIOs. Index-based lookups aren't a
+> good way forward.
 
-+1
+After Mark clarifying that ACPI is going to have named GPIOs I'm
+totally aligned on this, so OK!
 
-I agree with Arnd's opinion. I think that all dts files should be
-updated properly. This error message can be the good way to do it.
-Thank you.
-
-Best regards,
-Jingoo Han
+Yours,
+Linus Walleij
