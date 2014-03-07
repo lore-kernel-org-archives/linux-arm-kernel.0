@@ -1,66 +1,62 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 07 Mar 2014 08:22:06 -0500
-Subject: [RFC PATCH] arm64: Fix __addr_ok and __range_ok macros
-In-Reply-To: <20140306082023.GA4160@redhat.com>
-References: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
- <20140306082023.GA4160@redhat.com>
-Message-ID: <5319C7FE.3090300@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 7 Mar 2014 15:43:14 +0200
+Subject: [PATCH 1/8] CLK: ti: dra7: Initialize USB_DPLL
+In-Reply-To: <1394197751-28984-2-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-2-git-send-email-rogerq@ti.com>
+Message-ID: <5319CCF2.8090902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On 03/07/2014 03:09 PM, Roger Quadros wrote:
+> USB_DPLL must be initialized and locked at boot so that
+> USB modules can work.
+>
+> Also program USB_DLL_M2 output to half rate.
+>
+> CC: Mike Turquette <mturquette@linaro.org>
+> CC: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   drivers/clk/ti/clk-7xx.c | 11 +++++++++++
+>   1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> index 9977653..f89f3c2 100644
+> --- a/drivers/clk/ti/clk-7xx.c
+> +++ b/drivers/clk/ti/clk-7xx.c
+> @@ -18,6 +18,7 @@
+>
+>   #define DRA7_DPLL_ABE_DEFFREQ				361267200
+>   #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
+> +#define DRA7_DPLL_USB_DEFFREQ				960000000
+>
+>
+>   static struct ti_dt_clk dra7xx_clks[] = {
+> @@ -328,5 +329,15 @@ int __init dra7xx_dt_clk_init(void)
+>   	if (rc)
+>   		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
+>
+> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_ck");
+> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ);
+> +	if (rc)
+> +		pr_err("%s: failed to configure USB DPLL!\n", __func__);
+> +
+> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_m2_ck");
+> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ/2);
+> +	if (rc)
+> +		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+> +
 
-Thanks for the comments.
+I would rather see this done using the default-rate mechanism provided here:
 
-On 03/06/2014 03:20 AM, Michael S. Tsirkin wrote:
-> On Wed, Mar 05, 2014 at 05:41:28PM -0500, Christopher Covington wrote:
->> Without this, the following scenario is incorrectly determined
->> to be invalid.
->>
->> addr 0x7f_ffffe000 size 8192 addr_limit 0x80_00000000
->>
->> This behavior was observed while trying to vmsplice the stack
->> as part of a CRIU dump of a process.
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>  arch/arm64/include/asm/uaccess.h | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
->> index edb3d5c..9309024 100644
->> --- a/arch/arm64/include/asm/uaccess.h
->> +++ b/arch/arm64/include/asm/uaccess.h
->> @@ -66,12 +66,12 @@ static inline void set_fs(mm_segment_t fs)
->>  #define segment_eq(a,b)	((a) == (b))
->>  
->>  /*
->> - * Return 1 if addr < current->addr_limit, 0 otherwise.
->> + * Return 1 if addr <= current->addr_limit, 0 otherwise.
->>   */
->>  #define __addr_ok(addr)							\
->>  ({									\
->>  	unsigned long flag;						\
->> -	asm("cmp %1, %0; cset %0, lo"					\
->> +	asm("cmp %1, %0; cset %0, ls"					\
->>  		: "=&r" (flag)						\
->>  		: "r" (addr), "0" (current_thread_info()->addr_limit)	\
->>  		: "cc");						\
-> 
-> 
-> BTW can this use mov %0, #0 like arch/arm/include/asm/uaccess.h does?
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
 
-The A32 implementation uses "movlo", a conditional move instruction. My
-reading of section 3.2 Conditional Instructions of the ARMv8 ISA overview [1]
-and other documentation has led me to believe conditional move instructions as
-such are not available in A64, hence the choice of "cset".
+However, this remains to be commented by Mike whether the patch is okay 
+or not.
 
-1.
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.genc010197a/index.html
+-Tero
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+>   	return rc;
+>   }
+>
