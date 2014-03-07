@@ -1,78 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Mar 2014 09:58:36 -0800
-Subject: [GIT PULL] omap device tree changes for v3.15, part 2
-Message-ID: <20140307175835.GA23749@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 07 Mar 2014 22:01:01 +0300
+Subject: [PATCH 1/9] usb: chipidea: usbmisc: Add USB Host support for
+ i.MX25/i.MX35 CPUs
+In-Reply-To: <1394211863-7569-1-git-send-email-denis@eukrea.com>
+References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
+Message-ID: <531A176D.6090409@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f777ba1780584b100ab9664cc06d04f3bb273a84:
+Hello.
 
-  Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
+On 03/07/2014 08:04 PM, Denis Carikli wrote:
 
-are available in the git repository at:
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>   drivers/usb/chipidea/usbmisc_imx.c |   59 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 59 insertions(+)
 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index cd061ab..d956ad0 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,26 @@
+>   #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>   #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
+>
+> +#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
+> +#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+> +#define MXC_EHCI_INTERFACE_MASK		(0xf)
+> +
+> +#define MX25_OTG_SIC_SHIFT		29
+> +#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
+> +#define MX25_OTG_PM_BIT			BIT(24)
+> +#define MX25_OTG_PP_BIT			BIT(11)
+> +#define MX25_OTG_OCPOL_BIT		(1 << 3)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-part2
+    Hm, why not BIT(3). Though frankly speaking, I don't think (x << n) macros 
+go together well with BIT() ones.
 
-for you to fetch changes up to 18c49af3ee9e32a535413a949672bea726699f04:
+> +
+> +#define MX25_H1_SIC_SHIFT		21
+> +#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
+> +#define MX25_H1_PP_BIT			BIT(18)
+> +#define MX25_H1_PM_BIT			BIT(16)
+> +#define MX25_H1_IPPUE_UP_BIT		BIT(7)
+> +#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
+> +#define MX25_H1_TLL_BIT			BIT(5)
+> +#define MX25_H1_USBTE_BIT		BIT(4)
+> +#define MX25_H1_OCPOL_BIT		(1 << 2)
 
-  ARM: dts: am335x-evmsk: enable dual_emac mode (2014-03-05 11:53:36 -0800)
+    BIT(2)?
 
-----------------------------------------------------------------
-Part two of omap device tree changes enabling driver features
-in the dts files.
-
-----------------------------------------------------------------
-Andrii.Tseglytskyi (2):
-      ARM: dts: OMAP36xx: Add device node for ABB
-      ARM: dts: OMAP4: Add device nodes for ABB
-
-Balaji T K (3):
-      ARM: dts: am437x gp-evm: add sd card dt nodes
-      ARM: dts: am335x-evm: add SD card hotplug support
-      ARM: dts: am43x-epos-evm: add SD card hotplug support
-
-Florian Vaussard (1):
-      ARM: dts: Add support for OMAP4 Gumstix DuoVero/Parlor
-
-Imre Kaloz (1):
-      ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x EV-MSK
-
-Kishon Vijay Abraham I (1):
-      ARM: dts: omap5: added dt properties to adapt to the new phy framwork
-
-Nishanth Menon (1):
-      ARM: dts: DRA7: Add device nodes for ABB
-
-Roger Quadros (3):
-      ARM: OMAP2+: Remove legacy_init_ehci_clk()
-      ARM: dts: Get rid of incompatible ids for hci-omap USB host nodes
-      ARM: dts: Update echi-omap DT binding example usage
-
-Yegor Yefremov (1):
-      ARM: dts: am335x-evmsk: enable dual_emac mode
-
- .../devicetree/bindings/arm/omap/omap.txt          |   3 +
- .../devicetree/bindings/usb/ehci-omap.txt          |   2 +-
- .../devicetree/bindings/usb/ohci-omap3.txt         |   2 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/am335x-evm.dts                   |   9 +
- arch/arm/boot/dts/am335x-evmsk.dts                 |  43 ++++
- arch/arm/boot/dts/am4372.dtsi                      |   1 +
- arch/arm/boot/dts/am437x-gp-evm.dts                |  27 +++
- arch/arm/boot/dts/am43x-epos-evm.dts               |   9 +
- arch/arm/boot/dts/dra7.dtsi                        | 132 +++++++++++
- arch/arm/boot/dts/omap3.dtsi                       |   4 +-
- arch/arm/boot/dts/omap36xx.dtsi                    |  20 ++
- arch/arm/boot/dts/omap4-duovero-parlor.dts         | 146 ++++++++++++
- arch/arm/boot/dts/omap4-duovero.dtsi               | 252 +++++++++++++++++++++
- arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
- arch/arm/boot/dts/omap4.dtsi                       |  30 ++-
- arch/arm/boot/dts/omap443x.dtsi                    |  26 +++
- arch/arm/boot/dts/omap4460.dtsi                    |  37 +++
- arch/arm/boot/dts/omap5-uevm.dts                   |   8 +-
- arch/arm/boot/dts/omap5.dtsi                       |   9 +-
- arch/arm/mach-omap2/pdata-quirks.c                 |  26 +--
- 21 files changed, 758 insertions(+), 37 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-duovero-parlor.dts
- create mode 100644 arch/arm/boot/dts/omap4-duovero.dtsi
+WBR, Sergei
