@@ -1,28 +1,51 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 07 Mar 2014 11:07:51 +0100
-Subject: [PATCH v6 09/10] ARM: dts: Add rear camera nodes for Exynos4412
- TRATS2 board
-In-Reply-To: <1394122819-9582-10-git-send-email-s.nawrocki@samsung.com>
-References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
- <1394122819-9582-10-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <53199A77.9090602@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Mar 2014 11:07:51 +0100
+Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
+In-Reply-To: <20140307095222.GG21483@n2100.arm.linux.org.uk>
+References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307095222.GG21483@n2100.arm.linux.org.uk>
+Message-ID: <20140307100751.GN607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Russell,
 
-On 06/03/14 17:20, Sylwester Nawrocki wrote:
-> This patch enables the rear facing camera (s5c73m3) on TRATS2 board
-> by adding the I2C0 bus controller, s5c73m3 sensor, MIPI CSI-2 receiver
-> and the sensor's voltage regulator supply nodes.
+On Fri, Mar 07, 2014 at 09:52:23AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 04, 2014 at 05:28:37PM +0100, Maxime Ripard wrote:
+> > The Allwinner A31 SoC using that IP has a reset controller maintaining
+> > it reset unless told otherwise.
+> > 
+> > Add some optional reset support to the driver.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> This appears to be causing some build errors in Olof's next builder
+> for many of the ARM platforms which make use of this:
+> 
+> drivers/i2c/busses/i2c-mv64xxx.c:924: undefined reference to `reset_control_assert'
+> drivers/i2c/busses/i2c-mv64xxx.c:904: undefined reference to `reset_control_assert'
+> drivers/i2c/busses/i2c-mv64xxx.c:771: undefined reference to `devm_reset_control_get'
+> drivers/i2c/busses/i2c-mv64xxx.c:778: undefined reference to `reset_control_deassert'
 
-Could still patches 9, 10 be queued for v3.15, or is arm-soc
-already closed for this merge windiw ?
+The reset framework doesn't define its functions when its not
+selected, and somehow I think it was not here. What's odd is that
+there is an explicit select on RESET_CONTROLLER in the Kconfig. Maybe
+it's the circular dependency issue that has been reported that cause
+this and Wolfram sent a patch for: http://patchwork.ozlabs.org/patch/327573/
 
---
-Thanks,
-Sylwester
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/5ce19d1e/attachment.sig>
