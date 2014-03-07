@@ -1,44 +1,47 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 15:09:06 +0200
-Subject: [PATCH 3/8] ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
+Date: Fri, 7 Mar 2014 15:09:09 +0200
+Subject: [PATCH 6/8] ARM: dts: omap4+: Add clocks to USB2 PHY node
 In-Reply-To: <1394197751-28984-1-git-send-email-rogerq@ti.com>
 References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394197751-28984-4-git-send-email-rogerq@ti.com>
+Message-ID: <1394197751-28984-7-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the sysconfig class bits for the Super Speed USB
-controllers
+The USB2 PHY driver expects named clocks for wakeup clock
+and reference clock. Provide this information for USB2 PHY
+nodes in OMAP4 and OMAP5 SoC DTS.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/omap4.dtsi | 2 ++
+ arch/arm/boot/dts/omap5.dtsi | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 3c9a430..cca24ad 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1752,8 +1752,20 @@ static struct omap_hwmod dra7xx_uart6_hwmod = {
-  *
-  */
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 4e15be5..2f6cfa6 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -608,6 +608,8 @@
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a0ad080 0x58>;
+ 				ctrl-module = <&omap_control_usb2phy>;
++				clocks = <&usb_phy_cm_clk32k>;
++				clock-names = "wkupclk";
+ 				#phy-cells = <0>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 521caab..bf629bb 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -769,6 +769,8 @@
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a084000 0x7c>;
+ 				ctrl-module = <&omap_control_usb2phy>;
++				clocks = <&usb_phy_cm_clk32k>, <&usb_otg_ss_refclk960m>;
++				clock-names = "wkupclk", "refclk";
+ 				#phy-cells = <0>;
+ 			};
  
-+static struct omap_hwmod_class_sysconfig dra7xx_usb_otg_ss_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_DMADISABLE | SYSC_HAS_MIDLEMODE |
-+			   SYSC_HAS_SIDLEMODE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
-+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
- static struct omap_hwmod_class dra7xx_usb_otg_ss_hwmod_class = {
- 	.name	= "usb_otg_ss",
-+	.sysc	= &dra7xx_usb_otg_ss_sysc,
- };
- 
- /* usb_otg_ss1 */
 -- 
 1.8.3.2
