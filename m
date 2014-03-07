@@ -1,58 +1,66 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 07 Mar 2014 20:09:03 +0800
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140306085213.GU643@mal.justgohome.co.uk>
-References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
- .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk>
-Message-ID: <20140307120903.6F0C9C40612@trevor.secretlab.ca>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 07 Mar 2014 19:35:40 +0000
+Subject: [PATCH v6 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1394020137-1830-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com> <
+ 1394020137-1830-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140307193540.72720C40DBA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Mar 2014 08:52:13 +0000, Robie Basak <robie.basak@canonical.com> wrote:
-> On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
-> > I would also reference section 3.3 (Boot Option Variables Default Boot
-> > Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
-> > restate the meaning of the requirement in this spec, but the UEFI spec
-> > is the authoritative source. Distributed VM disk images fall under the
-> > same scenario as the firmware not having any valid boot variables.
+On Wed,  5 Mar 2014 11:48:52 +0000, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> Some architectures do not share x86 simple view of the I/O space and
+> instead use a range of addresses that map to external devices. For PCI,
+> these ranges can be expressed by OF bindings in a device tree file.
 > 
-> What happens when the VM is first booted without boot variables, but
-> then the OS expects to be able to set boot variables and see them on
-> next boot?
+> Introduce a pci_register_io_range() helper function that can be used
+> by the architecture code to keep track of the io ranges described by the
+> PCI bindings.
 > 
-> AIUI, we don't have an implementation of this right now, and even if we
-> did, there are implications for persistent storage of this data further
-> up the stack (a required implementation in libvirt, OpenStack nova
-> providing a storage area for it, etc).
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+> ---
+>  drivers/of/address.c       | 5 +++++
+>  include/linux/of_address.h | 1 +
+>  2 files changed, 6 insertions(+)
 > 
-> If possible, I would prefer to mandate that the host implementation is
-> permitted to no-op (or otherwise disable) boot variable write operations
-> altogether to avoid having to deal with this. In the common case, I
-> don't see why an OS installation shipped via a VM disk image would need
-> to write boot variables anyway.
-
-If a VM is booting from a distributed disk image, the boot variables
-absolutely should start out empty. That's the only sane option.
-
-It is appropriate to implement boot variable storage, but only because
-it is needed if multiple OSes get installed. Those variables should not
-get distributed with a disk image.
-
-> Would there be any adverse consequences to doing this?
-
-It would be a bad idea to inhibit variable storage. That would break
-all kinds of boot and install scenarios.
-
-> My reason is that this would save us from blocking a general OpenStack
-> implementation on ARM by requiring that these pieces are implemented
-> further up the stack first, when it would bring actual gain to doing so.
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 1a54f1f..d1bb30f 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -619,6 +619,11 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+>  }
+>  EXPORT_SYMBOL(of_get_address);
+>  
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> +{
+> +	return 0;
+> +}
+> +
+>  unsigned long __weak pci_address_to_pio(phys_addr_t address)
+>  {
+>  	if (address > IO_SPACE_LIMIT)
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index 5f6ed6b..40c418d 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -56,6 +56,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+>  extern const __be32 *of_get_address(struct device_node *dev, int index,
+>  			   u64 *size, unsigned int *flags);
+>  
+> +extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+>  extern unsigned long pci_address_to_pio(phys_addr_t addr);
+>  
+>  extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+> -- 
+> 1.9.0
 > 
-> This would not preclude host implementations from implementing writeable
-> variables, or guests from using them. Just that for a _portable VM disk
-> image_, the OS on it cannot assume that this functionality is present.
-
-Yeah, just to restate what I mean. If you're talking about bringing up a
-portable disk image, the VM should start with an empty list of boot
-variables.
-
-g.
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
