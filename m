@@ -1,93 +1,171 @@
 From: dave.long@linaro.org (David Long)
-Date: Fri,  7 Mar 2014 15:10:27 -0500
-Subject: [PATCH v7 02/15] ARM: Fix missing includes in kprobes sources
+Date: Fri,  7 Mar 2014 15:10:35 -0500
+Subject: [PATCH v7 10/15] ARM: Change more ARM kprobes symbol names to
+ something more generic
 In-Reply-To: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
 References: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1394223040-17129-3-git-send-email-dave.long@linaro.org>
+Message-ID: <1394223040-17129-11-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Make sure includes in ARM kprobes sources are done explicitly. Do not
-rely on includes from other includes.
+Change kprobe_emulate_none, kprobe_simulate_nop, and arm_kprobe_decode_init
+function names to something more appropriate for code being shared
+outside of the kprobes subsystem. Also, move the new arm_probes_decode_init
+declaration out of the kprobes.h include file and into the probes.h include file.
 
 Signed-off-by: David A. Long <dave.long@linaro.org>
 Acked-by: Jon Medhurst <tixy@linaro.org>
 ---
- arch/arm/include/asm/kprobes.h     | 2 +-
- arch/arm/kernel/kprobes-common.c   | 3 +++
- arch/arm/kernel/kprobes-test-arm.c | 1 +
- arch/arm/kernel/kprobes-test.c     | 4 +++-
- arch/arm/kernel/kprobes.c          | 2 ++
- 5 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/kernel/kprobes-arm.c   | 12 ++++++------
+ arch/arm/kernel/kprobes-thumb.c | 10 +++++-----
+ arch/arm/kernel/kprobes.c       |  2 +-
+ arch/arm/kernel/kprobes.h       |  2 --
+ arch/arm/kernel/probes.c        |  6 +++---
+ arch/arm/kernel/probes.h        |  6 ++++--
+ 6 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
-index f82ec22..fd2e5ca 100644
---- a/arch/arm/include/asm/kprobes.h
-+++ b/arch/arm/include/asm/kprobes.h
-@@ -18,7 +18,7 @@
+diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
+index 09a7b1e..d01d9f5 100644
+--- a/arch/arm/kernel/kprobes-arm.c
++++ b/arch/arm/kernel/kprobes-arm.c
+@@ -302,10 +302,10 @@ emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(probes_opcode_t insn,
+ }
  
- #include <linux/types.h>
- #include <linux/ptrace.h>
--#include <linux/percpu.h>
-+#include <linux/notifier.h>
- 
- #define __ARCH_WANT_KPROBES_INSN_SLOT
- #define MAX_INSN_SIZE			2
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-index 18a7628..455c800 100644
---- a/arch/arm/kernel/kprobes-common.c
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -14,6 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- #include <asm/system_info.h>
-+#include <linux/types.h>
-+#include <linux/stddef.h>
-+#include <linux/bug.h>
- 
- #include "kprobes.h"
- 
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index 8393129..87839de 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <asm/system_info.h>
- 
- #include "kprobes-test.h"
- 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 0cd63d0..4a774d4 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -201,7 +201,9 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/kprobes.h>
--
-+#include <linux/errno.h>
-+#include <linux/stddef.h>
-+#include <linux/bug.h>
- #include <asm/opcodes.h>
- 
- #include "kprobes.h"
+ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+-	[PROBES_EMULATE_NONE] = {.handler = kprobe_emulate_none},
+-	[PROBES_SIMULATE_NOP] = {.handler = kprobe_simulate_nop},
+-	[PROBES_PRELOAD_IMM] = {.handler = kprobe_simulate_nop},
+-	[PROBES_PRELOAD_REG] = {.handler = kprobe_simulate_nop},
++	[PROBES_EMULATE_NONE] = {.handler = probes_emulate_none},
++	[PROBES_SIMULATE_NOP] = {.handler = probes_simulate_nop},
++	[PROBES_PRELOAD_IMM] = {.handler = probes_simulate_nop},
++	[PROBES_PRELOAD_REG] = {.handler = probes_simulate_nop},
+ 	[PROBES_BRANCH_IMM] = {.handler = simulate_blx1},
+ 	[PROBES_MRS] = {.handler = simulate_mrs},
+ 	[PROBES_BRANCH_REG] = {.handler = simulate_blx2bx},
+@@ -326,8 +326,8 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+ 	[PROBES_DATA_PROCESSING_IMM] = {
+ 		.handler = emulate_rd12rn16rm0rs8_rwflags},
+ 	[PROBES_MOV_HALFWORD] = {.handler = emulate_rd12rm0_noflags_nopc},
+-	[PROBES_SEV] = {.handler = kprobe_emulate_none},
+-	[PROBES_WFE] = {.handler = kprobe_simulate_nop},
++	[PROBES_SEV] = {.handler = probes_emulate_none},
++	[PROBES_WFE] = {.handler = probes_simulate_nop},
+ 	[PROBES_SATURATE] = {.handler = emulate_rd12rn16rm0_rwflags_nopc},
+ 	[PROBES_REV] = {.handler = emulate_rd12rm0_noflags_nopc},
+ 	[PROBES_MMI] = {.handler = emulate_rd12rn16rm0_rwflags_nopc},
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index 610d693..2a73330 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -613,8 +613,8 @@ const union decode_action kprobes_t16_actions[NUM_PROBES_T16_ACTIONS] = {
+ 	[PROBES_T16_SIGN_EXTEND] = {.handler = t16_emulate_loregs_rwflags},
+ 	[PROBES_T16_PUSH] = {.decoder = t16_decode_push},
+ 	[PROBES_T16_POP] = {.decoder = t16_decode_pop},
+-	[PROBES_T16_SEV] = {.handler = kprobe_emulate_none},
+-	[PROBES_T16_WFE] = {.handler = kprobe_simulate_nop},
++	[PROBES_T16_SEV] = {.handler = probes_emulate_none},
++	[PROBES_T16_WFE] = {.handler = probes_simulate_nop},
+ 	[PROBES_T16_IT] = {.decoder = t16_decode_it},
+ 	[PROBES_T16_CMP] = {.handler = t16_emulate_loregs_rwflags},
+ 	[PROBES_T16_ADDSUB] = {.handler = t16_emulate_loregs_noitrwflags},
+@@ -644,12 +644,12 @@ const union decode_action kprobes_t32_actions[NUM_PROBES_T32_ACTIONS] = {
+ 	[PROBES_T32_MOVW] = {.handler = t32_emulate_rd8rn16_noflags},
+ 	[PROBES_T32_SAT] = {.handler = t32_emulate_rd8rn16rm0_rwflags},
+ 	[PROBES_T32_BITFIELD] = {.handler = t32_emulate_rd8rn16_noflags},
+-	[PROBES_T32_SEV] = {.handler = kprobe_emulate_none},
+-	[PROBES_T32_WFE] = {.handler = kprobe_simulate_nop},
++	[PROBES_T32_SEV] = {.handler = probes_emulate_none},
++	[PROBES_T32_WFE] = {.handler = probes_simulate_nop},
+ 	[PROBES_T32_MRS] = {.handler = t32_simulate_mrs},
+ 	[PROBES_T32_BRANCH_COND] = {.decoder = t32_decode_cond_branch},
+ 	[PROBES_T32_BRANCH] = {.handler = t32_simulate_branch},
+-	[PROBES_T32_PLDI] = {.handler = kprobe_simulate_nop},
++	[PROBES_T32_PLDI] = {.handler = probes_simulate_nop},
+ 	[PROBES_T32_LDR_LIT] = {.handler = t32_simulate_ldr_literal},
+ 	[PROBES_T32_LDRSTR] = {.handler = t32_emulate_ldrstr},
+ 	[PROBES_T32_SIGN_EXTEND] = {.handler = t32_emulate_rd8rn16rm0_rwflags},
 diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index a7b621e..54e7b46 100644
+index b4a3028..bfd7b81 100644
 --- a/arch/arm/kernel/kprobes.c
 +++ b/arch/arm/kernel/kprobes.c
-@@ -27,6 +27,8 @@
- #include <linux/stringify.h>
- #include <asm/traps.h>
- #include <asm/cacheflush.h>
-+#include <linux/percpu.h>
-+#include <linux/bug.h>
+@@ -614,7 +614,7 @@ static struct undef_hook kprobes_arm_break_hook = {
  
+ int __init arch_init_kprobes()
+ {
+-	arm_kprobe_decode_init();
++	arm_probes_decode_init();
+ #ifdef CONFIG_THUMB2_KERNEL
+ 	register_undef_hook(&kprobes_thumb16_break_hook);
+ 	register_undef_hook(&kprobes_thumb32_break_hook);
+diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
+index d0530b1..e2ae4ed 100644
+--- a/arch/arm/kernel/kprobes.h
++++ b/arch/arm/kernel/kprobes.h
+@@ -57,8 +57,6 @@ enum kprobe_insn arm_kprobe_decode_insn(probes_opcode_t,
+ 
+ #endif
+ 
+-void __init arm_kprobe_decode_init(void);
+-
+ #include "probes.h"
+ 
+ #endif /* _ARM_KERNEL_KPROBES_H */
+diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
+index c1cdc0d..92d359a 100644
+--- a/arch/arm/kernel/probes.c
++++ b/arch/arm/kernel/probes.c
+@@ -76,7 +76,7 @@ void __init test_alu_write_pc_interworking(void)
+ #endif /* !test_alu_write_pc_interworking */
+ 
+ 
+-void __init arm_kprobe_decode_init(void)
++void __init arm_probes_decode_init(void)
+ {
+ 	find_str_pc_offset();
+ 	test_load_write_pc_interworking();
+@@ -175,13 +175,13 @@ probes_check_cc * const probes_condition_checks[16] = {
+ };
+ 
+ 
+-void __kprobes kprobe_simulate_nop(probes_opcode_t opcode,
++void __kprobes probes_simulate_nop(probes_opcode_t opcode,
+ 	struct arch_specific_insn *asi,
+ 	struct pt_regs *regs)
+ {
+ }
+ 
+-void __kprobes kprobe_emulate_none(probes_opcode_t opcode,
++void __kprobes probes_emulate_none(probes_opcode_t opcode,
+ 	struct arch_specific_insn *asi,
+ 	struct pt_regs *regs)
+ {
+diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
+index 5a0497f..dedff8a 100644
+--- a/arch/arm/kernel/probes.h
++++ b/arch/arm/kernel/probes.h
+@@ -24,6 +24,8 @@
+ #include <linux/kprobes.h>
  #include "kprobes.h"
- #include "patch.h"
+ 
++void __init arm_probes_decode_init(void);
++
+ #if __LINUX_ARM_ARCH__ >= 7
+ 
+ /* str_pc_offset is architecturally defined from ARMv7 onwards */
+@@ -131,9 +133,9 @@ static inline void __kprobes alu_write_pc(long pcv, struct pt_regs *regs)
+ }
+ 
+ 
+-void __kprobes kprobe_simulate_nop(probes_opcode_t, struct arch_specific_insn *,
++void __kprobes probes_simulate_nop(probes_opcode_t, struct arch_specific_insn *,
+ 		struct pt_regs *regs);
+-void __kprobes kprobe_emulate_none(probes_opcode_t, struct arch_specific_insn *,
++void __kprobes probes_emulate_none(probes_opcode_t, struct arch_specific_insn *,
+ 		struct pt_regs *regs);
+ 
+ enum kprobe_insn __kprobes
 -- 
 1.8.1.2
