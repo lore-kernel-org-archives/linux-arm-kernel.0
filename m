@@ -1,164 +1,72 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 08 Mar 2014 04:21:02 +0000
-Subject: [PATCHv3 2/4] net: phy: extend fixed driver with
- fixed_phy_register()
-In-Reply-To: <1393930704-24374-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1393930704-24374-1-git-send-email-thomas.petazzoni@
- free-electrons.com> <1393930704-24374-3-git-send-email-thomas.petazzoni@
- free-electrons.com>
-Message-ID: <20140308042102.9BAE6C41032@trevor.secretlab.ca>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 07 Mar 2014 20:19:17 +0800
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <531843EE.8040102@redhat.com>
+References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
+ .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
+ 8040102@redhat.com>
+Message-ID: <20140307121917.2872CC4081D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  4 Mar 2014 11:58:22 +0100, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> The existing fixed_phy_add() function has several drawbacks that
-> prevents it from being used as is for OF-based declaration of fixed
-> PHYs:
+On Thu, 06 Mar 2014 10:46:22 +0100, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> Il 06/03/2014 09:52, Robie Basak ha scritto:
+> > On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
+> >> I would also reference section 3.3 (Boot Option Variables Default Boot
+> >> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's fine to
+> >> restate the meaning of the requirement in this spec, but the UEFI spec
+> >> is the authoritative source. Distributed VM disk images fall under the
+> >> same scenario as the firmware not having any valid boot variables.
+> >
+> > What happens when the VM is first booted without boot variables, but
+> > then the OS expects to be able to set boot variables and see them on
+> > next boot?
 > 
->  * The address of the PHY on the fake bus needs to be passed, while a
->    dynamic allocation is desired.
+> UEFI scans the devices; looks for an EFI system partition on the disks; 
+> and builds a default boot order.
 > 
->  * Since the phy_device instantiation is post-poned until the next
->    mdiobus scan, there is no way to associate the fixed PHY with its
->    OF node, which later prevents of_phy_connect() from finding this
->    fixed PHY from a given OF node.
+> > If possible, I would prefer to mandate that the host implementation is
+> > permitted to no-op (or otherwise disable) boot variable write operations
+> > altogether to avoid having to deal with this. In the common case, I
+> > don't see why an OS installation shipped via a VM disk image would need
+> > to write boot variables anyway.
+> >
+> > Would there be any adverse consequences to doing this?
 > 
-> To solve this, this commit introduces fixed_phy_register(), which will
-> allocate an available PHY address, add the PHY using fixed_phy_add()
-> and instantiate the phy_device structure associated with the provided
-> OF node.
+> Given the experience on x86 UEFI, no.
+> 
+> Unlike bare metal, it is common to run UEFI VMs without persistent flash 
+> storage.  In this case the boot variables and boot order are rebuilt on 
+> the fly on every boot, and it just works for both Windows and Linux; 
+> there's no reason why it should be any different for ARM.
+> 
+> > My reason is that this would save us from blocking a general OpenStack
+> > implementation on ARM by requiring that these pieces are implemented
+> > further up the stack first, when it would bring actual gain to doing so.
+> >
+> > This would not preclude host implementations from implementing writeable
+> > variables, or guests from using them. Just that for a _portable VM disk
+> > image_, the OS on it cannot assume that this functionality is present.
+> 
+> This is already the case for most OSes.  Otherwise you wouldn't be able 
+> to move a hard disk from a (physical) machine to another.
+> 
+> I strongly suggest that you take a look at the work done in Tiano Core's 
+> OvmfPkg, which has support for almost every QEMU feature thanks to the 
+> work of Laszlo Ersek and Jordan Justen.
+> 
+> In particular, OvmfPkg has support for specifying a boot order in the VM 
+> configuration (which maps to the "-boot" option in QEMU).  In this case, 
+> the UEFI boot order is overridden by a variable that is placed in some 
+> architecture-specific firmware configuration mechanism (on x86 we have 
+> one called fw_cfg, on ARM you could look at the fdt).  This predates 
+> UEFI and is not a UEFI variable; in fact is is a list of OpenFirmware 
+> device paths.  UEFI will match the OF paths to UEFI paths, and use the 
+> result to build a UEFI boot order.
 
-The phy address assignment is a little naive, but that can be fixed in a
-follow-up patch (see below for a suggestion)
+I don't know why we wouldn't want to make the UEFI variable the
+mechanism for exposing VM boot order to UEFI and the OS. I do completely
+agree that the boot order should be owned by the VM and be able to be
+manipulated from the config file and command line.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
-
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/phy/fixed.c   | 61 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/phy_fixed.h | 11 +++++++++
->  2 files changed, 72 insertions(+)
-> 
-> diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
-> index 0f02403..82095cc 100644
-> --- a/drivers/net/phy/fixed.c
-> +++ b/drivers/net/phy/fixed.c
-> @@ -21,6 +21,7 @@
->  #include <linux/phy_fixed.h>
->  #include <linux/err.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->  
->  #define MII_REGS_NUM 29
->  
-> @@ -203,6 +204,66 @@ err_regs:
->  }
->  EXPORT_SYMBOL_GPL(fixed_phy_add);
->  
-> +void fixed_phy_del(int phy_addr)
-> +{
-> +	struct fixed_mdio_bus *fmb = &platform_fmb;
-> +	struct fixed_phy *fp, *tmp;
-> +
-> +	list_for_each_entry_safe(fp, tmp, &fmb->phys, node) {
-> +		if (fp->addr == phy_addr) {
-> +			list_del(&fp->node);
-> +			kfree(fp);
-> +			return;
-> +		}
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(fixed_phy_del);
-> +
-> +static int phy_fixed_addr;
-> +static DEFINE_SPINLOCK(phy_fixed_addr_lock);
-> +
-> +int fixed_phy_register(unsigned int irq,
-> +		       struct fixed_phy_status *status,
-> +		       struct device_node *np)
-> +{
-> +	struct fixed_mdio_bus *fmb = &platform_fmb;
-> +	struct phy_device *phy;
-> +	int phy_addr;
-> +	int ret;
-> +
-> +	/* Get the next available PHY address, up to PHY_MAX_ADDR */
-> +	spin_lock(&phy_fixed_addr_lock);
-> +	if (phy_fixed_addr == PHY_MAX_ADDR) {
-> +		spin_unlock(&phy_fixed_addr_lock);
-> +		return -ENOSPC;
-> +	}
-> +	phy_addr = phy_fixed_addr++;
-
-If this instead looked over the fixed mdio bus list then an unallocated
-address could be assigned without the global static.
-
-> +	spin_unlock(&phy_fixed_addr_lock);
-> +
-> +	ret = fixed_phy_add(PHY_POLL, phy_addr, status);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	phy = get_phy_device(fmb->mii_bus, phy_addr, false);
-> +	if (!phy || IS_ERR(phy)) {
-> +		fixed_phy_del(phy_addr);
-> +		return -EINVAL;
-> +	}
-> +
-> +	of_node_get(np);
-> +	phy->dev.of_node = np;
-> +
-> +	ret = phy_device_register(phy);
-> +	if (ret) {
-> +		phy_device_free(phy);
-> +		of_node_put(np);
-> +		fixed_phy_del(phy_addr);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int __init fixed_mdio_bus_init(void)
->  {
->  	struct fixed_mdio_bus *fmb = &platform_fmb;
-> diff --git a/include/linux/phy_fixed.h b/include/linux/phy_fixed.h
-> index 509d8f5..902e8a1 100644
-> --- a/include/linux/phy_fixed.h
-> +++ b/include/linux/phy_fixed.h
-> @@ -9,15 +9,26 @@ struct fixed_phy_status {
->  	int asym_pause;
->  };
->  
-> +struct device_node;
-> +
->  #ifdef CONFIG_FIXED_PHY
->  extern int fixed_phy_add(unsigned int irq, int phy_id,
->  			 struct fixed_phy_status *status);
-> +extern int fixed_phy_register(unsigned int irq,
-> +			      struct fixed_phy_status *status,
-> +			      struct device_node *np);
->  #else
->  static inline int fixed_phy_add(unsigned int irq, int phy_id,
->  				struct fixed_phy_status *status)
->  {
->  	return -ENODEV;
->  }
-> +extern int fixed_phy_register(unsigned int irq,
-> +			      struct fixed_phy_status *status,
-> +			      struct device_node *np)
-> +{
-> +	return -ENODEV;
-> +}
->  #endif /* CONFIG_FIXED_PHY */
->  
->  /*
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+g.
