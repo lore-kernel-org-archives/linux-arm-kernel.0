@@ -1,36 +1,34 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 12:15:04 +0200
-Subject: [PATCH v3 4/8] ARM: dts: omap5: Add clocks to USB3 PHY node
+Date: Fri, 7 Mar 2014 12:15:03 +0200
+Subject: [PATCH v3 3/8] phy: ti-pipe3: Add SATA compatible to Documentation
+ binding
 In-Reply-To: <1394187308-19622-1-git-send-email-rogerq@ti.com>
 References: <1394187308-19622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394187308-19622-5-git-send-email-rogerq@ti.com>
+Message-ID: <1394187308-19622-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB3 PHY driver now expects named clocks. Add the
-relevant clocks to the USB3 PHY node.
+SATA PHY needs a new compatible ID. Add it to the DT binding documentation.
 
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/phy/ti-phy.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 859a800..88bd327 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -779,6 +779,12 @@
- 				      <0x4a084c00 0x40>;
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
- 				ctrl-module = <&omap_control_usb3phy>;
-+				clocks = <&usb_phy_cm_clk32k>,
-+					 <&sys_clkin>,
-+					 <&usb_otg_ss_refclk960m>;
-+				clock-names =	"wkupclk",
-+						"sysclk",
-+						"refclk";
- 				#phy-cells = <0>;
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+index 96ba29e..4ab9cb1 100644
+--- a/Documentation/devicetree/bindings/phy/ti-phy.txt
++++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+@@ -53,7 +53,8 @@ usb2phy at 4a0ad080 {
+ TI PIPE3 PHY
+ 
+ Required properties:
+- - compatible: Should be "ti,phy-usb3". "ti,omap-usb3" is deprecated.
++ - compatible: Should be "ti,phy-usb3" or "ti,phy-pipe3-sata".
++   "ti,omap-usb3" is deprecated.
+  - reg : Address and length of the register set for the device.
+  - reg-names: The names of the register addresses corresponding to the registers
+    filled in "reg".
 -- 
 1.8.3.2
