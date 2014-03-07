@@ -1,91 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Mar 2014 01:09:50 +0000
-Subject: [PATCH v6 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-In-Reply-To: <201403070137.38621.arnd@arndb.de>
-References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
- <1394020150-1875-2-git-send-email-Liviu.Dudau@arm.com>
- <20140305233135.GZ21483@n2100.arm.linux.org.uk>
- <201403070137.38621.arnd@arndb.de>
-Message-ID: <20140307010950.GE21483@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Mar 2014 09:26:48 +0800
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <20140226145345.GG1872@titan.lakedaemon.net>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+ <20140226000940.GF1872@titan.lakedaemon.net>
+ <CACRpkdYQa2BG_qxf5zY=7rks6O31ZF-BX0af3_u1MOgwfwxFSQ@mail.gmail.com>
+ <20140226145345.GG1872@titan.lakedaemon.net>
+Message-ID: <CACRpkdZRJG-TzN4c3NSH9PqcQzpo6EbEn5_bM-P3sh4_vSjtaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 01:37:38AM +0100, Arnd Bergmann wrote:
-> On Thursday 06 March 2014, Russell King - ARM Linux wrote:
-> > On Wed, Mar 05, 2014 at 11:49:08AM +0000, Liviu Dudau wrote:
-> > > The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
-> > > is wrong. It returns a mapped (i.e. virtual) address that can start from
-> > > zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
-> > > architectures that use !CONFIG_GENERIC_MAP define.
-> > 
-> > What value does PCI_IOBASE and IO_SPACE_LIMIT have on other architectures
-> > who make use of asm-generic/io.h ?
-> > 
-> > $ git grep asm-generic/io.h arch/
-> > arch/arc/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> PCI support hasn't been upstreamed.
-> 
-> > arch/blackfin/include/asm/io.h:#include <asm-generic/io.h>
-> > arch/metag/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> No PCI support
-> 
-> > arch/microblaze/include/asm/io.h:/* from asm-generic/io.h */
-> 
-> PCI_IOBASE=0, IO_SPACE_LIMIT=0xffffffff, so no change.
+On Wed, Feb 26, 2014 at 10:53 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Wed, Feb 26, 2014 at 10:43:45AM +0100, Linus Walleij wrote:
 
-Seems to define _IO_BASE not PCI_IOBASE.
+>> Actually, I'd prefer to pull it in, rebase and sign off each patch
+>> individually in my tree if that is not causing you problems.
+>
+> Actually, that would mess us up pretty badly. :(
 
-> > arch/openrisc/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> No PCI support
-> 
-> > arch/s390/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> s390 supports PCI but no I/O space
-> 
-> > arch/score/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> No PCI support
-> 
-> > arch/unicore32/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> unicore32 is broken currently, the patch fixes it.
-> 
-> > arch/xtensa/include/asm/io.h:#include <asm-generic/io.h>
-> 
-> PCI_IOBASE=0, IO_SPACE_LIMIT=0xffffffff, so no change.
+OK so I didn't do this, I just pulled it in :-)
 
-Doesn't appear to define PCI_IOBASE.
+>> That way it is visible that the patches were funneled through pin
+>> control.
+>
+> I'm a little confused by this.  Once you merge the branch into one of
+> yours, that merge commit is a part of the history.
 
-Maybe there's other patches required for these?
+Yes this has been discussed in the past. But when a developer
+bisects down to a certain commit and just looks at it with
+git log there is no telling which subsystem this thing came from
+and who actually funnelled it to Torvalds.
 
-> For most of these, I assume we actually want to remove support
-> for inb/outb as they don't support I/O space accesses. The other
-> ones look correct to me.
+I do know you *can* find that out with some git magic, the problem
+is that it is so magic that most developers don't know it and just
+look at the signoffs.
 
-Right, so:
+But it's not like I care super-much.
 
-#ifdef CONFIG_HAS_IOPORT
-#ifndef CONFIG_GENERIC_IOMAP
-static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
-{
-        return (void __iomem *) port;
-}
-
-changing that to include PCI_IOBASE in there will result in a build
-failure if the C compiler sees that.  In other words, when HAS_IOPORT=y
-and GENERIC_IOMAP=n.
-
-HAS_IOPORT is set when HAS_IOMEM is also set and NO_IOPORT unset.
-
-It looks to me like blackfin doesn't set NO_IOPORT nor NO_IOMEM, so
-this would have HAS_IOPORT set, and from what I can see doesn't set
-GENERIC_IOMAP.  So, this change probably breaks blackfin.
-
-I haven't looked deeply at the others.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Yours,
+Linus Walleij
