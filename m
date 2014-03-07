@@ -1,44 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Mar 2014 19:22:13 +0100
-Subject: [PATCH 6/7] regulator: AXP20x: Add support for regulators
- subsystem
-In-Reply-To: <1393692352-10839-7-git-send-email-carlo@caione.org>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
-Message-ID: <20140307182213.GC607@lukather>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 7 Mar 2014 10:28:57 -0800
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <20140307175612.GR21483@n2100.arm.linux.org.uk>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140307175612.GR21483@n2100.arm.linux.org.uk>
+Message-ID: <20140307182857.GB6963@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
-> +static struct platform_driver axp20x_regulator_driver = {
-> +	.probe	= axp20x_regulator_probe,
-> +	.remove	= axp20x_regulator_remove,
-> +	.driver	= {
-> +		.name		= "axp20x-regulator",
-> +		.owner		= THIS_MODULE,
-> +	},
-> +};
-> +
-> +static int __init axp20x_regulator_init(void)
-> +{
-> +	return platform_driver_register(&axp20x_regulator_driver);
-> +}
-> +
-> +subsys_initcall(axp20x_regulator_init);
+On Fri, Mar 07, 2014 at 05:56:12PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
+> > Hi,
+> > 
+> > this latest version of the imx-drm DT binding patches applies
+> > on top of staging-next and also depends on the OF graph binding
+> > patchset that moves the v4l2_of helpers to drivers/of.
+> > Currently, the two patchsets are also available at:
+> >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
+> >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
+> 
+> Okay, having looked at the second tree, pulling that will result in
+> pulling in all of the staging tree here, which I'd rather not do.  Unless
+> there's any objection, I'd like to take these as patches on top of the
+> imx-drm stuff which I sent to Greg plus the of-graph stuff which they
+> depend upon.  In other words, exactly how I've been testing it today.
+> 
+> Any objections?
 
-Hmmm, really?
-
-I thought the AXP was only connected through I2C? How is that a
-platform device then?
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/f0704cd2/attachment.sig>
+None from me!  :)
