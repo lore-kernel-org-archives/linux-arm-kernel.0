@@ -1,67 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Mar 2014 17:02:41 +0100
-Subject: [PATCH 4/7] of: configure the platform device dma_mask and
- dma_pfn_offset
-In-Reply-To: <53194817.70802@ti.com>
-References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
- <CAL_Jsq+Y8w0sLLdh5vcWMnW3ohEafAFRWubtCK66P1axsf1wRA@mail.gmail.com>
- <53194817.70802@ti.com>
-Message-ID: <201403071702.41716.arnd@arndb.de>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 7 Mar 2014 08:05:35 -0800
+Subject: [PATCH 0/7] pinctrl-msm cleanups
+In-Reply-To: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
+References: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAJAp7OhjkdW92PKk8xwkHSLx260Y_--ed5cePrk6cMe=k3RAXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 March 2014, Santosh Shilimkar wrote:
-> >> +
-> >> +       ret = dma_set_mask(dev, dma_mask);
-> >> +       if (ret < 0) {
-> >> +               dev_err(dev, "failed to set DMA mask %pad\n", &dma_mask);
-> >> +               dev->dma_mask = NULL;
-> >> +               return;
-> >> +       }
-> >> +
-> >> +       dev_dbg(dev, "dma_pfn_offset(%#08lx) dma_mask(%pad)\n",
-> >> +               dev->dma_pfn_offset, dev->dma_mask);
-> >> +
-> >> +       ret = dma_set_coherent_mask(dev, dma_mask);
-> > 
-> > I think these 2 calls belong in the drivers, not here.
-> > 
-> I also had same initial thought but Arnd mentioned that its a
-> shared responsibility between ARCH and drivers. Driver which
-> could be common between arches not always have the correct
-> mask information and it can change based on which arch it
-> is running.
-> 
-> With some discussion back and forth, we thought updating
-> the dma_mask while the device getting created, would be
-> better place since we can find the arch capability at
-> this centralise code and update it.
-> 
-> Ofcourse its bit debatable as the question you asked is
-> bit obvious as well. I let Arnd give his view here.
+On Thu, Mar 6, 2014 at 10:44 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Here are some small fixes and cleanups for the msm pinctrl
+> driver.
+>
+> Stephen Boyd (7):
+>   pinctrl: msm: Silence recursive lockdep warning
+>   pinctrl: msm: Check for ngpios > MAX_NR_GPIO
+>   pinctrl: msm: Drop unused includes
+>   pinctrl: msm: Drop OF_IRQ dependency
+>   pinctrl: msm: Replace lookup tables with math
+>   pinctrl: msm: Remove impossible WARN_ON()s
+>   pinctrl: msm: Simplify msm_config_reg() and callers
+>
+>  drivers/pinctrl/Kconfig           |  2 +-
+>  drivers/pinctrl/pinctrl-msm.c     | 73 ++++++++++++++-------------------------
+>  drivers/pinctrl/pinctrl-msm.h     |  5 +--
+>  drivers/pinctrl/pinctrl-msm8x74.c |  1 -
+>  4 files changed, 27 insertions(+), 54 deletions(-)
 
-If we set the mask *here*, we probably don't want to call 'dma_set_mask', but
-write to the mask directly, or we could call dma_coerce_mask_and_coherent(),
-which is really for overriding the mask pointer and value at once in cases
-where you absolutely know what it should be.
+Looks good
 
-We do need to decide what interface we want to use in platform device drivers,
-and I'm hoping that Russell has some idea which one he prefers:
-
-a) Follow what we do for PCI devices: assume that we can do DMA_MASK(32)
-on any device, and have drivers call dma_set_mask(DMA_MASK(64)) on devices
-that would like to do more than that, or call e.g. dma_set_mask(DMA_MASK(28))
-for devices that can do less than 32 bit, as given in the argument. This
-approach would be most consistent with the way PCI works, but it doesn't
-really work well for the case where the mask is less than 32-bit and the
-device driver doesn't know that.
-
-b) Never have to call dma_set_mask() for platform devices and assume that the
-platform code sets it up correctly. This would probably be the simpler
-solution, and I can't think of any downsides at the moment.
-
-In either case we probably want to call something like dt_dma_configure()
-from dma_set_mask() again to make sure that we stay within the limits
-imposed by the bus structure.
-
-	Arnd
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
