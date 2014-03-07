@@ -1,87 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Mar 2014 14:43:15 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix circular dependencies warning and
- compilation breakage
-In-Reply-To: <20140307111858.GB12274@katana>
-References: <20140307111858.GB12274@katana>
-Message-ID: <1394199795-5516-1-git-send-email-maxime.ripard@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Mar 2014 08:46:16 -0500
+Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
+In-Reply-To: <CACRpkdbEQSj7jLWT2BFR22m7phwmyKCByhQuFFgHvHoKvQFD5g@mail.gmail.com>
+References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140306201803.GL1872@titan.lakedaemon.net>
+ <CACRpkda0JCLZUv_KPmwucDh3ko2YbtG2ukMMscSodAbBpiY+zw@mail.gmail.com>
+ <20140307035056.GQ1872@titan.lakedaemon.net>
+ <CACRpkdbEQSj7jLWT2BFR22m7phwmyKCByhQuFFgHvHoKvQFD5g@mail.gmail.com>
+Message-ID: <20140307134616.GR1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the circular dependency introduced by commit 370136bc67c3
-("i2c: mv64xxx: Add reset deassert call"):
+On Fri, Mar 07, 2014 at 11:56:11AM +0800, Linus Walleij wrote:
+> On Fri, Mar 7, 2014 at 11:50 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Fri, Mar 07, 2014 at 11:48:25AM +0800, Linus Walleij wrote:
+> >> On Fri, Mar 7, 2014 at 4:18 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> >> > On Wed, Mar 05, 2014 at 01:03:10AM +0100, Sebastian Hesselbarth wrote:
+> >> >> Pinctrl will WARN on missing DT resources, which is a little bit too
+> >> >> noisy. Use dev_warn with FW_BUG instead.
+> >> >>
+> >> >> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >> >> ---
+> >> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> >> Cc: Andrew Lunn <andrew@lunn.ch>
+> >> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> >> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >> >> Cc: devicetree at vger.kernel.org
+> >> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> >> Cc: linux-kernel at vger.kernel.org
+> >> >> ---
+> >> >>  drivers/pinctrl/mvebu/pinctrl-dove.c | 3 ++-
+> >> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >> >
+> >> > Applied to mvebu/pinctrl
+> >>
+> >> So are you carrying this patch, or shall I apply it to my tree?
+> >>
+> >> In the former case: Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > I'll send you a pull tomorrow.
+> 
+> For a single patch?
 
-drivers/video/Kconfig:42:error: recursive dependency detected!
+Well, just the doc change and WARN change.  I've already taken the dts
+change into mvebu/dt (for arm-soc).
 
-Since the reset framework doesn't define dummy stubs whenever
-CONFIG_RESET_CONTROLLER is not defined, it's the only sane way to have a driver
-that compiles in any cases.
+There should be no need for these two to be in mvebu's for-next, so if
+it's easier for you to pick them, please do so.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/i2c/busses/Kconfig       |  1 -
- drivers/i2c/busses/i2c-mv64xxx.c | 22 +++++++++++++---------
- 2 files changed, 13 insertions(+), 10 deletions(-)
+I'll drop them from mvebu/pinctrl and update mvebu's for-next right now.
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 70bcad9..f5ed031 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -528,7 +528,6 @@ config I2C_MPC
- config I2C_MV64XXX
- 	tristate "Marvell mv64xxx I2C Controller"
- 	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
--	select RESET_CONTROLLER
- 	help
- 	  If you say yes to this option, support will be included for the
- 	  built-in I2C interface on the Marvell 64xxx line of host bridges.
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 203a548..a1dc99b 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -768,14 +768,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
- 	}
- 	drv_data->irq = irq_of_parse_and_map(np, 0);
- 
--	drv_data->rstc = devm_reset_control_get(dev, NULL);
--	if (IS_ERR(drv_data->rstc)) {
--		if (PTR_ERR(drv_data->rstc) == -EPROBE_DEFER) {
--			rc = -EPROBE_DEFER;
--			goto out;
-+	if (IS_ENABLED(CONFIG_RESET_CONTROLLER)) {
-+		drv_data->rstc = devm_reset_control_get(dev, NULL);
-+		if (IS_ERR(drv_data->rstc)) {
-+			if (PTR_ERR(drv_data->rstc) == -EPROBE_DEFER) {
-+				rc = -EPROBE_DEFER;
-+				goto out;
-+			}
-+		} else {
-+			reset_control_deassert(drv_data->rstc);
- 		}
--	} else {
--		reset_control_deassert(drv_data->rstc);
- 	}
- 
- 	/* Its not yet defined how timeouts will be specified in device tree.
-@@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
- exit_free_irq:
- 	free_irq(drv_data->irq, drv_data);
- exit_reset:
--	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
-+	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-+	    !IS_ERR(drv_data->rstc))
- 		reset_control_assert(drv_data->rstc);
- exit_clk:
- #if defined(CONFIG_HAVE_CLK)
-@@ -920,7 +923,8 @@ mv64xxx_i2c_remove(struct platform_device *dev)
- 
- 	i2c_del_adapter(&drv_data->adapter);
- 	free_irq(drv_data->irq, drv_data);
--	if (dev->dev.of_node && !IS_ERR(drv_data->rstc))
-+	if (dev->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-+	    !IS_ERR(drv_data->rstc))
- 		reset_control_assert(drv_data->rstc);
- #if defined(CONFIG_HAVE_CLK)
- 	/* Not all platforms have a clk */
--- 
-1.9.0
+thx,
+
+Jason.
