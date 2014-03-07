@@ -1,163 +1,132 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 7 Mar 2014 10:38:13 +0100
-Subject: [PATCH] ath6kl: sdio: fix system panic when doing wifi stress test
-In-Reply-To: <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <1384221185-8645-1-git-send-email-r64343@freescale.com>
- <87k3fvjvjg.fsf@kamboji.qca.qualcomm.com>
- <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <20140307093813.GA28728@pengutronix.de>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Fri,  7 Mar 2014 10:41:12 +0100
+Subject: [PATCH v2 5/5] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <1394185272-26054-1-git-send-email-maxime.coquelin@st.com>
+References: <1394185272-26054-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1394185272-26054-6-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+B2120 HDK is the reference board for STiH407 SoC.
+It has the following characteristics:
+ - 1GB DDR3
+ - 8GB eMMC / SD-Card slot
+ - 32MB NOR Flash
+ - 1 x Gbit Ethernet
+ - 1 x USB 3.0 port
+ - 1 x Mini-PCIe
+ - 1 x SATA
+ - 1 x HDMI output
+ - 1 x HDMI input
+ - 1 x SPDIF
 
-On Fri, Nov 29, 2013 at 06:02:11AM +0000, Hui Liu wrote:
-> > -----Original Message-----
-> > From: Kalle Valo [mailto:kvalo at qca.qualcomm.com]
-> > Sent: Tuesday, November 26, 2013 6:40 PM
-> > To: Liu Hui-R64343
-> > Cc: linux-arm-kernel at lists.infradead.org; linville at tuxdriver.com; linux-
-> > wireless at vger.kernel.org; netdev at vger.kernel.org; linux-
-> > kernel at vger.kernel.org; ath6kl-devel at qca.qualcomm.com
-> > Subject: Re: [PATCH] ath6kl: sdio: fix system panic when doing wifi
-> > stress test
-> > 
-> > Hi Jason,
-> > 
-> > Jason Liu <r64343@freescale.com> writes:
-> > 
-> > > When did the wifi iperf test, meet one following kernel panic:
-> > > command: iperf -c $TARGET_IP -i 5 -t 50 -w 1M
-> > >
-> > > Unable to handle kernel paging request at virtual address 1a480000 pgd
-> > > = 80004000 [1a480000] *pgd=00000000 Internal error: Oops: 805 [#1] SMP
-> > > ARM
-> > 
-> > [...]
-> > 
-> > > The kernel panic is caused by the sg_buf is not set correctly with the
-> > > following code when compiled with Yocto GCC 4.8.1:
-> > >
-> > > drivers/net/wireless/ath/ath6kl/hif.h:
-> > > struct hif_scatter_req {
-> > >         struct list_head list;
-> > >         /* address for the read/write operation */
-> > >         u32 addr;
-> > > 	...
-> > >
-> > >         /* bounce buffer for upper layers to copy to/from */
-> > >         u8 *virt_dma_buf;
-> > >
-> > >         struct hif_scatter_item scat_list[1];
-> > >
-> > >         u32 scat_q_depth;
-> > > };
-> > >
-> > > (Note: the scat_req.scat_list[] will dynamiclly grow with run-time)
-> > 
-> > There's actually a major bug right there, scat_list can corrupt
-> > scat_q_depth.
-> > 
-> > > The GCC 4.8.1 compiler will not do the for-loop till scat_entries,
-> > > instead, it only run one round loop. This may be caused by that the
-> > > GCC 4.8.1 thought that the scat_list only have one item and then no
-> > > need to do full iteration, but this is simply wrong by looking at the
-> > > assebly code. This will cause the sg buffer not get set when
-> > scat_entries > 1 and thus lead to kernel panic.
-> > >
-> > > This patch is a workaround to the GCC 4.8.1 complier issue by passing
-> > > the entry address of the scat_req->scat_list to the for-loop and
-> > > interate it, then, GCC 4.8.1 will do the full for-loop correctly.
-> > > (Note: This issue not observed with GCC 4.7.2, only found on the GCC
-> > > 4.8.1)
-> > >
-> > > This patch does not change any function logic and no any performance
-> > downgrade.
-> > 
-> > [...]
-> > 
-> > > +	scat_list = &scat_req->scat_list[0];
-> > > +
-> > >  	/* assemble SG list */
-> > > -	for (i = 0; i < scat_req->scat_entries; i++, sg++) {
-> > > +	for (i = 0; i < scat_req->scat_entries; i++, sg++, scat_list++) {
-> > >  		ath6kl_dbg(ATH6KL_DBG_SCATTER, "%d: addr:0x%p, len:%d\n",
-> > > -			   i, scat_req->scat_list[i].buf,
-> > > -			   scat_req->scat_list[i].len);
-> > > +			   i, scat_list->buf, scat_list->len);
-> > >
-> > > -		sg_set_buf(sg, scat_req->scat_list[i].buf,
-> > > -			   scat_req->scat_list[i].len);
-> > > +		sg_set_buf(sg, scat_list->buf, scat_list->len);
-> > >  	}
-> > 
-> > Working around the problem by adding a temporary variable makes me a bit
-> > worried, I would rather fix the root cause. Is the root cause by that we
-> > define the field with scat_list[1]?
-> 
-> Yes, this is what I assumed. 
-> 
-> > 
-> > Does the patch below help? It would also fix the corruption with
-> > scat_q_depth. Please note that I have only compile tested it. And I might
-> > have also missed something important, so please review it carefully.
-> 
-> Yes, Firstly, I have looked at the asm code and the compiler(gcc 4.8.1) works correctly after applying
-> the following patch. Secondly, I have tested the patch with compiler(gcc 4.8.1) on the real HW, and it
-> works fine too. Without the patch, the kernel crash will happen 100%.
-> 
-> Thus, for the patch:
-> 
-> Acked-by: Jason Liu <r64343@freescale.com>
-> Tested-by: Jason Liu <r64343@freescale.com>
-> 
-> Jason Liu
-> 
-> > 
-> > --- a/drivers/net/wireless/ath/ath6kl/hif.h
-> > +++ b/drivers/net/wireless/ath/ath6kl/hif.h
-> > @@ -197,9 +197,9 @@ struct hif_scatter_req {
-> >  	/* bounce buffer for upper layers to copy to/from */
-> >  	u8 *virt_dma_buf;
-> > 
-> > -	struct hif_scatter_item scat_list[1];
-> > -
-> >  	u32 scat_q_depth;
-> > +
-> > +	struct hif_scatter_item scat_list[0];
-> >  };
-> > 
-> >  struct ath6kl_irq_proc_registers {
-> > diff --git a/drivers/net/wireless/ath/ath6kl/sdio.c
-> > b/drivers/net/wireless/ath/ath6kl/sdio.c
-> > index 7126bdd..6bf15a3 100644
-> > --- a/drivers/net/wireless/ath/ath6kl/sdio.c
-> > +++ b/drivers/net/wireless/ath/ath6kl/sdio.c
-> > @@ -348,7 +348,7 @@ static int ath6kl_sdio_alloc_prep_scat_req(struct
-> > ath6kl_sdio *ar_sdio,
-> >  	int i, scat_req_sz, scat_list_sz, size;
-> >  	u8 *virt_buf;
-> > 
-> > -	scat_list_sz = (n_scat_entry - 1) * sizeof(struct hif_scatter_item);
-> > +	scat_list_sz = n_scat_entry * sizeof(struct hif_scatter_item);
-> >  	scat_req_sz = sizeof(*s_req) + scat_list_sz;
-> > 
-> >  	if (!virt_scat)
-> > 
-> > 
-> > --
-> > Kalle Valo
-> 
+This patch only introduces basic functionnalities, such as I2C and UART.
 
-What happend with this?
-If I look in mainline, I don't find it. At least the reording of the struct
-fields looks as if one definitely wants to have that.
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+---
+ arch/arm/boot/dts/Makefile          |  3 +-
+ arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
 
-Regards,
-Steffen
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d109908..c8ad5f5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -310,7 +310,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+ 	stih416-b2000.dtb \
+ 	stih415-b2020.dtb \
+-	stih416-b2020.dtb
++	stih416-b2020.dtb \
++	stih407-b2120.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+new file mode 100644
+index 0000000..9c97da4
+--- /dev/null
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2014 STMicroelectronics (R&D) Limited.
++ * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stih407.dtsi"
++/ {
++	model = "STiH407 B2120";
++	compatible = "st,stih407", "st,stih407-b2120";
++
++	chosen {
++		bootargs = "console=ttyAS0,115200";
++		linux,stdout-path = &sbc_serial0;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x80000000>;
++	};
++
++	aliases {
++		ttyAS0 = &sbc_serial0;
++	};
++
++	soc {
++		sbc_serial0: serial at 9530000 {
++			status = "okay";
++		};
++
++		leds {
++			compatible = "gpio-leds";
++			red {
++				#gpio-cells = <2>;
++				label = "Front Panel LED";
++				gpios = <&PIO4 1 0>;
++				linux,default-trigger = "heartbeat";
++			};
++			green {
++				#gpio-cells = <2>;
++				gpios = <&PIO1 3 0>;
++				default-state = "off";
++			};
++		};
++
++		i2c at 9842000 {
++			status = "okay";
++		};
++
++		i2c at 9843000 {
++			status = "okay";
++		};
++
++		i2c at 9844000 {
++			status = "okay";
++		};
++
++		i2c at 9845000 {
++			status = "okay";
++		};
++
++		i2c at 9540000 {
++			status = "okay";
++		};
++
++		/* SSC11 to HDMI */
++		i2c at 9541000 {
++			status = "okay";
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			st,i2c-min-scl-pulse-width-us = <0>;
++			st,i2c-min-sda-pulse-width-us = <5>;
++		};
++	};
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.0
