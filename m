@@ -1,48 +1,51 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 07 Mar 2014 18:45:15 +0100
-Subject: [PATCH 1/2] imx-drm: imx-ldb: Add drm_panel support
-In-Reply-To: <20140307172243.GQ21483@n2100.arm.linux.org.uk>
-References: <1394114080-27223-1-git-send-email-p.zabel@pengutronix.de>
- <20140307172243.GQ21483@n2100.arm.linux.org.uk>
-Message-ID: <1394214315.16309.47.camel@paszta.hi.pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 7 Mar 2014 18:54:33 +0100
+Subject: [PATCH] video: atmel_lcdfb: ensure the hardware is initialized
+ with the correct mode
+In-Reply-To: <1394209254-23797-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394209254-23797-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140307175433.GA2918@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-Am Freitag, den 07.03.2014, 17:22 +0000 schrieb Russell King - ARM
-Linux:
-> On Thu, Mar 06, 2014 at 02:54:39PM +0100, Philipp Zabel wrote:
-> > This patch allows to optionally attach the lvds-channel to a panel
-> > supported by a drm_panel driver instead of supplying the modes via
-> > device tree.
+On 07/03/2014 at 17:20:54 +0100, Antoine T?nart wrote :
+> If no driver takeover the atmel_lcdfb, the lcd won't be in a working state
+> since atmel_lcdfb_set_par() will never be called. Enabling a driver which does,
+> like fbcon, will call the function and put atmel_lcdfb in a working state.
 > 
-> Hmm, I think something may be missing in this patch... you're introducing
-> calls into the drm panel code, but there's nothign which ensures that
-> code gets built alongside imx-ldb.c.  With imx-ldb built as a module,
-> I get:
+> Fixes: b985172b328a (video: atmel_lcdfb: add device tree suport)
 > 
-> ERROR: "drm_panel_attach" [drivers/staging/imx-drm/imx-ldb.ko] undefined!
-> ERROR: "of_drm_find_panel" [drivers/staging/imx-drm/imx-ldb.ko] undefined!
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Thanks for testing. Yes, this Kconfig change is missing from patch 1:
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/drivers/staging/imx-drm/Kconfig
-b/drivers/staging/imx-drm/Kconfig
-index 82fb758..8e5b7e9 100644
---- a/drivers/staging/imx-drm/Kconfig
-+++ b/drivers/staging/imx-drm/Kconfig
-@@ -35,6 +35,7 @@ config DRM_IMX_TVE
- config DRM_IMX_LDB
- 	tristate "Support for LVDS displays"
- 	depends on DRM_IMX && MFD_SYSCON
-+	select DRM_PANEL
- 	help
- 	  Choose this to enable the internal LVDS Display Bridge (LDB)
- 	  found on i.MX53 and i.MX6 processors.
+> ---
+>  drivers/video/atmel_lcdfb.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index cd96162..b74e5f5d 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -1298,6 +1298,12 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>  		goto unregister_irqs;
+>  	}
+>  
+> +	ret = atmel_lcdfb_set_par(info);
+> +	if (ret < 0) {
+> +		dev_err(dev, "set par failed: %d\n", ret);
+> +		goto unregister_irqs;
+> +	}
+> +
+>  	dev_set_drvdata(dev, info);
+>  
+>  	/*
+> -- 
+> 1.8.3.2
+> 
 
-I haven't noticed because I've enabled the parallel display driver,
-which does correctly select DRM_PANEL.
-
-regards
-Philipp
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
