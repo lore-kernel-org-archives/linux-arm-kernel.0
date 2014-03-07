@@ -1,28 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Mar 2014 16:08:36 +0000
-Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
-In-Reply-To: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140307160836.GM21483@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Mar 2014 17:09:11 +0100
+Subject: [PATCH 3/7] of: introduce of_dma_is_coherent() helper
+In-Reply-To: <531948A8.9040106@ti.com>
+References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_JsqJ3QhRRNVAsvAPP=Ex_ptQcbpCXh7pf44K1xh+scFqiug@mail.gmail.com>
+ <531948A8.9040106@ti.com>
+Message-ID: <201403071709.11568.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
-> @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  exit_free_irq:
->  	free_irq(drv_data->irq, drv_data);
->  exit_reset:
-> -	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
-> +	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-> +	    !IS_ERR(drv_data->rstc))
->  		reset_control_assert(drv_data->rstc);
+On Friday 07 March 2014, Santosh Shilimkar wrote:
+> On Friday 07 March 2014 11:55 AM, Rob Herring wrote:
+>
+> > Thinking about this some more, if the arch is always coherent or
+> > always non-coherent, then the default ops are always fine. In that
+> > case set_arch_dma_coherent_ops is always a nop and of_dma_is_coherent
+> > is a don't care.
+> > 
+> Hmmm.. I guess you are right. In that case we can drop the need of
+> config option.
 
-Another question is... why do we need to check pd->dev.of_node here?
-If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
-controller node, so drv_data->rstc is either going to be a valid
-pointer, or it's going to be an error pointer - neither
-reset_control_get() nor devm_reset_control_get return NULL.
+A compile-time config option clearly would not work here, because it
+breaks multiplatform support when some platforms are different from
+others. I can still see the possible need for a global run-time setting
+though, to give some platform init code the ability to override the
+DT flags when it knows better. That is probably what you want to do
+on keystone without LPAE.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+	Arnd
