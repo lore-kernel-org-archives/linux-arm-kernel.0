@@ -1,43 +1,51 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 15:09:03 +0200
-Subject: [PATCH 0/8] USB support for DRA7-evm
-Message-ID: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+Date: Fri, 7 Mar 2014 15:09:04 +0200
+Subject: [PATCH 1/8] CLK: ti: dra7: Initialize USB_DPLL
+In-Reply-To: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+Message-ID: <1394197751-28984-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+USB_DPLL must be initialized and locked at boot so that
+USB modules can work.
 
-This series enables the 2 USB ports on the DRA7-evm.
+Also program USB_DLL_M2 output to half rate.
 
-Patches are based on on 3.14-rc4 with balbi/next, linux-phy/next,
-omap-for-v3.15/dt merged and [1] applied.
-
-[1] - http://article.gmane.org/gmane.linux.drivers.devicetree/65223.
-
-cheers,
--roger
-
+CC: Mike Turquette <mturquette@linaro.org>
+CC: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
-Roger Quadros (8):
-  CLK: ti: dra7: Initialize USB_DPLL
-  ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock gate
-  ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
-  phy: omap-usb2: Use generic clock names "wkupclk" and "refclk"
-  phy: omap-usb2: Add clock names to Documentation binding
-  ARM: dts: omap4+: Add clocks to USB2 PHY node
-  ARM: dts: dra7: Add USB related nodes
-  dts: dra7-evm: add USB support
+ drivers/clk/ti/clk-7xx.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
- Documentation/devicetree/bindings/phy/ti-phy.txt |   7 ++
- arch/arm/boot/dts/dra7-evm.dts                   |  24 +++++
- arch/arm/boot/dts/dra7.dtsi                      | 110 +++++++++++++++++++++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi             |  12 ++-
- arch/arm/boot/dts/omap4.dtsi                     |   2 +
- arch/arm/boot/dts/omap5.dtsi                     |   2 +
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c        |  22 ++---
- drivers/clk/ti/clk-7xx.c                         |  11 +++
- drivers/phy/phy-omap-usb2.c                      |   8 +-
- 9 files changed, 182 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index 9977653..f89f3c2 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -18,6 +18,7 @@
+ 
+ #define DRA7_DPLL_ABE_DEFFREQ				361267200
+ #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
++#define DRA7_DPLL_USB_DEFFREQ				960000000
+ 
+ 
+ static struct ti_dt_clk dra7xx_clks[] = {
+@@ -328,5 +329,15 @@ int __init dra7xx_dt_clk_init(void)
+ 	if (rc)
+ 		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
+ 
++	dpll_ck = clk_get_sys(NULL, "dpll_usb_ck");
++	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ);
++	if (rc)
++		pr_err("%s: failed to configure USB DPLL!\n", __func__);
++
++	dpll_ck = clk_get_sys(NULL, "dpll_usb_m2_ck");
++	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ/2);
++	if (rc)
++		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
++
+ 	return rc;
+ }
 -- 
 1.8.3.2
