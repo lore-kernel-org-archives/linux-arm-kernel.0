@@ -1,130 +1,163 @@
-From: mohun106@gmail.com (mohun106 at gmail.com)
-Date: Fri,  7 Mar 2014 14:19:25 +0530
-Subject: [RFC PATCH v2 1/1] arm64: Add boot time configuration of Intermediate
- Physical Address size
-In-Reply-To: <1394182165-10480-1-git-send-email-mohun106@gmail.com>
-References: <1394182165-10480-1-git-send-email-mohun106@gmail.com>
-Message-ID: <1394182165-10480-2-git-send-email-mohun106@gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 7 Mar 2014 10:38:13 +0100
+Subject: [PATCH] ath6kl: sdio: fix system panic when doing wifi stress test
+In-Reply-To: <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
+References: <1384221185-8645-1-git-send-email-r64343@freescale.com>
+ <87k3fvjvjg.fsf@kamboji.qca.qualcomm.com>
+ <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
+Message-ID: <20140307093813.GA28728@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Hi!
 
-ARMv8 supports a range of physical address bit sizes. The PARange bits
-from ID_AA64MMFR0_EL1 register are read during boot-time and the
-intermediate physical address size bits are written in the translation
-control registers (TCR_EL1 and VTCR_EL2).
+On Fri, Nov 29, 2013 at 06:02:11AM +0000, Hui Liu wrote:
+> > -----Original Message-----
+> > From: Kalle Valo [mailto:kvalo at qca.qualcomm.com]
+> > Sent: Tuesday, November 26, 2013 6:40 PM
+> > To: Liu Hui-R64343
+> > Cc: linux-arm-kernel at lists.infradead.org; linville at tuxdriver.com; linux-
+> > wireless at vger.kernel.org; netdev at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; ath6kl-devel at qca.qualcomm.com
+> > Subject: Re: [PATCH] ath6kl: sdio: fix system panic when doing wifi
+> > stress test
+> > 
+> > Hi Jason,
+> > 
+> > Jason Liu <r64343@freescale.com> writes:
+> > 
+> > > When did the wifi iperf test, meet one following kernel panic:
+> > > command: iperf -c $TARGET_IP -i 5 -t 50 -w 1M
+> > >
+> > > Unable to handle kernel paging request at virtual address 1a480000 pgd
+> > > = 80004000 [1a480000] *pgd=00000000 Internal error: Oops: 805 [#1] SMP
+> > > ARM
+> > 
+> > [...]
+> > 
+> > > The kernel panic is caused by the sg_buf is not set correctly with the
+> > > following code when compiled with Yocto GCC 4.8.1:
+> > >
+> > > drivers/net/wireless/ath/ath6kl/hif.h:
+> > > struct hif_scatter_req {
+> > >         struct list_head list;
+> > >         /* address for the read/write operation */
+> > >         u32 addr;
+> > > 	...
+> > >
+> > >         /* bounce buffer for upper layers to copy to/from */
+> > >         u8 *virt_dma_buf;
+> > >
+> > >         struct hif_scatter_item scat_list[1];
+> > >
+> > >         u32 scat_q_depth;
+> > > };
+> > >
+> > > (Note: the scat_req.scat_list[] will dynamiclly grow with run-time)
+> > 
+> > There's actually a major bug right there, scat_list can corrupt
+> > scat_q_depth.
+> > 
+> > > The GCC 4.8.1 compiler will not do the for-loop till scat_entries,
+> > > instead, it only run one round loop. This may be caused by that the
+> > > GCC 4.8.1 thought that the scat_list only have one item and then no
+> > > need to do full iteration, but this is simply wrong by looking at the
+> > > assebly code. This will cause the sg buffer not get set when
+> > scat_entries > 1 and thus lead to kernel panic.
+> > >
+> > > This patch is a workaround to the GCC 4.8.1 complier issue by passing
+> > > the entry address of the scat_req->scat_list to the for-loop and
+> > > interate it, then, GCC 4.8.1 will do the full for-loop correctly.
+> > > (Note: This issue not observed with GCC 4.7.2, only found on the GCC
+> > > 4.8.1)
+> > >
+> > > This patch does not change any function logic and no any performance
+> > downgrade.
+> > 
+> > [...]
+> > 
+> > > +	scat_list = &scat_req->scat_list[0];
+> > > +
+> > >  	/* assemble SG list */
+> > > -	for (i = 0; i < scat_req->scat_entries; i++, sg++) {
+> > > +	for (i = 0; i < scat_req->scat_entries; i++, sg++, scat_list++) {
+> > >  		ath6kl_dbg(ATH6KL_DBG_SCATTER, "%d: addr:0x%p, len:%d\n",
+> > > -			   i, scat_req->scat_list[i].buf,
+> > > -			   scat_req->scat_list[i].len);
+> > > +			   i, scat_list->buf, scat_list->len);
+> > >
+> > > -		sg_set_buf(sg, scat_req->scat_list[i].buf,
+> > > -			   scat_req->scat_list[i].len);
+> > > +		sg_set_buf(sg, scat_list->buf, scat_list->len);
+> > >  	}
+> > 
+> > Working around the problem by adding a temporary variable makes me a bit
+> > worried, I would rather fix the root cause. Is the root cause by that we
+> > define the field with scat_list[1]?
+> 
+> Yes, this is what I assumed. 
+> 
+> > 
+> > Does the patch below help? It would also fix the corruption with
+> > scat_q_depth. Please note that I have only compile tested it. And I might
+> > have also missed something important, so please review it carefully.
+> 
+> Yes, Firstly, I have looked at the asm code and the compiler(gcc 4.8.1) works correctly after applying
+> the following patch. Secondly, I have tested the patch with compiler(gcc 4.8.1) on the real HW, and it
+> works fine too. Without the patch, the kernel crash will happen 100%.
+> 
+> Thus, for the patch:
+> 
+> Acked-by: Jason Liu <r64343@freescale.com>
+> Tested-by: Jason Liu <r64343@freescale.com>
+> 
+> Jason Liu
+> 
+> > 
+> > --- a/drivers/net/wireless/ath/ath6kl/hif.h
+> > +++ b/drivers/net/wireless/ath/ath6kl/hif.h
+> > @@ -197,9 +197,9 @@ struct hif_scatter_req {
+> >  	/* bounce buffer for upper layers to copy to/from */
+> >  	u8 *virt_dma_buf;
+> > 
+> > -	struct hif_scatter_item scat_list[1];
+> > -
+> >  	u32 scat_q_depth;
+> > +
+> > +	struct hif_scatter_item scat_list[0];
+> >  };
+> > 
+> >  struct ath6kl_irq_proc_registers {
+> > diff --git a/drivers/net/wireless/ath/ath6kl/sdio.c
+> > b/drivers/net/wireless/ath/ath6kl/sdio.c
+> > index 7126bdd..6bf15a3 100644
+> > --- a/drivers/net/wireless/ath/ath6kl/sdio.c
+> > +++ b/drivers/net/wireless/ath/ath6kl/sdio.c
+> > @@ -348,7 +348,7 @@ static int ath6kl_sdio_alloc_prep_scat_req(struct
+> > ath6kl_sdio *ar_sdio,
+> >  	int i, scat_req_sz, scat_list_sz, size;
+> >  	u8 *virt_buf;
+> > 
+> > -	scat_list_sz = (n_scat_entry - 1) * sizeof(struct hif_scatter_item);
+> > +	scat_list_sz = n_scat_entry * sizeof(struct hif_scatter_item);
+> >  	scat_req_sz = sizeof(*s_req) + scat_list_sz;
+> > 
+> >  	if (!virt_scat)
+> > 
+> > 
+> > --
+> > Kalle Valo
+> 
 
-There is no change in the VA bits and levels of translation.
+What happend with this?
+If I look in mainline, I don't find it. At least the reording of the struct
+fields looks as if one definitely wants to have that.
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
----
- arch/arm64/include/asm/kvm_arm.h       |   15 ++++++---------
- arch/arm64/include/asm/pgtable-hwdef.h |    5 ++---
- arch/arm64/kvm/hyp-init.S              |    6 ++++++
- arch/arm64/mm/proc.S                   |    8 +++++++-
- 4 files changed, 21 insertions(+), 13 deletions(-)
+Regards,
+Steffen
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 0eb3986..21ef48d 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -106,7 +106,6 @@
- 
- /* VTCR_EL2 Registers bits */
- #define VTCR_EL2_PS_MASK	(7 << 16)
--#define VTCR_EL2_PS_40B		(2 << 16)
- #define VTCR_EL2_TG0_MASK	(1 << 14)
- #define VTCR_EL2_TG0_4K		(0 << 14)
- #define VTCR_EL2_TG0_64K	(1 << 14)
-@@ -129,10 +128,9 @@
-  * 64kB pages (TG0 = 1)
-  * 2 level page tables (SL = 1)
-  */
--#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
--				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
--				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
--				 VTCR_EL2_T0SZ_40B)
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
-+				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
- #else
- /*
-@@ -142,10 +140,9 @@
-  * 4kB pages (TG0 = 0)
-  * 3 level page tables (SL = 1)
-  */
--#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
--				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
--				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
--				 VTCR_EL2_T0SZ_40B)
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-+				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
- #endif
- 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index b1d2e26..f7af66b 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -100,9 +100,9 @@
- #define PTE_HYP			PTE_USER
- 
- /*
-- * 40-bit physical address supported.
-+ * Highest possible physical address supported.
-  */
--#define PHYS_MASK_SHIFT		(40)
-+#define PHYS_MASK_SHIFT		(48)
- #define PHYS_MASK		((UL(1) << PHYS_MASK_SHIFT) - 1)
- 
- /*
-@@ -122,7 +122,6 @@
- #define TCR_SHARED		((UL(3) << 12) | (UL(3) << 28))
- #define TCR_TG0_64K		(UL(1) << 14)
- #define TCR_TG1_64K		(UL(1) << 30)
--#define TCR_IPS_40BIT		(UL(2) << 32)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
- 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 2b0244d..d968796 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -68,6 +68,12 @@ __do_hyp_init:
- 	msr	tcr_el2, x4
- 
- 	ldr	x4, =VTCR_EL2_FLAGS
-+	/*
-+	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
-+	 * VTCR_EL2.
-+	 */
-+	mrs	x5, ID_AA64MMFR0_EL1
-+	bfi	x4, x5, #16, #3
- 	msr	vtcr_el2, x4
- 
- 	mrs	x4, mair_el1
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index e0ef63c..e085ee6 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -209,8 +209,14 @@ ENTRY(__cpu_setup)
- 	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
- 	 * both user and kernel.
- 	 */
--	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | TCR_IPS_40BIT | \
-+	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | \
- 		      TCR_ASID16 | TCR_TBI0 | (1 << 31)
-+	/*
-+	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
-+	 * TCR_EL1.
-+	 */
-+	mrs	x9, ID_AA64MMFR0_EL1
-+	bfi	x10, x9, #32, #3
- #ifdef CONFIG_ARM64_64K_PAGES
- 	orr	x10, x10, TCR_TG0_64K
- 	orr	x10, x10, TCR_TG1_64K
 -- 
-1.7.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
