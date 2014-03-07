@@ -1,58 +1,126 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 7 Mar 2014 14:56:36 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <53143796.2050309@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <20140228162752.GU21483@n2100.arm.linux.org.uk> <5310BDE3.60603@ti.com>
- <20140228165628.GX21483@n2100.arm.linux.org.uk> <53143796.2050309@ti.com>
-Message-ID: <5319C204.60907@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 07 Mar 2014 14:04:16 +0100
+Subject: [PATCH v2 03/11] ARM: exynos: Move to generic power domain
+ bindings
+In-Reply-To: <53174EB5.1090803@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1713847.uSatLFRtJj@amdc1032> <53174EB5.1090803@gmail.com>
+Message-ID: <19118595.DYTBeEpFjL@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/14 10:04, Tomi Valkeinen wrote:
-> Hi Rob, Pawel, Mark, Ian, Kumar,
 
-Ping,
+On Wednesday, March 05, 2014 05:20:05 PM Tomasz Figa wrote:
+> Hi Bartek,
+> 
+> On 05.03.2014 17:15, Bartlomiej Zolnierkiewicz wrote:
+> >
+> > Hi Tomek,
+> >
+> > On Monday, March 03, 2014 05:02:08 PM Tomasz Figa wrote:
+> >> This patch moves Exynos power domain code to use the new generic power
+> >> domain look-up framework introduced by previous patch, allowing the new
+> >> code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
+> >>
+> >> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> >> ---
+> >>   .../bindings/arm/exynos/power_domain.txt           | 12 ++--
+> >>   arch/arm/mach-exynos/pm_domains.c                  | 80 +---------------------
+> >>   kernel/power/Kconfig                               |  2 +-
+> >>   3 files changed, 7 insertions(+), 87 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> >> index 5216b41..60f26a8 100644
+> >> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> >> @@ -8,6 +8,8 @@ Required Properties:
+> >>       * samsung,exynos4210-pd - for exynos4210 type power domain.
+> >>   - reg: physical base address of the controller and length of memory mapped
+> >>       region.
+> >> +- #power-domain-cells: number of cells in power domain specifier;
+> >> +    must be 0.
+> >>
+> >>   Node of a device using power domains must have a samsung,power-domain property
+> >>   defined with a phandle to respective power domain.
+> >> @@ -17,12 +19,8 @@ Example:
+> >>   	lcd0: power-domain-lcd0 {
+> >>   		compatible = "samsung,exynos4210-pd";
+> >>   		reg = <0x10023C00 0x10>;
+> >> +		#power-domain-cells = <0>;
+> >>   	};
+> >>
+> >> -Example of the node using power domain:
+> >> -
+> >> -	node {
+> >> -		/* ... */
+> >> -		samsung,power-domain = <&lcd0>;
+> >> -		/* ... */
+> >> -	};
+> >> +See Documentation/devicetree/bindings/power/power_domain.txt for description
+> >> +of consumer-side bindings.
+> >> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> >> index 8fd2488..48ee6c9 100644
+> >> --- a/arch/arm/mach-exynos/pm_domains.c
+> >> +++ b/arch/arm/mach-exynos/pm_domains.c
+> >> @@ -75,78 +75,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+> >>   	return exynos_pd_power(domain, false);
+> >>   }
+> >>
+> >> -static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+> >> -					 struct device *dev)
+> >> -{
+> >> -	int ret;
+> >> -
+> >> -	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+> >> -
+> >> -	while (1) {
+> >> -		ret = pm_genpd_add_device(&pd->pd, dev);
+> >> -		if (ret != -EAGAIN)
+> >> -			break;
+> >> -		cond_resched();
+> >> -	}
+> >> -
+> >> -	pm_genpd_dev_need_restore(dev, true);
+> >> -}
+> >> -
+> >> -static void exynos_remove_device_from_domain(struct device *dev)
+> >> -{
+> >> -	struct generic_pm_domain *genpd = dev_to_genpd(dev);
+> >> -	int ret;
+> >> -
+> >> -	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
+> >> -
+> >> -	while (1) {
+> >> -		ret = pm_genpd_remove_device(genpd, dev);
+> >> -		if (ret != -EAGAIN)
+> >> -			break;
+> >> -		cond_resched();
+> >> -	}
+> >> -}
+> >> -
+> >> -static void exynos_read_domain_from_dt(struct device *dev)
+> >> -{
+> >> -	struct platform_device *pd_pdev;
+> >> -	struct exynos_pm_domain *pd;
+> >> -	struct device_node *node;
+> >> -
+> >> -	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
+> >
+> > This removes "samsung,power-domain" phandle handling but I cannot find
+> > in your patch series updates to existing EXYNOS dts files converting
+> > them to use the new "power-domain" property.  Am I missing something?
+> 
+> Patch 01/11 adds generic parsing code along with fallback to the legacy 
+> "samsung,power-domain" property, if the generic one is not present, as 
+> it was pretty straightforward to implement it there.
 
-Any hints on how to continue with this?
+Ah, silly me, I should have looked more closely at patch #1.  Anyway,
+I tested your patchset on Exynos4412 Trats2 target and it works fine
+(BTW it also seems that your patchset fixed the issue of device not
+being removed from power domain on ->probe failure).
 
-> On 28/02/14 18:56, Russell King - ARM Linux wrote:
->> On Fri, Feb 28, 2014 at 06:48:35PM +0200, Tomi Valkeinen wrote:
->>> This is totally unclear to me. How does it become a public standard?
->>> What's the forum for this?
->>
->> Me too.  That's where I'd hope someone on devicetree-discuss will be
->> able to help us work out what's the right approach here. :)
-> 
-> The story briefly so far: I've implemented DT support for OMAP display,
-> and created bindings for various (non-OMAP) display components,
-> including generic connector bindings for DVI, HDMI and analog-tv.
-> 
-> Russell's point was that these connector bindings are very generic, i.e.
-> they are not for any particular chip from a particular vendor, but for
-> any connector for DVI, HDMI or analog-tv. And he's worried that maybe we
-> shouldn't define such generic bindings without consulting the whole
-> device-tree community (i.e including non-linux users).
-> 
-> So the question is, is there such a community and a forum to bring up
-> this kind of things? If yes, should we bring this up there? If yes, what
-> kind of things in general should be brought into the attention of
-> non-linux users?
-> 
-> What I wonder here is that while a thing like DVI connector is, of
-> course, more generic than, say, "ti,tfp410" encoder chip, but isn't the
-> case still the same: we're defining global bindings for hardware that
-> should work for everyone, not only Linux users?
-> 
->  Tomi
-> 
-> 
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/490977c1/attachment.sig>
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
