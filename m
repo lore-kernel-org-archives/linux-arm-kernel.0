@@ -1,35 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 11:38:16 +0900
-Subject: [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
-In-Reply-To: <20140224054058.1143.14096.sendpatchset@w520>
-References: <20140224054058.1143.14096.sendpatchset@w520>
-Message-ID: <20140307023813.GG11702@verge.net.au>
+Date: Fri, 7 Mar 2014 11:38:24 +0900
+Subject: [PATCH] ARM: shmobile: Remove EMEV2 header file
+In-Reply-To: <CANqRtoSmphPAaxOFjAQcZ8RDigJpjYG3yCFMr5C_cw6JCHghkw@mail.gmail.com>
+References: <20140217073508.11156.21720.sendpatchset@w520>
+ <20140218000926.GB4776@verge.net.au>
+ <20140218023103.GA17063@verge.net.au>
+ <CANqRtoSmphPAaxOFjAQcZ8RDigJpjYG3yCFMr5C_cw6JCHghkw@mail.gmail.com>
+Message-ID: <20140307023821.GH11702@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:40:58PM +0900, Magnus Damm wrote:
-> ARM: shmobile: Rework include path for SoC files
+On Tue, Feb 18, 2014 at 11:35:25AM +0900, Magnus Damm wrote:
+> On Tue, Feb 18, 2014 at 11:31 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Feb 18, 2014 at 09:09:29AM +0900, Simon Horman wrote:
+> >> On Mon, Feb 17, 2014 at 04:35:08PM +0900, Magnus Damm wrote:
+> >> > From: Magnus Damm <damm@opensource.se>
+> >> >
+> >> > There is no C board code left for the EMEV2 SoC, so
+> >> > get rid of the emev2.h include file to save some lines.
+> >> > While at it make functions static.
+> >> >
+> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> >>
+> >> Thanks, I have queued this up.
+> >
+> > I have changed my mind and decided to defer this patch
+> > to avoid a tedious dependency of an SoC patch on a board patch.
 > 
-> [PATCH 01/12] ARM: shmobile: Add temporary include workaround
-> [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
-> [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
-> [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
-> [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
-> [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
-> [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
-> [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
-> [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
-> [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
-> [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
-> [PATCH 12/12] ARM: shmobile: Rework include path for common bits
-> 
-> Start converting the mach-shmobile subarchitecture from <mach/something.h>
-> to "something.h". This series covers shared code base and SoC code,
-> however actual header files are not moved yet. Upcoming series that
-> depend on this one will have to convert board code as well. When SoCs
-> code and board code have been converted then actual header files can
-> be moved and temporary include path workarounds can be removed.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> That's fine. We can handle further cleanup later. Thanks for your help!
 
-Thanks, I have queued this up.
+I have now queued it up again.
