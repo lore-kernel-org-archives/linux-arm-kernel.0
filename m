@@ -1,96 +1,55 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 12:15:07 +0200
-Subject: [PATCH v3 7/8] ARM: DRA7: hwmod: Add ocp2scp3 and sata hwmods
-In-Reply-To: <1394187308-19622-1-git-send-email-rogerq@ti.com>
-References: <1394187308-19622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394187308-19622-8-git-send-email-rogerq@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Mar 2014 10:34:33 +0000
+Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
+In-Reply-To: <20140307100751.GN607@lukather>
+References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307095222.GG21483@n2100.arm.linux.org.uk>
+ <20140307100751.GN607@lukather>
+Message-ID: <20140307103433.GH21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nikhil Devshatwar <nikhil.nd@ti.com>
+On Fri, Mar 07, 2014 at 11:07:51AM +0100, Maxime Ripard wrote:
+> Hi Russell,
+> 
+> On Fri, Mar 07, 2014 at 09:52:23AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Mar 04, 2014 at 05:28:37PM +0100, Maxime Ripard wrote:
+> > > The Allwinner A31 SoC using that IP has a reset controller maintaining
+> > > it reset unless told otherwise.
+> > > 
+> > > Add some optional reset support to the driver.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > 
+> > This appears to be causing some build errors in Olof's next builder
+> > for many of the ARM platforms which make use of this:
+> > 
+> > drivers/i2c/busses/i2c-mv64xxx.c:924: undefined reference to `reset_control_assert'
+> > drivers/i2c/busses/i2c-mv64xxx.c:904: undefined reference to `reset_control_assert'
+> > drivers/i2c/busses/i2c-mv64xxx.c:771: undefined reference to `devm_reset_control_get'
+> > drivers/i2c/busses/i2c-mv64xxx.c:778: undefined reference to `reset_control_deassert'
+> 
+> The reset framework doesn't define its functions when its not
+> selected, and somehow I think it was not here. What's odd is that
+> there is an explicit select on RESET_CONTROLLER in the Kconfig. Maybe
+> it's the circular dependency issue that has been reported that cause
+> this and Wolfram sent a patch for: http://patchwork.ozlabs.org/patch/327573/
 
-Add hwmods for ocp2scp3 and sata modules.
+If that patch has been taken, then yes, it will have caused the above -
+because now we have Dove and Kirkwood platforms trying to build this
+driver without RESET_CONTROLLER being set.
 
-[Roger Q] Clean up.
+The problem with depending on RESET_CONTROLLER is that then these
+platforms end up without their I2C controller - because there's nothing
+which enables RESET_CONTROLLER in their configuration.
 
-CC: Benoit Cousson <bcousson@baylibre.com>
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Signed-off-by: Nikhil Devshatwar <nikhil.nd@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+Since RESET_CONTROLLER is not required for those platforms, it really
+should be optional - and I think the real fix is for the reset controller
+support to provide stub functions.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 18f333c..3c9a430 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1215,6 +1215,30 @@ static struct omap_hwmod dra7xx_ocp2scp1_hwmod = {
- 	},
- };
- 
-+/* ocp2scp3 */
-+static struct omap_hwmod dra7xx_ocp2scp3_hwmod;
-+
-+/* l4_cfg -> ocp2scp3 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp3 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_ocp2scp3_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
-+	.name		= "ocp2scp3",
-+	.class		= &dra7xx_ocp2scp_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
- /*
-  * 'qspi' class
-  *
-@@ -1268,9 +1292,6 @@ static struct omap_hwmod_class dra7xx_sata_hwmod_class = {
- };
- 
- /* sata */
--static struct omap_hwmod_opt_clk sata_opt_clks[] = {
--	{ .role = "ref_clk", .clk = "sata_ref_clk" },
--};
- 
- static struct omap_hwmod dra7xx_sata_hwmod = {
- 	.name		= "sata",
-@@ -1278,6 +1299,7 @@ static struct omap_hwmod dra7xx_sata_hwmod = {
- 	.clkdm_name	= "l3init_clkdm",
- 	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
- 	.main_clk	= "func_48m_fclk",
-+	.mpu_rt_idx	= 1,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L3INIT_SATA_CLKCTRL_OFFSET,
-@@ -1285,8 +1307,6 @@ static struct omap_hwmod dra7xx_sata_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.opt_clks	= sata_opt_clks,
--	.opt_clks_cnt	= ARRAY_SIZE(sata_opt_clks),
- };
- 
- /*
-@@ -2683,6 +2703,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__mmc4,
- 	&dra7xx_l4_cfg__mpu,
- 	&dra7xx_l4_cfg__ocp2scp1,
-+	&dra7xx_l4_cfg__ocp2scp3,
- 	&dra7xx_l3_main_1__qspi,
- 	&dra7xx_l4_cfg__sata,
- 	&dra7xx_l4_cfg__smartreflex_core,
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
