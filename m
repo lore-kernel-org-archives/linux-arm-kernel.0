@@ -1,58 +1,51 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 7 Mar 2014 15:27:57 +0100
-Subject: [PATCH v9][ 6/8] staging: imx-drm: parallel display: add
- regulator support.
-In-Reply-To: <1394121869-13387-3-git-send-email-denis@eukrea.com>
-References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
- <1394121869-13387-1-git-send-email-denis@eukrea.com>
- <1394121869-13387-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140307152757.6e97abce@ipc1.ka-ro>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Fri,  7 Mar 2014 15:40:46 +0100
+Subject: [PATCH v3 0/5] Add STiH407 SoC and reference board support
+Message-ID: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series adds basic support to the STMicroelectronics STiH407 SoC and its
+B2120 reference board. The STiH407 is a dual-core ARM Cortex-A9 CPU aimed at
+STB market.
 
-Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v8->v9:
-> - Removed the Cc. They are now set in git-send-email directly.
-> - Rebased.
-> 
-> ChangeLog v7->v8:
-> - Shrinked even more the Cc list.
-> - Rebased.
-> 
-> ChangeLog v6->v7:
-> - Shrinked even more the Cc list.
-> - Rebased the patch and included video/of_display_timing.h
-> ---
->  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    1 +
->  drivers/staging/imx-drm/parallel-display.c         |   13 +++++++++++++
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> index 2d24425..4dd7ce5 100644
-> --- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> @@ -28,6 +28,7 @@ Required properties:
->  - compatible: Should be "fsl,imx-parallel-display"
->  - crtc: the crtc this display is connected to, see below
->  Optional properties:
-> +- display-supply : phandle to the regulator device tree node if needed.
->
-Any reason why this is named 'display-supply' rather than 'lcd-supply'
-like for imxfb?
+Changes since v2:
+-----------------
+    - Reordered the pinctrl patches
+    - Moved stih407_flashdata to stih407 pinctrl patch
 
+Changes since v1:
+-----------------
+	- Changed patch 2 commit title
+	- Rebased pinctrl patches to linux-pinctrl/devel
+	- Rebased ARM patches to arm_soc/for-next
 
-Lothar Wa?mann
+Giuseppe Cavallaro (2):
+  pinctrl: st: Enhance the controller to manage unavailable registers
+  pinctrl: st: add pinctrl support for the STiH407 SoC
+
+Maxime Coquelin (3):
+  ARM: STi: Add STiH407 SoC support
+  ARM: dts: Add STiH407 SoC support
+  ARM: dts: STiH407: Add B2120 board support
+
+ Documentation/arm/sti/stih407-overview.txt    |  18 +
+ Documentation/devicetree/bindings/arm/sti.txt |  15 +
+ arch/arm/boot/dts/Makefile                    |   3 +-
+ arch/arm/boot/dts/stih407-b2120.dts           |  78 ++++
+ arch/arm/boot/dts/stih407-clock.dtsi          |  41 ++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi        | 618 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407.dtsi                | 250 +++++++++++
+ arch/arm/mach-sti/Kconfig                     |   9 +
+ arch/arm/mach-sti/board-dt.c                  |   1 +
+ drivers/pinctrl/pinctrl-st.c                  | 123 +++--
+ 10 files changed, 1110 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/arm/sti/stih407-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+ create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih407-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407.dtsi
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.9.0
