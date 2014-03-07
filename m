@@ -1,108 +1,116 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri,  7 Mar 2014 10:28:07 -0700
-Subject: [PATCH v15 1/3] Documentation: Add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver binding documentation
-In-Reply-To: <1394213289-29565-1-git-send-email-lho@apm.com>
+Date: Fri,  7 Mar 2014 10:28:09 -0700
+Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY
+ DTS entries
+In-Reply-To: <1394213289-29565-3-git-send-email-lho@apm.com>
 References: <1394213289-29565-1-git-send-email-lho@apm.com>
-Message-ID: <1394213289-29565-2-git-send-email-lho@apm.com>
+ <1394213289-29565-2-git-send-email-lho@apm.com>
+ <1394213289-29565-3-git-send-email-lho@apm.com>
+Message-ID: <1394213289-29565-4-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the APM X-Gene SoC 15Gbps Multi-purpose PHY driver binding
-documentation.
+This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
+PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Tuan Phan <tphan@apm.com>
 Signed-off-by: Suman Tripathi <stripathi@apm.com>
 ---
- .../devicetree/bindings/phy/apm-xgene-phy.txt      |   79 ++++++++++++++++++++
- 1 files changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+ arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 75 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-new file mode 100644
-index 0000000..5f3a65a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-@@ -0,0 +1,79 @@
-+* APM X-Gene 15Gbps Multi-purpose PHY nodes
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d37d736..c78ddcf 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,51 @@
+ 				reg-names = "csr-reg";
+ 				clock-output-names = "eth8clk";
+ 			};
 +
-+PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
-+PHY (pair of lanes) has its own node.
++			sataphy1clk: sataphy1clk at 1f21c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f21c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy1clk";
++				status = "disabled";
++				csr-offset = <0x4>;
++				csr-mask = <0x00>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
 +
-+Required properties:
-+- compatible		: Shall be "apm,xgene-phy".
-+- reg			: PHY memory resource is the SDS PHY access resource.
-+- #phy-cells		: Shall be 1 as it expects one argument for setting
-+			  the mode of the PHY. Possible values are 0 (SATA),
-+			  1 (SGMII), 2 (PCIe), 3 (USB), and 4 (XFI).
++			sataphy2clk: sataphy1clk at 1f22c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f22c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy2clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
 +
-+Optional properties:
-+- status		: Shall be "ok" if enabled or "disabled" if disabled.
-+			  Default is "ok".
-+- clocks		: Reference to the clock entry.
-+- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
-+			  bit lines from the automatic calibrated position.
-+			  Two set of 3-tuple setting for each (up to 3)
-+			  supported link speed on the host. Range from 0 to
-+			  127 in unit of one bit period. Default is 10.
-+- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
-+			  data earlier than the nominal sampling point. 1 means
-+			  sample data later than the nominal sampling point.
-+			  Two set of 3-tuple setting for each (up to 3)
-+			  supported link speed on the host. Default is 0.
-+- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
-+			  gain control. Two set of 3-tuple setting for each
-+			  (up to 3) supported link speed on the host. Range is
-+			  between 0 to 31 in unit of dB. Default is 3.
-+- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
-+			  each (up to 3) supported link speed on the host.
-+			  Range is between 0 to 199500 in unit of uV.
-+			  Default is 199500 uV.
-+- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
-+			  3-tuple setting for each (up to 3) supported link
-+			  speed on the host. Range is 0 to 273000 in unit of
-+			  uV. Default is 0.
-+- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
-+			  3-tuple setting for each (up to 3) supported link
-+			  speed on the host. Range is 0 to 127400 in unit uV.
-+			  Default is 0x0.
-+- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
-+			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
-+			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
-+- apm,tx-speed		: Tx operating speed. One set of 3-tuple for each
-+			  supported link speed on the host.
-+			   0 = 1-2Gbps
-+			   1 = 2-4Gbps (1st tuple default)
-+			   2 = 4-8Gbps
-+			   3 = 8-15Gbps (2nd tuple default)
-+			   4 = 2.5-4Gbps
-+			   5 = 4-5Gbps
-+			   6 = 5-6Gbps
-+			   7 = 6-16Gbps (3rd tuple default)
++			sataphy3clk: sataphy1clk at 1f23c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f23c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy3clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
+ 		};
+ 
+ 		serial0: serial at 1c020000 {
+@@ -187,5 +232,35 @@
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0x0 0x4c 0x4>;
+ 		};
 +
-+NOTE: PHY override parameters are board specific setting.
-+
-+Example:
 +		phy1: phy at 1f21a000 {
 +			compatible = "apm,xgene-phy";
 +			reg = <0x0 0x1f21a000 0x0 0x100>;
 +			#phy-cells = <1>;
++			clocks = <&sataphy1clk 0>;
 +			status = "disabled";
++			apm,tx-boost-gain = <30 30 30 30 30 30>;
++			apm,tx-eye-tuning = <2 10 10 2 10 10>;
 +		};
 +
 +		phy2: phy at 1f22a000 {
 +			compatible = "apm,xgene-phy";
 +			reg = <0x0 0x1f22a000 0x0 0x100>;
 +			#phy-cells = <1>;
++			clocks = <&sataphy2clk 0>;
 +			status = "ok";
++			apm,tx-boost-gain = <30 30 30 30 30 30>;
++			apm,tx-eye-tuning = <1 10 10 2 10 10>;
 +		};
 +
 +		phy3: phy at 1f23a000 {
 +			compatible = "apm,xgene-phy";
 +			reg = <0x0 0x1f23a000 0x0 0x100>;
 +			#phy-cells = <1>;
++			clocks = <&sataphy3clk 0>;
 +			status = "ok";
++			apm,tx-boost-gain = <31 31 31 31 31 31>;
++			apm,tx-eye-tuning = <2 10 10 2 10 10>;
 +		};
+ 	};
+ };
 -- 
 1.5.5
