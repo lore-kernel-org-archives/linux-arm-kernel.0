@@ -1,35 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Mar 2014 01:24:12 +0100
-Subject: [PATCH v5 1/7] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140306160442.GG6457@e106497-lin.cambridge.arm.com>
-References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
- <201403042330.09607.arnd@arndb.de>
- <20140306160442.GG6457@e106497-lin.cambridge.arm.com>
-Message-ID: <201403070124.13139.arnd@arndb.de>
+Date: Fri, 7 Mar 2014 01:25:28 +0100
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <1394127555.4582.1.camel@weser.hi.pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <5318B232.2020507@wwwdotorg.org>
+ <1394127555.4582.1.camel@weser.hi.pengutronix.de>
+Message-ID: <201403070125.28582.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 March 2014, Liviu Dudau wrote:
-> On Tue, Mar 04, 2014 at 10:30:09PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 04 March 2014, Liviu Dudau wrote:
-> > > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> > > +{
-> > > +       return 0;
-> > > +}
-> > > +
+On Thursday 06 March 2014, Lucas Stach wrote:
+> Am Donnerstag, den 06.03.2014, 10:36 -0700 schrieb Stephen Warren:
+> > On 03/05/2014 06:25 AM, Lucas Stach wrote:
+> > > This is the recommended method of doing the IRQ
+> > > mapping. For old devicetrees we fall back to the
+> > > previous practice.
 > > 
-> > How about returning an error here? You don't actually register the range.
+> > Tested-by: Stephen Warren <swarren@nvidia.com>
+> > 
+> > I tested both with and without patch 1/6, and the PCIe-based NIC on
+> > Beaver worked fine either way. Without patch 1/6, I do see:
+> > 
+> > pci 0000:00:01.0: of_irq_parse_pci() failed with rc=-22
+> > 
+> > ... but that seems reasonable given that the DT that of_irq_parse_pci()
+> > parses is missing, and did correctly trigger the fallback path, so
+> > everything still worked.
 > 
-> That's not the intention here. I basically want a nop, as by default (read x86)
-> we do nothing with the IO range.
+> Yes, this should be normal. It spits this error for old DTs, but keeps
+> doing the right thing. I'm not sure if we should downgrade this to info
+> or dbg.
 
-I think x86 is a bad default though, because that is the exception rather than
-the rule. I also think that on x86, you shouldn't have an entry for the I/O
-space in the "ranges" property since there is no translation, and then we don't
-call this function.
-
-PCI devices described in DT on x86 would still be able to list their I/O BARs
-in DT, but you don't ever translate them into MMIO ranges.
+No, I think printing an error like this is appropriate: it is an incentive
+to update the dts files, but doesn't look too urgent as long as everything
+still works.
 
 	Arnd
