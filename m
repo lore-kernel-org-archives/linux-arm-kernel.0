@@ -1,112 +1,272 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Mar 2014 10:49:02 +0800
-Subject: [PATCH] irq: Consider a negative return value of irq_startup() as
- an error
-In-Reply-To: <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
-References: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
- <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
-Message-ID: <CACRpkdZ6D1XfDBdJEcR8G2HWkNcZSfz08Yvx8f0s+CqTUmybkg@mail.gmail.com>
+From: yoshiyuki.ito.ub@renesas.com (Yoshiyuki Ito)
+Date: Fri, 7 Mar 2014 11:57:09 +0900
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <20140307021633.GN1872@titan.lakedaemon.net>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+ <20140226000940.GF1872@titan.lakedaemon.net>
+ <CACRpkdYQa2BG_qxf5zY=7rks6O31ZF-BX0af3_u1MOgwfwxFSQ@mail.gmail.com>
+ <20140226145345.GG1872@titan.lakedaemon.net>
+ <CACRpkdZRJG-TzN4c3NSH9PqcQzpo6EbEn5_bM-P3sh4_vSjtaA@mail.gmail.com>
+ <20140307021633.GN1872@titan.lakedaemon.net>
+Message-ID: <20140307.115709.525573020409548427.yoshiyuki.ito.ub@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 6:15 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Tue, 25 Feb 2014, Jean-Jacques Hiblot wrote:
->
-> The whole drviers/gpio directory is full of this gpio_lock_as_irq()
-> called from the guts of irq_chip callbacks braindamage.
 
-OK then we need to figure out where to place this call to lock
-the lines as used by IRQs properly.
+To: ?????????
 
-The whole thing came out as a result of the resolution of a
-discussion about semantic dependencies in drivers/gpio, as drivers
-were not handling gpio_* calls to gpiolib and irqchip stuff
-orthogonally instead relying on implicit handling of call
-dependencies.
+??(?)???
 
-Anyway, using a GPIO line as an IRQ makes some other usecases
-(like setting it to output and bitbanging it as an I2C) impossible,
-and the gpiolib definately needs to be aware that it is used as
-an IRQ. And some usecases (like the line being an output)
-are impossible so the use as IRQ need to be denied.
+AGL???????????????????????
 
-> The comment above gpiod_lock_as_irq() is so wrong it's not even funny
-> anymore.
+L.F.??????????web??????????????????
 
-Sent a patch to fix this.
+Larry Augustin -- Individual Member Representative
+James Bottomley, Technical Advisory Board Member
+Mark Charlebois, Qualcomm Innovation Center, Inc. (QuIC)
+Alan Clark, SUSE
+Wim Coekaerts, Oracle
+Yoshiya Eto, Fujitsu
+Eileen Evans, Hewlett-Packard
+Frank Fanzilli
+Doug Fisher, Intel
+Dan Frye, IBM
+Bdale Garbee, Individual Member Representative
+Hisashi Hashimoto, Hitachi
+KIM Myung-Joon, ETRI
+Young Yoon Kim, Samsung Electronics
+Mark Lee, Splashtop
+Tsugikazu Shibata, NEC
 
-> The whole idiocy starts with commit d468bf9e, which tells people to
-> call this from irq_startup/enable. But it fails to tell, that this is
-> pointless because it wont prevent the interrupt from starting up.
+LF?????????????????????????????
+logo???????????????URL????????(??
+????????)?
 
-The call is still useful for the gpiolib intrinsics, we would be better off
-even if the error to lock the line as IRQ was just printed and then
-ignored, as then atleast the error message would tell users that they
-are trying to do something that is impossible. Before they had no clue
-and were debugging their GPIO irqs for days...
+??????????HP?IBM?INTEL?NEC??????Qualcomm?
+????
 
-> So 11 SoC lemmings followed and added this completely pointless
-> nonsense to their drivers.
+???????????????CISCO?Citrix?ETRL?Google?
+???Huawei?Netapp?NYSE???????????????
+SuSE????
 
-Maybe for the irq subsystem, but the gpio subsystem is very
-happy about now knowing if a GPIO is used as IRQ or not.
-It has implications for the (horrid) sysfs API to GPIO for example.
 
-> Dammit, I told you folks often enough that workarounds in some
-> subsystem do not actually cure a shortcoming in the core code. When
-> the core code was written, the GPIO case which might actually fail was
-> definitly not thought of. But that's not a reason for adding
-> tasteless and useless workarounds to the GPIO subsystem.
+Platinum Members
+www.fujitsu.com
+www.hp.com
+www.ibm.com
+www.intel.com
+www.nec.com
+www.oracle.com
+www.quicinc.com
+www.samsung.com
 
-So while it is true that the situation where the locking to IRQ
-fails was not handled properly, this was not added to workaround
-shortcomings in other subsystems, but rather to make gpiolib
-aware that a certain line is used for IRQs so as to stop people
-from shooting themselves in the foot using the gpiolib.
+Gold Members
+www.chinamobileltd.com
+www.cisco.com
+www.citrix.com
+www.etri.re.kr
+www.google.com
+www.hitachi.com
+www.huawei.com
+www.netapp.com
+nysetechnologies.nyx.com
+www.panasonic.com
+www.suse.com
+www.toyota.com
 
-> Of course you encouraged people to copy that nonsense all over the
-> place.
+Silver Members
+www.4linux.com.br
+www.6wind.com
+www.aavamobile.com
+www.aboveit.nl
+www.adeneo-embedded.com
+www.adobe.com
+www.advancedtelematic.com
+www.aisin-aw.co.jp
+www.allgosystems.com
+www.amarulasolutions.com
+aws.amazon.com
+www.amd.com
+www.antelink.com
+www.arm.com
+www.ashisuto.co.jp
+www.autonomicresources.com
+www.axis.com
+www.bn.com
+www.basyskom.com
+www.blackducksoftware.com
+www.bloombase.com
+www.bluecatnetworks.com
+www.borqs.com
+www.brightone.de
+www.broadcom.com
+www.bromium.com
+www.bt.com
+www.bull.com
+www.ca.com
+www.calix.com
+www.calxeda.com
+www.canonical.com
+www.caviumnetworks.com
+www.cdac.in
+www.chelsio.com
+www.cinemo.com
+www.cloudius-systems.com
+www.cloudscaling.com
+www.cloudsigma.com
+www.cloudsoftcorp.com
+www.cme.com
+www.codero.com
+www.codethink.co.uk
+www.collabora.co.uk
+www.comarch.com
+www.componentality.com
+www.credativ.com
+www.csr.com
+www.cybercom.com
+www.cypress.com
+www.dlink.com
+www.dotrtt.com
+www.dell.com
+www.globaldenso.com
+www.denx.de
+www.dfs-ais.de
+www.docker.io
+www.dreamhost.com
+www.dreamworks.com
+www.emc.com
+www.enea.com
+www.epson.com
+www.erlang-solutions.com
+www.eucalyptus.com
+exegy.com
+feuerlabs.com
+www.fixnetix.com
+www.fluendo.com
+www.freescale.com
+www.fusionio.com
+www.gazzang.com
+www.genymobile.com
+gsmart.gigabytecm.com
+www.goahead.com
+www.harman.com
+www.hgst.com
+www.hisense.com
+www.hostconcepts.com
+hsafoundation.com
+www.hyundai.com
+www.ics.com
+www.igalia.com
+www.inktank.com
+www.innominds.com
+www.interactivedata.com
+www.intrinsyc.com
+www.ixonos.com
+www.jaguarlandrover.com
+www.jpmorgan.com
+www.jvckenwood.com
+adaptxt.com
+www.lanedo.com
+www.lexisnexis.ca
+www.lexmark.com
+www.lg.com
+www.lineo.co.jp
+www.linpus.com
+www.lpi.org
+www.lsi.com
+www.mandriva.com
+www.marvell.com
+www.meinbergglobal.com
+www.mellanox.com
+www.mentor.com
+www.meyersound.com
+www.micware.co.jp
+www.mindspeed.com
+www.mips.com
+www.mocana.com
+www.nebula.com
+www.nexb.com
+www.nicira.com
+www.nipa.kr
+www.nissan-global.com
+www.nixu.com
+www.nokia.com
+www.ntt.co.jp
+nttd-mse.com
+nvidia.com
+www.osssystems.com
+www.omnibond.com
+www.op5.com
+www.openlogic.com
+www.osadl.org
+owncloud.org
+www.palamida.com
+www.parallels.com
+www.pelagicore.com
+www.perforce.com
+www.pingwinsoft.ru
+pioneer.jp
+www.produban.com
+www.profusion.mobi
+www.protecode.com
+www.proxmox.com
+www.pt.com
+www.puzzle.ch
+www.atheros.com
+reaktor.fi
+www.redhat.com
+www.renesas.com
+www.ricoh.com
+rusbitech.ru
+www.savoirfairelinux.com
+www.scalecomputing.com
+www.servergy.com
+www.siemens.com
+www.sim.com
+www.softlayer.com
+www.solarflare.com
+www.sonatype.com
+www.sony.com
+www.spectracoretech.com
+www.splashtop.com
+www.stericsson.com
+www.stec-inc.com
+www.suntec.net
+www.superb.net
+www.symbio.com
+www.symphonyteleca.com
+www.synopsys.com
+www.systena.co.jp
+www.ti.com
+www.ramsan.com
+www.thomas-krenn.com
+www.thundersoft.com
+www.tieto.com
+www.timesys.com
+www.toshiba.com
+www.toyotsu-electronics.co.jp
+www.travelping.com
+www.ts-a.com
+www.turbosystems.co.jp
+www.tuxera.com
+twitter.com
+www.valvesoftware.com
+www.via.com
+www.vbridges.com
+www.vmware.com
+www.wargaming.net
+www.windriver.com
+www.yahoo.com
+www.zenoss.com
+wwwen.zte.com.cn
 
-Not Jean-Jacques! I take the sole honor for that :-)
-
-> All startup functions do the same thing:
->
->     if (gpio_lock_as_irq() < 0)
->        dev_err("BLA");
->     unmask_irq();
->
-> Plus the shutdown functions having the gpio_unlock_as_irq() +
-> mask_irq() sequence. Sigh.
->
-> So the proper solution to the problem if we want to use irq_startup()
-> is:
->
->   Change the return value of the irq_startup() callback to int and
->   fixup all existing implementations. This wants to be done with a
->   coccinelle script. If you hurry up, I might squeeze it into 3.14 as
->   there is no risk at all. Otherwise this is going to happen after the
->   3.15 merge window closes.
-
-I think Jean-Jacques says he's onto this so great.
-
->   After that's done, remove all the copies of startup/shutdown
->   nonsense in drivers/gpio and force all gpio chips to call
->   gpio_set_irq_chip*() instead of irq_set_irq_chip*() and add generic
->   irq_startup/shutdown callbacks which are implemented in the gpiolib
->   core code.
-
-We probably need to mirror irq_set_chip_and_handler() too since
-most drivers use this, but I like this idea.
-
-> There is a less intrusive alternative solution:
->
->   Mark the interrupt as GPIO based in the core and let the core call
->   conditonally the gpio_[un]lock_as_irq functions.
-
-I think the first one is better actually.
-
-I'll see what Jean-Jacques comes up with and take it from there unless
-he's interested in taking it all the way.
-
-Yours,
-Linus Walleij
+Affiliates
+www.cicc.or.jp
+www.konkuk.ac.kr
+www.oamk.fi
+www.senecac.on.ca
+www.soongsil.ac.kr
+trace.wisc.edu
