@@ -1,27 +1,63 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 7 Mar 2014 14:59:04 -0800
-Subject: [PATCH RFC v2 08/11] tty: xuartps: Rename Kconfig symbols
-In-Reply-To: <20140307213058.702ff194@alan.etchedpixels.co.uk>
-References: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
- <1394219614-3197-9-git-send-email-soren.brinkmann@xilinx.com>
- <20140307213058.702ff194@alan.etchedpixels.co.uk>
-Message-ID: <a588bea6-d402-4a87-ada0-cdf13f13ba59@CH1EHSMHS033.ehs.local>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 7 Mar 2014 17:07:59 -0600
+Subject: [Patch v8 2/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <531A485D.9010508@mm-sol.com>
+References: <1393828245-18766-1-git-send-email-agross@codeaurora.org>
+ <1393828245-18766-3-git-send-email-agross@codeaurora.org>
+ <531A485D.9010508@mm-sol.com>
+Message-ID: <20140307230759.GC3241@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-03-07 at 09:30PM +0000, One Thousand Gnomes wrote:
-> On Fri,  7 Mar 2014 11:13:31 -0800
-> Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+On Sat, Mar 08, 2014 at 12:29:49AM +0200, Stanimir Vabanov wrote:
+> > +#define BAM_IRQ_SRCS_EE(pipe)		(0x0800 + ((pipe) * 0x80))
+> > +#define BAM_IRQ_SRCS_MSK_EE(pipe)	(0x0804 + ((pipe) * 0x80))
 > 
-> > Rename the config symbols for the Cadence UART to reflect the driver
-> > rebranding:
-> >   SERIAL_XILINX_PS_UART(_CONSOLE) -> SERIAL_CADENCE_UART(_CONSOLE)
+> s/pipe/ee ?
 > 
-> This breaks all those setups people have with pre-packed .config files
-> that have worked for a long time and now randomly need changing for this
-> kernel.
 
-And this will be dropped as well.
+Ah good catch.  I'll fix that.
 
-	Thanks,
-	S?ren
+> > +struct bam_chan {
+> > +	struct virt_dma_chan vc;
+> > +
+> > +	struct bam_device *bdev;
+> > +
+> > +	/* configuration from device tree */
+> > +	u32 id;
+> > +	u32 ee;
+> > +
+> 
+> do we need per channel ee? I'm asking because failed to find references
+> to it.
+> 
+
+You're right.  This is dead variable.  I had transitioned from channel to
+device when I modified the bindings.  Device is where it belongs.  I'll fix
+this.
+
+<snip>
+> > +
+> > +/**
+> > + * bam_alloc_chan - Allocate channel resources for DMA channel.
+> > + * @chan: specified channel
+> > + *
+> > + * This function allocates the FIFO descriptor memory
+> > + */
+> > +static int bam_alloc_chan(struct dma_chan *chan)
+> > +{
+> > +	struct bam_chan *bchan = to_bam_chan(chan);
+> > +	struct bam_device *bdev = bchan->bdev;
+> > +
+> 
+> you could invert the logic and avoid extra indentation.
+> 	if (bchan->fifo_virt)
+> 		return 0;
+> 
+
+True.  I'll flip that.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
