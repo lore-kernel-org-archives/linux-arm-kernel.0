@@ -1,76 +1,69 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  6 Mar 2014 22:44:40 -0800
-Subject: [PATCH 1/7] pinctrl: msm: Silence recursive lockdep warning
+Date: Thu,  6 Mar 2014 22:44:44 -0800
+Subject: [PATCH 5/7] pinctrl: msm: Replace lookup tables with math
 In-Reply-To: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
 References: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1394174686-8358-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1394174686-8358-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a driver calls enable_irq_wake() on a gpio turned interrupt
-from the msm pinctrl driver we'll get a lockdep warning like so:
-
-=============================================
-[ INFO: possible recursive locking detected ]
-3.14.0-rc3 #2 Not tainted
----------------------------------------------
-modprobe/52 is trying to acquire lock:
- (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
-
-but task is already holding lock:
- (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
-
-other info that might help us debug this:
- Possible unsafe locking scenario:
-
-       CPU0
-       ----
-  lock(&irq_desc_lock_class);
-  lock(&irq_desc_lock_class);
-
- *** DEADLOCK ***
-
- May be due to missing lock nesting notation
-
-4 locks held by modprobe/52:
- #0:  (&__lockdep_no_validate__){......}, at: [<c04f2864>] __driver_attach+0x48/0x98
- #1:  (&__lockdep_no_validate__){......}, at: [<c04f2874>] __driver_attach+0x58/0x98
- #2:  (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
- #3:  (&(&pctrl->lock)->rlock){......}, at: [<c04bb4b8>] msm_gpio_irq_set_wake+0x20/0xa8
-
-Silence it by putting the gpios into their own lock class.
+We don't need to waste space with these lookup tables, just do
+the math directly.
 
 Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/pinctrl-msm.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/pinctrl/pinctrl-msm.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index ef2bf3126da6..ac7223dab4a3 100644
+index 5daad720ecbb..58c23f138d7a 100644
 --- a/drivers/pinctrl/pinctrl-msm.c
 +++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -869,6 +869,12 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
+@@ -260,8 +260,10 @@ static int msm_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ #define MSM_PULL_DOWN	1
+ #define MSM_PULL_UP	3
+ 
+-static const unsigned msm_regval_to_drive[] = { 2, 4, 6, 8, 10, 12, 14, 16 };
+-static const unsigned msm_drive_to_regval[] = { -1, -1, 0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 5, -1, 6, -1, 7 };
++static unsigned msm_regval_to_drive(u32 val)
++{
++	return (val + 1) * 2;
++}
+ 
+ static int msm_config_group_get(struct pinctrl_dev *pctldev,
+ 				unsigned int group,
+@@ -298,7 +300,7 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
+ 		arg = arg == MSM_PULL_UP;
+ 		break;
+ 	case PIN_CONFIG_DRIVE_STRENGTH:
+-		arg = msm_regval_to_drive[arg];
++		arg = msm_regval_to_drive(arg);
+ 		break;
+ 	default:
+ 		dev_err(pctrl->dev, "Unsupported config parameter: %x\n",
+@@ -351,10 +353,10 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+ 			break;
+ 		case PIN_CONFIG_DRIVE_STRENGTH:
+ 			/* Check for invalid values */
+-			if (arg >= ARRAY_SIZE(msm_drive_to_regval))
++			if (arg > 16 || arg < 2 || (arg % 2) != 0)
+ 				arg = -1;
+ 			else
+-				arg = msm_drive_to_regval[arg];
++				arg = (arg / 2) - 1;
+ 			break;
+ 		default:
+ 			dev_err(pctrl->dev, "Unsupported config parameter: %x\n",
+@@ -533,7 +535,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	pull = (ctl_reg >> g->pull_bit) & 3;
+ 
+ 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
+-	seq_printf(s, " %dmA", msm_regval_to_drive[drive]);
++	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
+ 	seq_printf(s, " %s", pulls[pull]);
  }
  
-+/*
-+ * This lock class tells lockdep that GPIO irqs are in a different
-+ * category than their parents, so it won't report false recursion.
-+ */
-+static struct lock_class_key gpio_lock_class;
-+
- static int msm_gpio_init(struct msm_pinctrl *pctrl)
- {
- 	struct gpio_chip *chip;
-@@ -907,6 +913,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 
- 	for (i = 0; i < chip->ngpio; i++) {
- 		irq = irq_create_mapping(pctrl->domain, i);
-+		irq_set_lockdep_class(irq, &gpio_lock_class);
- 		irq_set_chip_and_handler(irq, &msm_gpio_irq_chip, handle_edge_irq);
- 		irq_set_chip_data(irq, pctrl);
- 	}
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
