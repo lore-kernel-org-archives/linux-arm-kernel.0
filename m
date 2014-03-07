@@ -1,47 +1,170 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 15:09:09 +0200
-Subject: [PATCH 6/8] ARM: dts: omap4+: Add clocks to USB2 PHY node
+Date: Fri, 7 Mar 2014 15:09:10 +0200
+Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
 In-Reply-To: <1394197751-28984-1-git-send-email-rogerq@ti.com>
 References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394197751-28984-7-git-send-email-rogerq@ti.com>
+Message-ID: <1394197751-28984-8-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB2 PHY driver expects named clocks for wakeup clock
-and reference clock. Provide this information for USB2 PHY
-nodes in OMAP4 and OMAP5 SoC DTS.
+Add nodes for the Super Speed USB controllers, omap-control-usb,
+USB2 PHY and USB3 PHY devices.
+
+Remove ocp2scp1 address space from hwmod data as it is
+now provided via device tree.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 2 ++
- arch/arm/boot/dts/omap5.dtsi | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
+ 2 files changed, 110 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 4e15be5..2f6cfa6 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -608,6 +608,8 @@
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
- 				ctrl-module = <&omap_control_usb2phy>;
-+				clocks = <&usb_phy_cm_clk32k>;
-+				clock-names = "wkupclk";
- 				#phy-cells = <0>;
- 			};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 597979b..1e73900 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -811,6 +811,116 @@
+ 			clocks = <&sata_ref_clk>;
+ 			ti,hwmods = "sata";
  		};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 521caab..bf629bb 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -769,6 +769,8 @@
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a084000 0x7c>;
- 				ctrl-module = <&omap_control_usb2phy>;
-+				clocks = <&usb_phy_cm_clk32k>, <&usb_otg_ss_refclk960m>;
-+				clock-names = "wkupclk", "refclk";
- 				#phy-cells = <0>;
- 			};
++
++		omap_control_usb2phy1: control-phy at 4a002300 {
++			compatible = "ti,control-phy-usb2";
++			reg = <0x4a002300 0x4>;
++			reg-names = "power";
++		};
++
++		omap_control_usb3phy1: control-phy at 4a002370 {
++			compatible = "ti,control-phy-pipe3";
++			reg = <0x4a002370 0x4>;
++			reg-names = "power";
++		};
++
++		omap_control_usb2phy2: control-phy at 0x4a002e74 {
++			compatible = "ti,control-phy-usb2-dra7";
++			reg = <0x4a002e74 0x4>;
++			reg-names = "power";
++		};
++
++		/* OCP2SCP1 */
++		ocp2scp at 4a080000 {
++			compatible = "ti,omap-ocp2scp";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <0x4a080000 0x20>;
++			ti,hwmods = "ocp2scp1";
++
++			usb2_phy1: phy at 4a084000 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a084000 0x400>;
++				ctrl-module = <&omap_control_usb2phy1>;
++				clocks = <&usb_phy1_always_on_clk32k>,
++					 <&usb_otg_ss1_refclk960m>;
++				clock-names =	"wkupclk",
++						"refclk";
++				#phy-cells = <0>;
++			};
++
++			usb2_phy2: phy at 4a085000 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a085000 0x400>;
++				ctrl-module = <&omap_control_usb2phy2>;
++				clocks = <&usb_phy2_always_on_clk32k>,
++					 <&usb_otg_ss2_refclk960m>;
++				clock-names =	"wkupclk",
++						"refclk";
++				#phy-cells = <0>;
++			};
++
++			usb3_phy1: phy at 4a084400 {
++				compatible = "ti,omap-usb3";
++				reg = <0x4a084400 0x80>,
++				      <0x4a084800 0x64>,
++				      <0x4a084c00 0x40>;
++				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
++				ctrl-module = <&omap_control_usb3phy1>;
++				clocks = <&usb_phy3_always_on_clk32k>,
++					 <&sys_clkin1>,
++					 <&usb_otg_ss1_refclk960m>,
++					 <&dpll_core_h13x2_ck>;
++				clock-names =	"wkupclk",
++						"sysclk",
++						"refclk",
++						"optclk";
++				#phy-cells = <0>;
++			};
++		};
++
++		omap_dwc3_1 at 48880000 {
++			compatible = "ti,dwc3";
++			ti,hwmods = "usb_otg_ss1";
++			reg = <0x48880000 0x10000>;
++			interrupts = <0 77 4>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <2>;
++			ranges;
++			usb1: usb at 48890000 {
++				compatible = "snps,dwc3";
++				reg = <0x48890000 0x17000>;
++				interrupts = <0 76 4>;
++				phys = <&usb2_phy1>, <&usb3_phy1>;
++				phy-names = "usb2-phy", "usb3-phy";
++				tx-fifo-resize;
++				maximum-speed = "super-speed";
++				dr_mode = "otg";
++			};
++		};
++
++		omap_dwc3_2 at 488c0000 {
++			compatible = "ti,dwc3";
++			ti,hwmods = "usb_otg_ss2";
++			reg = <0x488c0000 0x10000>;
++			interrupts = <0 92 4>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <2>;
++			ranges;
++			usb2: usb at 488d0000 {
++				compatible = "snps,dwc3";
++				reg = <0x488d0000 0x17000>;
++				interrupts = <0 78 4>;
++				phys = <&usb2_phy2>;
++				phy-names = "usb2-phy";
++				tx-fifo-resize;
++				maximum-speed = "high-speed";
++				dr_mode = "otg";
++			};
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index cca24ad..403ba02 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2351,21 +2351,11 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__mpu = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+-static struct omap_hwmod_addr_space dra7xx_ocp2scp1_addrs[] = {
+-	{
+-		.pa_start	= 0x4a080000,
+-		.pa_end		= 0x4a08001f,
+-		.flags		= ADDR_TYPE_RT
+-	},
+-	{ }
+-};
+-
+ /* l4_cfg -> ocp2scp1 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
+ 	.master		= &dra7xx_l4_cfg_hwmod,
+ 	.slave		= &dra7xx_ocp2scp1_hwmod,
+ 	.clk		= "l4_root_clk_div",
+-	.addr		= dra7xx_ocp2scp1_addrs,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
  
 -- 
 1.8.3.2
