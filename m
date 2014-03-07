@@ -1,27 +1,44 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 7 Mar 2014 17:33:35 +0100
-Subject: [PATCH V3 03/12] ARM: shmobile: r7s72100: add essential clock
- nodes to dtsi
-In-Reply-To: <5319F242.70903@codethink.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 07 Mar 2014 17:36:25 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140307162946.GG28943@katana>
 References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <1394208048-32495-4-git-send-email-wsa@the-dreams.de>
- <5319F242.70903@codethink.co.uk>
-Message-ID: <20140307163335.GH28943@katana>
+ <2368991.bjBJjms8qn@avalon> <20140307162946.GG28943@katana>
+Message-ID: <1552759.qGZNIXqrb1@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wolfram,
 
-> FYI: I'm pushing a patch through to make clock-indices a standard
-> DT property that will allow the of_clk_get_name() function to
-> work properly. With this, the renesas,clock-indices will be
-> replaced with the clock-indices.
+On Friday 07 March 2014 17:29:47 Wolfram Sang wrote:
+> Hi Laurent,
+> 
+> > Beside the comment to patch 06/12, I would have moved patches 06/12 to
+> > 08/12 to the beginning of the series, in order to avoid adding a clock
+> > workaround for the serial clock only to remove it a couple of patches
+> > later.
+> 
+> That would have saved only 2 lines since we need the workaround anyhow
+> (MTU2) and would break the incremental approach of this series somewhat.
+> I'd like to keep it.
 
-Great, I'll keep an eye on it!
+It would have saved one patch. If Simon needs to apply CCF support separately 
+I'm fine with that approach, but if both changes are applied at the same time 
+the SCIF patches could go in first.
 
+> > Oh, and one might ask you to fix the 80 columns checkpatch warnings for
+> > patch 01/12 :-)
+> 
+> Broken intentionally for the sake of readability :)
+
+-- 
+Regards,
+
+Laurent Pinchart
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/a53ecb50/attachment.sig>
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/4351711a/attachment.sig>
