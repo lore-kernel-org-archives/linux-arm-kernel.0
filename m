@@ -1,40 +1,65 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 7 Mar 2014 12:18:58 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 1/5] i2c: mv64xxx: Add reset
- deassert call
-In-Reply-To: <CAGb2v66xViOx+DdnuDwad0HsCx2YiYfxqBDAEwYdLHrSydOj0w@mail.gmail.com>
-References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140307095222.GG21483@n2100.arm.linux.org.uk>
- <20140307100751.GN607@lukather>
- <20140307103433.GH21483@n2100.arm.linux.org.uk>
- <CAGb2v66xViOx+DdnuDwad0HsCx2YiYfxqBDAEwYdLHrSydOj0w@mail.gmail.com>
-Message-ID: <20140307111858.GB12274@katana>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Fri, 7 Mar 2014 12:18:45 +0100
+Subject: imx-drm: ldb and display power on sequence
+In-Reply-To: <1394114410.3622.14.camel@paszta.hi.pengutronix.de>
+References: <CAH9NwWcE=4OVHSMKCEuTrFA7JMGEdkxrbX_0OORZ96N1Roi2HQ@mail.gmail.com>
+ <1394114410.3622.14.camel@paszta.hi.pengutronix.de>
+Message-ID: <CAH9NwWfz4tBtuKqaJx_E4Y-a5eYwBaBPg2RgO4CFnE1Dfddi8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Philipp,
 
-> > Since RESET_CONTROLLER is not required for those platforms, it really
-> > should be optional - and I think the real fix is for the reset controller
-> > support to provide stub functions.
-> 
-> Philipp Zabel suggested that adding a _optional variant that provides stubs
-> and doesn't depend on RESET_CONTROLLER is probably better. This keeps the
-> compile time checks for drivers requiring it.
-> 
-> See: https://lkml.org/lkml/2014/1/10/220
-> 
-> I ended up dropping my patch though.
+> Am Donnerstag, den 06.03.2014, 13:34 +0100 schrieb Christian Gmeiner:
+>> Hi all.
+>>
+>> On our custom board design (imx6d) we are using a TFT-display
+>> connceted via LVDS.
+>> The datasheet [0] says that the display needs a defined power up
+>> sequence. I need
+>> to control the following stuff:
+>>
+>> - LCD_ON (gpio2 3)
+>> - Backlight ON (gpio2 0)
+>> - PMW for dimm
+>>
+>> At the moment I have the backlight suff ready:
+>>
+>>        backlight {
+>>                compatible = "pwm-backlight";
+>>                pwms = <&pwm4 0 50000>;
+>>                enable-gpios = <&gpio2 0 0>;
+>>
+>>                brightness-levels = <0 1 2 3 4>;
+>>                default-brightness-level = <4>;
+>>        };
+>>
+>> Now I only need to enable the LCD_ON and wait 40ms before turning on
+>> the LVDS clocks and data.
+>
+> This can be done by adding a regulator-enable-ramp-delay property to the
+> gpio regulator.
+>
 
-Thanks for the pointer. Well, looks like I need to revert the offending
-i2c patches then until this issue is fixed? We can't have
-RESET_CONTROLLER (circular dependency) and we can't skip it (build
-failures).
+Correct.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/7a5dc2eb/attachment.sig>
+>> For this I tought to add a regulator support in
+>> imx_ldb_encoder_commit(..) of imx-ldb.c.
+>>That should give me the correct sequence for
+>> LVDS on to LVDS data/clock. Now I only need to get the pwm-backlight
+>> driver doing its work after ldb is ready.
+>
+> We should rather add drm_panel support to imx-ldb. I have just sent a
+> patch for this.
+> The simple-panel driver already supports regulator and backlight.
+>
+
+I am still life in the world of a stable kernel called 3.13.6 :) Will
+backport the simple-panel driver
+and will have a look at your patches - today.
+
+greets
+--
+Christian Gmeiner, MSc
+
+https://soundcloud.com/christian-gmeiner
