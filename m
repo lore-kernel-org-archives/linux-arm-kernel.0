@@ -1,26 +1,58 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 7 Mar 2014 15:26:14 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix circular dependencies warning and
- compilation breakage
-In-Reply-To: <20140307142405.GB28943@katana>
-References: <20140307111858.GB12274@katana>
- <1394199795-5516-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140307142405.GB28943@katana>
-Message-ID: <20140307142614.GC28943@katana>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 7 Mar 2014 15:27:57 +0100
+Subject: [PATCH v9][ 6/8] staging: imx-drm: parallel display: add
+ regulator support.
+In-Reply-To: <1394121869-13387-3-git-send-email-denis@eukrea.com>
+References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
+ <1394121869-13387-1-git-send-email-denis@eukrea.com>
+ <1394121869-13387-3-git-send-email-denis@eukrea.com>
+Message-ID: <20140307152757.6e97abce@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> Why don't you simply set rstc to some ERR_PTR above if not
-> RESET_CONTROLLER?
+Denis Carikli wrote:
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v8->v9:
+> - Removed the Cc. They are now set in git-send-email directly.
+> - Rebased.
+> 
+> ChangeLog v7->v8:
+> - Shrinked even more the Cc list.
+> - Rebased.
+> 
+> ChangeLog v6->v7:
+> - Shrinked even more the Cc list.
+> - Rebased the patch and included video/of_display_timing.h
+> ---
+>  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    1 +
+>  drivers/staging/imx-drm/parallel-display.c         |   13 +++++++++++++
+>  2 files changed, 14 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> index 2d24425..4dd7ce5 100644
+> --- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> @@ -28,6 +28,7 @@ Required properties:
+>  - compatible: Should be "fsl,imx-parallel-display"
+>  - crtc: the crtc this display is connected to, see below
+>  Optional properties:
+> +- display-supply : phandle to the regulator device tree node if needed.
+>
+Any reason why this is named 'display-supply' rather than 'lcd-supply'
+like for imxfb?
 
-I know why. Sorry for the noise.
 
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/9523e2cf/attachment.sig>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
