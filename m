@@ -1,137 +1,88 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 07 Mar 2014 15:12:53 +0100
-Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
-In-Reply-To: <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
-References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
- <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
-Message-ID: <5319D3E5.4000001@gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 07 Mar 2014 15:17:39 +0100
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <53183730.5060205@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
+ <20140228155937.GQ21483@n2100.arm.linux.org.uk>	<5310B567.7040605@ti.com>
+ <20140228162327.GT21483@n2100.arm.linux.org.uk>	<5316E31F.9050308@ti.com>
+ <CAMuHMdWVSfKrudBhE7FW-ZWBvMOLWjrQZvn1qZUfRt_H+P7A2w@mail.gmail.com>
+ <53183730.5060205@ti.com>
+Message-ID: <1394201859.16309.14.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi,
 
-On 07.03.2014 14:56, Pankaj Dubey wrote:
->> +static void __init exynos5260_clk_top_init(struct device_node *np)
->> +{
->> +       struct exynos5260_cmu_info cmu;
->> +       struct samsung_clk_provider *ctx;
->> +
->> +       memset(&cmu, 0, sizeof(cmu));
->> +
->> +       cmu.pll_clks = top_pll_clks;
->> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
->> +       cmu.mux_clks = top_mux_clks;
->> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
->> +       cmu.div_clks = top_div_clks;
->> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
->> +       cmu.gate_clks = top_gate_clks;
->> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
->> +       cmu.nr_clk_ids = TOP_NR_CLK;
->> +       cmu.clk_regs = top_clk_regs;
->> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
->> +
->> +       ctx = exynos5260_cmu_register_one(np, &cmu);
->> +
->> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
->> +                       ARRAY_SIZE(fixed_rate_ext_clks),
->> +                       ext_clk_match);
->> +}
->> +
->> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
->> +               exynos5260_clk_top_init);
->
-> Well with this approach we end up adding 14 such
-> exynosxxx_clk_xxx_init functions all of which has similar lines of
-> code. As I know there are many upcoming Exynos SoC which will also
-> have similar multiple clock controllers (in some of them there are
-> upto 25 clock domains, and in that case we will end up writing 25 such
-> init functions) so I have following suggestion where we can have one
-> more structure which will hold all static data and match_table to
-> match compatibility string and return CMU_TYPE which can be mapped to
-> get proper clock_data which can be used in single clock_init function.
-> Following is some sample code which I have implemented and tested on
-> one of Exynos SoC. Please let me know your opinion about this.
+Am Donnerstag, den 06.03.2014, 10:52 +0200 schrieb Tomi Valkeinen:
+> On 06/03/14 10:39, Geert Uytterhoeven wrote:
+> > On Wed, Mar 5, 2014 at 9:41 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> >> On 28/02/14 18:23, Russell King - ARM Linux wrote:
+> >>
+> >>> That's rather a lot of compatible strings.  Another possibility is:
+> >>>
+> >>>       compatible = "dvi-connector";
+> >>>       analog;
+> >>>       digital;
+> >>>       single-link;
+> >>>       dual-link;
+> >>
+> >> I made the following changes compared to the posted version. I decided
+> >> to leave the "single-link" out, as it's implied if "digital" is set.
+> >>
+> >>  Tomi
+> >>
+> >> @@ -6,11 +6,16 @@ Required properties:
+> >>
+> >>  Optional properties:
+> >>  - label: a symbolic name for the connector
+> >> -- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+> >> +- ddc-i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+> >> +- analog: the connector has DVI analog pins
+> >> +- digital: the connector has DVI digital pins
+> >> +- dual-link: the connector has pins for DVI dual-link
+> >>
+> >>  Required nodes:
+> >>  - Video port for DVI input
+> >>
+> >> +Note: One (or both) of 'analog' or 'digital' must be set.
+> > 
+> > So dual-link needs both "digital" and "dual-link"?
+> 
+> Yes. It is extra, but it felt clearer to me to have 'digital' as a
+> matching property for 'analog'.
+> 
+> Alternatively we could have three options:
+> 
+> analog;
+> digital-single-link;
+> digital-dual-link;
+> 
+> My reasoning to the format I chose was basically that when a connector
+> supports 'digital', it contains TMDS clock and TMDS data for link 1.
+> Adding dual link to that adds only TMDS data for link 2, so the second
+> data link is kind of an additional feature, marked with a flag.
+> 
+> Not a very big argument, and I'm fine with other format suggestions.
 
-Yes, this looks better indeed, however there is still a room for 
-improvement. Please see my comments below.
+I'd prefer the analog / digital / dual-link variant for aesthetic
+reasons. But looking at other connector types, I wonder if this should
+be generalized even more:
 
->
-> =============================
->
-> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
+For HDMI/DVI (digital) single-link means one clock pair and 3 TMDS data
+pairs, dual-link means one clock pair and 6 data pairs.
 
-Instead of making this an array, particular elements could be separate 
-structures. This would simplify the code below.
+On LVDS connectors, there usually are one clock pair and three (18-bit)
+or four (24-bit) LVDS data pairs, in dual channel configuration two
+clock pairs and 6 or 8 data pairs are used.
 
->          {
->                  .cmu_type = CMU_TYPE_TOP,
->                  .mux_clocks = top_mux_clks,
->                  .div_clocks = top_div_clks,
->                  .pll_clocks = top_pll_clks,
->                  .clk_regs = top_clk_regs,
->                  .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
->                  .nr_div_clocks = ARRAY_SIZE(top_div_clks),
->                  .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
->                  .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
->                  .nr_clks  = TOP_NR_CLK,
->          }, {
->                  .cmu_type = CMU_TYPE_EGL,
->                  .mux_clocks = egl_mux_clks,
->                  .div_clocks = egl_div_clks,
->                  .pll_clocks = egl_pll_clks,
->                   .clk_regs = egl_clk_regs,
->                  .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
->                  .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
->                  .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
->                  .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
->                  .nr_clks  = EGL_NR_CLK,
->          }, {
->         /* Add similar elements here */
-> };
->
-> static struct of_device_id cmu_subtype_match_table[] = {
->          {
->                  .compatible = "exynosxxxx-cmu-top",
->                  .data   = (void *)CMU_TYPE_TOP,
+For DisplayPort there is no separate clock pair, but 1 to 4 data pairs,
+and MIPI DSI again has one clock pair and a one or more data pairs.
 
-Here the data would be just a pointer to respective clock data struct 
-defined above.
+There are already optional endpoint configuration properties
+'data-lanes' and 'clock-lanes' for MIPI CSI-2 defined in
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+Could/should this be aligned with the same?
 
->          }, {
->                  .compatible = "exynosxxx-cmu-peris",
->                  .data   = (void *)CMU_TYPE_PERIS,
->          }, {
->         /* Add similar elements here */
-> };
->
-> void __init exynosxxx_clk_init(struct device_node *np)
-> {
->           [snip]
->
->          match = of_match_node(cmu_subtype_match_table, np);
->
->          if (!match)
->                  panic("%s: cmu type (%s) is not supported.\n", __func__,
->                                  np->name);
-
-This can't happen, because this function won't be called for any node 
-with compatible string not declared using CLK_OF_DECLARE().
-
->
->          reg_base = of_iomap(np, 0);
->          if (!reg_base)
->                  panic("%s: failed to map registers\n", __func__);
->
->          cmu_type = (unsigned long) match->data;
->
->          for (; i < CMU_TYPE_ALL; i++) {
->                  clk_data = &exynosxxxx_clk_data[i];
->                  if (cmu_type == clk_data->cmu_type)
->                          break;
->          }
-
-Now clk_data could be taken directly from match->data, without the need 
-to iterate over an array.
-
-Best regards,
-Tomasz
+regards
+Philipp
