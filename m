@@ -1,40 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Mar 2014 11:07:51 +0100
-Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
-In-Reply-To: <20140307095222.GG21483@n2100.arm.linux.org.uk>
+Date: Fri, 7 Mar 2014 11:13:48 +0100
+Subject: [PATCH v3 2/5] i2c: mv64xxx: Add support for the Allwinner A31
+ I2C driver
+In-Reply-To: <20140305163430.GC9228@katana>
 References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140307095222.GG21483@n2100.arm.linux.org.uk>
-Message-ID: <20140307100751.GN607@lukather>
+ <1393950521-4173-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140305163430.GC9228@katana>
+Message-ID: <20140307101348.GO607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Wolfram,
 
-On Fri, Mar 07, 2014 at 09:52:23AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 04, 2014 at 05:28:37PM +0100, Maxime Ripard wrote:
-> > The Allwinner A31 SoC using that IP has a reset controller maintaining
-> > it reset unless told otherwise.
-> > 
-> > Add some optional reset support to the driver.
+On Wed, Mar 05, 2014 at 05:34:30PM +0100, Wolfram Sang wrote:
+> On Tue, Mar 04, 2014 at 05:28:38PM +0100, Maxime Ripard wrote:
+> > The Allwinner A31 I2C controller is almost identical to the one used in the
+> > other Allwinner SoCs, except for the fact that it needs to clear the interrupt
+> > by setting the INT_FLAGS bit in the control register, instead of clearing it.
 > > 
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > > Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> This appears to be causing some build errors in Olof's next builder
-> for many of the ARM platforms which make use of this:
+> Applied to for-next, thanks!
 > 
-> drivers/i2c/busses/i2c-mv64xxx.c:924: undefined reference to `reset_control_assert'
-> drivers/i2c/busses/i2c-mv64xxx.c:904: undefined reference to `reset_control_assert'
-> drivers/i2c/busses/i2c-mv64xxx.c:771: undefined reference to `devm_reset_control_get'
-> drivers/i2c/busses/i2c-mv64xxx.c:778: undefined reference to `reset_control_deassert'
+> Still...
+> 
+> > +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-i2c"))
+> > +		drv_data->irq_clear_inverted = true;
+> 
+> ... next time an errata is needed, I think it makes sense to refactor all
+> these checks into one struct which can be used as match->data directly.
 
-The reset framework doesn't define its functions when its not
-selected, and somehow I think it was not here. What's odd is that
-there is an explicit select on RESET_CONTROLLER in the Kconfig. Maybe
-it's the circular dependency issue that has been reported that cause
-this and Wolfram sent a patch for: http://patchwork.ozlabs.org/patch/327573/
+Yep, it makes sense. Thanks!
 
 Maxime
 
@@ -48,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/5ce19d1e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/9394b6de/attachment.sig>
