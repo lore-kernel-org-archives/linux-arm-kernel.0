@@ -1,43 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 11:38:42 +0900
-Subject: [PATCH 01/03] ARM: shmobile: Remove legacy EMEV2 SoC support
-In-Reply-To: <CANqRtoTKLjHvjFHNtz3Qr9Mm+1ZafqxQFr7NtgTHNLh+4L+_NA@mail.gmail.com>
-References: <20140213082558.30630.93034.sendpatchset@w520>
- <20140213082608.30630.40000.sendpatchset@w520>
- <20140217032306.GH7772@verge.net.au>
- <20140218041643.GB32417@verge.net.au>
- <CANqRtoTKLjHvjFHNtz3Qr9Mm+1ZafqxQFr7NtgTHNLh+4L+_NA@mail.gmail.com>
-Message-ID: <20140307023839.GJ11702@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  6 Mar 2014 19:44:10 -0700
+Subject: [GIT PULL 2/2] ARM: bcm2835: DT changes for 3.15
+In-Reply-To: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
+References: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1394160250-3939-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 01:25:49PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Tue, Feb 18, 2014 at 1:16 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Feb 17, 2014 at 12:23:09PM +0900, Simon Horman wrote:
-> >> On Thu, Feb 13, 2014 at 05:26:08PM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm@opensource.se>
-> >> >
-> >> > Get rid of legacy EMEV2 SoC code including the legacy clock
-> >> > framework implementation. The multiplatform implementation
-> >> > together with DT board support shall be used instead.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> >>
-> >> Thanks, I have queued this up.
-> >
-> > I have dropped this patch for now and plan to deffer it.
-> > This is because although this is patch 1 of the series
-> > it removes emev2_clock_init() which causes the build
-> > of board-kzm9d-reference.c to fail without
-> > "ARM: shmobile: Remove Lager DT reference legacy clock bits".
-> >
-> > My current thinking is that the best way to sequence this is to
-> > queue up the board and defconfig changes for v3.15 but wait
-> > for v3.16 to queue up the SoC changes. This avoids tedious
-> > dependencies of SoC patches on board patches in the same release cycle.
-> 
-> Thanks, that's of course fine with me!
+A variety of features are added to the bcm2835 device trees:
+- ARM PMU, for perf_event
+- DMA controller
+- I2S controller
 
-I have now queued this up for v3.16.
+A few cleanups are applied to the DTs too.
+
+----------------------------------------------------------------
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.15-dt
+
+for you to fetch changes up to b7c6c1760685f7d3a3eecc19f4b792881bf1d907:
+
+  ARM: bcm2835: fix clock DT node names
+
+----------------------------------------------------------------
+
+Florian Meier (2):
+      ARM: bcm2835: add dmaengine driver to device tree
+      ARM: bcm2835: add I2S driver to device tree
+
+Stephen Warren (3):
+      ARM: bcm2835: fix DT node sort order
+      ARM: bcm2835: node name unit address cleanup
+      ARM: bcm2835: fix clock DT node names
+
+Vince Weaver (1):
+      ARM: bcm2835: perf_event support for Raspberry-Pi
+
+ arch/arm/boot/dts/bcm2835.dtsi | 92 ++++++++++++++++++++++++++-----------
+ 1 file changed, 65 insertions(+), 27 deletions(-)
