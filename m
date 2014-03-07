@@ -1,71 +1,194 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  7 Mar 2014 17:00:36 +0100
-Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
-Message-ID: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+Date: Fri,  7 Mar 2014 17:00:37 +0100
+Subject: [PATCH V3 01/12] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1394208048-32495-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves the r7s72100 platfrom from the legacy clock implementation to
-the common clock framework.
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-This series has been tested with the renesas-devel-v3.14-rc5-20140307v2 tag.
-If you want to boot into a console, you have a runtime dependency [1].
-
-Patches 1-5 is the minimal set to activate CCF and get the board booting into a
-console. Patches 6-8 add SCIF support, 9+10 I2C support, and 11+12 SPI support.
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+---
 
 Changes since V2:
 
-Patches 1+3 got updates, patch 12 was not send out last time due to sendmail error.
+* Document the input clocks for r7s72100
+* revamp and simplify the error paths of the driver
 
-Patch 1 should probably go via clock tree (it has no dependencies). The rest
-via shmobile. Please apply.
+Changes since V1:
+* added docs
+* preparation for usb_x1 support by documenting two input clocks
+* static-consted frqcr_tab
+* bail out if num_clks == 0
+* cosmetic fixes
 
-   Wolfram
+Mike: if you are fine with this driver, it would be good if you could apply it.
+Then, we can deal with the orthogonal dependencies in mach-shmobile seperately
+and know that the driver is already in place when the rest gets resolved.
+Thanks!
 
-PS: A tree can be found here with this series only:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf
-
-And here with a quick hack to make the system bootable:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf-bootable
-
-[1] http://lkml.org/lkml/2014/2/20/205 ([PATCH V7 0/3] clocksource: Consolidate SH and ARM mach-shmobile Kconfig bits)
-
-
-Wolfram Sang (12):
-  clk: shmobile: add CPG driver for rz-platforms
-  ARM: shmobile: r7s72100: document MSTP clock support
-  ARM: shmobile: r7s72100: add essential clock nodes to dtsi
-  ARM: shmobile: r7s72100: genmai: populate nodes for external clocks
-  ARM: shmobile: r7s72100: use workaround for non DT-clocks
-  ARM: shmobile: r7s72100: add scif nodes to dtsi
-  ARM: shmobile: r7s72100: genmai: activate scif2 for console output
-  ARM: shmobile: r7s72100: genmai: platform scif devices only for legacy
-    support
-  ARM: shmobile: r7s72100: add i2c clocks to dtsi
-  ARM: shmobile: r7s72100: remove I2C DT clocks from legacy clock
-    support
-  ARM: shmobile: r7s72100: add spi clocks to dtsi
-  ARM: shmobile: r7s72100: remove SPI DT clocks from legacy clock
-    support
-
- .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
- .../bindings/clock/renesas,rz-cpg-clocks.txt       |  29 +++
- arch/arm/boot/dts/r7s72100-genmai-reference.dts    |  12 ++
- arch/arm/boot/dts/r7s72100.dtsi                    | 223 ++++++++++++++++++++-
- arch/arm/mach-shmobile/board-genmai-reference.c    |  14 +-
- arch/arm/mach-shmobile/board-genmai.c              |  44 ++++
- arch/arm/mach-shmobile/clock-r7s72100.c            |   9 -
- arch/arm/mach-shmobile/setup-r7s72100.c            |  43 ----
+ .../bindings/clock/renesas,rz-cpg-clocks.txt       |  29 ++++++
  drivers/clk/shmobile/Makefile                      |   1 +
- drivers/clk/shmobile/clk-rz.c                      | 103 ++++++++++
- include/dt-bindings/clock/r7s72100-clock.h         |  40 ++++
- 11 files changed, 464 insertions(+), 55 deletions(-)
+ drivers/clk/shmobile/clk-rz.c                      | 103 +++++++++++++++++++++
+ 3 files changed, 133 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
  create mode 100644 drivers/clk/shmobile/clk-rz.c
- create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
+diff --git a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+new file mode 100644
+index 000000000000..98a257492522
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+@@ -0,0 +1,29 @@
++* Renesas RZ Clock Pulse Generator (CPG)
++
++The CPG generates core clocks for the RZ SoCs. It includes the PLL, variable
++CPU and GPU clocks, and several fixed ratio dividers.
++
++Required Properties:
++
++  - compatible: Must be one of
++    - "renesas,r7s72100-cpg-clocks" for the r7s72100 CPG
++    - "renesas,rz-cpg-clocks" for the generic RZ CPG
++  - reg: Base address and length of the memory resource used by the CPG
++  - clocks: References to possible parent clocks. Order must match clock modes
++    in the datasheet. For the r7s72100, this is extal, usb_x1.
++  - #clock-cells: Must be 1
++  - clock-output-names: The names of the clocks. Supported clocks are "pll",
++    "i", and "g"
++
++
++Example
++-------
++
++	cpg_clocks: cpg_clocks at fcfe0000 {
++		#clock-cells = <1>;
++		compatible = "renesas,r7s72100-cpg-clocks",
++			     "renesas,rz-cpg-clocks";
++		reg = <0xfcfe0000 0x18>;
++		clocks = <&extal_clk>, <&usb_x1_clk>;
++		clock-output-names = "pll", "i", "g";
++	};
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index 9ecef140dba7..5404cb931ebf 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
++obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
+ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
+diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
+new file mode 100644
+index 000000000000..7e68e8630962
+--- /dev/null
++++ b/drivers/clk/shmobile/clk-rz.c
+@@ -0,0 +1,103 @@
++/*
++ * rz Core CPG Clocks
++ *
++ * Copyright (C) 2013 Ideas On Board SPRL
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++struct rz_cpg {
++	struct clk_onecell_data data;
++	void __iomem *reg;
++};
++
++#define CPG_FRQCR	0x10
++#define CPG_FRQCR2	0x14
++
++/* -----------------------------------------------------------------------------
++ * Initialization
++ */
++
++static struct clk * __init
++rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const char *name)
++{
++	u32 val;
++	unsigned mult;
++	static const unsigned frqcr_tab[4] = { 3, 2, 0, 1 };
++
++	if (strcmp(name, "pll") == 0) {
++		/* FIXME: cpg_mode should be read from GPIO. But no GPIO support yet */
++		unsigned cpg_mode = 0; /* hardcoded to EXTAL for now */
++		const char *parent_name = of_clk_get_parent_name(np, cpg_mode);
++
++		mult = cpg_mode ? (32 / 4) : 30;
++
++		return clk_register_fixed_factor(NULL, name, parent_name, 0, mult, 1);
++	}
++
++	/* If mapping regs failed, skip non-pll clocks. System will boot anyhow */
++	if (!cpg->reg)
++		return ERR_PTR(-ENXIO);
++
++	/* FIXME:"i" and "g" are variable clocks with non-integer dividers (e.g. 2/3)
++	 * and the constraint that always g <= i. To get the rz platform started,
++	 * let them run@fixed current speed and implement the details later.
++	 */
++	if (strcmp(name, "i") == 0)
++		val = (clk_readl(cpg->reg + CPG_FRQCR) >> 8) & 3;
++	else if (strcmp(name, "g") == 0)
++		val = clk_readl(cpg->reg + CPG_FRQCR2) & 3;
++	else
++		return ERR_PTR(-EINVAL);
++
++	mult = frqcr_tab[val];
++	return clk_register_fixed_factor(NULL, name, "pll", 0, mult, 3);
++}
++
++static void __init rz_cpg_clocks_init(struct device_node *np)
++{
++	struct rz_cpg *cpg;
++	struct clk **clks;
++	unsigned i;
++	int num_clks;
++
++	num_clks = of_property_count_strings(np, "clock-output-names");
++	if (WARN(num_clks <= 0, "can't count CPG clocks\n"))
++		return;
++
++	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
++	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
++	BUG_ON(!cpg || !clks);
++
++	cpg->data.clks = clks;
++	cpg->data.clk_num = num_clks;
++
++	cpg->reg = of_iomap(np, 0);
++
++	for (i = 0; i < num_clks; ++i) {
++		const char *name;
++		struct clk *clk;
++
++		of_property_read_string_index(np, "clock-output-names", i, &name);
++
++		clk = rz_cpg_register_clock(np, cpg, name);
++		if (IS_ERR(clk))
++			pr_err("%s: failed to register %s %s clock (%ld)\n",
++			       __func__, np->name, name, PTR_ERR(clk));
++		else
++			cpg->data.clks[i] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++}
++CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
 -- 
 1.9.0
