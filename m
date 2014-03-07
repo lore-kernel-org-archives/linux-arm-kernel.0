@@ -1,51 +1,43 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Mar 2014 17:46:07 +0530
-Subject: [RFC PATCH 0/9] drivers: dma: Add support for dma-channel router
-Message-ID: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
+Date: Fri, 7 Mar 2014 17:46:08 +0530
+Subject: [RFC PATCH 1/9] drivers: dma: omap-dma: Avoid hard-coding of the
+ dma-request channels
+In-Reply-To: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
+References: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1394194576-23741-2-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some SoCs the dma request lines from the peripherals are
-routed to the dma-controller through a crossbar. With this the
-dma controller's available request lines are shared between the
-peripherals.
+The total number of dma-request channels is hard-coded. Instead read the
+data from DT.
 
-This adds support to register the crossbar router associated with
-a dma-channel and let the dma-controller driver map/unmap
-the peripheral dma crossbar line to dma-controller's request
-line.
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ drivers/dma/omap-dma.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-This is on top of Russell's OMAP dma engine rework series
-
-	http://www.spinics.net/lists/linux-omap/msg102969.html
-
-Sricharan R (9):
-  drivers: dma: omap-dma: Avoid hard-coding of the dma-request channels
-  drivers: dma: of-dma: Add support for dma-request line routers
-  drivers: dma: omap-dma: Add a seperate xlate function to get router
-    data
-  drivers: omap-dma: Add crossbar line as a resource to omap_chan
-    structure
-  drivers: dma: Add dma crossbar driver
-  arm: dts: dra: Add dma crossbar node
-  arm: dts: dra: Add dma-request router phandle to dma-specs
-  arm: dra: Enable dma crossbar support on dra7xx
-  arm: dts: dra7: Change the total dma-req numbers to crossbar channels
-
- .../devicetree/bindings/arm/omap/dma-crossbar.txt  |   26 +++
- arch/arm/boot/dts/dra7.dtsi                        |   47 +++--
- arch/arm/configs/omap2plus_defconfig               |    1 +
- drivers/dma/Kconfig                                |    7 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/of-dma.c                               |   82 +++++++-
- drivers/dma/omap-dma-xbar.c                        |  219 ++++++++++++++++++++
- drivers/dma/omap-dma-xbar.h                        |   32 +++
- drivers/dma/omap-dma.c                             |   72 ++++++-
- include/linux/of_dma.h                             |   22 ++
- 10 files changed, 479 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/dma-crossbar.txt
- create mode 100644 drivers/dma/omap-dma-xbar.c
- create mode 100644 drivers/dma/omap-dma-xbar.h
-
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 64ceca2..a0d6639 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -1093,6 +1093,7 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 	struct omap_dmadev *od;
+ 	struct resource *res;
+ 	int rc, i, irq;
++	u32 reqs;
+ 
+ 	od = devm_kzalloc(&pdev->dev, sizeof(*od), GFP_KERNEL);
+ 	if (!od)
+@@ -1126,7 +1127,9 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 
+ 	tasklet_init(&od->task, omap_dma_sched, (unsigned long)od);
+ 
+-	for (i = 0; i < 127; i++) {
++	of_property_read_u32(pdev->dev.of_node, "#dma-requests", &reqs);
++
++	for (i = 0; i < reqs; i++) {
+ 		rc = omap_dma_chan_init(od, i);
+ 		if (rc) {
+ 			omap_dma_free(od);
 -- 
 1.7.9.5
