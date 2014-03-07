@@ -1,88 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 07 Mar 2014 15:17:39 +0100
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <53183730.5060205@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>	<5310B567.7040605@ti.com>
- <20140228162327.GT21483@n2100.arm.linux.org.uk>	<5316E31F.9050308@ti.com>
- <CAMuHMdWVSfKrudBhE7FW-ZWBvMOLWjrQZvn1qZUfRt_H+P7A2w@mail.gmail.com>
- <53183730.5060205@ti.com>
-Message-ID: <1394201859.16309.14.camel@paszta.hi.pengutronix.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 7 Mar 2014 15:24:05 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix circular dependencies warning and
+ compilation breakage
+In-Reply-To: <1394199795-5516-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <20140307111858.GB12274@katana>
+ <1394199795-5516-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140307142405.GB28943@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Am Donnerstag, den 06.03.2014, 10:52 +0200 schrieb Tomi Valkeinen:
-> On 06/03/14 10:39, Geert Uytterhoeven wrote:
-> > On Wed, Mar 5, 2014 at 9:41 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> >> On 28/02/14 18:23, Russell King - ARM Linux wrote:
-> >>
-> >>> That's rather a lot of compatible strings.  Another possibility is:
-> >>>
-> >>>       compatible = "dvi-connector";
-> >>>       analog;
-> >>>       digital;
-> >>>       single-link;
-> >>>       dual-link;
-> >>
-> >> I made the following changes compared to the posted version. I decided
-> >> to leave the "single-link" out, as it's implied if "digital" is set.
-> >>
-> >>  Tomi
-> >>
-> >> @@ -6,11 +6,16 @@ Required properties:
-> >>
-> >>  Optional properties:
-> >>  - label: a symbolic name for the connector
-> >> -- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-> >> +- ddc-i2c-bus: phandle to the i2c bus that is connected to DVI DDC
-> >> +- analog: the connector has DVI analog pins
-> >> +- digital: the connector has DVI digital pins
-> >> +- dual-link: the connector has pins for DVI dual-link
-> >>
-> >>  Required nodes:
-> >>  - Video port for DVI input
-> >>
-> >> +Note: One (or both) of 'analog' or 'digital' must be set.
-> > 
-> > So dual-link needs both "digital" and "dual-link"?
+New patch -> new thread, please.
+
+> This patch fixes the circular dependency introduced by commit 370136bc67c3
+> ("i2c: mv64xxx: Add reset deassert call"):
 > 
-> Yes. It is extra, but it felt clearer to me to have 'digital' as a
-> matching property for 'analog'.
-> 
-> Alternatively we could have three options:
-> 
-> analog;
-> digital-single-link;
-> digital-dual-link;
-> 
-> My reasoning to the format I chose was basically that when a connector
-> supports 'digital', it contains TMDS clock and TMDS data for link 1.
-> Adding dual link to that adds only TMDS data for link 2, so the second
-> data link is kind of an additional feature, marked with a flag.
-> 
-> Not a very big argument, and I'm fine with other format suggestions.
+> drivers/video/Kconfig:42:error: recursive dependency detected!
 
-I'd prefer the analog / digital / dual-link variant for aesthetic
-reasons. But looking at other connector types, I wonder if this should
-be generalized even more:
+Please base it on i2c-next. I already applied my patch.
+Your patch fixes the build error discovered by it.
 
-For HDMI/DVI (digital) single-link means one clock pair and 3 TMDS data
-pairs, dual-link means one clock pair and 6 data pairs.
+> Since the reset framework doesn't define dummy stubs whenever
+> CONFIG_RESET_CONTROLLER is not defined, it's the only sane way to have a driver
+> that compiles in any cases.
 
-On LVDS connectors, there usually are one clock pair and three (18-bit)
-or four (24-bit) LVDS data pairs, in dual channel configuration two
-clock pairs and 6 or 8 data pairs are used.
+Paragraph needs reformat. And please drop "sane". #ifdefs are not sane.
+Fixing the reset framework would be sane.
 
-For DisplayPort there is no separate clock pair, but 1 to 4 data pairs,
-and MIPI DSI again has one clock pair and a one or more data pairs.
+> @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  exit_free_irq:
+>  	free_irq(drv_data->irq, drv_data);
+>  exit_reset:
+> -	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
+> +	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
+> +	    !IS_ERR(drv_data->rstc))
 
-There are already optional endpoint configuration properties
-'data-lanes' and 'clock-lanes' for MIPI CSI-2 defined in
-Documentation/devicetree/bindings/media/video-interfaces.txt.
-Could/should this be aligned with the same?
+Why don't you simply set rstc to some ERR_PTR above if not
+RESET_CONTROLLER?
 
-regards
-Philipp
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/a367f75e/attachment.sig>
