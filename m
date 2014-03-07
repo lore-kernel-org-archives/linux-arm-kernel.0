@@ -1,63 +1,76 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  6 Mar 2014 22:44:42 -0800
-Subject: [PATCH 3/7] pinctrl: msm: Drop unused includes
+Date: Thu,  6 Mar 2014 22:44:40 -0800
+Subject: [PATCH 1/7] pinctrl: msm: Silence recursive lockdep warning
 In-Reply-To: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
 References: <1394174686-8358-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1394174686-8358-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1394174686-8358-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These includes are unused or can be handled via forward
-declarations. Remove them.
+If a driver calls enable_irq_wake() on a gpio turned interrupt
+from the msm pinctrl driver we'll get a lockdep warning like so:
+
+=============================================
+[ INFO: possible recursive locking detected ]
+3.14.0-rc3 #2 Not tainted
+---------------------------------------------
+modprobe/52 is trying to acquire lock:
+ (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
+
+but task is already holding lock:
+ (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
+
+other info that might help us debug this:
+ Possible unsafe locking scenario:
+
+       CPU0
+       ----
+  lock(&irq_desc_lock_class);
+  lock(&irq_desc_lock_class);
+
+ *** DEADLOCK ***
+
+ May be due to missing lock nesting notation
+
+4 locks held by modprobe/52:
+ #0:  (&__lockdep_no_validate__){......}, at: [<c04f2864>] __driver_attach+0x48/0x98
+ #1:  (&__lockdep_no_validate__){......}, at: [<c04f2874>] __driver_attach+0x58/0x98
+ #2:  (&irq_desc_lock_class){-.....}, at: [<c026aea0>] __irq_get_desc_lock+0x48/0x88
+ #3:  (&(&pctrl->lock)->rlock){......}, at: [<c04bb4b8>] msm_gpio_irq_set_wake+0x20/0xa8
+
+Silence it by putting the gpios into their own lock class.
 
 Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/pinctrl-msm.c     | 1 -
- drivers/pinctrl/pinctrl-msm.h     | 5 +----
- drivers/pinctrl/pinctrl-msm8x74.c | 1 -
- 3 files changed, 1 insertion(+), 6 deletions(-)
+ drivers/pinctrl/pinctrl-msm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index 19b0de89dc07..5daad720ecbb 100644
+index ef2bf3126da6..ac7223dab4a3 100644
 --- a/drivers/pinctrl/pinctrl-msm.c
 +++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -28,7 +28,6 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqchip/chained_irq.h>
--#include <linux/of_irq.h>
- #include <linux/spinlock.h>
+@@ -869,6 +869,12 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
  
- #include "core.h"
-diff --git a/drivers/pinctrl/pinctrl-msm.h b/drivers/pinctrl/pinctrl-msm.h
-index 206e782e2daa..8fbe9fb19f36 100644
---- a/drivers/pinctrl/pinctrl-msm.h
-+++ b/drivers/pinctrl/pinctrl-msm.h
-@@ -13,10 +13,7 @@
- #ifndef __PINCTRL_MSM_H__
- #define __PINCTRL_MSM_H__
++/*
++ * This lock class tells lockdep that GPIO irqs are in a different
++ * category than their parents, so it won't report false recursion.
++ */
++static struct lock_class_key gpio_lock_class;
++
+ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+ {
+ 	struct gpio_chip *chip;
+@@ -907,6 +913,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
  
--#include <linux/pinctrl/pinctrl.h>
--#include <linux/pinctrl/pinmux.h>
--#include <linux/pinctrl/pinconf.h>
--#include <linux/pinctrl/machine.h>
-+struct pinctrl_pin_desc;
- 
- /**
-  * struct msm_function - a pinmux function
-diff --git a/drivers/pinctrl/pinctrl-msm8x74.c b/drivers/pinctrl/pinctrl-msm8x74.c
-index f944bf2172ef..bb5ded69f963 100644
---- a/drivers/pinctrl/pinctrl-msm8x74.c
-+++ b/drivers/pinctrl/pinctrl-msm8x74.c
-@@ -15,7 +15,6 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pinctrl/pinctrl.h>
--#include <linux/pinctrl/pinmux.h>
- 
- #include "pinctrl-msm.h"
- 
+ 	for (i = 0; i < chip->ngpio; i++) {
+ 		irq = irq_create_mapping(pctrl->domain, i);
++		irq_set_lockdep_class(irq, &gpio_lock_class);
+ 		irq_set_chip_and_handler(irq, &msm_gpio_irq_chip, handle_edge_irq);
+ 		irq_set_chip_data(irq, pctrl);
+ 	}
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
