@@ -1,77 +1,172 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Mar 2014 15:59:30 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
-Message-ID: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 8 Mar 2014 00:10:20 +0900
+Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
+In-Reply-To: <5319D3E5.4000001@gmail.com>
+References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
+ <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
+ <5319D3E5.4000001@gmail.com>
+Message-ID: <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 370136bc67c3 ("i2c: mv64xxx: Add reset deassert call"), introduced a
-recursive dependency, which was fixed by commit 80c69915e5fb ("i2c: mv64xxx:
-fix circular Kconfig dependency", that in turn, by dropping the dependency on
-RESET_CONTROLLER, introduced a compilation breakage whenever this option wasn't
-set.
+Hi Tomasz,
 
-drivers/i2c/busses/i2c-mv64xxx.c:924: undefined reference to `reset_control_assert'
-drivers/i2c/busses/i2c-mv64xxx.c:904: undefined reference to `reset_control_assert'
-drivers/i2c/busses/i2c-mv64xxx.c:771: undefined reference to `devm_reset_control_get'
-drivers/i2c/busses/i2c-mv64xxx.c:778: undefined reference to `reset_control_deassert'
 
-Since the reset framework doesn't define dummy stubs whenever
-CONFIG_RESET_CONTROLLER is not defined, protect the reset framework calls by
-IS_ENABLED tests to make sure it won't be compiled in.
+On Fri, Mar 7, 2014 at 11:12 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Pankaj,
+>
+>
+> On 07.03.2014 14:56, Pankaj Dubey wrote:
+>>>
+>>> +static void __init exynos5260_clk_top_init(struct device_node *np)
+>>> +{
+>>> +       struct exynos5260_cmu_info cmu;
+>>> +       struct samsung_clk_provider *ctx;
+>>> +
+>>> +       memset(&cmu, 0, sizeof(cmu));
+>>> +
+>>> +       cmu.pll_clks = top_pll_clks;
+>>> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
+>>> +       cmu.mux_clks = top_mux_clks;
+>>> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
+>>> +       cmu.div_clks = top_div_clks;
+>>> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
+>>> +       cmu.gate_clks = top_gate_clks;
+>>> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
+>>> +       cmu.nr_clk_ids = TOP_NR_CLK;
+>>> +       cmu.clk_regs = top_clk_regs;
+>>> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
+>>> +
+>>> +       ctx = exynos5260_cmu_register_one(np, &cmu);
+>>> +
+>>> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
+>>> +                       ARRAY_SIZE(fixed_rate_ext_clks),
+>>> +                       ext_clk_match);
+>>> +}
+>>> +
+>>> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
+>>> +               exynos5260_clk_top_init);
+>>
+>>
+>> Well with this approach we end up adding 14 such
+>> exynosxxx_clk_xxx_init functions all of which has similar lines of
+>> code. As I know there are many upcoming Exynos SoC which will also
+>> have similar multiple clock controllers (in some of them there are
+>> upto 25 clock domains, and in that case we will end up writing 25 such
+>> init functions) so I have following suggestion where we can have one
+>> more structure which will hold all static data and match_table to
+>> match compatibility string and return CMU_TYPE which can be mapped to
+>> get proper clock_data which can be used in single clock_init function.
+>> Following is some sample code which I have implemented and tested on
+>> one of Exynos SoC. Please let me know your opinion about this.
+>
+>
+> Yes, this looks better indeed, however there is still a room for
+> improvement. Please see my comments below.
+>
+>
+>>
+>> =============================
+>>
+>> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
+>
+>
+> Instead of making this an array, particular elements could be separate
+> structures. This would simplify the code below.
+>
+>
+>>          {
+>>                  .cmu_type = CMU_TYPE_TOP,
+>>                  .mux_clocks = top_mux_clks,
+>>                  .div_clocks = top_div_clks,
+>>                  .pll_clocks = top_pll_clks,
+>>                  .clk_regs = top_clk_regs,
+>>                  .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
+>>                  .nr_div_clocks = ARRAY_SIZE(top_div_clks),
+>>                  .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
+>>                  .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
+>>                  .nr_clks  = TOP_NR_CLK,
+>>          }, {
+>>                  .cmu_type = CMU_TYPE_EGL,
+>>                  .mux_clocks = egl_mux_clks,
+>>                  .div_clocks = egl_div_clks,
+>>                  .pll_clocks = egl_pll_clks,
+>>                   .clk_regs = egl_clk_regs,
+>>                  .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
+>>                  .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
+>>                  .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
+>>                  .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
+>>                  .nr_clks  = EGL_NR_CLK,
+>>          }, {
+>>         /* Add similar elements here */
+>> };
+>>
+>> static struct of_device_id cmu_subtype_match_table[] = {
+>>          {
+>>                  .compatible = "exynosxxxx-cmu-top",
+>>                  .data   = (void *)CMU_TYPE_TOP,
+>
+>
+> Here the data would be just a pointer to respective clock data struct
+> defined above.
+>
+>
+>>          }, {
+>>                  .compatible = "exynosxxx-cmu-peris",
+>>                  .data   = (void *)CMU_TYPE_PERIS,
+>>          }, {
+>>         /* Add similar elements here */
+>> };
+>>
+>> void __init exynosxxx_clk_init(struct device_node *np)
+>> {
+>>           [snip]
+>>
+>>          match = of_match_node(cmu_subtype_match_table, np);
+>>
+>>          if (!match)
+>>                  panic("%s: cmu type (%s) is not supported.\n", __func__,
+>>                                  np->name);
+>
+>
+> This can't happen, because this function won't be called for any node with
+> compatible string not declared using CLK_OF_DECLARE().
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/i2c/busses/i2c-mv64xxx.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+Agreed.
 
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 203a548..a1dc99b 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -768,14 +768,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
- 	}
- 	drv_data->irq = irq_of_parse_and_map(np, 0);
- 
--	drv_data->rstc = devm_reset_control_get(dev, NULL);
--	if (IS_ERR(drv_data->rstc)) {
--		if (PTR_ERR(drv_data->rstc) == -EPROBE_DEFER) {
--			rc = -EPROBE_DEFER;
--			goto out;
-+	if (IS_ENABLED(CONFIG_RESET_CONTROLLER)) {
-+		drv_data->rstc = devm_reset_control_get(dev, NULL);
-+		if (IS_ERR(drv_data->rstc)) {
-+			if (PTR_ERR(drv_data->rstc) == -EPROBE_DEFER) {
-+				rc = -EPROBE_DEFER;
-+				goto out;
-+			}
-+		} else {
-+			reset_control_deassert(drv_data->rstc);
- 		}
--	} else {
--		reset_control_deassert(drv_data->rstc);
- 	}
- 
- 	/* Its not yet defined how timeouts will be specified in device tree.
-@@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
- exit_free_irq:
- 	free_irq(drv_data->irq, drv_data);
- exit_reset:
--	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
-+	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-+	    !IS_ERR(drv_data->rstc))
- 		reset_control_assert(drv_data->rstc);
- exit_clk:
- #if defined(CONFIG_HAVE_CLK)
-@@ -920,7 +923,8 @@ mv64xxx_i2c_remove(struct platform_device *dev)
- 
- 	i2c_del_adapter(&drv_data->adapter);
- 	free_irq(drv_data->irq, drv_data);
--	if (dev->dev.of_node && !IS_ERR(drv_data->rstc))
-+	if (dev->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-+	    !IS_ERR(drv_data->rstc))
- 		reset_control_assert(drv_data->rstc);
- #if defined(CONFIG_HAVE_CLK)
- 	/* Not all platforms have a clk */
--- 
-1.9.0
+>
+>
+>>
+>>          reg_base = of_iomap(np, 0);
+>>          if (!reg_base)
+>>                  panic("%s: failed to map registers\n", __func__);
+>>
+>>          cmu_type = (unsigned long) match->data;
+>>
+>>          for (; i < CMU_TYPE_ALL; i++) {
+>>                  clk_data = &exynosxxxx_clk_data[i];
+>>                  if (cmu_type == clk_data->cmu_type)
+>>                          break;
+>>          }
+>
+>
+> Now clk_data could be taken directly from match->data, without the need to
+> iterate over an array.
+
+Good point. Let me change as per your suggestion and test. And then we
+will go for this change in next new version of patch. Also please
+review rest patch also and let us know if anything still can be
+improved.
+
+Thanks,
+Pankaj Dubey
+
+>
+> Best regards,
+> Tomasz
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
