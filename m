@@ -1,63 +1,45 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 7 Mar 2014 17:07:59 -0600
-Subject: [Patch v8 2/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <531A485D.9010508@mm-sol.com>
-References: <1393828245-18766-1-git-send-email-agross@codeaurora.org>
- <1393828245-18766-3-git-send-email-agross@codeaurora.org>
- <531A485D.9010508@mm-sol.com>
-Message-ID: <20140307230759.GC3241@qualcomm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 7 Mar 2014 15:08:00 -0800
+Subject: [PATCH RFC v2 04/11] tty: xuartps: Remove bogus comment and
+ register write
+In-Reply-To: <20140307212816.715e5e19@alan.etchedpixels.co.uk>
+References: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394219614-3197-5-git-send-email-soren.brinkmann@xilinx.com>
+ <20140307212816.715e5e19@alan.etchedpixels.co.uk>
+Message-ID: <e074f376-9565-422e-abee-fdaa031239a1@TX2EHSMHS043.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 08, 2014 at 12:29:49AM +0200, Stanimir Vabanov wrote:
-> > +#define BAM_IRQ_SRCS_EE(pipe)		(0x0800 + ((pipe) * 0x80))
-> > +#define BAM_IRQ_SRCS_MSK_EE(pipe)	(0x0804 + ((pipe) * 0x80))
+On Fri, 2014-03-07 at 09:28PM +0000, One Thousand Gnomes wrote:
+> On Fri,  7 Mar 2014 11:13:27 -0800
+> Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
 > 
-> s/pipe/ee ?
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  drivers/tty/serial/xilinx_uartps.c | 6 +-----
+> >  1 file changed, 1 insertion(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> > index a4bd6242e72d..a39c2d290902 100644
+> > --- a/drivers/tty/serial/xilinx_uartps.c
+> > +++ b/drivers/tty/serial/xilinx_uartps.c
+> > @@ -1082,11 +1082,7 @@ static void xuartps_console_write(struct console *co, const char *s,
+> >  
+> >  	xuartps_writel(ctrl, XUARTPS_CR_OFFSET);
+> >  
+> > -	/* restore interrupt state, it seems like there may be a h/w bug
+> > -	 * in that the interrupt enable register should not need to be
+> > -	 * written based on the data sheet
+> > -	 */
+> > -	xuartps_writel(~imr, XUARTPS_IDR_OFFSET);
+> > +	/* restore interrupt state */
 > 
+> It would be appropriate for the changelog at least to explain why the
+> note about the data sheet differing is going away !
 
-Ah good catch.  I'll fix that.
+I don't know why anybody ever thought things are broken. IMHO, the
+comment does not make any sense. Why would it not be required to write
+the enable register when you enable interrupts?
+I think someone read the data sheet wrong.
 
-> > +struct bam_chan {
-> > +	struct virt_dma_chan vc;
-> > +
-> > +	struct bam_device *bdev;
-> > +
-> > +	/* configuration from device tree */
-> > +	u32 id;
-> > +	u32 ee;
-> > +
-> 
-> do we need per channel ee? I'm asking because failed to find references
-> to it.
-> 
-
-You're right.  This is dead variable.  I had transitioned from channel to
-device when I modified the bindings.  Device is where it belongs.  I'll fix
-this.
-
-<snip>
-> > +
-> > +/**
-> > + * bam_alloc_chan - Allocate channel resources for DMA channel.
-> > + * @chan: specified channel
-> > + *
-> > + * This function allocates the FIFO descriptor memory
-> > + */
-> > +static int bam_alloc_chan(struct dma_chan *chan)
-> > +{
-> > +	struct bam_chan *bchan = to_bam_chan(chan);
-> > +	struct bam_device *bdev = bchan->bdev;
-> > +
-> 
-> you could invert the logic and avoid extra indentation.
-> 	if (bchan->fifo_virt)
-> 		return 0;
-> 
-
-True.  I'll flip that.
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+	S?ren
