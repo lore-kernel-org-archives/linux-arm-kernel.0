@@ -1,28 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 7 Mar 2014 21:53:03 +0530
-Subject: [PATCH 5/8] phy: omap-usb2: Add clock names to Documentation
- binding
-In-Reply-To: <20140307160422.GA23885@saruman.home>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-6-git-send-email-rogerq@ti.com>
- <20140307160422.GA23885@saruman.home>
-Message-ID: <5319F267.3080309@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 7 Mar 2014 17:25:10 +0100
+Subject: [PATCH V3 06/12] ARM: shmobile: r7s72100: add scif nodes to dtsi
+In-Reply-To: <1930280.sZNcfhZEL8@avalon>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <1394208048-32495-7-git-send-email-wsa@the-dreams.de>
+ <1930280.sZNcfhZEL8@avalon>
+Message-ID: <20140307162510.GF28943@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
 
-On Friday 07 March 2014 09:34 PM, Felipe Balbi wrote:
-> On Fri, Mar 07, 2014 at 03:09:08PM +0200, Roger Quadros wrote:
->> Add "wkupclk" and "refclk" information to DT binding information.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->
-> so, should I take this one ?
+> > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> > b/arch/arm/boot/dts/r7s72100.dtsi index 6af5c28c670e..d49afe30c1d7 100644
+> > --- a/arch/arm/boot/dts/r7s72100.dtsi
+> > +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> > @@ -23,6 +23,14 @@
+> >  		i2c1 = &i2c1;
+> >  		i2c2 = &i2c2;
+> >  		i2c3 = &i2c3;
+> > +		serial0 = &scif0;
+> > +		serial1 = &scif1;
+> > +		serial2 = &scif2;
+> > +		serial3 = &scif3;
+> > +		serial4 = &scif4;
+> > +		serial5 = &scif5;
+> > +		serial6 = &scif6;
+> > +		serial7 = &scif7;
+> 
+> As port usages is board specific, shouldn't this be moved to the board .dts 
+> file, with only serial0 = &scif2 ?
 
-yes.. the ti-phy.txt is only in your tree.
+Nope, the intention of these aliases is to have a consistent numbering
+of SCIF cores, similar to platform.dev_id.
 
-Thanks
-Kishon
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/81f203b1/attachment.sig>
