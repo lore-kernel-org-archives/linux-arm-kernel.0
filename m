@@ -1,22 +1,19 @@
-From: kentborg@borg.org (Kent Borg)
-Date: Fri, 07 Mar 2014 18:14:59 -0500
-Subject: SMP Documentation?
-Message-ID: <531A52F3.1010303@borg.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 7 Mar 2014 15:16:06 -0800
+Subject: [PATCH RFC v2 09/11] ARM: multi_v7_defconfig: Adopt to UART
+ driver renaming
+In-Reply-To: <1394219614-3197-10-git-send-email-soren.brinkmann@xilinx.com>
+References: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394219614-3197-10-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <726e4ba5-be0b-49d8-80f1-04cf05599ba4@TX2EHSMHS031.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is there any documentation on the semantics of the SMP ops:
+On Fri, 2014-03-07 at 11:13AM -0800, Soren Brinkmann wrote:
+> The Xilinx UARTPS driver has been renamed to Cadence UART.  Remove
+> the stale Xilinx UARTPS config options and add Cadence UART instead.
 
-  - .smp_init_cpus,
-  - .smp_prepare_cpus,
-  - .smp_secondary_init,
-  - .smp_boot_secondary?
+This will also be dropped, since the corresponding renaming of config
+symbol gets dropped.
 
-I can certainly see examples in existing code, but I isn't clear to me 
-why, for example, an SoC can't just do everything in smp_boot_secondary()?
-
-Thanks,
-
--kb, the Kent who figures these four different calls are there for 
-reasons, and there are a lot of ways for SMP to not work if he doesn't 
-understand the reasons.
+	S?ren
