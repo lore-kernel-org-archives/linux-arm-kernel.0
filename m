@@ -1,57 +1,86 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri,  7 Mar 2014 20:22:10 +0100
-Subject: [PATCH v4 0/9] ARM: dts: Better support for Gumstix Overo (for 3.15?)
-Message-ID: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+Date: Fri,  7 Mar 2014 20:22:17 +0100
+Subject: [PATCH v4 7/9] ARM: dts: omap3-tobi: Use include file
+ omap-gpmc-smsc9221
+In-Reply-To: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1394220139-1760-8-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony, Benoit,
+Use the timings provided by omap-gpmc-smsc9221. This does not change
+the timings, but it avoids code duplication.
 
-This is the fourth version of my Overo series. Compared to v3, I reorganized
-a bit the include files (omap3-overo.dtsi -> omap3-overo-base.dtsi and created
-SoC-specific omap3-overo.dtsi and omap3-overo-storm.dtsi). This was necessary
-to correctly define the pinmux for the processor board's pins belonging to the
-omap3_pmx_core2 pinctrl. For details, see the discussion on the v3 [1].
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi | 42 ++------------------------
+ 1 file changed, 3 insertions(+), 39 deletions(-)
 
-Most patches are pretty obvious. Patch 6 adds some specific timings for
-LAN9221 into a generic file. By using shorter timing, it is possible to
-double the Ethernet bandwidth. Thus is may interest people using a similar
-chip.
-
-I tested this series with both the OMAP35xx Overo and the OMAP36xx Overo.
-Wifi and Bluetooth are functional, HSUSB works.
-
-Note: I hope that this can go into 3.15, since the patches were first
-posted before the 3.14 merge window. They add a number of useful peripherals,
-so this would be much appreciated.
-
-Regards,
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/111143
-
-Florian Vaussard (9):
-  ARM: dts: overo: reorganize include files
-  ARM: dts: omap3-tobi: Add missing pinctrl
-  ARM: dts: omap3-overo: Add missing pinctrl
-  ARM: dts: omap3-overo: Enable WiFi/BT combo
-  ARM: dts: omap3-overo: Add HSUSB PHY
-  ARM: dts: omap: Add common file for SMSC9221
-  ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
-  ARM: dts: omap3-tobi: Add AT24C01 EEPROM
-  ARM: dts: overo: Push uart3 pinmux down to expansion board
-
- arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi      |  58 +++++++
- arch/arm/boot/dts/omap3-overo-base.dtsi        | 221 +++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts   |   2 +-
- arch/arm/boot/dts/omap3-overo-storm.dtsi       |  35 ++++
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi |  67 ++++----
- arch/arm/boot/dts/omap3-overo-tobi.dts         |   2 +-
- arch/arm/boot/dts/omap3-overo.dtsi             |  97 +++--------
- 7 files changed, 365 insertions(+), 117 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-base.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm.dtsi
-
+diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+index 7375cda..e7f2ac7 100644
+--- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+@@ -19,18 +19,6 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
+-
+-	vddvario: regulator-vddvario {
+-		  compatible = "regulator-fixed";
+-		  regulator-name = "vddvario";
+-		  regulator-always-on;
+-	};
+-
+-	vdd33a: regulator-vdd33a {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vdd33a";
+-		regulator-always-on;
+-	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -42,39 +30,15 @@
+ 	};
+ };
+ 
++#include "omap-gpmc-smsc9221.dtsi"
++
+ &gpmc {
+ 	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
+ 
+-	ethernet at 5,0 {
+-		compatible = "smsc,lan9221", "smsc,lan9115";
++	ethernet at gpmc {
+ 		reg = <5 0 0xff>;
+-		bank-width = <2>;
+-
+-		gpmc,mux-add-data;
+-		gpmc,cs-on-ns = <0>;
+-		gpmc,cs-rd-off-ns = <42>;
+-		gpmc,cs-wr-off-ns = <36>;
+-		gpmc,adv-on-ns = <6>;
+-		gpmc,adv-rd-off-ns = <12>;
+-		gpmc,adv-wr-off-ns = <12>;
+-		gpmc,oe-on-ns = <0>;
+-		gpmc,oe-off-ns = <42>;
+-		gpmc,we-on-ns = <0>;
+-		gpmc,we-off-ns = <36>;
+-		gpmc,rd-cycle-ns = <60>;
+-		gpmc,wr-cycle-ns = <54>;
+-		gpmc,access-ns = <36>;
+-		gpmc,page-burst-access-ns = <0>;
+-		gpmc,bus-turnaround-ns = <0>;
+-		gpmc,cycle2cycle-delay-ns = <0>;
+-		gpmc,wr-data-mux-bus-ns = <18>;
+-		gpmc,wr-access-ns = <42>;
+-		gpmc,cycle2cycle-samecsen;
+-		gpmc,cycle2cycle-diffcsen;
+-
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176 */
+-		reg-io-width = <4>;
+ 	};
+ };
+ 
 -- 
 1.8.3.2
