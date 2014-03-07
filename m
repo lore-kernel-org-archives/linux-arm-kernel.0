@@ -1,49 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Mar 2014 11:56:11 +0800
-Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
-In-Reply-To: <20140307035056.GQ1872@titan.lakedaemon.net>
-References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140306201803.GL1872@titan.lakedaemon.net>
- <CACRpkda0JCLZUv_KPmwucDh3ko2YbtG2ukMMscSodAbBpiY+zw@mail.gmail.com>
- <20140307035056.GQ1872@titan.lakedaemon.net>
-Message-ID: <CACRpkdbEQSj7jLWT2BFR22m7phwmyKCByhQuFFgHvHoKvQFD5g@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 7 Mar 2014 11:59:46 +0800
+Subject: [PATCH] Disable Subpage nand write when using Atmel PMECC
+In-Reply-To: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
+References: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
+Message-ID: <53194432.50104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 7, 2014 at 11:50 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Fri, Mar 07, 2014 at 11:48:25AM +0800, Linus Walleij wrote:
->> On Fri, Mar 7, 2014 at 4:18 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > On Wed, Mar 05, 2014 at 01:03:10AM +0100, Sebastian Hesselbarth wrote:
->> >> Pinctrl will WARN on missing DT resources, which is a little bit too
->> >> noisy. Use dev_warn with FW_BUG instead.
->> >>
->> >> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> >> ---
->> >> Cc: Russell King <linux@arm.linux.org.uk>
->> >> Cc: Jason Cooper <jason@lakedaemon.net>
->> >> Cc: Andrew Lunn <andrew@lunn.ch>
->> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> >> Cc: Linus Walleij <linus.walleij@linaro.org>
->> >> Cc: devicetree at vger.kernel.org
->> >> Cc: linux-arm-kernel at lists.infradead.org
->> >> Cc: linux-kernel at vger.kernel.org
->> >> ---
->> >>  drivers/pinctrl/mvebu/pinctrl-dove.c | 3 ++-
->> >>  1 file changed, 2 insertions(+), 1 deletion(-)
->> >
->> > Applied to mvebu/pinctrl
->>
->> So are you carrying this patch, or shall I apply it to my tree?
->>
->> In the former case: Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Dear Herve
+
+I add the Brian in the email, who is the maintainer of the mtd.
+
+On 3/3/2014 7:15 PM, Herve Codina wrote:
+> Crash detected on sam5d35 and its pmecc nand ecc controller.
 >
-> I'll send you a pull tomorrow.
+> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+> (nand_base.c) when we write a sub page.
+> chip->ecc.hwctl function is not set when we are using PMECC controller.
+> As a workaround, set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+> order to disable sub page access in nand_write_page.
+>
+>
+> Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
 
-For a single patch?
+Acked-by: Josh Wu <josh.wu@atmel.com>
 
-Remember I want the DTS changes to go to ARM SoC on some different
-pull...
+> ---
+>   drivers/mtd/nand/atmel_nand.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 1f719e0..4ce181a 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1220,6 +1220,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>   		goto err;
+>   	}
+>   
+> +	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
+>   	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+>   	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
+>   
 
-Yours,
-Linus Walleij
+Best Regards,
+Josh Wu
