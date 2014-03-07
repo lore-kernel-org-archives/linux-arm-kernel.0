@@ -1,90 +1,57 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri,  7 Mar 2014 20:22:16 +0100
-Subject: [PATCH v4 6/9] ARM: dts: omap: Add common file for SMSC9221
-In-Reply-To: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394220139-1760-7-git-send-email-florian.vaussard@epfl.ch>
+Date: Fri,  7 Mar 2014 20:22:10 +0100
+Subject: [PATCH v4 0/9] ARM: dts: Better support for Gumstix Overo (for 3.15?)
+Message-ID: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices (SMSC9217, SMSC9218 and SMSC9221 at least) have better
-timings, allowing a higher transfer speed. Create a common file
-with these timings.
+Hello Tony, Benoit,
 
-Performance results with iperf:
+This is the fourth version of my Overo series. Compared to v3, I reorganized
+a bit the include files (omap3-overo.dtsi -> omap3-overo-base.dtsi and created
+SoC-specific omap3-overo.dtsi and omap3-overo-storm.dtsi). This was necessary
+to correctly define the pinmux for the processor board's pins belonging to the
+omap3_pmx_core2 pinctrl. For details, see the discussion on the v3 [1].
 
-- omap-gpmc-smsc911x.dtsi => 54.9 Mbps
-- omap-gpmc-smsc9221.dtsi => 92.7 Mbps
+Most patches are pretty obvious. Patch 6 adds some specific timings for
+LAN9221 into a generic file. By using shorter timing, it is possible to
+double the Ethernet bandwidth. Thus is may interest people using a similar
+chip.
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi | 58 +++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+I tested this series with both the OMAP35xx Overo and the OMAP36xx Overo.
+Wifi and Bluetooth are functional, HSUSB works.
+
+Note: I hope that this can go into 3.15, since the patches were first
+posted before the 3.14 merge window. They add a number of useful peripherals,
+so this would be much appreciated.
+
+Regards,
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/111143
+
+Florian Vaussard (9):
+  ARM: dts: overo: reorganize include files
+  ARM: dts: omap3-tobi: Add missing pinctrl
+  ARM: dts: omap3-overo: Add missing pinctrl
+  ARM: dts: omap3-overo: Enable WiFi/BT combo
+  ARM: dts: omap3-overo: Add HSUSB PHY
+  ARM: dts: omap: Add common file for SMSC9221
+  ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
+  ARM: dts: omap3-tobi: Add AT24C01 EEPROM
+  ARM: dts: overo: Push uart3 pinmux down to expansion board
+
+ arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi      |  58 +++++++
+ arch/arm/boot/dts/omap3-overo-base.dtsi        | 221 +++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts   |   2 +-
+ arch/arm/boot/dts/omap3-overo-storm.dtsi       |  35 ++++
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi |  67 ++++----
+ arch/arm/boot/dts/omap3-overo-tobi.dts         |   2 +-
+ arch/arm/boot/dts/omap3-overo.dtsi             |  97 +++--------
+ 7 files changed, 365 insertions(+), 117 deletions(-)
  create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-overo-base.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-overo-storm.dtsi
 
-diff --git a/arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi b/arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
-new file mode 100644
-index 0000000..73e272f
---- /dev/null
-+++ b/arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
-@@ -0,0 +1,58 @@
-+/*
-+ * Common file for GPMC connected smsc9221 on omaps
-+ *
-+ * Compared to smsc911x, smsc9221 (and others like smsc9217
-+ * or smsc 9218) has faster timings, leading to higher
-+ * bandwidth.
-+ *
-+ * Note that the board specifc DTS file needs to specify
-+ * ranges, pinctrl, reg, interrupt parent and interrupts.
-+ */
-+
-+/ {
-+	vddvario: regulator-vddvario {
-+		  compatible = "regulator-fixed";
-+		  regulator-name = "vddvario";
-+		  regulator-always-on;
-+	};
-+
-+	vdd33a: regulator-vdd33a {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdd33a";
-+		regulator-always-on;
-+	};
-+};
-+
-+&gpmc {
-+	ethernet at gpmc {
-+		compatible = "smsc,lan9221","smsc,lan9115";
-+		bank-width = <2>;
-+
-+		gpmc,mux-add-data;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <42>;
-+		gpmc,cs-wr-off-ns = <36>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <12>;
-+		gpmc,adv-wr-off-ns = <12>;
-+		gpmc,oe-on-ns = <0>;
-+		gpmc,oe-off-ns = <42>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <36>;
-+		gpmc,rd-cycle-ns = <60>;
-+		gpmc,wr-cycle-ns = <54>;
-+		gpmc,access-ns = <36>;
-+		gpmc,page-burst-access-ns = <0>;
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,wr-data-mux-bus-ns = <18>;
-+		gpmc,wr-access-ns = <42>;
-+		gpmc,cycle2cycle-samecsen;
-+		gpmc,cycle2cycle-diffcsen;
-+
-+		vddvario-supply = <&vddvario>;
-+		vdd33a-supply = <&vdd33a>;
-+		reg-io-width = <4>;
-+		smsc,save-mac-address;
-+	};
-+};
 -- 
 1.8.3.2
