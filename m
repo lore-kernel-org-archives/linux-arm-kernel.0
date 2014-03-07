@@ -1,47 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 09:24:37 +0900
-Subject: [PATCH v2 11/11] ARM: shmobile: koelsch/lager/multi defconfig:
- Enable MSIOF
-In-Reply-To: <1393324219-3317-12-git-send-email-geert@linux-m68k.org>
-References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
- <1393324219-3317-12-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140307002437.GD11702@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Mar 2014 01:24:12 +0100
+Subject: [PATCH v5 1/7] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140306160442.GG6457@e106497-lin.cambridge.arm.com>
+References: <1393948204-11555-1-git-send-email-Liviu.Dudau@arm.com>
+ <201403042330.09607.arnd@arndb.de>
+ <20140306160442.GG6457@e106497-lin.cambridge.arm.com>
+Message-ID: <201403070124.13139.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 11:30:19AM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Thursday 06 March 2014, Liviu Dudau wrote:
+> On Tue, Mar 04, 2014 at 10:30:09PM +0000, Arnd Bergmann wrote:
+> > On Tuesday 04 March 2014, Liviu Dudau wrote:
+> > > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> > > +{
+> > > +       return 0;
+> > > +}
+> > > +
+> > 
+> > How about returning an error here? You don't actually register the range.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> That's not the intention here. I basically want a nop, as by default (read x86)
+> we do nothing with the IO range.
 
-Hi Geert,
+I think x86 is a bad default though, because that is the exception rather than
+the rule. I also think that on x86, you shouldn't have an entry for the I/O
+space in the "ranges" property since there is no translation, and then we don't
+call this function.
 
-as discussed elsewhere I have queued up the multiplatform portion of this patch.
-For reference the patch that I have queued up is as follows.
+PCI devices described in DT on x86 would still be able to list their I/O BARs
+in DT, but you don't ever translate them into MMIO ranges.
 
-
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-
-ARM: shmobile: multiplatform: Enable MSIOF in defconfig
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 83b0725..2a27d46 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -78,6 +78,7 @@ CONFIG_I2C_GPIO=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
- # CONFIG_HWMON is not set
--- 
-1.8.5.2
+	Arnd
