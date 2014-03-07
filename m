@@ -1,154 +1,68 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 07 Mar 2014 17:37:42 +0900
-Subject: [PATCH v4 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <1394085963-27553-2-git-send-email-tinamdar@apm.com>
-References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
- <1394085963-27553-2-git-send-email-tinamdar@apm.com>
-Message-ID: <005901cf39e0$81ceb960$856c2c20$%han@samsung.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 7 Mar 2014 09:37:36 +0100
+Subject: [PATCH v5 0/3] tty/serial: Add helpers to use GPIOs to control
+ modem lines and implement atmel_serial.c
+In-Reply-To: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
+References: <1393845120-6340-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <CACQ1gAhVAMXab6T_nQudPR9+CMy_Sv_JpeGNfY9Su+453yGf-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 06, 2014 3:06 PM, Tanmay Inamdar wrote:
-> 
+2014-03-03 12:11 GMT+01:00 Richard Genoud <noreply.rgenoud@gmail.com>:
+> The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
+> but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
+> Moreover, even if the controller can handle CTS/RTS, the dedicated
+> CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
+>
+> So this patchset adds the possibility to control those lines via GPIO,
+> as it is done for RTS in the patch "switch atmel serial to use gpiolib"
+>
+> As it was suggested by Alexander Shiyan, I made that available for
+> every board.
+>
+> Patch 1 implements the generic helpers to control modem lines via GPIO
+> Patch 2 implements modem control lines in atmel_serial atmel_serial.
+> Patch 3 implement the interrupts of CTS/DSR/DCD/RI.
+>
+> This is based on next-20140303 + [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
+> (It has been acked by Linus, but I don't think it has been applied in a tree yet)
+>
+> Tested on at91sam9g35, with a null modem cable between 2 serial ports,
+> one with CTS/RTS controlled by the USART controller, the other via GPIO,
+> full duplex transfers.
+> Did some tests also with null modem cables on a PC, and with real modems.
+>
+> Updates from v4:
+>         - patches "tty/serial: at91: remove unused open/close hooks" and
+>         "tty/serial: at91: use dev_err instead of printk" have been picked
+>         by Greg on tty tree.
+>         - As Alexander pointed out, IS_ERR_OR_NULL() was replaced by a simple
+>         check againts NULL in patch 1/3
+>         - in path 1/3, a warning is produced instead of an error when we can't set
+>         the direction of a GPIO.
+>
+> Updates from v3:
+>         - add static keyword on struct uart0_gpios_table.
+>         - add use an index at the mctrl_gpio_init() function to make it
+>         usable by driver that allocates several ports at once.
+>         - hide struct gpio_desc from users.
+>         - patch "pinctrl: at91: implement get_direction" has been picked by Linus.
+>         - patch "ARM: at91: gpio: implement get_direction" has been acked by Linus.
+>
+> Updates from v2:
+>         - remove UART_GPIO_MIN/UART_GPIO_MAX_INPUT and use a direction
+>         boolean instead.
+>         - implement get_direction in at91 pinctrl and mach-at91/gpio.c.
+>         - remove the get_mctrl_gpio_name() function that was used for
+>         logs only.
+>         - split atmel_serial.c patch in 2.
+>         - use a gpio lookup table to declare modem gpios in platform
+>         devices boards. So there's no more special case for platform
+>         data gpios in atmel_serial.c.
+>
+> Updates from v1:
+>         - Instead of controlling modem signal only on atmel board, the
+>         code is now available for every board.
+>         - The active low flag from device tree is now used.
 
-Hi Tanmay Inamdar,
-
-I added some minor comments. :-)
-
-> This patch adds the AppliedMicro X-Gene SOC PCIe controller driver.
-> X-Gene PCIe controller supports maxmum upto 8 lanes and GEN3 speed.
-
-Would you fix the followings?
-
-s/maxmum/maximum
-s/upto/up to
-
-> X-Gene SOC supports maximum 5 PCIe ports.
-> 
-> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  drivers/pci/host/Kconfig     |   10 +
->  drivers/pci/host/Makefile    |    1 +
->  drivers/pci/host/pci-xgene.c |  739 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 750 insertions(+)
->  create mode 100644 drivers/pci/host/pci-xgene.c
-
-[.....]
-
-> --- /dev/null
-> +++ b/drivers/pci/host/pci-xgene.c
-
-[.....]
-
-> +
-> +static int xgene_pcie_parse_map_dma_ranges(struct xgene_pcie_port *port)
-> +{
-> +	struct device_node *np = port->node;
-> +	struct of_pci_range range;
-> +	struct of_pci_range_parser parser;
-> +	struct device *dev = port->dev;
-> +	u8 ib_reg_mask = 0;
-> +
-> +	if (pci_dma_range_parser_init(&parser, np)) {
-> +		dev_err(dev, "missing dma-ranges property\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Get the dma-ranges from DT */
-> +	for_each_of_pci_range(&parser, &range) {
-> +		u64 end = range.cpu_addr + range.size - 1;
-> +		dev_dbg(port->dev, "0x%08x 0x%016llx..0x%016llx -> 0x%016llx\n",
-> +			range.flags, range.cpu_addr, end, range.pci_addr);
-> +		xgene_pcie_setup_ib_reg(port, &range, &ib_reg_mask);
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int __init xgene_pcie_probe_bridge(struct platform_device *pdev)
-
-Please, remove '__init' marker in order to fix section mismatch
-warning.
-
-> +{
-> +	struct device_node *np = of_node_get(pdev->dev.of_node);
-> +	struct xgene_pcie_port *port;
-> +	struct pci_host_bridge *bridge;
-> +	resource_size_t lastbus;
-> +	u32 lanes = 0, speed = 0;
-> +	u64 cfg_addr = 0;
-> +	int ret;
-> +
-> +	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
-> +	if (!port)
-> +		return -ENOMEM;
-> +	port->node = np;
-> +	port->dev = &pdev->dev;
-> +
-> +	ret = xgene_pcie_map_reg(port, pdev, &cfg_addr);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = xgene_pcie_init_port(port);
-> +	if (ret)
-> +		return ret;
-> +	xgene_pcie_program_core(port->csr_base);
-> +	xgene_pcie_setup_root_complex(port);
-> +
-> +	bridge = of_create_pci_host_bridge(&pdev->dev, &xgene_pcie_ops, port);
-> +	if (IS_ERR_OR_NULL(bridge))
-> +		return PTR_ERR(bridge);
-> +
-> +	ret = xgene_pcie_map_ranges(port, bridge, cfg_addr);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = xgene_pcie_parse_map_dma_ranges(port);
-> +	if (ret)
-> +		return ret;
-> +
-> +	xgene_pcie_poll_linkup(port, &lanes, &speed);
-> +	if (!port->link_up)
-> +		dev_info(port->dev, "(rc) link down\n");
-> +	else
-> +		dev_info(port->dev, "(rc) x%d gen-%d link up\n",
-> +				lanes, speed + 1);
-> +	platform_set_drvdata(pdev, port);
-> +	lastbus = pci_rescan_bus(bridge->bus);
-> +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id xgene_pcie_match_table[] __initconst = {
-
-Please, remove '__initconst' marker in order to fix section mismatch
-warning.
-
-> +	{.compatible = "apm,xgene-pcie",},
-> +	{},
-> +};
-> +
-> +static struct platform_driver xgene_pcie_driver = {
-> +	.driver = {
-> +		   .name = "xgene-pcie",
-> +		   .owner = THIS_MODULE,
-> +		   .of_match_table = of_match_ptr(xgene_pcie_match_table),
-> +		  },
-
-Please fix this indent style, as below:
-
-+	},
-
-See you later. :-)
-
-Best regards,
-Jingoo Han
-
-> +	.probe = xgene_pcie_probe_bridge,
-> +};
-> +module_platform_driver(xgene_pcie_driver);
-> +
-> +MODULE_AUTHOR("Tanmay Inamdar <tinamdar@apm.com>");
-> +MODULE_DESCRIPTION("APM X-Gene PCIe driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.7.9.5
+I'll send a v6 with (last) corrections next week.
