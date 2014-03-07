@@ -1,46 +1,43 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Mar 2014 15:09:07 +0200
-Subject: [PATCH 4/8] phy: omap-usb2: Use generic clock names "wkupclk" and
- "refclk"
+Date: Fri, 7 Mar 2014 15:09:08 +0200
+Subject: [PATCH 5/8] phy: omap-usb2: Add clock names to Documentation binding
 In-Reply-To: <1394197751-28984-1-git-send-email-rogerq@ti.com>
 References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
-Message-ID: <1394197751-28984-5-git-send-email-rogerq@ti.com>
+Message-ID: <1394197751-28984-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As clocks might be named differently on multiple platforms, use a generic
-name in the driver and allow device tree node to specify the platform
-specific clock name.
+Add "wkupclk" and "refclk" information to DT binding information.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/phy/phy-omap-usb2.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/phy/ti-phy.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-index a2205a8..fb5e515 100644
---- a/drivers/phy/phy-omap-usb2.c
-+++ b/drivers/phy/phy-omap-usb2.c
-@@ -275,16 +275,16 @@ static int omap_usb2_probe(struct platform_device *pdev)
- 	if (IS_ERR(phy_provider))
- 		return PTR_ERR(phy_provider);
+diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+index 4ab9cb1..49c381c 100644
+--- a/Documentation/devicetree/bindings/phy/ti-phy.txt
++++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+@@ -36,6 +36,11 @@ Required properties:
+  - reg : Address and length of the register set for the device.
+  - #phy-cells: determine the number of cells that should be given in the
+    phandle while referencing this phy.
++ - clocks: a list of phandles and clock-specifier pairs, one for each entry in
++   clock-names.
++ - clock-names: should include:
++   * "wkupclk" - wakeup clock.
++   * "refclk" - reference clock (optional).
  
--	phy->wkupclk = devm_clk_get(phy->dev, "usb_phy_cm_clk32k");
-+	phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
- 	if (IS_ERR(phy->wkupclk)) {
--		dev_err(&pdev->dev, "unable to get usb_phy_cm_clk32k\n");
-+		dev_err(&pdev->dev, "unable to get wkupclk\n");
- 		return PTR_ERR(phy->wkupclk);
- 	}
- 	clk_prepare(phy->wkupclk);
+ Optional properties:
+  - ctrl-module : phandle of the control module used by PHY driver to power on
+@@ -48,6 +53,8 @@ usb2phy at 4a0ad080 {
+ 	reg = <0x4a0ad080 0x58>;
+ 	ctrl-module = <&omap_control_usb>;
+ 	#phy-cells = <0>;
++	clocks = <&usb_phy_cm_clk32k>, <&usb_otg_ss_refclk960m>;
++	clock-names = "wkupclk", "refclk";
+ };
  
--	phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-+	phy->optclk = devm_clk_get(phy->dev, "refclk");
- 	if (IS_ERR(phy->optclk))
--		dev_vdbg(&pdev->dev, "unable to get refclk960m\n");
-+		dev_dbg(&pdev->dev, "unable to get refclk\n");
- 	else
- 		clk_prepare(phy->optclk);
- 
+ TI PIPE3 PHY
 -- 
 1.8.3.2
