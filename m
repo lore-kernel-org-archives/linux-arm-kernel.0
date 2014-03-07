@@ -1,46 +1,75 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Fri, 7 Mar 2014 19:57:51 +0100
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <20140307182857.GB6963@kroah.com>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140307175612.GR21483@n2100.arm.linux.org.uk>
- <20140307182857.GB6963@kroah.com>
-Message-ID: <CA+gwMcfMMUvRc6ZPh3qM1nGXW3ECWA=CD6M9PbgmoOdwx4fGYQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri,  7 Mar 2014 11:13:23 -0800
+Subject: [PATCH RFC v2 00/11] tty: xuartps: Rebranding
+Message-ID: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added Shawn to Cc:]
+A second iteration of this series.
 
-On Fri, Mar 7, 2014 at 7:28 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Fri, Mar 07, 2014 at 05:56:12PM +0000, Russell King - ARM Linux wrote:
->> On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
->> > Hi,
->> >
->> > this latest version of the imx-drm DT binding patches applies
->> > on top of staging-next and also depends on the OF graph binding
->> > patchset that moves the v4l2_of helpers to drivers/of.
->> > Currently, the two patchsets are also available at:
->> >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
->> >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
->>
->> Okay, having looked at the second tree, pulling that will result in
->> pulling in all of the staging tree here, which I'd rather not do.  Unless
->> there's any objection, I'd like to take these as patches on top of the
->> imx-drm stuff which I sent to Greg plus the of-graph stuff which they
->> depend upon.  In other words, exactly how I've been testing it today.
->>
->> Any objections?
->
-> None from me!  :)
+I added some more to the cleanup parts. The more you look at things the
+more things to fix you find.
 
-Nor from me. But I'd like to point out that there already is one merge issue
-with Shawn's for-next branch in arch/arm/boot/dts/imx53-qsb.dts between
-    d5eb195 "ARM: dts: i.MX53: move common QSB nodes to new file"
-and these two patches:
-    17b5001 "imx-drm: convert to componentised device support".
-    "ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to dtsi"
-The first one already is in staging-next.
+The read-modify-write refactoring is more or less a result of the prefix
+substitution. With the changed prefix for better indentation is
+necessary, and I think it makes the code more readably in general.
 
-regards
-Philipp
+The controversial part, the re-branding: I split this up into 4 separate
+patches, starting at 5/8. Each going a little further and I'd like to
+know which ones are wanted/okay and which rather not. And whether the
+wanted ones should be squashed.
+
+The first one is pretty much the light-weight changes Alan suggested.
+
+The second changes the driver name. I don't know if that is acceptable.
+I think the name is used in some sysfs nodes. Does that make it part of
+the userspace API? And I don't know if the name might be used elsewhere?
+
+The third is mostly a search and replace of 'xuartps' with
+'cdns-uart'. A noisy change but it should not impact anything else. I
+thought it might be nice to have more generic names since they show in
+stack traces and the xuartps thing may not be that meaningful on
+non-Zynq platforms - though there is non for this driver as of now.
+
+Similar the Kconfig symbol renaming. Probably not worth it, but might
+clarify things a bit.
+
+The defconfig update would - obviously - only needed if the Kconfig
+change is done. Which is probably another reason to not change the
+config symbol.
+
+In the documentation I added xlnx,xuartps as valid compatible string,
+but refrained from documenting the Zynq-specific clock names. The
+driver, though, allows them, but prints a warning.
+
+The DT update would silence the afore-mentioned warning by migrating to
+the new clock names.
+
+	Thanks,
+	S?ren
+
+Soren Brinkmann (11):
+  tty: xuartps: Clean up
+  tty: xuartps: Print warning in clock notifier
+  tty: xuartps: Refactor read-modify-writes
+  tty: xuartps: Remove bogus comment and register write
+  tty: xuartps: Rebrand driver as Cadence UART
+  tty: xuartps: Change driver name to 'cdns-uart'
+  tty: xuartps: Replace function and symbol prefix
+  tty: xuartps: Rename Kconfig symbols
+  ARM: multi_v7_defconfig: Adopt to UART driver renaming
+  tty: cadence: Document DT binding
+  ARM: zynq: DT: Migrate UART to Cadence binding
+
+ .../devicetree/bindings/serial/cdns,uart.txt       |   20 +
+ arch/arm/boot/dts/zynq-7000.dtsi                   |    8 +-
+ arch/arm/configs/multi_v7_defconfig                |    4 +-
+ drivers/tty/serial/Kconfig                         |   15 +-
+ drivers/tty/serial/Makefile                        |    2 +-
+ drivers/tty/serial/xilinx_uartps.c                 | 1123 ++++++++++----------
+ include/uapi/linux/serial_core.h                   |    2 +-
+ 7 files changed, 569 insertions(+), 605 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
+
+-- 
+1.9.0.1.g4196000
