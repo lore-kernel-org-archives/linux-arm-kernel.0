@@ -1,21 +1,28 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 6 Mar 2014 23:34:52 -0800
-Subject: [PATCH 0/3] mtd: gpmi: add subpage read support
-In-Reply-To: <531975F7.8020201@freescale.com>
-References: <a> <1388718102-26097-1-git-send-email-b32955@freescale.com>
- <20140307072702.GC13420@norris-Latitude-E6410>
- <531975F7.8020201@freescale.com>
-Message-ID: <20140307073452.GD31517@norris-Latitude-E6410>
+Date: Fri, 7 Mar 2014 00:02:51 -0800
+Subject: [PATCH] Disable Subpage nand write when using Atmel PMECC
+In-Reply-To: <53194432.50104@atmel.com>
+References: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
+ <53194432.50104@atmel.com>
+Message-ID: <20140307080251.GI31517@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 03:32:07PM +0800, Huang Shijie wrote:
-> ? 2014?03?07? 15:27, Brian Norris ??:
-> >Do you have an actual dependency? I don't spot it myself. They applied
-> >fine to my tree, and the code is logically independent.
-> this patch set does not have any dependency.
-> it's independent.
+On Fri, Mar 07, 2014 at 11:59:46AM +0800, Josh Wu wrote:
+> On 3/3/2014 7:15 PM, Herve Codina wrote:
+> >Crash detected on sam5d35 and its pmecc nand ecc controller.
+> >
+> >The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+> >(nand_base.c) when we write a sub page.
+> >chip->ecc.hwctl function is not set when we are using PMECC controller.
+> >As a workaround, set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+> >order to disable sub page access in nand_write_page.
+> >
+> >
+> >Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+> 
+> Acked-by: Josh Wu <josh.wu@atmel.com>
 
-Thanks for the confirmation. Pushed to l2-mtd.git.
+Pushed to l2-mtd.git. Thanks!
 
 Brian
