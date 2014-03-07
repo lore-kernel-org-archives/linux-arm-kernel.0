@@ -1,59 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 6 Mar 2014 20:42:51 -0800
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140307044251.GD9985@codeaurora.org>
+From: cernekee@gmail.com (Kevin Cernekee)
+Date: Thu, 6 Mar 2014 20:44:57 -0800
+Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
+In-Reply-To: <53193FEE.4060002@ieee.org>
+References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+ <53193FEE.4060002@ieee.org>
+Message-ID: <CAJiQ=7BrCqo3VijjEvt2JLifM0MNGYmAA+VG_YQbSHfyBqsbtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05, Sebastian Capella wrote:
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 8756e4b..d32adbb 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-> +#define __pa_symbol(x)		__pa((unsigned long)(x))
+On Thu, Mar 6, 2014 at 7:41 PM, Alex Elder <elder@ieee.org> wrote:
+>> This patchset adds very minimal support for the BCM63138 SoC which is
+>> a xDSL SoC using a dual Cortex A9 CPU complex.
+>
+>
+> Why do you use "63xx" for the generic name, when the specific
+> part you are defining here is 63138?  I would have expected
+> "63xxx".
 
-Thanks for removing RELOC_HIDE, as Russell already stated it's
-never been necessary on ARM.
+The product line has a mix of 4-digit and 5-digit part numbers.  The
+drivers for onchip peripherals all used "bcm63xx":
 
-Looking at this definition now it doesn't look right. Isn't
-&__nosave_begin a virtual address? Casting it to an unsigned long
-isn't going to give you a physical address. Why can't we use
-__pa()?
-
-> +extern const void __nosave_begin, __nosave_end;
-> +
-> +int pfn_is_nosave(unsigned long pfn)
-> +{
-> +	unsigned long nosave_begin_pfn =
-> +			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-> +	unsigned long nosave_end_pfn =
-> +			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-> +
-> +	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-> +}
-
-Perhaps this code could be:
-
-	unsigned long nosave_begin_pfn = virt_to_pfn(&__nosave_begin);
-	unsigned long nosave_end_pfn = virt_to_pfn(&__nosave_end);
-
-	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
-
-or if virt_to_pfn() doesn't exist on ARM and we can't add it for
-some reason:
-
-	unsigned long nosave_begin_pfn = __phys_to_pfn(__pa(&__nosave_begin));
-	unsigned long nosave_end_pfn = __phys_to_pfn(__pa(&__nosave_end));
-
-	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+$ find drivers/ | grep 63xx
+drivers/tty/serial/bcm63xx_uart.c
+drivers/pcmcia/bcm63xx_pcmcia.h
+drivers/pcmcia/bcm63xx_pcmcia.c
+drivers/usb/gadget/bcm63xx_udc.c
+drivers/watchdog/max63xx_wdt.c
+drivers/watchdog/bcm63xx_wdt.c
+drivers/char/hw_random/bcm63xx-rng.c
+drivers/mtd/bcm63xxpart.c
+drivers/net/phy/bcm63xx.c
+drivers/net/ethernet/broadcom/bcm63xx_enet.h
+drivers/net/ethernet/broadcom/bcm63xx_enet.c
+drivers/spi/spi-bcm63xx.c
+drivers/spi/spi-bcm63xx-hsspi.c
