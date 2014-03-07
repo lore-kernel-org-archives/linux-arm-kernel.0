@@ -1,21 +1,41 @@
-From: mark.roszko@gmail.com (Mark Roszko)
-Date: Fri, 7 Mar 2014 00:30:37 -0500
-Subject: [PATCH v2] i2c:at91: Add device tree property to set
- clock-frequency
-In-Reply-To: <05EF9B59-7009-49D2-B57F-5612C39F1FF0@jcrosoft.com>
-References: <1393293045-31849-1-git-send-email-mark.roszko@gmail.com>
- <20140228110506.GF11192@ldesroches-Latitude-E6320>
- <CAJjB1qLXnO-Zkte3vg_X5ktXmj1=tG+p5BcLX9vbCgzyfg_rWA@mail.gmail.com>
- <4A1E236E-E048-4E37-AFE8-C0AC283B73D0@jcrosoft.com>
- <CAJjB1qKriEVAQyvMaYu_N+QWJ=dzTxK91Hi_OUM8h_4i78EvbA@mail.gmail.com>
- <05EF9B59-7009-49D2-B57F-5612C39F1FF0@jcrosoft.com>
-Message-ID: <CAJjB1qJwa-x6yTAyEK8ByU4MNHnRgRpM4oYOFZFDm5Mi1wPHtw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 7 Mar 2014 11:18:00 +0530
+Subject: [PATCH v3] phy: omap-control: update dra7 and am437 usb2 bindings
+Message-ID: <1394171280-13359-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ah, you are talking about the individual slave devices within an
-device tree i2c bus like the i2c eeproms? Yea, it would be nicer if
-one could define it as such to deal with having slave devices that
-can't handle certain speeds such as I have. This patch does work
-though nicely for my needs with an SAMA5 with three i2c buses running
-at 50kHz, 100kHz and 400kHz separately.
+From: Roger Quadros <rogerq@ti.com>
+
+The dra7-usb2 and am437-usb2 bindings have not yet been used.
+Change them to be more elegant.
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Changes from v2:
+Kept only the drivers/phy part in this patch
+
+ drivers/phy/phy-omap-control.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/phy/phy-omap-control.c b/drivers/phy/phy-omap-control.c
+index 17fc200..a7e2d7f 100644
+--- a/drivers/phy/phy-omap-control.c
++++ b/drivers/phy/phy-omap-control.c
+@@ -228,11 +228,11 @@ static const struct of_device_id omap_control_phy_id_table[] = {
+ 		.data = &pipe3_data,
+ 	},
+ 	{
+-		.compatible = "ti,control-phy-dra7usb2",
++		.compatible = "ti,control-phy-dra7-usb2",
+ 		.data = &dra7usb2_data,
+ 	},
+ 	{
+-		.compatible = "ti,control-phy-am437usb2",
++		.compatible = "ti,control-phy-am437-usb2",
+ 		.data = &am437usb2_data,
+ 	},
+ 	{},
+-- 
+1.7.9.5
