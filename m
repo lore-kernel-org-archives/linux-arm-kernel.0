@@ -1,175 +1,103 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 07 Mar 2014 16:22:45 +0100
-Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
-In-Reply-To: <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
-References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
- <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
- <5319D3E5.4000001@gmail.com>
- <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
-Message-ID: <5319E445.9000409@gmail.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Fri, 07 Mar 2014 16:24:04 +0100
+Subject: [PATCH 1/2] dt-bindings: clock: Move at91.h to dt-bindigs/clock
+In-Reply-To: <1394085884-13081-2-git-send-email-tushar.behera@linaro.org>
+References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
+ <1394085884-13081-2-git-send-email-tushar.behera@linaro.org>
+Message-ID: <5319E494.3090805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.03.2014 16:10, Pankaj Dubey wrote:
-> Hi Tomasz,
->
->
-> On Fri, Mar 7, 2014 at 11:12 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Pankaj,
->>
->>
->> On 07.03.2014 14:56, Pankaj Dubey wrote:
->>>>
->>>> +static void __init exynos5260_clk_top_init(struct device_node *np)
->>>> +{
->>>> +       struct exynos5260_cmu_info cmu;
->>>> +       struct samsung_clk_provider *ctx;
->>>> +
->>>> +       memset(&cmu, 0, sizeof(cmu));
->>>> +
->>>> +       cmu.pll_clks = top_pll_clks;
->>>> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
->>>> +       cmu.mux_clks = top_mux_clks;
->>>> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
->>>> +       cmu.div_clks = top_div_clks;
->>>> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
->>>> +       cmu.gate_clks = top_gate_clks;
->>>> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
->>>> +       cmu.nr_clk_ids = TOP_NR_CLK;
->>>> +       cmu.clk_regs = top_clk_regs;
->>>> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
->>>> +
->>>> +       ctx = exynos5260_cmu_register_one(np, &cmu);
->>>> +
->>>> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
->>>> +                       ARRAY_SIZE(fixed_rate_ext_clks),
->>>> +                       ext_clk_match);
->>>> +}
->>>> +
->>>> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
->>>> +               exynos5260_clk_top_init);
->>>
->>>
->>> Well with this approach we end up adding 14 such
->>> exynosxxx_clk_xxx_init functions all of which has similar lines of
->>> code. As I know there are many upcoming Exynos SoC which will also
->>> have similar multiple clock controllers (in some of them there are
->>> upto 25 clock domains, and in that case we will end up writing 25 such
->>> init functions) so I have following suggestion where we can have one
->>> more structure which will hold all static data and match_table to
->>> match compatibility string and return CMU_TYPE which can be mapped to
->>> get proper clock_data which can be used in single clock_init function.
->>> Following is some sample code which I have implemented and tested on
->>> one of Exynos SoC. Please let me know your opinion about this.
->>
->>
->> Yes, this looks better indeed, however there is still a room for
->> improvement. Please see my comments below.
->>
->>
->>>
->>> =============================
->>>
->>> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
->>
->>
->> Instead of making this an array, particular elements could be separate
->> structures. This would simplify the code below.
->>
->>
->>>           {
->>>                   .cmu_type = CMU_TYPE_TOP,
->>>                   .mux_clocks = top_mux_clks,
->>>                   .div_clocks = top_div_clks,
->>>                   .pll_clocks = top_pll_clks,
->>>                   .clk_regs = top_clk_regs,
->>>                   .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
->>>                   .nr_div_clocks = ARRAY_SIZE(top_div_clks),
->>>                   .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
->>>                   .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
->>>                   .nr_clks  = TOP_NR_CLK,
->>>           }, {
->>>                   .cmu_type = CMU_TYPE_EGL,
->>>                   .mux_clocks = egl_mux_clks,
->>>                   .div_clocks = egl_div_clks,
->>>                   .pll_clocks = egl_pll_clks,
->>>                    .clk_regs = egl_clk_regs,
->>>                   .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
->>>                   .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
->>>                   .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
->>>                   .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
->>>                   .nr_clks  = EGL_NR_CLK,
->>>           }, {
->>>          /* Add similar elements here */
->>> };
->>>
->>> static struct of_device_id cmu_subtype_match_table[] = {
->>>           {
->>>                   .compatible = "exynosxxxx-cmu-top",
->>>                   .data   = (void *)CMU_TYPE_TOP,
->>
->>
->> Here the data would be just a pointer to respective clock data struct
->> defined above.
->>
->>
->>>           }, {
->>>                   .compatible = "exynosxxx-cmu-peris",
->>>                   .data   = (void *)CMU_TYPE_PERIS,
->>>           }, {
->>>          /* Add similar elements here */
->>> };
->>>
->>> void __init exynosxxx_clk_init(struct device_node *np)
->>> {
->>>            [snip]
->>>
->>>           match = of_match_node(cmu_subtype_match_table, np);
->>>
->>>           if (!match)
->>>                   panic("%s: cmu type (%s) is not supported.\n", __func__,
->>>                                   np->name);
->>
->>
->> This can't happen, because this function won't be called for any node with
->> compatible string not declared using CLK_OF_DECLARE().
->
-> Agreed.
->
->>
->>
->>>
->>>           reg_base = of_iomap(np, 0);
->>>           if (!reg_base)
->>>                   panic("%s: failed to map registers\n", __func__);
->>>
->>>           cmu_type = (unsigned long) match->data;
->>>
->>>           for (; i < CMU_TYPE_ALL; i++) {
->>>                   clk_data = &exynosxxxx_clk_data[i];
->>>                   if (cmu_type == clk_data->cmu_type)
->>>                           break;
->>>           }
->>
->>
->> Now clk_data could be taken directly from match->data, without the need to
->> iterate over an array.
->
-> Good point. Let me change as per your suggestion and test. And then we
-> will go for this change in next new version of patch.
+Le 06/03/2014 07:04, Tushar Behera a ?crit :
+> Most of the clock related dt-binding header files are located in
+> dt-bindings/clock folder. It would be good to keep all the similar
+> header files at a single location.
 
-OK, thanks.
+It seems I chose the wrong place when I decided to put at91 macros in 
+this directory :-)
 
-> Also please
-> review rest patch also and let us know if anything still can be
-> improved.
-
-I had reviewed version 3 of this series and most of my comments have 
-been addressed. I'm waiting for remaining two to be addressed, but they 
-are covered by your comments for v4.
-
-A link to v3 thread for reference:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27249
-
-Best regards,
-Tomasz
+>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Acked-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> CC: Rob Landley <rob@landley.net>
+> CC: Andrew Victor <linux@maxim.org.za>
+> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>   .../devicetree/bindings/clock/at91-clock.txt       |    2 +-
+>   arch/arm/boot/dts/sama5d3.dtsi                     |    2 +-
+>   arch/arm/boot/dts/sama5d3_mci2.dtsi                |    2 +-
+>   arch/arm/boot/dts/sama5d3_tcb1.dtsi                |    2 +-
+>   arch/arm/boot/dts/sama5d3_uart.dtsi                |    2 +-
+>   include/dt-bindings/{clk => clock}/at91.h          |    0
+>   6 files changed, 5 insertions(+), 5 deletions(-)
+>   rename include/dt-bindings/{clk => clock}/at91.h (100%)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index cd5e239..6794cdc 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -62,7 +62,7 @@ Required properties for PMC node:
+>   - interrupt-controller : tell that the PMC is an interrupt controller.
+>   - #interrupt-cells : must be set to 1. The first cell encodes the interrupt id,
+>   	and reflect the bit position in the PMC_ER/DR/SR registers.
+> -	You can use the dt macros defined in dt-bindings/clk/at91.h.
+> +	You can use the dt macros defined in dt-bindings/clock/at91.h.
+>   	0 (AT91_PMC_MOSCS) -> main oscillator ready
+>   	1 (AT91_PMC_LOCKA) -> PLL A ready
+>   	2 (AT91_PMC_LOCKB) -> PLL B ready
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 3d5faf8..8c977b5 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -13,7 +13,7 @@
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+>   #include <dt-bindings/gpio/gpio.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>   
+>   / {
+>   	model = "Atmel SAMA5D3 family SoC";
+> diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> index b029fe7..1b02208 100644
+> --- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> @@ -9,7 +9,7 @@
+>   
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>   
+>   / {
+>   	ahb {
+> diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> index 382b044..0284845 100644
+> --- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> @@ -9,7 +9,7 @@
+>   
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>   
+>   / {
+>   	aliases {
+> diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> index a9fa75e..7a8d4c6 100644
+> --- a/arch/arm/boot/dts/sama5d3_uart.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> @@ -9,7 +9,7 @@
+>   
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>   
+>   / {
+>   	aliases {
+> diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clock/at91.h
+> similarity index 100%
+> rename from include/dt-bindings/clk/at91.h
+> rename to include/dt-bindings/clock/at91.h
