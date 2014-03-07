@@ -1,52 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Mar 2014 11:41:11 +0800
-Subject: [PATCHv2 3/5] net: rfkill: gpio: remove gpio names
-In-Reply-To: <53169304.9080002@wwwdotorg.org>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1393330950-7283-4-git-send-email-heikki.krogerus@linux.intel.com>
- <530D218E.9010007@wwwdotorg.org>
- <CACRpkdZF4-rWs1WkOp3t0x77fgSCE71E=wdrxiDuGZ8eBu_p_Q@mail.gmail.com>
- <53168976.7000008@wwwdotorg.org>
- <CACRpkdYfQoDmPX0He4J2Sn2wgQn2hHoHyPqnStLRVqrvi=M+-w@mail.gmail.com>
- <53169304.9080002@wwwdotorg.org>
-Message-ID: <CACRpkdaYuZ5bXo7djOv04oyHPAFbO=pKfR7L7UBY+kZqZUHfmQ@mail.gmail.com>
+From: elder@ieee.org (Alex Elder)
+Date: Thu, 06 Mar 2014 21:41:34 -0600
+Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
+In-Reply-To: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <53193FEE.4060002@ieee.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 10:59 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 03/04/2014 07:37 PM, Linus Walleij wrote:
->> On Wed, Mar 5, 2014 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 03/04/2014 06:43 PM, Linus Walleij wrote:
->>
->>>> If I understand the situation correctly it's like ACPI does not have named
->>>> GPIOs so keeping specifying this in DT GPIO bindings is counter-productive
->>>> to the work of abstracting the access to GPIO handlers so that drivers
->>>> need not know whether ACPI or DT is used for describing the hardware.
->>>
->>> For devices that already have both ACPI and DT bindings, we can't
->>> pretend they can be the same; they are already potentially different. We
->>> simply need to parse DT and ACPI differently, since that's the sway
->>> their bindings are defined.
->>>
->>> For any devices that don't have both ACPI and DT bindings, I agree we
->>> should certainly strive to make any new bindings aligned so we don't
->>> have to deal with this for them.
->>>
->>> However, we can't change the past.
->>
->> Yeah, right, so for this very driver there are no bindings defined (yet)
->> and the only device tree I can find referencing it is the Tegra20-paz00
->> and it just use gpios = <>;
->>
->> So in this case I think this patch is the right way forward, but I admit
->> I'm really uncertain in the general case.
+On 03/06/2014 11:45 AM, Florian Fainelli wrote:
+> Hi all,
 >
-> If there are no bindings defined at all yet, then we can define both DT
-> and ACPI bindings to use name-based GPIOs. Index-based lookups aren't a
-> good way forward.
+> This patchset adds very minimal support for the BCM63138 SoC which is
+> a xDSL SoC using a dual Cortex A9 CPU complex.
 
-After Mark clarifying that ACPI is going to have named GPIOs I'm
-totally aligned on this, so OK!
+Why do you use "63xx" for the generic name, when the specific
+part you are defining here is 63138?  I would have expected
+"63xxx".
 
-Yours,
-Linus Walleij
+					-Alex
+
+
+> Future work will focus on:
+>
+> - clock device/driver/providers
+> - SMP support (already working)
+> - DT'fying drivers/tty/serial/bcm63xx_uart.c to be usable
+>
+> Florian Fainelli (6):
+>    ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
+>    ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
+>    ARM: BCM63XX: add low-level UART debug support
+>    ARM: BCM63XX: add BCM63138 minimal Device Tree
+>    ARM: BCM63XX: add BCM963138DVT Reference platform DTS
+>    MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
+>
+>   .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
+>   MAINTAINERS                                        |  10 ++
+>   arch/arm/Kconfig.debug                             |  20 +++-
+>   arch/arm/boot/dts/Makefile                         |   1 +
+>   arch/arm/boot/dts/bcm63138.dtsi                    | 109 +++++++++++++++++++++
+>   arch/arm/boot/dts/bcm63138dvt.dts                  |  18 ++++
+>   arch/arm/include/debug/bcm63xxx.S                  |  33 +++++++
+>   arch/arm/mach-bcm/Kconfig                          |  20 ++++
+>   arch/arm/mach-bcm/Makefile                         |   2 +
+>   arch/arm/mach-bcm/bcm63xx.h                        |  29 ++++++
+>   arch/arm/mach-bcm/board_bcm63xx.c                  |  94 ++++++++++++++++++
+>   11 files changed, 342 insertions(+), 3 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+>   create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
+>   create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
+>   create mode 100644 arch/arm/include/debug/bcm63xxx.S
+>   create mode 100644 arch/arm/mach-bcm/bcm63xx.h
+>   create mode 100644 arch/arm/mach-bcm/board_bcm63xx.c
+>
