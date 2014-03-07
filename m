@@ -1,55 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Mar 2014 12:10:27 -0500
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. #3)
-Message-ID: <20140307171027.GG18707@titan.lakedaemon.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Mar 2014 18:19:32 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
+In-Reply-To: <20140307160836.GM21483@n2100.arm.linux.org.uk>
+References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307160836.GM21483@n2100.arm.linux.org.uk>
+Message-ID: <20140307171932.GU607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Fri, Mar 07, 2014 at 04:08:36PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
+> > @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+> >  exit_free_irq:
+> >  	free_irq(drv_data->irq, drv_data);
+> >  exit_reset:
+> > -	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
+> > +	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
+> > +	    !IS_ERR(drv_data->rstc))
+> >  		reset_control_assert(drv_data->rstc);
+> 
+> Another question is... why do we need to check pd->dev.of_node here?
+> If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
+> controller node, so drv_data->rstc is either going to be a valid
+> pointer, or it's going to be an error pointer - neither
+> reset_control_get() nor devm_reset_control_get return NULL.
 
-This should be the last pull request for mvebu/soc for v3.15.  It's a
-small change and a big one all rolled into one :-P
+Hmmm, right. I'll fix this in a later version.
 
-With the dove pinctrl changes going through LinusW's tree, this patch is
-all that's really necessary for the move.
+Wolfram, do you want me to respin the patch making use of
+reset_get_optional introduced by Philip in its other mail?
 
-As usual, this is an incremental pull request from tags/mvebu-soc-3.15-2
-in the mvebu/soc branch up to tags/mvebu-soc-3.15-3.
-
-Please pull.
-
-thx,
-
-Jason.
-
-The following changes since commit 0d75ab68fd1a516f7a394fac6ba0f0ef34bbd18e:
-
-  Merge branch 'mvebu/soc-kw' into mvebu/soc (2014-03-01 03:21:04 +0000)
-
-are available in the git repository at:
-
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.15-3
-
-for you to fetch changes up to 00e8ec2f0b05bfc8acaf13cf91c2ca1e624f3535:
-
-  ARM: mvebu: move DT Dove to MVEBU (2014-03-04 04:13:48 +0000)
-
-----------------------------------------------------------------
-mvebu soc changes for v3.15 (incremental #3)
-
- - dove
-    - move devicetree code from mach-dove/ to mach-mvebu/ :-)
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (1):
-      ARM: mvebu: move DT Dove to MVEBU
-
- arch/arm/boot/dts/Makefile                           |  2 +-
- arch/arm/mach-dove/Kconfig                           | 12 ------------
- arch/arm/mach-dove/Makefile                          |  1 -
- arch/arm/mach-mvebu/Kconfig                          | 12 ++++++++++++
- arch/arm/mach-mvebu/Makefile                         |  1 +
- arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} | 20 ++++++++------------
- 6 files changed, 22 insertions(+), 26 deletions(-)
- rename arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} (61%)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/e5889c10/attachment.sig>
