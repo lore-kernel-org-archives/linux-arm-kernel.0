@@ -1,67 +1,263 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 07 Mar 2014 14:49:32 +0100
-Subject: I2C dummy adapter driver ?
-In-Reply-To: <20140305011530.GN13126@sirena.org.uk>
-References: <5305382E.9050902@gmail.com>
- <CAJe_ZhcMMVRTErH3ctbnZyn30_cp9XXjEfUZXdWaVWUHqs4CRw@mail.gmail.com>
- <53073C51.5010401@samsung.com> <20140228060728.GB29849@sirena.org.uk>
- <5315BB34.8080803@samsung.com> <20140305011530.GN13126@sirena.org.uk>
-Message-ID: <5319CE6C.2020001@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 7 Mar 2014 22:56:23 +0900
+Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
+In-Reply-To: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
+References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/14 02:15, Mark Brown wrote:
-> On Tue, Mar 04, 2014 at 12:38:28PM +0100, Sylwester Nawrocki wrote:
->> On 28/02/14 07:07, Mark Brown wrote:
->>> On Fri, Feb 21, 2014 at 12:45:21PM +0100, Sylwester Nawrocki wrote:
-> 
->>>> The I2C bus driver with empty i2c_algorithm.master_xfer() helps WRT to
->>>> using standard DT binding and v4l2_subdev interface.
-> 
->>> Wouldn't a platform device do just as well here if there's no actual
->>> control?
-> 
->> Then the I2C client devices would have to be instantiated manually, 
->> I think it's more trouble.
-> 
-> I2C is not that much more enumerable than platform bus, I don't see the
-> difference here?  To the extent I2C is enumerable a dummy adaptor isn't
-> going to support that.
+Hi Rahul,
 
-Yes, it won't be enumerable, I just meant allocating client devices 
-would need to be taken care of, rather that having this handled entirely 
-by, e.g. i2c-core. 
+On Thu, Mar 6, 2014 at 10:45 PM, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Add support for exynos5260 clocks in clock driver.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
->> I could as well create custom I2C client drivers per ISP, but then the 
->> I2C devices would have to be represented somehow in DT, to pass stuff 
->> like voltage regulators and GPIOs. Anyway, it's not something could be 
->> done in mainline.
-> 
-> Why not?
+Even though my signed-off-by is present in this patch I can't see my
+email-id in cc list. Please check why?
 
-Well, my concern was that existing sub-device drivers would need to be
-extended to handle other bus types, like the platform bus.
+[snip]
 
-And since that very same device could be controlled by the host CPU or
-not, it just depends what host interface/SoC it is linked to, such
-a complication may not be justified.  It's like introducing bridge/host 
-details to the client drivers. In general the sub-devices should be
-host-agnostic.
+> +#include "clk-exynos5260.h"
+> +#include "clk.h"
+> +#include "clk-pll.h"
+> +
+> +#include <dt-bindings/clk/exynos5260-clk.h>
 
->> Even if there is no actual I2C communication on the host CPU side, the 
->> power up/down sequence is handled there. The intention is to keep this 
->> common per an I2C client, regardless of whether I2C communication is 
->> done by firmware or the host the CPU.
-> 
-> The way you're talking it sounds like your code is very hard coded to
-> use I2C here.  What happens if someone uses SPI or some other bus to
-> control an ISP?
+Better to move "exynos5260-clk.h" from "dt-bindings/clk" to "dt-bindings/clock"
+as patch for moving all such headers already landed and looks good also.
 
-The other busses, like SPI, are also handled the V4L2 subdev in 
-a standard way.  The host just need to be aware on what control bus 
-a subdev is located on, to get hold of it.
+[snip]
 
-Let me add that for image sensors I2C is used as a control bus in 
-majority of cases.  An I2C-compatible (CCI) bus is specified as 
-a control bus by the MIPI CSI-2 specification. With newer version 
-of the standard we may need to create a MIPI CSI (control) bus.
+> +/*
+> + * Applicable for all 2550 Type PLLS for Exynos5260, listed below
+> + * DISP_PLL, EGL_PLL, KFC_PLL, MEM_PLL,
+> + * BUS_PLL, MEDIA_PLL, G3D_PLL.
+> + */
+> +static const struct samsung_pll_rate_table pll2550_24mhz_tbl[] = {
+
+shouldn't we mark rate_table with __initconst?
+
+[snip]
+
+> + * Applicable for 2650 Type PLL for AUD_PLL.
+> + */
+> +static const struct samsung_pll_rate_table pll2650_24mhz_tbl[] = {
+
+Ditto.
+
+[snip]
+
+> +#else
+> +static void exynos5260_clk_sleep_init(void) {}
+
+This will fail to compile if CONFIG_PM_SLEEP is not defined. Keep function
+signature same.
+
+> +#endif
+> +
+> +static struct samsung_clk_provider *
+> +__init exynos5260_cmu_register_one(struct device_node *np,
+> +                       struct exynos5260_cmu_info *cmu)
+> +{
+> +       void __iomem *reg_base;
+> +       struct samsung_clk_provider *ctx;
+> +
+> +       reg_base = of_iomap(np, 0);
+> +       if (!reg_base)
+> +               panic("%s: failed to map registers\n", __func__);
+> +
+> +       ctx = samsung_clk_init(np, reg_base, cmu->nr_clk_ids);
+> +       if (!ctx)
+> +               panic("%s: unable to alllocate ctx\n", __func__);
+> +
+> +       if (cmu->pll_clks)
+> +               samsung_clk_register_pll(ctx, cmu->pll_clks, cmu->nr_pll_clks,
+> +                       reg_base);
+> +       if (cmu->mux_clks)
+> +               samsung_clk_register_mux(ctx,  cmu->mux_clks,
+> +                       cmu->nr_mux_clks);
+> +       if (cmu->div_clks)
+> +               samsung_clk_register_div(ctx, cmu->div_clks, cmu->nr_div_clks);
+> +       if (cmu->gate_clks)
+> +               samsung_clk_register_gate(ctx, cmu->gate_clks,
+> +                       cmu->nr_gate_clks);
+> +       if (cmu->clk_regs)
+> +               exynos5260_clk_sleep_init(reg_base, cmu->clk_regs,
+> +                       cmu->nr_clk_regs);
+> +
+> +       return ctx;
+
+As far as I can see only one user of this return "ctx" is only
+"exynos5260_clk_top_init", other init functions just ignoring this
+return value.
+This can be avoided if we register "fin_pll" (as well as all phyclocks
+as they are also fixed rate clocks) clock via DT.
+As I have already done it for another ExynosXXX SoC and it worked for
+me, on the same hand when today I tried this on Exynos5260, I can see
+it's working well and I can register "fin_pll" as "fixed_clock" via DT
+and kernel booted without any issues. Late registration of parent
+clock does not causing any issues and CCF takes care of that.
+If required I can send the changes internally or if you are OK I can
+also upload next version of this patch with this fix, along with
+addressing all other comments .
+
+[snip]
+
+> +struct samsung_fixed_rate_clock fixed_rate_ext_clks[] __initdata = {
+> +       FRATE(FIN_PLL, "fin_pll", NULL, CLK_IS_ROOT, 0),
+> +};
+
+In this version you removed other fixed clocks (phyclks and ioclks)
+but I can not see corresponding DT patches where it has been moved.
+Or am I missing anything here?
+
+[snip]
+
+> +static void __init exynos5260_clk_top_init(struct device_node *np)
+> +{
+> +       struct exynos5260_cmu_info cmu;
+> +       struct samsung_clk_provider *ctx;
+> +
+> +       memset(&cmu, 0, sizeof(cmu));
+> +
+> +       cmu.pll_clks = top_pll_clks;
+> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
+> +       cmu.mux_clks = top_mux_clks;
+> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
+> +       cmu.div_clks = top_div_clks;
+> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
+> +       cmu.gate_clks = top_gate_clks;
+> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
+> +       cmu.nr_clk_ids = TOP_NR_CLK;
+> +       cmu.clk_regs = top_clk_regs;
+> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
+> +
+> +       ctx = exynos5260_cmu_register_one(np, &cmu);
+> +
+> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
+> +                       ARRAY_SIZE(fixed_rate_ext_clks),
+> +                       ext_clk_match);
+> +}
+> +
+> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
+> +               exynos5260_clk_top_init);
+
+Well with this approach we end up adding 14 such
+exynosxxx_clk_xxx_init functions all of which has similar lines of
+code. As I know there are many upcoming Exynos SoC which will also
+have similar multiple clock controllers (in some of them there are
+upto 25 clock domains, and in that case we will end up writing 25 such
+init functions) so I have following suggestion where we can have one
+more structure which will hold all static data and match_table to
+match compatibility string and return CMU_TYPE which can be mapped to
+get proper clock_data which can be used in single clock_init function.
+Following is some sample code which I have implemented and tested on
+one of Exynos SoC. Please let me know your opinion about this.
+
+=============================
+
+static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
+        {
+                .cmu_type = CMU_TYPE_TOP,
+                .mux_clocks = top_mux_clks,
+                .div_clocks = top_div_clks,
+                .pll_clocks = top_pll_clks,
+                .clk_regs = top_clk_regs,
+                .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
+                .nr_div_clocks = ARRAY_SIZE(top_div_clks),
+                .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
+                .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
+                .nr_clks  = TOP_NR_CLK,
+        }, {
+                .cmu_type = CMU_TYPE_EGL,
+                .mux_clocks = egl_mux_clks,
+                .div_clocks = egl_div_clks,
+                .pll_clocks = egl_pll_clks,
+                 .clk_regs = egl_clk_regs,
+                .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
+                .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
+                .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
+                .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
+                .nr_clks  = EGL_NR_CLK,
+        }, {
+       /* Add similar elements here */
+};
+
+static struct of_device_id cmu_subtype_match_table[] = {
+        {
+                .compatible = "exynosxxxx-cmu-top",
+                .data   = (void *)CMU_TYPE_TOP,
+        }, {
+                .compatible = "exynosxxx-cmu-peris",
+                .data   = (void *)CMU_TYPE_PERIS,
+        }, {
+       /* Add similar elements here */
+};
+
+void __init exynosxxx_clk_init(struct device_node *np)
+{
+         [snip]
+
+        match = of_match_node(cmu_subtype_match_table, np);
+
+        if (!match)
+                panic("%s: cmu type (%s) is not supported.\n", __func__,
+                                np->name);
+
+        reg_base = of_iomap(np, 0);
+        if (!reg_base)
+                panic("%s: failed to map registers\n", __func__);
+
+        cmu_type = (unsigned long) match->data;
+
+        for (; i < CMU_TYPE_ALL; i++) {
+                clk_data = &exynosxxxx_clk_data[i];
+                if (cmu_type == clk_data->cmu_type)
+                        break;
+        }
+
+        ctx = samsung_clk_init(np, reg_base, clk_data->nr_clks);
+        if (!ctx)
+                panic("%s: unable to alllocate ctx\n", __func__);
+
+        if (clk_data->nr_pll_clocks)
+          samsung_clk_register_pll(ctx, clk_data->pll_clocks,
+                                clk_data->nr_pll_clocks,
+                                reg_base);
+        if (clk_data->nr_mux_clocks)
+                samsung_clk_register_mux(ctx, clk_data->mux_clocks,
+                                clk_data->nr_mux_clocks);
+        if (clk_data->nr_div_clocks)
+                samsung_clk_register_div(ctx, clk_data->div_clocks,
+                                clk_data->nr_div_clocks);
+        if (clk_data->nr_gate_clocks)
+                samsung_clk_register_gate(ctx, clk_data->gate_clocks,
+                                clk_data->nr_gate_clocks);
+          if (cmu->nr_clk_regs)
+             exynosxxx_clk_sleep_init(reg_base, cmu->clk_regs,
+                       cmu->nr_clk_regs);
+         [snip]
+
+ }
+CLK_OF_DECLARE(cmu_top, "exynosxxxx-cmu-top", exynosxxxx_clk_init);
+CLK_OF_DECLARE(cmu_egl, "exynosxxxx-cmu-egl", exynosxxxx_clk_init);
+/* add more clock domain entries here */
+
+=======================================================
+
+> diff --git a/drivers/clk/samsung/clk-exynos5260.h b/drivers/clk/samsung/clk-exynos5260.h
+> new file mode 100644
+> index 0000000..7c3717a
+> --- /dev/null
+> +++ b/drivers/clk/samsung/clk-exynos5260.h
+> @@ -0,0 +1,448 @@
+> +#ifndef __CLK_EXYNOS5260_H
+> +#define __CLK_EXYNOS5260_H
+> +
+
+
+Thanks,
+Pankaj Dubey
