@@ -1,133 +1,354 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Mar 2014 19:13:00 +0100
-Subject: [PATCH 2/7] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1393692352-10839-3-git-send-email-carlo@caione.org>
+Date: Fri, 7 Mar 2014 19:18:25 +0100
+Subject: [PATCH 4/7] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <1393692352-10839-5-git-send-email-carlo@caione.org>
 References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-3-git-send-email-carlo@caione.org>
-Message-ID: <20140307181300.GZ607@lukather>
+ <1393692352-10839-5-git-send-email-carlo@caione.org>
+Message-ID: <20140307181825.GB607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 05:45:47PM +0100, Carlo Caione wrote:
-> Bindings documentation for the AXP20x driver. In this file also two
-> sub-nodes (PEK and regulators) are documented.
+On Sat, Mar 01, 2014 at 05:45:49PM +0100, Carlo Caione wrote:
+> This patch add support for the Power Enable Key found on MFD AXP202 and
+> AXP209. Besides the basic support for the button, the driver adds two
+> entries in sysfs to configure the time delay for power on/off.
 > 
 > Signed-off-by: Carlo Caione <carlo@caione.org>
 > ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+>  arch/arm/configs/sunxi_defconfig |   2 +
+
+Again, please provide a separate patch for both sunxi_defconfig and
+multi_v7_defconfig.
+
+(This can be the same patches than the one enabling the MFD though)
+
+>  drivers/input/misc/Kconfig       |  11 ++
+>  drivers/input/misc/Makefile      |   1 +
+>  drivers/input/misc/axp20x-pek.c  | 265 +++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 279 insertions(+)
+>  create mode 100644 drivers/input/misc/axp20x-pek.c
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+> index f8aa7e6..d59c826 100644
+> --- a/arch/arm/configs/sunxi_defconfig
+> +++ b/arch/arm/configs/sunxi_defconfig
+> @@ -39,6 +39,8 @@ CONFIG_SUN4I_EMAC=y
+>  # CONFIG_NET_VENDOR_STMICRO is not set
+>  # CONFIG_NET_VENDOR_WIZNET is not set
+>  # CONFIG_WLAN is not set
+> +CONFIG_INPUT_MISC=y
+> +CONFIG_INPUT_AXP20X_PEK=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_8250_CONSOLE=y
+>  CONFIG_SERIAL_8250_NR_UARTS=8
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 5f4967d..c9438ac 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -384,6 +384,17 @@ config INPUT_RETU_PWRBUTTON
+>  	  To compile this driver as a module, choose M here. The module will
+>  	  be called retu-pwrbutton.
+>  
+> +config INPUT_AXP20X_PEK
+> +	tristate "X-Powers AXP20X power button driver"
+> +	depends on MFD_AXP20X
+> +	help
+> +	  Say Y here if you want to enable power key reporting via the
+> +	  AXP20X PMIC.
+> +
+> +	  To compile this driver as a module, choose M here. The module will
+> +	  be called axp20x-pek.
+> +
+> +
+>  config INPUT_TWL4030_PWRBUTTON
+>  	tristate "TWL4030 Power button Driver"
+>  	depends on TWL4030_CORE
+> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> index 0ebfb6d..41d5403 100644
+> --- a/drivers/input/misc/Makefile
+> +++ b/drivers/input/misc/Makefile
+> @@ -49,6 +49,7 @@ obj-$(CONFIG_INPUT_POWERMATE)		+= powermate.o
+>  obj-$(CONFIG_INPUT_PWM_BEEPER)		+= pwm-beeper.o
+>  obj-$(CONFIG_INPUT_RB532_BUTTON)	+= rb532_button.o
+>  obj-$(CONFIG_INPUT_RETU_PWRBUTTON)	+= retu-pwrbutton.o
+> +obj-$(CONFIG_INPUT_AXP20X_PEK)		+= axp20x-pek.o
+>  obj-$(CONFIG_INPUT_GPIO_ROTARY_ENCODER)	+= rotary_encoder.o
+>  obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
+>  obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
+> diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
 > new file mode 100644
-> index 0000000..ae3e3c4
+> index 0000000..799275d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -0,0 +1,93 @@
-> +* axp20x device tree bindings
+> +++ b/drivers/input/misc/axp20x-pek.c
+> @@ -0,0 +1,265 @@
+> +/*
+> + * axp20x power button driver.
+> + *
+> + * Copyright (C) 2013 Carlo Caione <carlo@caione.org>
+> + *
+> + * This file is subject to the terms and conditions of the GNU General
+> + * Public License. See the file "COPYING" in the main directory of this
+> + * archive for more details.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +The axp20x family current members :-
-> +axp202 (X-Powers)
-> +axp209 (X-Powers)
+> +#include <linux/errno.h>
+> +#include <linux/irq.h>
+> +#include <linux/init.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/axp20x.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
 > +
-> +Required properties:
-> +- compatible 			: Should be "x-powers,axp202" or "x-powers,axp209"
-> +- interrupt-controller 		: axp20x has its own internal IRQs
-> +- #interrupt-cells 		: Should be set to 1
-> +- interrupt-parent 		: The parent interrupt controller
-> +- interrupts 			: Interrupt specifiers for interrupt sources
-> +- reg 				: The I2C slave address for the AXP chip
-> +- axp,system-power-controller	: Telling whether or not this pmic is
-> +				  controlling the system power
+> +#define AXP20X_PEK_STARTUP_MASK		(0xc0)
+> +#define AXP20X_PEK_SHUTDOWN_MASK	(0x03)
 > +
-> +Sub-nodes:
-> +* regulators : Contain the regulator nodes. The regulators are bound using
-> +	       their name as listed here: dcdc2, dcdc3, ldo1, ldo2, ldo3,
-> +	       ldo4, ldo5.
-> +	       The bindings details of individual regulator device can be found in:
-> +	       Documentation/devicetree/bindings/regulator/regulator.txt with the
-> +	       exception of:
-> +
-> +	- dcdc-freq		: defines the work frequency of DC-DC in KHz
-> +				  (range: 750-1875)
-> +	- dcdc-workmode		: 1 for PWM mode, 0 for AUTO mode
+> +static const char const *startup_time[] = { "128mS", "3S" , "1S", "2S" };
+> +static const char const *shutdown_time[] = { "4S", "6S" , "8S", "10S" };
 
-You don't seem to always set this. You should mention that it is
-optional, and which default value it has.
+I guess these are seconds. If so, a lowercase s in needed.
 
 > +
-> +* axp20x-pek : Power Enable Key
-> +	- compatible		: should be "x-powers,axp20x-pek"
-
-Why is this needed for?
-
-Plus, please don't use any generic, or pattern matching compatibles,
-but rather precise ones, so that if it is needed, we can add any quirk
-we want.
-
-
-> +Example:
-> +
-> +axp: axp20x at 34 {
-> +	reg = <0x34>;
-> +	interrupt-parent = <&nmi_intc>;
-> +	interrupts = <0 8>;
-> +
-> +	axp,system-power-controller;
-> +
-> +	compatible = "x-powers,axp209";
-> +	interrupt-controller;
-> +	#interrupt-cells = <1>;
-> +
-> +	axp20x-pek {
-> +		compatible = "x-powers,axp20x-pek";
-> +	};
-> +
-> +	regulators {
-> +		dcdc-freq = "8";
-> +
-> +		axp_dcdc2: dcdc2 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <2275000>;
-> +			dcdc-workmode = <0>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_dcdc3: dcdc3 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <3500000>;
-> +			dcdc-workmode = <0>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_ldo1: ldo1 {
-> +			regulator-min-microvolt = <1300000>;
-> +			regulator-max-microvolt = <1300000>;
-> +		};
-> +
-> +		axp_ldo2: ldo2 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_ldo3: ldo3 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <3500000>;
-> +		};
-> +
-> +		axp_ldo4: ldo4 {
-> +			regulator-min-microvolt = <1250000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +
-> +		axp_ldo5: ldo5 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +	};
+> +struct axp20x_pek {
+> +	struct axp20x_dev *axp20x;
+> +	struct input_dev *input;
+> +	int irq_dbr;
+> +	int irq_dbf;
 > +};
 > +
+> +struct axp20x_pek_ext_attr {
+> +	const char const **str;
+> +	unsigned int mask;
+> +};
+> +
+> +static struct axp20x_pek_ext_attr axp20x_pek_startup_ext_attr = {
+> +	.str	= startup_time,
+> +	.mask	= AXP20X_PEK_STARTUP_MASK,
+> +};
+> +
+> +static struct axp20x_pek_ext_attr axp20x_pek_shutdown_ext_attr = {
+> +	.str	= shutdown_time,
+> +	.mask	= AXP20X_PEK_SHUTDOWN_MASK,
+> +};
+> +
+> +static struct axp20x_pek_ext_attr *get_axp_ext_attr(struct device_attribute *attr)
+> +{
+> +	return container_of(attr, struct dev_ext_attribute, attr)->var;
+> +}
+> +
+> +ssize_t axp20x_show_ext_attr(struct device *dev, struct device_attribute *attr,
+> +			     char *buf)
+> +{
+> +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> +	unsigned int val;
+> +	int ret, i;
+> +	int cnt = 0;
+> +
+> +	ret = regmap_read(axp20x_pek->axp20x->regmap, AXP20X_PEK_KEY, &val);
+> +	if (ret != 0)
+> +		return ret;
+> +
+> +	val &= axp20x_ea->mask;
+> +	val >>= ffs(axp20x_ea->mask) - 1;
+> +
+> +	for (i = 0; i < 4; i++) {
+> +		if (val == i)
+> +			cnt += sprintf(buf + cnt, "[%s] ", axp20x_ea->str[i]);
+> +		else
+> +			cnt += sprintf(buf + cnt, "%s ", axp20x_ea->str[i]);
+> +	}
+> +
+> +	cnt += sprintf(buf + cnt, "\n");
+> +
+> +	return cnt;
+> +}
+> +
+> +ssize_t axp20x_store_ext_attr(struct device *dev, struct device_attribute *attr,
+> +			      const char *buf, size_t count)
+> +{
+> +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> +	char val_str[20];
+> +	int ret, i;
+> +	size_t len;
+> +
+> +	val_str[sizeof(val_str) - 1] = '\0';
+> +	strncpy(val_str, buf, sizeof(val_str) - 1);
+> +	len = strlen(val_str);
+> +
+> +	if (len && val_str[len - 1] == '\n')
+> +		val_str[len - 1] = '\0';
+> +
+> +	for (i = 0; i < 4; i++) {
+> +		if (!strcmp(val_str, axp20x_ea->str[i])) {
+> +			ret = regmap_update_bits(axp20x_pek->axp20x->regmap,
+> +						 AXP20X_PEK_KEY,
+> +						 axp20x_ea->mask, i);
+> +			if (ret != 0)
+> +				return -EINVAL;
+> +			return count;
+> +		}
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static struct dev_ext_attribute axp20x_dev_attr_startup = {
+> +	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> +	.var	= &axp20x_pek_startup_ext_attr
+> +};
+> +
+> +static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
+> +	__ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> +	&axp20x_pek_shutdown_ext_attr
+> +};
+> +
+> +static struct attribute *dev_attrs[] = {
+> +	&axp20x_dev_attr_startup.attr.attr,
+> +	&axp20x_dev_attr_shutdown.attr.attr,
+> +	NULL,
+> +};
+> +
+> +static struct attribute_group dev_attr_group = {
+> +	.attrs	= dev_attrs,
+> +};
+> +
+> +static const struct attribute_group *dev_attr_groups[] = {
+> +	&dev_attr_group,
+> +	NULL,
+> +};
+> +
+> +static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
+> +{
+> +	struct input_dev *idev = pwr;
+> +	struct axp20x_pek *axp20x_pek = input_get_drvdata(idev);
+> +
+> +	if (irq == axp20x_pek->irq_dbr)
+> +		input_report_key(idev, KEY_POWER, true);
+> +	else if (irq == axp20x_pek->irq_dbf)
+> +		input_report_key(idev, KEY_POWER, false);
+> +
+> +	input_sync(idev);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int axp20x_pek_probe(struct platform_device *pdev)
+> +{
+> +	struct axp20x_pek *axp20x_pek;
+> +	struct axp20x_dev *axp20x;
+> +	struct input_dev *idev;
+> +	int error;
+> +
+> +	axp20x_pek = devm_kzalloc(&pdev->dev, sizeof(struct axp20x_pek),
+> +				  GFP_KERNEL);
+> +	if (!axp20x_pek)
+> +		return -ENOMEM;
+> +
+> +	axp20x_pek->axp20x = dev_get_drvdata(pdev->dev.parent);
+> +	axp20x = axp20x_pek->axp20x;
+> +
+> +	axp20x_pek->irq_dbr = platform_get_irq_byname(pdev, "PEK_DBR");
+> +	if (axp20x_pek->irq_dbr < 0) {
+> +		dev_err(&pdev->dev, "No IRQ for PEK_DBR, error=%d\n",
+> +				axp20x_pek->irq_dbr);
+> +		return axp20x_pek->irq_dbr;
+> +	}
+> +	axp20x_pek->irq_dbr = regmap_irq_get_virq(axp20x->regmap_irqc,
+> +						  axp20x_pek->irq_dbr);
+> +
+> +	axp20x_pek->irq_dbf = platform_get_irq_byname(pdev, "PEK_DBF");
+> +	if (axp20x_pek->irq_dbf < 0) {
+> +		dev_err(&pdev->dev, "No IRQ for PEK_DBF, error=%d\n",
+> +				axp20x_pek->irq_dbf);
+> +		return axp20x_pek->irq_dbf;
+> +	}
+> +	axp20x_pek->irq_dbf = regmap_irq_get_virq(axp20x->regmap_irqc,
+> +						  axp20x_pek->irq_dbf);
+> +
+> +	axp20x_pek->input = devm_input_allocate_device(&pdev->dev);
+> +	if (!axp20x_pek->input)
+> +		return -ENOMEM;
+> +
+> +	idev = axp20x_pek->input;
+> +
+> +	idev->name = "axp20x-pek";
+> +	idev->phys = "m1kbd/input2";
+> +	idev->dev.parent = &pdev->dev;
+> +
+> +	input_set_capability(idev, EV_KEY, KEY_POWER);
+> +
+> +	input_set_drvdata(idev, axp20x_pek);
+> +
+> +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbr,
+> +					  NULL, axp20x_pek_irq, 0,
+> +					  "axp20x-pek-dbr", idev);
+> +	if (error) {
+> +		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
+> +			axp20x_pek->irq_dbr, error);
+> +
+> +		return error;
+> +	}
+> +
+> +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbf,
+> +					  NULL, axp20x_pek_irq, 0,
+> +					  "axp20x-pek-dbf", idev);
+> +	if (error) {
+> +		dev_err(axp20x->dev, "Failed to request dbf IRQ#%d: %d\n",
+> +			axp20x_pek->irq_dbf, error);
+> +		return error;
+> +	}
+> +
+> +	idev->dev.groups = dev_attr_groups;
+> +	error = input_register_device(idev);
+> +	if (error) {
+> +		dev_err(axp20x->dev, "Can't register input device: %d\n", error);
+> +		return error;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, axp20x_pek);
+> +
+> +	return 0;
+> +}
+> +
+> +static int axp20x_pek_remove(struct platform_device *pdev)
+> +{
+> +	struct axp20x_pek *axp20x_pek = platform_get_drvdata(pdev);
+> +
+> +	input_unregister_device(axp20x_pek->input);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id axp20x_pek_match[] = {
+> +	{ .compatible = "x-powers,axp20x-pek", },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, axp20x_pek_match);
+> +
+> +static struct platform_driver axp20x_pek_driver = {
+> +	.probe		= axp20x_pek_probe,
+> +	.remove		= axp20x_pek_remove,
+> +	.driver		= {
+> +		.name		= "axp20x-pek",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= axp20x_pek_match,
+> +	},
+> +};
+> +module_platform_driver(axp20x_pek_driver);
+> +
+> +MODULE_DESCRIPTION("axp20x Power Button");
+> +MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
+> +MODULE_LICENSE("GPL");
 > -- 
 > 1.8.3.2
 > 
@@ -142,4 +363,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/52e645ac/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/eacc6a62/attachment.sig>
