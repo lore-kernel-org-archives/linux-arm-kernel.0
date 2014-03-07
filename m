@@ -1,27 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 10:48:48 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add shared shmobile_init_delay()
-In-Reply-To: <20140307000003.GB24411@verge.net.au>
-References: <20140306032814.10814.2949.sendpatchset@w520>
- <20140306032824.10814.21953.sendpatchset@w520>
- <20140307000003.GB24411@verge.net.au>
-Message-ID: <20140307014844.GE11702@verge.net.au>
+Date: Fri, 7 Mar 2014 11:05:26 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Break out and extend clock workaround
+In-Reply-To: <20140224072921.3522.55023.sendpatchset@w520>
+References: <20140224072921.3522.55023.sendpatchset@w520>
+Message-ID: <20140307020521.GF11702@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 09:00:06AM +0900, Simon Horman wrote:
-> On Thu, Mar 06, 2014 at 12:28:24PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Introduce shmobile_init_delay() that gets CPU specific
-> > parameters from DT and sets up the early delay from
-> > there. This allows us to both remove frequency information
-> > from the C code and consolidate existing code.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
+On Mon, Feb 24, 2014 at 04:29:21PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Break out and extend clock workaround
 > 
-> Hi Magnus,
+> [PATCH 01/03] ARM: shmobile: Introduce shmobile_clk_workaround()
+> [PATCH 02/03] ARM: shmobile: Use shmobile_clk_workaround() on Lager
+> [PATCH 03/03] ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
 > 
-> I am holding off on this one until the rest of the series is finalised.
+> These patches consolidates the clkdev workaround present in the DT
+> reference version of board code for Lager and Koelsch, and it also
+> extends it to allow static enablement of a selected set of clocks
+> during boot. The latter is needed for USB PCI support patches that
+> will be posted shortly.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-After some discussion off-list I have queued this up.
+Thanks, I have queued these up.
