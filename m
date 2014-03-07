@@ -1,314 +1,4085 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri,  7 Mar 2014 20:22:11 +0100
-Subject: [PATCH v4 1/9] ARM: dts: overo: reorganize include files
-In-Reply-To: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394220139-1760-2-git-send-email-florian.vaussard@epfl.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  7 Mar 2014 12:22:16 -0700
+Subject: [PATCH 3/4] pinctrl: tegra: dynamically calculate function list of
+ groups
+In-Reply-To: <1394220137-16351-1-git-send-email-swarren@wwwdotorg.org>
+References: <1394220137-16351-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1394220137-16351-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, overo-related include files are organized as follow:
+From: Stephen Warren <swarren@nvidia.com>
 
-                     omap3-overo.dtsi
-                             |
-                             |
-omap34xx.dtsi   omap3-overo-tobi-common.dtsi   omap36xx.dtsi
-      |              |                 |             |
-      ---------------                  ---------------
-              |                                |
-    omap3-overo-tobi.dts          omap3-overo-storm-tobi.dts
+The per-SoC data structures for Tegra pinctrl stored some information
+in a redundant way. Specifically, the list of groups that each function
+could be muxed onto was stored once explicitly, and also as part of the
+definition of each group. Eliminate this redundancy, and calculate each
+function's list of valid groups at pinctrl probe time. This removes
+thousands of lines of code from the pinctrl driver and ~16K from the
+vmlinux binary size, and adds only about 500uS to the boot process (on
+Tegra30; newer SoCs will likely be faster still).
 
-This is unpractical when one has to deal with SoC-specific pinmux
-belonging to the omap3_pmx_core2 (defined in omap34xx/omap36xx),
-for pins related to the processor board. With the current
-hierarchy, such pinmux has to be defined in the expansion board's
-.dts, which is not logical.
-
-This patches reorganizes the files to add (yet another) abstraction
-layer between the processor and the expansion boards.
-
-omap34xx.dtsi       omap3-overo-base.dtsi      omap36xx.dtsi
-      |              |                 |             |
-      ---------------                  ---------------
-              |                                |
-      omap3-overo.dtsi               omap3-overo-storm.dtsi
-              |                                |
-      --------                                  ------
-      |         omap3-overo-tobi-common.dtsi         |
-      |              |                 |             |
-      ---------------                  ---------------
-              |                                |
-    omap3-overo-tobi.dts          omap3-overo-storm-tobi.dts
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/omap3-overo-base.dtsi        | 94 ++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts   |  2 +-
- arch/arm/boot/dts/omap3-overo-storm.dtsi       | 11 +++
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi |  2 -
- arch/arm/boot/dts/omap3-overo-tobi.dts         |  2 +-
- arch/arm/boot/dts/omap3-overo.dtsi             | 89 +-----------------------
- 6 files changed, 110 insertions(+), 90 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-overo-base.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm.dtsi
+ drivers/pinctrl/pinctrl-tegra.c    |   38 ++
+ drivers/pinctrl/pinctrl-tegra.h    |    4 +-
+ drivers/pinctrl/pinctrl-tegra114.c |  931 +--------------------------
+ drivers/pinctrl/pinctrl-tegra124.c | 1102 +-------------------------------
+ drivers/pinctrl/pinctrl-tegra20.c  |  627 +-----------------
+ drivers/pinctrl/pinctrl-tegra30.c  | 1242 +-----------------------------------
+ 6 files changed, 44 insertions(+), 3900 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
-new file mode 100644
-index 0000000..5970999
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * The Gumstix Overo must be combined with an expansion board.
-+ */
-+
-+/ {
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		overo {
-+			label = "overo:blue:COM";
-+			pwms = <&twl_pwmled 1 7812500>;
-+			max-brightness = <127>;
-+			linux,default-trigger = "mmc0";
-+		};
-+	};
-+
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "overo";
-+
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+
-+		twl_audio: audio {
-+			compatible = "ti,twl4030-audio";
-+			codec {
-+			};
-+		};
-+	};
-+};
-+
-+#include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
-+
-+/* i2c2 pins are used for gpio */
-+&i2c2 {
-+	status = "disabled";
-+};
-+
-+/* on board microSD slot */
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	bus-width = <4>;
-+};
-+
-+/* optional on board WiFi */
-+&mmc2 {
-+	bus-width = <4>;
-+};
-+
-+&twl_gpio {
-+	ti,use-leds;
-+};
-+
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	phys = <&usb2_phy>;
-+	phy-names = "usb2-phy";
-+	mode = <3>;
-+	power = <50>;
-+};
-+
-+&omap3_pmx_core {
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
-+			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx */
-+		>;
-+	};
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins>;
-+};
-diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-index 966b5c9..879383a 100644
---- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-@@ -12,7 +12,7 @@
+diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
+index e767355ab0ad..65458096f41e 100644
+--- a/drivers/pinctrl/pinctrl-tegra.c
++++ b/drivers/pinctrl/pinctrl-tegra.c
+@@ -39,6 +39,7 @@ struct tegra_pmx {
+ 	struct pinctrl_dev *pctl;
  
- /dts-v1/;
+ 	const struct tegra_pinctrl_soc_data *soc;
++	const char **group_pins;
  
--#include "omap36xx.dtsi"
-+#include "omap3-overo-storm.dtsi"
- #include "omap3-overo-tobi-common.dtsi"
+ 	int nbanks;
+ 	void __iomem **regs;
+@@ -620,6 +621,8 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
+ 	struct tegra_pmx *pmx;
+ 	struct resource *res;
+ 	int i;
++	const char **group_pins;
++	int fn, gn, gfn;
  
- / {
-diff --git a/arch/arm/boot/dts/omap3-overo-storm.dtsi b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-new file mode 100644
-index 0000000..c30efb3
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-@@ -0,0 +1,11 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ 	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
+ 	if (!pmx) {
+@@ -629,6 +632,41 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
+ 	pmx->dev = &pdev->dev;
+ 	pmx->soc = soc_data;
+ 
++	/*
++	 * Each mux group will appear in 4 functions' list of groups.
++	 * This over-allocates slightly, since not all groups are mux groups.
++	 */
++	pmx->group_pins = devm_kzalloc(&pdev->dev,
++		soc_data->ngroups * 4 * sizeof(*pmx->group_pins),
++		GFP_KERNEL);
++	if (!pmx->group_pins)
++		return -ENOMEM;
 +
-+#include "omap36xx.dtsi"
-+#include "omap3-overo-base.dtsi"
++	group_pins = pmx->group_pins;
++	for (fn = 0; fn < soc_data->nfunctions; fn++) {
++		struct tegra_function *func = &soc_data->functions[fn];
 +
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-index 4edc013..9b4a6d2 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-@@ -10,8 +10,6 @@
-  * Tobi expansion board is manufactured by Gumstix Inc.
++		func->groups = group_pins;
++
++		for (gn = 0; gn < soc_data->ngroups; gn++) {
++			const struct tegra_pingroup *g = &soc_data->groups[gn];
++
++			if (g->mux_reg == -1)
++				continue;
++
++			for (gfn = 0; gfn < 4; gfn++)
++				if (g->funcs[gfn] == fn)
++					break;
++			if (gfn == 4)
++				continue;
++
++			BUG_ON(group_pins - pmx->group_pins >=
++				soc_data->ngroups * 4);
++			*group_pins++ = g->name;
++			func->ngroups++;
++		}
++	}
++
+ 	tegra_pinctrl_gpio_range.npins = pmx->soc->ngpios;
+ 	tegra_pinctrl_desc.name = dev_name(&pdev->dev);
+ 	tegra_pinctrl_desc.pins = pmx->soc->pins;
+diff --git a/drivers/pinctrl/pinctrl-tegra.h b/drivers/pinctrl/pinctrl-tegra.h
+index 817f7061dc4c..6053832d433e 100644
+--- a/drivers/pinctrl/pinctrl-tegra.h
++++ b/drivers/pinctrl/pinctrl-tegra.h
+@@ -72,7 +72,7 @@ enum tegra_pinconf_tristate {
   */
+ struct tegra_function {
+ 	const char *name;
+-	const char * const *groups;
++	const char **groups;
+ 	unsigned ngroups;
+ };
  
--#include "omap3-overo.dtsi"
--
- / {
- 	leds {
- 		compatible = "gpio-leds";
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-index de5653e..fd6400e 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-@@ -12,7 +12,7 @@
+@@ -193,7 +193,7 @@ struct tegra_pinctrl_soc_data {
+ 	unsigned ngpios;
+ 	const struct pinctrl_pin_desc *pins;
+ 	unsigned npins;
+-	const struct tegra_function *functions;
++	struct tegra_function *functions;
+ 	unsigned nfunctions;
+ 	const struct tegra_pingroup *groups;
+ 	unsigned ngroups;
+diff --git a/drivers/pinctrl/pinctrl-tegra114.c b/drivers/pinctrl/pinctrl-tegra114.c
+index 46da27ff2d64..1c9346f28b84 100644
+--- a/drivers/pinctrl/pinctrl-tegra114.c
++++ b/drivers/pinctrl/pinctrl-tegra114.c
+@@ -1420,941 +1420,12 @@ enum tegra_mux {
+ 	TEGRA_MUX_VI_ALT3,
+ };
  
- /dts-v1/;
+-static const char * const blink_groups[] = {
+-	"clk_32k_out_pa0",
+-};
+-
+-static const char * const cec_groups[] = {
+-	"hdmi_cec_pee3",
+-};
+-
+-static const char * const cldvfs_groups[] = {
+-	"gmi_ad9_ph1",
+-	"gmi_ad10_ph2",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"dvfs_pwm_px0",
+-	"dvfs_clk_px2",
+-};
+-
+-static const char * const clk12_groups[] = {
+-	"sdmmc1_wp_n_pv3",
+-	"sdmmc1_clk_pz0",
+-};
+-
+-static const char * const cpu_groups[] = {
+-	"cpu_pwr_req",
+-};
+-
+-static const char * const dap_groups[] = {
+-	"clk1_req_pee2",
+-	"clk2_req_pcc5",
+-};
+-
+-static const char * const dap1_groups[] = {
+-	"clk1_req_pee2",
+-};
+-
+-static const char * const dap2_groups[] = {
+-	"clk1_out_pw4",
+-	"gpio_x4_aud_px4",
+-};
+-
+-static const char * const dev3_groups[] = {
+-	"clk3_req_pee1",
+-};
+-
+-static const char * const displaya_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-	"uart3_rts_n_pc0",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_col3_pq3",
+-	"sdmmc3_dat2_pb5",
+-};
+-
+-static const char * const displaya_alt_groups[] = {
+-	"kb_row6_pr6",
+-};
+-
+-static const char * const displayb_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const dtv_groups[] = {
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"dap4_fs_pp4",
+-	"dap4_dout_pp6",
+-	"gmi_wait_pi7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-};
+-
+-static const char * const emc_dll_groups[] = {
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-};
+-
+-static const char * const extperiph1_groups[] = {
+-	"clk1_out_pw4",
+-};
+-
+-static const char * const extperiph2_groups[] = {
+-	"clk2_out_pw5",
+-};
+-
+-static const char * const extperiph3_groups[] = {
+-	"clk3_out_pee0",
+-};
+-
+-static const char * const gmi_groups[] = {
+-	"gmi_wp_n_pc7",
+-
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad9_ph1",
+-	"gmi_ad10_ph2",
+-	"gmi_ad11_ph3",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_wr_n_pi0",
+-	"gmi_oe_n_pi1",
+-	"gmi_cs6_n_pi3",
+-	"gmi_rst_n_pi4",
+-	"gmi_iordy_pi5",
+-	"gmi_cs7_n_pi6",
+-	"gmi_wait_pi7",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_dqs_p_pj3",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs4_n_pk2",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-};
+-
+-static const char * const gmi_alt_groups[] = {
+-	"gmi_wp_n_pc7",
+-	"gmi_cs3_n_pk4",
+-	"gmi_a16_pj7",
+-};
+-
+-static const char * const hda_groups[] = {
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-};
+-
+-static const char * const hsi_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-};
+-
+-static const char * const i2c1_groups[] = {
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const i2c2_groups[] = {
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-};
+-
+-static const char * const i2c3_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-};
+-
+-static const char * const i2c4_groups[] = {
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-};
+-
+-static const char * const i2cpwr_groups[] = {
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-};
+-
+-static const char * const i2s0_groups[] = {
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-};
+-
+-static const char * const i2s1_groups[] = {
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-};
+-
+-static const char * const i2s2_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-};
+-
+-static const char * const i2s3_groups[] = {
+-	"dap4_fs_pp4",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_sclk_pp7",
+-};
+-
+-static const char * const i2s4_groups[] = {
+-	"pcc1",
+-	"pbb0",
+-	"pbb7",
+-	"pcc2",
+-};
+-
+-static const char * const irda_groups[] = {
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-};
+-
+-static const char * const kbc_groups[] = {
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-};
+-
+-static const char * const nand_groups[] = {
+-	"gmi_wp_n_pc7",
+-	"gmi_wait_pi7",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs4_n_pk2",
+-	"gmi_cs6_n_pi3",
+-	"gmi_cs7_n_pi6",
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad9_ph1",
+-	"gmi_ad10_ph2",
+-	"gmi_ad11_ph3",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_wr_n_pi0",
+-	"gmi_oe_n_pi1",
+-	"gmi_dqs_p_pj3",
+-	"gmi_rst_n_pi4",
+-};
+-
+-static const char * const nand_alt_groups[] = {
+-	"gmi_cs6_n_pi3",
+-	"gmi_cs7_n_pi6",
+-	"gmi_rst_n_pi4",
+-};
+-
+-static const char * const owr_groups[] = {
+-	"pu0",
+-	"kb_col4_pq4",
+-	"owr",
+-	"sdmmc3_cd_n_pv2",
+-};
+-
+-static const char * const pmi_groups[] = {
+-	"pwr_int_n",
+-};
+-
+-static const char * const pwm0_groups[] = {
+-	"sdmmc1_dat2_py5",
+-	"uart3_rts_n_pc0",
+-	"pu3",
+-	"gmi_ad8_ph0",
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const pwm1_groups[] = {
+-	"sdmmc1_dat1_py6",
+-	"pu4",
+-	"gmi_ad9_ph1",
+-	"sdmmc3_dat2_pb5",
+-};
+-
+-static const char * const pwm2_groups[] = {
+-	"pu5",
+-	"gmi_ad10_ph2",
+-	"kb_col3_pq3",
+-	"sdmmc3_dat1_pb6",
+-};
+-
+-static const char * const pwm3_groups[] = {
+-	"pu6",
+-	"gmi_ad11_ph3",
+-	"sdmmc3_cmd_pa7",
+-};
+-
+-static const char * const pwron_groups[] = {
+-	"core_pwr_req",
+-};
+-
+-static const char * const reset_out_n_groups[] = {
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd1_groups[] = {
+-	"pv1",
+-	"hdmi_int_pn7",
+-	"pu1",
+-	"pu2",
+-	"gmi_wp_n_pc7",
+-	"gmi_adv_n_pk0",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_wr_n_pi0",
+-	"gmi_oe_n_pi1",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x7_aud_px7",
+-
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd2_groups[] = {
+-	"pv0",
+-	"pv1",
+-	"sdmmc1_dat0_py7",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"dap4_fs_pp4",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_sclk_pp7",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"gmi_iordy_pi5",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat7_paa7",
+-	"pcc1",
+-	"pbb7",
+-	"pcc2",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"sys_clk_req_pz5",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"owr",
+-	"spdif_out_pk5",
+-	"gpio_x1_aud_px1",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_dat0_pb7",
+-	"gpio_w2_aud_pw2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_out_pee4",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd3_groups[] = {
+-	"pv0",
+-	"pv1",
+-	"sdmmc1_clk_pz0",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"dap4_din_pp5",
+-	"dap4_sclk_pp7",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"pcc1",
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"pbb7",
+-	"pcc2",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"clk_32k_out_pa0",
+-	"sys_clk_req_pz5",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"owr",
+-	"clk1_req_pee2",
+-	"clk1_out_pw4",
+-	"spdif_out_pk5",
+-	"spdif_in_pk6",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dvfs_pwm_px0",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-	"dvfs_clk_px2",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_dat0_pb7",
+-	"hdmi_cec_pee3",
+-	"sdmmc3_cd_n_pv2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_out_pee4",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd4_groups[] = {
+-	"pv0",
+-	"pv1",
+-	"sdmmc1_clk_pz0",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"dap4_fs_pp4",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_sclk_pp7",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_rst_n_pi4",
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-	"cam_mclk_pcc0",
+-	"pcc1",
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"pbb7",
+-	"pcc2",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_col2_pq2",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"clk_32k_out_pa0",
+-	"sys_clk_req_pz5",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"owr",
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-	"clk1_req_pee2",
+-	"clk1_out_pw4",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dvfs_pwm_px0",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-	"dvfs_clk_px2",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-	"gpio_x7_aud_px7",
+-	"sdmmc3_cd_n_pv2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"sdmmc3_clk_lb_out_pee4",
+-};
+-
+-static const char * const sdmmc1_groups[] = {
+-
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-	"uart3_cts_n_pa1",
+-	"kb_col5_pq5",
+-	"sdmmc1_wp_n_pv3",
+-};
+-
+-static const char * const sdmmc2_groups[] = {
+-	"gmi_iordy_pi5",
+-	"gmi_clk_pk1",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs7_n_pi6",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_dqs_p_pj3",
+-};
+-
+-static const char * const sdmmc3_groups[] = {
+-	"kb_col4_pq4",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-	"hdmi_cec_pee3",
+-	"sdmmc3_cd_n_pv2",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"sdmmc3_clk_lb_out_pee4",
+-};
+-
+-static const char * const sdmmc4_groups[] = {
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-};
+-
+-static const char * const soc_groups[] = {
+-	"gmi_cs1_n_pj2",
+-	"gmi_oe_n_pi1",
+-	"clk_32k_out_pa0",
+-	"hdmi_cec_pee3",
+-};
+-
+-static const char * const spdif_groups[] = {
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-};
+-
+-static const char * const spi1_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"gpio_x3_aud_px3",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-	"gpio_x7_aud_px7",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const spi2_groups[] = {
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-	"gpio_x7_aud_px7",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const spi3_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const spi4_groups[] = {
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"uart3_cts_n_pa1",
+-	"gmi_wait_pi7",
+-	"gmi_cs6_n_pi3",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_a19_pk7",
+-	"gmi_wr_n_pi0",
+-	"sdmmc1_wp_n_pv3",
+-};
+-
+-static const char * const spi5_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-};
+-
+-static const char * const spi6_groups[] = {
+-	"dvfs_pwm_px0",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-	"dvfs_clk_px2",
+-	"gpio_x6_aud_px6",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const sysclk_groups[] = {
+-	"sys_clk_req_pz5",
+-};
+-
+-static const char * const trace_groups[] = {
+-	"gmi_iordy_pi5",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs4_n_pk2",
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-	"gmi_dqs_p_pj3",
+-};
+-
+-static const char * const uarta_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc1_wp_n_pv3",
+-};
+-
+-static const char * const uartb_groups[] = {
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-};
+-
+-static const char * const uartc_groups[] = {
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-};
+-
+-static const char * const uartd_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-};
+-
+-static const char * const ulpi_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-};
+-
+-static const char * const usb_groups[] = {
+-	"pv0",
+-	"pu6",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs4_n_pk2",
+-	"gmi_ad11_ph3",
+-	"kb_col0_pq0",
+-	"spdif_in_pk6",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-};
+-
+-static const char * const vgp1_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-};
+-
+-static const char * const vgp2_groups[] = {
+-	"cam_i2c_sda_pbb2",
+-};
+-
+-static const char * const vgp3_groups[] = {
+-	"pbb3",
+-};
+-
+-static const char * const vgp4_groups[] = {
+-	"pbb4",
+-};
+-
+-static const char * const vgp5_groups[] = {
+-	"pbb5",
+-};
+-
+-static const char * const vgp6_groups[] = {
+-	"pbb6",
+-};
+-
+-static const char * const vi_groups[] = {
+-	"cam_mclk_pcc0",
+-	"pbb0",
+-};
+-
+-static const char * const vi_alt1_groups[] = {
+-	"cam_mclk_pcc0",
+-	"pbb0",
+-};
+-
+-static const char * const vi_alt3_groups[] = {
+-	"cam_mclk_pcc0",
+-	"pbb0",
+-};
+-
+ #define FUNCTION(fname)					\
+ 	{						\
+ 		.name = #fname,				\
+-		.groups = fname##_groups,		\
+-		.ngroups = ARRAY_SIZE(fname##_groups),	\
+ 	}
  
--#include "omap34xx.dtsi"
-+#include "omap3-overo.dtsi"
- #include "omap3-overo-tobi-common.dtsi"
+-static const struct tegra_function  tegra114_functions[] = {
++static struct tegra_function  tegra114_functions[] = {
+ 	FUNCTION(blink),
+ 	FUNCTION(cec),
+ 	FUNCTION(cldvfs),
+diff --git a/drivers/pinctrl/pinctrl-tegra124.c b/drivers/pinctrl/pinctrl-tegra124.c
+index 7c6b7b63320f..3b03d77d454b 100644
+--- a/drivers/pinctrl/pinctrl-tegra124.c
++++ b/drivers/pinctrl/pinctrl-tegra124.c
+@@ -1581,1112 +1581,12 @@ enum tegra_mux {
+ 	TEGRA_MUX_TMDS,
+ };
  
- / {
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index 5970999..7bbda68 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -1,94 +1,11 @@
- /*
-- * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
+-static const char * const blink_groups[] = {
+-	"clk_32k_out_pa0",
+-};
+-
+-static const char * const cec_groups[] = {
+-	"hdmi_cec_pee3",
+-};
+-
+-static const char * const cldvfs_groups[] = {
+-	"ph2",
+-	"ph3",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"dvfs_pwm_px0",
+-	"dvfs_clk_px2",
+-};
+-
+-static const char * const clk12_groups[] = {
+-	"sdmmc1_wp_n_pv3",
+-	"sdmmc1_clk_pz0",
+-};
+-
+-static const char * const cpu_groups[] = {
+-	"cpu_pwr_req",
+-};
+-
+-static const char * const dap_groups[] = {
+-	"dap_mclk1_req_pee2",
+-	"clk2_req_pcc5",
+-};
+-
+-static const char * const dap1_groups[] = {
+-	"dap_mclk1_req_pee2",
+-};
+-
+-static const char * const dap2_groups[] = {
+-	"dap_mclk1_pw4",
+-	"gpio_x4_aud_px4",
+-};
+-
+-static const char * const dev3_groups[] = {
+-	"clk3_req_pee1",
+-};
+-
+-static const char * const displaya_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"ph1",
+-	"pi4",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_col3_pq3",
+-	"sdmmc3_dat2_pb5",
+-};
+-
+-static const char * const displaya_alt_groups[] = {
+-	"kb_row6_pr6",
+-};
+-
+-static const char * const displayb_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_sclk_pp3",
+-
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-
+-	"pbb3",
+-	"pbb4",
+-	"pbb6",
+-
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const dtv_groups[] = {
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"dap4_fs_pp4",
+-	"dap4_dout_pp6",
+-	"pi7",
+-	"ph0",
+-	"ph6",
+-	"ph7",
+-};
+-
+-static const char * const extperiph1_groups[] = {
+-	"dap_mclk1_pw4",
+-};
+-
+-static const char * const extperiph2_groups[] = {
+-	"clk2_out_pw5",
+-};
+-
+-static const char * const extperiph3_groups[] = {
+-	"clk3_out_pee0",
+-};
+-
+-static const char * const gmi_groups[] = {
+-	"uart2_cts_n_pj5",
+-	"uart2_rts_n_pj6",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-
+-	"dap4_fs_pp4",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_sclk_pp7",
+-
+-	"pc7",
+-
+-	"pg0",
+-	"pg1",
+-	"pg2",
+-	"pg3",
+-	"pg4",
+-	"pg5",
+-	"pg6",
+-	"pg7",
+-
+-	"ph0",
+-	"ph1",
+-	"ph2",
+-	"ph3",
+-	"ph4",
+-	"ph5",
+-	"ph6",
+-	"ph7",
+-
+-	"pi0",
+-	"pi1",
+-	"pi2",
+-	"pi3",
+-	"pi4",
+-	"pi5",
+-	"pi6",
+-	"pi7",
+-
+-	"pj0",
+-	"pj2",
+-
+-	"pk0",
+-	"pk1",
+-	"pk2",
+-	"pk3",
+-	"pk4",
+-
+-	"pj7",
+-	"pb0",
+-	"pb1",
+-	"pk7",
+-
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"gmi_clk_lb",
+-
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-
+-	"dap2_fs_pa2",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_sclk_pa3",
+-
+-	"dvfs_pwm_px0",
+-	"dvfs_clk_px2",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-};
+-
+-static const char * const gmi_alt_groups[] = {
+-	"pc7",
+-	"pk4",
+-	"pj7",
+-};
+-
+-static const char * const hda_groups[] = {
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-};
+-
+-static const char * const hsi_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-};
+-
+-static const char * const i2c1_groups[] = {
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const i2c2_groups[] = {
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-};
+-
+-static const char * const i2c3_groups[] = {
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-};
+-
+-static const char * const i2c4_groups[] = {
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-};
+-
+-static const char * const i2cpwr_groups[] = {
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-};
+-
+-static const char * const i2s0_groups[] = {
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_sclk_pn3",
+-};
+-
+-static const char * const i2s1_groups[] = {
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-};
+-
+-static const char * const i2s2_groups[] = {
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-};
+-
+-static const char * const i2s3_groups[] = {
+-	"dap4_fs_pp4",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_sclk_pp7",
+-};
+-
+-static const char * const i2s4_groups[] = {
+-	"pcc1",
+-	"pbb6",
+-	"pbb7",
+-	"pcc2",
+-};
+-
+-static const char * const irda_groups[] = {
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-};
+-
+-static const char * const kbc_groups[] = {
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-	"kb_row16_pt0",
+-	"kb_row17_pt1",
+-
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-};
+-
+-static const char * const owr_groups[] = {
+-	"pu0",
+-	"kb_col4_pq4",
+-	"owr",
+-	"sdmmc3_cd_n_pv2",
+-};
+-
+-static const char * const pmi_groups[] = {
+-	"pwr_int_n",
+-};
+-
+-static const char * const pwm0_groups[] = {
+-	"sdmmc1_dat2_py5",
+-	"uart3_rts_n_pc0",
+-	"pu3",
+-	"ph0",
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const pwm1_groups[] = {
+-	"sdmmc1_dat1_py6",
+-	"pu4",
+-	"ph1",
+-	"sdmmc3_dat2_pb5",
+-};
+-
+-static const char * const pwm2_groups[] = {
+-	"pu5",
+-	"ph2",
+-	"kb_col3_pq3",
+-	"sdmmc3_dat1_pb6",
+-};
+-
+-static const char * const pwm3_groups[] = {
+-	"pu6",
+-	"ph3",
+-	"sdmmc3_cmd_pa7",
+-};
+-
+-static const char * const pwron_groups[] = {
+-	"core_pwr_req",
+-};
+-
+-static const char * const reset_out_n_groups[] = {
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd1_groups[] = {
+-	"pv0",
+-	"pv1",
+-
+-	"hdmi_int_pn7",
+-	"pu1",
+-	"pu2",
+-	"pc7",
+-	"pi7",
+-	"pk0",
+-	"pj0",
+-	"pj2",
+-	"pk2",
+-	"pi3",
+-	"pi6",
+-
+-	"pg0",
+-	"pg1",
+-	"pg2",
+-	"pg3",
+-	"pg4",
+-	"pg5",
+-	"pg6",
+-	"pg7",
+-
+-	"pi0",
+-	"pi1",
+-
+-	"gpio_x7_aud_px7",
+-
+-	"reset_out_n",
+-};
+-
+-static const char * const rsvd2_groups[] = {
+-	"pv0",
+-	"pv1",
+-
+-	"sdmmc1_dat0_py7",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"pc7",
+-	"pi5",
+-	"pj0",
+-	"pj2",
+-
+-	"pk4",
+-	"pk2",
+-	"pi3",
+-	"pi6",
+-	"pg0",
+-	"pg1",
+-	"pg5",
+-	"pg6",
+-	"pg7",
+-
+-	"ph4",
+-	"ph5",
+-	"pj7",
+-	"pb0",
+-	"pb1",
+-	"pk7",
+-	"pi0",
+-	"pi1",
+-
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat7_paa7",
+-	"pcc1",
+-	"pbb6",
+-	"pbb7",
+-	"pcc2",
+-	"jtag_rtck",
+-
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"clk_32k_in",
+-	"owr",
+-
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"gpio_x1_aud_px1",
+-
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_dat0_pb7",
+-
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_wake_n_pdd3",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l1_clkreq_n_pdd6",
+-	"hdmi_cec_pee3",
+-
+-	"gpio_w2_aud_pw2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_out_pee4",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"gmi_clk_lb",
+-	"reset_out_n",
+-	"kb_row16_pt0",
+-	"kb_row17_pt1",
+-	"dp_hpd_pff0",
+-	"usb_vbus_en2_pff1",
+-	"pff2",
+-};
+-
+-static const char * const rsvd3_groups[] = {
+-	"dap3_sclk_pp3",
+-	"pv0",
+-	"pv1",
+-	"sdmmc1_clk_pz0",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-
+-	"pu6",
+-
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-
+-	"dap4_din_pp5",
+-	"dap4_sclk_pp7",
+-
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-
+-	"sdmmc4_dat5_paa5",
+-	"pcc1",
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"pbb5",
+-	"pbb7",
+-	"jtag_rtck",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row15_ps7",
+-
+-	"clk_32k_out_pa0",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"clk_32k_in",
+-	"owr",
+-
+-	"dap_mclk1_pw4",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_dat0_pb7",
+-
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_wake_n_pdd3",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l1_clkreq_n_pdd6",
+-	"hdmi_cec_pee3",
+-
+-	"sdmmc3_cd_n_pv2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_out_pee4",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"reset_out_n",
+-	"kb_row16_pt0",
+-	"kb_row17_pt1",
+-	"dp_hpd_pff0",
+-	"usb_vbus_en2_pff1",
+-	"pff2",
+-};
+-
+-static const char * const rsvd4_groups[] = {
+-	"dap3_dout_pp2",
+-	"pv0",
+-	"pv1",
+-	"sdmmc1_clk_pz0",
+-
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"hdmi_int_pn7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-
+-	"dap4_fs_pp4",
+-	"dap4_dout_pp6",
+-	"dap4_din_pp5",
+-	"dap4_sclk_pp7",
+-
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-
+-	"pi5",
+-	"pk1",
+-	"pk2",
+-	"pg0",
+-	"pg1",
+-	"pg2",
+-	"pg3",
+-	"ph4",
+-	"ph5",
+-	"pb0",
+-	"pb1",
+-	"pk7",
+-	"pi0",
+-	"pi1",
+-	"pi2",
+-
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-
+-	"jtag_rtck",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col5_pq5",
+-
+-	"clk_32k_out_pa0",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"pwr_int_n",
+-	"clk_32k_in",
+-	"owr",
+-
+-	"dap1_fs_pn0",
+-	"dap1_din_pn1",
+-	"dap1_sclk_pn3",
+-	"dap_mclk1_req_pee2",
+-	"dap_mclk1_pw4",
+-
+-	"dap2_fs_pa2",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_sclk_pa3",
+-
+-	"dvfs_pwm_px0",
+-	"dvfs_clk_px2",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-
+-	"gpio_x5_aud_px5",
+-	"gpio_x7_aud_px7",
+-
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_wake_n_pdd3",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l1_clkreq_n_pdd6",
+-	"hdmi_cec_pee3",
+-
+-	"sdmmc3_cd_n_pv2",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"sdmmc3_clk_lb_out_pee4",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"gmi_clk_lb",
+-
+-	"dp_hpd_pff0",
+-	"usb_vbus_en2_pff1",
+-	"pff2",
+-};
+-
+-static const char * const sdmmc1_groups[] = {
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-	"uart3_cts_n_pa1",
+-	"sdmmc1_wp_n_pv3",
+-};
+-
+-static const char * const sdmmc2_groups[] = {
+-	"pi5",
+-	"pk1",
+-	"pk3",
+-	"pk4",
+-	"pi6",
+-	"ph4",
+-	"ph5",
+-	"ph6",
+-	"ph7",
+-	"pi2",
+-	"cam_mclk_pcc0",
+-	"pcc1",
+-	"pbb0",
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"pbb7",
+-	"pcc2",
+-	"gmi_clk_lb",
+-};
+-
+-static const char * const sdmmc3_groups[] = {
+-	"pk0",
+-	"pcc2",
+-
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-
+-	"sdmmc3_cd_n_pv2",
+-	"sdmmc3_clk_lb_in_pee5",
+-	"sdmmc3_clk_lb_out_pee4",
+-};
+-
+-static const char * const sdmmc4_groups[] = {
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-};
+-
+-static const char * const soc_groups[] = {
+-	"pk0",
+-	"pj2",
+-	"kb_row15_ps7",
+-	"clk_32k_out_pa0",
+-};
+-
+-static const char * const spdif_groups[] = {
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-};
+-
+-static const char * const spi1_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"gpio_x3_aud_px3",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-	"gpio_x7_aud_px7",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const spi2_groups[] = {
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"gpio_x4_aud_px4",
+-	"gpio_x5_aud_px5",
+-	"gpio_x6_aud_px6",
+-	"gpio_x7_aud_px7",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const spi3_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-};
+-
+-static const char * const spi4_groups[] = {
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-
+-	"pi3",
+-	"pg4",
+-	"pg5",
+-	"pg6",
+-	"pg7",
+-	"ph3",
+-	"pi4",
+-	"sdmmc1_wp_n_pv3",
+-};
+-
+-static const char * const spi5_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"dap3_fs_pp0",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_sclk_pp3",
+-};
+-
+-static const char * const spi6_groups[] = {
+-	"dvfs_pwm_px0",
+-	"gpio_x1_aud_px1",
+-	"gpio_x3_aud_px3",
+-	"dvfs_clk_px2",
+-	"gpio_x6_aud_px6",
+-	"gpio_w2_aud_pw2",
+-	"gpio_w3_aud_pw3",
+-};
+-
+-static const char * const trace_groups[] = {
+-	"pi2",
+-	"pi4",
+-	"pi7",
+-	"ph0",
+-	"ph6",
+-	"ph7",
+-	"pg2",
+-	"pg3",
+-	"pk1",
+-	"pk3",
+-};
+-
+-static const char * const uarta_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat0_py7",
+-
+-
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"kb_row10_ps2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc1_wp_n_pv3",
+-
+-};
+-
+-static const char * const uartb_groups[] = {
+-	"uart2_rts_n_pj6",
+-	"uart2_cts_n_pj5",
+-};
+-
+-static const char * const uartc_groups[] = {
+-	"uart3_txd_pw6",
+-	"uart3_rxd_pw7",
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"kb_row16_pt0",
+-	"kb_row17_pt1",
+-};
+-
+-static const char * const uartd_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"pj7",
+-	"pb0",
+-	"pb1",
+-	"pk7",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-};
+-
+-static const char * const ulpi_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-};
+-
+-static const char * const usb_groups[] = {
+-	"pj0",
+-	"usb_vbus_en0_pn4",
+-	"usb_vbus_en1_pn5",
+-	"usb_vbus_en2_pff1",
+-};
+-
+-static const char * const vgp1_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-};
+-
+-static const char * const vgp2_groups[] = {
+-	"cam_i2c_sda_pbb2",
+-};
+-
+-static const char * const vgp3_groups[] = {
+-	"pbb3",
+-};
+-
+-static const char * const vgp4_groups[] = {
+-	"pbb4",
+-};
+-
+-static const char * const vgp5_groups[] = {
+-	"pbb5",
+-};
+-
+-static const char * const vgp6_groups[] = {
+-	"pbb0",
+-};
+-
+-static const char * const vi_groups[] = {
+-	"cam_mclk_pcc0",
+-};
+-
+-static const char * const vi_alt1_groups[] = {
+-	"cam_mclk_pcc0",
+-};
+-
+-static const char * const vi_alt3_groups[] = {
+-	"cam_mclk_pcc0",
+-};
+-
+-static const char * const vimclk2_groups[] = {
+-	"pbb0",
+-};
+-
+-static const char * const vimclk2_alt_groups[] = {
+-	"pbb0",
+-};
+-
+-static const char * const sata_groups[] = {
+-	"dap_mclk1_req_pee2",
+-	"dap1_dout_pn2",
+-	"pff2",
+-};
+-
+-static const char * const ccla_groups[] = {
+-	"pk3",
+-};
+-
+-static const char * const rtck_groups[] = {
+-	"jtag_rtck",
+-};
+-
+-static const char * const sys_groups[] = {
+-	"kb_row3_pr3",
+-};
+-
+-static const char * const pe0_groups[] = {
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l0_clkreq_n_pdd2",
+-};
+-
+-static const char * const pe_groups[] = {
+-	"pex_wake_n_pdd3",
+-};
+-
+-static const char * const pe1_groups[] = {
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l1_clkreq_n_pdd6",
+-};
+-
+-static const char * const dp_groups[] = {
+-	"dp_hpd_pff0",
+-};
+-
+-static const char * const clk_groups[] = {
+-	"clk_32k_in",
+-};
+-
+-static const char * const tmds_groups[] = {
+-	"pg4",
+-	"ph1",
+-	"ph2",
+-};
+-
+ #define FUNCTION(fname)					\
+ 	{						\
+ 		.name = #fname,				\
+-		.groups = fname##_groups,		\
+-		.ngroups = ARRAY_SIZE(fname##_groups),	\
+ 	}
  
--/*
-- * The Gumstix Overo must be combined with an expansion board.
-- */
--
--/ {
--	pwmleds {
--		compatible = "pwm-leds";
--
--		overo {
--			label = "overo:blue:COM";
--			pwms = <&twl_pwmled 1 7812500>;
--			max-brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--	};
--
--	sound {
--		compatible = "ti,omap-twl4030";
--		ti,model = "overo";
--
--		ti,mcbsp = <&mcbsp2>;
--		ti,codec = <&twl_audio>;
--	};
--};
--
--&i2c1 {
--	clock-frequency = <2600000>;
--
--	twl: twl at 48 {
--		reg = <0x48>;
--		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
--		interrupt-parent = <&intc>;
--
--		twl_audio: audio {
--			compatible = "ti,twl4030-audio";
--			codec {
--			};
--		};
--	};
--};
--
--#include "twl4030.dtsi"
--#include "twl4030_omap3.dtsi"
--
--/* i2c2 pins are used for gpio */
--&i2c2 {
--	status = "disabled";
--};
--
--/* on board microSD slot */
--&mmc1 {
--	vmmc-supply = <&vmmc1>;
--	bus-width = <4>;
--};
--
--/* optional on board WiFi */
--&mmc2 {
--	bus-width = <4>;
--};
--
--&twl_gpio {
--	ti,use-leds;
--};
--
--&usb_otg_hs {
--	interface-type = <0>;
--	usb-phy = <&usb2_phy>;
--	phys = <&usb2_phy>;
--	phy-names = "usb2-phy";
--	mode = <3>;
--	power = <50>;
--};
--
--&omap3_pmx_core {
--	uart3_pins: pinmux_uart3_pins {
--		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx */
--		>;
--	};
--};
-+#include "omap34xx.dtsi"
-+#include "omap3-overo-base.dtsi"
+-static const struct tegra_function tegra124_functions[] = {
++static struct tegra_function tegra124_functions[] = {
+ 	FUNCTION(blink),
+ 	FUNCTION(cec),
+ 	FUNCTION(cldvfs),
+diff --git a/drivers/pinctrl/pinctrl-tegra20.c b/drivers/pinctrl/pinctrl-tegra20.c
+index a8ceb08172b2..e0b504088387 100644
+--- a/drivers/pinctrl/pinctrl-tegra20.c
++++ b/drivers/pinctrl/pinctrl-tegra20.c
+@@ -1894,637 +1894,12 @@ enum tegra_mux {
+ 	TEGRA_MUX_XIO,
+ };
  
--&uart3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart3_pins>;
+-static const char * const ahb_clk_groups[] = {
+-	"cdev2",
 -};
+-
+-static const char * const apb_clk_groups[] = {
+-	"cdev2",
+-};
+-
+-static const char * const audio_sync_groups[] = {
+-	"cdev1",
+-};
+-
+-static const char * const crt_groups[] = {
+-	"crtp",
+-	"lm1",
+-};
+-
+-static const char * const dap1_groups[] = {
+-	"dap1",
+-};
+-
+-static const char * const dap2_groups[] = {
+-	"dap2",
+-};
+-
+-static const char * const dap3_groups[] = {
+-	"dap3",
+-};
+-
+-static const char * const dap4_groups[] = {
+-	"dap4",
+-};
+-
+-static const char * const dap5_groups[] = {
+-	"gme",
+-};
+-
+-static const char * const displaya_groups[] = {
+-	"lcsn",
+-	"ld0",
+-	"ld1",
+-	"ld10",
+-	"ld11",
+-	"ld12",
+-	"ld13",
+-	"ld14",
+-	"ld15",
+-	"ld16",
+-	"ld17",
+-	"ld2",
+-	"ld3",
+-	"ld4",
+-	"ld5",
+-	"ld6",
+-	"ld7",
+-	"ld8",
+-	"ld9",
+-	"ldc",
+-	"ldi",
+-	"lhp0",
+-	"lhp1",
+-	"lhp2",
+-	"lhs",
+-	"lm0",
+-	"lm1",
+-	"lpp",
+-	"lpw0",
+-	"lpw1",
+-	"lpw2",
+-	"lsc0",
+-	"lsc1",
+-	"lsck",
+-	"lsda",
+-	"lsdi",
+-	"lspi",
+-	"lvp0",
+-	"lvp1",
+-	"lvs",
+-};
+-
+-static const char * const displayb_groups[] = {
+-	"lcsn",
+-	"ld0",
+-	"ld1",
+-	"ld10",
+-	"ld11",
+-	"ld12",
+-	"ld13",
+-	"ld14",
+-	"ld15",
+-	"ld16",
+-	"ld17",
+-	"ld2",
+-	"ld3",
+-	"ld4",
+-	"ld5",
+-	"ld6",
+-	"ld7",
+-	"ld8",
+-	"ld9",
+-	"ldc",
+-	"ldi",
+-	"lhp0",
+-	"lhp1",
+-	"lhp2",
+-	"lhs",
+-	"lm0",
+-	"lm1",
+-	"lpp",
+-	"lpw0",
+-	"lpw1",
+-	"lpw2",
+-	"lsc0",
+-	"lsc1",
+-	"lsck",
+-	"lsda",
+-	"lsdi",
+-	"lspi",
+-	"lvp0",
+-	"lvp1",
+-	"lvs",
+-};
+-
+-static const char * const emc_test0_dll_groups[] = {
+-	"kbca",
+-};
+-
+-static const char * const emc_test1_dll_groups[] = {
+-	"kbcc",
+-};
+-
+-static const char * const gmi_groups[] = {
+-	"ata",
+-	"atb",
+-	"atc",
+-	"atd",
+-	"ate",
+-	"dap1",
+-	"dap2",
+-	"dap4",
+-	"gma",
+-	"gmb",
+-	"gmc",
+-	"gmd",
+-	"gme",
+-	"gpu",
+-	"irrx",
+-	"irtx",
+-	"pta",
+-	"spia",
+-	"spib",
+-	"spic",
+-	"spid",
+-	"spie",
+-	"uca",
+-	"ucb",
+-};
+-
+-static const char * const gmi_int_groups[] = {
+-	"gmb",
+-};
+-
+-static const char * const hdmi_groups[] = {
+-	"hdint",
+-	"lpw0",
+-	"lpw2",
+-	"lsc1",
+-	"lsck",
+-	"lsda",
+-	"lspi",
+-	"pta",
+-};
+-
+-static const char * const i2cp_groups[] = {
+-	"i2cp",
+-};
+-
+-static const char * const i2c1_groups[] = {
+-	"rm",
+-	"spdi",
+-	"spdo",
+-	"spig",
+-	"spih",
+-};
+-
+-static const char * const i2c2_groups[] = {
+-	"ddc",
+-	"pta",
+-};
+-
+-static const char * const i2c3_groups[] = {
+-	"dtf",
+-};
+-
+-static const char * const ide_groups[] = {
+-	"ata",
+-	"atb",
+-	"atc",
+-	"atd",
+-	"ate",
+-	"gmb",
+-};
+-
+-static const char * const irda_groups[] = {
+-	"uad",
+-};
+-
+-static const char * const kbc_groups[] = {
+-	"kbca",
+-	"kbcb",
+-	"kbcc",
+-	"kbcd",
+-	"kbce",
+-	"kbcf",
+-};
+-
+-static const char * const mio_groups[] = {
+-	"kbcb",
+-	"kbcd",
+-	"kbcf",
+-};
+-
+-static const char * const mipi_hs_groups[] = {
+-	"uaa",
+-	"uab",
+-};
+-
+-static const char * const nand_groups[] = {
+-	"ata",
+-	"atb",
+-	"atc",
+-	"atd",
+-	"ate",
+-	"gmb",
+-	"gmd",
+-	"kbca",
+-	"kbcb",
+-	"kbcc",
+-	"kbcd",
+-	"kbce",
+-	"kbcf",
+-};
+-
+-static const char * const osc_groups[] = {
+-	"cdev1",
+-	"cdev2",
+-};
+-
+-static const char * const owr_groups[] = {
+-	"kbce",
+-	"owc",
+-	"uac",
+-};
+-
+-static const char * const pcie_groups[] = {
+-	"gpv",
+-	"slxa",
+-	"slxk",
+-};
+-
+-static const char * const plla_out_groups[] = {
+-	"cdev1",
+-};
+-
+-static const char * const pllc_out1_groups[] = {
+-	"csus",
+-};
+-
+-static const char * const pllm_out1_groups[] = {
+-	"cdev1",
+-};
+-
+-static const char * const pllp_out2_groups[] = {
+-	"csus",
+-};
+-
+-static const char * const pllp_out3_groups[] = {
+-	"csus",
+-};
+-
+-static const char * const pllp_out4_groups[] = {
+-	"cdev2",
+-};
+-
+-static const char * const pwm_groups[] = {
+-	"gpu",
+-	"sdb",
+-	"sdc",
+-	"sdd",
+-	"ucb",
+-};
+-
+-static const char * const pwr_intr_groups[] = {
+-	"pmc",
+-};
+-
+-static const char * const pwr_on_groups[] = {
+-	"pmc",
+-};
+-
+-static const char * const rsvd1_groups[] = {
+-	"dta",
+-	"dtb",
+-	"dtc",
+-	"dtd",
+-	"dte",
+-	"gmd",
+-	"gme",
+-};
+-
+-static const char * const rsvd2_groups[] = {
+-	"crtp",
+-	"dap1",
+-	"dap3",
+-	"dap4",
+-	"ddc",
+-	"dtb",
+-	"dtc",
+-	"dte",
+-	"dtf",
+-	"gpu7",
+-	"gpv",
+-	"hdint",
+-	"i2cp",
+-	"owc",
+-	"rm",
+-	"sdio1",
+-	"spdi",
+-	"spdo",
+-	"uac",
+-	"uca",
+-	"uda",
+-};
+-
+-static const char * const rsvd3_groups[] = {
+-	"crtp",
+-	"dap2",
+-	"dap3",
+-	"ddc",
+-	"gpu7",
+-	"gpv",
+-	"hdint",
+-	"i2cp",
+-	"ld17",
+-	"ldc",
+-	"ldi",
+-	"lhp0",
+-	"lhp1",
+-	"lhp2",
+-	"lm1",
+-	"lpp",
+-	"lpw1",
+-	"lvp0",
+-	"lvp1",
+-	"owc",
+-	"pmc",
+-	"rm",
+-	"uac",
+-};
+-
+-static const char * const rsvd4_groups[] = {
+-	"ata",
+-	"ate",
+-	"crtp",
+-	"dap3",
+-	"dap4",
+-	"ddc",
+-	"dta",
+-	"dtc",
+-	"dtd",
+-	"dtf",
+-	"gpu",
+-	"gpu7",
+-	"gpv",
+-	"hdint",
+-	"i2cp",
+-	"kbce",
+-	"lcsn",
+-	"ld0",
+-	"ld1",
+-	"ld2",
+-	"ld3",
+-	"ld4",
+-	"ld5",
+-	"ld6",
+-	"ld7",
+-	"ld8",
+-	"ld9",
+-	"ld10",
+-	"ld11",
+-	"ld12",
+-	"ld13",
+-	"ld14",
+-	"ld15",
+-	"ld16",
+-	"ld17",
+-	"ldc",
+-	"ldi",
+-	"lhp0",
+-	"lhp1",
+-	"lhp2",
+-	"lhs",
+-	"lm0",
+-	"lpp",
+-	"lpw1",
+-	"lsc0",
+-	"lsdi",
+-	"lvp0",
+-	"lvp1",
+-	"lvs",
+-	"owc",
+-	"pmc",
+-	"pta",
+-	"rm",
+-	"spif",
+-	"uac",
+-	"uca",
+-	"ucb",
+-};
+-
+-static const char * const rtck_groups[] = {
+-	"gpu7",
+-};
+-
+-static const char * const sdio1_groups[] = {
+-	"sdio1",
+-};
+-
+-static const char * const sdio2_groups[] = {
+-	"dap1",
+-	"dta",
+-	"dtd",
+-	"kbca",
+-	"kbcb",
+-	"kbcd",
+-	"spdi",
+-	"spdo",
+-};
+-
+-static const char * const sdio3_groups[] = {
+-	"sdb",
+-	"sdc",
+-	"sdd",
+-	"slxa",
+-	"slxc",
+-	"slxd",
+-	"slxk",
+-};
+-
+-static const char * const sdio4_groups[] = {
+-	"atb",
+-	"atc",
+-	"atd",
+-	"gma",
+-	"gme",
+-};
+-
+-static const char * const sflash_groups[] = {
+-	"gmc",
+-	"gmd",
+-};
+-
+-static const char * const spdif_groups[] = {
+-	"slxc",
+-	"slxd",
+-	"spdi",
+-	"spdo",
+-	"uad",
+-};
+-
+-static const char * const spi1_groups[] = {
+-	"dtb",
+-	"dte",
+-	"spia",
+-	"spib",
+-	"spic",
+-	"spid",
+-	"spie",
+-	"spif",
+-	"uda",
+-};
+-
+-static const char * const spi2_groups[] = {
+-	"sdb",
+-	"slxa",
+-	"slxc",
+-	"slxd",
+-	"slxk",
+-	"spia",
+-	"spib",
+-	"spic",
+-	"spid",
+-	"spie",
+-	"spif",
+-	"spig",
+-	"spih",
+-	"uab",
+-};
+-
+-static const char * const spi2_alt_groups[] = {
+-	"spid",
+-	"spie",
+-	"spig",
+-	"spih",
+-};
+-
+-static const char * const spi3_groups[] = {
+-	"gma",
+-	"lcsn",
+-	"lm0",
+-	"lpw0",
+-	"lpw2",
+-	"lsc1",
+-	"lsck",
+-	"lsda",
+-	"lsdi",
+-	"sdc",
+-	"sdd",
+-	"spia",
+-	"spib",
+-	"spic",
+-	"spif",
+-	"spig",
+-	"spih",
+-	"uaa",
+-};
+-
+-static const char * const spi4_groups[] = {
+-	"gmc",
+-	"irrx",
+-	"irtx",
+-	"slxa",
+-	"slxc",
+-	"slxd",
+-	"slxk",
+-	"uad",
+-};
+-
+-static const char * const trace_groups[] = {
+-	"kbcc",
+-	"kbcf",
+-};
+-
+-static const char * const twc_groups[] = {
+-	"dap2",
+-	"sdc",
+-};
+-
+-static const char * const uarta_groups[] = {
+-	"gpu",
+-	"irrx",
+-	"irtx",
+-	"sdb",
+-	"sdd",
+-	"sdio1",
+-	"uaa",
+-	"uab",
+-	"uad",
+-};
+-
+-static const char * const uartb_groups[] = {
+-	"irrx",
+-	"irtx",
+-};
+-
+-static const char * const uartc_groups[] = {
+-	"uca",
+-	"ucb",
+-};
+-
+-static const char * const uartd_groups[] = {
+-	"gmc",
+-	"uda",
+-};
+-
+-static const char * const uarte_groups[] = {
+-	"gma",
+-	"sdio1",
+-};
+-
+-static const char * const ulpi_groups[] = {
+-	"uaa",
+-	"uab",
+-	"uda",
+-};
+-
+-static const char * const vi_groups[] = {
+-	"dta",
+-	"dtb",
+-	"dtc",
+-	"dtd",
+-	"dte",
+-	"dtf",
+-};
+-
+-static const char * const vi_sensor_clk_groups[] = {
+-	"csus",
+-};
+-
+-static const char * const xio_groups[] = {
+-	"ld0",
+-	"ld1",
+-	"ld10",
+-	"ld11",
+-	"ld12",
+-	"ld13",
+-	"ld14",
+-	"ld15",
+-	"ld16",
+-	"ld2",
+-	"ld3",
+-	"ld4",
+-	"ld5",
+-	"ld6",
+-	"ld7",
+-	"ld8",
+-	"ld9",
+-	"lhs",
+-	"lsc0",
+-	"lspi",
+-	"lvs",
+-};
+-
+ #define FUNCTION(fname)					\
+ 	{						\
+ 		.name = #fname,				\
+-		.groups = fname##_groups,		\
+-		.ngroups = ARRAY_SIZE(fname##_groups),	\
+ 	}
+ 
+-static const struct tegra_function tegra20_functions[] = {
++static struct tegra_function tegra20_functions[] = {
+ 	FUNCTION(ahb_clk),
+ 	FUNCTION(apb_clk),
+ 	FUNCTION(audio_sync),
+diff --git a/drivers/pinctrl/pinctrl-tegra30.c b/drivers/pinctrl/pinctrl-tegra30.c
+index 4e591f62cfa1..4bc95802ea67 100644
+--- a/drivers/pinctrl/pinctrl-tegra30.c
++++ b/drivers/pinctrl/pinctrl-tegra30.c
+@@ -2015,1253 +2015,13 @@ enum tegra_mux {
+ 	TEGRA_MUX_VI_ALT2,
+ 	TEGRA_MUX_VI_ALT3,
+ };
+-static const char * const blink_groups[] = {
+-	"clk_32k_out_pa0",
+-};
+-
+-static const char * const cec_groups[] = {
+-	"hdmi_cec_pee3",
+-	"owr",
+-};
+-
+-static const char * const clk_12m_out_groups[] = {
+-	"pv3",
+-};
+-
+-static const char * const clk_32k_in_groups[] = {
+-	"clk_32k_in",
+-};
+-
+-static const char * const core_pwr_req_groups[] = {
+-	"core_pwr_req",
+-};
+-
+-static const char * const cpu_pwr_req_groups[] = {
+-	"cpu_pwr_req",
+-};
+-
+-static const char * const crt_groups[] = {
+-	"crt_hsync_pv6",
+-	"crt_vsync_pv7",
+-};
+-
+-static const char * const dap_groups[] = {
+-	"clk1_req_pee2",
+-	"clk2_req_pcc5",
+-};
+-
+-static const char * const ddr_groups[] = {
+-	"vi_d0_pt4",
+-	"vi_d1_pd5",
+-	"vi_d10_pt2",
+-	"vi_d11_pt3",
+-	"vi_d2_pl0",
+-	"vi_d3_pl1",
+-	"vi_d4_pl2",
+-	"vi_d5_pl3",
+-	"vi_d6_pl4",
+-	"vi_d7_pl5",
+-	"vi_d8_pl6",
+-	"vi_d9_pl7",
+-	"vi_hsync_pd7",
+-	"vi_vsync_pd6",
+-};
+-
+-static const char * const dev3_groups[] = {
+-	"clk3_req_pee1",
+-};
+-
+-static const char * const displaya_groups[] = {
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_fs_pp0",
+-	"dap3_sclk_pp3",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"lcd_cs0_n_pn4",
+-	"lcd_cs1_n_pw0",
+-	"lcd_d0_pe0",
+-	"lcd_d1_pe1",
+-	"lcd_d10_pf2",
+-	"lcd_d11_pf3",
+-	"lcd_d12_pf4",
+-	"lcd_d13_pf5",
+-	"lcd_d14_pf6",
+-	"lcd_d15_pf7",
+-	"lcd_d16_pm0",
+-	"lcd_d17_pm1",
+-	"lcd_d18_pm2",
+-	"lcd_d19_pm3",
+-	"lcd_d2_pe2",
+-	"lcd_d20_pm4",
+-	"lcd_d21_pm5",
+-	"lcd_d22_pm6",
+-	"lcd_d23_pm7",
+-	"lcd_d3_pe3",
+-	"lcd_d4_pe4",
+-	"lcd_d5_pe5",
+-	"lcd_d6_pe6",
+-	"lcd_d7_pe7",
+-	"lcd_d8_pf0",
+-	"lcd_d9_pf1",
+-	"lcd_dc0_pn6",
+-	"lcd_dc1_pd2",
+-	"lcd_de_pj1",
+-	"lcd_hsync_pj3",
+-	"lcd_m1_pw1",
+-	"lcd_pclk_pb3",
+-	"lcd_pwr0_pb2",
+-	"lcd_pwr1_pc1",
+-	"lcd_pwr2_pc6",
+-	"lcd_sck_pz4",
+-	"lcd_sdin_pz2",
+-	"lcd_sdout_pn5",
+-	"lcd_vsync_pj4",
+-	"lcd_wr_n_pz3",
+-};
+-
+-static const char * const displayb_groups[] = {
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_fs_pp0",
+-	"dap3_sclk_pp3",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"lcd_cs0_n_pn4",
+-	"lcd_cs1_n_pw0",
+-	"lcd_d0_pe0",
+-	"lcd_d1_pe1",
+-	"lcd_d10_pf2",
+-	"lcd_d11_pf3",
+-	"lcd_d12_pf4",
+-	"lcd_d13_pf5",
+-	"lcd_d14_pf6",
+-	"lcd_d15_pf7",
+-	"lcd_d16_pm0",
+-	"lcd_d17_pm1",
+-	"lcd_d18_pm2",
+-	"lcd_d19_pm3",
+-	"lcd_d2_pe2",
+-	"lcd_d20_pm4",
+-	"lcd_d21_pm5",
+-	"lcd_d22_pm6",
+-	"lcd_d23_pm7",
+-	"lcd_d3_pe3",
+-	"lcd_d4_pe4",
+-	"lcd_d5_pe5",
+-	"lcd_d6_pe6",
+-	"lcd_d7_pe7",
+-	"lcd_d8_pf0",
+-	"lcd_d9_pf1",
+-	"lcd_dc0_pn6",
+-	"lcd_dc1_pd2",
+-	"lcd_de_pj1",
+-	"lcd_hsync_pj3",
+-	"lcd_m1_pw1",
+-	"lcd_pclk_pb3",
+-	"lcd_pwr0_pb2",
+-	"lcd_pwr1_pc1",
+-	"lcd_pwr2_pc6",
+-	"lcd_sck_pz4",
+-	"lcd_sdin_pz2",
+-	"lcd_sdout_pn5",
+-	"lcd_vsync_pj4",
+-	"lcd_wr_n_pz3",
+-};
+-
+-static const char * const dtv_groups[] = {
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-};
+-
+-static const char * const extperiph1_groups[] = {
+-	"clk1_out_pw4",
+-};
+-
+-static const char * const extperiph2_groups[] = {
+-	"clk2_out_pw5",
+-};
+-
+-static const char * const extperiph3_groups[] = {
+-	"clk3_out_pee0",
+-};
+-
+-static const char * const gmi_groups[] = {
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_fs_pn0",
+-	"dap1_sclk_pn3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_fs_pp4",
+-	"dap4_sclk_pp7",
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad10_ph2",
+-	"gmi_ad11_ph3",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad9_ph1",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs4_n_pk2",
+-	"gmi_cs6_n_pi3",
+-	"gmi_cs7_n_pi6",
+-	"gmi_dqs_pi2",
+-	"gmi_iordy_pi5",
+-	"gmi_oe_n_pi1",
+-	"gmi_rst_n_pi4",
+-	"gmi_wait_pi7",
+-	"gmi_wp_n_pc7",
+-	"gmi_wr_n_pi0",
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-	"spi1_cs0_n_px6",
+-	"spi1_mosi_px4",
+-	"spi1_sck_px5",
+-	"spi2_cs0_n_px3",
+-	"spi2_miso_px1",
+-	"spi2_mosi_px0",
+-	"spi2_sck_px2",
+-	"uart2_cts_n_pj5",
+-	"uart2_rts_n_pj6",
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"uart3_rxd_pw7",
+-	"uart3_txd_pw6",
+-};
+-
+-static const char * const gmi_alt_groups[] = {
+-	"gmi_a16_pj7",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs7_n_pi6",
+-	"gmi_wp_n_pc7",
+-};
+-
+-static const char * const hda_groups[] = {
+-	"clk1_req_pee2",
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_fs_pn0",
+-	"dap1_sclk_pn3",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_l0_prsnt_n_pdd0",
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l1_clkreq_n_pdd6",
+-	"pex_l1_prsnt_n_pdd4",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l2_clkreq_n_pcc7",
+-	"pex_l2_prsnt_n_pdd7",
+-	"pex_l2_rst_n_pcc6",
+-	"pex_wake_n_pdd3",
+-	"spdif_in_pk6",
+-};
+-
+-static const char * const hdcp_groups[] = {
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"lcd_pwr0_pb2",
+-	"lcd_pwr2_pc6",
+-	"lcd_sck_pz4",
+-	"lcd_sdout_pn5",
+-	"lcd_wr_n_pz3",
+-};
+-
+-static const char * const hdmi_groups[] = {
+-	"hdmi_int_pn7",
+-};
+-
+-static const char * const hsi_groups[] = {
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-};
+-
+-static const char * const i2c1_groups[] = {
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"spi2_cs1_n_pw2",
+-	"spi2_cs2_n_pw3",
+-};
+-
+-static const char * const i2c2_groups[] = {
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-};
+-
+-static const char * const i2c3_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat4_paa4",
+-};
+-
+-static const char * const i2c4_groups[] = {
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-};
+-
+-static const char * const i2cpwr_groups[] = {
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-};
+-
+-static const char * const i2s0_groups[] = {
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_fs_pn0",
+-	"dap1_sclk_pn3",
+-};
+-
+-static const char * const i2s1_groups[] = {
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-};
+-
+-static const char * const i2s2_groups[] = {
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_fs_pp0",
+-	"dap3_sclk_pp3",
+-};
+-
+-static const char * const i2s3_groups[] = {
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_fs_pp4",
+-	"dap4_sclk_pp7",
+-};
+-
+-static const char * const i2s4_groups[] = {
+-	"pbb0",
+-	"pbb7",
+-	"pcc1",
+-	"pcc2",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-};
+-
+-static const char * const invalid_groups[] = {
+-	"kb_row3_pr3",
+-	"sdmmc4_clk_pcc4",
+-};
+-
+-static const char * const kbc_groups[] = {
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-};
+-
+-static const char * const mio_groups[] = {
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-};
+-
+-static const char * const nand_groups[] = {
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad10_ph2",
+-	"gmi_ad11_ph3",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad9_ph1",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs4_n_pk2",
+-	"gmi_cs6_n_pi3",
+-	"gmi_cs7_n_pi6",
+-	"gmi_dqs_pi2",
+-	"gmi_iordy_pi5",
+-	"gmi_oe_n_pi1",
+-	"gmi_rst_n_pi4",
+-	"gmi_wait_pi7",
+-	"gmi_wp_n_pc7",
+-	"gmi_wr_n_pi0",
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-};
+-
+-static const char * const nand_alt_groups[] = {
+-	"gmi_cs6_n_pi3",
+-	"gmi_cs7_n_pi6",
+-	"gmi_rst_n_pi4",
+-};
+-
+-static const char * const owr_groups[] = {
+-	"pu0",
+-	"pv2",
+-	"kb_row5_pr5",
+-	"owr",
+-};
+-
+-static const char * const pcie_groups[] = {
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_l0_prsnt_n_pdd0",
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l1_clkreq_n_pdd6",
+-	"pex_l1_prsnt_n_pdd4",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l2_clkreq_n_pcc7",
+-	"pex_l2_prsnt_n_pdd7",
+-	"pex_l2_rst_n_pcc6",
+-	"pex_wake_n_pdd3",
+-};
+-
+-static const char * const pwm0_groups[] = {
+-	"gmi_ad8_ph0",
+-	"pu3",
+-	"sdmmc3_dat3_pb4",
+-	"sdmmc3_dat5_pd0",
+-	"uart3_rts_n_pc0",
+-};
+-
+-static const char * const pwm1_groups[] = {
+-	"gmi_ad9_ph1",
+-	"pu4",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat4_pd1",
+-};
+-
+-static const char * const pwm2_groups[] = {
+-	"gmi_ad10_ph2",
+-	"pu5",
+-	"sdmmc3_clk_pa6",
+-};
+-
+-static const char * const pwm3_groups[] = {
+-	"gmi_ad11_ph3",
+-	"pu6",
+-	"sdmmc3_cmd_pa7",
+-};
+-
+-static const char * const pwr_int_n_groups[] = {
+-	"pwr_int_n",
+-};
+-
+-static const char * const rsvd1_groups[] = {
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs0_n_pj0",
+-	"gmi_cs1_n_pj2",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs3_n_pk4",
+-	"gmi_cs4_n_pk2",
+-	"gmi_dqs_pi2",
+-	"gmi_iordy_pi5",
+-	"gmi_oe_n_pi1",
+-	"gmi_wait_pi7",
+-	"gmi_wp_n_pc7",
+-	"gmi_wr_n_pi0",
+-	"pu1",
+-	"pu2",
+-	"pv0",
+-	"pv1",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-	"vi_pclk_pt0",
+-};
+-
+-static const char * const rsvd2_groups[] = {
+-	"clk1_out_pw4",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"clk_32k_in",
+-	"clk_32k_out_pa0",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"crt_hsync_pv6",
+-	"crt_vsync_pv7",
+-	"dap3_din_pp1",
+-	"dap3_dout_pp2",
+-	"dap3_fs_pp0",
+-	"dap3_sclk_pp3",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_fs_pp4",
+-	"dap4_sclk_pp7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"pbb0",
+-	"pbb7",
+-	"pcc1",
+-	"pcc2",
+-	"pv0",
+-	"pv1",
+-	"pv2",
+-	"pv3",
+-	"hdmi_cec_pee3",
+-	"hdmi_int_pn7",
+-	"jtag_rtck_pu7",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"pwr_int_n",
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat0_py7",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc4_rst_n_pcc3",
+-	"spdif_out_pk5",
+-	"sys_clk_req_pz5",
+-	"uart3_cts_n_pa1",
+-	"uart3_rxd_pw7",
+-	"uart3_txd_pw6",
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-	"vi_d0_pt4",
+-	"vi_d10_pt2",
+-	"vi_d11_pt3",
+-	"vi_hsync_pd7",
+-	"vi_vsync_pd6",
+-};
+-
+-static const char * const rsvd3_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"clk1_out_pw4",
+-	"clk1_req_pee2",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"clk_32k_in",
+-	"clk_32k_out_pa0",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"crt_hsync_pv6",
+-	"crt_vsync_pv7",
+-	"dap2_din_pa4",
+-	"dap2_dout_pa5",
+-	"dap2_fs_pa2",
+-	"dap2_sclk_pa3",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"pbb0",
+-	"pbb7",
+-	"pcc1",
+-	"pcc2",
+-	"pv0",
+-	"pv1",
+-	"pv2",
+-	"pv3",
+-	"hdmi_cec_pee3",
+-	"hdmi_int_pn7",
+-	"jtag_rtck_pu7",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row3_pr3",
+-	"lcd_d0_pe0",
+-	"lcd_d1_pe1",
+-	"lcd_d10_pf2",
+-	"lcd_d11_pf3",
+-	"lcd_d12_pf4",
+-	"lcd_d13_pf5",
+-	"lcd_d14_pf6",
+-	"lcd_d15_pf7",
+-	"lcd_d16_pm0",
+-	"lcd_d17_pm1",
+-	"lcd_d18_pm2",
+-	"lcd_d19_pm3",
+-	"lcd_d2_pe2",
+-	"lcd_d20_pm4",
+-	"lcd_d21_pm5",
+-	"lcd_d22_pm6",
+-	"lcd_d23_pm7",
+-	"lcd_d3_pe3",
+-	"lcd_d4_pe4",
+-	"lcd_d5_pe5",
+-	"lcd_d6_pe6",
+-	"lcd_d7_pe7",
+-	"lcd_d8_pf0",
+-	"lcd_d9_pf1",
+-	"lcd_dc0_pn6",
+-	"lcd_dc1_pd2",
+-	"lcd_de_pj1",
+-	"lcd_hsync_pj3",
+-	"lcd_m1_pw1",
+-	"lcd_pclk_pb3",
+-	"lcd_pwr1_pc1",
+-	"lcd_vsync_pj4",
+-	"owr",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_l0_prsnt_n_pdd0",
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l1_clkreq_n_pdd6",
+-	"pex_l1_prsnt_n_pdd4",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l2_clkreq_n_pcc7",
+-	"pex_l2_prsnt_n_pdd7",
+-	"pex_l2_rst_n_pcc6",
+-	"pex_wake_n_pdd3",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"pwr_int_n",
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc4_rst_n_pcc3",
+-	"sys_clk_req_pz5",
+-};
+-
+-static const char * const rsvd4_groups[] = {
+-	"clk1_out_pw4",
+-	"clk1_req_pee2",
+-	"clk2_out_pw5",
+-	"clk2_req_pcc5",
+-	"clk3_out_pee0",
+-	"clk3_req_pee1",
+-	"clk_32k_in",
+-	"clk_32k_out_pa0",
+-	"core_pwr_req",
+-	"cpu_pwr_req",
+-	"crt_hsync_pv6",
+-	"crt_vsync_pv7",
+-	"dap4_din_pp5",
+-	"dap4_dout_pp6",
+-	"dap4_fs_pp4",
+-	"dap4_sclk_pp7",
+-	"ddc_scl_pv4",
+-	"ddc_sda_pv5",
+-	"gen1_i2c_scl_pc4",
+-	"gen1_i2c_sda_pc5",
+-	"gen2_i2c_scl_pt5",
+-	"gen2_i2c_sda_pt6",
+-	"gmi_a19_pk7",
+-	"gmi_ad0_pg0",
+-	"gmi_ad1_pg1",
+-	"gmi_ad10_ph2",
+-	"gmi_ad11_ph3",
+-	"gmi_ad12_ph4",
+-	"gmi_ad13_ph5",
+-	"gmi_ad14_ph6",
+-	"gmi_ad15_ph7",
+-	"gmi_ad2_pg2",
+-	"gmi_ad3_pg3",
+-	"gmi_ad4_pg4",
+-	"gmi_ad5_pg5",
+-	"gmi_ad6_pg6",
+-	"gmi_ad7_pg7",
+-	"gmi_ad8_ph0",
+-	"gmi_ad9_ph1",
+-	"gmi_adv_n_pk0",
+-	"gmi_clk_pk1",
+-	"gmi_cs2_n_pk3",
+-	"gmi_cs4_n_pk2",
+-	"gmi_dqs_pi2",
+-	"gmi_iordy_pi5",
+-	"gmi_oe_n_pi1",
+-	"gmi_rst_n_pi4",
+-	"gmi_wait_pi7",
+-	"gmi_wr_n_pi0",
+-	"pcc2",
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-	"pv0",
+-	"pv1",
+-	"pv2",
+-	"pv3",
+-	"hdmi_cec_pee3",
+-	"hdmi_int_pn7",
+-	"jtag_rtck_pu7",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_row0_pr0",
+-	"kb_row1_pr1",
+-	"kb_row2_pr2",
+-	"kb_row4_pr4",
+-	"lcd_cs0_n_pn4",
+-	"lcd_cs1_n_pw0",
+-	"lcd_d0_pe0",
+-	"lcd_d1_pe1",
+-	"lcd_d10_pf2",
+-	"lcd_d11_pf3",
+-	"lcd_d12_pf4",
+-	"lcd_d13_pf5",
+-	"lcd_d14_pf6",
+-	"lcd_d15_pf7",
+-	"lcd_d16_pm0",
+-	"lcd_d17_pm1",
+-	"lcd_d18_pm2",
+-	"lcd_d19_pm3",
+-	"lcd_d2_pe2",
+-	"lcd_d20_pm4",
+-	"lcd_d21_pm5",
+-	"lcd_d22_pm6",
+-	"lcd_d23_pm7",
+-	"lcd_d3_pe3",
+-	"lcd_d4_pe4",
+-	"lcd_d5_pe5",
+-	"lcd_d6_pe6",
+-	"lcd_d7_pe7",
+-	"lcd_d8_pf0",
+-	"lcd_d9_pf1",
+-	"lcd_dc0_pn6",
+-	"lcd_dc1_pd2",
+-	"lcd_de_pj1",
+-	"lcd_hsync_pj3",
+-	"lcd_m1_pw1",
+-	"lcd_pclk_pb3",
+-	"lcd_pwr1_pc1",
+-	"lcd_sdin_pz2",
+-	"lcd_vsync_pj4",
+-	"owr",
+-	"pex_l0_clkreq_n_pdd2",
+-	"pex_l0_prsnt_n_pdd0",
+-	"pex_l0_rst_n_pdd1",
+-	"pex_l1_clkreq_n_pdd6",
+-	"pex_l1_prsnt_n_pdd4",
+-	"pex_l1_rst_n_pdd5",
+-	"pex_l2_clkreq_n_pcc7",
+-	"pex_l2_prsnt_n_pdd7",
+-	"pex_l2_rst_n_pcc6",
+-	"pex_wake_n_pdd3",
+-	"pwr_i2c_scl_pz6",
+-	"pwr_i2c_sda_pz7",
+-	"pwr_int_n",
+-	"spi1_miso_px7",
+-	"sys_clk_req_pz5",
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"uart3_rxd_pw7",
+-	"uart3_txd_pw6",
+-	"vi_d0_pt4",
+-	"vi_d1_pd5",
+-	"vi_d10_pt2",
+-	"vi_d11_pt3",
+-	"vi_d2_pl0",
+-	"vi_d3_pl1",
+-	"vi_d4_pl2",
+-	"vi_d5_pl3",
+-	"vi_d6_pl4",
+-	"vi_d7_pl5",
+-	"vi_d8_pl6",
+-	"vi_d9_pl7",
+-	"vi_hsync_pd7",
+-	"vi_pclk_pt0",
+-	"vi_vsync_pd6",
+-};
+-
+-static const char * const rtck_groups[] = {
+-	"jtag_rtck_pu7",
+-};
+-
+-static const char * const sata_groups[] = {
+-	"gmi_cs6_n_pi3",
+-};
+-
+-static const char * const sdmmc1_groups[] = {
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat0_py7",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat3_py4",
+-};
+-
+-static const char * const sdmmc2_groups[] = {
+-	"dap1_din_pn1",
+-	"dap1_dout_pn2",
+-	"dap1_fs_pn0",
+-	"dap1_sclk_pn3",
+-	"kb_row10_ps2",
+-	"kb_row11_ps3",
+-	"kb_row12_ps4",
+-	"kb_row13_ps5",
+-	"kb_row14_ps6",
+-	"kb_row15_ps7",
+-	"kb_row6_pr6",
+-	"kb_row7_pr7",
+-	"kb_row8_ps0",
+-	"kb_row9_ps1",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"vi_d1_pd5",
+-	"vi_d2_pl0",
+-	"vi_d3_pl1",
+-	"vi_d4_pl2",
+-	"vi_d5_pl3",
+-	"vi_d6_pl4",
+-	"vi_d7_pl5",
+-	"vi_d8_pl6",
+-	"vi_d9_pl7",
+-	"vi_pclk_pt0",
+-};
+-
+-static const char * const sdmmc3_groups[] = {
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-	"sdmmc3_dat4_pd1",
+-	"sdmmc3_dat5_pd0",
+-	"sdmmc3_dat6_pd3",
+-	"sdmmc3_dat7_pd4",
+-};
+-
+-static const char * const sdmmc4_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-	"cam_i2c_sda_pbb2",
+-	"cam_mclk_pcc0",
+-	"pbb0",
+-	"pbb3",
+-	"pbb4",
+-	"pbb5",
+-	"pbb6",
+-	"pbb7",
+-	"pcc1",
+-	"sdmmc4_clk_pcc4",
+-	"sdmmc4_cmd_pt7",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"sdmmc4_dat4_paa4",
+-	"sdmmc4_dat5_paa5",
+-	"sdmmc4_dat6_paa6",
+-	"sdmmc4_dat7_paa7",
+-	"sdmmc4_rst_n_pcc3",
+-};
+-
+-static const char * const spdif_groups[] = {
+-	"sdmmc3_dat6_pd3",
+-	"sdmmc3_dat7_pd4",
+-	"spdif_in_pk6",
+-	"spdif_out_pk5",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-};
+-
+-static const char * const spi1_groups[] = {
+-	"spi1_cs0_n_px6",
+-	"spi1_miso_px7",
+-	"spi1_mosi_px4",
+-	"spi1_sck_px5",
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-};
+-
+-static const char * const spi2_groups[] = {
+-	"sdmmc3_cmd_pa7",
+-	"sdmmc3_dat4_pd1",
+-	"sdmmc3_dat5_pd0",
+-	"sdmmc3_dat6_pd3",
+-	"sdmmc3_dat7_pd4",
+-	"spi1_cs0_n_px6",
+-	"spi1_mosi_px4",
+-	"spi1_sck_px5",
+-	"spi2_cs0_n_px3",
+-	"spi2_cs1_n_pw2",
+-	"spi2_cs2_n_pw3",
+-	"spi2_miso_px1",
+-	"spi2_mosi_px0",
+-	"spi2_sck_px2",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-};
+-
+-static const char * const spi2_alt_groups[] = {
+-	"spi1_cs0_n_px6",
+-	"spi1_miso_px7",
+-	"spi1_mosi_px4",
+-	"spi1_sck_px5",
+-	"spi2_cs1_n_pw2",
+-	"spi2_cs2_n_pw3",
+-};
+-
+-static const char * const spi3_groups[] = {
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_dat0_pb7",
+-	"sdmmc3_dat1_pb6",
+-	"sdmmc3_dat2_pb5",
+-	"sdmmc3_dat3_pb4",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-	"spi1_miso_px7",
+-	"spi2_cs0_n_px3",
+-	"spi2_cs1_n_pw2",
+-	"spi2_cs2_n_pw3",
+-	"spi2_miso_px1",
+-	"spi2_mosi_px0",
+-	"spi2_sck_px2",
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-};
+-
+-static const char * const spi4_groups[] = {
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-	"sdmmc3_dat4_pd1",
+-	"sdmmc3_dat5_pd0",
+-	"sdmmc3_dat6_pd3",
+-	"sdmmc3_dat7_pd4",
+-	"uart2_cts_n_pj5",
+-	"uart2_rts_n_pj6",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-};
+-
+-static const char * const spi5_groups[] = {
+-	"lcd_cs0_n_pn4",
+-	"lcd_cs1_n_pw0",
+-	"lcd_pwr0_pb2",
+-	"lcd_pwr2_pc6",
+-	"lcd_sck_pz4",
+-	"lcd_sdin_pz2",
+-	"lcd_sdout_pn5",
+-	"lcd_wr_n_pz3",
+-};
+-
+-static const char * const spi6_groups[] = {
+-	"spi2_cs0_n_px3",
+-	"spi2_miso_px1",
+-	"spi2_mosi_px0",
+-	"spi2_sck_px2",
+-};
+-
+-static const char * const sysclk_groups[] = {
+-	"sys_clk_req_pz5",
+-};
+-
+-static const char * const test_groups[] = {
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-};
+-
+-static const char * const trace_groups[] = {
+-	"kb_col0_pq0",
+-	"kb_col1_pq1",
+-	"kb_col2_pq2",
+-	"kb_col3_pq3",
+-	"kb_col4_pq4",
+-	"kb_col5_pq5",
+-	"kb_col6_pq6",
+-	"kb_col7_pq7",
+-	"kb_row4_pr4",
+-	"kb_row5_pr5",
+-};
+-
+-static const char * const uarta_groups[] = {
+-	"pu0",
+-	"pu1",
+-	"pu2",
+-	"pu3",
+-	"pu4",
+-	"pu5",
+-	"pu6",
+-	"sdmmc1_clk_pz0",
+-	"sdmmc1_cmd_pz1",
+-	"sdmmc1_dat0_py7",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc3_clk_pa6",
+-	"sdmmc3_cmd_pa7",
+-	"uart2_cts_n_pj5",
+-	"uart2_rts_n_pj6",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-};
+-
+-static const char * const uartb_groups[] = {
+-	"uart2_cts_n_pj5",
+-	"uart2_rts_n_pj6",
+-	"uart2_rxd_pc3",
+-	"uart2_txd_pc2",
+-};
+-
+-static const char * const uartc_groups[] = {
+-	"uart3_cts_n_pa1",
+-	"uart3_rts_n_pc0",
+-	"uart3_rxd_pw7",
+-	"uart3_txd_pw6",
+-};
+-
+-static const char * const uartd_groups[] = {
+-	"gmi_a16_pj7",
+-	"gmi_a17_pb0",
+-	"gmi_a18_pb1",
+-	"gmi_a19_pk7",
+-	"ulpi_clk_py0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-};
+-
+-static const char * const uarte_groups[] = {
+-	"sdmmc1_dat0_py7",
+-	"sdmmc1_dat1_py6",
+-	"sdmmc1_dat2_py5",
+-	"sdmmc1_dat3_py4",
+-	"sdmmc4_dat0_paa0",
+-	"sdmmc4_dat1_paa1",
+-	"sdmmc4_dat2_paa2",
+-	"sdmmc4_dat3_paa3",
+-};
+-
+-static const char * const ulpi_groups[] = {
+-	"ulpi_clk_py0",
+-	"ulpi_data0_po1",
+-	"ulpi_data1_po2",
+-	"ulpi_data2_po3",
+-	"ulpi_data3_po4",
+-	"ulpi_data4_po5",
+-	"ulpi_data5_po6",
+-	"ulpi_data6_po7",
+-	"ulpi_data7_po0",
+-	"ulpi_dir_py1",
+-	"ulpi_nxt_py2",
+-	"ulpi_stp_py3",
+-};
+-
+-static const char * const vgp1_groups[] = {
+-	"cam_i2c_scl_pbb1",
+-};
+-
+-static const char * const vgp2_groups[] = {
+-	"cam_i2c_sda_pbb2",
+-};
+-
+-static const char * const vgp3_groups[] = {
+-	"pbb3",
+-	"sdmmc4_dat5_paa5",
+-};
+-
+-static const char * const vgp4_groups[] = {
+-	"pbb4",
+-	"sdmmc4_dat6_paa6",
+-};
+-
+-static const char * const vgp5_groups[] = {
+-	"pbb5",
+-	"sdmmc4_dat7_paa7",
+-};
+-
+-static const char * const vgp6_groups[] = {
+-	"pbb6",
+-	"sdmmc4_rst_n_pcc3",
+-};
+-
+-static const char * const vi_groups[] = {
+-	"cam_mclk_pcc0",
+-	"vi_d0_pt4",
+-	"vi_d1_pd5",
+-	"vi_d10_pt2",
+-	"vi_d11_pt3",
+-	"vi_d2_pl0",
+-	"vi_d3_pl1",
+-	"vi_d4_pl2",
+-	"vi_d5_pl3",
+-	"vi_d6_pl4",
+-	"vi_d7_pl5",
+-	"vi_d8_pl6",
+-	"vi_d9_pl7",
+-	"vi_hsync_pd7",
+-	"vi_mclk_pt1",
+-	"vi_pclk_pt0",
+-	"vi_vsync_pd6",
+-};
+-
+-static const char * const vi_alt1_groups[] = {
+-	"cam_mclk_pcc0",
+-	"vi_mclk_pt1",
+-};
+-
+-static const char * const vi_alt2_groups[] = {
+-	"vi_mclk_pt1",
+-};
+-
+-static const char * const vi_alt3_groups[] = {
+-	"cam_mclk_pcc0",
+-	"vi_mclk_pt1",
+-};
+ 
+ #define FUNCTION(fname)					\
+ 	{						\
+ 		.name = #fname,				\
+-		.groups = fname##_groups,		\
+-		.ngroups = ARRAY_SIZE(fname##_groups),	\
+ 	}
+ 
+-static const struct tegra_function tegra30_functions[] = {
++static struct tegra_function tegra30_functions[] = {
+ 	FUNCTION(blink),
+ 	FUNCTION(cec),
+ 	FUNCTION(clk_12m_out),
 -- 
-1.8.3.2
+1.8.1.5
