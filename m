@@ -1,85 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Mar 2014 09:00:06 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add shared shmobile_init_delay()
-In-Reply-To: <20140306032824.10814.21953.sendpatchset@w520>
-References: <20140306032814.10814.2949.sendpatchset@w520>
- <20140306032824.10814.21953.sendpatchset@w520>
-Message-ID: <20140307000003.GB24411@verge.net.au>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 6 Mar 2014 21:10:01 -0300
+Subject: [PATCH 0/4] ARM: mvebu: Device Tree updates for Armada XP boards
+In-Reply-To: <20140306200543.GG1872@titan.lakedaemon.net>
+References: <1393951022-18114-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140306200543.GG1872@titan.lakedaemon.net>
+Message-ID: <20140307001001.GA13690@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 12:28:24PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Mar 06, Jason Cooper wrote:
+> On Tue, Mar 04, 2014 at 05:36:58PM +0100, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > This set of commits updates the Armada XP DB and Armada XP GP Device
+> > Trees to work with the newest DT capable bootloaders from Marvell that
+> > remap internal registers at 0xf1000000 and move the MBus Window base
+> > address to 0xf0000000.
+> > 
+> > Also, the last commit updates the available amount of RAM on the
+> > Armada XP Matrix board.
+> > 
+> > Thomas
+> > 
+> > Thomas Petazzoni (4):
+> >   ARM: mvebu: change the default PCIe apertures for Armada 370/XP
+> >   ARM: mvebu: switch the Armada XP DB to use internal registers at
+> >     0xf1000000
+> >   ARM: mvebu: switch the Armada XP GP to use internal registers at
+> >     0xf1000000
+> >   ARM: mvebu: the Armada XP Matrix board has 4 GB
+> > 
+> >  arch/arm/boot/dts/armada-370-xp.dtsi   |  4 ++--
+> >  arch/arm/boot/dts/armada-xp-db.dts     | 13 +++++++++++--
+> >  arch/arm/boot/dts/armada-xp-gp.dts     | 22 ++++++++++++++++------
+> >  arch/arm/boot/dts/armada-xp-matrix.dts |  7 ++++++-
+> >  4 files changed, 35 insertions(+), 11 deletions(-)
 > 
-> Introduce shmobile_init_delay() that gets CPU specific
-> parameters from DT and sets up the early delay from
-> there. This allows us to both remove frequency information
-> from the C code and consolidate existing code.
+> Whole series applied to mvebu/dt.
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> fyi - we only have one more day of -next (tonight, 7pm US East Coast
+> time) before -rc6 drops.
+> 
+> I'm comfortable sending a lightly tested mvebu/dt pull request with all
+> the stuff submitted in the last couple days, but I fear there isn't
+> enough testing time before arm-soc stops taking pull requests.
+> 
+> I'm particularly concerned about the watchdog changes and the coherency
 
-Hi Magnus,
+Hm... I wasn't really aiming v3.15, as I thought it was already too late.
 
-I am holding off on this one until the rest of the series is finalised.
+On the other side, if we can get someone to review the changes and someone
+to double-check them on 370/XP/Kirkwood, you could pull it soon enough?
 
-> ---
-> 
->  arch/arm/mach-shmobile/include/mach/common.h |    1 
->  arch/arm/mach-shmobile/timer.c               |   28 ++++++++++++++++++++++++++
->  2 files changed, 29 insertions(+)
-> 
-> --- 0001/arch/arm/mach-shmobile/include/mach/common.h
-> +++ work/arch/arm/mach-shmobile/include/mach/common.h	2014-03-06 12:06:03.000000000 +0900
-> @@ -4,6 +4,7 @@
->  extern void shmobile_earlytimer_init(void);
->  extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
->  			 unsigned int mult, unsigned int div);
-> +extern void shmobile_init_delay(void);
->  struct twd_local_timer;
->  extern void shmobile_setup_console(void);
->  extern void shmobile_boot_vector(void);
-> --- 0001/arch/arm/mach-shmobile/timer.c
-> +++ work/arch/arm/mach-shmobile/timer.c	2014-03-06 12:06:03.000000000 +0900
-> @@ -21,6 +21,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/clocksource.h>
->  #include <linux/delay.h>
-> +#include <linux/of_address.h>
->  
->  void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
->  				 unsigned int mult, unsigned int div)
-> @@ -39,6 +40,33 @@ void __init shmobile_setup_delay(unsigne
->  		preset_lpj = max_cpu_core_mhz * value;
->  }
->  
-> +void __init shmobile_init_delay(void)
-> +{
-> +	struct device_node *np, *parent;
-> +	u32 max_freq, freq;
-> +
-> +	max_freq = 0;
-> +
-> +	parent = of_find_node_by_path("/cpus");
-> +	if (parent) {
-> +		for_each_child_of_node(parent, np) {
-> +			if (!of_property_read_u32(np, "clock-frequency", &freq))
-> +				max_freq = max(max_freq, freq);
-> +		}
-> +		of_node_put(parent);
-> +	}
-> +
-> +	if (max_freq) {
-> +		if (of_find_compatible_node(NULL, NULL, "arm,cortex-a8"))
-> +			shmobile_setup_delay(max_freq, 1, 3);
-> +		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
-> +			shmobile_setup_delay(max_freq, 1, 3);
-> +		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a15"))
-> +			if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
-> +				shmobile_setup_delay(max_freq, 2, 4);
-> +	}
-> +}
-> +
->  static void __init shmobile_late_time_init(void)
->  {
->  	/*
-> 
+Anyway, it's not a big deal if it gets pulled in v3.16. We are already
+doing *a lot* of mvebu movement in this release, IMHO.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
