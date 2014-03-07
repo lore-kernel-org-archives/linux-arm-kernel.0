@@ -1,68 +1,137 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 7 Mar 2014 15:59:17 +0200
-Subject: [PATCH 2/8] ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock
- gate
-In-Reply-To: <1394197751-28984-3-git-send-email-rogerq@ti.com>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-3-git-send-email-rogerq@ti.com>
-Message-ID: <5319D0B5.6060300@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 07 Mar 2014 15:12:53 +0100
+Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
+In-Reply-To: <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
+References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
+ <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
+Message-ID: <5319D3E5.4000001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2014 03:09 PM, Roger Quadros wrote:
-> This clock gate description was missing in older Reference manuals.
-> It is present on the SoC to provide 960MHz reference clock to the
-> internal USB PHYs.
+Hi Pankaj,
 
-Can you provide a document reference here?
+On 07.03.2014 14:56, Pankaj Dubey wrote:
+>> +static void __init exynos5260_clk_top_init(struct device_node *np)
+>> +{
+>> +       struct exynos5260_cmu_info cmu;
+>> +       struct samsung_clk_provider *ctx;
+>> +
+>> +       memset(&cmu, 0, sizeof(cmu));
+>> +
+>> +       cmu.pll_clks = top_pll_clks;
+>> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
+>> +       cmu.mux_clks = top_mux_clks;
+>> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
+>> +       cmu.div_clks = top_div_clks;
+>> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
+>> +       cmu.gate_clks = top_gate_clks;
+>> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
+>> +       cmu.nr_clk_ids = TOP_NR_CLK;
+>> +       cmu.clk_regs = top_clk_regs;
+>> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
+>> +
+>> +       ctx = exynos5260_cmu_register_one(np, &cmu);
+>> +
+>> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
+>> +                       ARRAY_SIZE(fixed_rate_ext_clks),
+>> +                       ext_clk_match);
+>> +}
+>> +
+>> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
+>> +               exynos5260_clk_top_init);
+>
+> Well with this approach we end up adding 14 such
+> exynosxxx_clk_xxx_init functions all of which has similar lines of
+> code. As I know there are many upcoming Exynos SoC which will also
+> have similar multiple clock controllers (in some of them there are
+> upto 25 clock domains, and in that case we will end up writing 25 such
+> init functions) so I have following suggestion where we can have one
+> more structure which will hold all static data and match_table to
+> match compatibility string and return CMU_TYPE which can be mapped to
+> get proper clock_data which can be used in single clock_init function.
+> Following is some sample code which I have implemented and tested on
+> one of Exynos SoC. Please let me know your opinion about this.
 
--Tero
+Yes, this looks better indeed, however there is still a room for 
+improvement. Please see my comments below.
 
 >
-> Use l3init_960m_gfclk as parent of usb_otg_ss1_refclk960m and
-> usb_otg_ss2_refclk960m.
+> =============================
 >
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 12 ++++++++++--
->   1 file changed, 10 insertions(+), 2 deletions(-)
+> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
+
+Instead of making this an array, particular elements could be separate 
+structures. This would simplify the code below.
+
+>          {
+>                  .cmu_type = CMU_TYPE_TOP,
+>                  .mux_clocks = top_mux_clks,
+>                  .div_clocks = top_div_clks,
+>                  .pll_clocks = top_pll_clks,
+>                  .clk_regs = top_clk_regs,
+>                  .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
+>                  .nr_div_clocks = ARRAY_SIZE(top_div_clks),
+>                  .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
+>                  .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
+>                  .nr_clks  = TOP_NR_CLK,
+>          }, {
+>                  .cmu_type = CMU_TYPE_EGL,
+>                  .mux_clocks = egl_mux_clks,
+>                  .div_clocks = egl_div_clks,
+>                  .pll_clocks = egl_pll_clks,
+>                   .clk_regs = egl_clk_regs,
+>                  .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
+>                  .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
+>                  .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
+>                  .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
+>                  .nr_clks  = EGL_NR_CLK,
+>          }, {
+>         /* Add similar elements here */
+> };
 >
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index e96da9a..b8d3a9d 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -1386,6 +1386,14 @@
->   		ti,dividers = <1>, <8>;
->   	};
+> static struct of_device_id cmu_subtype_match_table[] = {
+>          {
+>                  .compatible = "exynosxxxx-cmu-top",
+>                  .data   = (void *)CMU_TYPE_TOP,
+
+Here the data would be just a pointer to respective clock data struct 
+defined above.
+
+>          }, {
+>                  .compatible = "exynosxxx-cmu-peris",
+>                  .data   = (void *)CMU_TYPE_PERIS,
+>          }, {
+>         /* Add similar elements here */
+> };
 >
-> +	l3init_960m_gfclk: l3init_960m_gfclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&dpll_usb_clkdcoldo>;
-> +		ti,bit-shift = <8>;
-> +		reg = <0x06c0>;
-> +	};
-> +
->   	dss_32khz_clk: dss_32khz_clk {
->   		#clock-cells = <0>;
->   		compatible = "ti,gate-clock";
-> @@ -1533,7 +1541,7 @@
->   	usb_otg_ss1_refclk960m: usb_otg_ss1_refclk960m {
->   		#clock-cells = <0>;
->   		compatible = "ti,gate-clock";
-> -		clocks = <&dpll_usb_clkdcoldo>;
-> +		clocks = <&l3init_960m_gfclk>;
->   		ti,bit-shift = <8>;
->   		reg = <0x13f0>;
->   	};
-> @@ -1541,7 +1549,7 @@
->   	usb_otg_ss2_refclk960m: usb_otg_ss2_refclk960m {
->   		#clock-cells = <0>;
->   		compatible = "ti,gate-clock";
-> -		clocks = <&dpll_usb_clkdcoldo>;
-> +		clocks = <&l3init_960m_gfclk>;
->   		ti,bit-shift = <8>;
->   		reg = <0x1340>;
->   	};
+> void __init exynosxxx_clk_init(struct device_node *np)
+> {
+>           [snip]
 >
+>          match = of_match_node(cmu_subtype_match_table, np);
+>
+>          if (!match)
+>                  panic("%s: cmu type (%s) is not supported.\n", __func__,
+>                                  np->name);
+
+This can't happen, because this function won't be called for any node 
+with compatible string not declared using CLK_OF_DECLARE().
+
+>
+>          reg_base = of_iomap(np, 0);
+>          if (!reg_base)
+>                  panic("%s: failed to map registers\n", __func__);
+>
+>          cmu_type = (unsigned long) match->data;
+>
+>          for (; i < CMU_TYPE_ALL; i++) {
+>                  clk_data = &exynosxxxx_clk_data[i];
+>                  if (cmu_type == clk_data->cmu_type)
+>                          break;
+>          }
+
+Now clk_data could be taken directly from match->data, without the need 
+to iterate over an array.
+
+Best regards,
+Tomasz
