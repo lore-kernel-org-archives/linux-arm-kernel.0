@@ -1,62 +1,55 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 7 Mar 2014 15:43:14 +0200
-Subject: [PATCH 1/8] CLK: ti: dra7: Initialize USB_DPLL
-In-Reply-To: <1394197751-28984-2-git-send-email-rogerq@ti.com>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-2-git-send-email-rogerq@ti.com>
-Message-ID: <5319CCF2.8090902@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Mar 2014 14:44:12 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 1/5] i2c: mv64xxx: Add reset
+ deassert call
+In-Reply-To: <20140307111858.GB12274@katana>
+References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307095222.GG21483@n2100.arm.linux.org.uk>
+ <20140307100751.GN607@lukather>
+ <20140307103433.GH21483@n2100.arm.linux.org.uk>
+ <CAGb2v66xViOx+DdnuDwad0HsCx2YiYfxqBDAEwYdLHrSydOj0w@mail.gmail.com>
+ <20140307111858.GB12274@katana>
+Message-ID: <20140307134412.GR607@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2014 03:09 PM, Roger Quadros wrote:
-> USB_DPLL must be initialized and locked at boot so that
-> USB modules can work.
->
-> Also program USB_DLL_M2 output to half rate.
->
-> CC: Mike Turquette <mturquette@linaro.org>
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->   drivers/clk/ti/clk-7xx.c | 11 +++++++++++
->   1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-> index 9977653..f89f3c2 100644
-> --- a/drivers/clk/ti/clk-7xx.c
-> +++ b/drivers/clk/ti/clk-7xx.c
-> @@ -18,6 +18,7 @@
->
->   #define DRA7_DPLL_ABE_DEFFREQ				361267200
->   #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
-> +#define DRA7_DPLL_USB_DEFFREQ				960000000
->
->
->   static struct ti_dt_clk dra7xx_clks[] = {
-> @@ -328,5 +329,15 @@ int __init dra7xx_dt_clk_init(void)
->   	if (rc)
->   		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
->
-> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_ck");
-> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ);
-> +	if (rc)
-> +		pr_err("%s: failed to configure USB DPLL!\n", __func__);
-> +
-> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_m2_ck");
-> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ/2);
-> +	if (rc)
-> +		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
-> +
+Hi,
 
-I would rather see this done using the default-rate mechanism provided here:
+On Fri, Mar 07, 2014 at 12:18:58PM +0100, Wolfram Sang wrote:
+> 
+> > > Since RESET_CONTROLLER is not required for those platforms, it really
+> > > should be optional - and I think the real fix is for the reset controller
+> > > support to provide stub functions.
+> > 
+> > Philipp Zabel suggested that adding a _optional variant that provides stubs
+> > and doesn't depend on RESET_CONTROLLER is probably better. This keeps the
+> > compile time checks for drivers requiring it.
+> > 
+> > See: https://lkml.org/lkml/2014/1/10/220
+> > 
+> > I ended up dropping my patch though.
+> 
+> Thanks for the pointer. Well, looks like I need to revert the offending
+> i2c patches then until this issue is fixed? We can't have
+> RESET_CONTROLLER (circular dependency) and we can't skip it (build
+> failures).
+> 
 
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
+I just sent a fix in reply to your mail that should fix the issue
+without having to revert the patches.
 
-However, this remains to be commented by Mike whether the patch is okay 
-or not.
+Thanks!
+Maxime
 
--Tero
-
->   	return rc;
->   }
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/6635e2ba/attachment.sig>
