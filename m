@@ -1,65 +1,111 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Fri, 7 Mar 2014 12:18:45 +0100
-Subject: imx-drm: ldb and display power on sequence
-In-Reply-To: <1394114410.3622.14.camel@paszta.hi.pengutronix.de>
-References: <CAH9NwWcE=4OVHSMKCEuTrFA7JMGEdkxrbX_0OORZ96N1Roi2HQ@mail.gmail.com>
- <1394114410.3622.14.camel@paszta.hi.pengutronix.de>
-Message-ID: <CAH9NwWfz4tBtuKqaJx_E4Y-a5eYwBaBPg2RgO4CFnE1Dfddi8A@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 7 Mar 2014 12:28:28 +0100
+Subject: [PATCH v2 3/5] pinctrl: st: Enhance the controller to manage
+ unavailable registers
+In-Reply-To: <5319A263.6020201@st.com>
+References: <1394185272-26054-1-git-send-email-maxime.coquelin@st.com>
+ <1394185272-26054-4-git-send-email-maxime.coquelin@st.com>
+ <5319A263.6020201@st.com>
+Message-ID: <5319AD5C.7050301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Srini,
 
-> Am Donnerstag, den 06.03.2014, 13:34 +0100 schrieb Christian Gmeiner:
->> Hi all.
->>
->> On our custom board design (imx6d) we are using a TFT-display
->> connceted via LVDS.
->> The datasheet [0] says that the display needs a defined power up
->> sequence. I need
->> to control the following stuff:
->>
->> - LCD_ON (gpio2 3)
->> - Backlight ON (gpio2 0)
->> - PMW for dimm
->>
->> At the moment I have the backlight suff ready:
->>
->>        backlight {
->>                compatible = "pwm-backlight";
->>                pwms = <&pwm4 0 50000>;
->>                enable-gpios = <&gpio2 0 0>;
->>
->>                brightness-levels = <0 1 2 3 4>;
->>                default-brightness-level = <4>;
->>        };
->>
->> Now I only need to enable the LCD_ON and wait 40ms before turning on
->> the LVDS clocks and data.
+On 03/07/2014 11:41 AM, srinivas kandagatla wrote:
+> Hi Peppe/Maxime,
+> I missed a comment... :-)
 >
-> This can be done by adding a regulator-enable-ramp-delay property to the
-> gpio regulator.
 >
-
-Correct.
-
->> For this I tought to add a regulator support in
->> imx_ldb_encoder_commit(..) of imx-ldb.c.
->>That should give me the correct sequence for
->> LVDS on to LVDS data/clock. Now I only need to get the pwm-backlight
->> driver doing its work after ldb is ready.
+> On 07/03/14 09:41, Maxime COQUELIN wrote:
+>> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>>
+>> This patch adds a new logic inside the st pinctrl to manage
+>> an unsupported scenario: some sysconfig are not available!
+>>
+>> This is the case of STiH407 where, although documented, the
+>> following registers from SYSCFG_FLASH have been removed from the SoC.
+>>
+>> SYSTEM_CONFIG3040
+>>     Output Enable pad control for all PIO Alternate Functions
+>> and
+>> SYSTEM_ CONFIG3050
+>>     Pull Up pad control for all PIO Alternate Functions
+>>
+>> Without managing this condition an imprecise external abort
+>> will be detect.
+>>
+>> To do this the patch also reviews the st_parse_syscfgs
+>> and other routines to manipulate the registers only if
+>> actually available.
+>> In any case, for example the st_parse_syscfgs detected
+>> an error condition but no action was made in the
+>> st_pctl_probe_dt.
+>>
+>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>> ---
+>>   drivers/pinctrl/pinctrl-st.c | 121 +++++++++++++++++++++++++++----------------
+>>   1 file changed, 75 insertions(+), 46 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+>> index 9e9b6ea..d1886b4 100644
+>> --- a/drivers/pinctrl/pinctrl-st.c
+>> +++ b/drivers/pinctrl/pinctrl-st.c
+>> @@ -390,6 +390,19 @@ static const struct st_pctl_data  stih416_data = {
+>>   	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
+>>   };
+>>
+>> +static const struct st_pctl_data  stih407_flashdata = {
+>> +	.rt_style	= st_retime_style_none,
+>> +	.input_delays	= stih416_delays,
+>> +	.ninput_delays	= 14,
+>> +	.output_delays	= stih416_delays,
+>> +	.noutput_delays = 14,
+>> +	.alt = 0,
+>> +	.oe = -1, /* Not Available */
+>> +	.pu = -1, /* Not Available */
+>> +	.od = 60,
+>> +	.rt = 100,
+>> +};
+>> +
 >
-> We should rather add drm_panel support to imx-ldb. I have just sent a
-> patch for this.
-> The simple-panel driver already supports regulator and backlight.
+> I think this stih407_flashdata go with the previous patch "pinctrl: st:
+> add pinctrl support for the STiH407 SoC"
 >
+> So that this patch just adds new checks to pinctrl-driver and not
+> stih407 related stuff.
 
-I am still life in the world of a stable kernel called 3.13.6 :) Will
-backport the simple-panel driver
-and will have a look at your patches - today.
+Problem is that "oe" and "pu" takes -1 in that patch, and these values 
+will be passed directly to devm_regmap_field_alloc without any check.
 
-greets
---
-Christian Gmeiner, MSc
+I propose to apply this patch before "pinctrl: st: add pinctrl support 
+for the STiH407 SoC", and move stih407_flashdata as you recommend.
 
-https://soundcloud.com/christian-gmeiner
+Is it fine for you?
+
+Thanks for the review,
+Maxime
+
+>
+> Other than that the patch looks good to me.
+>
+>>   }
+>>
+>>   /*
+>> @@ -1583,7 +1612,7 @@ static struct of_device_id st_pctl_of_match[] = {
+>>   	{ .compatible = "st,stih407-sbc-pinctrl", .data = &stih416_data},
+>>   	{ .compatible = "st,stih407-front-pinctrl", .data = &stih416_data},
+>>   	{ .compatible = "st,stih407-rear-pinctrl", .data = &stih416_data},
+>> -	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih416_data},
+>> +	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih407_flashdata},
+> Same as first comment.
+>>   	{ /* sentinel */ }
+>>   };
+>>
+>>
+>
+>
+> Thanks,
+> srini
+>
