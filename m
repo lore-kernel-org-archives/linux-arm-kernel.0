@@ -1,120 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Mar 2014 16:50:31 +0000
-Subject: [PATCH v9][ 5/8] staging: imx-drm: Use de-active and
- pixelclk-active display-timings.
-In-Reply-To: <1394121869-13387-2-git-send-email-denis@eukrea.com>
-References: <1394121702-13257-3-git-send-email-denis@eukrea.com>
- <1394121869-13387-1-git-send-email-denis@eukrea.com>
- <1394121869-13387-2-git-send-email-denis@eukrea.com>
-Message-ID: <20140307165031.GO21483@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Mar 2014 08:55:14 -0800
+Subject: [PATCH 1/8] CLK: ti: dra7: Initialize USB_DPLL
+In-Reply-To: <5319CCF2.8090902@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-2-git-send-email-rogerq@ti.com>
+ <5319CCF2.8090902@ti.com>
+Message-ID: <20140307165513.GD3789@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 05:04:26PM +0100, Denis Carikli wrote:
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> index 849b3e1..5d273c1 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> @@ -595,8 +595,12 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
->  		}
->  	}
->  
-> -	if (sig->clk_pol)
-> -		di_gen |= DI_GEN_POLARITY_DISP_CLK;
-> +	if (sig->set_mask & SET_CLK_POL) {
-> +		if (sig->clk_pol)
-> +			di_gen |= DI_GEN_POLARITY_DISP_CLK;
-> +		else
-> +			di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
-> +	}
->  
->  	ipu_di_write(di, di_gen, DI_GENERAL);
->  
-> @@ -606,8 +610,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
->  	reg = ipu_di_read(di, DI_POL);
->  	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
->  
-> -	if (sig->enable_pol)
-> -		reg |= DI_POL_DRDY_POLARITY_15;
-> +	if (sig->set_mask & SET_DE_POL) {
-> +		if (sig->enable_pol)
-> +			reg |= DI_POL_DRDY_POLARITY_15;
-> +		else
-> +			reg &= ~DI_POL_DRDY_POLARITY_15;
-> +	}
-> +
->  	if (sig->data_pol)
->  		reg |= DI_POL_DRDY_DATA_POLARITY;
->  
-> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-> index f506075..71f757f 100644
-> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
-> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> @@ -157,8 +157,22 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
->  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->  		sig_cfg.Vsync_pol = 1;
->  
-> -	sig_cfg.enable_pol = 1;
-> -	sig_cfg.clk_pol = 0;
-> +	if (mode->private_flags & IMXDRM_MODE_FLAG_DE_HIGH) {
-> +		sig_cfg.enable_pol = 1;
-> +		sig_cfg.set_mask |= SET_DE_POL;
-> +	} else if (mode->private_flags & IMXDRM_MODE_FLAG_DE_LOW) {
-> +		sig_cfg.enable_pol = 0;
-> +		sig_cfg.set_mask |= SET_DE_POL;
-> +	}
-> +
-> +	if (mode->private_flags & IMXDRM_MODE_FLAG_PIXDATA_POSEDGE) {
-> +		sig_cfg.clk_pol = 1;
-> +		sig_cfg.set_mask |= SET_CLK_POL;
-> +	} else if (mode->private_flags & IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE) {
-> +		sig_cfg.clk_pol = 0;
-> +		sig_cfg.set_mask |= SET_CLK_POL;
-> +	}
+* Tero Kristo <t-kristo@ti.com> [140307 05:46]:
+> On 03/07/2014 03:09 PM, Roger Quadros wrote:
+> >USB_DPLL must be initialized and locked at boot so that
+> >USB modules can work.
+> >
+> >Also program USB_DLL_M2 output to half rate.
+> >
+> >CC: Mike Turquette <mturquette@linaro.org>
+> >CC: Tero Kristo <t-kristo@ti.com>
+> >Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >---
+> >  drivers/clk/ti/clk-7xx.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >
+> >diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> >index 9977653..f89f3c2 100644
+> >--- a/drivers/clk/ti/clk-7xx.c
+> >+++ b/drivers/clk/ti/clk-7xx.c
+> >@@ -18,6 +18,7 @@
+> >
+> >  #define DRA7_DPLL_ABE_DEFFREQ				361267200
+> >  #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
+> >+#define DRA7_DPLL_USB_DEFFREQ				960000000
+> >
+> >
+> >  static struct ti_dt_clk dra7xx_clks[] = {
+> >@@ -328,5 +329,15 @@ int __init dra7xx_dt_clk_init(void)
+> >  	if (rc)
+> >  		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
+> >
+> >+	dpll_ck = clk_get_sys(NULL, "dpll_usb_ck");
+> >+	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ);
+> >+	if (rc)
+> >+		pr_err("%s: failed to configure USB DPLL!\n", __func__);
+> >+
+> >+	dpll_ck = clk_get_sys(NULL, "dpll_usb_m2_ck");
+> >+	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ/2);
+> >+	if (rc)
+> >+		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+> >+
+> 
+> I would rather see this done using the default-rate mechanism provided here:
+> 
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
+> 
+> However, this remains to be commented by Mike whether the patch is
+> okay or not.
 
-So how does this work for other displays, for example, HDMI, where we need
-enable_pol=1 and clk_pol=0 ?
+Yes let's wait for that and not add hacks for new features.
 
->From what I can see, we end up with sig_cfg.enable_pol=0, sig_cfg.clk_pol=0,
-sig_cfg.set_mask=0.
+Regards,
 
-What we end up with for enable_pol is this:
-
-	reg = ipu_di_read(di, DI_POL);
-	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
-
--	if (sig->enable_pol)
--		reg |= DI_POL_DRDY_POLARITY_15;
-+	if (sig->set_mask & SET_DE_POL) {
-+		if (sig->enable_pol)
-+			reg |= DI_POL_DRDY_POLARITY_15;
-+		else
-+			reg &= ~DI_POL_DRDY_POLARITY_15;
-+	}
-
-which is no different from:
-
-	reg = ipu_di_read(di, DI_POL);
-	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
-
-	if (sig->set_mask & SET_DE_POL && sig->enable_pol)
-		reg |= DI_POL_DRDY_POLARITY_15;
-
-because even with SET_DE_POL unset, we still end up clearing the bit.
-
-Similar seems to happen with the clock polarity as well - in order for
-that bit to be set, buth the set_mask and the clk_pol but must be set.
-
-Dovetailing in to my previous reply, if we want to do this, maybe we
-should convert clk_pol and enable_pol to be a tristate (can be an
-u8 or enum).  Essentially, it has three values: preserve, active high,
-active low.
-
-However, one of the things that really worries me here is the "preserve"
-action - what if it's not correctly set initially, and we don't have
-anything specifying either polarity, which will happen if the only
-encoder/connector you have is imx-hdmi.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Tony
