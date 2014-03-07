@@ -1,31 +1,47 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 7 Mar 2014 11:37:30 +0100
-Subject: [PATCH v3 1/5] i2c: mv64xxx: Add reset deassert call
-In-Reply-To: <20140307103433.GH21483@n2100.arm.linux.org.uk>
-References: <1393950521-4173-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393950521-4173-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140307095222.GG21483@n2100.arm.linux.org.uk>
- <20140307100751.GN607@lukather>
- <20140307103433.GH21483@n2100.arm.linux.org.uk>
-Message-ID: <20140307103730.GA12274@katana>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Fri, 7 Mar 2014 10:37:44 +0000
+Subject: [PATCH v2 3/5] pinctrl: st: Enhance the controller to manage
+ unavailable registers
+In-Reply-To: <1394185272-26054-4-git-send-email-maxime.coquelin@st.com>
+References: <1394185272-26054-1-git-send-email-maxime.coquelin@st.com>
+ <1394185272-26054-4-git-send-email-maxime.coquelin@st.com>
+Message-ID: <5319A178.7040002@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peppe,
+Thanks for the patch.
 
-> Since RESET_CONTROLLER is not required for those platforms, it really
-> should be optional - and I think the real fix is for the reset controller
-> support to provide stub functions.
+On 07/03/14 09:41, Maxime COQUELIN wrote:
+> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> 
+> This patch adds a new logic inside the st pinctrl to manage
+> an unsupported scenario: some sysconfig are not available!
+> 
+> This is the case of STiH407 where, although documented, the
+> following registers from SYSCFG_FLASH have been removed from the SoC.
+> 
+> SYSTEM_CONFIG3040
+>    Output Enable pad control for all PIO Alternate Functions
+> and
+> SYSTEM_ CONFIG3050
+>    Pull Up pad control for all PIO Alternate Functions
+> 
+> Without managing this condition an imprecise external abort
+> will be detect.
+> 
+> To do this the patch also reviews the st_parse_syscfgs
+> and other routines to manipulate the registers only if
+> actually available.
+> In any case, for example the st_parse_syscfgs detected
+> an error condition but no action was made in the
+> st_pctl_probe_dt.
+> 
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> ---
 
-I agree; and I assumed it already does. Will resend a patch posted
-earlier [1] to fix the issue. And still debugging why my build-tests
-didn't get it :(
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-[1] https://lkml.org/lkml/2013/8/9/442
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140307/42c8ccff/attachment.sig>
+--srini
