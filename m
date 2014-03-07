@@ -1,32 +1,153 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 08 Mar 2014 09:32:15 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzldIHVzYjogY2hpcGlkZWE6IHVzYm1pc2M6IEFkZCBV?=
- =?UTF-8?B?U0IgSG9zdCBzdXBwb3J0IGZvciBpLk1YMjUvaS5NWDM1IENQVXM=?=
-In-Reply-To: <1394211863-7569-1-git-send-email-denis@eukrea.com>
-References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394256735.984728060@f310.i.mail.ru>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 07 Mar 2014 21:09:17 +0000
+Subject: [PATCH v6 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <1394020137-1830-5-git-send-email-Liviu.Dudau@arm.com>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com> <
+ 1394020137-1830-5-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140307210917.152E8C40F14@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????,  7 ????? 2014, 18:04 +01:00 ?? Denis Carikli <denis@eukrea.com>:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  drivers/usb/chipidea/usbmisc_imx.c |   59 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
+On Wed,  5 Mar 2014 11:48:55 +0000, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> Make it easier to discover the domain number of a bus by storing
+> the number in pci_host_bridge for the root bus. Several architectures
+> have their own way of storing this information, so it makes sense
+> to try to unify the code. While at this, add a new function that
+> creates a root bus in a given domain and make pci_create_root_bus()
+> a wrapper around this function.
 > 
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index cd061ab..d956ad0 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-...
-> +		val = readl(usbmisc->base);
-> +		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
-> +		val |= (MXC_EHCI_INTERFACE_DIFF_UNI & MXC_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-> +		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
-> +		writel(val, usbmisc->base);
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 
-At the moment, we only enable/disable interface and manage overcurrent option
-in the usbmisc driver.
-Is it worth it to handle type of interface here?
+Looks okay to me structure wise, again I'd like an ack from Ben or Arnd.
 
----
+g.
+
+> ---
+>  drivers/pci/probe.c | 41 +++++++++++++++++++++++++++++++++--------
+>  include/linux/pci.h |  4 ++++
+>  2 files changed, 37 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index fd11c12..172c615 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1714,8 +1714,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+>  {
+>  }
+>  
+> -struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> -		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+> +struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
+> +		int domain, int bus, struct pci_ops *ops, void *sysdata,
+> +		struct list_head *resources)
+>  {
+>  	int error;
+>  	struct pci_host_bridge *bridge;
+> @@ -1728,30 +1729,34 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  
+>  	bridge = pci_alloc_host_bridge();
+>  	if (!bridge)
+> -		return NULL;
+> +		return ERR_PTR(-ENOMEM);
+>  
+>  	bridge->dev.parent = parent;
+>  	bridge->dev.release = pci_release_host_bridge_dev;
+> +	bridge->domain_nr = domain;
+>  	error = pcibios_root_bridge_prepare(bridge);
+>  	if (error)
+>  		goto err_out;
+>  
+>  	b = pci_alloc_bus();
+> -	if (!b)
+> +	if (!b) {
+> +		error = -ENOMEM;
+>  		goto err_out;
+> +	}
+>  
+>  	b->sysdata = sysdata;
+>  	b->ops = ops;
+>  	b->number = b->busn_res.start = bus;
+> -	b2 = pci_find_bus(pci_domain_nr(b), bus);
+> +	b2 = pci_find_bus(bridge->domain_nr, bus);
+>  	if (b2) {
+>  		/* If we already got to this bus through a different bridge, ignore it */
+>  		dev_dbg(&b2->dev, "bus already known\n");
+> +		error = -EEXIST;
+>  		goto err_bus_out;
+>  	}
+>  
+>  	bridge->bus = b;
+> -	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+> +	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
+>  	error = device_register(&bridge->dev);
+>  	if (error) {
+>  		put_device(&bridge->dev);
+> @@ -1766,7 +1771,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  
+>  	b->dev.class = &pcibus_class;
+>  	b->dev.parent = b->bridge;
+> -	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
+> +	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
+>  	error = device_register(&b->dev);
+>  	if (error)
+>  		goto class_dev_reg_err;
+> @@ -1816,7 +1821,27 @@ err_bus_out:
+>  	kfree(b);
+>  err_out:
+>  	kfree(bridge);
+> -	return NULL;
+> +	return ERR_PTR(error);
+> +}
+> +
+> +struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> +		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+> +{
+> +	int domain_nr;
+> +	struct pci_bus *b = pci_alloc_bus();
+> +	if (!b)
+> +		return NULL;
+> +
+> +	b->sysdata = sysdata;
+> +	domain_nr = pci_domain_nr(b);
+> +	kfree(b);
+> +
+> +	b = pci_create_root_bus_in_domain(parent, domain_nr, bus,
+> +				ops, sysdata, resources);
+> +	if (IS_ERR(b))
+> +		return NULL;
+> +
+> +	return b;
+>  }
+>  
+>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 33aa2ca..1eed009 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -394,6 +394,7 @@ struct pci_host_bridge_window {
+>  struct pci_host_bridge {
+>  	struct device dev;
+>  	struct pci_bus *bus;		/* root bus */
+> +	int domain_nr;
+>  	struct list_head windows;	/* pci_host_bridge_windows */
+>  	void (*release_fn)(struct pci_host_bridge *);
+>  	void *release_data;
+> @@ -747,6 +748,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
+>  struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  				    struct pci_ops *ops, void *sysdata,
+>  				    struct list_head *resources);
+> +struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
+> +			int domain, int bus, struct pci_ops *ops,
+> +			void *sysdata, struct list_head *resources);
+>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+>  int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+>  void pci_bus_release_busn_res(struct pci_bus *b);
+> -- 
+> 1.9.0
+> 
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
