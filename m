@@ -1,23 +1,38 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 7 Mar 2014 15:53:21 -0800
-Subject: [PATCH RFC v2 07/11] tty: xuartps: Replace function and symbol
- prefix
-In-Reply-To: <1394219614-3197-8-git-send-email-soren.brinkmann@xilinx.com>
-References: <1394219614-3197-1-git-send-email-soren.brinkmann@xilinx.com>
- <1394219614-3197-8-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <e88dccf5-e7a0-4fe0-86e0-5c20eabbdd97@VA3EHSMHS029.ehs.local>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 8 Mar 2014 01:41:17 +0100
+Subject: [BUG] atmel: spi: scheduling while atomic
+In-Reply-To: <20140307225810.GB2918@piout.net>
+References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
+ <5316CA84.4080907@aksignal.cz> <20140307225810.GB2918@piout.net>
+Message-ID: <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-03-07 at 11:13AM -0800, Soren Brinkmann wrote:
-> Use 'CDNS_UART' or 'cdns_uart' instead of 'XUARTPS' and 'xuartps' as
-> function and symbol prefix. This is essentially doing:
->  - s/XUARTPS/CDNS_UART/g
->  - s/xuartps/cdns_uart/g
-> The only exception is PORT_XUARTPS, which stays as is, due to its
-> exposure to user space.
+2014-03-07 23:58 GMT+01:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 05/03/2014 at 07:56:04 +0100, Ji?? Prchal wrote :
+>> [    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
+>> [    0.906250] Modules linked in:
+>> [    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-rc4_cpm9g25+ #1
+>> [    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>] (show_stack+0x10/0x14)
+>> [    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>] (__schedule_bug+0x48/0x60)
+>> [    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>] (__schedule+0x60/0x484)
+>> [    0.906250] [<c0390294>] (__schedule) from [<c038feac>] (schedule_timeout+0x17c/0x1ac)
+>> [    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>] (wait_for_common+0x10c/0x1f0)
+>> [    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>] (atmel_spi_transfer_one_message+0x71c/0xa48)
+>> [    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from [<c0246624>] (spi_pump_messages+0x210/0x238)
+>> [    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>] (kthread_worker_fn+0x15c/0x1b4)
+>> [    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>] (kthread+0xb8/0xcc)
+>> [    0.906250] [<c0034534>] (kthread) from [<c0009510>] (ret_from_fork+0x14/0x24)
+>> [    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
+>
+> Actually, I'm not quite sure how spi_pump_messages can be called from an
+> atomic context.
 
-If nobody objects, I'll squash this into 5/11 'tty: xuartps: Rebrand
-driver as Cadence UART'.
-
-	S?ren
+spi_pump_messages() is not called from atomic context.  Rather,
+atmel_spi_transfer_one_message() does a spin_lock_irqsave() (via
+atmel_spi_lock()) and then calls atmel_spi_one_transfer(), which calls
+wait_for_completion_timeout().  That's why schedule is being called
+from atomic context.  This was introduced by 8090d6d1a4 ("spi: atmel:
+Refactor spi-atmel to use SPI framework queue"). I think you should
+see the warning with CONFIG_PREEMPT=y.
