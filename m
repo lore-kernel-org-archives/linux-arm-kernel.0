@@ -1,43 +1,30 @@
-From: kvalo@qca.qualcomm.com (Kalle Valo)
-Date: Sat, 8 Mar 2014 13:57:36 +0200
-Subject: [PATCH] ath6kl: sdio: fix system panic when doing wifi stress test
-In-Reply-To: <20140307093813.GA28728@pengutronix.de> (Steffen Trumtrar's
- message of "Fri, 7 Mar 2014 10:38:13 +0100")
-References: <1384221185-8645-1-git-send-email-r64343@freescale.com>
- <87k3fvjvjg.fsf@kamboji.qca.qualcomm.com>
- <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
- <20140307093813.GA28728@pengutronix.de>
-Message-ID: <87a9d0oqbz.fsf@kamboji.qca.qualcomm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Mar 2014 11:59:48 +0000
+Subject: [PATCH v2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <20140308073758.DA63FC408EC@trevor.secretlab.ca>
+References: <20140220153042.DF053C4050F@trevor.secretlab.ca>
+ <1392988720-20976-1-git-send-email-jjhiblot@traphandler.com>
+ <20140308073758.DA63FC408EC@trevor.secretlab.ca>
+Message-ID: <20140308115948.GX21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+On Sat, Mar 08, 2014 at 07:37:58AM +0000, Grant Likely wrote:
+> I believe we already talked about the above test. This function must
+> only process devices created by of_platform_populate(). Merely checking
+> the of_node pointer is not a sufficient test because there are other
+> paths in the kernel for creating platform_devices that might get a node
+> pointer attached to it.
 
-Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
+There definitely are: there are a number of platform device drivers
+which create a new platform device structure, and copy the of_node
+pointer across.
 
->> > Does the patch below help? It would also fix the corruption with
->> > scat_q_depth. Please note that I have only compile tested it. And I might
->> > have also missed something important, so please review it carefully.
->> 
->> Yes, Firstly, I have looked at the asm code and the compiler(gcc 4.8.1) works correctly after applying
->> the following patch. Secondly, I have tested the patch with compiler(gcc 4.8.1) on the real HW, and it
->> works fine too. Without the patch, the kernel crash will happen 100%.
->> 
->> Thus, for the patch:
->> 
->> Acked-by: Jason Liu <r64343@freescale.com>
->> Tested-by: Jason Liu <r64343@freescale.com>
-
-[...]
-
-> What happend with this? If I look in mainline, I don't find it. At
-> least the reording of the struct fields looks as if one definitely
-> wants to have that.
-
-It seems that I forgot to submit this properly, sorry about that. I did
-it now:
-
-http://lists.infradead.org/pipermail/ath6kl/2014-March/000000.html
+However, that's really sick code, and can result in the platform device
+driver probing the device it just created... this practise should be
+outlawed.
 
 -- 
-Kalle Valo
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
