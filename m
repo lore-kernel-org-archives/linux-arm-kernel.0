@@ -1,43 +1,43 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 8 Mar 2014 12:43:04 +0100
-Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
- regulators subsystem
-In-Reply-To: <20140307182213.GC607@lukather>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
- <20140307182213.GC607@lukather>
-Message-ID: <CAOQ7t2YSidSPVSBrBzj3R1SYS_Xb10a2vfEs+u1DEkrhEJQCaQ@mail.gmail.com>
+From: kvalo@qca.qualcomm.com (Kalle Valo)
+Date: Sat, 8 Mar 2014 13:57:36 +0200
+Subject: [PATCH] ath6kl: sdio: fix system panic when doing wifi stress test
+In-Reply-To: <20140307093813.GA28728@pengutronix.de> (Steffen Trumtrar's
+ message of "Fri, 7 Mar 2014 10:38:13 +0100")
+References: <1384221185-8645-1-git-send-email-r64343@freescale.com>
+ <87k3fvjvjg.fsf@kamboji.qca.qualcomm.com>
+ <AD13664F485EE54694E29A7F9D5BE1AFC0AD96@039-SN2MPN1-022.039d.mgd.msft.net>
+ <20140307093813.GA28728@pengutronix.de>
+Message-ID: <87a9d0oqbz.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 7, 2014 at 7:22 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
->> +static struct platform_driver axp20x_regulator_driver = {
->> +     .probe  = axp20x_regulator_probe,
->> +     .remove = axp20x_regulator_remove,
->> +     .driver = {
->> +             .name           = "axp20x-regulator",
->> +             .owner          = THIS_MODULE,
->> +     },
->> +};
->> +
->> +static int __init axp20x_regulator_init(void)
->> +{
->> +     return platform_driver_register(&axp20x_regulator_driver);
->> +}
->> +
->> +subsys_initcall(axp20x_regulator_init);
->
-> Hmmm, really?
->
-> I thought the AXP was only connected through I2C? How is that a
-> platform device then?
+Hi Steffen,
 
-Not really. It is plain wrong.
-I'll fix it in v2.
+Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
 
-Thanks,
+>> > Does the patch below help? It would also fix the corruption with
+>> > scat_q_depth. Please note that I have only compile tested it. And I might
+>> > have also missed something important, so please review it carefully.
+>> 
+>> Yes, Firstly, I have looked at the asm code and the compiler(gcc 4.8.1) works correctly after applying
+>> the following patch. Secondly, I have tested the patch with compiler(gcc 4.8.1) on the real HW, and it
+>> works fine too. Without the patch, the kernel crash will happen 100%.
+>> 
+>> Thus, for the patch:
+>> 
+>> Acked-by: Jason Liu <r64343@freescale.com>
+>> Tested-by: Jason Liu <r64343@freescale.com>
+
+[...]
+
+> What happend with this? If I look in mainline, I don't find it. At
+> least the reording of the struct fields looks as if one definitely
+> wants to have that.
+
+It seems that I forgot to submit this properly, sorry about that. I did
+it now:
+
+http://lists.infradead.org/pipermail/ath6kl/2014-March/000000.html
 
 -- 
-Carlo Caione
+Kalle Valo
