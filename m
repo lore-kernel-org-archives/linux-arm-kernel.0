@@ -1,94 +1,43 @@
-From: michael.casadevall@linaro.org (Michael Casadevall)
-Date: Sat, 08 Mar 2014 19:41:08 +0800
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <531843EE.8040102@redhat.com>
-References: <20140226183454.GA14639@cbox>
- <20140301152756.67A02C40238@trevor.secretlab.ca>
- <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.8040102@redhat.com>
-Message-ID: <531B01D4.10806@linaro.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 8 Mar 2014 12:43:04 +0100
+Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
+ regulators subsystem
+In-Reply-To: <20140307182213.GC607@lukather>
+References: <1393692352-10839-1-git-send-email-carlo@caione.org>
+ <1393692352-10839-7-git-send-email-carlo@caione.org>
+ <20140307182213.GC607@lukather>
+Message-ID: <CAOQ7t2YSidSPVSBrBzj3R1SYS_Xb10a2vfEs+u1DEkrhEJQCaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 7, 2014 at 7:22 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
+>> +static struct platform_driver axp20x_regulator_driver = {
+>> +     .probe  = axp20x_regulator_probe,
+>> +     .remove = axp20x_regulator_remove,
+>> +     .driver = {
+>> +             .name           = "axp20x-regulator",
+>> +             .owner          = THIS_MODULE,
+>> +     },
+>> +};
+>> +
+>> +static int __init axp20x_regulator_init(void)
+>> +{
+>> +     return platform_driver_register(&axp20x_regulator_driver);
+>> +}
+>> +
+>> +subsys_initcall(axp20x_regulator_init);
+>
+> Hmmm, really?
+>
+> I thought the AXP was only connected through I2C? How is that a
+> platform device then?
 
-On 03/06/2014 05:46 PM, Paolo Bonzini wrote:
-> Il 06/03/2014 09:52, Robie Basak ha scritto:
->> On Sat, Mar 01, 2014 at 03:27:56PM +0000, Grant Likely wrote:
->>> I would also reference section 3.3 (Boot Option Variables Default Boot
->>> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) here. It's 
->>> fine to
->>> restate the meaning of the requirement in this spec, but the UEFI spec
->>> is the authoritative source. Distributed VM disk images fall under the
->>> same scenario as the firmware not having any valid boot variables.
->>
->> What happens when the VM is first booted without boot variables, but
->> then the OS expects to be able to set boot variables and see them on
->> next boot?
->
-> UEFI scans the devices; looks for an EFI system partition on the 
-> disks; and builds a default boot order.
->
->> If possible, I would prefer to mandate that the host implementation is
->> permitted to no-op (or otherwise disable) boot variable write operations
->> altogether to avoid having to deal with this. In the common case, I
->> don't see why an OS installation shipped via a VM disk image would need
->> to write boot variables anyway.
->>
->> Would there be any adverse consequences to doing this?
->
-> Given the experience on x86 UEFI, no.
->
-> Unlike bare metal, it is common to run UEFI VMs without persistent 
-> flash storage.  In this case the boot variables and boot order are 
-> rebuilt on the fly on every boot, and it just works for both Windows 
-> and Linux; there's no reason why it should be any different for ARM.
->
-While I realize in the real world, we can live with non-persistent boot 
-variables, this is a *direct* violation of the UEFI spec; we can't call 
-our VMs UEFI-compatible if we do this.
+Not really. It is plain wrong.
+I'll fix it in v2.
 
-However, I've been looking at the spec, and I think we're within spec if 
-we save the variables on the HDD itself. There's some support for this 
-already (Firmware Block Volume Device), but its possible we could 
-implement boot variables as a file on system partition (UEFI's default 
-search order can be used to figure out which variable file to use, or 
-some sorta fingerprinting system). The biggest trick though is that 
-UEFI's Runtime Services will need to be able to write this file, which 
-may require us move a large chunk of UEFI to runtime services so the FAT 
-filesystem stuff can stick around. If we give it a proper partition, 
-then we can just do raw block read/writes. This however would require us 
-mandating that said partition exists, and making sure there aren't any 
-hidden gotchas in invoking this.
+Thanks,
 
-Obviously this isn't ideal, but this might be the middle road solution 
-we need here. I can dig through Tiano to get a realistic idea of how 
-hard this will be in reality if we want to seriously look at this option.
-
->> My reason is that this would save us from blocking a general OpenStack
->> implementation on ARM by requiring that these pieces are implemented
->> further up the stack first, when it would bring actual gain to doing so.
->>
->> This would not preclude host implementations from implementing writeable
->> variables, or guests from using them. Just that for a _portable VM disk
->> image_, the OS on it cannot assume that this functionality is present.
->
-> This is already the case for most OSes.  Otherwise you wouldn't be 
-> able to move a hard disk from a (physical) machine to another.
->
-> I strongly suggest that you take a look at the work done in Tiano 
-> Core's OvmfPkg, which has support for almost every QEMU feature thanks 
-> to the work of Laszlo Ersek and Jordan Justen.
->
-> In particular, OvmfPkg has support for specifying a boot order in the 
-> VM configuration (which maps to the "-boot" option in QEMU). In this 
-> case, the UEFI boot order is overridden by a variable that is placed 
-> in some architecture-specific firmware configuration mechanism (on x86 
-> we have one called fw_cfg, on ARM you could look at the fdt).  This 
-> predates UEFI and is not a UEFI variable; in fact is is a list of 
-> OpenFirmware device paths.  UEFI will match the OF paths to UEFI 
-> paths, and use the result to build a UEFI boot order.
->
-This lines up with work to make Tiano itself run on FDT to handle 
-varying boot configurations. Is this behaviour and the DT nodes codified 
-anywhere?
-
-> Paolo
+-- 
+Carlo Caione
