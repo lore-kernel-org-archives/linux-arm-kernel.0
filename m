@@ -1,48 +1,164 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 07 Mar 2014 20:40:21 +0800
-Subject: [PATCH] MAINTAINERS: add maintainers for arm64 acpi
-In-Reply-To: <20140304235044.GB11418@arm.com>
-References: <1393899345-7397-1-git-send-email-graeme.gregory@linaro.org> <
- 1393899345-7397-2-git-send-email-graeme.gregory@linaro.org> <20140304102316
- .GG30596@arm.com> <20140304190318.GE28736@xora-yoga13> <20140304235044.
- GB11418@arm.com>
-Message-ID: <20140307124021.BB567C40928@trevor.secretlab.ca>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 08 Mar 2014 04:21:02 +0000
+Subject: [PATCHv3 2/4] net: phy: extend fixed driver with
+ fixed_phy_register()
+In-Reply-To: <1393930704-24374-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1393930704-24374-1-git-send-email-thomas.petazzoni@
+ free-electrons.com> <1393930704-24374-3-git-send-email-thomas.petazzoni@
+ free-electrons.com>
+Message-ID: <20140308042102.9BAE6C41032@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Mar 2014 23:50:44 +0000, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Mar 04, 2014 at 07:03:18PM +0000, Graeme Gregory wrote:
-> > On Tue, Mar 04, 2014 at 10:23:16AM +0000, Catalin Marinas wrote:
-> > > On Tue, Mar 04, 2014 at 02:15:45AM +0000, Graeme Gregory wrote:
-> > > > +ACPI ARM64
-> > > 
-> > > That's a pretty broad statement for a single file. Is it core support,
-> > > architected peripherals, SoC?
-> > > 
-> > Hi Catalin would changing the title to ACPI ARM64 Core Support be better
-> > in your mind. I do intend for the maintainership to cover just the
-> > plat/arm-core.c file.
+On Tue,  4 Mar 2014 11:58:22 +0100, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> The existing fixed_phy_add() function has several drawbacks that
+> prevents it from being used as is for OF-based declaration of fixed
+> PHYs:
 > 
-> See my reply to Grant. If that's the only thing you guys are aiming for,
-> who's in charge of the other bits? Face-to-face meeting in 3 hours
-> anyway, so we can get back here with the conclusion.
+>  * The address of the PHY on the fake bus needs to be passed, while a
+>    dynamic allocation is desired.
+> 
+>  * Since the phy_device instantiation is post-poned until the next
+>    mdiobus scan, there is no way to associate the fixed PHY with its
+>    OF node, which later prevents of_phy_connect() from finding this
+>    fixed PHY from a given OF node.
+> 
+> To solve this, this commit introduces fixed_phy_register(), which will
+> allocate an available PHY address, add the PHY using fixed_phy_add()
+> and instantiate the phy_device structure associated with the provided
+> OF node.
 
-Update for the benefit of those who weren't at Connect. I really think
-Hanjun and Graeme can do an excellent job here, but I appreciate that
-they are new to maintainership. To help them along, I'll mentor them in
-the maintainer process. I'm encouraging them to take the lead, but I'll
-be reading all the patches and I'll jump into the conversation if I
-think it is going off the rails. I'll also ack patches when I think they
-are in good shape and there is it is well defined what the boundaries
-need to be.
+The phy address assignment is a little naive, but that can be fixed in a
+follow-up patch (see below for a suggestion)
 
-We all agree that the current patches are not ready to be merged and
-there is feedback to be addressed before the next merge request. We will
-not attempt to merge without acks from Catalin.
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-Also missing is a clear statement of how ACPI works on ARM. There needs
-to be a straight forward description of how ACPI PM works and how it is
-different from using FDT. That document will be written in short
-order and posted for review.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/net/phy/fixed.c   | 61 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/phy_fixed.h | 11 +++++++++
+>  2 files changed, 72 insertions(+)
+> 
+> diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+> index 0f02403..82095cc 100644
+> --- a/drivers/net/phy/fixed.c
+> +++ b/drivers/net/phy/fixed.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/phy_fixed.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>  
+>  #define MII_REGS_NUM 29
+>  
+> @@ -203,6 +204,66 @@ err_regs:
+>  }
+>  EXPORT_SYMBOL_GPL(fixed_phy_add);
+>  
+> +void fixed_phy_del(int phy_addr)
+> +{
+> +	struct fixed_mdio_bus *fmb = &platform_fmb;
+> +	struct fixed_phy *fp, *tmp;
+> +
+> +	list_for_each_entry_safe(fp, tmp, &fmb->phys, node) {
+> +		if (fp->addr == phy_addr) {
+> +			list_del(&fp->node);
+> +			kfree(fp);
+> +			return;
+> +		}
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(fixed_phy_del);
+> +
+> +static int phy_fixed_addr;
+> +static DEFINE_SPINLOCK(phy_fixed_addr_lock);
+> +
+> +int fixed_phy_register(unsigned int irq,
+> +		       struct fixed_phy_status *status,
+> +		       struct device_node *np)
+> +{
+> +	struct fixed_mdio_bus *fmb = &platform_fmb;
+> +	struct phy_device *phy;
+> +	int phy_addr;
+> +	int ret;
+> +
+> +	/* Get the next available PHY address, up to PHY_MAX_ADDR */
+> +	spin_lock(&phy_fixed_addr_lock);
+> +	if (phy_fixed_addr == PHY_MAX_ADDR) {
+> +		spin_unlock(&phy_fixed_addr_lock);
+> +		return -ENOSPC;
+> +	}
+> +	phy_addr = phy_fixed_addr++;
 
-g.
+If this instead looked over the fixed mdio bus list then an unallocated
+address could be assigned without the global static.
+
+> +	spin_unlock(&phy_fixed_addr_lock);
+> +
+> +	ret = fixed_phy_add(PHY_POLL, phy_addr, status);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	phy = get_phy_device(fmb->mii_bus, phy_addr, false);
+> +	if (!phy || IS_ERR(phy)) {
+> +		fixed_phy_del(phy_addr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	of_node_get(np);
+> +	phy->dev.of_node = np;
+> +
+> +	ret = phy_device_register(phy);
+> +	if (ret) {
+> +		phy_device_free(phy);
+> +		of_node_put(np);
+> +		fixed_phy_del(phy_addr);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int __init fixed_mdio_bus_init(void)
+>  {
+>  	struct fixed_mdio_bus *fmb = &platform_fmb;
+> diff --git a/include/linux/phy_fixed.h b/include/linux/phy_fixed.h
+> index 509d8f5..902e8a1 100644
+> --- a/include/linux/phy_fixed.h
+> +++ b/include/linux/phy_fixed.h
+> @@ -9,15 +9,26 @@ struct fixed_phy_status {
+>  	int asym_pause;
+>  };
+>  
+> +struct device_node;
+> +
+>  #ifdef CONFIG_FIXED_PHY
+>  extern int fixed_phy_add(unsigned int irq, int phy_id,
+>  			 struct fixed_phy_status *status);
+> +extern int fixed_phy_register(unsigned int irq,
+> +			      struct fixed_phy_status *status,
+> +			      struct device_node *np);
+>  #else
+>  static inline int fixed_phy_add(unsigned int irq, int phy_id,
+>  				struct fixed_phy_status *status)
+>  {
+>  	return -ENODEV;
+>  }
+> +extern int fixed_phy_register(unsigned int irq,
+> +			      struct fixed_phy_status *status,
+> +			      struct device_node *np)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif /* CONFIG_FIXED_PHY */
+>  
+>  /*
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
