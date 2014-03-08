@@ -1,242 +1,136 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 08 Mar 2014 18:24:29 +0900
-Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
-In-Reply-To: <CAPdUM4Pt0Ofh=M5pwdj+0NwSvfK4JvZbpWUS6JfD3vnTi2JaGg@mail.gmail.com>
-References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
- <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
- <5319D3E5.4000001@gmail.com>
- <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
- <5319E445.9000409@gmail.com>
- <CAPdUM4Pt0Ofh=M5pwdj+0NwSvfK4JvZbpWUS6JfD3vnTi2JaGg@mail.gmail.com>
-Message-ID: <531AE1CD.2070203@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 8 Mar 2014 10:15:48 +0100 (CET)
+Subject: [PATCH] irq: Consider a negative return value of irq_startup()
+ as an error
+In-Reply-To: <CACRpkdZ6D1XfDBdJEcR8G2HWkNcZSfz08Yvx8f0s+CqTUmybkg@mail.gmail.com>
+References: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
+ <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
+ <CACRpkdZ6D1XfDBdJEcR8G2HWkNcZSfz08Yvx8f0s+CqTUmybkg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1403080857160.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On Fri, 7 Mar 2014, Linus Walleij wrote:
+> I'll see what Jean-Jacques comes up with and take it from there unless
+> he's interested in taking it all the way.
 
-On 03/08/2014 04:20 AM, Rahul Sharma wrote:
-> Hi Tomasz,
->
-> On 7 March 2014 20:52, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 07.03.2014 16:10, Pankaj Dubey wrote:
->>> Hi Tomasz,
->>>
->>>
->>> On Fri, Mar 7, 2014 at 11:12 PM, Tomasz Figa <tomasz.figa@gmail.com>
->>> wrote:
->>>> Hi Pankaj,
->>>>
->>>>
->>>> On 07.03.2014 14:56, Pankaj Dubey wrote:
->>>>>>
->>>>>> +static void __init exynos5260_clk_top_init(struct device_node *np)
->>>>>> +{
->>>>>> +       struct exynos5260_cmu_info cmu;
->>>>>> +       struct samsung_clk_provider *ctx;
->>>>>> +
->>>>>> +       memset(&cmu, 0, sizeof(cmu));
->>>>>> +
->>>>>> +       cmu.pll_clks = top_pll_clks;
->>>>>> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
->>>>>> +       cmu.mux_clks = top_mux_clks;
->>>>>> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
->>>>>> +       cmu.div_clks = top_div_clks;
->>>>>> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
->>>>>> +       cmu.gate_clks = top_gate_clks;
->>>>>> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
->>>>>> +       cmu.nr_clk_ids = TOP_NR_CLK;
->>>>>> +       cmu.clk_regs = top_clk_regs;
->>>>>> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
->>>>>> +
->>>>>> +       ctx = exynos5260_cmu_register_one(np, &cmu);
->>>>>> +
->>>>>> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
->>>>>> +                       ARRAY_SIZE(fixed_rate_ext_clks),
->>>>>> +                       ext_clk_match);
->>>>>> +}
->>>>>> +
->>>>>> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
->>>>>> +               exynos5260_clk_top_init);
->>>>>
->>>>>
->>>>> Well with this approach we end up adding 14 such
->>>>> exynosxxx_clk_xxx_init functions all of which has similar lines of
->>>>> code. As I know there are many upcoming Exynos SoC which will also
->>>>> have similar multiple clock controllers (in some of them there are
->>>>> upto 25 clock domains, and in that case we will end up writing 25 such
->>>>> init functions) so I have following suggestion where we can have one
->>>>> more structure which will hold all static data and match_table to
->>>>> match compatibility string and return CMU_TYPE which can be mapped to
->>>>> get proper clock_data which can be used in single clock_init function.
->>>>> Following is some sample code which I have implemented and tested on
->>>>> one of Exynos SoC. Please let me know your opinion about this.
->>>>
->>>>
->>>> Yes, this looks better indeed, however there is still a room for
->>>> improvement. Please see my comments below.
->>>>
->>>>
->>>>> =============================
->>>>>
->>>>> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
->>>>
->>>>
->>>> Instead of making this an array, particular elements could be separate
->>>> structures. This would simplify the code below.
->>>>
->>>>
->>>>>            {
->>>>>                    .cmu_type = CMU_TYPE_TOP,
->>>>>                    .mux_clocks = top_mux_clks,
->>>>>                    .div_clocks = top_div_clks,
->>>>>                    .pll_clocks = top_pll_clks,
->>>>>                    .clk_regs = top_clk_regs,
->>>>>                    .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
->>>>>                    .nr_div_clocks = ARRAY_SIZE(top_div_clks),
->>>>>                    .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
->>>>>                    .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
->>>>>                    .nr_clks  = TOP_NR_CLK,
->>>>>            }, {
->>>>>                    .cmu_type = CMU_TYPE_EGL,
->>>>>                    .mux_clocks = egl_mux_clks,
->>>>>                    .div_clocks = egl_div_clks,
->>>>>                    .pll_clocks = egl_pll_clks,
->>>>>                     .clk_regs = egl_clk_regs,
->>>>>                    .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
->>>>>                    .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
->>>>>                    .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
->>>>>                    .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
->>>>>                    .nr_clks  = EGL_NR_CLK,
->>>>>            }, {
->>>>>           /* Add similar elements here */
->>>>> };
->>>>>
->>>>> static struct of_device_id cmu_subtype_match_table[] = {
->>>>>            {
->>>>>                    .compatible = "exynosxxxx-cmu-top",
->>>>>                    .data   = (void *)CMU_TYPE_TOP,
->>>>
->>>>
->>>> Here the data would be just a pointer to respective clock data struct
->>>> defined above.
->>>>
->>>>
->>>>>            }, {
->>>>>                    .compatible = "exynosxxx-cmu-peris",
->>>>>                    .data   = (void *)CMU_TYPE_PERIS,
->>>>>            }, {
->>>>>           /* Add similar elements here */
->>>>> };
->>>>>
->>>>> void __init exynosxxx_clk_init(struct device_node *np)
->>>>> {
->>>>>             [snip]
->>>>>
->>>>>            match = of_match_node(cmu_subtype_match_table, np);
->>>>>
->>>>>            if (!match)
->>>>>                    panic("%s: cmu type (%s) is not supported.\n",
->>>>> __func__,
->>>>>                                    np->name);
->>>>
->>>>
->>>> This can't happen, because this function won't be called for any node
->>>> with
->>>> compatible string not declared using CLK_OF_DECLARE().
->>>
->>> Agreed.
->>>
->>>>
->>>>>            reg_base = of_iomap(np, 0);
->>>>>            if (!reg_base)
->>>>>                    panic("%s: failed to map registers\n", __func__);
->>>>>
->>>>>            cmu_type = (unsigned long) match->data;
->>>>>
->>>>>            for (; i < CMU_TYPE_ALL; i++) {
->>>>>                    clk_data = &exynosxxxx_clk_data[i];
->>>>>                    if (cmu_type == clk_data->cmu_type)
->>>>>                            break;
->>>>>            }
->>>>
->>>>
->>>> Now clk_data could be taken directly from match->data, without the need
->>>> to
->>>> iterate over an array.
-> I am just curious, is it really a worth to replace 14 init functions
-> with 14 same
-> sized isolated structures. We will also be adding a array of these structure
-> pointers and little overhead to parse this array based on compatible
-> string for each cmu probe.
->
-> IMHO, calling correct function meant for the given CMU, looks more
-> straight and crisp. Most of the duplication is already addressed in
-> exynos5260_cmu_register_one.
->
-> Please, let me know if we are still looking for this change. It should
-> be easy to
-> change it that way.
->
->>> Good point. Let me change as per your suggestion and test. And then we
->>> will go for this change in next new version of patch.
->>
->> OK, thanks.
->>
->>
->>> Also please
->>> review rest patch also and let us know if anything still can be
->>> improved.
->>
->> I had reviewed version 3 of this series and most of my comments have been
->> addressed. I'm waiting for remaining two to be addressed, but they are
->> covered by your comments for v4.
-> I will address the fixes for fin_pll and sclk_uart in the next
-> version. Thanks for the
-> review.
-One update from my end.
-Today I verified that even though I removed CLK_IGNORE_UNUSED flag from 
-sclk_uartX I can
-see kernel is booting fine and no issues as you mentioned. FYI I am 
-using 3.14_rc1 tag and
-applied all patches on top of it. For reference I have mailed all 
-related patches to you.
+Thought more about it while trying to come up with a persuasive
+argument for the other Linus to take the irq_startup change that late
+in the cycle:
 
-@Tomasz,
+Using startup is the wrong point in __setup_irq() because we call
+chip->irq_set_type() before we call chip->irq_startup(). And we want
+this to be in that order to avoid spurious interrupts.
 
-I modified code as per our discussion and addressed all comments 
-including moving fixed clock to DT
-and found it's working well, so we can now finalize which way to  go ahead.
-Following is some data between V4 and probable next version, which might 
-help in making decision.
+Proper solution below. That leaves the startup/unmask logic untouched
+and provides separate callbacks for this kind of requirements. That
+makes it also simpler to have common functions for all gpios as you
+don't have to do the mask/unmask dance in startup/shutdown. So you can
+simply create gpio_irq_request/release_resources() and let the drivers
+add those to their callbacks.
 
-drivers/clk/samsung/exynos5260-clock.c
+If you agree, I put that into a separate branch based on an upstream
+-rc so you can pull it into your gpiolib stuff and work from there.
 
-Before Change
-LoC: 1890
-size drivers/clk/samsung/clk-exynos5260.o
-    text       data        bss        dec        hex    filename
-   14226      14956          0      29182       71fe 
-drivers/clk/samsung/clk-exynos5260.o
+Thanks,
 
-After Change:
-LoC: 1806
-size drivers/clk/samsung/clk-exynos5260.o
-    text       data        bss        dec        hex    filename
-   15446      14544          0      29990       7526 
-drivers/clk/samsung/clk-exynos5260.o
+	tglx
 
+---------------------->
+Subject: genirq: Provide irq_request/release_resources chip callbacks
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Sat, 08 Mar 2014 08:59:58 +0100
 
->
-> Regards,
-> Rahul Sharma.
->
->> A link to v3 thread for reference:
->> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27249
->>
->> Best regards,
->> Tomasz
+For certain irq types, e.g. gpios, it's necessary to request resources
+before starting up the irq.
 
+This might fail so we cannot use the irq_startup() callback because we
+might call the irq_set_type() callback before that which does not make
+sense when the resource is not available. Calling irq_startup() before
+irq_set_type() can lead to spurious interrupts which is not desired
+either.
 
--- 
-Best Regards,
-Pankaj Dubey
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ include/linux/irq.h |    6 ++++++
+ kernel/irq/manage.c |   28 +++++++++++++++++++++++++++-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
+
+Index: linux-2.6/include/linux/irq.h
+===================================================================
+--- linux-2.6.orig/include/linux/irq.h
++++ linux-2.6/include/linux/irq.h
+@@ -303,6 +303,10 @@ static inline irq_hw_number_t irqd_to_hw
+  * @irq_pm_shutdown:	function called from core code on shutdown once per chip
+  * @irq_calc_mask:	Optional function to set irq_data.mask for special cases
+  * @irq_print_chip:	optional to print special chip info in show_interrupts
++ * @irq_request_resources:	optional to request resources before calling
++ *				any other callback related to this irq
++ * @irq_release_resources:	optional to release resources acquired with
++ *				irq_request_resources
+  * @flags:		chip specific flags
+  */
+ struct irq_chip {
+@@ -336,6 +340,8 @@ struct irq_chip {
+ 	void		(*irq_calc_mask)(struct irq_data *data);
+ 
+ 	void		(*irq_print_chip)(struct irq_data *data, struct seq_file *p);
++	int		(*irq_request_resources)(struct irq_data *data);
++	void		(*irq_release_resources)(struct irq_data *data);
+ 
+ 	unsigned long	flags;
+ };
+Index: linux-2.6/kernel/irq/manage.c
+===================================================================
+--- linux-2.6.orig/kernel/irq/manage.c
++++ linux-2.6/kernel/irq/manage.c
+@@ -897,6 +897,23 @@ static void irq_setup_forced_threading(s
+ 	}
+ }
+ 
++static int irq_request_resources(struct irq_desc *desc)
++{
++	struct irq_data *d = &desc->irq_data;
++	struct irq_chip *c = d->chip;
++
++	return c->irq_request_resources ? c->irq_request_resources(d) : 0;
++}
++
++static void irq_release_resources(struct irq_desc *desc)
++{
++	struct irq_data *d = &desc->irq_data;
++	struct irq_chip *c = d->chip;
++
++	if (c->irq_release_resources)
++		c->irq_release_resources(d);
++}
++
+ /*
+  * Internal function to register an irqaction - typically used to
+  * allocate special interrupts that are part of the architecture.
+@@ -1092,6 +1109,13 @@ __setup_irq(unsigned int irq, struct irq
+ 	}
+ 
+ 	if (!shared) {
++		ret = irq_request_resources(desc);
++		if (ret) {
++			pr_err("Failed to request resources for %s (irq %d) on irqchip %s\n",
++			       new->name, irq, desc->irq_data.chip->name);
++			goto out_mask;
++		}
++
+ 		init_waitqueue_head(&desc->wait_for_threads);
+ 
+ 		/* Setup the type (level, edge polarity) if configured: */
+@@ -1262,8 +1286,10 @@ static struct irqaction *__free_irq(unsi
+ 	*action_ptr = action->next;
+ 
+ 	/* If this was the last handler, shut down the IRQ line: */
+-	if (!desc->action)
++	if (!desc->action) {
+ 		irq_shutdown(desc);
++		irq_release_resources(desc);
++	}
+ 
+ #ifdef CONFIG_SMP
+ 	/* make sure affinity_hint is cleaned up */
