@@ -1,175 +1,242 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 08 Mar 2014 05:56:12 +0000
-Subject: [PATCHv3 4/4] net: mvneta: add support for fixed links
-In-Reply-To: <20140304123038.652f933d@skate>
-References: <1393930704-24374-1-git-send-email-thomas.petazzoni@
- free-electrons.com> <1393930704-24374-5-git-send-email-thomas.petazzoni@
- free-electrons.com> <20140304123038.652f933d@skate>
-Message-ID: <20140308055612.82646C405B0@trevor.secretlab.ca>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 08 Mar 2014 18:24:29 +0900
+Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
+In-Reply-To: <CAPdUM4Pt0Ofh=M5pwdj+0NwSvfK4JvZbpWUS6JfD3vnTi2JaGg@mail.gmail.com>
+References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
+ <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
+ <5319D3E5.4000001@gmail.com>
+ <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
+ <5319E445.9000409@gmail.com>
+ <CAPdUM4Pt0Ofh=M5pwdj+0NwSvfK4JvZbpWUS6JfD3vnTi2JaGg@mail.gmail.com>
+Message-ID: <531AE1CD.2070203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Mar 2014 12:30:38 +0100, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> Hello all,
-> 
-> On Tue,  4 Mar 2014 11:58:24 +0100, Thomas Petazzoni wrote:
-> 
-> >  	phy_node = of_parse_phandle(dn, "phy", 0);
-> > -	if (!phy_node) {
-> > -		dev_err(&pdev->dev, "no associated PHY\n");
-> > -		err = -ENODEV;
-> > -		goto err_free_irq;
-> > +	if (of_phy_is_fixed_link(phy_node)) {
-> > +		err = of_phy_register_fixed_link(phy_node);
-> > +		if (err < 0) {
-> > +			dev_err(&pdev->dev, "cannot register fixed PHY\n");
-> > +			goto err_free_irq;
-> > +		}
-> >  	}
-> >  
-> >  	phy_mode = of_get_phy_mode(dn);
-> 
-> As noted by Sebastian Hesselbarth (talking with me on IRC), it would be
-> nicer if network driver didn't had to be modified to ensure that the
-> fixed PHY the network device is connected to gets registered into the
-> kernel.
-> 
-> So ideally, the fixed MDIO bus implemented in drivers/net/phy/fixed.c
-> should scan the Device Tree, and register at boot time the fixed PHYs.
+Hi Rahul,
 
-That's a poor design. I don't like to see code parsing the entire tree
-looking for something it recognizes. All bindings are ultimately under
-control of the driver using it so that there is always the option to
-work around crazy stuff.
+On 03/08/2014 04:20 AM, Rahul Sharma wrote:
+> Hi Tomasz,
+>
+> On 7 March 2014 20:52, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 07.03.2014 16:10, Pankaj Dubey wrote:
+>>> Hi Tomasz,
+>>>
+>>>
+>>> On Fri, Mar 7, 2014 at 11:12 PM, Tomasz Figa <tomasz.figa@gmail.com>
+>>> wrote:
+>>>> Hi Pankaj,
+>>>>
+>>>>
+>>>> On 07.03.2014 14:56, Pankaj Dubey wrote:
+>>>>>>
+>>>>>> +static void __init exynos5260_clk_top_init(struct device_node *np)
+>>>>>> +{
+>>>>>> +       struct exynos5260_cmu_info cmu;
+>>>>>> +       struct samsung_clk_provider *ctx;
+>>>>>> +
+>>>>>> +       memset(&cmu, 0, sizeof(cmu));
+>>>>>> +
+>>>>>> +       cmu.pll_clks = top_pll_clks;
+>>>>>> +       cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
+>>>>>> +       cmu.mux_clks = top_mux_clks;
+>>>>>> +       cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
+>>>>>> +       cmu.div_clks = top_div_clks;
+>>>>>> +       cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
+>>>>>> +       cmu.gate_clks = top_gate_clks;
+>>>>>> +       cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
+>>>>>> +       cmu.nr_clk_ids = TOP_NR_CLK;
+>>>>>> +       cmu.clk_regs = top_clk_regs;
+>>>>>> +       cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
+>>>>>> +
+>>>>>> +       ctx = exynos5260_cmu_register_one(np, &cmu);
+>>>>>> +
+>>>>>> +       samsung_clk_of_register_fixed_ext(ctx, fixed_rate_ext_clks,
+>>>>>> +                       ARRAY_SIZE(fixed_rate_ext_clks),
+>>>>>> +                       ext_clk_match);
+>>>>>> +}
+>>>>>> +
+>>>>>> +CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
+>>>>>> +               exynos5260_clk_top_init);
+>>>>>
+>>>>>
+>>>>> Well with this approach we end up adding 14 such
+>>>>> exynosxxx_clk_xxx_init functions all of which has similar lines of
+>>>>> code. As I know there are many upcoming Exynos SoC which will also
+>>>>> have similar multiple clock controllers (in some of them there are
+>>>>> upto 25 clock domains, and in that case we will end up writing 25 such
+>>>>> init functions) so I have following suggestion where we can have one
+>>>>> more structure which will hold all static data and match_table to
+>>>>> match compatibility string and return CMU_TYPE which can be mapped to
+>>>>> get proper clock_data which can be used in single clock_init function.
+>>>>> Following is some sample code which I have implemented and tested on
+>>>>> one of Exynos SoC. Please let me know your opinion about this.
+>>>>
+>>>>
+>>>> Yes, this looks better indeed, however there is still a room for
+>>>> improvement. Please see my comments below.
+>>>>
+>>>>
+>>>>> =============================
+>>>>>
+>>>>> static struct exynosxxxx_clock_data exynosxxxx_clk_data[] __initdata = {
+>>>>
+>>>>
+>>>> Instead of making this an array, particular elements could be separate
+>>>> structures. This would simplify the code below.
+>>>>
+>>>>
+>>>>>            {
+>>>>>                    .cmu_type = CMU_TYPE_TOP,
+>>>>>                    .mux_clocks = top_mux_clks,
+>>>>>                    .div_clocks = top_div_clks,
+>>>>>                    .pll_clocks = top_pll_clks,
+>>>>>                    .clk_regs = top_clk_regs,
+>>>>>                    .nr_mux_clocks = ARRAY_SIZE(top_mux_clks),
+>>>>>                    .nr_div_clocks = ARRAY_SIZE(top_div_clks),
+>>>>>                    .nr_pll_clocks = ARRAY_SIZE(top_pll_clks),
+>>>>>                    .nr_clk_regs = ARRAY_SIZE(top_clk_regs),
+>>>>>                    .nr_clks  = TOP_NR_CLK,
+>>>>>            }, {
+>>>>>                    .cmu_type = CMU_TYPE_EGL,
+>>>>>                    .mux_clocks = egl_mux_clks,
+>>>>>                    .div_clocks = egl_div_clks,
+>>>>>                    .pll_clocks = egl_pll_clks,
+>>>>>                     .clk_regs = egl_clk_regs,
+>>>>>                    .nr_mux_clocks = ARRAY_SIZE(egl_mux_clks),
+>>>>>                    .nr_div_clocks = ARRAY_SIZE(egl_div_clks),
+>>>>>                    .nr_pll_clocks = ARRAY_SIZE(egl_pll_clks),
+>>>>>                    .nr_clk_regs = ARRAY_SIZE(egl_clk_regs),
+>>>>>                    .nr_clks  = EGL_NR_CLK,
+>>>>>            }, {
+>>>>>           /* Add similar elements here */
+>>>>> };
+>>>>>
+>>>>> static struct of_device_id cmu_subtype_match_table[] = {
+>>>>>            {
+>>>>>                    .compatible = "exynosxxxx-cmu-top",
+>>>>>                    .data   = (void *)CMU_TYPE_TOP,
+>>>>
+>>>>
+>>>> Here the data would be just a pointer to respective clock data struct
+>>>> defined above.
+>>>>
+>>>>
+>>>>>            }, {
+>>>>>                    .compatible = "exynosxxx-cmu-peris",
+>>>>>                    .data   = (void *)CMU_TYPE_PERIS,
+>>>>>            }, {
+>>>>>           /* Add similar elements here */
+>>>>> };
+>>>>>
+>>>>> void __init exynosxxx_clk_init(struct device_node *np)
+>>>>> {
+>>>>>             [snip]
+>>>>>
+>>>>>            match = of_match_node(cmu_subtype_match_table, np);
+>>>>>
+>>>>>            if (!match)
+>>>>>                    panic("%s: cmu type (%s) is not supported.\n",
+>>>>> __func__,
+>>>>>                                    np->name);
+>>>>
+>>>>
+>>>> This can't happen, because this function won't be called for any node
+>>>> with
+>>>> compatible string not declared using CLK_OF_DECLARE().
+>>>
+>>> Agreed.
+>>>
+>>>>
+>>>>>            reg_base = of_iomap(np, 0);
+>>>>>            if (!reg_base)
+>>>>>                    panic("%s: failed to map registers\n", __func__);
+>>>>>
+>>>>>            cmu_type = (unsigned long) match->data;
+>>>>>
+>>>>>            for (; i < CMU_TYPE_ALL; i++) {
+>>>>>                    clk_data = &exynosxxxx_clk_data[i];
+>>>>>                    if (cmu_type == clk_data->cmu_type)
+>>>>>                            break;
+>>>>>            }
+>>>>
+>>>>
+>>>> Now clk_data could be taken directly from match->data, without the need
+>>>> to
+>>>> iterate over an array.
+> I am just curious, is it really a worth to replace 14 init functions
+> with 14 same
+> sized isolated structures. We will also be adding a array of these structure
+> pointers and little overhead to parse this array based on compatible
+> string for each cmu probe.
+>
+> IMHO, calling correct function meant for the given CMU, looks more
+> straight and crisp. Most of the duplication is already addressed in
+> exynos5260_cmu_register_one.
+>
+> Please, let me know if we are still looking for this change. It should
+> be easy to
+> change it that way.
+>
+>>> Good point. Let me change as per your suggestion and test. And then we
+>>> will go for this change in next new version of patch.
+>>
+>> OK, thanks.
+>>
+>>
+>>> Also please
+>>> review rest patch also and let us know if anything still can be
+>>> improved.
+>>
+>> I had reviewed version 3 of this series and most of my comments have been
+>> addressed. I'm waiting for remaining two to be addressed, but they are
+>> covered by your comments for v4.
+> I will address the fixes for fin_pll and sclk_uart in the next
+> version. Thanks for the
+> review.
+One update from my end.
+Today I verified that even though I removed CLK_IGNORE_UNUSED flag from 
+sclk_uartX I can
+see kernel is booting fine and no issues as you mentioned. FYI I am 
+using 3.14_rc1 tag and
+applied all patches on top of it. For reference I have mailed all 
+related patches to you.
 
-Creating the fixed phy really does need to be triggered at probe time when
-the ethernet device goes looking for a phy. We should be able to make
-that more generic though. I suggest a single wrapper function that all
-Eth drivers can use to hook up the PHY and will parse both real phys and
-fixed links, but if a driver has a crazy binding, then it can override
-it by open coding the individual decode steps.
+@Tomasz,
 
-> The only problem is how to recognize in the DT which nodes are fixed
-> PHYs. Looking for the "fixed-link" property is very fragile as other
-> completely unrelated nodes may use this property for other purposes.
-> Using a compatible string? A device_type property? Or should we have a
-> fragment of the DT for the fixed MDIO bus itself?
-> 
-> I've done a quick prototype that is based on using the "fixed-eth-phy"
-> compatible string as the key to find fixed PHYs in the DT, just to see
-> how it would work. It works well, and allows to get rid of changes in
-> the network driver completely. See below for the prototype-level patch
-> (which applies on top of the proposed patch series, for now).
-> 
-> Suggestions?
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 053a650..8a68a07 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -2805,14 +2805,6 @@ static int mvneta_probe(struct platform_device *pdev)
->  	}
->  
->  	phy_node = of_parse_phandle(dn, "phy", 0);
-> -	if (of_phy_is_fixed_link(phy_node)) {
-> -		err = of_phy_register_fixed_link(phy_node);
-> -		if (err < 0) {
-> -			dev_err(&pdev->dev, "cannot register fixed PHY\n");
-> -			goto err_free_irq;
-> -		}
-> -	}
-> -
->  	phy_mode = of_get_phy_mode(dn);
->  	if (phy_mode < 0) {
->  		dev_err(&pdev->dev, "incorrect phy-mode\n");
-> diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
-> index 82095cc..45a7d5a 100644
-> --- a/drivers/net/phy/fixed.c
-> +++ b/drivers/net/phy/fixed.c
-> @@ -22,6 +22,7 @@
->  #include <linux/err.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
-> +#include <linux/of_mdio.h>
->  
->  #define MII_REGS_NUM 29
->  
-> @@ -293,6 +294,8 @@ static int __init fixed_mdio_bus_init(void)
->  	if (ret)
->  		goto err_mdiobus_alloc;
->  
-> +	of_phy_register_fixed_phys();
-> +
->  	return 0;
->  
->  err_mdiobus_alloc:
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index c645fb8..4e75a70 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -277,16 +277,12 @@ struct phy_device *of_phy_attach(struct net_device *dev,
->  EXPORT_SYMBOL(of_phy_attach);
->  
->  #if defined(CONFIG_FIXED_PHY)
-> -bool of_phy_is_fixed_link(struct device_node *np)
-> -{
-> -	return of_property_read_bool(np, "fixed-link");
-> -}
-> -EXPORT_SYMBOL(of_phy_is_fixed_link);
-> -
-> -int of_phy_register_fixed_link(struct device_node *np)
-> +static int of_phy_register_fixed_link(struct device_node *np)
->  {
->  	struct fixed_phy_status status = {};
->  
->  	status.link = 1;
->  	status.duplex = of_property_read_bool(np, "full-duplex");
->  	if (of_property_read_u32(np, "speed", &status.speed))
-> @@ -296,5 +292,14 @@ int of_phy_register_fixed_link(struct device_node *np)
->  
->  	return fixed_phy_register(PHY_POLL, &status, np);
->  }
-> -EXPORT_SYMBOL(of_phy_register_fixed_link);
-> +
-> +void of_phy_register_fixed_phys(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	for_each_compatible_node(np, NULL, "fixed-eth-phy") {
-> +		of_phy_register_fixed_link(np);
-> +	}
-> +}
-> +
->  #endif
-> diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-> index 77a6e32..c8d080b 100644
-> --- a/include/linux/of_mdio.h
-> +++ b/include/linux/of_mdio.h
-> @@ -68,17 +68,9 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
->  #endif /* CONFIG_OF */
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
-> -extern int of_phy_register_fixed_link(struct device_node *np);
-> -extern bool of_phy_is_fixed_link(struct device_node *np);
-> +extern void of_phy_register_fixed_phys(void);
->  #else
-> -static inline int of_phy_register_fixed_link(struct device_node *np)
-> -{
-> -	return -ENOSYS;
-> -}
-> -static inline bool of_phy_is_fixed_link(struct device_node *np)
-> -{
-> -	return false;
-> -}
-> +static inline void of_phy_register_fixed_phys(void) {};
->  #endif
->  
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I modified code as per our discussion and addressed all comments 
+including moving fixed clock to DT
+and found it's working well, so we can now finalize which way to  go ahead.
+Following is some data between V4 and probable next version, which might 
+help in making decision.
+
+drivers/clk/samsung/exynos5260-clock.c
+
+Before Change
+LoC: 1890
+size drivers/clk/samsung/clk-exynos5260.o
+    text       data        bss        dec        hex    filename
+   14226      14956          0      29182       71fe 
+drivers/clk/samsung/clk-exynos5260.o
+
+After Change:
+LoC: 1806
+size drivers/clk/samsung/clk-exynos5260.o
+    text       data        bss        dec        hex    filename
+   15446      14544          0      29990       7526 
+drivers/clk/samsung/clk-exynos5260.o
+
+
+>
+> Regards,
+> Rahul Sharma.
+>
+>> A link to v3 thread for reference:
+>> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27249
+>>
+>> Best regards,
+>> Tomasz
+
+
+-- 
+Best Regards,
+Pankaj Dubey
