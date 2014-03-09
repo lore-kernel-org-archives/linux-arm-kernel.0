@@ -1,26 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 22:10:29 -0800
-Subject: [GIT PULL] Allwinner fixes for 3.14
-In-Reply-To: <20140303102052.GA28112@lukather>
-References: <20140303102052.GA28112@lukather>
-Message-ID: <20140309061029.GB16310@quad.lixom.net>
+Date: Sat, 8 Mar 2014 22:14:39 -0800
+Subject: [GIT PULL] bcm pinctrl rename
+In-Reply-To: <201402252018.34109.arnd@arndb.de>
+References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
+ <20140221222947.GB13233@quad.lixom.net>
+ <CAEPRUYqUNxOT=KnhSmbXbL2e2tCs=jAhQqKLiVVc13okpBxHnw@mail.gmail.com>
+ <201402252018.34109.arnd@arndb.de>
+Message-ID: <20140309061439.GC16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 11:20:52AM +0100, Maxime Ripard wrote:
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On Tue, Feb 25, 2014 at 08:18:33PM +0100, Arnd Bergmann wrote:
+> On Tuesday 25 February 2014, Christian Daudt wrote:
+> > Can you please pull the patches below. Note that if you wanto to
+> > absolutely reduce this to the bone, you can drop the last patch in the
+> > series titled "pinctrl: Rename Broadcom Capri pinctrl binding". That
+> > is the documentation fixup, so the binding doc will be wrong until
+> > 3.15. But that will reduce the change to just 2 lines :)
 > 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/mripard/linux.git tags/sunxi-fixes-for-3.14
-> 
-> for you to fetch changes up to 40dd8f3b900cac1d925605a9d3199368c4af0a40:
-> 
->   ARM: sunxi: dt: Change the touchscreen compatibles (2014-02-07 22:30:05 +0100)
+> I've gone through the remaining pull requests today but didn't touch
+> this one. Since Olof asked for the changes, I'm expecting him to
+> look at the new version first. I don't have an opinion on the contents
+> myself.
 
-Pulled, thanks.
+Yep, pulled now.
+
+I noticed a typo in one of the binding file examples that you might want
+to fix, but it's not urgent for 3.14:
+
+
+@@ -119,7 +119,7 @@ Optional Properties (for HDMI pins):
+ Example:
+  // pin controller node
+pinctrl at 35004800 {
+-       compatible = "brcm,capri-pinctrl";
++       compatible = "brcmbcm11351-pinctrl";
+	reg = <0x35004800 0x430>;
 
 
 -Olof
