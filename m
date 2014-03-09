@@ -1,47 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 23:28:04 -0800
-Subject: [GIT PULL] SOCFPGA updates for 3.15
-In-Reply-To: <20140309055611.GF12854@quad.lixom.net>
-References: <1393472077-16220-1-git-send-email-dinguyen@altera.com>
- <20140309055611.GF12854@quad.lixom.net>
-Message-ID: <20140309072804.GJ16310@quad.lixom.net>
+Date: Sat, 8 Mar 2014 23:29:04 -0800
+Subject: [GIT PULL 3/4] omap device tree changes for v3.15
+In-Reply-To: <20140303001045.GC5000@atomide.com>
+References: <pull-1393802089-910509>
+ <20140303001045.GC5000@atomide.com>
+Message-ID: <20140309072904.GK16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 08, 2014 at 09:56:11PM -0800, Olof Johansson wrote:
-> On Wed, Feb 26, 2014 at 09:34:37PM -0600, dinguyen at altera.com wrote:
-> > Hi Arnd, Kevin and Olof,
-> > 
-> > Please consider pulling in these patches for v3.15.
-> > 
-> > Thanks,
-> > Dinh
-> > 
+On Sun, Mar 02, 2014 at 04:10:49PM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [140302 15:55]:
 > > The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
 > > 
 > >   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
 > > 
 > > are available in the git repository at:
 > > 
-> >   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_updates_for_3.15
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-signed
 > > 
-> > for you to fetch changes up to 1b60b9fac9c56488f78aa4396301757d37e586e7:
+> > for you to fetch changes up to f777ba1780584b100ab9664cc06d04f3bb273a84:
 > > 
-> >   dts: socfpga: Update clock entry to support multiple parents (2014-02-26 21:12:51 -0600)
+> >   Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
+> > 
+> > ----------------------------------------------------------------
+> > 
+> > Device tree related changes for omaps with minor code
+> > changes also to platform data quirks that are still needed
+> > for some features.
 > 
-> Hi,
-> 
-> Merged into next/drivers.
+> FYI, this probably causes a minor overlapping additions conflict
+> with the recently merged fixes. My resolve below for reference.
 
-This caused build failures when building dtb targets:
-
-ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
-ERROR: Input tree has errors, aborting (use -f to force output)
-make[3]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 2
-
-And others.
-
-Please fix and respin; I've dropped the branch.
+D'oh, saw this after I did the merge. Yes, same resolution as I used.
 
 
 -Olof
