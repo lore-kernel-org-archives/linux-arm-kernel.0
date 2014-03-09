@@ -1,35 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 9 Mar 2014 11:55:14 +0000
-Subject: linux-next: build failure after merge of the arm-soc tree
-Message-ID: <20140309115514.GY28112@sirena.org.uk>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Sun, 9 Mar 2014 22:43:19 +1100
+Subject: [PATCH RFC 1/5] dtc: Add helpers for various message levels
+In-Reply-To: <1392919611-10746-2-git-send-email-t.figa@samsung.com>
+References: <1392919611-10746-1-git-send-email-t.figa@samsung.com>
+ <1392919611-10746-2-git-send-email-t.figa@samsung.com>
+Message-ID: <20140309114319.GF20356@voom.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Feb 20, 2014 at 07:06:47PM +0100, Tomasz Figa wrote:
+> This patch adds three helper macros to print errors, warnings and
+> informational messages using standard format.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  dtc.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/dtc.h b/dtc.h
+> index 20de073..e95bed7 100644
+> --- a/dtc.h
+> +++ b/dtc.h
+> @@ -43,6 +43,9 @@
+>  #define debug(fmt,args...)
+>  #endif
+>  
+> +#define pr_err(...)	fprintf (stderr, "ERROR: " __VA_ARGS__)
+> +#define pr_warn(...)	fprintf (stderr, "WARNING: " __VA_ARGS__)
+> +#define pr_info(...)	fprintf (stderr, "INFO: " __VA_ARGS__)
 
-After merging the arm-soc tree, today's linux-next build (20140309)
-failed for arm64 defconfig like this:
+So, there are already several message helper functions in dtc.
+They're not all that consistently applied, so I can see an argument
+for cleaning things up, and replacing them with ones modelled on the
+kernel versions like these.
 
-/home/broonie/next/next/drivers/irqchip/irq-gic.c: In function 'gic_raise_softirq':
-/home/broonie/next/next/drivers/irqchip/irq-gic.c:666:2: error: implicit declaration of function 'dmb' [-Werror=implicit-function-declaration]
-  dmb(ishst);
-  ^
-/home/broonie/next/next/drivers/irqchip/irq-gic.c:666:6: error: 'ishst' undeclared (first use in this function)
-  dmb(ishst);
-      ^
-/home/broonie/next/next/drivers/irqchip/irq-gic.c:666:6: note: each undeclared identifier is reported only once for each function it appears
-in
-cc1: some warnings being treated as errors
-make[3]: *** [drivers/irqchip/irq-gic.o] Error 1
+But.. this patch doesn't do that, it just adds yet another variant to
+the mix.
 
-This is due to 8adbf57fc4294 (irqchip: gic: use dmb ishst instead of dsb
-when raising a softirq) and has been going on for several builds now but
-Stephen hasn't been including this build in his per-merge testing.  I've
-abandoned arm64 testing since a simple revert causes problems for arm.
+In addition, what we want for messages in dtc is a bit different from
+the kernel - the kernel's expexted to keep running, and the messages
+log events of interest.  For dtc, for each warning/error you should
+also be deciding whether that should terminate the program or not -
+these helpers don't address that.
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/ab01db95/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/40f9c367/attachment-0001.sig>
