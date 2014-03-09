@@ -1,59 +1,84 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Sun, 09 Mar 2014 20:43:11 +0100
-Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART inputs
-Message-ID: <6599423.XddAUl3dCe@typ>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 10 Mar 2014 04:01:12 +0800
+Subject: [PATCH 1/4] ARM: dts: keystone: update for supporting K2L/K2E EVMs
+In-Reply-To: <20140309053924.GD12854@quad.lixom.net>
+References: <1393365035-20083-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393365035-20083-2-git-send-email-santosh.shilimkar@ti.com>
+ <20140309053924.GD12854@quad.lixom.net>
+Message-ID: <531CC888.1080100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable integrated pull-ups on the UART RX pins of Rockchip RK3188.
+On Sunday 09 March 2014 01:39 PM, Olof Johansson wrote:
+> On Tue, Feb 25, 2014 at 04:50:32PM -0500, Santosh Shilimkar wrote:
+>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>
+>> This patch add compatibility strings for k2hk, k2l and k2e EVMs
+>>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  .../devicetree/bindings/arm/keystone/keystone.txt  |   10 ++++++++++
+>>  arch/arm/mach-keystone/keystone.c                  |    3 +++
+>>  2 files changed, 13 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>> index 63c0e6a..ad16e7a 100644
+>> --- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>> @@ -8,3 +8,13 @@ Required properties:
+>>   - compatible: All TI specific devices present in Keystone SOC should be in
+>>     the form "ti,keystone-*". Generic devices like gic, arch_timers, ns16550
+>>     type UART should use the specified compatible for those devices.
+>> +
+>> +Boards:
+>> +-  Keystone 2 Hawking/Kepler EVM
+>> +   compatible = "ti,k2hk-evm"
+>> +
+>> +-  Keystone 2 Lamarr EVM
+>> +   compatible = "ti,k2l-evm"
+> 
+> Your previous email said Lammar. One, or maybe both, are wrong, but which one?
+>
+My email had a typo then. The one here is right.
+ 
+>> +
+>> +-  Keystone 2 Edison EVM
+>> +   compatible = "ti,k2e-evm"
+>> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+>> index 6e6bb7d..aa0d212 100644
+>> --- a/arch/arm/mach-keystone/keystone.c
+>> +++ b/arch/arm/mach-keystone/keystone.c
+>> @@ -47,6 +47,9 @@ static void __init keystone_init(void)
+>>  
+>>  static const char *keystone_match[] __initconst = {
+>>  	"ti,keystone-evm",
+>> +	"ti,k2hk-evm",
+>> +	"ti,k2l-evm",
+>> +	"ti,k2e-evm",
+> 
+> -evm indicate board-level compat fields. We'd be better off just keeping a
+> "ti,keystone" top-level compatible here and just using that to probe. That
+> way you don't have to touch the file for new boards in the future.
+> 
+So far keystone-evm was k2hk(Keystone2 Hawking EVM) but with additional two
+SOC's and board's, separate compatible was needed to differentiate. These
+boards do have significant differences though current mainline code.
+This mainly because the boards are build for those specific SOC families.
 
-This fixes UART receive on the radxa Rock board, which has an input diode
-preventing the RX pin from being raised from the outside.
+I would like to keep the organisation that way so that we cab support any
+future boards like below.
+"ti,k2hk-evm" --> All the Keystone2 Hawking/Kepler boards
+"ti,k2l-evm" --> All the Keystone2 Lamarr boards
+"ti,k2e-evm" --> All the Keystone2 Edision boards
 
-Signed-off-by: Max Schwarz <max.schwarz@online.de>
----
- arch/arm/boot/dts/rk3188.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I don't expect to touch this file till new SOC gets added with its
+EVM.
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 412f4d0..2e10bd7 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -149,7 +149,7 @@
- 
- 			uart0 {
- 				uart0_xfer: uart0-xfer {
--					rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_none>,
-+					rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_up>,
- 							<RK_GPIO1 1 RK_FUNC_1 &pcfg_pull_none>;
- 				};
- 
-@@ -164,7 +164,7 @@
- 
- 			uart1 {
- 				uart1_xfer: uart1-xfer {
--					rockchip,pins = <RK_GPIO1 4 RK_FUNC_1 &pcfg_pull_none>,
-+					rockchip,pins = <RK_GPIO1 4 RK_FUNC_1 &pcfg_pull_up>,
- 							<RK_GPIO1 5 RK_FUNC_1 &pcfg_pull_none>;
- 				};
- 
-@@ -179,7 +179,7 @@
- 
- 			uart2 {
- 				uart2_xfer: uart2-xfer {
--					rockchip,pins = <RK_GPIO1 8 RK_FUNC_1 &pcfg_pull_none>,
-+					rockchip,pins = <RK_GPIO1 8 RK_FUNC_1 &pcfg_pull_up>,
- 							<RK_GPIO1 9 RK_FUNC_1 &pcfg_pull_none>;
- 				};
- 				/* no rts / cts for uart2 */
-@@ -187,7 +187,7 @@
- 
- 			uart3 {
- 				uart3_xfer: uart3-xfer {
--					rockchip,pins = <RK_GPIO1 10 RK_FUNC_1 &pcfg_pull_none>,
-+					rockchip,pins = <RK_GPIO1 10 RK_FUNC_1 &pcfg_pull_up>,
- 							<RK_GPIO1 11 RK_FUNC_1 &pcfg_pull_none>;
- 				};
- 
--- 
-1.8.3.2
+Regards,
+Ssantosh
