@@ -1,26 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 22:56:08 -0800
-Subject: [GIT PULL] Rockchip SMP support for 3.15
-In-Reply-To: <2945154.fxjrIo87Hl@phil>
-References: <2945154.fxjrIo87Hl@phil>
-Message-ID: <20140309065608.GE16310@quad.lixom.net>
+Date: Sat, 8 Mar 2014 22:57:16 -0800
+Subject: [GIT PULL] two omap dt regression fixes for v3.14-rc4
+In-Reply-To: <20140302230448.GB5000@atomide.com>
+References: <20140302230448.GB5000@atomide.com>
+Message-ID: <20140309065716.GF16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 01, 2014 at 08:27:19PM +0100, Heiko St?bner wrote:
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On Sun, Mar 02, 2014 at 03:04:48PM -0800, Tony Lindgren wrote:
+> The following changes since commit 4b41636878ee32d4c45a49de7749abca9721bd6a:
 > 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>   ARM: OMAP3: Fix pinctrl interrupts for core2 (2014-02-27 15:35:48 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.15-rockchip-smp
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-dt-rc4
 > 
-> for you to fetch changes up to a7a2b3118b410fb3cd3a8363b157c56f4211ee05:
+> for you to fetch changes up to ae41a3030ce8901853b3cfd5e118a4b0288aa068:
 > 
->   ARM: rockchip: add smp bringup code (2014-03-01 17:21:57 +0100)
+>   ARM: dts: omap3-gta04: Add ti,omap36xx to compatible property to avoid problems with booting (2014-03-02 09:44:45 -0800)
 
-Pulled, thanks.
+
+Pulled into fixes.
 
 
 -Olof
