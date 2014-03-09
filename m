@@ -1,60 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 10 Mar 2014 00:25:24 +0100
-Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
-In-Reply-To: <20140309.191235.1047481546773873653.davem@davemloft.net>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1394192092-27461-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140309.191235.1047481546773873653.davem@davemloft.net>
-Message-ID: <531CF864.9040406@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 10 Mar 2014 00:32:56 +0100
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <20140309183523.GD22881@quad.lixom.net>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net>
+Message-ID: <531CFA28.9020600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 12:12 AM, David Miller wrote:
-> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Date: Fri,  7 Mar 2014 12:34:52 +0100
->
->> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->>    ("net: phy: resume/suspend PHYs on attach/detach")
->> introduced a feature to suspend PHYs when entering halted state.
+On 09.03.2014 19:35, Olof Johansson wrote:
+> On Mon, Mar 03, 2014 at 09:56:11AM +0000, Kukjin Kim wrote:
+>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 >>
->> Unfortunately, not all bootloaders properly power-up PHYs on reset
->> and fail to access ethernet because the PHY is still powered down.
+>>    Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 >>
->> Therefore, this adds code and documentation for a sysfs attribute to
->> allow/deny PHYs to be suspended on a per-PHY basis. Disabling that
->> attribute prevents PHYs from being suspended when entering halted state.
+>> are available in the git repository at:
 >>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Reported-by: Andrew Lunn <andrew@lunn.ch>
+>>    http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-pm-1
+>>
+>> for you to fetch changes up to e11d919e4aa2009077e3e4f829ff991d37adca61:
+>>
+>>    ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code (2014-02-14 08:16:01 +0900)
 >
-> I know you won't like what I have to say, but I want to see a solution
-> without this sysfs knob.
+> Hi,
 >
-> First of all, you obviously have a way to end up having the sysfs knob
-> get set on the appropriate systems.
->
-> Therefore, you obviously have some way to propagate the same piece of
-> information into the kernel somehow during boot time.
->
-> For example, via a device tree property or similar.
+> I don't see a single cc or acked-by line from Mike Turquette here. I'll hold
+> off until he's had a chance to take a look at these ones; I suspect they'll be
+> fine since it's mostly code refactoring though.
 
-There is no way to determine if a bootloader is broken or not. The
-sysfs knob allows to provide a use case based decision. Of course, we
-can invent some freaky device tree property but that the DT maintainers
-will not like either.
+I guess I should have ACKed them too, but it felt kind of strange to ACK 
+my own patches. ;)
 
-This is not an issue with broken HW but SW. The PHY is fine, you can
-suspend and resume it perfectly in Linux. But the bootloader fails to
-properly initialize it on a warm boot. You could update the bootloader
-and the issue disappears.
+Anyway, for all samsung-clk patches:
 
-> Please pursue an avenue such as that.  This sysfs thing, it's a user
-> facing interface we'd have to live with forever.
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-If you want me to try a devicetree property for the issue, we also
-create ABI and we will have to live with it forever.
-
-I am open for suggestions, but I have a bad feeling about a "broken
-bootloader" DT property.
-
-Sebastian
+Best regards,
+Tomasz
