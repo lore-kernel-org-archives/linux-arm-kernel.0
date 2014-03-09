@@ -1,35 +1,44 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 9 Mar 2014 09:56:18 +0100
-Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
- regulators subsystem
-In-Reply-To: <20140309075148.GJ28112@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 9 Mar 2014 10:11:44 +0100
+Subject: [PATCH 1/7] mfd: AXP20x: Add mfd driver for AXP20x PMIC
+In-Reply-To: <20140308113141.GA14009@localhost.fastwebnet.it>
 References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
- <20140307182213.GC607@lukather>
- <CAOQ7t2YSidSPVSBrBzj3R1SYS_Xb10a2vfEs+u1DEkrhEJQCaQ@mail.gmail.com>
- <20140309075148.GJ28112@sirena.org.uk>
-Message-ID: <20140309085618.GA4683@localhost.fastwebnet.it>
+ <1393692352-10839-2-git-send-email-carlo@caione.org>
+ <20140307180936.GY607@lukather>
+ <20140308113141.GA14009@localhost.fastwebnet.it>
+Message-ID: <20140309091144.GB3335@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 09, 2014 at 07:51:48AM +0000, Mark Brown wrote:
-> On Sat, Mar 08, 2014 at 12:43:04PM +0100, Carlo Caione wrote:
-> > On Fri, Mar 7, 2014 at 7:22 PM, Maxime Ripard
-> > > On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
-> 
-> > >> +     return platform_driver_register(&axp20x_regulator_driver);
-> 
-> > > I thought the AXP was only connected through I2C? How is that a
-> > > platform device then?
-> 
-> > Not really. It is plain wrong.
-> > I'll fix it in v2.
-> 
-> Are you sure this is wrong?  For MFDs the core MFD is a driver of
-> whatever bus type is in use but the function drivers are platform
-> devices which talk to the hardware via the core device.
+Hi Carlo,
 
-ok, I spoke too soon. Sorry for the noise.
+On Sat, Mar 08, 2014 at 12:31:41PM +0100, Carlo Caione wrote:
+> > > +	axp20x->pm_off = of_property_read_bool(node, "axp,system-power-controller");
+> > > +
+> > > +	if (axp20x->pm_off && !pm_power_off) {
+> > > +		axp20x_pm_power_off = axp20x;
+> > > +		pm_power_off = axp20x_power_off;
+> > > +	}
+> > 
+> > I don't think we have any other way to actually power down the board.
+> > 
+> > Is there any reason why we would not need this property?
+> 
+> In case you have multiple PMIC on the board in this way you con define
+> which is the one apt to power off.
+
+Do we even have such a board?
+
+Let's leave this out, we can always add it later if needs be.
 
 -- 
-Carlo Caione
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/1ba2880f/attachment.sig>
