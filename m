@@ -1,27 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 23:02:36 -0800
-Subject: [GIT PULL 1/4] omap soc changes for v3.15
-In-Reply-To: <5313bcc0.c56e440a.725b.39e8SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <5313bcc0.c56e440a.725b.39e8SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20140309070236.GG16310@quad.lixom.net>
+Date: Sat, 8 Mar 2014 23:18:42 -0800
+Subject: [GIT PULL 2/4] omap prcm changes for v3.15
+In-Reply-To: <5313bcc3.c5bf440a.7302.4a69SMTPIN_ADDED_MISSING@mx.google.com>
+References: <pull-1393802089-910509>
+ <5313bcc3.c5bf440a.7302.4a69SMTPIN_ADDED_MISSING@mx.google.com>
+Message-ID: <20140309071842.GH16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 03:14:45PM -0800, Tony Lindgren wrote:
+On Sun, Mar 02, 2014 at 03:14:46PM -0800, Tony Lindgren wrote:
 > The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
 >   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/soc-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/prcm-signed
 > 
-> for you to fetch changes up to 9b91bd81fa40b4765e24721d970c26ae2e1d8b0d:
+> for you to fetch changes up to 9ed5811ddd32eb02140783095f1fec7d12fb3eb9:
 > 
->   ARM: OMAP2+: remove OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF (2014-02-28 15:36:34 -0800)
-> 
+>   Merge tag 'for-v3.15/omap-hwmod-clk-prcm-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.15/prcm (2014-02-28 15:41:55 -0800)
 
-Pulled, thanks.
+Pulled into next/soc. Thanks.
 
 
 -Olof
