@@ -1,10 +1,12 @@
 From: ian.campbell@citrix.com (Ian Campbell)
-Date: Sun, 9 Mar 2014 02:29:44 +0000
+Date: Sun, 9 Mar 2014 02:35:48 +0000
 Subject: [stable 3.10.y] Please backport a56a5cf1f2ec "ARM: highbank: avoid
  L2 cache smc calls when PL310 is not present"
-Message-ID: <1394332184.13270.72.camel@hastur.hellion.org.uk>
+Message-ID: <1394332548.13270.74.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[trying again with the correct stable@, sorry for the noise]
 
 Hi stable@,
 
