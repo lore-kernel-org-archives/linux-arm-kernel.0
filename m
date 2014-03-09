@@ -1,50 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Mar 2014 11:45:00 -0700
-Subject: [GIT PULL] ux500 devicetree cleanups for v3.15, take two
-In-Reply-To: <CACRpkdb4SgZgbgQ6m31LWmqTT7nskaR8yV4OXO9RmvgXhVZPCA@mail.gmail.com>
-References: <CACRpkdb4SgZgbgQ6m31LWmqTT7nskaR8yV4OXO9RmvgXhVZPCA@mail.gmail.com>
-Message-ID: <20140309184500.GH22881@quad.lixom.net>
+Date: Sun, 9 Mar 2014 11:47:16 -0700
+Subject: [GIT PULL] pull request on mmp irq for v3.15
+In-Reply-To: <CAN1soZxPsDza791Ejs3HOo+YAQrW-HFLfrxf669Y4-exjtBbNw@mail.gmail.com>
+References: <CAN1soZxPsDza791Ejs3HOo+YAQrW-HFLfrxf669Y4-exjtBbNw@mail.gmail.com>
+Message-ID: <20140309184716.GI22881@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 02:12:54AM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Tue, Mar 04, 2014 at 09:14:11AM +0800, Haojian Zhuang wrote:
+> Hi all,
 > 
-> this is a set of cleanups building upon the already submitted cleanups
-> queued on the ux500/dt branch in the ARM SoC tree.
+> Please help to pull request from pxa git tree on irq.
 > 
-> This kills of another three boardfile things with just constants so it's a
-> real nice step forward to finalizing ux500 as a DT-only platform.
+> Regards
+> Haojian
 > 
-> Remaining cleanups are a few hardcoded DMA definitions related to
-> DMA (that I won't do until I can really test the result) and some MMC
-> stuff that first need proper DT support in the MMC subsystem.
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
-> This contains a u300 patch as well, as it is closely related to the same
-> ux500 patch and I do not plan to send any separate u300 pull request
-> for this kernel cycle.
-> 
-> So please pull this in!
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 77ad9dfc2c7e3b5ce49efc5c0c215f7c36c91cf2:
-> 
->   ARM: ux500: move last AB8505 set-up to DT (2014-02-04 20:50:55 +0100)
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-dt-v3.15-2
+>   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/irq-mmp
 > 
-> for you to fetch changes up to f864c46aae4cb6aed09e98615c427fcc4f1de104:
+> for you to fetch changes up to 13dde81828eee39086ffce334a7a9996ef5104ab:
 > 
->   mfd: dbx500/abx500: root out hardcoded IRQ assignments (2014-03-04
-> 08:58:11 +0800)
+>   irqchip: mmp: avoid use head file in a specific arch (2014-03-04
+> 08:56:47 +0800)
+> 
+> ----------------------------------------------------------------
+> fix build on 64-bit cpu
 
-Nice. Pulled into next/dt due to the dependencies.
+Pulled, but the tag was empty with no text when I pulled it.
 
 
 -Olof
