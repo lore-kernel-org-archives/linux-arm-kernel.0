@@ -1,24 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 22:07:28 -0800
-Subject: [GIT PULL] Xilinx Zynq changes for v3.15
-In-Reply-To: <5310382F.5060700@monstr.eu>
-References: <53061EBA.1080002@monstr.eu>
- <5310382F.5060700@monstr.eu>
-Message-ID: <20140309060728.GA16310@quad.lixom.net>
+Date: Sat, 8 Mar 2014 22:10:29 -0800
+Subject: [GIT PULL] Allwinner fixes for 3.14
+In-Reply-To: <20140303102052.GA28112@lukather>
+References: <20140303102052.GA28112@lukather>
+Message-ID: <20140309061029.GB16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 08:18:07AM +0100, Michal Simek wrote:
+On Mon, Mar 03, 2014 at 11:20:52AM +0100, Maxime Ripard wrote:
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> 
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mripard/linux.git tags/sunxi-fixes-for-3.14
+> 
+> for you to fetch changes up to 40dd8f3b900cac1d925605a9d3199368c4af0a40:
+> 
+>   ARM: sunxi: dt: Change the touchscreen compatibles (2014-02-07 22:30:05 +0100)
 
-> Any update on this one?
-
-Hi,
-
-Looks like it fell between chairs, but the bigger problem is the fetch URL:
-
-> >   git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
-
-Care to send a fresh pull request with a publicly accessible repo URL? :)
+Pulled, thanks.
 
 
 -Olof
