@@ -1,84 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 10 Mar 2014 04:01:12 +0800
-Subject: [PATCH 1/4] ARM: dts: keystone: update for supporting K2L/K2E EVMs
-In-Reply-To: <20140309053924.GD12854@quad.lixom.net>
-References: <1393365035-20083-1-git-send-email-santosh.shilimkar@ti.com>
- <1393365035-20083-2-git-send-email-santosh.shilimkar@ti.com>
- <20140309053924.GD12854@quad.lixom.net>
-Message-ID: <531CC888.1080100@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 09 Mar 2014 19:12:35 -0400 (EDT)
+Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
+In-Reply-To: <1394192092-27461-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394192092-27461-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140309.191235.1047481546773873653.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 March 2014 01:39 PM, Olof Johansson wrote:
-> On Tue, Feb 25, 2014 at 04:50:32PM -0500, Santosh Shilimkar wrote:
->> From: Murali Karicheri <m-karicheri2@ti.com>
->>
->> This patch add compatibility strings for k2hk, k2l and k2e EVMs
->>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  .../devicetree/bindings/arm/keystone/keystone.txt  |   10 ++++++++++
->>  arch/arm/mach-keystone/keystone.c                  |    3 +++
->>  2 files changed, 13 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> index 63c0e6a..ad16e7a 100644
->> --- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> @@ -8,3 +8,13 @@ Required properties:
->>   - compatible: All TI specific devices present in Keystone SOC should be in
->>     the form "ti,keystone-*". Generic devices like gic, arch_timers, ns16550
->>     type UART should use the specified compatible for those devices.
->> +
->> +Boards:
->> +-  Keystone 2 Hawking/Kepler EVM
->> +   compatible = "ti,k2hk-evm"
->> +
->> +-  Keystone 2 Lamarr EVM
->> +   compatible = "ti,k2l-evm"
-> 
-> Your previous email said Lammar. One, or maybe both, are wrong, but which one?
->
-My email had a typo then. The one here is right.
- 
->> +
->> +-  Keystone 2 Edison EVM
->> +   compatible = "ti,k2e-evm"
->> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
->> index 6e6bb7d..aa0d212 100644
->> --- a/arch/arm/mach-keystone/keystone.c
->> +++ b/arch/arm/mach-keystone/keystone.c
->> @@ -47,6 +47,9 @@ static void __init keystone_init(void)
->>  
->>  static const char *keystone_match[] __initconst = {
->>  	"ti,keystone-evm",
->> +	"ti,k2hk-evm",
->> +	"ti,k2l-evm",
->> +	"ti,k2e-evm",
-> 
-> -evm indicate board-level compat fields. We'd be better off just keeping a
-> "ti,keystone" top-level compatible here and just using that to probe. That
-> way you don't have to touch the file for new boards in the future.
-> 
-So far keystone-evm was k2hk(Keystone2 Hawking EVM) but with additional two
-SOC's and board's, separate compatible was needed to differentiate. These
-boards do have significant differences though current mainline code.
-This mainly because the boards are build for those specific SOC families.
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Fri,  7 Mar 2014 12:34:52 +0100
 
-I would like to keep the organisation that way so that we cab support any
-future boards like below.
-"ti,k2hk-evm" --> All the Keystone2 Hawking/Kepler boards
-"ti,k2l-evm" --> All the Keystone2 Lamarr boards
-"ti,k2e-evm" --> All the Keystone2 Edision boards
+> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+>   ("net: phy: resume/suspend PHYs on attach/detach")
+> introduced a feature to suspend PHYs when entering halted state.
+> 
+> Unfortunately, not all bootloaders properly power-up PHYs on reset
+> and fail to access ethernet because the PHY is still powered down.
+> 
+> Therefore, this adds code and documentation for a sysfs attribute to
+> allow/deny PHYs to be suspended on a per-PHY basis. Disabling that
+> attribute prevents PHYs from being suspended when entering halted state.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
 
-I don't expect to touch this file till new SOC gets added with its
-EVM.
+I know you won't like what I have to say, but I want to see a solution
+without this sysfs knob.
 
-Regards,
-Ssantosh
+First of all, you obviously have a way to end up having the sysfs knob
+get set on the appropriate systems.
+
+Therefore, you obviously have some way to propagate the same piece of
+information into the kernel somehow during boot time.
+
+For example, via a device tree property or similar.
+
+Please pursue an avenue such as that.  This sysfs thing, it's a user
+facing interface we'd have to live with forever.
