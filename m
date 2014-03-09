@@ -1,106 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Mar 2014 10:28:46 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.14-rc
-Message-ID: <20140309172846.GA20640@quad.lixom.net>
+Date: Sun, 9 Mar 2014 11:22:02 -0700
+Subject: [GIT PULL 2/6] Samsung drivers for v3.15
+In-Reply-To: <15399641.260291393840311352.JavaMail.weblogic@epml16>
+References: <15399641.260291393840311352.JavaMail.weblogic@epml16>
+Message-ID: <20140309182202.GA22881@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Mar 03, 2014 at 09:51:51AM +0000, Kukjin Kim wrote:
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> 
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> 
+> are available in the git repository at:
+> 
+>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/samsung-drivers
+> 
+> for you to fetch changes up to a83784859ccde07ebdc3a7acfbb2f74cb6c75a80:
+> 
+>   irqchip: exynos-combiner: call handle_bad_irq directly (2014-02-14 07:27:40 +0900)
 
-The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+Pulled into next/cleanup, thanks for splitting off into a separate branch.
 
-  Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 10554647b488f58f2c36c78368e9bab4b93da721:
-
-  Merge tag 'omap-for-v3.14/fixes-dt-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-03-08 22:56:31 -0800)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.14-rc
-
-A collection of fixes for ARM platforms. A little large due to us missing to
-do one last week, but there's nothing in particular here that is in itself
-large and scary.
-
-Mostly a handful of smaller fixes all over the place. The majority is made
-up of fixes for OMAP, but there are a few for others as well. In particular,
-there was a decision to rename a binding for the Broadcom pinctrl block that
-we need to go in before the final release since we then treat it as ABI.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      Merge tag 'omap-for-v3.14/fixes-rc4' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Christian Daudt (1):
-      pinctrl: refer to updated dt binding string.
-
-Illia Smyrnov (1):
-      ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
-
-Javier Martinez Canillas (1):
-      ARM: dts: omap3-igep: fix boot fail due wrong compatible match
-
-Marek Belisko (1):
-      ARM: dts: omap3-gta04: Add ti,omap36xx to compatible property to avoid problems with booting
-
-Maxime Ripard (2):
-      ARM: sun7i: dt: Fix interrupt trigger types
-      ARM: sunxi: dt: Change the touchscreen compatibles
-
-Olof Johansson (3):
-      Merge tag 'sunxi-fixes-for-3.14' of https://github.com/mripard/linux into fixes
-      Merge tag 'bcm-for-3.14-pinctrl-reduced-rename' of git://github.com/broadcom/bcm11351 into fixes
-      Merge tag 'omap-for-v3.14/fixes-dt-rc4' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Santosh Shilimkar (1):
-      ARM: OMAP: Kill warning in CPUIDLE code with !CONFIG_SMP
-
-Sebastian Reichel (1):
-      ARM: OMAP2+: Add support for thumb mode on DT booted N900
-
-Sherman Yin (2):
-      Update dtsi with new pinctrl compatible string
-      pinctrl: Rename Broadcom Capri pinctrl binding
-
-Stephen Warren (1):
-      ARM: tegra: add LED options back into tegra_defconfig
-
-Suman Anna (1):
-      ARM: DRA7: hwmod data: correct the sysc data for spinlock
-
-Tomi Valkeinen (1):
-      ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
-
-Tony Lindgren (2):
-      Merge tag 'for-v3.14-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.14/fixes
-      ARM: OMAP3: Fix pinctrl interrupts for core2
-
-Vaibhav Bedia (1):
-      ARM: OMAP5: PRM: Fix reboot handling
-
- ...capri-pinctrl.txt => brcm,bcm11351-pinctrl.txt} |  8 +-
- arch/arm/boot/dts/bcm11351.dtsi                    |  2 +-
- arch/arm/boot/dts/omap3-gta04.dts                  |  2 +-
- arch/arm/boot/dts/omap3-igep0020.dts               |  2 +-
- arch/arm/boot/dts/omap3-igep0030.dts               |  2 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                   |  2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 12 +--
- arch/arm/configs/tegra_defconfig                   |  3 +
- arch/arm/mach-omap2/cclock3xxx_data.c              |  2 +
- arch/arm/mach-omap2/cpuidle44xx.c                  |  8 +-
- arch/arm/mach-omap2/dpll3xxx.c                     | 92 ++++++++++++++++++----
- arch/arm/mach-omap2/omap_hwmod.c                   | 20 ++---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  9 +--
- arch/arm/mach-omap2/pdata-quirks.c                 | 21 ++++-
- arch/arm/mach-omap2/prminst44xx.c                  |  4 +-
- drivers/pinctrl/pinctrl-capri.c                    |  2 +-
- include/linux/clk/ti.h                             |  4 +
- 19 files changed, 146 insertions(+), 53 deletions(-)
- rename Documentation/devicetree/bindings/pinctrl/{brcm,capri-pinctrl.txt => brcm,bcm11351-pinctrl.txt} (98%)
+-Olof
