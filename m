@@ -1,31 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 9 Mar 2014 19:08:07 +0000
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <CAOesGMhUVEEa6KLs2ZORxJunxitVdOQ5-wbs3KtEWBq+77t5JA@mail.gmail.com>
-References: <20140309114134.502cdcae7e6a97db684d6b15@kernel.org>
- <CAOesGMhUVEEa6KLs2ZORxJunxitVdOQ5-wbs3KtEWBq+77t5JA@mail.gmail.com>
-Message-ID: <20140309190807.GZ28112@sirena.org.uk>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Sun, 9 Mar 2014 20:09:42 +0100
+Subject: [GIT PULL] Reset controller fixes and updates
+In-Reply-To: <20140309051736.GA12854@quad.lixom.net>
+References: <1392731862.3606.42.camel@pizza.hi.pengutronix.de>
+ <20140309051736.GA12854@quad.lixom.net>
+Message-ID: <20140309190942.GA4939@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 09, 2014 at 10:08:58AM -0700, Olof Johansson wrote:
-> On Sun, Mar 9, 2014 at 4:41 AM, Mark Brown <broonie@kernel.org> wrote:
+Hi Olof,
 
-> > ERROR: Input tree has errors, aborting (use -f to force output)
-> > make[2]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 2
+On Sat, Mar 08, 2014 at 09:17:36PM -0800, Olof Johansson wrote:
+> Hi Philipp,
+> 
+> Can I please ask that you send these to arm at kernel.org in the future?
+[...]
 
-> Known issue, I unmerged the offending branch but didn't push out the
-> backed out for-next branch last night (I was unaware that you were
-> doing linux-next now, and sfr doesn't do them until Sunday night our
-> time, so I didn't think it was urgent).
+Alright, I'll do that from now on.
 
-No worries, I wouldn't have done it on a Sunday either but this time
-round I've got Stephen's scripts so I've been pipe cleaning those so
-hopefully everything will actually run properly on Monday.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/d8130a81/attachment.sig>
+> I didn't see this branch pulled yet, but I also see 4 patches on it now, not
+> 3. Maybe you have a refreshed pull request further down in my inbox though, if
+> so I'll get to it there. If not, please clarify if you still want all
+> 4 patches to be merged or just the first 3.
+
+The weekend got in the way. I've since rewritten the last commit message with
+ack and review tags and will send a new pull request to the preferred address.
+
+thanks
+Philipp
