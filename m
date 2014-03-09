@@ -1,44 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 23:33:47 -0800
-Subject: [GIT PULL 4/4] omap crossbar support for v3.15
-In-Reply-To: <5313bcc5.a8fc440a.467f.7ba2SMTPIN_ADDED_MISSING@mx.google.com>
-References: <pull-1393802089-910509>
- <5313bcc5.a8fc440a.467f.7ba2SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20140309073347.GL16310@quad.lixom.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 9 Mar 2014 07:51:48 +0000
+Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
+ regulators subsystem
+In-Reply-To: <CAOQ7t2YSidSPVSBrBzj3R1SYS_Xb10a2vfEs+u1DEkrhEJQCaQ@mail.gmail.com>
+References: <1393692352-10839-1-git-send-email-carlo@caione.org>
+ <1393692352-10839-7-git-send-email-carlo@caione.org>
+ <20140307182213.GC607@lukather>
+ <CAOQ7t2YSidSPVSBrBzj3R1SYS_Xb10a2vfEs+u1DEkrhEJQCaQ@mail.gmail.com>
+Message-ID: <20140309075148.GJ28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 03:14:49PM -0800, Tony Lindgren wrote:
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/crossbar-signed
-> 
-> for you to fetch changes up to 9594274201ac3c67d5c569aae63792e58bcd33e6:
-> 
->   Merge branch 'crossbar_3.14_rc1' of git://github.com/Sricharanti/sricharan into omap-for-v3.15/crossbar (2014-02-28 13:35:02 -0800)
-> 
-> ----------------------------------------------------------------
-> 
-> Add support for GIC crossbar that routes interrupts on newer omaps.
-> 
-> Looks like people wanted these merged via the omap tree as it's
-> the only user for the GIC crossbar.
-> 
-> ----------------------------------------------------------------
-> Sricharan R (4):
->       DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
->       DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
->       ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
->       ARM: DRA: Enable Crossbar IP support for DRA7XX
+On Sat, Mar 08, 2014 at 12:43:04PM +0100, Carlo Caione wrote:
+> On Fri, Mar 7, 2014 at 7:22 PM, Maxime Ripard
+> > On Sat, Mar 01, 2014 at 05:45:51PM +0100, Carlo Caione wrote:
 
-Whoa, lots of caps on those driver subjects. I don't think we need those
-in the future, lower case is just fine (and DRIVERS: usually isn't used).
+> >> +     return platform_driver_register(&axp20x_regulator_driver);
 
-Branch has been merged into next/drivers.
+> > I thought the AXP was only connected through I2C? How is that a
+> > platform device then?
 
+> Not really. It is plain wrong.
+> I'll fix it in v2.
 
--Olof
+Are you sure this is wrong?  For MFDs the core MFD is a driver of
+whatever bus type is in use but the function drivers are platform
+devices which talk to the hardware via the core device.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/6dc1f954/attachment-0001.sig>
