@@ -1,44 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 9 Mar 2014 10:11:44 +0100
-Subject: [PATCH 1/7] mfd: AXP20x: Add mfd driver for AXP20x PMIC
-In-Reply-To: <20140308113141.GA14009@localhost.fastwebnet.it>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-2-git-send-email-carlo@caione.org>
- <20140307180936.GY607@lukather>
- <20140308113141.GA14009@localhost.fastwebnet.it>
-Message-ID: <20140309091144.GB3335@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 9 Mar 2014 11:41:34 +0000
+Subject: linux-next: build failure after merge of the arm-soc tree
+Message-ID: <20140309114134.502cdcae7e6a97db684d6b15@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+Hi all,
 
-On Sat, Mar 08, 2014 at 12:31:41PM +0100, Carlo Caione wrote:
-> > > +	axp20x->pm_off = of_property_read_bool(node, "axp,system-power-controller");
-> > > +
-> > > +	if (axp20x->pm_off && !pm_power_off) {
-> > > +		axp20x_pm_power_off = axp20x;
-> > > +		pm_power_off = axp20x_power_off;
-> > > +	}
-> > 
-> > I don't think we have any other way to actually power down the board.
-> > 
-> > Is there any reason why we would not need this property?
-> 
-> In case you have multiple PMIC on the board in this way you con define
-> which is the one apt to power off.
+After merging the arm-soc tree, today's linux-next build (20140309)
+failed for multi_v7_defconfig like this:
 
-Do we even have such a board?
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
 
-Let's leave this out, we can always add it later if needs be.
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[2]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 2
+make[2]: *** Waiting for unfinished jobs....
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
+
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
+
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[2]: *** [arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb] Error 2
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
+
+ERROR (phandle_references): Reference to non-existent node or label "sysmgr"
+
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[2]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 2
+make[1]: *** [dtbs] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
+Build failed
+
+I have tried using the tree from Friday instead but see following mail.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/1ba2880f/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140309/96ecf1a1/attachment.sig>
