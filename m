@@ -1,39 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Mar 2014 22:04:30 -0800
-Subject: [GIT PULL] ARM: mvebu: watchdog driver changes for v3.15 (incr.
- pull #2)
-In-Reply-To: <20140228193342.GP1872@titan.lakedaemon.net>
-References: <20140228193342.GP1872@titan.lakedaemon.net>
-Message-ID: <20140309060430.GH12854@quad.lixom.net>
+Date: Sat, 8 Mar 2014 22:07:28 -0800
+Subject: [GIT PULL] Xilinx Zynq changes for v3.15
+In-Reply-To: <5310382F.5060700@monstr.eu>
+References: <53061EBA.1080002@monstr.eu>
+ <5310382F.5060700@monstr.eu>
+Message-ID: <20140309060728.GA16310@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 02:33:42PM -0500, Jason Cooper wrote:
-> All,
-> 
-> This small pull request sends a fix for warnings noticed by Olof's
-> autobuilder.  I don't anticipate any other changes to this branch for
-> this window, so I'm sending this is now.
-> 
-> This is an incremental pull request from tags/mvebu-watchdog-3.15 in the
-> mvebu/watchdog branch to tags/mvebu-watchdog-3.15-2.
-> 
-> Please pull.
-> 
-> thx,
-> 
-> Jason.
-> 
-> 
-> The following changes since commit 59416745bb8cbe32daf805f768418353168b0664:
-> 
->   watchdog: orion: Enable the build on ARCH_MVEBU (2014-02-22 03:44:34 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-watchdog-3.15-2
+On Fri, Feb 28, 2014 at 08:18:07AM +0100, Michal Simek wrote:
 
-Pulled.
+> Any update on this one?
+
+Hi,
+
+Looks like it fell between chairs, but the bigger problem is the fetch URL:
+
+> >   git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
+
+Care to send a fresh pull request with a publicly accessible repo URL? :)
 
 
 -Olof
