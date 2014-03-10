@@ -1,62 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 15:38:15 +0000
-Subject: [PATCH 1/5] drivers: input: keyboard: st-keyscan: add keyscan
- driver
-In-Reply-To: <20140310152859.GA29054@core.coreip.homeip.net>
-References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
- <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
- <20140310114819.GO14976@lee--X1>
- <20140310152859.GA29054@core.coreip.homeip.net>
-Message-ID: <20140310153815.GE13661@lee--X1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Mar 2014 08:41:06 -0700
+Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
+In-Reply-To: <531DBCA8.80507@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <531823C5.1020008@ti.com> <20140307164929.GC3789@atomide.com>
+ <531DBCA8.80507@ti.com>
+Message-ID: <20140310154105.GA4882@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > This patch adds ST Keyscan driver to use the keypad hw a subset
-> > > of ST boards provide. Specific board setup will be put in the
-> > > given dt.
-> > > 
-> > > Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-> > > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140310 06:26]:
+> On 07/03/14 18:49, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140305 23:32]:
+> >> Hi Tony,
+> >>
+> >> On 21/01/14 12:56, Tomi Valkeinen wrote:
+> >>> Hi,
+> >>>
+> >>> Here's version 3 of the DSS DT series.
+> >>
+> >> Can you have a look at the arch/arm/ parts in the series and ack if
+> >> they're ok, i.e, patches 1, 2, 32.
 > > 
-> > Are you sure these are in the correct order?
+> > Patches 1, 2 & 32 look OK to me, so for those please feel free to add:
 > > 
-> > What is the history of this commit?
-> > 
-> > > ---
-> > >  .../devicetree/bindings/input/st-keypad.txt        |  50 ++++
-> > 
-> > This should be submitted as a seperate patch.
+> > Acked-by: Tony Lindgren <tony@atomide.com>
 > 
-> Why do we have such requirement? To me it would make more sense to add
-> binding documentation in the same commit as the code that uses these
-> bindings.
-
-I'm inclined to agree with you and that's actually how we used to do
-it, but a decision was made by the DT guys at one of the Kernel
-Summits to submit Documentation as a separate patch.
-
-> [...]
+> Thanks.
 > 
-> > > +
-> > > +	error = matrix_keypad_parse_of_params(dev, &pdata->num_out_pads,
-> > > +			&pdata->num_in_pads);
-> > > +	if (error) {
-> > > +		dev_err(dev, "failed to parse keypad params\n");
-> > > +		return error;
-> > 
-> > Nit: It's pretty unusual to use this for a standard error handling
-> > variable. Consider 'ret' or 'err' as a replacement.
+> > How about do a pull request for just the .dts changes against current
+> > omap-for-v3.15/dt branch ASAP for me so I can pull it in? That is assuming
+> > that just the .dts changes alone won't break anything.
 > 
-> I like "error", in fact there are a lot of these in input. I use "error" for
-> data that is only returned from error path and "retval" when the same
-> variable is returned in both success and error paths.
+> Unfortunately they do break. At least pinmuxing is moved from the global
+> definitions to be handled by the respective display drivers, and there
+> are some regulator_name hacks that the DT patches remove.
 
-If that's your preference then I'm cool with it too. Scrap my comment.
+OK. Will that cause regressions for omap3 as that's still also booting
+in legacy mode?
+ 
+> I think those changes could be removed from my patches, and then added
+> back later when everything else has been merged.
 
-[...]
+Or you could have a second branch that also merges in omap-for-v3.15/dt
+branch that you can send later towards the merge window after the arm-soc
+changes have been merged. If you want to do that, then feel free to add
+my ack also for the .dts changes:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+If however those changes get postponed to v3.16, it's best that you'll
+redo the branch as I'm sure we'll have other merge issues for v3.16.
+ 
+> The bigger issue is that suddenly there's lots of discussion about the
+> display DT bindings. If those are not resolved very soon, I guess I have
+> no choice but to again skip the merge window for the DSS DT changes.
+
+OK, some of these more bindings can take easily six months to reach
+some kind of resolution. You may be able to use TI specific unstable
+bindings meanwhile if that makese sense.
+
+Regards,
+
+Tony
