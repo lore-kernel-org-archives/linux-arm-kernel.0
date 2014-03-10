@@ -1,139 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Mar 2014 16:45:58 -0500
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>
- <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
-Message-ID: <CAL_JsqJ00Zr1tMoyR1+qHUhsNoc6Kj6s+nTZTkNTwki9HFHq8g@mail.gmail.com>
+From: mr.nuke.me@gmail.com (mr.nuke.me at gmail.com)
+Date: Mon, 10 Mar 2014 14:49:15 -0700 (PDT)
+Subject: [PATCH v5 6/8] ARM: dts: sun4i: Add support for mmc
+In-Reply-To: <20140211193423.4568.34947.stgit@dizzy-6.o2s.ch>
+References: <20140211190543.4568.83517.stgit@dizzy-6.o2s.ch>
+ <20140211193423.4568.34947.stgit@dizzy-6.o2s.ch>
+Message-ID: <ac47de94-92ef-4b53-9983-34dd2f9924ea@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 10:25 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Am Freitag, den 28.02.2014, 15:59 +0000 schrieb Russell King - ARM
-> Linux:
->> On Fri, Feb 28, 2014 at 02:20:10PM +0200, Tomi Valkeinen wrote:
->> > Add DT binding documentation for DVI Connector.
->> >
->> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> > Reviewed-by: Archit Taneja <archit@ti.com>
->> > ---
->> >  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
->> >  1 file changed, 26 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
->> > new file mode 100644
->> > index 000000000000..6a0aff866c78
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
->> > @@ -0,0 +1,26 @@
->> > +DVI Connector
->> > +==============
->> > +
->> > +Required properties:
->> > +- compatible: "dvi-connector"
->> > +
->> > +Optional properties:
->> > +- label: a symbolic name for the connector
->> > +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
->> > +
->> > +Required nodes:
->> > +- Video port for DVI input
->> > +
->> > +Example
->> > +-------
->> > +
->> > +dvi0: connector at 0 {
->> > +   compatible = "dvi-connector";
->> > +   label = "dvi";
->> > +
->> > +   i2c-bus = <&i2c3>;
->> > +
->> > +   dvi_connector_in: endpoint {
->> > +           remote-endpoint = <&tfp410_out>;
->> > +   };
->> > +};
->>
->> This looks far too simplistic.  There are different classes of DVI
->> connector - there is:
->>
->> DVI A - analogue only
->> DVI D - digital only (single and dual link)
->> DVI I - both (single and dual digital link)
->>
->> DRM at least makes a distinction between these three classes, and this
->> disctinction is part of the user API.  How would a display system know
->> which kind of DVI connector is wired up on the board from this DT
->> description?
->
-> Maybe this could be inferred from the sources connected to it. For
-> example a i.MX5 board with the SoC internal TV Encoder and an external
-> SiI902x HDMI encoder connected to the same DVI I connector:
->
-> ipu {
->         port at 2 {
->                 ipu_di0_disp0: endpoint {
->                         remote-endpoint = <&sii902x_in>;
->                 };
->         };
->         port at 3 {
->                 ipu_di1_tve: endpoint {
->                         remote-endpoint = <&tve_in>;
->                 };
->         };
-> };
->
-> &sii902x {
->         compatible = "si,sii9022";
->
->         port at 0 {
->                 sii902x_in: endpoint {
->                         remote-endpoint = <&ipu_di0>;
->                 };
->         };
->         port at 1 {
->                 sii902x_out: endpoint {
->                         remote-endpoint = <&dvi_d_in>;
->                 };
->         };
-> };
->
-> &tve {
->         compatible = "fsl,imx53-tve";
->         port at 0 {
->                 tve_in: endpoint {
->                         remote-endpoint = <&ipu_di1>;
->                 };
->         };
->         port at 1 {
->                 tve_out: endpoint {
->                         remote-endpoint = <&dvi_a_in>;
->                 };
->         };
-> };
->
-> dvi-connector {
->         compatible = "dvi-connector";
->         ddc-i2c-bus = <&i2c3>;
->
->         port {
->                 dvi_d_in: endpoint at 0 {
->                         remote-endpoint = <&sii902x_out>;
->                 };
->                 dvi_a_in: endpoint at 1 {
->                         remote-endpoint = <&tve_out>;
->                 };
->         };
-> };
->
-> It should be possible to let the connector know that those two endpoints
-> are connected to a TMDS source and to a VGA source, respectively.
+On Tuesday, February 11, 2014 1:34:25 PM UTC-6, David Lanzend?rfer wrote:
+> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> index b139ee6..20b976a 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> @@ -33,6 +33,14 @@
+>  			};
+>  		
+>  		};
+> +		mmc0: mmc at 01c0f000 {
+> +			pinctrl-names = "default", "default";
+> +			pinctrl-0 = <&mmc0_pins_a>;
+> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
+> +			status = "okay";
+> +		};
+> +
+>  		pinctrl at 01c20800 {
+>  		
+>  			led_pins_cubieboard: led_pins at 0 {
+>  			
+>  				allwinner,pins = "PH20", "PH21";
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi
+> b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 9044c53..d040d37 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -330,6 +330,46 @@
+>  			#size-cells = <0>;
+>  		
+>  		};
+> +		mmc0: mmc at 01c0f000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
 
-I like this proposal over the others. Although, would dual link be a
-single endpoint or 2 endpoints? How would you differentiate that?
+Should be "allwinner,sun4i-a10-mmc", or we will hang the MMC driver on A10.
 
-The port node seems a bit pointless.
+> +		mmc1: mmc at 01c10000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+ditto
 
-Rob
+> +		mmc2: mmc at 01c11000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+ditto
+
+> +		mmc3: mmc at 01c12000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+ditto
