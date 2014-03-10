@@ -1,47 +1,58 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Mon, 10 Mar 2014 09:11:55 +0100
-Subject: [BUG] atmel: spi: scheduling while atomic
-In-Reply-To: <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
-References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
- <5316CA84.4080907@aksignal.cz> <20140307225810.GB2918@piout.net>
- <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
-Message-ID: <531D73CB.7040402@aksignal.cz>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 10 Mar 2014 09:12:09 +0100
+Subject: [GIT PULL v2] Xilinx Zynq dt changes for v3.15
+In-Reply-To: <53061EAD.9000000@monstr.eu>
+References: <53061EAD.9000000@monstr.eu>
+Message-ID: <531D73D9.7060207@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-at first: warning is on all spi devices.
-at second: its with CONFIG_PREEMPT=y, without (# CONFIG_PREEMPT_RCU is not set) is OK, but I wonder if this config will 
-be fast enough for our usage (nearly RT)?
+Hi,
+
+please pull this patch to your arm-soc tree.
+
+Changes in v2: Fix incorrect git repo url
+
+Thanks,
+Michal
 
 
-Dne 8.3.2014 01:41, Rabin Vincent napsal(a):
-> 2014-03-07 23:58 GMT+01:00 Alexandre Belloni
-> <alexandre.belloni@free-electrons.com>:
->> On 05/03/2014 at 07:56:04 +0100, Ji?? Prchal wrote :
->>> [    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
->>> [    0.906250] Modules linked in:
->>> [    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-rc4_cpm9g25+ #1
->>> [    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>] (show_stack+0x10/0x14)
->>> [    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>] (__schedule_bug+0x48/0x60)
->>> [    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>] (__schedule+0x60/0x484)
->>> [    0.906250] [<c0390294>] (__schedule) from [<c038feac>] (schedule_timeout+0x17c/0x1ac)
->>> [    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>] (wait_for_common+0x10c/0x1f0)
->>> [    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>] (atmel_spi_transfer_one_message+0x71c/0xa48)
->>> [    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from [<c0246624>] (spi_pump_messages+0x210/0x238)
->>> [    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>] (kthread_worker_fn+0x15c/0x1b4)
->>> [    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>] (kthread+0xb8/0xcc)
->>> [    0.906250] [<c0034534>] (kthread) from [<c0009510>] (ret_from_fork+0x14/0x24)
->>> [    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
->>
->> Actually, I'm not quite sure how spi_pump_messages can be called from an
->> atomic context.
->
-> spi_pump_messages() is not called from atomic context.  Rather,
-> atmel_spi_transfer_one_message() does a spin_lock_irqsave() (via
-> atmel_spi_lock()) and then calls atmel_spi_one_transfer(), which calls
-> wait_for_completion_timeout().  That's why schedule is being called
-> from atomic context.  This was introduced by 8090d6d1a4 ("spi: atmel:
-> Refactor spi-atmel to use SPI framework queue"). I think you should
-> see the warning with CONFIG_PREEMPT=y.
->
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.15
+
+for you to fetch changes up to 3795e91d2abb25164dda5687ca680a7ab940c447:
+
+  arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v3.15
+
+- Define fclk-enable property
+
+----------------------------------------------------------------
+Soren Brinkmann (1):
+      arm: dt: zynq: Add fclk-enable property to clkc node
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/13897a86/attachment-0001.sig>
