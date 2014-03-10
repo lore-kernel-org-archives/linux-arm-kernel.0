@@ -1,38 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 10 Mar 2014 17:36:56 +0900
-Subject: [PATCH] ARM: shmobile: APMU: Fix warnings due to improper printk
- formats
-In-Reply-To: <cover.1394440471.git.horms+renesas@verge.net.au>
-References: <cover.1394440471.git.horms+renesas@verge.net.au>
-Message-ID: <56ff873122c4baab43df241c7701d043b8ec8a8e.1394440471.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 10 Mar 2014 17:47:46 +0900
+Subject: [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
+In-Reply-To: <20140307023813.GG11702@verge.net.au>
+References: <20140224054058.1143.14096.sendpatchset@w520>
+ <20140307023813.GG11702@verge.net.au>
+Message-ID: <20140310084740.GC24411@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Fri, Mar 07, 2014 at 11:38:16AM +0900, Simon Horman wrote:
+> On Mon, Feb 24, 2014 at 02:40:58PM +0900, Magnus Damm wrote:
+> > ARM: shmobile: Rework include path for SoC files
+> > 
+> > [PATCH 01/12] ARM: shmobile: Add temporary include workaround
+> > [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
+> > [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
+> > [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
+> > [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
+> > [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
+> > [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
+> > [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
+> > [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
+> > [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
+> > [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
+> > [PATCH 12/12] ARM: shmobile: Rework include path for common bits
+> > 
+> > Start converting the mach-shmobile subarchitecture from <mach/something.h>
+> > to "something.h". This series covers shared code base and SoC code,
+> > however actual header files are not moved yet. Upcoming series that
+> > depend on this one will have to convert board code as well. When SoCs
+> > code and board code have been converted then actual header files can
+> > be moved and temporary include path workarounds can be removed.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> 
+> Thanks, I have queued this up.
 
-Use the %pr printk specifier to print resource variables. This fixes
-warnings on platforms where resource_size_t has a different size than
-int.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/platsmp-apmu.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 1da5a72..8cb641c 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -75,8 +75,7 @@ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- 	apmu_cpus[cpu].iomem = ioremap_nocache(res->start, resource_size(res));
- 	apmu_cpus[cpu].bit = bit;
- 
--	pr_debug("apmu ioremap %d %d 0x%08x 0x%08x\n", cpu, bit,
--		 res->start, resource_size(res));
-+	pr_debug("apmu ioremap %d %d %pr\n", cpu, bit, res);
- }
- 
- static struct {
--- 
-1.8.5.2
+As Olof has indicated that he is not happy with the first patch of
+the series I have dropped the entire series for now.
