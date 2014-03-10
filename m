@@ -1,59 +1,59 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 11 Mar 2014 00:00:12 +0800
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <1394104717-3100-3-git-send-email-sthokal@xilinx.com>
-References: <1394104717-3100-1-git-send-email-sthokal@xilinx.com>
- <1394104717-3100-3-git-send-email-sthokal@xilinx.com>
-Message-ID: <CABb+yY1y1sOozVU=iAsotWG-q3N=SogjHjZ=iF04CiXF89eeOg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 10 Mar 2014 11:05:40 -0500
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+In-Reply-To: <53143796.2050309@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <20140228162752.GU21483@n2100.arm.linux.org.uk>
+ <5310BDE3.60603@ti.com>
+ <20140228165628.GX21483@n2100.arm.linux.org.uk>
+ <53143796.2050309@ti.com>
+Message-ID: <CAL_JsqLppZHjND_LFMxscR0WCD4Ox7vF0fDbQFoYg=TENXxY8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 7:18 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
-
-> +static struct dma_async_tx_descriptor *
-> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
-> +                                struct dma_interleaved_template *xt,
-> +                                unsigned long flags)
-> +{
-> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> +       struct xilinx_vdma_tx_descriptor *desc;
-> +       struct xilinx_vdma_tx_segment *segment;
-> +       struct xilinx_vdma_tx_segment *prev = NULL;
-> +       int i;
-> +
-> +       if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM))
-> +               return NULL;
-> +
-> +       if (!xt->numf || !xt->sgl[0].size)
-> +               return NULL;
-> +
-> +       /* Allocate a transaction descriptor. */
-> +       desc = xilinx_vdma_alloc_tx_descriptor(chan);
-> +       if (!desc)
-> +               return NULL;
-> +
-> +       dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
-> +       desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
-> +       desc->async_tx.cookie = 0;
-> +       async_tx_ack(&desc->async_tx);
-> +
-> +       /* Build the list of transaction segments. */
-> +       for (i = 0; i < xt->frame_size; i++) {
-> +               struct xilinx_vdma_desc_hw *hw;
-> +
-> +               /* Allocate the link descriptor from DMA pool */
-> +               segment = xilinx_vdma_alloc_tx_segment(chan);
-> +               if (!segment)
-> +                       goto error;
-> +
-> +               /* Fill in the hardware descriptor */
-> +               hw = &segment->hw;
-> +               hw->vsize = xt->numf;
-> +               hw->hsize = xt->sgl[0].size;
-> +               hw->stride = xt->sgl[0].icg <<
-> +                               XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT;
+On Mon, Mar 3, 2014 at 2:04 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> Hi Rob, Pawel, Mark, Ian, Kumar,
 >
-It seems the xt->frame_size is (should be?) always going to be 1?
-If yes, the for-loop isn't needed.
-If no, you should probably use 'i' as the index to sgl[], and not always 0.
+> On 28/02/14 18:56, Russell King - ARM Linux wrote:
+>> On Fri, Feb 28, 2014 at 06:48:35PM +0200, Tomi Valkeinen wrote:
+>>> This is totally unclear to me. How does it become a public standard?
+>>> What's the forum for this?
+>>
+>> Me too.  That's where I'd hope someone on devicetree-discuss will be
+>> able to help us work out what's the right approach here. :)
+>
+> The story briefly so far: I've implemented DT support for OMAP display,
+> and created bindings for various (non-OMAP) display components,
+> including generic connector bindings for DVI, HDMI and analog-tv.
+>
+> Russell's point was that these connector bindings are very generic, i.e.
+> they are not for any particular chip from a particular vendor, but for
+> any connector for DVI, HDMI or analog-tv. And he's worried that maybe we
+> shouldn't define such generic bindings without consulting the whole
+> device-tree community (i.e including non-linux users).
+
+So re-work it to be generic and send it out. DT maintainers would
+rarely disagree that something shouldn't be made generic.
+
+> So the question is, is there such a community and a forum to bring up
+> this kind of things? If yes, should we bring this up there? If yes, what
+> kind of things in general should be brought into the attention of
+> non-linux users?
+
+devicetree list is just that. It is not just for Linux. There is the
+newly created devicetree-spec at vger.kernel.org which is for more
+core/common binding discussion.
+
+>
+> What I wonder here is that while a thing like DVI connector is, of
+> course, more generic than, say, "ti,tfp410" encoder chip, but isn't the
+> case still the same: we're defining global bindings for hardware that
+> should work for everyone, not only Linux users?
+
+Defining the connectors in DT is a useful thing although mainly when
+you have multiple connectors of the same type. Labels for composite,
+SVideo, VGA, DVI, HDMI seem less useful to me. Describing position or
+printed label (like front vs. rear connections) seem more useful to
+me.
+
+Rob
