@@ -1,44 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Mar 2014 16:21:01 +0100
-Subject: [PATCH v6 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140310144414.GT6457@e106497-lin.cambridge.arm.com>
-References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
- <201403081815.08829.arnd@arndb.de>
- <20140310144414.GT6457@e106497-lin.cambridge.arm.com>
-Message-ID: <2115856.ZTdgp5fkma@wuerfel>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Mar 2014 16:22:43 +0100
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <CAL_JsqL3V7Gmkx5MoAhzwbM8Po6QURUY+g3ytxs+H_u-FLR6SQ@mail.gmail.com>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <CAL_JsqL3V7Gmkx5MoAhzwbM8Po6QURUY+g3ytxs+H_u-FLR6SQ@mail.gmail.com>
+Message-ID: <1e9389a5-744d-4e6c-8428-f95ea0860239@VA3EHSMHS015.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 March 2014 14:44:14 Liviu Dudau wrote:
-> I will try to improve the error handling in the next patchset version.
-> However I am still confused about the earlier discussion on
-> pci_register_io_range(). Your suggestion initially was to return an
-> error in the default weak implementation, but in your last email you
-> are talking about returning 'port'.
+On 03/10/2014 04:15 PM, Rob Herring wrote:
+> On Tue, Mar 4, 2014 at 7:20 AM, Kedareswara rao Appana
+> <appana.durga.rao@xilinx.com> wrote:
+>> This patch adds xilinx CAN controller support.
+>> This driver supports both ZYNQ CANPS and Soft IP
+>> AXI CAN controller.
+>>
+>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+>> ---
+>> This patch is rebased on the 3.14 rc5 kernel.
+>> Changes for v5:
+>> - Updated the driver with the review comments.
+>> - Remove the check for the tx fifo full interrupt condition
+>>   form Tx interrupt routine as we are checking it in the _xmit
+>>   routine.
+>> - Clearing the txok interrupt in the tx interrupt routine for
+>>   every Tx can frame.
+>> Changes for v4:
+>> - Added check for the tx fifo full interrupt condition in
+>>   Tx interrupt routine.
+>> - Added be iohelper functions.
+>> - Moved the clock enable/disable to probe/remove because of
+>>   Added big endian support for AXI CAN controller case(reading
+>>   a register during probe for that we need to enable clock).
+>> Changes for v3:
+>> - Updated the driver with the review comments.
+>> - Modified the tranmit logic as per Marc suggestion.
+>> - Enabling the clock when the interface is up to reduce the
+>>   Power consumption.
+>> Changes for v2:
+>> - Updated with the review comments.
+>> - Removed the unnecessary debug prints.
+>> - include tx,rx fifo depths in ZYNQ CANPS case also.
+>> ---
+>>  .../devicetree/bindings/net/can/xilinx_can.txt     |   45 +
+>>  drivers/net/can/Kconfig                            |    7 +
+>>  drivers/net/can/Makefile                           |    1 +
+>>  drivers/net/can/xilinx_can.c                       | 1195 ++++++++++++++++++++
+>>  4 files changed, 1248 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>>  create mode 100644 drivers/net/can/xilinx_can.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>> new file mode 100644
+>> index 0000000..0e57103
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>> @@ -0,0 +1,45 @@
+>> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
+>> +---------------------------------------------------------
+>> +
+>> +Required properties:
+>> +- compatible           : Should be "xlnx,zynq-can-1.00.a" for Zynq CAN
+>> +                         controllers and "xlnx,axi-can-1.00.a" for Axi CAN
+>> +                         controllers.
+>> +- reg                  : Physical base address and size of the Axi CAN/Zynq
+>> +                         CANPS registers map.
+>> +- interrupts           : Property with a value describing the interrupt
+>> +                         number.
+>> +- interrupt-parent     : Must be core interrupt controller
+>> +- clock-names          : List of input clock names - "ref_clk", "aper_clk"
+>> +                         (See clock bindings for details. Two clocks are
+>> +                          required for Zynq CAN. For Axi CAN
+>> +                          case it is one(ref_clk)).
+>> +- clocks               : Clock phandles (see clock bindings for details).
+>> +- tx-fifo-depth                : Can Tx fifo depth.
+>> +- rx-fifo-depth                : Can Rx fifo depth.
+>> +
+>> +
+>> +Example:
+>> +
+>> +For Zynq CANPS Dts file:
+>> +       zynq_can_0: zynq-can at e0008000 {
+> 
+> The preferred node name convention is to use the type of device. There
+> is no standard in this case, but I would use just "can at ...".
+> 
+> Otherwise, for the binding:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-You can do either one: 'port' should be positive or zero, while the
-error would always be negative. We do the same thing in many interfaces
-in the kernel.
+Thanks Rob for your ACK.
 
-> My idea when I've introduced the
-> helper function was that it would return an error if it fails to
-> register the IO range and zero otherwise. I agree that we can treat
-> the default 'do nothing with the IO range' case as an error, with
-> the caveat that will force architectures that use this code to
-> provide their own implementation of pci_register_io_range() in order
-> to avoid failure, even for the cases where the architecture has a 1:1
-> mapping between IO and CPU addresses.
+Kedar: You have got more things to change from Marc that's why please change this too.
 
-Which architectures are you thinking of? The only one I know that
-does this is ia64, and we won't ever have to support this helper
-on that architecture.
-
-I did not ask to treat 'do nothing with the IO range' as an error,
-what I meant is that we should treat 'architecture cannot translate
-from I/O space to memory space but DT lists a translation anyway'
-as an error. On x86, you should never see an entry for the I/O space
-in "ranges", so we will not call this function unless there is a
-bug in DT.
-
-	Arnd
+Thanks,
+Michal
