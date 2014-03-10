@@ -1,78 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 10 Mar 2014 01:07:05 +0100
-Subject: [PATCH v4 4/5] clk/exynos5260: add macros and documentation for
- exynos5260
-In-Reply-To: <1393931558-23502-5-git-send-email-rahul.sharma@samsung.com>
-References: <1393931558-23502-1-git-send-email-rahul.sharma@samsung.com>
- <1393931558-23502-5-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <531D0229.5070209@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 9 Mar 2014 17:08:28 -0700
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <531CFA28.9020600@gmail.com>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net>
+ <531CFA28.9020600@gmail.com>
+Message-ID: <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-Please see some minor comments below.
-
-On 04.03.2014 12:12, Rahul Sharma wrote:
-> Add macros which are used as Clock IDs in DT and clock file.
-> It also adds the documentation for the exynos5260 clocks.
+On Sun, Mar 9, 2014 at 4:32 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 09.03.2014 19:35, Olof Johansson wrote:
+>>
+>> On Mon, Mar 03, 2014 at 09:56:11AM +0000, Kukjin Kim wrote:
+>>>
+>>> The following changes since commit
+>>> 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>>
+>>>    Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>    http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>> tags/samsung-pm-1
+>>>
+>>> for you to fetch changes up to e11d919e4aa2009077e3e4f829ff991d37adca61:
+>>>
+>>>    ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code (2014-02-14
+>>> 08:16:01 +0900)
+>>
+>>
+>> Hi,
+>>
+>> I don't see a single cc or acked-by line from Mike Turquette here. I'll
+>> hold
+>> off until he's had a chance to take a look at these ones; I suspect
+>> they'll be
+>> fine since it's mostly code refactoring though.
 >
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
-> ---
->   .../devicetree/bindings/clock/exynos5260-clock.txt |   55 +++++
->   include/dt-bindings/clk/exynos5260-clk.h           |  233 ++++++++++++++++++++
->   2 files changed, 288 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
->   create mode 100644 include/dt-bindings/clk/exynos5260-clk.h
+>
+> I guess I should have ACKed them too, but it felt kind of strange to ACK my
+> own patches. ;)
+>
+> Anyway, for all samsung-clk patches:
+>
+> Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-[snip]
+Yeah, self-acking doesn't make much sense. :)
 
-> diff --git a/include/dt-bindings/clk/exynos5260-clk.h b/include/dt-bindings/clk/exynos5260-clk.h
-> new file mode 100644
-> index 0000000..4dc20a8
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/exynos5260-clk.h
+I'm mostly worried about patches touching other subsystems without the
+other maintainer being aware of it or having reviewed them. As I said,
+these mostly look like refactorings but it's still good habit.
 
-Please use dt-bindings/clock directory.
 
-> @@ -0,0 +1,233 @@
-> +/*
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Provides Constants for Exynos5260 clocks.
-> +*/
-
-nit: Misaligned star.
-
-> +
-> +#ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
-> +#define _DT_BINDINGS_CLK_EXYNOS5260_H
-> +
-> +/*
-> + * Clock names: XXXXXX_YYYYY_ZZZZZ
-> + *                    |------| |----| |----|
-> + *                       cmu       type      IP
-
-The alignment looks wrong. Also tabs should be used.
-
-> +*/
-
-nit: Misaligned star.
-
-> +
-> +/* list of clocks for CMU_TOP */
-
-nit: Please properly capitalize comments and end them with a dot, e.g.
-
-/* List of clocks for CMU_TOP. */
-
-> +#define	FIN_PLL			1
-
-nit: No tabs between #define and DEF_NAME, please.
-
-Best regards,
-Tomasz
+-Olof
