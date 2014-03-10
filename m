@@ -1,43 +1,48 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 10 Mar 2014 21:50:58 +0100
-Subject: [PATCH v2 0/3] net: phy: fix uninitalized WOL struct in
- phy_ethtool_get_wol
-In-Reply-To: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 10 Mar 2014 21:51:01 +0100
+Subject: [PATCH v2 3/3] net: cpsw: simplify phy_ethtool_get_wol call
+In-Reply-To: <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1394484661-4554-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+With phy_ethtool_get_wol now clearing struct ethtool_wolinfo, we can
+simplify routines calling it.
 
-this is a small patch set based on a single patch sent earlier [1] to
-fix uninitalized struct ethtool_wolinfo in phy_ethtool_get_wol.
-Compared to the single patch, this clears the whole struct
-ethtool_wolinfo passed to phy_ethtool_get_wol and adds a check for
-non-NULL struct phy_device.
-
-I also added two cleanup patches for current users of
-phy_ethtool_get_wol. Those two patches are also based on v3.14-rc1 but
-aren't really part of the fix. They can wait for v3.15 and I'll rebase
-on request.
-
-[1] https://lkml.org/lkml/2014/3/9/169
-
-Sebastian Hesselbarth (3):
-  net: phy: fix uninitalized WOL parameters in phy_ethtool_get_wol
-  net: mv643xx_eth: simplify phy_ethtool_get_wol call
-  net: cpsw: simplify phy_ethtool_get_wol call
-
- drivers/net/ethernet/marvell/mv643xx_eth.c | 5 +----
- drivers/net/ethernet/ti/cpsw.c             | 7 +------
- drivers/net/phy/phy.c                      | 4 +++-
- 3 files changed, 5 insertions(+), 11 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v1->v2:
+- initial
+
 Cc: David Miller <davem@davemloft.net>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
 Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/ti/cpsw.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index bde63e3af96f..06950c75cb2f 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -1726,12 +1726,7 @@ static void cpsw_get_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
+ {
+ 	struct cpsw_priv *priv = netdev_priv(ndev);
+ 	int slave_no = cpsw_slave_index(priv);
+-
+-	wol->supported = 0;
+-	wol->wolopts = 0;
+-
+-	if (priv->slaves[slave_no].phy)
+-		phy_ethtool_get_wol(priv->slaves[slave_no].phy, wol);
++	phy_ethtool_get_wol(priv->slaves[slave_no].phy, wol);
+ }
+ 
+ static int cpsw_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 -- 
 1.8.5.3
