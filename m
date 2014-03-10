@@ -1,43 +1,42 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 10 Mar 2014 19:28:55 +0530
-Subject: [RFC PATCH 0/9] drivers: dma: Add support for dma-channel router
-In-Reply-To: <CAL_JsqLF6Ey1t1BV4tnFcFK-KmOU9H2nQE+ZHoZRq2r_nRTxNw@mail.gmail.com>
-References: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
- <CAL_JsqLF6Ey1t1BV4tnFcFK-KmOU9H2nQE+ZHoZRq2r_nRTxNw@mail.gmail.com>
-Message-ID: <531DC51F.50309@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Mar 2014 15:11:57 +0100
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <1394459790.2270.39.camel@shinybook.infradead.org>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+ <20110101151545.GC25924@n2100.arm.linux.org.uk>
+ <1394459790.2270.39.camel@shinybook.infradead.org>
+Message-ID: <5345792.VhzckVI5HA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Monday 10 March 2014 06:56:30 David Woodhouse wrote:
+> It is not impossible for the DMA controller to "delegate" transactions
+> so that (to the IOMMU) they appear to come from the individual slave
+> device rather than from itself.
+> 
+> The Intel IOMMU has now gained support for DMA mapping for devices
+> enumerated by ACPI ? essentially the ACPI "DMAR" table just has a lookup
+> table of ACPI device paths, and tells us the PCI bus/devfn that their
+> DMA transactions will *appear* to be from.
 
-On Sunday 09 March 2014 01:23 AM, Rob Herring wrote:
-> On Fri, Mar 7, 2014 at 6:16 AM, Sricharan R <r.sricharan@ti.com> wrote:
->> In some SoCs the dma request lines from the peripherals are
->> routed to the dma-controller through a crossbar. With this the
->> dma controller's available request lines are shared between the
->> peripherals.
->>
->> This adds support to register the crossbar router associated with
->> a dma-channel and let the dma-controller driver map/unmap
->> the peripheral dma crossbar line to dma-controller's request
->> line.
-> This is not a unique concept and should follow some existing pattern.
-> Perhaps something like interrupt-map. For the dmas property, the
-> parent should be the crossbar and then the crossbar block has to
-> translate that into the DMA controller request. All the DMA ctrlr
-> request connections should be described in the crossbar node. In
-> theory, you could have chained crossbars. This should be documented as
-> part of the generic DMA binding.
-  The idea here was to do the map/unmap crossbar<->dma-request
- from the  dma-controller at runtime just like any other resource, unlike
-  interrupt-map fixed in DTS. I did not think about the chained
-  crossbars case. I will add this here. And as you have suggested will
-  make it work like irq_parse_and_map.
+This makes a lot of sense for standalone DMA masters enumerated by ACPI,
+but I fail to see what the purpose of that would be when the DMA
+is delegated to a separate DMA engine devices. Do you have an idea?
 
-Regards,
- Sricharan
-> There are also other similar IP like CoreSight CTI which are just
-> signal routers. So there is probably some possibility of common code
-> here.
->
-> Rob
+It sounds to me that they are trying to isolate the DMA masters
+because the slave driver is not trusted for some reason, yet the
+DMA engine driver that does the DMA is trusted.
+
+> Of course, it's also possible that all these BIOSes are broken and they
+> *should* just list the DMA controller itself, instead of all the slave
+> devices. But while I'm always quick to jump to the conclusion that it's
+> the BIOS at fault, that doesn't necessarily seem likely here...
+
+It would be good to verify this anyway. There are multiple reasons why
+we have to pass the dmaengine device to the dma-mapping API at the moment
+rather than the slave device, but in essence it comes down to the engine
+being the one that is the master on its parent bus. A trivial example
+where it goes wrong would be the slave living on a 32-bit noncoherent bus
+and the master living on a 64-bit coherent bus.
+
+	Arnd
