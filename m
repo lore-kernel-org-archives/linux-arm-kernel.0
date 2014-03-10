@@ -1,87 +1,47 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 10 Mar 2014 17:24:11 +0900
-Subject: [PATCH 1/3] drivers: clk: add samsung common clock config option
-In-Reply-To: <531D0718.8000305@gmail.com>
-References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
- <1393392247-6247-2-git-send-email-pankaj.dubey@samsung.com>
- <531D0718.8000305@gmail.com>
-Message-ID: <531D76AB.2030401@samsung.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Mon, 10 Mar 2014 09:11:55 +0100
+Subject: [BUG] atmel: spi: scheduling while atomic
+In-Reply-To: <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
+References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
+ <5316CA84.4080907@aksignal.cz> <20140307225810.GB2918@piout.net>
+ <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
+Message-ID: <531D73CB.7040402@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi all,
+at first: warning is on all spi devices.
+at second: its with CONFIG_PREEMPT=y, without (# CONFIG_PREEMPT_RCU is not set) is OK, but I wonder if this config will 
+be fast enough for our usage (nearly RT)?
 
-On 03/10/2014 09:28 AM, Tomasz Figa wrote:
-> Hi Pankaj,
->
-> On 26.02.2014 06:24, Pankaj Dubey wrote:
->> add samsung common clock config option and let ARCH_EXYNOS or 
->> ARCH_S3CXXXX
->> select this if they want to use samsung common clock infrastructure.
+
+Dne 8.3.2014 01:41, Rabin Vincent napsal(a):
+> 2014-03-07 23:58 GMT+01:00 Alexandre Belloni
+> <alexandre.belloni@free-electrons.com>:
+>> On 05/03/2014 at 07:56:04 +0100, Ji?? Prchal wrote :
+>>> [    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
+>>> [    0.906250] Modules linked in:
+>>> [    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-rc4_cpm9g25+ #1
+>>> [    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>] (show_stack+0x10/0x14)
+>>> [    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>] (__schedule_bug+0x48/0x60)
+>>> [    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>] (__schedule+0x60/0x484)
+>>> [    0.906250] [<c0390294>] (__schedule) from [<c038feac>] (schedule_timeout+0x17c/0x1ac)
+>>> [    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>] (wait_for_common+0x10c/0x1f0)
+>>> [    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>] (atmel_spi_transfer_one_message+0x71c/0xa48)
+>>> [    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from [<c0246624>] (spi_pump_messages+0x210/0x238)
+>>> [    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>] (kthread_worker_fn+0x15c/0x1b4)
+>>> [    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>] (kthread+0xb8/0xcc)
+>>> [    0.906250] [<c0034534>] (kthread) from [<c0009510>] (ret_from_fork+0x14/0x24)
+>>> [    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
 >>
->> CC: Mike Turquette <mturquette@linaro.org>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/clk/Kconfig  |   10 ++++++++++
->>   drivers/clk/Makefile |    2 +-
->>   2 files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index 7641965..d93a325 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -23,6 +23,16 @@ config COMMON_CLK
->>   menu "Common Clock Framework"
->>       depends on COMMON_CLK
->>
->> +config COMMON_CLK_SAMSUNG
->> +    bool "Clock driver for Samsung SoCs"
->> +    depends on ARCH_S3C64XX || ARCH_S3C24XX || ARCH_EXYNOS || ARM64
->> +    ---help---
->> +          Supports clocking on Exynos SoCs:
->> +      - Exynos5250, Exynos5420 board.
->> +      - Exynos4 boards.
->> +      - S3C2412, S3C2416, S3C2466 boards.
->> +      - S3C64XX boards.
+>> Actually, I'm not quite sure how spi_pump_messages can be called from an
+>> atomic context.
 >
-> I don't think listing the platforms here explicitly is a good idea, as 
-> this option shouldn't generally be user-visible (related platforms 
-> would not work without this option enabled) and adding support for 
-> every new SoC would require changing the help string.
+> spi_pump_messages() is not called from atomic context.  Rather,
+> atmel_spi_transfer_one_message() does a spin_lock_irqsave() (via
+> atmel_spi_lock()) and then calls atmel_spi_one_transfer(), which calls
+> wait_for_completion_timeout().  That's why schedule is being called
+> from atomic context.  This was introduced by 8090d6d1a4 ("spi: atmel:
+> Refactor spi-atmel to use SPI framework queue"). I think you should
+> see the warning with CONFIG_PREEMPT=y.
 >
-> I wonder if we really need this to be user-visible. What about moving 
-> it out of this menu, making the symbol select COMMON_CLK and let the 
-> platforms just select COMMON_CLK_SAMSUNG alone?
->
-> Best regards,
-> Tomasz
->
-
-Thanks for review. I agree your point. In that case how about adding 
-"drivers/clk/samsung/Kconfig" as below:
-
-+config COMMON_CLK_SAMSUNG
-+    bool
-+    select COMMON_CLK
-+
-+config S3C2412_COMMON_CLK //These macros are introduced by Heiko's 
-clock patches for S3C24XX SoC
-+    bool
-+    select COMMON_CLK_SAMSUNG
-+
-+config S3C2443_COMMON_CLK
-+    bool
-+    select COMMON_CLK_SAMSUNG
-
-In this way we can get rid of clock related config options from 
-"arch/arm/mach-s3c24xx/Kconfig" and in future
-if any other old SoC such as S5P clocks getting converted to use common 
-clock, they can add related config here rather
-than arch/mach-xxx/Kconfig if required. Thus we can keep all common 
-clock config option for Samsung SoC at one place.
-All Exynos SOC can select only COMMON_CLK_SAMSUNG to use Samsung common 
-clock infrastructure.
-
--- 
-Best Regards,
-Pankaj Dubey
