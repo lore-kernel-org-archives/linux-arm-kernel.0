@@ -1,415 +1,581 @@
-From: zoltan.kiss@citrix.com (Zoltan Kiss)
-Date: Mon, 10 Mar 2014 17:14:02 +0000
-Subject: [PATCH] xen/grant-table: Refactor gnttab_[un]map_refs to avoid
- m2p_override
-In-Reply-To: <1393516530-9145-1-git-send-email-zoltan.kiss@citrix.com>
-References: <1393516530-9145-1-git-send-email-zoltan.kiss@citrix.com>
-Message-ID: <531DF2DA.20209@citrix.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Mar 2014 18:20:22 +0100
+Subject: [PATCH v6 2/3] tty/serial: at91: use mctrl_gpio helpers
+In-Reply-To: <1394469951-21192-3-git-send-email-richard.genoud@gmail.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <531DF456.6050506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David/Stefano, can you take a look, and ack if you are happy with this? 
-I could build it on ARM and a backported version on 3.10 have seen quite 
-a lot of testing recently.
+On 10/03/2014 17:45, Richard Genoud :
+> On sam9x5, dedicated CTS (and RTS) pins are unusable together with the
+> LCDC, the EMAC, or the MMC because they share the same line.
+> 
+> Moreover, the USART controller doesn't handle DTR/DSR/DCD/RI signals,
+> so we have to control them via GPIO.
+> 
+> This patch permits to use GPIOs to control the CTS/RTS/DTR/DSR/DCD/RI
+> signals.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Zoli
+Good for me: Greg are you okay to take the at91 bits included in this patch?
 
-On 27/02/14 15:55, Zoltan Kiss wrote:
-> (This is a continuation of "[PATCH v9] xen/grant-table: Avoid m2p_override
-> during mapping")
->
-> The grant mapping API does m2p_override unnecessarily: only gntdev needs it,
-> for blkback and future netback patches it just cause a lock contention, as
-> those pages never go to userspace. Therefore this series does the following:
-> - the bulk of the original function (everything after the mapping hypercall)
->    is moved to arch-dependent set/clear_foreign_p2m_mapping
-> - the "if (xen_feature(XENFEAT_auto_translated_physmap))" brach goes to ARM
-> - therefore the ARM function could be much smaller, the m2p_override stubs
->    could be also removed
-> - on x86 the set_phys_to_machine calls were moved up to this new funcion
->    from m2p_override functions
-> - and m2p_override functions are only called when there is a kmap_ops param
->
-> It also removes a stray space from arch/x86/include/asm/xen/page.h.
->
-> Signed-off-by: Zoltan Kiss <zoltan.kiss@citrix.com>
-> Suggested-by: Anthony Liguori <aliguori@amazon.com>
-> Suggested-by: David Vrabel <david.vrabel@citrix.com>
-> Suggested-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
 > ---
->   arch/arm/include/asm/xen/page.h |   15 ++---
->   arch/arm/xen/p2m.c              |   32 +++++++++++
->   arch/x86/include/asm/xen/page.h |   11 +++-
->   arch/x86/xen/p2m.c              |  121 ++++++++++++++++++++++++++++++++++-----
->   drivers/xen/grant-table.c       |   73 +----------------------
->   5 files changed, 156 insertions(+), 96 deletions(-)
->
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index e0965ab..cf4f3e8 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -97,16 +97,13 @@ static inline pte_t *lookup_address(unsigned long address, unsigned int *level)
->   	return NULL;
->   }
->
-> -static inline int m2p_add_override(unsigned long mfn, struct page *page,
-> -		struct gnttab_map_grant_ref *kmap_op)
-> -{
-> -	return 0;
-> -}
-> +extern int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
-> +				   struct gnttab_map_grant_ref *kmap_ops,
-> +				   struct page **pages, unsigned int count);
->
-> -static inline int m2p_remove_override(struct page *page, bool clear_pte)
-> -{
-> -	return 0;
-> -}
-> +extern int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
-> +				     struct gnttab_map_grant_ref *kmap_ops,
-> +				     struct page **pages, unsigned int count);
->
->   bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn);
->   bool __set_phys_to_machine_multi(unsigned long pfn, unsigned long mfn,
-> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-> index b31ee1b2..9c48778 100644
-> --- a/arch/arm/xen/p2m.c
-> +++ b/arch/arm/xen/p2m.c
-> @@ -146,6 +146,38 @@ unsigned long __mfn_to_pfn(unsigned long mfn)
->   }
->   EXPORT_SYMBOL_GPL(__mfn_to_pfn);
->
-> +int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
-> +			    struct gnttab_map_grant_ref *kmap_ops,
-> +			    struct page **pages, unsigned int count);
-> +{
-> +	int i;
+>  .../devicetree/bindings/serial/atmel-usart.txt     |  12 ++-
+>  arch/arm/mach-at91/at91rm9200_devices.c            |  16 ++--
+>  arch/arm/mach-at91/at91sam9260_devices.c           |   7 --
+>  arch/arm/mach-at91/at91sam9261_devices.c           |   4 -
+>  arch/arm/mach-at91/at91sam9263_devices.c           |   4 -
+>  arch/arm/mach-at91/at91sam9g45_devices.c           |   5 -
+>  arch/arm/mach-at91/at91sam9rl_devices.c            |   5 -
+>  drivers/tty/serial/Kconfig                         |   1 +
+>  drivers/tty/serial/atmel_serial.c                  | 105 ++++++++++++++-------
+>  include/linux/platform_data/atmel.h                |   1 -
+>  10 files changed, 90 insertions(+), 70 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> index 17c1042b2df8..a6391e70a8fd 100644
+> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> @@ -13,8 +13,9 @@ Required properties:
+>  Optional properties:
+>  - atmel,use-dma-rx: use of PDC or DMA for receiving data
+>  - atmel,use-dma-tx: use of PDC or DMA for transmitting data
+> -- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
+> -  function pin for the USART RTS feature. If unsure, don't specify this property.
+> +- {rts,cts,dtr,dsr,rng,dcd}-gpios: specify a GPIO for RTS/CTS/DTR/DSR/RI/DCD line respectively.
+> +  It will use specified PIO instead of the peripheral function pin for the USART feature.
+> +  If unsure, don't specify this property.
+>  - add dma bindings for dma transfer:
+>  	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
+>  		memory peripheral interface and USART DMA channel ID, FIFO configuration.
+> @@ -35,7 +36,12 @@ Example:
+>  		clock-names = "usart";
+>  		atmel,use-dma-rx;
+>  		atmel,use-dma-tx;
+> -		rts-gpios = <&pioD 15 0>;
+> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+> +		cts-gpios = <&pioD 16 GPIO_ACTIVE_LOW>;
+> +		dtr-gpios = <&pioD 17 GPIO_ACTIVE_LOW>;
+> +		dsr-gpios = <&pioD 18 GPIO_ACTIVE_LOW>;
+> +		dcd-gpios = <&pioD 20 GPIO_ACTIVE_LOW>;
+> +		rng-gpios = <&pioD 19 GPIO_ACTIVE_LOW>;
+>  	};
+>  
+>  - use DMA:
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index f3f19f21352a..291a90a5b1d4 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -15,6 +15,7 @@
+>  
+>  #include <linux/dma-mapping.h>
+>  #include <linux/gpio.h>
+> +#include <linux/gpio/driver.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c-gpio.h>
+>  
+> @@ -923,7 +924,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -962,7 +962,14 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+> +};
 > +
-> +	for (i = 0; i < count; i++) {
-> +		if (map_ops[i].status)
-> +			continue;
-> +		set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
-> +				    map_ops[i].dev_bus_addr >> PAGE_SHIFT);
+> +static struct gpiod_lookup_table uart0_gpios_table = {
+> +	.dev_id = "atmel_usart",
+> +	.table = {
+> +		GPIO_LOOKUP("pioA", 21, "rts", GPIO_ACTIVE_LOW),
+> +		{ },
+> +	},
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -993,7 +1000,7 @@ static inline void configure_usart0_pins(unsigned pins)
+>  		 * We need to drive the pin manually. The serial driver will driver
+>  		 * this to high when initializing.
+>  		 */
+> -		uart0_data.rts_gpio = AT91_PIN_PA21;
+> +		gpiod_add_lookup_table(&uart0_gpios_table);
+>  	}
+>  }
+>  
+> @@ -1013,7 +1020,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -1065,7 +1071,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> @@ -1109,7 +1114,6 @@ static struct resource uart3_resources[] = {
+>  static struct atmel_uart_data uart3_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart3_dmamask = DMA_BIT_MASK(32);
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 2ae7715f1309..a1b989eac8b8 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -820,7 +820,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -859,7 +858,6 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -911,7 +909,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -955,7 +952,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> @@ -999,7 +995,6 @@ static struct resource uart3_resources[] = {
+>  static struct atmel_uart_data uart3_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart3_dmamask = DMA_BIT_MASK(32);
+> @@ -1043,7 +1038,6 @@ static struct resource uart4_resources[] = {
+>  static struct atmel_uart_data uart4_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart4_dmamask = DMA_BIT_MASK(32);
+> @@ -1082,7 +1076,6 @@ static struct resource uart5_resources[] = {
+>  static struct atmel_uart_data uart5_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart5_dmamask = DMA_BIT_MASK(32);
+> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+> index 80e35895d28f..b5f7a7226ff8 100644
+> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+> @@ -881,7 +881,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -920,7 +919,6 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -964,7 +962,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -1008,7 +1005,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index 43d53d6156dd..39803c3296b2 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -1325,7 +1325,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -1364,7 +1363,6 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -1408,7 +1406,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -1452,7 +1449,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 77b04c2edd78..4e53d8d9737b 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -1588,7 +1588,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -1627,7 +1626,6 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -1671,7 +1669,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -1715,7 +1712,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> @@ -1759,7 +1755,6 @@ static struct resource uart3_resources[] = {
+>  static struct atmel_uart_data uart3_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart3_dmamask = DMA_BIT_MASK(32);
+> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+> index 428fc412aaf1..f75985062913 100644
+> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+> @@ -957,7 +957,6 @@ static struct resource dbgu_resources[] = {
+>  static struct atmel_uart_data dbgu_data = {
+>  	.use_dma_tx	= 0,
+>  	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+> @@ -996,7 +995,6 @@ static struct resource uart0_resources[] = {
+>  static struct atmel_uart_data uart0_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart0_dmamask = DMA_BIT_MASK(32);
+> @@ -1048,7 +1046,6 @@ static struct resource uart1_resources[] = {
+>  static struct atmel_uart_data uart1_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart1_dmamask = DMA_BIT_MASK(32);
+> @@ -1092,7 +1089,6 @@ static struct resource uart2_resources[] = {
+>  static struct atmel_uart_data uart2_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart2_dmamask = DMA_BIT_MASK(32);
+> @@ -1136,7 +1132,6 @@ static struct resource uart3_resources[] = {
+>  static struct atmel_uart_data uart3_data = {
+>  	.use_dma_tx	= 1,
+>  	.use_dma_rx	= 1,
+> -	.rts_gpio	= -EINVAL,
+>  };
+>  
+>  static u64 uart3_dmamask = DMA_BIT_MASK(32);
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 7e8f15cfb8d0..f4e20410a138 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -97,6 +97,7 @@ config SERIAL_ATMEL
+>  	bool "AT91 / AT32 on-chip serial port support"
+>  	depends on ARCH_AT91 || AVR32
+>  	select SERIAL_CORE
+> +	select SERIAL_MCTRL_GPIO
+>  	help
+>  	  This enables the driver for the on-chip UARTs of the Atmel
+>  	  AT91 and AT32 processors.
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 53eeea13ff16..43ca659c1d4b 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -43,6 +43,8 @@
+>  #include <linux/platform_data/atmel.h>
+>  #include <linux/timer.h>
+>  #include <linux/gpio.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/err.h>
+>  
+>  #include <asm/io.h>
+>  #include <asm/ioctls.h>
+> @@ -57,6 +59,8 @@
+>  
+>  #include <linux/serial_core.h>
+>  
+> +#include "serial_mctrl_gpio.h"
+> +
+>  static void atmel_start_rx(struct uart_port *port);
+>  static void atmel_stop_rx(struct uart_port *port);
+>  
+> @@ -162,7 +166,7 @@ struct atmel_uart_port {
+>  	struct circ_buf		rx_ring;
+>  
+>  	struct serial_rs485	rs485;		/* rs485 settings */
+> -	int			rts_gpio;	/* optional RTS GPIO */
+> +	struct mctrl_gpios	*gpios;
+>  	unsigned int		tx_done_mask;
+>  	bool			is_usart;	/* usart or uart */
+>  	struct timer_list	uart_timer;	/* uart timer */
+> @@ -237,6 +241,50 @@ static bool atmel_use_dma_rx(struct uart_port *port)
+>  	return atmel_port->use_dma_rx;
+>  }
+>  
+> +static unsigned int atmel_get_lines_status(struct uart_port *port)
+> +{
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	unsigned int status, ret = 0;
+> +
+> +	status = UART_GET_CSR(port);
+> +
+> +	mctrl_gpio_get(atmel_port->gpios, &ret);
+> +
+> +	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+> +						UART_GPIO_CTS))) {
+> +		if (ret & TIOCM_CTS)
+> +			status &= ~ATMEL_US_CTS;
+> +		else
+> +			status |= ATMEL_US_CTS;
 > +	}
 > +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(set_foreign_p2m_mapping);
-> +
-> +int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
-> +			      struct gnttab_map_grant_ref *kmap_ops,
-> +			      struct page **pages, unsigned int count);
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
-> +				    INVALID_P2M_ENTRY);
+> +	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+> +						UART_GPIO_DSR))) {
+> +		if (ret & TIOCM_DSR)
+> +			status &= ~ATMEL_US_DSR;
+> +		else
+> +			status |= ATMEL_US_DSR;
 > +	}
 > +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(clear_foreign_p2m_mapping);
+> +	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+> +						UART_GPIO_RI))) {
+> +		if (ret & TIOCM_RI)
+> +			status &= ~ATMEL_US_RI;
+> +		else
+> +			status |= ATMEL_US_RI;
+> +	}
 > +
->   bool __set_phys_to_machine_multi(unsigned long pfn,
->   		unsigned long mfn, unsigned long nr_pages)
->   {
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index 3e276eb..c949923 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -49,10 +49,17 @@ extern bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn);
->   extern unsigned long set_phys_range_identity(unsigned long pfn_s,
->   					     unsigned long pfn_e);
->
-> +extern int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
-> +				   struct gnttab_map_grant_ref *kmap_ops,
-> +				   struct page **pages, unsigned int count);
->   extern int m2p_add_override(unsigned long mfn, struct page *page,
->   			    struct gnttab_map_grant_ref *kmap_op);
-> +extern int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
-> +				     struct gnttab_map_grant_ref *kmap_ops,
-> +				     struct page **pages, unsigned int count);
->   extern int m2p_remove_override(struct page *page,
-> -				struct gnttab_map_grant_ref *kmap_op);
-> +			       struct gnttab_map_grant_ref *kmap_op,
-> +			       unsigned long mfn);
->   extern struct page *m2p_find_override(unsigned long mfn);
->   extern unsigned long m2p_find_override_pfn(unsigned long mfn, unsigned long pfn);
->
-> @@ -121,7 +128,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
->   		pfn = m2p_find_override_pfn(mfn, ~0);
->   	}
->
+> +	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+> +						UART_GPIO_DCD))) {
+> +		if (ret & TIOCM_CD)
+> +			status &= ~ATMEL_US_DCD;
+> +		else
+> +			status |= ATMEL_US_DCD;
+> +	}
+> +
+> +	return status;
+> +}
+> +
+>  /* Enable or disable the rs485 support */
+>  void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+>  {
+> @@ -296,17 +344,6 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+>  	unsigned int mode;
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  
 > -	/*
-> +	/*
->   	 * pfn is ~0 if there are no entries in the m2p for mfn or if the
->   	 * entry doesn't map back to the mfn and m2p_override doesn't have a
->   	 * valid entry for it.
-> diff --git a/arch/x86/xen/p2m.c b/arch/x86/xen/p2m.c
-> index 696c694..85e5d78 100644
-> --- a/arch/x86/xen/p2m.c
-> +++ b/arch/x86/xen/p2m.c
-> @@ -881,6 +881,65 @@ static unsigned long mfn_hash(unsigned long mfn)
->   	return hash_long(mfn, M2P_OVERRIDE_HASH_SHIFT);
->   }
->
-> +int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
-> +			    struct gnttab_map_grant_ref *kmap_ops,
-> +			    struct page **pages, unsigned int count)
-> +{
-> +	int i, ret = 0;
-> +	bool lazy = false;
-> +	pte_t *pte;
-> +
-> +	if (xen_feature(XENFEAT_auto_translated_physmap))
-> +		return 0;
-> +
-> +	if (kmap_ops &&
-> +	    !in_interrupt() &&
-> +	    paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
-> +		arch_enter_lazy_mmu_mode();
-> +		lazy = true;
-> +	}
-> +
-> +	for (i = 0; i < count; i++) {
-> +		unsigned long mfn, pfn;
-> +
-> +		/* Do not add to override if the map failed. */
-> +		if (map_ops[i].status)
-> +			continue;
-> +
-> +		if (map_ops[i].flags & GNTMAP_contains_pte) {
-> +			pte = (pte_t *) (mfn_to_virt(PFN_DOWN(map_ops[i].host_addr)) +
-> +				(map_ops[i].host_addr & ~PAGE_MASK));
-> +			mfn = pte_mfn(*pte);
-> +		} else {
-> +			mfn = PFN_DOWN(map_ops[i].dev_bus_addr);
-> +		}
-> +		pfn = page_to_pfn(pages[i]);
-> +
-> +		WARN_ON(PagePrivate(pages[i]));
-> +		SetPagePrivate(pages[i]);
-> +		set_page_private(pages[i], mfn);
-> +		pages[i]->index = pfn_to_mfn(pfn);
-> +
-> +		if (unlikely(!set_phys_to_machine(pfn, FOREIGN_FRAME(mfn)))) {
-> +			ret = -ENOMEM;
-> +			goto out;
-> +		}
-> +
-> +		if (kmap_ops) {
-> +			ret = m2p_add_override(mfn, pages[i], &kmap_ops[i]);
-> +			if (ret)
-> +				goto out;
-> +		}
-> +	}
-> +
-> +out:
-> +	if (lazy)
-> +		arch_leave_lazy_mmu_mode();
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(set_foreign_p2m_mapping);
-> +
->   /* Add an MFN override for a particular page */
->   int m2p_add_override(unsigned long mfn, struct page *page,
->   		struct gnttab_map_grant_ref *kmap_op)
-> @@ -899,13 +958,6 @@ int m2p_add_override(unsigned long mfn, struct page *page,
->   					"m2p_add_override: pfn %lx not mapped", pfn))
->   			return -EINVAL;
->   	}
-> -	WARN_ON(PagePrivate(page));
-> -	SetPagePrivate(page);
-> -	set_page_private(page, mfn);
-> -	page->index = pfn_to_mfn(pfn);
-> -
-> -	if (unlikely(!set_phys_to_machine(pfn, FOREIGN_FRAME(mfn))))
-> -		return -ENOMEM;
->
->   	if (kmap_op != NULL) {
->   		if (!PageHighMem(page)) {
-> @@ -943,20 +995,62 @@ int m2p_add_override(unsigned long mfn, struct page *page,
->   	return 0;
->   }
->   EXPORT_SYMBOL_GPL(m2p_add_override);
-> +
-> +int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
-> +			      struct gnttab_map_grant_ref *kmap_ops,
-> +			      struct page **pages, unsigned int count)
-> +{
-> +	int i, ret = 0;
-> +	bool lazy = false;
-> +
-> +	if (xen_feature(XENFEAT_auto_translated_physmap))
-> +		return 0;
-> +
-> +	if (kmap_ops &&
-> +	    !in_interrupt() &&
-> +	    paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
-> +		arch_enter_lazy_mmu_mode();
-> +		lazy = true;
-> +	}
-> +
-> +	for (i = 0; i < count; i++) {
-> +		unsigned long mfn = get_phys_to_machine(page_to_pfn(pages[i]));
-> +		unsigned long pfn = page_to_pfn(pages[i]);
-> +
-> +		if (mfn == INVALID_P2M_ENTRY || !(mfn & FOREIGN_FRAME_BIT)) {
-> +			ret = -EINVAL;
-> +			goto out;
-> +		}
-> +
-> +		set_page_private(pages[i], INVALID_P2M_ENTRY);
-> +		WARN_ON(!PagePrivate(pages[i]));
-> +		ClearPagePrivate(pages[i]);
-> +		set_phys_to_machine(pfn, pages[i]->index);
-> +
-> +		if (kmap_ops)
-> +			ret = m2p_remove_override(pages[i], &kmap_ops[i], mfn);
-> +		if (ret)
-> +			goto out;
-> +	}
-> +
-> +out:
-> +	if (lazy)
-> +		arch_leave_lazy_mmu_mode();
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(clear_foreign_p2m_mapping);
-> +
->   int m2p_remove_override(struct page *page,
-> -		struct gnttab_map_grant_ref *kmap_op)
-> +			struct gnttab_map_grant_ref *kmap_op,
-> +			unsigned long mfn)
->   {
->   	unsigned long flags;
-> -	unsigned long mfn;
->   	unsigned long pfn;
->   	unsigned long uninitialized_var(address);
->   	unsigned level;
->   	pte_t *ptep = NULL;
->
->   	pfn = page_to_pfn(page);
-> -	mfn = get_phys_to_machine(pfn);
-> -	if (mfn == INVALID_P2M_ENTRY || !(mfn & FOREIGN_FRAME_BIT))
-> -		return -EINVAL;
->
->   	if (!PageHighMem(page)) {
->   		address = (unsigned long)__va(pfn << PAGE_SHIFT);
-> @@ -970,10 +1064,7 @@ int m2p_remove_override(struct page *page,
->   	spin_lock_irqsave(&m2p_override_lock, flags);
->   	list_del(&page->lru);
->   	spin_unlock_irqrestore(&m2p_override_lock, flags);
-> -	WARN_ON(!PagePrivate(page));
-> -	ClearPagePrivate(page);
->
-> -	set_phys_to_machine(pfn, page->index);
->   	if (kmap_op != NULL) {
->   		if (!PageHighMem(page)) {
->   			struct multicall_space mcs;
-> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> index b84e3ab..6d325bd 100644
-> --- a/drivers/xen/grant-table.c
-> +++ b/drivers/xen/grant-table.c
-> @@ -933,9 +933,6 @@ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
->   		    struct page **pages, unsigned int count)
->   {
->   	int i, ret;
-> -	bool lazy = false;
-> -	pte_t *pte;
-> -	unsigned long mfn;
->
->   	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map_ops, count);
->   	if (ret)
-> @@ -947,45 +944,7 @@ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
->   			gnttab_retry_eagain_gop(GNTTABOP_map_grant_ref, map_ops + i,
->   						&map_ops[i].status, __func__);
->
-> -	/* this is basically a nop on x86 */
-> -	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-> -		for (i = 0; i < count; i++) {
-> -			if (map_ops[i].status)
-> -				continue;
-> -			set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
-> -					map_ops[i].dev_bus_addr >> PAGE_SHIFT);
-> -		}
-> -		return ret;
+> -	 * AT91RM9200 Errata #39: RTS0 is not internally connected
+> -	 * to PA21. We need to drive the pin as a GPIO.
+> -	 */
+> -	if (gpio_is_valid(atmel_port->rts_gpio)) {
+> -		if (mctrl & TIOCM_RTS)
+> -			gpio_set_value(atmel_port->rts_gpio, 0);
+> -		else
+> -			gpio_set_value(atmel_port->rts_gpio, 1);
 > -	}
 > -
-> -	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
-> -		arch_enter_lazy_mmu_mode();
-> -		lazy = true;
-> -	}
-> -
-> -	for (i = 0; i < count; i++) {
-> -		/* Do not add to override if the map failed. */
-> -		if (map_ops[i].status)
-> -			continue;
-> -
-> -		if (map_ops[i].flags & GNTMAP_contains_pte) {
-> -			pte = (pte_t *) (mfn_to_virt(PFN_DOWN(map_ops[i].host_addr)) +
-> -				(map_ops[i].host_addr & ~PAGE_MASK));
-> -			mfn = pte_mfn(*pte);
-> -		} else {
-> -			mfn = PFN_DOWN(map_ops[i].dev_bus_addr);
-> -		}
-> -		ret = m2p_add_override(mfn, pages[i], kmap_ops ?
-> -				       &kmap_ops[i] : NULL);
-> -		if (ret)
-> -			goto out;
-> -	}
-> -
-> - out:
-> -	if (lazy)
-> -		arch_leave_lazy_mmu_mode();
-> -
+>  	if (mctrl & TIOCM_RTS)
+>  		control |= ATMEL_US_RTSEN;
+>  	else
+> @@ -319,6 +356,8 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+>  
+>  	UART_PUT_CR(port, control);
+>  
+> +	mctrl_gpio_set(atmel_port->gpios, mctrl);
+> +
+>  	/* Local loopback mode? */
+>  	mode = UART_GET_MR(port) & ~ATMEL_US_CHMODE;
+>  	if (mctrl & TIOCM_LOOP)
+> @@ -346,7 +385,8 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+>   */
+>  static u_int atmel_get_mctrl(struct uart_port *port)
+>  {
+> -	unsigned int status, ret = 0;
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	unsigned int ret = 0, status;
+>  
+>  	status = UART_GET_CSR(port);
+>  
+> @@ -362,7 +402,7 @@ static u_int atmel_get_mctrl(struct uart_port *port)
+>  	if (!(status & ATMEL_US_RI))
+>  		ret |= TIOCM_RI;
+>  
 > -	return ret;
-> +	return set_foreign_p2m_mapping(map_ops, kmap_ops, pages, count);
->   }
->   EXPORT_SYMBOL_GPL(gnttab_map_refs);
->
-> @@ -993,39 +952,13 @@ int gnttab_unmap_refs(struct gnttab_unmap_grant_ref *unmap_ops,
->   		      struct gnttab_map_grant_ref *kmap_ops,
->   		      struct page **pages, unsigned int count)
->   {
-> -	int i, ret;
-> -	bool lazy = false;
-> +	int ret;
->
->   	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, unmap_ops, count);
->   	if (ret)
->   		return ret;
->
-> -	/* this is basically a nop on x86 */
-> -	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-> -		for (i = 0; i < count; i++) {
-> -			set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
-> -					INVALID_P2M_ENTRY);
+> +	return mctrl_gpio_get(atmel_port->gpios, &ret);
+>  }
+>  
+>  /*
+> @@ -1042,7 +1082,7 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
+>  	unsigned int status, pending, pass_counter = 0;
+>  
+>  	do {
+> -		status = UART_GET_CSR(port);
+> +		status = atmel_get_lines_status(port);
+>  		pending = status & UART_GET_IMR(port);
+>  		if (!pending)
+>  			break;
+> @@ -1568,7 +1608,7 @@ static int atmel_startup(struct uart_port *port)
+>  	}
+>  
+>  	/* Save current CSR for comparison in atmel_tasklet_func() */
+> -	atmel_port->irq_status_prev = UART_GET_CSR(port);
+> +	atmel_port->irq_status_prev = atmel_get_lines_status(port);
+>  	atmel_port->irq_status = atmel_port->irq_status_prev;
+>  
+>  	/*
+> @@ -2324,6 +2364,15 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>  #define atmel_serial_resume NULL
+>  #endif
+>  
+> +static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
+> +{
+> +	p->gpios = mctrl_gpio_init(dev, 0);
+> +	if (IS_ERR_OR_NULL(p->gpios))
+> +		return -1;
+> +
+> +	return 0;
+> +}
+> +
+>  static int atmel_serial_probe(struct platform_device *pdev)
+>  {
+>  	struct atmel_uart_port *port;
+> @@ -2359,25 +2408,11 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>  	port = &atmel_ports[ret];
+>  	port->backup_imr = 0;
+>  	port->uart.line = ret;
+> -	port->rts_gpio = -EINVAL; /* Invalid, zero could be valid */
+> -	if (pdata)
+> -		port->rts_gpio = pdata->rts_gpio;
+> -	else if (np)
+> -		port->rts_gpio = of_get_named_gpio(np, "rts-gpios", 0);
+> -
+> -	if (gpio_is_valid(port->rts_gpio)) {
+> -		ret = devm_gpio_request(&pdev->dev, port->rts_gpio, "RTS");
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
+> -			goto err;
 > -		}
-> -		return ret;
+> -		/* Default to 1 as RTS is active low */
+> -		ret = gpio_direction_output(port->rts_gpio, 1);
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
+> -			goto err;
+> -		}
 > -	}
-> -
-> -	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
-> -		arch_enter_lazy_mmu_mode();
-> -		lazy = true;
-> -	}
-> -
-> -	for (i = 0; i < count; i++) {
-> -		ret = m2p_remove_override(pages[i], kmap_ops ?
-> -				       &kmap_ops[i] : NULL);
-> -		if (ret)
-> -			goto out;
-> -	}
-> -
-> - out:
-> -	if (lazy)
-> -		arch_leave_lazy_mmu_mode();
-> -
-> -	return ret;
-> +	return clear_foreign_p2m_mapping(unmap_ops, kmap_ops, pages, count);
->   }
->   EXPORT_SYMBOL_GPL(gnttab_unmap_refs);
->
->
+> +
+> +	ret = atmel_init_gpios(port, &pdev->dev);
+> +	if (ret < 0)
+> +		dev_err(&pdev->dev, "%s",
+> +			"Failed to initialize GPIOs. The serial port may not work as expected");
+>  
+>  	ret = atmel_init_port(port, pdev);
+>  	if (ret)
+> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+> index e26b0c14edea..cea9f70133c5 100644
+> --- a/include/linux/platform_data/atmel.h
+> +++ b/include/linux/platform_data/atmel.h
+> @@ -84,7 +84,6 @@ struct atmel_uart_data {
+>  	short			use_dma_rx;	/* use receive DMA? */
+>  	void __iomem		*regs;		/* virt. base address, if any */
+>  	struct serial_rs485	rs485;		/* rs485 settings */
+> -	int			rts_gpio;	/* optional RTS GPIO */
+>  };
+>  
+>   /* Touchscreen Controller */
+> 
+
+
+-- 
+Nicolas Ferre
