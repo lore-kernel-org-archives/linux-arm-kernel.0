@@ -1,56 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Mar 2014 17:08:28 -0700
-Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
-In-Reply-To: <531CFA28.9020600@gmail.com>
-References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
- <20140309183523.GD22881@quad.lixom.net>
- <531CFA28.9020600@gmail.com>
-Message-ID: <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 10 Mar 2014 01:12:43 +0100
+Subject: [PATCH v4 1/5] clk/samsung: add support for multiple clock
+ providers
+In-Reply-To: <1393931558-23502-2-git-send-email-rahul.sharma@samsung.com>
+References: <1393931558-23502-1-git-send-email-rahul.sharma@samsung.com>
+ <1393931558-23502-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <531D037B.2080708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 9, 2014 at 4:32 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 09.03.2014 19:35, Olof Johansson wrote:
->>
->> On Mon, Mar 03, 2014 at 09:56:11AM +0000, Kukjin Kim wrote:
->>>
->>> The following changes since commit
->>> 38dbfb59d1175ef458d006556061adeaa8751b72:
->>>
->>>    Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>    http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>> tags/samsung-pm-1
->>>
->>> for you to fetch changes up to e11d919e4aa2009077e3e4f829ff991d37adca61:
->>>
->>>    ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code (2014-02-14
->>> 08:16:01 +0900)
->>
->>
->> Hi,
->>
->> I don't see a single cc or acked-by line from Mike Turquette here. I'll
->> hold
->> off until he's had a chance to take a look at these ones; I suspect
->> they'll be
->> fine since it's mostly code refactoring though.
->
->
-> I guess I should have ACKed them too, but it felt kind of strange to ACK my
-> own patches. ;)
->
-> Anyway, for all samsung-clk patches:
->
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
+Hi Rahul,
 
-Yeah, self-acking doesn't make much sense. :)
+On 04.03.2014 12:12, Rahul Sharma wrote:
+> Samsung CCF helper functions do not provide support to
+> register multiple Clock Providers for a given SoC. Due to
+> this limitation SoC platforms are not able to use these
+> helpers for registering multiple clock providers and are
+> forced to bypass this layer.
+>
+> This layer is modified accordingly to enable the support.
+>
+> Clock file for exynos4, exynos5250, exynos5420, exynos5440
+> and S3c64xx are also modified as per changed helper functions.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos4.c    |   47 +++++++-------
+>   drivers/clk/samsung/clk-exynos5250.c |   25 +++++---
+>   drivers/clk/samsung/clk-exynos5420.c |   24 ++++---
+>   drivers/clk/samsung/clk-exynos5440.c |   18 +++---
+>   drivers/clk/samsung/clk-pll.c        |   14 +++--
+>   drivers/clk/samsung/clk-s3c64xx.c    |   44 +++++++------
+>   drivers/clk/samsung/clk.c            |  115 +++++++++++++++++++---------------
+>   drivers/clk/samsung/clk.h            |   72 ++++++++++++++-------
+>   8 files changed, 210 insertions(+), 149 deletions(-)
 
-I'm mostly worried about patches touching other subsystems without the
-other maintainer being aware of it or having reviewed them. As I said,
-these mostly look like refactorings but it's still good habit.
+This patch looks good. However in the meantime two series adding s3c2412 
+and s3c2416 clock drivers have been merged through Kgene's tree and this 
+patch should be rebased on top of this. I have pulled those drivers to 
+my tree as well, to samsung-next branch.
 
-
--Olof
+Best regards,
+Tomasz
