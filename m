@@ -1,159 +1,57 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Mon, 10 Mar 2014 21:56:00 +0000
-Subject: [PATCH v6 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1469359.kil5iaOqdU@wuerfel>
-References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
- <2115856.ZTdgp5fkma@wuerfel>
- <20140310163343.GY6457@e106497-lin.cambridge.arm.com>
- <1469359.kil5iaOqdU@wuerfel>
-Message-ID: <20140310215600.GA14968@bart.dudau.co.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 10 Mar 2014 15:20:23 -0700
+Subject: [PATCH v2 0/3] net: phy: fix uninitalized WOL struct in
+ phy_ethtool_get_wol
+In-Reply-To: <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAGVrzcbBcbPLnRa8ausZzcSyFBaySt=UEL_QQCAOJomrkaz1rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 07:59:59PM +0100, Arnd Bergmann wrote:
-> On Monday 10 March 2014 16:33:44 Liviu Dudau wrote:
-> > On Mon, Mar 10, 2014 at 03:21:01PM +0000, Arnd Bergmann wrote:
-> > > On Monday 10 March 2014 14:44:14 Liviu Dudau wrote:
-> > > > I will try to improve the error handling in the next patchset version.
-> > > > However I am still confused about the earlier discussion on
-> > > > pci_register_io_range(). Your suggestion initially was to return an
-> > > > error in the default weak implementation, but in your last email you
-> > > > are talking about returning 'port'.
-> > > 
-> > > You can do either one: 'port' should be positive or zero, while the
-> > > error would always be negative. We do the same thing in many interfaces
-> > > in the kernel.
-> > > 
-> > > > My idea when I've introduced the
-> > > > helper function was that it would return an error if it fails to
-> > > > register the IO range and zero otherwise. I agree that we can treat
-> > > > the default 'do nothing with the IO range' case as an error, with
-> > > > the caveat that will force architectures that use this code to
-> > > > provide their own implementation of pci_register_io_range() in order
-> > > > to avoid failure, even for the cases where the architecture has a 1:1
-> > > > mapping between IO and CPU addresses.
-> > > 
-> > > Which architectures are you thinking of? The only one I know that
-> > > does this is ia64, and we won't ever have to support this helper
-> > > on that architecture.
-> > 
-> > I was thinking about architectures that have IO_SPACE_LIMIT >= 0xffffffff.
-> > While not an absolute indicator, with the default pci_address_to_pio()
-> > that means that they can use the CPU MMIO address as IO address directly.
-> 
-> Not really, that would only work if they also have instructions to do
-> raw accesses to physical memory addresses rather than virtual memory
-> pointers that most architectures do.
-> 
-> > $ git grep IO_SPACE_LIMIT | grep -i ffffffff
-> > arch/arm/include/asm/io.h:#define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
-> > arch/arm/mach-at91/include/mach/io.h:#define IO_SPACE_LIMIT		0xFFFFFFFF
-> > arch/arm/mach-omap1/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> > arch/arm/mach-pxa/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> > arch/arm/mach-s3c24xx/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> 
-> These use a special trick where an __iomem pointer is the same as
-> the port number. This works most of the time, but breaks anything
-> that assumes that port numbers are low, such as /dev/port or
-> broken devices. Moreover, it means your code won't work because
-> it depends on passing the virtual start address of the PIO mapping
-> window as io_offset.
-> 
-> > arch/avr32/include/asm/io.h:#define IO_SPACE_LIMIT	0xffffffff
-> > arch/frv/include/asm/io.h:#define IO_SPACE_LIMIT	0xffffffff
-> 
-> They have no MMU, and the code relies on the port number to match
-> both the virtual and the physical address. You could be right about
-> these, but I would guess that the code also needs some other
-> changes if we want to make it work on nommu kernels. It also depends
-> on whether the I/O bus address is the same as the CPU address, or
-> if it starts at bus address 0.
-> 
-> > arch/ia64/include/asm/io.h:#define IO_SPACE_LIMIT		0xffffffffffffffffUL
-> 
-> Here, the definition is special, the token is just used to encode
-> a space number and an offset within the I/O space.
-> 
-> > arch/m32r/include/asm/io.h:#define IO_SPACE_LIMIT  0xFFFFFFFF
-> 
-> no PCI here.
-> 
-> > arch/m68k/include/asm/io_no.h:#define IO_SPACE_LIMIT 0xffffffff
-> 
-> This looks like a mistake, it should be smaller
-> 
-> > arch/microblaze/include/asm/io.h:#define IO_SPACE_LIMIT (0xFFFFFFFF)
-> 
-> I suspect it doesn't actually work. microblaze copied large parts
-> of this from PowerPC, but the parts that differ apparently get
-> it wrong for the I/O space. 
-> 
-> > arch/mn10300/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> 
-> Same category as frv. We should ask David Howells whether he
-> thinks I/O space actually works on these.
-> 
-> > arch/sh/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> 
-> I think this should just be 0xffff.
-> 
-> > arch/sparc/include/asm/io_32.h:#define IO_SPACE_LIMIT 0xffffffff
-> > arch/sparc/include/asm/io_64.h:#define IO_SPACE_LIMIT 0xffffffffffffffffUL
-> 
-> Sparc actually accesses the physical addresses, so in theory
-> it could always work. In the 64-bit case it would however have
-> to check that the port number is smaller than 0xffffffff, otherwise
-> you couldn't set the BAR. This means you still need a custom
-> function.
-> 
-> > arch/tile/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
-> 
-> tile seems to support only ioport_map() but not inb/outb, if I'm
-> reading this right.
-> 
-> > > I did not ask to treat 'do nothing with the IO range' as an error,
-> > > what I meant is that we should treat 'architecture cannot translate
-> > > from I/O space to memory space but DT lists a translation anyway'
-> > > as an error. On x86, you should never see an entry for the I/O space
-> > > in "ranges", so we will not call this function unless there is a
-> > > bug in DT.
-> > 
-> > Ok, it's just that there is no "architecture cannot translate from I/O
-> > space to memory space" indicator anywhere and I don't want to make x86
-> > a special case.
-> 
-> Right.
-> 
-> > So, my proposal is this: default weak implementation of pci_register_io_range()
-> > returns an error (meaning I have no idea how to translate IO addresses
-> > to memory space) and anyone that wants this function to return success will
-> > have to provide their implementation.
-> 
-> Another idea: make this conditional on the definition of PCI_IOBASE: If this
-> is defined, we can use the arm64 version that uses this number. Otherwise
-> we fall back to returning an error, which means that either on the
-> architecture we shouldn't be calling that function, or we need a custom
-> implementation.
+2014-03-10 13:50 GMT-07:00 Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com>:
+> David,
+>
+> this is a small patch set based on a single patch sent earlier [1] to
+> fix uninitalized struct ethtool_wolinfo in phy_ethtool_get_wol.
+> Compared to the single patch, this clears the whole struct
+> ethtool_wolinfo passed to phy_ethtool_get_wol and adds a check for
+> non-NULL struct phy_device.
+>
+> I also added two cleanup patches for current users of
+> phy_ethtool_get_wol. Those two patches are also based on v3.14-rc1 but
+> aren't really part of the fix. They can wait for v3.15 and I'll rebase
+> on request.
 
-PCI_IOBASE is always defined. See the discussion with Russell on this subject.
+Looks good to me, thanks Sebastian:
 
-include/asm-generic/io.h has at line 118:
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-#ifndef PCI_IOBASE
-#define PCI_IOBASE ((void __iomem *) 0)
-#endif
-
-I will go with my idea tomorrow. arm64 overwrite the implementation anyway, I
-find it cleaner rather than having to do #ifdefs and/or ifs.
-
-Best regards,
-Liviu
-
-> 
-> 	Arnd
+>
+> [1] https://lkml.org/lkml/2014/3/9/169
+>
+> Sebastian Hesselbarth (3):
+>   net: phy: fix uninitalized WOL parameters in phy_ethtool_get_wol
+>   net: mv643xx_eth: simplify phy_ethtool_get_wol call
+>   net: cpsw: simplify phy_ethtool_get_wol call
+>
+>  drivers/net/ethernet/marvell/mv643xx_eth.c | 5 +----
+>  drivers/net/ethernet/ti/cpsw.c             | 7 +------
+>  drivers/net/phy/phy.c                      | 4 +++-
+>  3 files changed, 5 insertions(+), 11 deletions(-)
+>
+> ---
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 1.8.5.3
+>
+
+
+
+-- 
+Florian
