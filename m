@@ -1,53 +1,56 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 10 Mar 2014 15:22:48 +0200
-Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
-In-Reply-To: <20140307164929.GC3789@atomide.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <531823C5.1020008@ti.com> <20140307164929.GC3789@atomide.com>
-Message-ID: <531DBCA8.80507@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Mar 2014 14:26:09 +0100
+Subject: [PATCH 2/3] ARM: at91: at91sam9g45: change at91_adc name
+In-Reply-To: <5318C98C.1070702@kernel.org>
+References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <5318C98C.1070702@kernel.org>
+Message-ID: <531DBD71.8040905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/14 18:49, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140305 23:32]:
->> Hi Tony,
+On 06/03/2014 20:16, Jonathan Cameron :
+> On 05/03/14 16:57, Alexandre Belloni wrote:
+>> We can't use "at91_adc" to refer to the at91_adc driver anymore as the name is
+>> used to match an id_table.
 >>
->> On 21/01/14 12:56, Tomi Valkeinen wrote:
->>> Hi,
->>>
->>> Here's version 3 of the DSS DT series.
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> As stated in previous email, I'll take this along with the fix that 'broke'
+> this, if I get an Ack from one of the at91 maintainers.
+
+Jonathan,
+
+It is maybe more clear if I answer here:
+- so, yes, you can take the 3 patches yourself (if you do not mind)
+- you have, for the whole series::
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks for your help with this issue.
+
+Bye,
+
+>> ---
+>>   arch/arm/mach-at91/at91sam9g45_devices.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> Can you have a look at the arch/arm/ parts in the series and ack if
->> they're ok, i.e, patches 1, 2, 32.
+>> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+>> index cb36fa872d30..88554024eb2d 100644
+>> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+>> @@ -1203,7 +1203,7 @@ static struct resource adc_resources[] = {
+>>   };
+>>
+>>   static struct platform_device at91_adc_device = {
+>> -	.name		= "at91_adc",
+>> +	.name		= "at91sam9g45-adc",
+>>   	.id		= -1,
+>>   	.dev		= {
+>>   				.platform_data	= &adc_data,
+>>
 > 
-> Patches 1, 2 & 32 look OK to me, so for those please feel free to add:
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-
-Thanks.
-
-> How about do a pull request for just the .dts changes against current
-> omap-for-v3.15/dt branch ASAP for me so I can pull it in? That is assuming
-> that just the .dts changes alone won't break anything.
-
-Unfortunately they do break. At least pinmuxing is moved from the global
-definitions to be handled by the respective display drivers, and there
-are some regulator_name hacks that the DT patches remove.
-
-I think those changes could be removed from my patches, and then added
-back later when everything else has been merged.
-
-The bigger issue is that suddenly there's lots of discussion about the
-display DT bindings. If those are not resolved very soon, I guess I have
-no choice but to again skip the merge window for the DSS DT changes.
-
- Tomi
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/4aede038/attachment.sig>
+-- 
+Nicolas Ferre
