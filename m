@@ -1,78 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 14:44:29 +0000
-Subject: [PATCH v3 3/5] pinctrl: st: add pinctrl support for the STiH407
- SoC
-In-Reply-To: <1394203251-25361-4-git-send-email-maxime.coquelin@st.com>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-4-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20140310144429.GA13661@lee--X1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Mar 2014 15:41:50 +0100
+Subject: [PATCH v4 5/7] ARM: sun6i: Protect SDRAM gating bit
+In-Reply-To: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1394462512-11620-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> 
-> This patch adds the initial support for pinctrl based on H407 SoC.
-> 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Prevent the SDRAM controller from being gated by force-enabling it in the
+machine code.
 
-SOBs should be in order of submission flow and author's should only be
-kept if the patch is unchanged. If it's been adapted you will require
-a re-review and they Acked-by or Reviewed-by tag.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/sun6i.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> ---
->  drivers/pinctrl/pinctrl-st.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 1721611..d1886b4 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -390,6 +390,19 @@ static const struct st_pctl_data  stih416_data = {
->  	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
->  };
->  
-> +static const struct st_pctl_data  stih407_flashdata = {
-
-Nit: Double space.
-
-> +	.rt_style	= st_retime_style_none,
-> +	.input_delays	= stih416_delays,
-> +	.ninput_delays	= 14,
-
-ARRAY_SIZE(stih416_delays)
-
-> +	.output_delays	= stih416_delays,
-> +	.noutput_delays = 14,
-
-ARRAY_SIZE(stih416_delays)
-
-> +	.alt = 0,
-> +	.oe = -1, /* Not Available */
-> +	.pu = -1, /* Not Available */
-> +	.od = 60,
-> +	.rt = 100,
-> +};
-> +
->  /* Low level functions.. */
->  static inline int st_gpio_bank(int gpio)
->  {
-> @@ -1596,6 +1609,10 @@ static struct of_device_id st_pctl_of_match[] = {
->  	{ .compatible = "st,stih416-rear-pinctrl", .data = &stih416_data},
->  	{ .compatible = "st,stih416-fvdp-fe-pinctrl", .data = &stih416_data},
->  	{ .compatible = "st,stih416-fvdp-lite-pinctrl", .data = &stih416_data},
-> +	{ .compatible = "st,stih407-sbc-pinctrl", .data = &stih416_data},
-> +	{ .compatible = "st,stih407-front-pinctrl", .data = &stih416_data},
-> +	{ .compatible = "st,stih407-rear-pinctrl", .data = &stih416_data},
-> +	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih407_flashdata},
->  	{ /* sentinel */ }
->  };
-
-After the small changes above, feel free to add my:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-
+diff --git a/arch/arm/mach-sunxi/sun6i.c b/arch/arm/mach-sunxi/sun6i.c
+index 6b3905505fe0..1ccb27524a9e 100644
+--- a/arch/arm/mach-sunxi/sun6i.c
++++ b/arch/arm/mach-sunxi/sun6i.c
+@@ -34,6 +34,11 @@ static void __init sun6i_dt_init(void)
+ 	clk = clk_get(NULL, "cpu");
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
++
++	/* DDR gating clock */
++	clk = clk_get(NULL, "ahb1_sdram");
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
+ }
+ 
+ extern void __init sun6i_reset_init(void);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.0
