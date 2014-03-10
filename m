@@ -1,57 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 10 Mar 2014 15:20:23 -0700
-Subject: [PATCH v2 0/3] net: phy: fix uninitalized WOL struct in
- phy_ethtool_get_wol
-In-Reply-To: <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAGVrzcbBcbPLnRa8ausZzcSyFBaySt=UEL_QQCAOJomrkaz1rw@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 10 Mar 2014 15:26:07 -0700
+Subject: Tegra baseline test results for v3.14-rc6
+Message-ID: <531E3BFF.2020801@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-10 13:50 GMT-07:00 Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com>:
-> David,
->
-> this is a small patch set based on a single patch sent earlier [1] to
-> fix uninitalized struct ethtool_wolinfo in phy_ethtool_get_wol.
-> Compared to the single patch, this clears the whole struct
-> ethtool_wolinfo passed to phy_ethtool_get_wol and adds a check for
-> non-NULL struct phy_device.
->
-> I also added two cleanup patches for current users of
-> phy_ethtool_get_wol. Those two patches are also based on v3.14-rc1 but
-> aren't really part of the fix. They can wait for v3.15 and I'll rebase
-> on request.
+Here are some basic Tegra test results for Linux v3.14-rc6.
+Logs and other details at:
 
-Looks good to me, thanks Sebastian:
-
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
->
-> [1] https://lkml.org/lkml/2014/3/9/169
->
-> Sebastian Hesselbarth (3):
->   net: phy: fix uninitalized WOL parameters in phy_ethtool_get_wol
->   net: mv643xx_eth: simplify phy_ethtool_get_wol call
->   net: cpsw: simplify phy_ethtool_get_wol call
->
->  drivers/net/ethernet/marvell/mv643xx_eth.c | 5 +----
->  drivers/net/ethernet/ti/cpsw.c             | 7 +------
->  drivers/net/phy/phy.c                      | 4 +++-
->  3 files changed, 5 insertions(+), 11 deletions(-)
->
-> ---
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> --
-> 1.8.5.3
->
+     http://nvt.pwsan.com/experimental/linux/testlogs/test_v3.14-rc6/20140309213233/
 
 
+Test summary
+------------
 
--- 
-Florian
+Build: zImage:
+     Pass: ( 9/ 9): tegra_defconfig%tegra20,114_mergeconfig,
+		   tegra_defconfig%tegra30,114_mergeconfig,
+		   tegra_defconfig%tegra30_mergeconfig,
+		   tegra_defconfig%tegra20,30_mergeconfig,
+		   tegra_defconfig%tegra124_mergeconfig,
+		   tegra_defconfig%tegra114_mergeconfig,
+		   multi_v7_defconfig,
+		   tegra_defconfig%tegra20_mergeconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra114_mergeconfig:
+     Pass: ( 1/ 1): tegra114-dalmore-a04
+
+Boot to userspace: tegra_defconfig%tegra20,114_mergeconfig:
+     Pass: ( 1/ 1): tegra114-dalmore-a04
+
+Boot to userspace: tegra_defconfig%tegra20,30_mergeconfig:
+     Pass: ( 1/ 1): tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra30,114_mergeconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra30_mergeconfig:
+     Pass: ( 1/ 1): tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169)):
+    text     data      bss    total  kernel
+   +1684     +280      -64    +1900  multi_v7_defconfig
+  +21635    +1536      +64   +23235  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169))
+   avail  rsrvd   high  freed  board          kconfig
+(no differences)
