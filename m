@@ -1,178 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Mar 2014 12:02:12 -0500
-Subject: [PATCH 2/3] soc: keystone: add QMSS driver
-In-Reply-To: <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>
- <1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAL_Jsq+O660oV9FtthG3gTkVOhL0ku-UHSrkt-ROauu1iNpbaA@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 10 Mar 2014 12:11:44 -0500
+Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
+ driver support
+In-Reply-To: <20140303035426.GC2411@sirena.org.uk>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-4-git-send-email-nm@ti.com>
+ <20140224015826.GU25940@sirena.org.uk> <530B594F.2030500@ti.com>
+ <20140303035426.GC2411@sirena.org.uk>
+Message-ID: <531DF250.5060100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 5:18 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> From: Sandeep Nair <sandeep_n@ti.com>
->
-> The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
-> the main hardware sub system which forms the backbone of the Keystone
-> Multi-core Navigator. QMSS consist of queue managers, packed-data structure
-> processors(PDSP), linking RAM, descriptor pools and infrastructure
-> Packet DMA.
->
-> The Queue Manager is a hardware module that is responsible for accelerating
-> management of the packet queues. Packets are queued/de-queued by writing or
-> reading descriptor address to a particular memory mapped location. The PDSPs
-> perform QMSS related functions like accumulation, QoS, or event management.
-> Linking RAM registers are used to link the descriptors which are stored in
-> descriptor RAM. Descriptor RAM is configurable as internal or external memory.
->
-> The QMSS driver manages the PDSP setups, linking RAM regions,
-> queue pool management (allocation, push, pop and notify) and descriptor
-> pool management. The specifics on the device tree bindings for
-> QMSS can be found in:
->         Documentation/devicetree/bindings/soc/keystone-qmss.txt
+On 03/02/2014 09:54 PM, Mark Brown wrote:
+> On Mon, Feb 24, 2014 at 08:38:07AM -0600, Nishanth Menon wrote:
+> 
+>> Intent here is to allow drivers such as cpufreq-cpu0 to be reused on
+>> platforms such as TI's OMAP derivatives, and other SoCs which differ
+>> only by the sequence involved in voltage scale operations. So, this
+>> patch provides a framework for registering the underlying
+>> implementation of the SoC specific voltage change methodology.
+> 
+> That bit is clear, what's very opaque from the code is how this is going
+> to be accomplished.
+The SoC specific voltage domain drivers register with
+devm_voltdm_register. the fops provide the abstraction needed for the
+SoC (example in patch #5 - which introduces OMAP specific voltage
+domain which handles ABB and VDD regulators).
 
-You are telling me where I can find a file that is added in this commit?
+What would you suggest that we do to clarify the usage here?
 
-All this description of what the h/w block does should go into the binding doc.
+>> Overall the sequence takes place after this patch is as follows:
+>> a) voltage domain drivers such as those of TI or others register with
+>> voltage domain with devm_voltdm_register.
+>> b) cpufreq-cpu0/devfreq drivers:
+>> of_pm_voltdm_notifier_register(introduced as part of patch #1) to
+>> register notifiers around clk of interest. This request is linked to
+>> the specific voltage domain using phandle in device tree.
+>> c) when cpufreq-cpu0/devfreq does a clk_set_rate, the common clock
+>> framework triggers notifiers in voltage domain core which in turn,
+>> invokes the corresponding handlers for the voltage domain driver
+>> ensuring the right dvfs sequence specific to the SoC is triggered.
+> 
+> So the first question I have here is what happens if multiple clocks
+> need to be updated in lock step - if we're only triggering off clock
+> notifiers that seems tricky.  The other thing here is that the fact that
+Yes, that is true, however, there are ways to implement them, for
+example: We could implement an higher level clock that takes care of
+the multiple clock node control to handle this kind of scenario.
 
->
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  .../devicetree/bindings/soc/keystone-qmss.txt      |  209 +++
->  drivers/Kconfig                                    |    2 +
->  drivers/Makefile                                   |    3 +
->  drivers/soc/Kconfig                                |    2 +
->  drivers/soc/Makefile                               |    5 +
->  drivers/soc/keystone/Kconfig                       |   15 +
->  drivers/soc/keystone/Makefile                      |    5 +
->  drivers/soc/keystone/qmss_acc.c                    |  591 ++++++++
->  drivers/soc/keystone/qmss_queue.c                  | 1533 ++++++++++++++++++++
->  drivers/soc/keystone/qmss_queue.h                  |  236 +++
->  include/linux/soc/keystone_qmss.h                  |  390 +++++
->  11 files changed, 2991 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/keystone-qmss.txt
->  create mode 100644 drivers/soc/Makefile
->  create mode 100644 drivers/soc/keystone/Kconfig
->  create mode 100644 drivers/soc/keystone/Makefile
->  create mode 100644 drivers/soc/keystone/qmss_acc.c
->  create mode 100644 drivers/soc/keystone/qmss_queue.c
->  create mode 100644 drivers/soc/keystone/qmss_queue.h
->  create mode 100644 include/linux/soc/keystone_qmss.h
->
-> diff --git a/Documentation/devicetree/bindings/soc/keystone-qmss.txt b/Documentation/devicetree/bindings/soc/keystone-qmss.txt
-> new file mode 100644
-> index 0000000..f975207
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/keystone-qmss.txt
-> @@ -0,0 +1,209 @@
-> +* Texas Instruments Keystone QMSS driver
-> +
-> +Required properties:
-> +- compatible   : Must be "ti,keystone-qmss";
-> +- clocks       : phandle to the reference clock for this device.
-> +- queue-range  : <start number> total range of queue numbers for the device.
-> +- linkram0     : <address size> for internal link ram, where size is the total
-> +                 link ram entries.
-> +- linkram1     : <address size> for external link ram, where size is the total
-> +                 external link ram entries. If the address is specified as "0"
-> +                 driver will allocate memory.
-> +- qmgrs         : the number of individual queue managers in the device. On
-> +                  keystone 1 range of devices there should be only one node.
-> +                 On keystone 2 devices there can be more than 1 node.
-> +  -- managed-queues    : the actual queues managed by each queue manager
-> +                         instance, specified as <"base queue #" "# of queues">.
-> +  -- reg               : Address and length of the register set for the device
-> +                         for peek, status, config, region, push, pop regions.
-> +  -- reg-names         : Names for the above register regions. The name to be
-> +                         used is as follows:
-> +                         - "config" : Queue configuration region.
-> +                         - "status" : Queue status RAM.
-> +                         - "region" : Descriptor memory setup region.
-> +                         - "push"   : Queue Management/Queue Proxy region.
-> +                         - "pop"    : Queue Management/Queue Proxy region.
-> +                         - "peek"   : Queue Peek region.
+I can elaborate that in the commit message, if that is desirable.
 
-reg-names should be optional. Also you have the order different from
-reg. Be consistent as to what is the correct order.
+> your API is "of_" suggests that it is in fact linked very srongly to DT
+> - it'd be good to split out the layers to make sure things make sense
+> standalone, the DT helpers are obviously good but the API should be able
+> to stand separately.
 
-> +- queue-pools  : Queue ranges are grouped into 3 type of pools:
-> +                 - qpend           : pool of qpend(interruptible) queues
-> +                 - general-purpose : pool of general queues, primarly used
-> +                                     as free descriptor queues or the
-> +                                     transmit DMA queues.
-> +                 - accumulator     : pool of queues on accumulator channel
-> +                 Each range can have the following properties:
-> +  -- values            : number of queues to use per queue range, specified as
-> +                         <"base queue #" "# of queues">.
+You are correct, I had intended the RFC as purely "OF only". I will
+make it independent of of in the next revision.
 
-values of what? This needs a better name.
-
-> +  -- interrupts                : Optional property to specify the interrupt mapping
-> +                         for interruptible queues. The driver additionaly sets
-> +                         the interrupt affinity based on the cpu mask.
-> +  -- reserved          : Optional property used to reserve the range. Queues
-> +                         in a reserved range can only be allocated by id.
-
-reserved what? This needs a better name and description.
-
-> +  -- accumulator       : Accumulator channel property specified as:
-> +                         <pdsp-id, channel, entries, pacing mode, latency>
-> +                         pdsp-id     : QMSS PDSP running accumulator firmware
-> +                                       on which the channel has to be
-> +                                       configured
-> +                         channel     : Accumulator channel number
-> +                         entries     : Size of the accumulator descriptor list
-> +                         pacing mode : Interrupt pacing mode
-> +                                       0 : None, i.e interrupt on list full
-> +                                       1 : Time delay since last interrupt
-> +                                       2 : Time delay since first new packet
-> +                                       3 : Time delay since last new packet
-> +                         latency     : time to delay the interrupt, specified
-> +                                       in microseconds.
-> +  -- multi-queue       : Optional property to specify that the channel has to
-> +                         monitor upto 32 queues starting at the base queue #.
-
-What does the property contain? What's a channel in this context?
-
-> +- descriptor-regions   : Descriptor memory region specification.
-
-huh?
-
-> +  -- id                                : region number.
-> +  -- values                    : number of descriptors in the region,
-> +                                 specified as
-> +                                 <"# of descriptors" "descriptor size">.
-> +  -- link-index                        : start index, i.e. index of the first
-> +                                 descriptor in the region.
-> +
-> +Optional properties:
-> +- dma-coherent : Present if DMA operations are coherent.
-> +- pdsps                : PDSP configuration, if any.
-
-This is a child node? Make that clear and separate the description for
-each node.
-
-> +  -- firmware          : firmware to be loaded on the PDSP.
-> +  -- id                        : the qmss pdsp that will run the firmware.
-> +  -- reg               : Address and length of the register set of the PDSP
-> +                         for iram, intd, region, command regions.
-> +  -- reg-names         : Names for the above register regions. The name to be
-> +                         used is as follows:
-> +                         - "iram"   : PDSP internal RAM region.
-> +                         - "reg"    : PDSP control/status region registers.
-> +                         - "intd"   : QMSS interrupt distributor registers.
-> +                         - "cmd"    : PDSP command interface region.
-> +
-> +Example:
-
-I probably have other comments, but address the above first.
-
-Rob
+-- 
+Regards,
+Nishanth Menon
