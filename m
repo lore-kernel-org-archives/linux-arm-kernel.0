@@ -1,18 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Mar 2014 11:09:39 +0800
-Subject: [PATCH v2 5/6] ARM: dts: imx6: add PCIe interrupt mapping
- properties
-In-Reply-To: <1394025951-32438-6-git-send-email-l.stach@pengutronix.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
- <1394025951-32438-6-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140310030938.GB15218@S2101-09.ap.freescale.net>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 10 Mar 2014 11:33:20 +0800
+Subject: [PATCH] clk: hisilicon: fix warning from smatch
+Message-ID: <1394422400-17639-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 02:25:50PM +0100, Lucas Stach wrote:
-> As defined by the common PCI bindings.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+drivers/clk/hisilicon/clk-hi3620.c:338
+mmc_clk_delay() warn: always true condition '(para >= 0) => (0-u32max >= 0)'
 
-Applied, thanks.
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/clk/hisilicon/clk-hi3620.c |   15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+index 38faa469d288..e75f742ca422 100644
+--- a/drivers/clk/hisilicon/clk-hi3620.c
++++ b/drivers/clk/hisilicon/clk-hi3620.c
+@@ -335,15 +335,14 @@ static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
+ {
+ 	u32 i;
+ 
+-	if (para >= 0) {
+-		for (i = 0; i < len; i++) {
+-			if (para % 2)
+-				val |= 1 << (off + i);
+-			else
+-				val &= ~(1 << (off + i));
+-			para = para >> 1;
+-		}
++	for (i = 0; i < len; i++) {
++		if (para % 2)
++			val |= 1 << (off + i);
++		else
++			val &= ~(1 << (off + i));
++		para = para >> 1;
+ 	}
++
+ 	return val;
+ }
+ 
+-- 
+1.7.9.5
