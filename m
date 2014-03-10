@@ -1,42 +1,50 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Mar 2014 14:49:21 +0200
-Subject: [PATCH v2 1/8] ARM: dts: dra7: Initialize USB_DPLL
-In-Reply-To: <1394197751-28984-2-git-send-email-rogerq@ti.com>
-References: <1394197751-28984-2-git-send-email-rogerq@ti.com>
-Message-ID: <1394455761-19226-1-git-send-email-rogerq@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 10 Mar 2014 13:53:19 +0100
+Subject: [PATCH 2/3] mfd: sec-core: Add of_compatible strings for MFD cells
+In-Reply-To: <20140310124623.GA18561@lee--X1>
+References: <1394454858-3139-1-git-send-email-k.kozlowski@samsung.com>
+ <1394454858-3139-3-git-send-email-k.kozlowski@samsung.com>
+ <20140310124623.GA18561@lee--X1>
+Message-ID: <1394455999.16208.3.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB_DPLL must be initialized and locked at boot so that
-USB modules can work.
+On Mon, 2014-03-10 at 12:46 +0000, Lee Jones wrote:
+> > Add of_compatible strings for S5M8767 RTC, S5M8767 clock and S2MPS14
+> > clock MFD cells.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  drivers/mfd/sec-core.c |    3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+> > index d163c66edebb..e8ac2e3c1f58 100644
+> > --- a/drivers/mfd/sec-core.c
+> > +++ b/drivers/mfd/sec-core.c
+> > @@ -57,8 +57,10 @@ static const struct mfd_cell s5m8767_devs[] = {
+> >  		.name = "s5m8767-pmic",
+> >  	}, {
+> >  		.name = "s5m-rtc",
+> > +		.of_compatible = "samsung,s5m8767-rtc",
+> >  	}, {
+> >  		.name = "s5m8767-clk",
+> > +		.of_compatible = "samsung,s5m8767-clk",
+> >  	}
+> >  };
+> >  
+> > @@ -77,6 +79,7 @@ static const struct mfd_cell s2mps14_devs[] = {
+> >  		.name = "s2mps14-rtc",
+> >  	}, {
+> >  		.name = "s2mps14-clk",
+> > +		.of_compatible = "samsung,s2mps14-clk",
+> >  	}
+> >  };
+> 
+> Any reason for not applying compatible strings for the other devices?
 
-Program USB_DLL_M2 output to half rate as well.
+Partially yes because I do not want to add them for devices which I
+cannot test (s5m8761, s5m8763) but you're right that there are no
+obstacles for s2mps11, s5m8767 and s2mps14.
 
-Patch depends on
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
-
-CC: Mike Turquette <mturquette@linaro.org>
-CC: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 597979b..f376923 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -815,3 +815,11 @@
- };
- 
- /include/ "dra7xx-clocks.dtsi"
-+
-+&dpll_usb_ck {
-+        default-rate = <960000000>;
-+};
-+
-+&dpll_usb_m2_ck {
-+	default-rate = <480000000>;
-+};
--- 
-1.8.3.2
+I'll fix this in next version.
