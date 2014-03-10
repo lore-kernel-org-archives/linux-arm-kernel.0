@@ -1,38 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 10:34:14 +0000
-Subject: [PATCH 5/5] ARM: multi_v7_defconfig: add st-keyscan driver
-In-Reply-To: <1393990772-9567-6-git-send-email-gabriel.fernandez@st.com>
-References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
- <1393990772-9567-6-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20140310103414.GH14976@lee--X1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Mar 2014 10:45:58 +0000
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <20140309115514.GY28112@sirena.org.uk>
+References: <20140309115514.GY28112@sirena.org.uk>
+Message-ID: <20140310104558.GB8830@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch adds KEYBOARD_ST_KEYSCAN config
+On Sun, Mar 09, 2014 at 11:55:14AM +0000, Mark Brown wrote:
+> Hi all,
+
+Hi Mark,
+
+> After merging the arm-soc tree, today's linux-next build (20140309)
+> failed for arm64 defconfig like this:
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> /home/broonie/next/next/drivers/irqchip/irq-gic.c: In function 'gic_raise_softirq':
+> /home/broonie/next/next/drivers/irqchip/irq-gic.c:666:2: error: implicit declaration of function 'dmb' [-Werror=implicit-function-declaration]
+>   dmb(ishst);
+>   ^
 
-You should capitalise ST Keyscan in the $SUBJECT line, but other than that:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Damnit, that's because we ended up going with dmb instead of dsb after it
+(surprisingly) turned out to be sufficient. The simple patch below fixes the
+problem -- Catalin, can we get this into -next please?
 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index ee69829..5e926981 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -131,6 +131,7 @@ CONFIG_INPUT_EVDEV=y
->  CONFIG_KEYBOARD_GPIO=y
->  CONFIG_KEYBOARD_TEGRA=y
->  CONFIG_KEYBOARD_SPEAR=y
-> +CONFIG_KEYBOARD_ST_KEYSCAN=y
->  CONFIG_KEYBOARD_CROS_EC=y
->  CONFIG_MOUSE_PS2_ELANTECH=y
->  CONFIG_INPUT_MISC=y
+I have an extra patch which actually makes use of the options, but we should
+get things building again first.
 
+Cheers,
+
+Will
+
+--->8
+
+>From bacbd4af61a671ad21f58197ed16116ff41b54cd Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Mon, 10 Mar 2014 10:36:52 +0000
+Subject: [PATCH] arm64: barriers: add dmb barrier
+
+Commit 8adbf57fc429 ("irqchip: gic: use dmb ishst instead of dsb when
+raising a softirq") added an explicit dmb(...) call to the GIC driver.
+
+This patch adds a simple dmb() macro to arm64, which expands to a DMB SY
+instruction.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/barrier.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 409ca370cfe2..66eb7648043b 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -25,6 +25,7 @@
+ #define wfi()		asm volatile("wfi" : : : "memory")
+ 
+ #define isb()		asm volatile("isb" : : : "memory")
++#define dmb(opt)	asm volatile("dmb sy" : : : "memory")
+ #define dsb(opt)	asm volatile("dsb sy" : : : "memory")
+ 
+ #define mb()		dsb()
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.2
