@@ -1,40 +1,50 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 10 Mar 2014 12:09:42 +0000
-Subject: [PATCH v5 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <5319AF00.5030602@ti.com>
-References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
- <53184C2E.3000807@ti.com> <1394119431.4160.84.camel@hornet>
- <5319AF00.5030602@ti.com>
-Message-ID: <1394453382.3853.6.camel@hornet>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Mar 2014 13:05:58 +0100
+Subject: [PATCH v3 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <1394028474.28803.172.camel@smile.fi.intel.com>
+References: <1393949884-892-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393949884-892-7-git-send-email-maxime.ripard@free-electrons.com>
+ <1394028474.28803.172.camel@smile.fi.intel.com>
+Message-ID: <20140310120558.GF2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-03-07 at 11:35 +0000, Tomi Valkeinen wrote:
-> > ... and this makes me try to get out of its way. In other words, I fully
-> > agree with you, but I don't think this applies to this particular patch,
-> > as I'm not even trying to represent the display pipeline. The (optional)
+Hi Andriy,
+
+On Wed, Mar 05, 2014 at 02:07:55PM +0000, Shevchenko, Andriy wrote:
+> > +		return PTR_ERR(pll6);
+> > +	}
+> > +
+> > +	ret = clk_set_parent(mux, pll6);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	devm_clk_put(&pdev->dev, mux);
+> > +	devm_clk_put(&pdev->dev, pll6);
 > 
-> Right, you are not, at the moment. My point was, if the driver is
-> extended later to support pipelines, or common panel/encoder drivers,
-> you (most likely) need to have similar bindings than the other people use.
+> Since you put those here, would it be better to use plain
+> clk_get/clk_put ?
 
-No argument here.
+Actually, this allows to have no exit path for the case where one of
+the calls between the first clk_get, and here. devm_clk_* makes error
+handling much easier here, that's just all
 
-> Note that the same DT bindings you add here should also work for the DRM
-> driver in the future. So, in fact, the question is extended to: will the
-> fbdev 
+I'll fix the other comments you had, and send a new version.
 
-No, I don't think so. It's a end of line for it, I believe. From my
-personal point of view the main goal is to fill the last gap between DT
-and non-DT support on one of the Versatile Express boards - CLCD works
-fine when booted with ATAGs, doesn't work when booted with DT. It looks
-bad.
+Thanks!
+Maxime
 
-> or drm driver support common panels/encoders?
-
-I would hope so, yes. VE display pipeline is quite complex (more than I
-would hope ;-) so to implement KMS in a proper way (with hotplugging,
-bells and whistles) it will have to know more than now. But it's out of
-scope for me.
-
-Pawel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/580c7192/attachment-0001.sig>
