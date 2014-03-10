@@ -1,47 +1,45 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 10 Mar 2014 09:15:42 +0100
-Subject: [GIT PULL] Xilinx Zynq changes for v3.15
-In-Reply-To: <20140309060728.GA16310@quad.lixom.net>
-References: <53061EBA.1080002@monstr.eu> <5310382F.5060700@monstr.eu>
- <20140309060728.GA16310@quad.lixom.net>
-Message-ID: <531D74AE.5050808@monstr.eu>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 10 Mar 2014 17:36:43 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Clock Updates for
+ v3.15
+Message-ID: <cover.1394440226.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 03/09/2014 07:07 AM, Olof Johansson wrote:
-> On Fri, Feb 28, 2014 at 08:18:07AM +0100, Michal Simek wrote:
-> 
->> Any update on this one?
-> 
-> Hi,
-> 
-> Looks like it fell between chairs, but the bigger problem is the fetch URL:
+Please consider this third round of Renesas ARM based SoC clock updates
+for v3.15.
 
-ok.
+I am posting this series after the release of v3.14-rc6 as it only
+contains a fix.
 
->>>   git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
-> 
-> Care to send a fresh pull request with a publicly accessible repo URL? :)
-
-Thanks for pointing to it. I have sent second pull request.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+This pull request is based on the previous round of
+such requests, tagged as renesas-clock2-for-v3.15,
+which I have already sent a pull-request for.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/9b1a3af9/attachment.sig>
+The following changes since commit 9ced1d47719b5f32e4231338dd362c136518ed08:
+
+  ARM: shmobile: r8a7790: add sound SCU clock support (2014-02-24 10:03:02 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock3-for-v3.15
+
+for you to fetch changes up to d93023f81d2c79595e64e4f516f03af4e4c73c13:
+
+  ARM: shmobile: r7s72100: fix bus clock calculation (2014-03-06 13:22:02 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Clock Updates for v3.15
+
+r7s72100 (RZ/A1H) SoC
+* Correct bus clock calculation
+
+----------------------------------------------------------------
+Wolfram Sang (1):
+      ARM: shmobile: r7s72100: fix bus clock calculation
+
+ arch/arm/mach-shmobile/clock-r7s72100.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
