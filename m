@@ -1,100 +1,129 @@
-From: noreply.rgenoud@gmail.com (Richard Genoud)
-Date: Mon, 10 Mar 2014 17:45:48 +0100
-Subject: [PATCH v6 0/3] tty/serial: Add helpers to use GPIOs to control modem
- lines and implement atmel_serial.c
-Message-ID: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Mar 2014 17:51:56 +0100
+Subject: [PATCH v4 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <2475487.axlvKsBQ0c@wuerfel>
+References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
+ <2475487.axlvKsBQ0c@wuerfel>
+Message-ID: <20140310165156.GI2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
-but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
-Moreover, even if the controller can handle CTS/RTS, the dedicated
-CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
+Hi Arnd,
 
-So this patchset adds the possibility to control those lines via GPIO,
-as it is done for RTS in the patch "switch atmel serial to use gpiolib"
+On Mon, Mar 10, 2014 at 04:34:04PM +0100, Arnd Bergmann wrote:
+> On Monday 10 March 2014 15:41:51 Maxime Ripard wrote:
+> 
+> > +/*
+> > + * Hardware representation of the LLI
+> > + *
+> > + * The hardware will be fed the physical address of this structure,
+> > + * and read its content in order to start the transfer.
+> > + */
+> > +struct sun6i_dma_lli {
+> > +	u32			cfg;
+> > +	u32			src;
+> > +	u32			dst;
+> > +	u32			len;
+> > +	u32			para;
+> > +	u32			p_lli_next;
+> > +	struct sun6i_dma_lli	*v_lli_next;
+> > +} __packed;
+> 
+> It looks strange to have a pointer in a hardware structure, since
+> the pointer doesn't make sense to the device.
 
-As it was suggested by Alexander Shiyan, I made that available for
-every board.
+Actually, it's not used at all by the device itself. It's used only by
+the driver to be able to follow that list whenever we need to
+free/dump it.
 
-Patch 1 implements the generic helpers to control modem lines via GPIO
-Patch 2 implements modem control lines in atmel_serial atmel_serial.
-Patch 3 implements the interrupts of CTS/DSR/DCD/RI in atmel_serial.
+> Also, the '__packed' attribute seems strange. Are you sure
+> you want to reduce the alignment from 4 bytes to 1 byte?
 
-I've taken into account lasts remarks that Alexander made me off-list.
+What I wanted to make sure is that the structure is actually what I
+declared above in memory, but it's true that it's completely useless
+here.
 
-This is based on next-20140307 + [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
-(It has been acked by Linus, but I don't think it has been applied in a tree yet)
+> > +static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct sun6i_dma_dev *sdev = dev_id;
+> > +	struct sun6i_vchan *vchan;
+> > +	struct sun6i_pchan *pchan;
+> > +	int i, j, ret = IRQ_NONE;
+> > +	u32 status;
+> > +
+> > +	for (i = 0; i < 2; i++) {
+> > +		status = readl(sdev->base + DMA_IRQ_STAT(i));
+> > +		if (!status)
+> > +			continue;
+> > +
+> > +		dev_dbg(sdev->slave.dev, "DMA irq status %s: 0x%x\n",
+> > +			i ? "high" : "low", status);
+> > +
+> > +		writel(status, sdev->base + DMA_IRQ_STAT(i));
+> > +
+> > +		for (j = 0; (j < 8) && status; j++) {
+> > +			if (status & DMA_IRQ_QUEUE) {
+> > +				pchan = sdev->pchans + j;
+> > +				vchan = pchan->vchan;
+> > +
+> > +				if (vchan) {
+> > +					unsigned long flags;
+> > +
+> > +					spin_lock_irqsave(&vchan->vc.lock,
+> > +							  flags);
+> 
+> Interrupts are already disabled here.
 
-Tested on at91sam9g35, with a null modem cable between 2 serial ports,
-one with CTS/RTS controlled by the USART controller, the other via GPIO,
-full duplex transfers.
-Did some tests also with null modem cables on a PC, and with real modems.
-And a lot of rings tested with ioctl TIOCMIWAIT, TIOCGICOUNT, TIOCMGET (and TIOCMSET, for RTS/DTR)
+True.
 
-Updates from v5:
-	- Add UART_GPIO_RNG.
-	- Add atmel-serial documentation that was lost in v3 !
-	- switched a dev_warn to dev_dbg.
-	- remove checks (irq >= 0) in interrupt handler.
-	- simplified a !IS_ERR_OR_NULL(gpiod) test to just gpiod
-	- fixed a bug in rollback code in atmel_serial.c
+> > +	sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	if (IS_ERR(sdc->clk)) {
+> > +		dev_err(&pdev->dev, "No clock specified\n");
+> > +		return PTR_ERR(sdc->clk);
+> > +	}
+> > +
+> > +	mux = devm_clk_get(&pdev->dev, "ahb1_mux");
+> > +	if (IS_ERR(mux)) {
+> > +		dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> > +		return PTR_ERR(mux);
+> > +	}
+> > +
+> > +	pll6 = devm_clk_get(&pdev->dev, "pll6");
+> > +	if (IS_ERR(pll6)) {
+> > +		dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> > +		return PTR_ERR(pll6);
+> > +	}
+> > +
+> > +	ret = clk_set_parent(mux, pll6);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> > +		return ret;
+> > +	}
+> 
+> Neither "pll6" nor "ahb1_mux" are listed in the DT binding. Also, why
+> is it the driver's business to set the parent?
 
-Updates from v4:
-	- patches "tty/serial: at91: remove unused open/close hooks" and
-	"tty/serial: at91: use dev_err instead of printk" have been picked
-	by Greg on tty tree.
-	- As Alexander pointed out, IS_ERR_OR_NULL() was replaced by a simple
-	check againts NULL in patch 1/3
-	- in path 1/3, a warning is produced instead of an error when we can't set
-	the direction of a GPIO.
+Those are global clocks, so it's not really part pof the driver
+binding itself. But I can add them.
 
-Updates from v3:
-	- add static keyword on struct uart0_gpios_table.
-	- add use an index at the mctrl_gpio_init() function to make it
-	usable by driver that allocates several ports at once.
-	- hide struct gpio_desc from users.
-	- patch "pinctrl: at91: implement get_direction" has been picked by Linus.
-	- patch "ARM: at91: gpio: implement get_direction" has been acked by Linus.
+About the reparenting itself, other devices are actually fine having
+any parent they want, only the DMA is picky about it (at least, from
+what we know), so it made sense to me to put it into the driver
+itself. Where would you put it?
 
-Updates from v2:
-	- remove UART_GPIO_MIN/UART_GPIO_MAX_INPUT and use a direction
-	boolean instead.
-	- implement get_direction in at91 pinctrl and mach-at91/gpio.c.
-	- remove the get_mctrl_gpio_name() function that was used for
-	logs only.
-	- split atmel_serial.c patch in 2.
-	- use a gpio lookup table to declare modem gpios in platform
-	devices boards. So there's no more special case for platform
-	data gpios in atmel_serial.c.
-
-Updates from v1:
-	- Instead of controlling modem signal only on atmel board, the
-	code is now available for every board.
-	- The active low flag from device tree is now used.
-
-Richard Genoud (3):
-  tty/serial: Add GPIOLIB helpers for controlling modem lines
-  tty/serial: at91: use mctrl_gpio helpers
-  tty/serial: at91: add interrupts for modem control lines
-
- .../devicetree/bindings/serial/atmel-usart.txt     |  12 +-
- Documentation/serial/driver                        |  25 +++
- arch/arm/mach-at91/at91rm9200_devices.c            |  16 +-
- arch/arm/mach-at91/at91sam9260_devices.c           |   7 -
- arch/arm/mach-at91/at91sam9261_devices.c           |   4 -
- arch/arm/mach-at91/at91sam9263_devices.c           |   4 -
- arch/arm/mach-at91/at91sam9g45_devices.c           |   5 -
- arch/arm/mach-at91/at91sam9rl_devices.c            |   5 -
- drivers/tty/serial/Kconfig                         |   4 +
- drivers/tty/serial/Makefile                        |   3 +
- drivers/tty/serial/atmel_serial.c                  | 230 +++++++++++++++++----
- drivers/tty/serial/serial_mctrl_gpio.c             | 143 +++++++++++++
- drivers/tty/serial/serial_mctrl_gpio.h             | 110 ++++++++++
- include/linux/platform_data/atmel.h                |   1 -
- 14 files changed, 496 insertions(+), 73 deletions(-)
- create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
- create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
+Thanks,
+Maxime
 
 -- 
-1.8.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/2e057db9/attachment.sig>
