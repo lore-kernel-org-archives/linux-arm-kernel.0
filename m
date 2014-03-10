@@ -1,33 +1,32 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Mon, 10 Mar 2014 11:51:30 +0000
-Subject: [PATCH 0/4] Add support for the Cortex A5 global timer
-Message-ID: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
+Date: Mon, 10 Mar 2014 11:51:34 +0000
+Subject: [PATCH 4/4] KConfig: Vexpress: build the ARM_GLOBAL_TIMER with
+ vexpress platform
+In-Reply-To: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
+References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
+Message-ID: <1394452294-24552-5-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for the global timer with the Cortex
-A5. This is relatively simple patch series and mainly consists of:
+The Cortex A5 now contains bindings for the global timer
+driver. Ensure that the driver is built with a vexpress platform.
 
- - Update a check in the drive probe code for an unusable global timer
-   to be non-specific to the A9.
- - Add the appropriate device tree node and Kconfig options.
- - Add a compatible node for the specifc A5 global timer in the DT
-   binding.
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+ arch/arm/mach-vexpress/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Any comments welcome.
-Matt
-
-Matthew Leach (4):
-  clocksource: arm_global_timer: Only check for unusable timer on A9
-  documentaion: DT: allow a A5 compatible string in global timer
-  dts: ca5: add the global timer for the A5
-  KConfig: Vexpress: build the ARM_GLOBAL_TIMER with vexpress platform
-
- Documentation/devicetree/bindings/arm/global_timer.txt |  6 ++++--
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts                | 10 +++++++++-
- arch/arm/mach-vexpress/Kconfig                         |  1 +
- drivers/clocksource/arm_global_timer.c                 |  5 +++--
- 4 files changed, 17 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 4a70be4..4fb2a65 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_VEXPRESS
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
++	select ARM_GLOBAL_TIMER
+ 	select ARM_TIMER_SP804
+ 	select COMMON_CLK
+ 	select COMMON_CLK_VERSATILE
 -- 
 1.8.5.3
