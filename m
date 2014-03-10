@@ -1,10 +1,9 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 11 Mar 2014 02:05:21 +0530
-Subject: [PATCH v3 09/52] arm,
- hw-breakpoint: Fix CPU hotplug callback registration
+Date: Tue, 11 Mar 2014 02:05:38 +0530
+Subject: [PATCH v3 10/52] arm, kvm: Fix CPU hotplug callback registration
 In-Reply-To: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
 References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140310203521.10746.47464.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,49 +38,51 @@ registration is:
 	cpu_notifier_register_done();
 
 
-Fix the hw-breakpoint code in arm by using this latter form of callback
-registration.
+Fix the kvm code in arm by using this latter form of callback registration.
 
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Gleb Natapov <gleb@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Ingo Molnar <mingo@kernel.org>
+Cc: kvmarm at lists.cs.columbia.edu
+Cc: kvm at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Paolo Bonzini <pbonzini@redhat.com>
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- arch/arm/kernel/hw_breakpoint.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 3d44660..3702de8 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -1072,6 +1072,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	core_num_brps = get_num_brps();
- 	core_num_wrps = get_num_wrps();
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index bd18bb8..f0e50a0 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
  
 +	cpu_notifier_register_begin();
 +
- 	/*
- 	 * We need to tread carefully here because DBGSWENABLE may be
- 	 * driven low on this core and there isn't an architected way to
-@@ -1088,6 +1090,7 @@ static int __init arch_hw_breakpoint_init(void)
- 	if (!cpumask_empty(&debug_err_mask)) {
- 		core_num_brps = 0;
- 		core_num_wrps = 0;
-+		cpu_notifier_register_done();
- 		return 0;
+ 	err = init_hyp_mode();
+ 	if (err)
+ 		goto out_err;
+ 
+-	err = register_cpu_notifier(&hyp_init_cpu_nb);
++	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+ 	if (err) {
+ 		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+ 		goto out_err;
  	}
  
-@@ -1107,7 +1110,10 @@ static int __init arch_hw_breakpoint_init(void)
- 			TRAP_HWBKPT, "breakpoint debug exception");
- 
- 	/* Register hotplug and PM notifiers. */
--	register_cpu_notifier(&dbg_reset_nb);
-+	__register_cpu_notifier(&dbg_reset_nb);
-+
 +	cpu_notifier_register_done();
 +
- 	pm_init();
+ 	hyp_cpu_pm_init();
+ 
+ 	kvm_coproc_table_init();
  	return 0;
+ out_err:
++	cpu_notifier_register_done();
+ 	return err;
  }
+ 
