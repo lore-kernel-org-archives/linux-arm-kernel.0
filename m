@@ -1,36 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun,  9 Mar 2014 22:42:09 -0700
-Subject: [PATCH] ARM: enable ARM_HAS_SG_CHAIN for multiplatform
-Message-ID: <1394430129-30297-1-git-send-email-olof@lixom.net>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Mon, 10 Mar 2014 05:50:19 +0000
+Subject: [PATCH 2/9] ARM: dts: i.MX51: Add a second usbphy.
+In-Reply-To: <1394427060.539541345@f354.i.mail.ru>
+References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
+ <1394211863-7569-2-git-send-email-denis@eukrea.com>
+ <20140310005159.GB2727@shlinux1.ap.freescale.net>
+ <1394427060.539541345@f354.i.mail.ru>
+Message-ID: <c6475b21bb0d4252aded9e7a42f0d90c@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ARM_HAS_SG_CHAIN for all multiplatform targets, it makes sense
-to enable on all "modern" platforms; downsides are limited for platforms
-that don't need it.
+ 
+> > >
+> > > diff --git a/arch/arm/boot/dts/imx51.dtsi
+> > > b/arch/arm/boot/dts/imx51.dtsi index e508e6f..917b6ed 100644
+> > > --- a/arch/arm/boot/dts/imx51.dtsi
+> > > +++ b/arch/arm/boot/dts/imx51.dtsi
+> > > @@ -100,6 +100,13 @@
+> > >  			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> > >  			clock-names = "main_clk";
+> > >  		};
+> > > +
+> > > +		usbphy1: usbphy at 1 {
+> > > +			compatible = "usb-nop-xceiv";
+> > > +			reg = <1>;
+> > > +			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> > > +			clock-names = "main_clk";
+> > > +		};
+> >
+> > Is this the ulpi phy for host1 controller? Why the clock is the same
+> > with utmi phy clock for otg controller.
+> 
+> As far as I know, for i.MX51 this is as it should be.
+> 
 
-Requested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+Are you sure? From clock file, they are different ccm clock gate.
 
-I'll apply this to next/soc in lack of better places. I did a build+boot
-test across my set of machines earlier today and it didn't seem to cause
-any problems.
+> However, I doubt the usefulness of forcing "fsl,usbphy = <&usbphy1>"
+> below.
+> 
 
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Yes, for ulpi phy, it should use ulpi phy driver (drivers/usb/phy/phy-ulpi.c),
+not generic phy driver.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a5833f792e56..271a54d5d26f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -307,6 +307,7 @@ config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
- 	depends on MMU
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARM_HAS_SG_CHAIN
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR
- 	select CLKSRC_OF
--- 
-1.8.4.1.601.g02b3b1d
+Peter
