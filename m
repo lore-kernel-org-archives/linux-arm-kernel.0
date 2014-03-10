@@ -1,31 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Mar 2014 15:41:50 +0100
-Subject: [PATCH v4 5/7] ARM: sun6i: Protect SDRAM gating bit
+Date: Mon, 10 Mar 2014 15:41:49 +0100
+Subject: [PATCH v4 4/7] ARM: sun6i: Protect CPU clock
 In-Reply-To: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1394462512-11620-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1394462512-11620-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent the SDRAM controller from being gated by force-enabling it in the
-machine code.
+Right now, AHB is an indirect child clock of the CPU clock. If that happens to
+change, since the CPU clock has no other consumers declared in Linux, it would
+be shut down, which is not really a good idea.
+
+Prevent this by forcing it enabled.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/sun6i.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-sunxi/sun6i.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/mach-sunxi/sun6i.c b/arch/arm/mach-sunxi/sun6i.c
-index 6b3905505fe0..1ccb27524a9e 100644
+index c5dc81988ce9..6b3905505fe0 100644
 --- a/arch/arm/mach-sunxi/sun6i.c
 +++ b/arch/arm/mach-sunxi/sun6i.c
-@@ -34,6 +34,11 @@ static void __init sun6i_dt_init(void)
- 	clk = clk_get(NULL, "cpu");
- 	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
+@@ -10,6 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+ #include <linux/init.h>
+@@ -22,9 +23,17 @@
+ 
+ static void __init sun6i_dt_init(void)
+ {
++	struct clk *clk;
 +
-+	/* DDR gating clock */
-+	clk = clk_get(NULL, "ahb1_sdram");
+ 	sunxi_setup_restart();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++
++	/* Make sure the clocks we absolutely need are enabled */
++	/* CPU clock */
++	clk = clk_get(NULL, "cpu");
 +	if (!IS_ERR(clk))
 +		clk_prepare_enable(clk);
  }
