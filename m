@@ -1,31 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Mar 2014 12:59:05 +0100
-Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <20140310072719.GB2571@katana>
-References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <1725290.WIBK8uYmkH@avalon> <20140310072719.GB2571@katana>
-Message-ID: <1452941.Qc8gHZ8xpL@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Mar 2014 11:58:18 +0000
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <20140310104558.GB8830@mudshark.cambridge.arm.com>
+References: <20140309115514.GY28112@sirena.org.uk>
+ <20140310104558.GB8830@mudshark.cambridge.arm.com>
+Message-ID: <20140310115817.GA10240@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Monday 10 March 2014 08:27:19 Wolfram Sang wrote:
-> > Indeed, I got it wrong. We can leave it as-is then.
+On Mon, Mar 10, 2014 at 10:45:58AM +0000, Will Deacon wrote:
+> On Sun, Mar 09, 2014 at 11:55:14AM +0000, Mark Brown wrote:
+> > Hi all,
 > 
-> Great. So I guess, this series can be applied now?
+> Hi Mark,
+> 
+> > After merging the arm-soc tree, today's linux-next build (20140309)
+> > failed for arm64 defconfig like this:
+> > 
+> > /home/broonie/next/next/drivers/irqchip/irq-gic.c: In function 'gic_raise_softirq':
+> > /home/broonie/next/next/drivers/irqchip/irq-gic.c:666:2: error: implicit declaration of function 'dmb' [-Werror=implicit-function-declaration]
+> >   dmb(ishst);
+> >   ^
+> 
+> Damnit, that's because we ended up going with dmb instead of dsb after it
+> (surprisingly) turned out to be sufficient. The simple patch below fixes the
+> problem -- Catalin, can we get this into -next please?
 
-There's just the issue of serial port aliases left. I've started a discussion 
-about that on the DT mailing list (you've been CC'ed).
+Done.
 
 -- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/74ba8270/attachment.sig>
+Catalin
