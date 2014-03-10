@@ -1,69 +1,50 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Mar 2014 20:17:21 +0100
-Subject: [PATCHv3 4/8] ARM: at91/dt: at91sam9260: remove useless adc properties
-In-Reply-To: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394479045-31852-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Mar 2014 20:17:17 +0100
+Subject: [PATCHv3 0/8] at91_adc: documentation and device tree cleanups
+Message-ID: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the properties that are not used anymore by the at91_adc driver.
+The first patch synchronise the documentation with the actual code and correct
+the example.
 
-Also, add #address-cells, #size-cells and a reg for each trigger to comply to
-the ePAPR.
+The second patch move the documentation to the correct location (under iio/adc)
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+The remaining patches correct the device trees that are using the adc, mainly
+removing unused properties and making the binding compliant with the ePAPR.
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 997901f7ed73..366fc2cbcd64 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -608,37 +608,38 @@
- 			};
- 
- 			adc0: adc at fffe0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				compatible = "atmel,at91sam9260-adc";
- 				reg = <0xfffe0000 0x100>;
- 				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 0>;
- 				atmel,adc-use-external-triggers;
- 				atmel,adc-channels-used = <0xf>;
- 				atmel,adc-vref = <3300>;
--				atmel,adc-num-channels = <4>;
- 				atmel,adc-startup-time = <15>;
--				atmel,adc-channel-base = <0x30>;
--				atmel,adc-drdy-mask = <0x10000>;
--				atmel,adc-status-register = <0x1c>;
--				atmel,adc-trigger-register = <0x04>;
- 				atmel,adc-res = <8 10>;
- 				atmel,adc-res-names = "lowres", "highres";
- 				atmel,adc-use-res = "highres";
- 
- 				trigger at 0 {
-+					reg = <0>;
- 					trigger-name = "timer-counter-0";
- 					trigger-value = <0x1>;
- 				};
- 				trigger at 1 {
-+					reg = <1>;
- 					trigger-name = "timer-counter-1";
- 					trigger-value = <0x3>;
- 				};
- 
- 				trigger at 2 {
-+					reg = <2>;
- 					trigger-name = "timer-counter-2";
- 					trigger-value = <0x5>;
- 				};
- 
- 				trigger at 3 {
-+					reg = <3>;
- 					trigger-name = "external";
- 					trigger-value = <0x13>;
- 					trigger-external;
+Changes in v3:
+ - also remove the useless atmel,adc-clock-rate
+
+Changes in v2:
+ - add #address-cells, #size-cells and a reg for each trigger to comply to the
+   ePAPR instead of removing the unit-address.
+ - also correct the atmel,adc-use-external-triggers property name in the
+   documentation and in the device tree that got it wrong.
+
+Alexandre Belloni (8):
+  Documentation: dt: iio: improve atmel-adc documentation
+  Documentation: dt: iio: move arm/atmel-adc.txt to iio/adc/at91_adc.txt
+  ARM: at91/dt: at91-ariag25: remove useless adc properties
+  ARM: at91/dt: at91sam9260: remove useless adc properties
+  ARM: at91/dt: at91sam9g45: remove useless adc properties
+  ARM: at91/dt: at91sam9x5: remove useless adc properties
+  ARM: at91/dt: sama5d3: remove useless adc properties
+  ARM: at91/dt: at91-cosino: remove useless adc properties
+
+ .../devicetree/bindings/arm/atmel-adc.txt          | 81 ---------------------
+ .../devicetree/bindings/iio/adc/at91_adc.txt       | 82 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91-ariag25.dts                 |  1 -
+ arch/arm/boot/dts/at91-cosino.dtsi                 |  1 -
+ arch/arm/boot/dts/at91-cosino_mega2560.dts         |  1 -
+ arch/arm/boot/dts/at91sam9260.dtsi                 | 11 +--
+ arch/arm/boot/dts/at91sam9g45.dtsi                 | 11 +--
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 13 ++--
+ arch/arm/boot/dts/sama5d3.dtsi                     | 13 ++--
+ arch/arm/boot/dts/sama5d3xdm.dtsi                  |  1 -
+ 10 files changed, 108 insertions(+), 107 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+
 -- 
 1.8.3.2
