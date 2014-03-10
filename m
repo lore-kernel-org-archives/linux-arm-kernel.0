@@ -1,66 +1,61 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 10 Mar 2014 07:40:08 +0530
-Subject: [PATCH v4 5/5] clk/exynos5260: add clock file for exynos5260
-In-Reply-To: <531D007F.4030800@gmail.com>
-References: <1394113551-2134-1-git-send-email-rahul.sharma@samsung.com>
- <CAGcde9Hqs92bri0Fu3y7rvMhiFMYe+N7YWT-mxL2HTsnJTvz2w@mail.gmail.com>
- <5319D3E5.4000001@gmail.com>
- <CAGcde9GetFjdRxqJfPY_1qdxzKb+4cqjsc+ALnN0PxSrApjyxg@mail.gmail.com>
- <5319E445.9000409@gmail.com>
- <CAPdUM4Pt0Ofh=M5pwdj+0NwSvfK4JvZbpWUS6JfD3vnTi2JaGg@mail.gmail.com>
- <531AE1CD.2070203@samsung.com> <531D007F.4030800@gmail.com>
-Message-ID: <CAPdUM4O-PKy+A_-2gSbKzfuX4qDGjc=Q1=ExEhWH5sKzCn7xPA@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 10 Mar 2014 02:51:33 +0000
+Subject: [PATCH] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1394419893.15968.88.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Mon, 2014-03-10 at 02:01 +0100, Sebastian Hesselbarth wrote:
+> phy_ethtool_get_wol is a helper to get current WOL settings from
+> a phy device. When using this helper on a PHY without .get_wol
+> callback, struct ethtool_wolinfo is never set-up correctly and
+> may contain misleading information about WOL status.
+> 
+> To fix this, always zero relevant fields of struct ethtool_wolinfo
+> regardless of .get_wol callback availability.
 
-On 10 March 2014 05:29, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 08.03.2014 10:24, Pankaj Dubey wrote:
->>
->> Hi Rahul,
->
->
->> I modified code as per our discussion and addressed all comments
->> including moving fixed clock to DT
->> and found it's working well, so we can now finalize which way to  go
->> ahead.
->> Following is some data between V4 and probable next version, which might
->> help in making decision.
->>
->> drivers/clk/samsung/exynos5260-clock.c
->>
->> Before Change
->> LoC: 1890
->> size drivers/clk/samsung/clk-exynos5260.o
->>     text       data        bss        dec        hex    filename
->>    14226      14956          0      29182       71fe
->> drivers/clk/samsung/clk-exynos5260.o
->>
->> After Change:
->> LoC: 1806
->> size drivers/clk/samsung/clk-exynos5260.o
->>     text       data        bss        dec        hex    filename
->>    15446      14544          0      29990       7526
->> drivers/clk/samsung/clk-exynos5260.o
->
->
-> Well, somehow I've been under impression that the change would bring more
-> significant results. Here we can see slight reduction in lines of code, but
-> also slight increase of kernel image size. Still, in general, nothing
-> extreme.
->
-> In this case I'd probably go with Rahul's original code, as it doesn't
-> require second matching and separate match table, which adds redundant
-> compatible strings used just for this extra matching pass.
->
-> I guess this is all just bike shedding, though.
+I think it's the caller's responsibility to zero out struct
+ethtool_wolinfo.  That is what ethtool_get_wol() does.
 
-yea. I understand. Will proceed as you said.
+Maybe you could split ethtool_get_wol() like we did
+ethtool_get_settings(), to support in-kernel invocation of ETHTOOL_GWOL?
 
-Regards,
-Rahul Sharma
+Ben.
 
->
-> Best regards,
-> Tomasz
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/phy/phy.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+> index 19c9eca0ef26..62a7cd401e1c 100644
+> --- a/drivers/net/phy/phy.c
+> +++ b/drivers/net/phy/phy.c
+> @@ -1092,6 +1092,7 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
+>  
+>  void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
+>  {
+> +	wol->supported = wol->wolopts = 0;
+>  	if (phydev->drv->get_wol)
+>  		phydev->drv->get_wol(phydev, wol);
+>  }
+
+-- 
+Ben Hutchings
+Computers are not intelligent.	They only think they are.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/77d8477a/attachment.sig>
