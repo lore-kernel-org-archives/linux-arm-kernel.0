@@ -1,49 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Mar 2014 11:52:02 +0100
-Subject: [PATCH 0/3] iio: adc: at91 fixes
-In-Reply-To: <531823BB.4080106@atmel.com>
-References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
- <531823BB.4080106@atmel.com>
-Message-ID: <531D9952.5070405@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Mar 2014 10:56:56 +0000
+Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
+References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
+Message-ID: <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 08:28, Josh Wu :
-> Hi, Alexandre
+On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary Kalluri wrote:
+> Added EDAC support for reporting the ecc errors of zynq ddr controller.
+> The ddr ecc controller corrects single bit errors and detects double bit
+> errors
 > 
-> On 3/6/2014 12:57 AM, Alexandre Belloni wrote:
->> This series fixes a kernel crash at probe time when using the at91_adc driver
->> through platform_data. This crash appeared in 3.13.
->>
->> The first patch fixes the crash. While it is already quite late, I think it
->> would be good to get it in 3.14.
->>
->> The next patches restore support for at91_adc on the at91sam9g45 and at91sam9260
->> based boards. It would be great if they could make it in 3.14. But I'm not sure
->> it is worth applying them to 3.13.
->>
->> Alexandre Belloni (3):
->>    iio: adc: at91_adc: Repair broken platform_data support
->>    ARM: at91: at91sam9g45: change at91_adc name
->>    ARM: at91: at91sam9260: change at91_adc name
->>
->>   arch/arm/mach-at91/at91sam9260_devices.c |  2 +-
->>   arch/arm/mach-at91/at91sam9g45_devices.c |  2 +-
->>   drivers/iio/adc/at91_adc.c               | 26 ++++++++++++++++++++++----
->>   3 files changed, 24 insertions(+), 6 deletions(-)
->>
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
+>  drivers/edac/Kconfig                               |    7 +
+>  drivers/edac/Makefile                              |    1 +
+>  drivers/edac/zynq_edac.c                           |  613 ++++++++++++++++++++
+>  4 files changed, 639 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/edac/zynq_edac.txt
+>  create mode 100644 drivers/edac/zynq_edac.c
 > 
-> Thank you for the fixes.
-> I tested the patch series in at91sam9m10g45ek and works fine.
-> 
-> so here is my:
-> Tested-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Josh Wu <josh.wu@atmel.com>
+> diff --git a/Documentation/devicetree/bindings/edac/zynq_edac.txt b/Documentation/devicetree/bindings/edac/zynq_edac.txt
+> new file mode 100644
+> index 0000000..c21ff83
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
+> @@ -0,0 +1,18 @@
+> +Zynq EDAC driver, it does reports the DDR ECC single bit errors that are
+> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
+> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
 
-Ok, fine with me:
+Is this an or or a xor?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+For the former case, which is the most general, which can be used as a
+fallback?
 
+How about something like:
 
--- 
-Nicolas Ferre
+- compatible: should contain:
+  * "xlnx,ps7-ddrc-1.00.a" for <DESCRIPTION HERE>
+  * "xlnx,ps7-ddrc" for any compatible variant
+
+Is there any need at all for the "xlnx,ps7-ddrc" string? The driver
+doesn't care about it.
+
+Cheers,
+Mark.
