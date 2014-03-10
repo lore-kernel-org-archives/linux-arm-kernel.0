@@ -1,92 +1,87 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Mar 2014 15:32:41 -0500
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <531DEB1A.5090509@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <20140228162752.GU21483@n2100.arm.linux.org.uk>
- <5310BDE3.60603@ti.com>
- <20140228165628.GX21483@n2100.arm.linux.org.uk>
- <53143796.2050309@ti.com>
- <CAL_JsqLppZHjND_LFMxscR0WCD4Ox7vF0fDbQFoYg=TENXxY8Q@mail.gmail.com>
- <531DEB1A.5090509@ti.com>
-Message-ID: <CAL_Jsq+cwWXCmFDK7b+YVo5vYKqxtN6ym=YbOqYnJwCPf2JpWQ@mail.gmail.com>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 11 Mar 2014 02:05:21 +0530
+Subject: [PATCH v3 09/52] arm,
+ hw-breakpoint: Fix CPU hotplug callback registration
+In-Reply-To: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
+References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20140310203521.10746.47464.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 11:40 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> Hi Rob,
->
-> On 10/03/14 18:05, Rob Herring wrote:
->
->>> Russell's point was that these connector bindings are very generic, i.e.
->>> they are not for any particular chip from a particular vendor, but for
->>> any connector for DVI, HDMI or analog-tv. And he's worried that maybe we
->>> shouldn't define such generic bindings without consulting the whole
->>> device-tree community (i.e including non-linux users).
->>
->> So re-work it to be generic and send it out. DT maintainers would
->> rarely disagree that something shouldn't be made generic.
->
-> They (in this series) are already designed to be generic.
->
-> I should perhaps re-word the question: we are concerned whether these
-> bindings are good for all the users, not just us, and whether there
-> already exists something that overlaps.
+Subsystems that want to register CPU hotplug callbacks, as well as perform
+initialization for the CPUs that are already online, often do it as shown
+below:
 
-Given this is tied into the rest of video description with endpoints
-and such, you really have to look at the whole picture to answer that
-question. I'd guess Linux well ahead of other OSs in terms of dealing
-with the plethora of video and graphics h/w. I'd be more concerned
-that the bindings are good for all h/w rather than all OS's.
+	get_online_cpus();
 
-> Afaik, there's nothing overlapping. And I don't see why they wouldn't be
-> good for all users (with the few minor modifications that have been
-> discussed in this thread). But, if I gathered right, Russell would like
-> some kind of ack from someone who might know better than us.
->
-> So is it enough to have posted these, and gotten acks from the people
-> involved, or should we get acks from DT maintainers also?
+	for_each_online_cpu(cpu)
+		init_cpu(cpu);
 
-We really leave it up to the subsystem maintainers to decide, but for
-new common/generic bindings it is a good idea to get DT maintainers
-ack. I'll go thru the individual patches.
+	register_cpu_notifier(&foobar_cpu_notifier);
 
-> Is there a way to get the attention of, say, BSD people, or should we
-> just presume they'll follow the list?
+	put_online_cpus();
 
-devicetree-spec was created specifically to have a lower volume list
-without a bunch of Linux driver patches which aren't relevant to
-people from other OSs.
+This is wrong, since it is prone to ABBA deadlocks involving the
+cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+with CPU hotplug operations).
 
->>> So the question is, is there such a community and a forum to bring up
->>> this kind of things? If yes, should we bring this up there? If yes, what
->>> kind of things in general should be brought into the attention of
->>> non-linux users?
->>
->> devicetree list is just that. It is not just for Linux. There is the
->> newly created devicetree-spec at vger.kernel.org which is for more
->> core/common binding discussion.
->
-> Ok.
->
->>> What I wonder here is that while a thing like DVI connector is, of
->>> course, more generic than, say, "ti,tfp410" encoder chip, but isn't the
->>> case still the same: we're defining global bindings for hardware that
->>> should work for everyone, not only Linux users?
->>
->> Defining the connectors in DT is a useful thing although mainly when
->> you have multiple connectors of the same type. Labels for composite,
->> SVideo, VGA, DVI, HDMI seem less useful to me. Describing position or
->> printed label (like front vs. rear connections) seem more useful to
->> me.
->
-> My point above was that it feels mentally easier to define bindings for
-> one particular IP block or chip, than defining bindings for a more
-> generic thing like "HDMI connector". But, in the end, I believe they
-> both should go through similar review, and there's no such difference.
+Instead, the correct and race-free way of performing the callback
+registration is:
 
-Unless you need to describe different types of HDMI connectors, I
-don't see any issue with it being generic. I certainly don't see the
-need for prepending with "linux," in this case.
+	cpu_notifier_register_begin();
 
-Rob
+	for_each_online_cpu(cpu)
+		init_cpu(cpu);
+
+	/* Note the use of the double underscored version of the API */
+	__register_cpu_notifier(&foobar_cpu_notifier);
+
+	cpu_notifier_register_done();
+
+
+Fix the hw-breakpoint code in arm by using this latter form of callback
+registration.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+---
+
+ arch/arm/kernel/hw_breakpoint.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 3d44660..3702de8 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -1072,6 +1072,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 	core_num_brps = get_num_brps();
+ 	core_num_wrps = get_num_wrps();
+ 
++	cpu_notifier_register_begin();
++
+ 	/*
+ 	 * We need to tread carefully here because DBGSWENABLE may be
+ 	 * driven low on this core and there isn't an architected way to
+@@ -1088,6 +1090,7 @@ static int __init arch_hw_breakpoint_init(void)
+ 	if (!cpumask_empty(&debug_err_mask)) {
+ 		core_num_brps = 0;
+ 		core_num_wrps = 0;
++		cpu_notifier_register_done();
+ 		return 0;
+ 	}
+ 
+@@ -1107,7 +1110,10 @@ static int __init arch_hw_breakpoint_init(void)
+ 			TRAP_HWBKPT, "breakpoint debug exception");
+ 
+ 	/* Register hotplug and PM notifiers. */
+-	register_cpu_notifier(&dbg_reset_nb);
++	__register_cpu_notifier(&dbg_reset_nb);
++
++	cpu_notifier_register_done();
++
+ 	pm_init();
+ 	return 0;
+ }
