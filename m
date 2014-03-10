@@ -1,81 +1,43 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 10 Mar 2014 06:56:30 -0700
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <20110101151545.GC25924@n2100.arm.linux.org.uk>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
- <20101221182037.GA4783@n2100.arm.linux.org.uk>
- <20101222122904.GC14693@n2100.arm.linux.org.uk>
- <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
- <20110101151545.GC25924@n2100.arm.linux.org.uk>
-Message-ID: <1394459790.2270.39.camel@shinybook.infradead.org>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 10 Mar 2014 19:28:55 +0530
+Subject: [RFC PATCH 0/9] drivers: dma: Add support for dma-channel router
+In-Reply-To: <CAL_JsqLF6Ey1t1BV4tnFcFK-KmOU9H2nQE+ZHoZRq2r_nRTxNw@mail.gmail.com>
+References: <1394194576-23741-1-git-send-email-r.sricharan@ti.com>
+ <CAL_JsqLF6Ey1t1BV4tnFcFK-KmOU9H2nQE+ZHoZRq2r_nRTxNw@mail.gmail.com>
+Message-ID: <531DC51F.50309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-01-01 at 15:15 +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
-> > Support for the DMA_COMPL flags are necessary if the DMA_MEMCPY
-> > capability is advertised, yes this driver got this wrong.  I'll update
-> > the documentation to make this requirement clear, and audit the other
-> > drivers.  With slave-only drivers the only usage model is one where
-> > the client driver owns dma-mapping.  In the non-slave (opportunistic
-> > memcpy offload) case the client is unaware of the engine so the driver
-> > owns unmapping.  The minimal fix is to disable memcpy offload.
-> 
-> As a side note, the DMA mapping for slaves should be done using the
-> DMA struct device, not the struct device of the peripheral making use
-> of the DMA engine.
-> 
-> Why?  The slave device has no knowledge of how the DMA engine is
-> connected into the system, or the DMA parameters associated with the
-> device performing the DMA, such as the DMA mask and boundaries.  (If
-> there are several generic DMA agents in the system, it can't know
-> which is the correct one to use until a channel has been allocated.)
-> The only struct device which has this information is the one for the
-> DMA engine itself.
-> 
-> Therefore, the struct device which is passed into the DMA mapping APIs
-> to prepare memory for DMA must always be the DMA engine struct device
-> (chan->device->dev) and never the slave struct device.
+Hi Rob,
 
-That all seems eminently sensible. However, I wonder if it always has to
-be true.
+On Sunday 09 March 2014 01:23 AM, Rob Herring wrote:
+> On Fri, Mar 7, 2014 at 6:16 AM, Sricharan R <r.sricharan@ti.com> wrote:
+>> In some SoCs the dma request lines from the peripherals are
+>> routed to the dma-controller through a crossbar. With this the
+>> dma controller's available request lines are shared between the
+>> peripherals.
+>>
+>> This adds support to register the crossbar router associated with
+>> a dma-channel and let the dma-controller driver map/unmap
+>> the peripheral dma crossbar line to dma-controller's request
+>> line.
+> This is not a unique concept and should follow some existing pattern.
+> Perhaps something like interrupt-map. For the dmas property, the
+> parent should be the crossbar and then the crossbar block has to
+> translate that into the DMA controller request. All the DMA ctrlr
+> request connections should be described in the crossbar node. In
+> theory, you could have chained crossbars. This should be documented as
+> part of the generic DMA binding.
+  The idea here was to do the map/unmap crossbar<->dma-request
+ from the  dma-controller at runtime just like any other resource, unlike
+  interrupt-map fixed in DTS. I did not think about the chained
+  crossbars case. I will add this here. And as you have suggested will
+  make it work like irq_parse_and_map.
 
-It is not impossible for the DMA controller to "delegate" transactions
-so that (to the IOMMU) they appear to come from the individual slave
-device rather than from itself.
-
-The Intel IOMMU has now gained support for DMA mapping for devices
-enumerated by ACPI ? essentially the ACPI "DMAR" table just has a lookup
-table of ACPI device paths, and tells us the PCI bus/devfn that their
-DMA transactions will *appear* to be from.
-
-What we've seen is that it is the individual slave devices that are
-listed in these tables, *not* the DMA controller itself. It looks like
-we are actually expected to set up the IOMMU mapping for the *slave*,
-not the DMA controller. The system doesn't even *tell* me how to set up
-DMA mappings for the DMA controller device; only the slaves.
-
-I haven't looked at the datasheet for the DMA controller in question,
-but it's probably the case that there's a per-channel configuration for
-what PCIe source-id to put into the DMA transactions.?
-
-Of course, it's also possible that all these BIOSes are broken and they
-*should* just list the DMA controller itself, instead of all the slave
-devices. But while I'm always quick to jump to the conclusion that it's
-the BIOS at fault, that doesn't necessarily seem likely here...
-
--- 
-dwmw2
-
-? We've seen plenty of multi-function devices where the DMA appears to
-  come from the wrong function by *accident*, requiring quirks to make
-  it work with the IOMMU. This would just be a case of doing the same
-  kind of delegation on purpose.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/e5697cfd/attachment.bin>
+Regards,
+ Sricharan
+> There are also other similar IP like CoreSight CTI which are just
+> signal routers. So there is probably some possibility of common code
+> here.
+>
+> Rob
