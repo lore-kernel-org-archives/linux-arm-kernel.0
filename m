@@ -1,44 +1,42 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Mon, 10 Mar 2014 06:55:20 +0100
-Subject: [PATCH 1/9] usb: chipidea: usbmisc: Add USB Host support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 10 Mar 2014 09:58:46 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzldIEFSTTogZHRzOiBpLk1YNTE6IEFkZCBhIHNlY29u?=
+ =?UTF-8?B?ZCB1c2JwaHku?=
+In-Reply-To: <c6475b21bb0d4252aded9e7a42f0d90c@BL2PR03MB226.namprd03.prod.outlook.com>
 References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
- <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
-Message-ID: <20140310065520.469cac2e@e6520eb>
+ <1394427060.539541345@f354.i.mail.ru>
+ <c6475b21bb0d4252aded9e7a42f0d90c@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <1394431126.727643973@f362.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+???????????, 10 ????? 2014, 5:50 UTC ?? Peter Chen <Peter.Chen@freescale.com>:
+>  
+> > > >
+> > > > diff --git a/arch/arm/boot/dts/imx51.dtsi
+> > > > b/arch/arm/boot/dts/imx51.dtsi index e508e6f..917b6ed 100644
+> > > > --- a/arch/arm/boot/dts/imx51.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx51.dtsi
+> > > > @@ -100,6 +100,13 @@
+> > > >  			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> > > >  			clock-names = "main_clk";
+> > > >  		};
+> > > > +
+> > > > +		usbphy1: usbphy at 1 {
+> > > > +			compatible = "usb-nop-xceiv";
+> > > > +			reg = <1>;
+> > > > +			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> > > > +			clock-names = "main_clk";
+> > > > +		};
+> > >
+> > > Is this the ulpi phy for host1 controller? Why the clock is the same
+> > > with utmi phy clock for otg controller.
+> > 
+> > As far as I know, for i.MX51 this is as it should be.
+> > 
+> 
+> Are you sure? From clock file, they are different ccm clock gate.
 
-Le Sun, 9 Mar 2014 22:21:59 -0300,
-Fabio Estevam <festevam@gmail.com> a ?crit :
-> On Fri, Mar 7, 2014 at 2:04 PM, Denis Carikli <denis@eukrea.com> wrote:
-> 
-> > +static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
-> > +{
-> > +       void __iomem *reg = NULL;
-> 
-> This variable is not used and causes a warning. Please remove it.
-> 
-> After applying this patch things go further when I boot with a USB
-> thumb connected to the USB Host1 port:
-> 
-> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> usbcore: registered new interface driver usb-storage
-> 53ff4400.usb supply vbus not found, using dummy regulator
-> ci_hdrc ci_hdrc.0: EHCI Host Controller
-> ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
-> hub 1-0:1.0: USB hub found
-> hub 1-0:1.0: 1 port detected
-> ....
-> 
-> usb 1-1: new full-speed USB device number 2 using ci_hdrc
-> 
-> (Not sure why it says full-speed device. When I connect the same
-> device to a PC it says high-speed)
-> 
-because i.MX25 and i.MX35 only have a full speed phy on the host port.
+clk-imx51-imx53.c ? I think you confuse with i.MX50/53.
 
-Eric
+---
