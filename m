@@ -1,45 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Mar 2014 11:57:04 +0000
-Subject: [PATCH 2/4] documentaion: DT: allow a A5 compatible string in
- global timer
-In-Reply-To: <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
-References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
- <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
-Message-ID: <20140310115703.GI14999@e106331-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 10 Mar 2014 12:59:05 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140310072719.GB2571@katana>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <1725290.WIBK8uYmkH@avalon> <20140310072719.GB2571@katana>
+Message-ID: <1452941.Qc8gHZ8xpL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 11:51:32AM +0000, Matthew Leach wrote:
-> The global timer is present on the Cortex A5. Add a compatibility
-> string to the DT binding to allow a Cortex A5 global timer.
-> 
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Hi Wolfram,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  Documentation/devicetree/bindings/arm/global_timer.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+On Monday 10 March 2014 08:27:19 Wolfram Sang wrote:
+> > Indeed, I got it wrong. We can leave it as-is then.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-> index 1e54898..0932891 100644
-> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-> @@ -4,8 +4,10 @@
->  
->  ** Timer node required properties:
->  
-> -- compatible : Should be "arm,cortex-a9-global-timer"
-> -		Driver supports versions r2p0 and above.
-> +- compatible : should contain
-> +	     * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
-> +	     * "arm,cortex-a9-global-timer" for Cortex-A9 global timers
-> +	         or any compatible implementation.
->  
->  - interrupts : One interrupt to each core
->  
-> -- 
-> 1.8.5.3
-> 
+> Great. So I guess, this series can be applied now?
+
+There's just the issue of serial port aliases left. I've started a discussion 
+about that on the DT mailing list (you've been CC'ed).
+
+-- 
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/74ba8270/attachment.sig>
