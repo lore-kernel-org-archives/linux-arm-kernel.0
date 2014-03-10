@@ -1,39 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 10 Mar 2014 08:16:44 -0300
-Subject: [PATCH 1/9] usb: chipidea: usbmisc: Add USB Host support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <1394427482.225153574@f354.i.mail.ru>
-References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
- <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
- <1394427482.225153574@f354.i.mail.ru>
-Message-ID: <CAOMZO5BJafTT8bOftmdRRCAdUJJLh_pzR9wEdtp8TGQYRZ0KMQ@mail.gmail.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Mon, 10 Mar 2014 12:17:31 +0100
+Subject: [linux-sunxi] Re: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND
+ flash controller support
+In-Reply-To: <20140129191005.GG1427@obsidianresearch.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
+ <20140129175641.GF1427@obsidianresearch.com>
+ <20140129184619.GC27143@localhost>
+ <20140129191005.GG1427@obsidianresearch.com>
+Message-ID: <531D9F4B.6040505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hello Jason,
 
-On Mon, Mar 10, 2014 at 1:58 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+Le 29/01/2014 20:10, Jason Gunthorpe a ?crit :
+> On Wed, Jan 29, 2014 at 03:46:20PM -0300, Ezequiel Garcia wrote:
+>
+>> After CE# has been pulled high and then transitioned low again, the host
+>> should issue a Set Features to select the appropriate asynchronous timing mode.
+>> """
+> Oh, I had forgot you should do a set feature too
+>
+> Boris, I think the core core should handle this dance and the driver
+> should just implement a call back to change the timing mode on the
+> interface..
+>
+> If I ever get a moment I can work on support for timing setting in the
+> mvebu driver, I have boards here with ONFI NAND..
 
-> Fabio, start with to make work USB port on your board in the bootloader.
-> Then with the previous driver (ehci-mxc).
-> Most likely problem is a wrong (or missing) clock.
-> As I mentioned earlier, DTS has incorrect clock nodes.
+Any progress on this ?
+I'm about to post the 3rd version of this series and if you already have
+something working I could base my work on your proposal.
 
-Yes, you are right, thanks.
 
-If I change the usb host clocks as:
+Best Regards,
 
--                               clocks = <&clks 9>, <&clks 70>, <&clks 8>;
--                               clock-names = "ipg", "ahb", "per";
-+                               clocks = <&clks 70>;
-
-Then USB host1 works fine on my mx25pdk board.
-
-Denis,
-
-Could you please resend 4/9 by changing the clocks nodes in the OTG
-and Host1 ports as shown above?
-
-Thanks,
-
-Fabio Estevam
+Boris
+> Regards,
+> Jason
+>
