@@ -1,37 +1,52 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 09 Mar 2014 23:40:32 -0400 (EDT)
-Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
-In-Reply-To: <531D0D0D.4050703@gmail.com>
-References: <531D094C.1090205@gmail.com>
- <20140309.204101.47552917508273123.davem@davemloft.net>
- <531D0D0D.4050703@gmail.com>
-Message-ID: <20140309.234032.873557698878535571.davem@davemloft.net>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 10 Mar 2014 08:51:00 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzldIEFSTTogZHRzOiBpLk1YNTE6IEFkZCBhIHNlY29u?=
+ =?UTF-8?B?ZCB1c2JwaHku?=
+In-Reply-To: <20140310005159.GB2727@shlinux1.ap.freescale.net>
+References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
+ <1394211863-7569-2-git-send-email-denis@eukrea.com>
+ <20140310005159.GB2727@shlinux1.ap.freescale.net>
+Message-ID: <1394427060.539541345@f354.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Mon, 10 Mar 2014 01:53:33 +0100
-
-> On 03/10/2014 01:41 AM, David Miller wrote:
->> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Date: Mon, 10 Mar 2014 01:37:32 +0100
->>
->>> The mechanism is manual, no automatic way to determine it.
->>
->> We recognize BIOS and ACPI bugs and work around them, by looking at
->> version information and whatnot, so you really can't convince me that
->> something similar can't be done here perhaps in the platform code.
+???????????, 10 ????? 2014, 8:52 +08:00 ?? Peter Chen <peter.chen@freescale.com>:
+> On Fri, Mar 07, 2014 at 06:04:16PM +0100, Denis Carikli wrote:
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > ---
+> >  arch/arm/boot/dts/imx51.dtsi |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> > index e508e6f..917b6ed 100644
+> > --- a/arch/arm/boot/dts/imx51.dtsi
+> > +++ b/arch/arm/boot/dts/imx51.dtsi
+> > @@ -100,6 +100,13 @@
+> >  			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> >  			clock-names = "main_clk";
+> >  		};
+> > +
+> > +		usbphy1: usbphy at 1 {
+> > +			compatible = "usb-nop-xceiv";
+> > +			reg = <1>;
+> > +			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+> > +			clock-names = "main_clk";
+> > +		};
 > 
-> Hmm, if the is a way to determine the version of that particual u-boot
-> I'd be happy to exploit that information. But I honestly doubt that.
-> Compared to u-boot bootloader and kernel interaction, BIOS and ACPI
-> are well-defined protocols.
-> 
-> I personally, would prefer everybody should update his broken
-> bootloaders, but that will just not happen.
+> Is this the ulpi phy for host1 controller? Why the clock is the same with utmi phy
+> clock for otg controller.
 
-What you can do is have a test that _perhaps_ covers a "broader than
-reality" list of broken bootloader cases.
+As far as I know, for i.MX51 this is as it should be.
 
-Then you have something the bootloader can provide which indicates
-that it has been fixed.
+However, I doubt the usefulness of forcing "fsl,usbphy = <&usbphy1>" below.
+
+> >  	soc {
+> > @@ -239,6 +246,7 @@
+> >  				interrupts = <14>;
+> >  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+> >  				fsl,usbmisc = <&usbmisc 1>;
+> > +				fsl,usbphy = <&usbphy1>;
+> >  				status = "disabled";
+> >  			};
+
+---
