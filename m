@@ -1,94 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Mar 2014 16:34:04 +0100
-Subject: [PATCH v4 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
- <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2475487.axlvKsBQ0c@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Mar 2014 15:38:15 +0000
+Subject: [PATCH 1/5] drivers: input: keyboard: st-keyscan: add keyscan
+ driver
+In-Reply-To: <20140310152859.GA29054@core.coreip.homeip.net>
+References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
+ <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
+ <20140310114819.GO14976@lee--X1>
+ <20140310152859.GA29054@core.coreip.homeip.net>
+Message-ID: <20140310153815.GE13661@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 March 2014 15:41:51 Maxime Ripard wrote:
+> > > This patch adds ST Keyscan driver to use the keypad hw a subset
+> > > of ST boards provide. Specific board setup will be put in the
+> > > given dt.
+> > > 
+> > > Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
+> > > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> > 
+> > Are you sure these are in the correct order?
+> > 
+> > What is the history of this commit?
+> > 
+> > > ---
+> > >  .../devicetree/bindings/input/st-keypad.txt        |  50 ++++
+> > 
+> > This should be submitted as a seperate patch.
+> 
+> Why do we have such requirement? To me it would make more sense to add
+> binding documentation in the same commit as the code that uses these
+> bindings.
 
-> +/*
-> + * Hardware representation of the LLI
-> + *
-> + * The hardware will be fed the physical address of this structure,
-> + * and read its content in order to start the transfer.
-> + */
-> +struct sun6i_dma_lli {
-> +	u32			cfg;
-> +	u32			src;
-> +	u32			dst;
-> +	u32			len;
-> +	u32			para;
-> +	u32			p_lli_next;
-> +	struct sun6i_dma_lli	*v_lli_next;
-> +} __packed;
+I'm inclined to agree with you and that's actually how we used to do
+it, but a decision was made by the DT guys at one of the Kernel
+Summits to submit Documentation as a separate patch.
 
-It looks strange to have a pointer in a hardware structure, since
-the pointer doesn't make sense to the device.
+> [...]
+> 
+> > > +
+> > > +	error = matrix_keypad_parse_of_params(dev, &pdata->num_out_pads,
+> > > +			&pdata->num_in_pads);
+> > > +	if (error) {
+> > > +		dev_err(dev, "failed to parse keypad params\n");
+> > > +		return error;
+> > 
+> > Nit: It's pretty unusual to use this for a standard error handling
+> > variable. Consider 'ret' or 'err' as a replacement.
+> 
+> I like "error", in fact there are a lot of these in input. I use "error" for
+> data that is only returned from error path and "retval" when the same
+> variable is returned in both success and error paths.
 
-Also, the '__packed' attribute seems strange. Are you sure
-you want to reduce the alignment from 4 bytes to 1 byte?
+If that's your preference then I'm cool with it too. Scrap my comment.
 
-> +static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
-> +{
-> +	struct sun6i_dma_dev *sdev = dev_id;
-> +	struct sun6i_vchan *vchan;
-> +	struct sun6i_pchan *pchan;
-> +	int i, j, ret = IRQ_NONE;
-> +	u32 status;
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		status = readl(sdev->base + DMA_IRQ_STAT(i));
-> +		if (!status)
-> +			continue;
-> +
-> +		dev_dbg(sdev->slave.dev, "DMA irq status %s: 0x%x\n",
-> +			i ? "high" : "low", status);
-> +
-> +		writel(status, sdev->base + DMA_IRQ_STAT(i));
-> +
-> +		for (j = 0; (j < 8) && status; j++) {
-> +			if (status & DMA_IRQ_QUEUE) {
-> +				pchan = sdev->pchans + j;
-> +				vchan = pchan->vchan;
-> +
-> +				if (vchan) {
-> +					unsigned long flags;
-> +
-> +					spin_lock_irqsave(&vchan->vc.lock,
-> +							  flags);
+[...]
 
-Interrupts are already disabled here.
-
-> +	sdc->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(sdc->clk)) {
-> +		dev_err(&pdev->dev, "No clock specified\n");
-> +		return PTR_ERR(sdc->clk);
-> +	}
-> +
-> +	mux = devm_clk_get(&pdev->dev, "ahb1_mux");
-> +	if (IS_ERR(mux)) {
-> +		dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
-> +		return PTR_ERR(mux);
-> +	}
-> +
-> +	pll6 = devm_clk_get(&pdev->dev, "pll6");
-> +	if (IS_ERR(pll6)) {
-> +		dev_err(&pdev->dev, "Couldn't get PLL6\n");
-> +		return PTR_ERR(pll6);
-> +	}
-> +
-> +	ret = clk_set_parent(mux, pll6);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
-> +		return ret;
-> +	}
-
-Neither "pll6" nor "ahb1_mux" are listed in the DT binding. Also, why
-is it the driver's business to set the parent?
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
