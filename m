@@ -1,170 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 10 Mar 2014 13:34:16 +0100
-Subject: [PATCH 1/3] clk: s2mps11: Add support for S2MPS14 clocks
-In-Reply-To: <1394454858-3139-1-git-send-email-k.kozlowski@samsung.com>
-References: <1394454858-3139-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1394454858-3139-2-git-send-email-k.kozlowski@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Mar 2014 12:37:48 +0000
+Subject: [PATCH v3 5/5] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <1394203251-25361-6-git-send-email-maxime.coquelin@st.com>
+References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
+ <1394203251-25361-6-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20140310123748.GV14976@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
-s2mps11 clock driver.
+> B2120 HDK is the reference board for STiH407 SoC.
+> It has the following characteristics:
+>  - 1GB DDR3
+>  - 8GB eMMC / SD-Card slot
+>  - 32MB NOR Flash
+>  - 1 x Gbit Ethernet
+>  - 1 x USB 3.0 port
+>  - 1 x Mini-PCIe
+>  - 1 x SATA
+>  - 1 x HDMI output
+>  - 1 x HDMI input
+>  - 1 x SPDIF
+> 
+> This patch only introduces basic functionnalities, such as I2C and UART.
+> 
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> ---
+>  arch/arm/boot/dts/Makefile          |  3 +-
+>  arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 80 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clk/clk-s2mps11.c |   61 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 46 insertions(+), 15 deletions(-)
+Patch looks pretty inert:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index 508875535e1e..8dafb552274f 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -1,7 +1,7 @@
- /*
-  * clk-s2mps11.c - Clock driver for S2MPS11.
-  *
-- * Copyright (C) 2013 Samsung Electornics
-+ * Copyright (C) 2013,2014 Samsung Electornics
-  *
-  * This program is free software; you can redistribute  it and/or modify it
-  * under  the terms of  the GNU General  Public License as published by the
-@@ -13,10 +13,6 @@
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-  *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
-  */
- 
- #include <linux/module.h>
-@@ -27,6 +23,7 @@
- #include <linux/clk-provider.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/samsung/s2mps11.h>
-+#include <linux/mfd/samsung/s2mps14.h>
- #include <linux/mfd/samsung/s5m8767.h>
- #include <linux/mfd/samsung/core.h>
- 
-@@ -125,7 +122,21 @@ static struct clk_init_data s2mps11_clks_init[S2MPS11_CLKS_NUM] = {
- 	},
- };
- 
--static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
-+static struct clk_init_data s2mps14_clks_init[S2MPS11_CLKS_NUM] = {
-+	[S2MPS11_CLK_AP] = {
-+		.name = "s2mps14_ap",
-+		.ops = &s2mps11_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
-+	[S2MPS11_CLK_BT] = {
-+		.name = "s2mps14_bt",
-+		.ops = &s2mps11_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
-+};
-+
-+static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev,
-+		struct clk_init_data *clks_init)
- {
- 	struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
- 	struct device_node *clk_np;
-@@ -145,9 +156,12 @@ static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
- 	if (!clk_table)
- 		return ERR_PTR(-ENOMEM);
- 
--	for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-+	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-+		if (!clks_init[i].name)
-+			continue; /* Skip clocks not present in some devices */
- 		of_property_read_string_index(clk_np, "clock-output-names", i,
--				&s2mps11_clks_init[i].name);
-+				&clks_init[i].name);
-+	}
- 
- 	return clk_np;
- }
-@@ -158,6 +172,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 	struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
- 	struct device_node *clk_np = NULL;
- 	unsigned int s2mps11_reg;
-+	struct clk_init_data *clks_init;
- 	int i, ret = 0;
- 	u32 val;
- 
-@@ -168,25 +183,33 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 
- 	s2mps11_clk = s2mps11_clks;
- 
--	clk_np = s2mps11_clk_parse_dt(pdev);
--	if (IS_ERR(clk_np))
--		return PTR_ERR(clk_np);
--
- 	switch (platform_get_device_id(pdev)->driver_data) {
- 	case S2MPS11X:
- 		s2mps11_reg = S2MPS11_REG_RTC_CTRL;
-+		clks_init = s2mps11_clks_init;
-+		break;
-+	case S2MPS14X:
-+		s2mps11_reg = S2MPS14_REG_RTCCTRL;
-+		clks_init = s2mps14_clks_init;
- 		break;
- 	case S5M8767X:
- 		s2mps11_reg = S5M8767_REG_CTRL1;
-+		clks_init = s2mps11_clks_init;
- 		break;
- 	default:
- 		dev_err(&pdev->dev, "Invalid device type\n");
- 		return -EINVAL;
- 	};
- 
-+	clk_np = s2mps11_clk_parse_dt(pdev, clks_init);
-+	if (IS_ERR(clk_np))
-+		return PTR_ERR(clk_np);
-+
- 	for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
-+		if (!clks_init[i].name)
-+			continue; /* Skip clocks not present in some devices */
- 		s2mps11_clk->iodev = iodev;
--		s2mps11_clk->hw.init = &s2mps11_clks_init[i];
-+		s2mps11_clk->hw.init = &clks_init[i];
- 		s2mps11_clk->mask = 1 << i;
- 		s2mps11_clk->reg = s2mps11_reg;
- 
-@@ -220,8 +243,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 	}
- 
- 	if (clk_table) {
--		for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-+		for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-+			/* Skip clocks not present on S2MPS14 */
-+			if (!clks_init[i].name)
-+				continue;
- 			clk_table[i] = s2mps11_clks[i].clk;
-+		}
- 
- 		clk_data.clks = clk_table;
- 		clk_data.clk_num = S2MPS11_CLKS_NUM;
-@@ -250,14 +277,18 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
- 	struct s2mps11_clk *s2mps11_clks = platform_get_drvdata(pdev);
- 	int i;
- 
--	for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-+	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-+		if (!s2mps11_clks[i].lookup)
-+			continue; /* Skip clocks not present in some devices */
- 		clkdev_drop(s2mps11_clks[i].lookup);
-+	}
- 
- 	return 0;
- }
- 
- static const struct platform_device_id s2mps11_clk_id[] = {
- 	{ "s2mps11-clk", S2MPS11X},
-+	{ "s2mps14-clk", S2MPS14X},
- 	{ "s5m8767-clk", S5M8767X},
- 	{ },
- };
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
