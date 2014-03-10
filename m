@@ -1,42 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 10 Mar 2014 18:01:09 +0000
-Subject: [PATCH RFC v4 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <20140219160449.11460.93660@capellas-linux>
-References: <1392724051-11950-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1392724051-11950-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20140219160449.11460.93660@capellas-linux>
-Message-ID: <20140310180109.GB834@e102568-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Mar 2014 18:01:31 +0000
+Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
+ driver support
+In-Reply-To: <531DF931.1060108@ti.com>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-4-git-send-email-nm@ti.com>
+ <20140224015826.GU25940@sirena.org.uk> <530B594F.2030500@ti.com>
+ <20140303035426.GC2411@sirena.org.uk> <531DF250.5060100@ti.com>
+ <20140310172221.GT28112@sirena.org.uk> <531DF931.1060108@ti.com>
+Message-ID: <20140310180131.GZ28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 04:04:49PM +0000, Sebastian Capella wrote:
-> Quoting Lorenzo Pieralisi (2014-02-18 03:47:31)
-> > +       - index
-> > +               Usage: Required
-> > +               Value type: <u32>
-> > +               Definition: It represents the idle state index.
-> > +                           An increasing index value implies less power
-> > +                           consumption. Index must be given a sequential
-> > +                           value = {0, 1, ....}, starting from 0.
-> One minor comment.  In the example, it can be tricky to see how this is sequential
-> since the states interleave.  Not sure if it merits rewording here?
+On Mon, Mar 10, 2014 at 12:41:05PM -0500, Nishanth Menon wrote:
 
-- index
-	Usage: Required
-	Value type: <u32>
-	Definition: It represents the idle state index.
-		    The index must be given an increasing
-		    value = {0, 1, ....}, starting from 0, with higher
-		    values implying less power consumption.
-		    Indices must be unique as seen from a cpu
-		    perspective, ie phandles in the cpu nodes [1]
-		    cpu-idle-states array property are not allowed to
-		    point at idle state nodes having the same index
-		    value.
+> The only other options are:
+> a) Abstract it at a higher level at "user drivers", since they are
+> aware of the sequencing needs - but this partially defeats the
+> purpose, unless ofcourse, we do a tricky implementation such as:
+> clk a, b, c -> prenotifiers in a, postnotifiers in c (which as you
+> mentioned is a little trickier to get right).
+> b) introduce a higher level generic dvfs function[1] which does not
+> seem very attractive either.
 
-Ack ?
+> Any other suggestions other than limiting the usage(and documenting it
+> so) and hoping for a future evolution to take this into consideration?
 
-I will post a v5, should be final.
-
-Lorenzo
+Something might be doable with telling the clock API about maintianing
+ratios between clocks?  I do think we should have an idea where we'd go
+with such requirements, even if we don't currently handle it, so that we
+can hopefully avoid another round of refactoring everything but it
+doesn't seem 100% essential, just very nice to have.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/b5dd9a96/attachment.sig>
