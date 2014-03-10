@@ -1,52 +1,45 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 10 Mar 2014 15:28:35 +0200
-Subject: [PATCH v2 1/8] ARM: dts: dra7: Initialize USB_DPLL
-In-Reply-To: <1394455761-19226-1-git-send-email-rogerq@ti.com>
-References: <1394197751-28984-2-git-send-email-rogerq@ti.com>
- <1394455761-19226-1-git-send-email-rogerq@ti.com>
-Message-ID: <531DBE03.2070603@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 10 Mar 2014 21:28:26 +0800
+Subject: [PATCH 3/7] of: introduce of_dma_is_coherent() helper
+In-Reply-To: <201403071709.11568.arnd@arndb.de>
+References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_JsqJ3QhRRNVAsvAPP=Ex_ptQcbpCXh7pf44K1xh+scFqiug@mail.gmail.com>
+ <531948A8.9040106@ti.com> <201403071709.11568.arnd@arndb.de>
+Message-ID: <531DBDFA.5000104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 02:49 PM, Roger Quadros wrote:
-> USB_DPLL must be initialized and locked at boot so that
-> USB modules can work.
->
-> Program USB_DLL_M2 output to half rate as well.
->
-> Patch depends on
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
->
-> CC: Mike Turquette <mturquette@linaro.org>
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->   arch/arm/boot/dts/dra7.dtsi | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 597979b..f376923 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -815,3 +815,11 @@
->   };
->
->   /include/ "dra7xx-clocks.dtsi"
-> +
-> +&dpll_usb_ck {
-> +        default-rate = <960000000>;
-> +};
-> +
-> +&dpll_usb_m2_ck {
-> +	default-rate = <480000000>;
-> +};
->
+On Saturday 08 March 2014 12:09 AM, Arnd Bergmann wrote:
+> On Friday 07 March 2014, Santosh Shilimkar wrote:
+>> On Friday 07 March 2014 11:55 AM, Rob Herring wrote:
+>>
+>>> Thinking about this some more, if the arch is always coherent or
+>>> always non-coherent, then the default ops are always fine. In that
+>>> case set_arch_dma_coherent_ops is always a nop and of_dma_is_coherent
+>>> is a don't care.
+>>>
+>> Hmmm.. I guess you are right. In that case we can drop the need of
+>> config option.
+> 
+> A compile-time config option clearly would not work here, because it
+> breaks multiplatform support when some platforms are different from
+> others. I can still see the possible need for a global run-time setting
+> though, to give some platform init code the ability to override the
+> DT flags when it knows better. That is probably what you want to do
+> on keystone without LPAE.
+> 
+The compile time flag added was keeping in mind to be used per architecture
+like ARM, X86 or powerpc on need basis. I understand that it might
+be used by machines within the architectures but that was not my
+intention. In any case config bit isn't a good idea.
 
-You can add these directly under the dra7xx-clocks.dtsi file as well, as 
-I don't think anybody needs to modify these. And the properties can be 
-added directly under the nodes themselves.
+Keystone without LPAE actually I don't need such an option. For
+non-LPAE case, I need to modify the memory node and same goes
+with dma-ranges info to use aliased address space.
 
-However, this patch can't be acked yet as we have no feedback from Mike 
-for the default-rate proposal.
+How about we care about such an option when we actually need
+it. As Rob pointed out, we are just fine for now with sane
+defaults.
 
--Tero
+Regards,
+Santosh
