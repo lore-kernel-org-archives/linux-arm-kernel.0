@@ -1,60 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Mar 2014 11:03:42 -0700
-Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
-In-Reply-To: <531DD6A8.7010406@epfl.ch>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
- <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
- <531D9452.6040501@ti.com> <531DD6A8.7010406@epfl.ch>
-Message-ID: <20140310180341.GC4882@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Mar 2014 18:11:29 +0000
+Subject: [PATCH 2/4] documentaion: DT: allow a A5 compatible string in
+ global timer
+In-Reply-To: <CAL_JsqLEUknsO6DccSyd4p5gd1=1KUN5s=W6L0iOoiERxMaPbw@mail.gmail.com>
+References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
+ <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
+ <CAL_JsqLE6pWJMRvXbOOca4fFb9OUieMimnuxxo4AFKkSMiFvsg@mail.gmail.com>
+ <20140310165137.GO14999@e106331-lin.cambridge.arm.com>
+ <CAL_JsqLEUknsO6DccSyd4p5gd1=1KUN5s=W6L0iOoiERxMaPbw@mail.gmail.com>
+Message-ID: <20140310181129.GP14999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Florian Vaussard <florian.vaussard@epfl.ch> [140310 08:17]:
-> On 03/10/2014 11:30 AM, Roger Quadros wrote:
+On Mon, Mar 10, 2014 at 05:57:32PM +0000, Rob Herring wrote:
+> On Mon, Mar 10, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Mar 10, 2014 at 04:27:09PM +0000, Rob Herring wrote:
+> >> On Mon, Mar 10, 2014 at 6:51 AM, Matthew Leach <matthew.leach@arm.com> wrote:
+> >> > The global timer is present on the Cortex A5. Add a compatibility
+> >> > string to the DT binding to allow a Cortex A5 global timer.
+> >> >
+> >> > Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/arm/global_timer.txt | 6 ++++--
+> >> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+> >> > index 1e54898..0932891 100644
+> >> > --- a/Documentation/devicetree/bindings/arm/global_timer.txt
+> >> > +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+> >> > @@ -4,8 +4,10 @@
+> >> >
+> >> >  ** Timer node required properties:
+> >> >
+> >> > -- compatible : Should be "arm,cortex-a9-global-timer"
+> >> > -               Driver supports versions r2p0 and above.
+> >>
+> >> Shouldn't you keep this information for the A9?
 > >
-> > If you don't use the OMAP3x30_CORE2_IOPAD() macro then these definitions can fit in omap3-overo-base.dtsi.
-> > The offsets will be taken care of if you place them within &omap3_pmx_core2 {} . e.g.
-> > 
-> > +                       0x50 (PIN_OUTPUT | MUX_MODE3)           /* etk_d10.hsusb2_clk */
-> > +                       0x52 (PIN_OUTPUT | MUX_MODE3)           /* etk_d11.hsusb2_stp */
-> > +                       0x54 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d12.hsusb2_dir */
-> > +                       0x56 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d13.hsusb2_nxt */
-> > +                       0x58 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d14.hsusb2_data0 */
-> > +                       0x5a (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d15.hsusb2_data1 */
-> > 
-> > Do you think this is better?
-> > 
+> > To me it feels like documenting the driver rather than the binding for
+> > the hardware.
+> >
+> > I'm happy to retain notes about the constraints imposed by Linux
+> > drivers, but I'd prefer if it were the exception rather than the rule.
 > 
-> I do not think that this could work. Let's take for example hsusb2_clk
-> et let's do the math. Here, 0x50 is the offset inside omap3_pmx_core2
-> pinctrl, so:
-> 
->         hsusb2_clk  omap3_pmx_core2      hsusb2_clk
->          offset        base addr.       PADCONF addr.
->           ----        ----------         ----------
-> OMAP34xx: 0x50        0x480025d8         0x48002628  *NO*
-> OMAP36xx: 0x50        0x480025a0         0x480025F0  *ok*
-> 
-> Looking at the TRM, the PADCONF address for hsusb2_clk is 0x480025F0 in
-> both cases. Thus we will be wrong on OMAP34xx (offset should be 0x18
-> instead of 0x50). Thus so far, I do not see any magical solution apart
-> putting the omap3_pmx_core2 pins in a SoC-dependant .dtsi file.
-> 
-> I already expressed my concerns [1] about having a different base
-> address for omap3_pmx_core2 depending on the SoC (although I do
-> understand the rational behind). This makes cross-SoC platforms more
-> difficult to maintain.
+> Isn't the driver constraint based on the global timer h/w being broken
+> on pre r2p0? If it is truly a Linux limitation that could be fixed,
+> then I agree.
 
-Yeah the muxing should always be possible to do at board level.
+Unfortunately, I must admit ignorance on this matter.
 
-Just the use of external pulls for some boards will make it hard
-to have anything common. If you want something common, you can
-have something like omap36xx-usb-xyz.dtsi as long as it's always
-wired up the same way.
+>From a quick look, the comparator behaviour on Cortex-A9 cores prior to
+r2p0 seems to make it unusable in practice (though I'm not aware of the
+precise behaviour, perhaps there is some possible workaround).
 
-Regards,
+We can note the problem in the binding document, but we don't need to
+refer to any particular driver. :)
 
-Tony
- 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289874
-> 
+Cheers,
+Mark.
