@@ -1,51 +1,97 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Mar 2014 11:28:46 -0500
-Subject: [PATCH 2/4] documentaion: DT: allow a A5 compatible string in
- global timer
-In-Reply-To: <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
-References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
- <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
-Message-ID: <CAL_JsqJ3ODGD5D6LO9qW1yD2kScy6RkDfiOQ0B71kBhymFAVHQ@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 10 Mar 2014 16:33:44 +0000
+Subject: [PATCH v6 6/6] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <2115856.ZTdgp5fkma@wuerfel>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+ <201403081815.08829.arnd@arndb.de>
+ <20140310144414.GT6457@e106497-lin.cambridge.arm.com>
+ <2115856.ZTdgp5fkma@wuerfel>
+Message-ID: <20140310163343.GY6457@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 6:51 AM, Matthew Leach <matthew.leach@arm.com> wrote:
-> The global timer is present on the Cortex A5. Add a compatibility
-> string to the DT binding to allow a Cortex A5 global timer.
+On Mon, Mar 10, 2014 at 03:21:01PM +0000, Arnd Bergmann wrote:
+> On Monday 10 March 2014 14:44:14 Liviu Dudau wrote:
+> > I will try to improve the error handling in the next patchset version.
+> > However I am still confused about the earlier discussion on
+> > pci_register_io_range(). Your suggestion initially was to return an
+> > error in the default weak implementation, but in your last email you
+> > are talking about returning 'port'.
+> 
+> You can do either one: 'port' should be positive or zero, while the
+> error would always be negative. We do the same thing in many interfaces
+> in the kernel.
+> 
+> > My idea when I've introduced the
+> > helper function was that it would return an error if it fails to
+> > register the IO range and zero otherwise. I agree that we can treat
+> > the default 'do nothing with the IO range' case as an error, with
+> > the caveat that will force architectures that use this code to
+> > provide their own implementation of pci_register_io_range() in order
+> > to avoid failure, even for the cases where the architecture has a 1:1
+> > mapping between IO and CPU addresses.
+> 
+> Which architectures are you thinking of? The only one I know that
+> does this is ia64, and we won't ever have to support this helper
+> on that architecture.
 
-Also, please use get_maintainers.pl so you copy the right people and list.
+I was thinking about architectures that have IO_SPACE_LIMIT >= 0xffffffff.
+While not an absolute indicator, with the default pci_address_to_pio()
+that means that they can use the CPU MMIO address as IO address directly.
 
-Rob
+$ git grep IO_SPACE_LIMIT | grep -i ffffffff
+arch/arm/include/asm/io.h:#define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+arch/arm/mach-at91/include/mach/io.h:#define IO_SPACE_LIMIT		0xFFFFFFFF
+arch/arm/mach-omap1/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/arm/mach-pxa/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/arm/mach-s3c24xx/include/mach/io.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/avr32/include/asm/io.h:#define IO_SPACE_LIMIT	0xffffffff
+arch/frv/include/asm/io.h:#define IO_SPACE_LIMIT	0xffffffff
+arch/ia64/include/asm/io.h:#define IO_SPACE_LIMIT		0xffffffffffffffffUL
+arch/m32r/include/asm/io.h:#define IO_SPACE_LIMIT  0xFFFFFFFF
+arch/m68k/include/asm/io_no.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/microblaze/include/asm/io.h:#define IO_SPACE_LIMIT (0xFFFFFFFF)
+arch/mn10300/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/sh/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/sparc/include/asm/io_32.h:#define IO_SPACE_LIMIT 0xffffffff
+arch/sparc/include/asm/io_64.h:#define IO_SPACE_LIMIT 0xffffffffffffffffUL
+arch/tile/include/asm/io.h:#define IO_SPACE_LIMIT 0xffffffff
 
->
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/global_timer.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-> index 1e54898..0932891 100644
-> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-> @@ -4,8 +4,10 @@
->
->  ** Timer node required properties:
->
-> -- compatible : Should be "arm,cortex-a9-global-timer"
-> -               Driver supports versions r2p0 and above.
-> +- compatible : should contain
-> +            * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
-> +            * "arm,cortex-a9-global-timer" for Cortex-A9 global timers
-> +                or any compatible implementation.
->
->  - interrupts : One interrupt to each core
->
-> --
-> 1.8.5.3
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> 
+> I did not ask to treat 'do nothing with the IO range' as an error,
+> what I meant is that we should treat 'architecture cannot translate
+> from I/O space to memory space but DT lists a translation anyway'
+> as an error. On x86, you should never see an entry for the I/O space
+> in "ranges", so we will not call this function unless there is a
+> bug in DT.
+
+Ok, it's just that there is no "architecture cannot translate from I/O
+space to memory space" indicator anywhere and I don't want to make x86
+a special case.
+
+So, my proposal is this: default weak implementation of pci_register_io_range()
+returns an error (meaning I have no idea how to translate IO addresses
+to memory space) and anyone that wants this function to return success will
+have to provide their implementation.
+
+I will send an updated series.
+
+Best regards,
+Liviu
+
+> 
+> 	Arnd
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
