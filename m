@@ -1,44 +1,35 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 10 Mar 2014 17:54:44 -0300
-Subject: [PATCH 6/7] ARM: dts: mx35: USB block requires only one clock
+Date: Mon, 10 Mar 2014 17:54:45 -0300
+Subject: [PATCH 7/7] ARM: dts: imx25-pdk: Add USB Host1 support
 In-Reply-To: <1394484885-21262-1-git-send-email-festevam@gmail.com>
 References: <1394484885-21262-1-git-send-email-festevam@gmail.com>
-Message-ID: <1394484885-21262-6-git-send-email-festevam@gmail.com>
+Message-ID: <1394484885-21262-7-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Like other imx SoCs only one USB clock is needed on mx35.
-
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx35.dtsi | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+The following driver patch is also needed in order to get USB functional on mx25:
+http://www.spinics.net/lists/linux-usb/msg104080.html
 
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index e59ccb4..474a73d 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -296,8 +296,7 @@
- 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4000 0x0200>;
- 				interrupts = <37>;
--				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
--				clock-names = "ipg", "ahb", "per";
-+				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
-@@ -306,8 +305,7 @@
- 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4400 0x0200>;
- 				interrupts = <35>;
--				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
--				clock-names = "ipg", "ahb", "per";
-+				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
+ arch/arm/boot/dts/imx25-pdk.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index 7a6d21f..0394313 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -107,3 +107,9 @@
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
++
++&usbhost1 {
++	phy_type = "serial";
++	dr_mode = "host";
++	status = "okay";
++};
 -- 
 1.8.1.2
