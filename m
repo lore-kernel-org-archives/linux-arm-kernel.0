@@ -1,117 +1,215 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 10 Mar 2014 09:08:48 +0000
-Subject: [BUG] atmel: spi: scheduling while atomic
-In-Reply-To: <531D73CB.7040402@aksignal.cz>
-References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
- <5316CA84.4080907@aksignal.cz> <20140307225810.GB2918@piout.net>
- <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
- <531D73CB.7040402@aksignal.cz>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172FF9685@penmbx01>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Mar 2014 09:17:07 +0000
+Subject: [PATCH v3 2/5] pinctrl: st: Enhance the controller to manage
+ unavailable registers
+In-Reply-To: <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
+References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
+ <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20140310091707.GD14976@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Ji?? Prchal [mailto:jiri.prchal at aksignal.cz]
-> Sent: Monday, March 10, 2014 4:12 PM
-> To: Rabin Vincent; Alexandre Belloni; Yang, Wenyou
-> Cc: Ferre, Nicolas; linux-arm-kernel at lists.infradead.org;
-> sboyd at codeaurora.org
-> Subject: Re: [BUG] atmel: spi: scheduling while atomic
+> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 > 
-> Hi all,
-> at first: warning is on all spi devices.
-> at second: its with CONFIG_PREEMPT=y, without (# CONFIG_PREEMPT_RCU is
-> not set) is OK, but I wonder if this config will be fast enough for our
-> usage (nearly RT)?
+> This patch adds a new logic inside the st pinctrl to manage
+> an unsupported scenario: some sysconfig are not available!
 > 
+> This is the case of STiH407 where, although documented, the
+> following registers from SYSCFG_FLASH have been removed from the SoC.
 > 
-> Dne 8.3.2014 01:41, Rabin Vincent napsal(a):
-> > 2014-03-07 23:58 GMT+01:00 Alexandre Belloni
-> > <alexandre.belloni@free-electrons.com>:
-> >> On 05/03/2014 at 07:56:04 +0100, Ji?? Prchal wrote :
-> >>> [    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
-> >>> [    0.906250] Modules linked in:
-> >>> [    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-
-> rc4_cpm9g25+ #1
-> >>> [    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>]
-> (show_stack+0x10/0x14)
-> >>> [    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>]
-> (__schedule_bug+0x48/0x60)
-> >>> [    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>]
-> (__schedule+0x60/0x484)
-> >>> [    0.906250] [<c0390294>] (__schedule) from [<c038feac>]
-> (schedule_timeout+0x17c/0x1ac)
-> >>> [    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>]
-> (wait_for_common+0x10c/0x1f0)
-> >>> [    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>]
-> (atmel_spi_transfer_one_message+0x71c/0xa48)
-> >>> [    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from
-> [<c0246624>] (spi_pump_messages+0x210/0x238)
-> >>> [    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>]
-> (kthread_worker_fn+0x15c/0x1b4)
-> >>> [    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>]
-> (kthread+0xb8/0xcc)
-> >>> [    0.906250] [<c0034534>] (kthread) from [<c0009510>]
-> (ret_from_fork+0x14/0x24)
-> >>> [    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
-> >>
-> >> Actually, I'm not quite sure how spi_pump_messages can be called from
-> an
-> >> atomic context.
-> >
-> > spi_pump_messages() is not called from atomic context.  Rather,
-> > atmel_spi_transfer_one_message() does a spin_lock_irqsave() (via
-> > atmel_spi_lock()) and then calls atmel_spi_one_transfer(), which calls
-> > wait_for_completion_timeout().  That's why schedule is being called
-> > from atomic context.  This was introduced by 8090d6d1a4 ("spi: atmel:
-> > Refactor spi-atmel to use SPI framework queue"). I think you should
-> > see the warning with CONFIG_PREEMPT=y.
-> >
+> SYSTEM_CONFIG3040
+>    Output Enable pad control for all PIO Alternate Functions
+> and
+> SYSTEM_ CONFIG3050
+>    Pull Up pad control for all PIO Alternate Functions
+> 
+> Without managing this condition an imprecise external abort
+> will be detect.
+> 
+> To do this the patch also reviews the st_parse_syscfgs
+> and other routines to manipulate the registers only if
+> actually available.
+> In any case, for example the st_parse_syscfgs detected
+> an error condition but no action was made in the
+> st_pctl_probe_dt.
+> 
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 
-Thanks a lot for the report and analysis.
+These two SOBs need reordering.
 
---->8-------- 
->From ba2dd7aee12cb09b9ef159251859443e1b055669 Mon Sep 17 00:00:00 2001
-From: Wenyou Yang <wenyou.yang@atmel.com>
-Date: Mon, 10 Mar 2014 16:44:33 +0800
-Subject: [PATCH] spi: atmel: fix BUG: scheduling while atomic with
- CONFIG_PREEMPT=y
+> ---
+>  drivers/pinctrl/pinctrl-st.c | 106 +++++++++++++++++++++++++------------------
+>  1 file changed, 61 insertions(+), 45 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> index 9fb66aa..1721611 100644
+> --- a/drivers/pinctrl/pinctrl-st.c
+> +++ b/drivers/pinctrl/pinctrl-st.c
+> @@ -410,25 +410,27 @@ static void st_pinconf_set_config(struct st_pio_control *pc,
+>  	unsigned int oe_value, pu_value, od_value;
+>  	unsigned long mask = BIT(pin);
+>  
+> -	regmap_field_read(output_enable, &oe_value);
+> -	regmap_field_read(pull_up, &pu_value);
+> -	regmap_field_read(open_drain, &od_value);
+> -
+> -	/* Clear old values */
+> -	oe_value &= ~mask;
+> -	pu_value &= ~mask;
+> -	od_value &= ~mask;
+> -
+> -	if (config & ST_PINCONF_OE)
+> -		oe_value |= mask;
+> -	if (config & ST_PINCONF_PU)
+> -		pu_value |= mask;
+> -	if (config & ST_PINCONF_OD)
+> -		od_value |= mask;
+> -
+> -	regmap_field_write(output_enable, oe_value);
+> -	regmap_field_write(pull_up, pu_value);
+> -	regmap_field_write(open_drain, od_value);
+> +	if (output_enable) {
+> +		regmap_field_read(output_enable, &oe_value);
+> +		oe_value &= ~mask;
+> +		if (config & ST_PINCONF_OE)
+> +			oe_value |= mask;
+> +		regmap_field_write(output_enable, oe_value);
+> +	}
+> +	if (pull_up) {
+> +		regmap_field_read(pull_up, &pu_value);
+> +		pu_value &= ~mask;
+> +		if (config & ST_PINCONF_PU)
+> +			pu_value |= mask;
+> +		regmap_field_write(pull_up, pu_value);
+> +	}
+> +	if (open_drain) {
+> +		regmap_field_read(open_drain, &od_value);
+> +		od_value &= ~mask;
+> +		if (config & ST_PINCONF_OD)
+> +			od_value |= mask;
+> +		regmap_field_write(open_drain, od_value);
+> +	}
 
-introduced by 8090d6d1a415d3ae1a7208995decfab8f60f4f36
-("spi: atmel: Refactor spi-atmel to use SPI framework queue")
+Nice change.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/spi/spi-atmel.c |    4 ++++
- 1 file changed, 4 insertions(+)
+Nit: For consistency with the changes below, please consider placing
+new lines between the 3 outer checks.
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index b0842f7..e05c3f2 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1130,8 +1130,12 @@ static int atmel_spi_one_transfer(struct spi_master *master,
- 			atmel_spi_next_xfer_pio(master, xfer);
- 		}
- 
-+		atmel_spi_unlock(as);
-+
- 		ret = wait_for_completion_timeout(&as->xfer_completion,
- 							SPI_DMA_TIMEOUT);
-+		atmel_spi_lock(as);
-+
- 		if (WARN_ON(ret == 0)) {
- 			dev_err(&spi->dev,
- 				"spi trasfer timeout, err %d\n", ret);
+>  }
+>  
+
+<snip>
+
+> -static void st_pinconf_get_direction(struct st_pio_control *pc,
+> -	int pin, unsigned long *config)
+> +static void st_pinconf_get_direction(struct st_pio_control *pc, int pin,
+> +				     unsigned long *config)
+
+Unrelated change?
+
+>  {
+>  	unsigned int oe_value, pu_value, od_value;
+
+Is it worth checking for (!config) here?
+
+> -	regmap_field_read(pc->oe, &oe_value);
+> -	regmap_field_read(pc->pu, &pu_value);
+> -	regmap_field_read(pc->od, &od_value);
+> +	if (pc->oe) {
+> +		regmap_field_read(pc->oe, &oe_value);
+> +		if (oe_value & BIT(pin))
+> +			ST_PINCONF_PACK_OE(*config);
+> +	}
+>  
+> -	if (oe_value & BIT(pin))
+> -		ST_PINCONF_PACK_OE(*config);
+> -	if (pu_value & BIT(pin))
+> -		ST_PINCONF_PACK_PU(*config);
+> -	if (od_value & BIT(pin))
+> -		ST_PINCONF_PACK_OD(*config);
+> +	if (pc->pu) {
+> +		regmap_field_read(pc->pu, &pu_value);
+> +		if (pu_value & BIT(pin))
+> +			ST_PINCONF_PACK_PU(*config);
+> +	}
+>  
+> +	if (pc->od) {
+> +		regmap_field_read(pc->od, &od_value);
+> +		if (od_value & BIT(pin))
+> +			ST_PINCONF_PACK_OD(*config);
+> +	}
+>  }
+
+Nice.
+
+>  static int st_pinconf_get_retime_packed(struct st_pinctrl *info,
+> @@ -1105,8 +1116,21 @@ static int st_pctl_dt_setup_retime(struct st_pinctrl *info,
+>  	return -EINVAL;
+>  }
+>  
+> -static int st_parse_syscfgs(struct st_pinctrl *info,
+> -		int bank, struct device_node *np)
+> +
+> +static struct regmap_field *st_pc_get_value(struct device *dev,
+> +					    struct regmap *regmap, int bank,
+> +					    int data, int lsb, int msb)
+> +{
+> +	struct reg_field reg = REG_FIELD((data + bank) * 4, lsb, msb);
+> +
+> +	if (data < 0)
+> +		return NULL;
+
+What happens is data < 0 and it's used in REG_FIELD?
+
+Would it make more sense to make this check before calling REG_FIELD?
+
+> +	return devm_regmap_field_alloc(dev, regmap, reg);
+> +}
+> +
+> +static void st_parse_syscfgs(struct st_pinctrl *info, int bank,
+> +			     struct device_node *np)
+>  {
+>  	const struct st_pctl_data *data = info->data;
+>  	/**
+> @@ -1116,29 +1140,21 @@ static int st_parse_syscfgs(struct st_pinctrl *info,
+>  	 */
+>  	int lsb = (bank%4) * ST_GPIO_PINS_PER_BANK;
+>  	int msb = lsb + ST_GPIO_PINS_PER_BANK - 1;
+> -	struct reg_field alt_reg = REG_FIELD((data->alt + bank) * 4, 0, 31);
+> -	struct reg_field oe_reg = REG_FIELD((data->oe + bank/4) * 4, lsb, msb);
+> -	struct reg_field pu_reg = REG_FIELD((data->pu + bank/4) * 4, lsb, msb);
+> -	struct reg_field od_reg = REG_FIELD((data->od + bank/4) * 4, lsb, msb);
+>  	struct st_pio_control *pc = &info->banks[bank].pc;
+>  	struct device *dev = info->dev;
+>  	struct regmap *regmap  = info->regmap;
+>  
+> -	pc->alt = devm_regmap_field_alloc(dev, regmap, alt_reg);
+> -	pc->oe = devm_regmap_field_alloc(dev, regmap, oe_reg);
+> -	pc->pu = devm_regmap_field_alloc(dev, regmap, pu_reg);
+> -	pc->od = devm_regmap_field_alloc(dev, regmap, od_reg);
+> -
+> -	if (IS_ERR(pc->alt) || IS_ERR(pc->oe) ||
+> -			IS_ERR(pc->pu) || IS_ERR(pc->od))
+> -		return -EINVAL;
+> +	pc->alt = st_pc_get_value(dev, regmap, bank, data->alt, 0, 31);
+> +	pc->oe = st_pc_get_value(dev, regmap, bank/4, data->oe, lsb, msb);
+> +	pc->pu = st_pc_get_value(dev, regmap, bank/4, data->pu, lsb, msb);
+> +	pc->od = st_pc_get_value(dev, regmap, bank/4, data->od, lsb, msb);
+>  
+>  	/* retime avaiable for all pins by default */
+>  	pc->rt_pin_mask = 0xff;
+>  	of_property_read_u32(np, "st,retime-pin-mask", &pc->rt_pin_mask);
+>  	st_pctl_dt_setup_retime(info, bank, pc);
+>  
+> -	return 0;
+> +	return;
+>  }
+>  
+>  /*
+
 -- 
-1.7.9.5
----<8----
-
-This patch should fix this issue.
-I know it is not good one, the lock usage in the driver code should be double checked.
-
-Thanks.
-
-Best Regards,
-Wenyou Yang.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
