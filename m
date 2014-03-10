@@ -1,112 +1,81 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Mon, 10 Mar 2014 14:44:04 +0100
-Subject: [RFC PATCH v2 04/14] mtd: nand: define struct nand_timings
-In-Reply-To: <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <531DC1A4.7010208@gmail.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 10 Mar 2014 06:56:30 -0700
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <20110101151545.GC25924@n2100.arm.linux.org.uk>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+ <20101221182037.GA4783@n2100.arm.linux.org.uk>
+ <20101222122904.GC14693@n2100.arm.linux.org.uk>
+ <AANLkTikpyAggDCPef1pS=_QHnu9-FyLcpddGyVHnGwWx@mail.gmail.com>
+ <20110101151545.GC25924@n2100.arm.linux.org.uk>
+Message-ID: <1394459790.2270.39.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, 2011-01-01 at 15:15 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 22, 2010 at 03:45:39PM -0800, Dan Williams wrote:
+> > Support for the DMA_COMPL flags are necessary if the DMA_MEMCPY
+> > capability is advertised, yes this driver got this wrong.  I'll update
+> > the documentation to make this requirement clear, and audit the other
+> > drivers.  With slave-only drivers the only usage model is one where
+> > the client driver owns dma-mapping.  In the non-slave (opportunistic
+> > memcpy offload) case the client is unaware of the engine so the driver
+> > owns unmapping.  The minimal fix is to disable memcpy offload.
+> 
+> As a side note, the DMA mapping for slaves should be done using the
+> DMA struct device, not the struct device of the peripheral making use
+> of the DMA engine.
+> 
+> Why?  The slave device has no knowledge of how the DMA engine is
+> connected into the system, or the DMA parameters associated with the
+> device performing the DMA, such as the DMA mask and boundaries.  (If
+> there are several generic DMA agents in the system, it can't know
+> which is the correct one to use until a channel has been allocated.)
+> The only struct device which has this information is the one for the
+> DMA engine itself.
+> 
+> Therefore, the struct device which is passed into the DMA mapping APIs
+> to prepare memory for DMA must always be the DMA engine struct device
+> (chan->device->dev) and never the slave struct device.
 
-Le 29/01/2014 15:34, Boris BREZILLON a ?crit :
-> Define a struct containing the standard NAND timings as described in NAND
-> datasheets.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> ---
->   include/linux/mtd/nand.h |   49 ++++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 49 insertions(+)
->
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 9e6c8f9..67f0829 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -805,4 +805,53 @@ static inline bool nand_is_slc(struct nand_chip *chip)
->   {
->   	return chip->bits_per_cell == 1;
->   }
-> +
-> +/**
-> + * struct nand_sdr_timings - SDR NAND chip timings
-> + *
-> + * This struct defines the timing requirements of a SDR NAND chip.
-> + * These informations can be found in every NAND datasheets and the timings
-> + * meaning are described in the ONFI specifications:
-> + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf? (chapter 4.15 Timing
-> + * Parameters)
-> + *
-> + */
-> +
-> +struct nand_sdr_timings {
-> +	u32 tALH_min;
-> +	u32 tADL_min;
-> +	u32 tALS_min;
-> +	u32 tAR_min;
-> +	u32 tCEA_max;
-> +	u32 tCEH_min;
-> +	u32 tCH_min;
-> +	u32 tCHZ_max;
-> +	u32 tCLH_min;
-> +	u32 tCLR_min;
-> +	u32 tCLS_min;
-> +	u32 tCOH_min;
-> +	u32 tCS_min;
-> +	u32 tDH_min;
-> +	u32 tDS_min;
-> +	u32 tFEAT_max;
-> +	u32 tIR_min;
-> +	u32 tITC_max;
-> +	u32 tRC_min;
-> +	u32 tREA_max;
-> +	u32 tREH_min;
-> +	u32 tRHOH_min;
-> +	u32 tRHW_min;
-> +	u32 tRHZ_max;
-> +	u32 tRLOH_min;
-> +	u32 tRP_min;
-> +	u32 tRR_min;
-> +	u64 tRST_max;
-> +	u32 tWB_max;
-> +	u32 tWC_min;
-> +	u32 tWH_min;
-> +	u32 tWHR_min;
-> +	u32 tWP_min;
-> +	u32 tWW_min;
-> +};
+That all seems eminently sensible. However, I wonder if it always has to
+be true.
 
-Some timings are missing here (see Table 55 in the ONFI spec):
+It is not impossible for the DMA controller to "delegate" transactions
+so that (to the IOMMU) they appear to come from the individual slave
+device rather than from itself.
 
--tR
--tBERS
--tCCS
--tPLEBSY
--...
+The Intel IOMMU has now gained support for DMA mapping for devices
+enumerated by ACPI ? essentially the ACPI "DMAR" table just has a lookup
+table of ACPI device paths, and tells us the PCI bus/devfn that their
+DMA transactions will *appear* to be from.
 
-I see at least 3 of those timings that could be useful (for the moment) :
-- tR: this one should be used to fill the chip_delay field
-- tPROG and tBERS: could be used within nand_wait to choose the timeo
-   value appropriately.
+What we've seen is that it is the individual slave devices that are
+listed in these tables, *not* the DMA controller itself. It looks like
+we are actually expected to set up the IOMMU mapping for the *slave*,
+not the DMA controller. The system doesn't even *tell* me how to set up
+DMA mappings for the DMA controller device; only the slaves.
 
-The problem is that these timings cannot be deduced from the ONFI timing 
-mode
-but should rather be extracted from other ONFI parameters or from 
-specific DT
-properties (hence why I didn't add them to the nand_sdr_timings struct 
-int the
-first place).
+I haven't looked at the datasheet for the DMA controller in question,
+but it's probably the case that there's a per-channel configuration for
+what PCIe source-id to put into the DMA transactions.?
 
-Should I add these fields to the nand_sdr_timings struct and change the way
-onfi_async_timing_mode_to_sdr_timings works (fill a nand timing struct 
-passed
-as an argument instead of returning a const pointer) ?
-Or should I create a new struct for these timings ?
-In the latter case how should I name it ?
+Of course, it's also possible that all these BIOSes are broken and they
+*should* just list the DMA controller itself, instead of all the slave
+devices. But while I'm always quick to jump to the conclusion that it's
+the BIOS at fault, that doesn't necessarily seem likely here...
 
-Best Regards,
+-- 
+dwmw2
 
-Boris
+? We've seen plenty of multi-function devices where the DMA appears to
+  come from the wrong function by *accident*, requiring quirks to make
+  it work with the IOMMU. This would just be a case of doing the same
+  kind of delegation on purpose.
 
-> +
->   #endif /* __LINUX_MTD_NAND_H */
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/e5697cfd/attachment.bin>
