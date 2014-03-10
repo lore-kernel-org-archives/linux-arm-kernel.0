@@ -1,7 +1,7 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 15:29:11 +0000
+Date: Mon, 10 Mar 2014 15:30:41 +0000
 Subject: [PATCH] mfd: tps65218: Fix reported randconfig error
-Message-ID: <1394465351-14764-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1394465441-15040-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
