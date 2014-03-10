@@ -1,56 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Mar 2014 14:26:09 +0100
-Subject: [PATCH 2/3] ARM: at91: at91sam9g45: change at91_adc name
-In-Reply-To: <5318C98C.1070702@kernel.org>
-References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
- <5318C98C.1070702@kernel.org>
-Message-ID: <531DBD71.8040905@atmel.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 10 Mar 2014 15:28:35 +0200
+Subject: [PATCH v2 1/8] ARM: dts: dra7: Initialize USB_DPLL
+In-Reply-To: <1394455761-19226-1-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-2-git-send-email-rogerq@ti.com>
+ <1394455761-19226-1-git-send-email-rogerq@ti.com>
+Message-ID: <531DBE03.2070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 20:16, Jonathan Cameron :
-> On 05/03/14 16:57, Alexandre Belloni wrote:
->> We can't use "at91_adc" to refer to the at91_adc driver anymore as the name is
->> used to match an id_table.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> As stated in previous email, I'll take this along with the fix that 'broke'
-> this, if I get an Ack from one of the at91 maintainers.
+On 03/10/2014 02:49 PM, Roger Quadros wrote:
+> USB_DPLL must be initialized and locked at boot so that
+> USB modules can work.
+>
+> Program USB_DLL_M2 output to half rate as well.
+>
+> Patch depends on
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
+>
+> CC: Mike Turquette <mturquette@linaro.org>
+> CC: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 597979b..f376923 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -815,3 +815,11 @@
+>   };
+>
+>   /include/ "dra7xx-clocks.dtsi"
+> +
+> +&dpll_usb_ck {
+> +        default-rate = <960000000>;
+> +};
+> +
+> +&dpll_usb_m2_ck {
+> +	default-rate = <480000000>;
+> +};
+>
 
-Jonathan,
+You can add these directly under the dra7xx-clocks.dtsi file as well, as 
+I don't think anybody needs to modify these. And the properties can be 
+added directly under the nodes themselves.
 
-It is maybe more clear if I answer here:
-- so, yes, you can take the 3 patches yourself (if you do not mind)
-- you have, for the whole series::
+However, this patch can't be acked yet as we have no feedback from Mike 
+for the default-rate proposal.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks for your help with this issue.
-
-Bye,
-
->> ---
->>   arch/arm/mach-at91/at91sam9g45_devices.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
->> index cb36fa872d30..88554024eb2d 100644
->> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
->> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
->> @@ -1203,7 +1203,7 @@ static struct resource adc_resources[] = {
->>   };
->>
->>   static struct platform_device at91_adc_device = {
->> -	.name		= "at91_adc",
->> +	.name		= "at91sam9g45-adc",
->>   	.id		= -1,
->>   	.dev		= {
->>   				.platform_data	= &adc_data,
->>
-> 
-> 
-
-
--- 
-Nicolas Ferre
+-Tero
