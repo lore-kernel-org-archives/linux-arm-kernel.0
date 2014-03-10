@@ -1,44 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Mar 2014 11:58:08 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
-In-Reply-To: <20140307160836.GM21483@n2100.arm.linux.org.uk>
-References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140307160836.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <20140310105808.GE2815@lukather>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 10 Mar 2014 13:05:08 +0200
+Subject: [PATCH 2/8] ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock
+ gate
+In-Reply-To: <5319D0B5.6060300@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-3-git-send-email-rogerq@ti.com> <5319D0B5.6060300@ti.com>
+Message-ID: <531D9C64.50809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 04:08:36PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
-> > @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
-> >  exit_free_irq:
-> >  	free_irq(drv_data->irq, drv_data);
-> >  exit_reset:
-> > -	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
-> > +	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-> > +	    !IS_ERR(drv_data->rstc))
-> >  		reset_control_assert(drv_data->rstc);
+On 03/07/2014 03:59 PM, Tero Kristo wrote:
+> On 03/07/2014 03:09 PM, Roger Quadros wrote:
+>> This clock gate description was missing in older Reference manuals.
+>> It is present on the SoC to provide 960MHz reference clock to the
+>> internal USB PHYs.
 > 
-> Another question is... why do we need to check pd->dev.of_node here?
-> If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
-> controller node, so drv_data->rstc is either going to be a valid
-> pointer, or it's going to be an error pointer - neither
-> reset_control_get() nor devm_reset_control_get return NULL.
+> Can you provide a document reference here?
+> 
 
-Following back on this as I was doing the patch, actually,
-drv_data->rstc will be NULL if we're not probed by DT, and hence never
-call reset_control_get, that would set an error pointer.
+Unfortunately it hasn't yet been included in the TRM.
+I have the internal defect ID but I don't think it makes any sense here.
 
-But then, we can use IS_ERR_OR_NULL on drv_data->rstc.
+DRA7xx-TRMINC00203
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/335d938f/attachment.sig>
+cheers,
+-roger
+
+> 
+>>
+>> Use l3init_960m_gfclk as parent of usb_otg_ss1_refclk960m and
+>> usb_otg_ss2_refclk960m.
+>>
+>> CC: Tero Kristo <t-kristo@ti.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 12 ++++++++++--
+>>   1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> index e96da9a..b8d3a9d 100644
+>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> @@ -1386,6 +1386,14 @@
+>>           ti,dividers = <1>, <8>;
+>>       };
+>>
+>> +    l3init_960m_gfclk: l3init_960m_gfclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,gate-clock";
+>> +        clocks = <&dpll_usb_clkdcoldo>;
+>> +        ti,bit-shift = <8>;
+>> +        reg = <0x06c0>;
+>> +    };
+>> +
+>>       dss_32khz_clk: dss_32khz_clk {
+>>           #clock-cells = <0>;
+>>           compatible = "ti,gate-clock";
+>> @@ -1533,7 +1541,7 @@
+>>       usb_otg_ss1_refclk960m: usb_otg_ss1_refclk960m {
+>>           #clock-cells = <0>;
+>>           compatible = "ti,gate-clock";
+>> -        clocks = <&dpll_usb_clkdcoldo>;
+>> +        clocks = <&l3init_960m_gfclk>;
+>>           ti,bit-shift = <8>;
+>>           reg = <0x13f0>;
+>>       };
+>> @@ -1541,7 +1549,7 @@
+>>       usb_otg_ss2_refclk960m: usb_otg_ss2_refclk960m {
+>>           #clock-cells = <0>;
+>>           compatible = "ti,gate-clock";
+>> -        clocks = <&dpll_usb_clkdcoldo>;
+>> +        clocks = <&l3init_960m_gfclk>;
+>>           ti,bit-shift = <8>;
+>>           reg = <0x1340>;
+>>       };
+>>
+> 
