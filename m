@@ -1,45 +1,31 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 10 Mar 2014 16:26:53 +0100
-Subject: [PATCH v5] can: xilinx CAN controller support.
-In-Reply-To: <3245971.RIuVmbVL0Z@wuerfel>
-References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
- <531DD493.3030306@monstr.eu> <531DD5E7.7090406@pengutronix.de>
- <3245971.RIuVmbVL0Z@wuerfel>
-Message-ID: <1964213d-6bd9-49fa-805e-42e1e0630fd5@VA3EHSMHS029.ehs.local>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Mon, 10 Mar 2014 16:26:57 +0100
+Subject: [PATCH] ARM: dts: am335x-evmsk: enable DMA controller for USB
+Message-ID: <1394465217-24171-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 04:15 PM, Arnd Bergmann wrote:
-> On Monday 10 March 2014 16:10:31 Marc Kleine-Budde wrote:
->>>>> +config CAN_XILINXCAN
->>>>> +   tristate "Xilinx CAN"
->>>>> +   depends on ARCH_ZYNQ || MICROBLAZE
->>>>
->>>> Is Zynq multiarch already?
->>>
->>> let me just answer this. Zynq is device with hardcoded dual arm cortex-a9 + some IPs
->>> and programmable logic.
->>> It means if you add Microblaze to PL or another CPU then you get multi architecture setup.
->>
->> Sorry for the confusion, I'm not talking about
->> more-than-one-architecture-in-a-FPGA, but the feature of the ARM-Linux
->> Kernel to run on different ARM architecture. For example, it's possible
->> to start the same kernel on a freescale imx6 and a the new marvel ebu
->> platform. If the Zynq Kernel supports this feature, too, we should not
->> limit to ARCH_ZYNQ, but use ARM instead.
-> 
-> Zynq has been multiplatform capable from the start. Ideally we'd let
-> users build the driver for any architecture and specify the exact
-> dependencies, it doesn't even have to be limited to ARM.
-> 
-> You probably want something like
-> 
-> 	config CAN_XILINX
-> 	tristate "Xilinx CAN"
-> 	depends on ARCH_ZYNQ || MICROBLAZE || COMPILE_TEST
-> 	depends on COMMON_CLK && HAS_MMIO  # whatever you need for other architectures
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-Fengguang: Are you use COMPILE_TEST in zero day testing system?
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ arch/arm/boot/dts/am335x-evmsk.dts |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Thanks,
-Michal
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index fa19271..ec08f6f 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -384,6 +384,10 @@
+ 		status = "okay";
+ 		dr_mode = "host";
+ 	};
++
++	dma-controller at 07402000  {
++		status = "okay";
++	};
+ };
+ 
+ &epwmss2 {
+-- 
+1.7.7
