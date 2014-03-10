@@ -1,145 +1,161 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 10 Mar 2014 16:10:31 +0100
-Subject: [PATCH v5] can: xilinx CAN controller support.
-In-Reply-To: <531DD493.3030306@monstr.eu>
-References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
- <531DD2C4.5060109@pengutronix.de> <531DD493.3030306@monstr.eu>
-Message-ID: <531DD5E7.7090406@pengutronix.de>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 10 Mar 2014 16:13:44 +0100
+Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <531D9452.6040501@ti.com>
+References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+ <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
+ <531D9452.6040501@ti.com>
+Message-ID: <531DD6A8.7010406@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 04:04 PM, Michal Simek wrote:
-> Hi Marc,
+Hi Roger,
+
+On 03/10/2014 11:30 AM, Roger Quadros wrote:
+> Hi Florian,
 > 
-> On 03/10/2014 03:57 PM, Marc Kleine-Budde wrote:
->> On 03/04/2014 02:20 PM, Kedareswara rao Appana wrote:
->>> This patch adds xilinx CAN controller support.
->>> This driver supports both ZYNQ CANPS and Soft IP
->>> AXI CAN controller.
->>>
->>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
->>> ---
->>> This patch is rebased on the 3.14 rc5 kernel.
->>> Changes for v5:
->>> - Updated the driver with the review comments.
->>> - Remove the check for the tx fifo full interrupt condition
->>>   form Tx interrupt routine as we are checking it in the _xmit
->>>   routine.
->>> - Clearing the txok interrupt in the tx interrupt routine for
->>>   every Tx can frame.
->>> Changes for v4:
->>> - Added check for the tx fifo full interrupt condition in
->>>   Tx interrupt routine.
->>> - Added be iohelper functions.
->>> - Moved the clock enable/disable to probe/remove because of
->>>   Added big endian support for AXI CAN controller case(reading
->>>   a register during probe for that we need to enable clock).
->>> Changes for v3:
->>> - Updated the driver with the review comments.
->>> - Modified the tranmit logic as per Marc suggestion.
->>> - Enabling the clock when the interface is up to reduce the
->>>   Power consumption.
->>> Changes for v2:
->>> - Updated with the review comments.
->>> - Removed the unnecessary debug prints.
->>> - include tx,rx fifo depths in ZYNQ CANPS case also.
->>> ---
->>>  .../devicetree/bindings/net/can/xilinx_can.txt     |   45 +
->>>  drivers/net/can/Kconfig                            |    7 +
->>>  drivers/net/can/Makefile                           |    1 +
->>>  drivers/net/can/xilinx_can.c                       | 1195 ++++++++++++++++++++
->>>  4 files changed, 1248 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>>  create mode 100644 drivers/net/can/xilinx_can.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>> new file mode 100644
->>> index 0000000..0e57103
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>> @@ -0,0 +1,45 @@
->>> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
->>> +---------------------------------------------------------
->>> +
->>> +Required properties:
->>> +- compatible		: Should be "xlnx,zynq-can-1.00.a" for Zynq CAN
->>> +			  controllers and "xlnx,axi-can-1.00.a" for Axi CAN
->>> +			  controllers.
->>> +- reg			: Physical base address and size of the Axi CAN/Zynq
->>> +			  CANPS registers map.
->>> +- interrupts		: Property with a value describing the interrupt
->>> +			  number.
->>> +- interrupt-parent	: Must be core interrupt controller
->>> +- clock-names		: List of input clock names - "ref_clk", "aper_clk"
->>> +			  (See clock bindings for details. Two clocks are
->>> +			   required for Zynq CAN. For Axi CAN
->>> +			   case it is one(ref_clk)).
->>> +- clocks		: Clock phandles (see clock bindings for details).
->>> +- tx-fifo-depth		: Can Tx fifo depth.
->>> +- rx-fifo-depth		: Can Rx fifo depth.
->>> +
->>> +
->>> +Example:
->>> +
->>> +For Zynq CANPS Dts file:
->>> +	zynq_can_0: zynq-can at e0008000 {
->>> +			compatible = "xlnx,zynq-can-1.00.a";
->>> +			clocks = <&clkc 19>, <&clkc 36>;
->>> +			clock-names = "ref_clk", "aper_clk";
->>> +			reg = <0xe0008000 0x1000>;
->>> +			interrupts = <0 28 4>;
->>> +			interrupt-parent = <&intc>;
->>> +			tx-fifo-depth = <0x40>;
->>> +			rx-fifo-depth = <0x40>;
->>> +		};
->>> +For Axi CAN Dts file:
->>> +	axi_can_0: axi-can at 40000000 {
->>> +			compatible = "xlnx,axi-can-1.00.a";
->>> +			clocks = <&clkc 0>;
->>> +			clock-names = "ref_clk" ;
->>> +			reg = <0x40000000 0x10000>;
->>> +			interrupt-parent = <&intc>;
->>> +			interrupts = <0 59 1>;
->>> +			tx-fifo-depth = <0x40>;
->>> +			rx-fifo-depth = <0x40>;
->>> +		};
->>> diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
->>> index 9e7d95d..b180239 100644
->>> --- a/drivers/net/can/Kconfig
->>> +++ b/drivers/net/can/Kconfig
->>> @@ -125,6 +125,13 @@ config CAN_GRCAN
->>>  	  endian syntheses of the cores would need some modifications on
->>>  	  the hardware level to work.
->>>  
->>> +config CAN_XILINXCAN
->>> +	tristate "Xilinx CAN"
->>> +	depends on ARCH_ZYNQ || MICROBLAZE
+> On 03/07/2014 09:22 PM, Florian Vaussard wrote:
+>> Add the High-Speed USB PHY.
 >>
->> Is Zynq multiarch already?
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  arch/arm/boot/dts/omap3-overo-base.dtsi  | 44 ++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap3-overo-storm.dtsi | 16 ++++++++++++
+>>  arch/arm/boot/dts/omap3-overo.dtsi       | 16 ++++++++++++
+>>  3 files changed, 76 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
+>> index edac70e..13d1ad2 100644
+>> --- a/arch/arm/boot/dts/omap3-overo-base.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
+>> @@ -30,6 +30,24 @@
+>>  		ti,codec = <&twl_audio>;
+>>  	};
+>>  
+>> +	/* HS USB Port 2 Power */
+>> +	hsusb2_power: hsusb2_power_reg {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "hsusb2_vbus";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
+>> +		startup-delay-us = <70000>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>> +	/* HS USB Host PHY on PORT 2 */
+>> +	hsusb2_phy: hsusb2_phy {
+>> +		compatible = "usb-nop-xceiv";
+>> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
+>> +		vcc-supply = <&hsusb2_power>;
+>> +	};
+>> +
+>>  	/* Regulator to trigger the nPoweron signal of the Wifi module */
+>>  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
+>>  		compatible = "regulator-fixed";
+>> @@ -64,6 +82,11 @@
+>>  };
+>>  
+>>  &omap3_pmx_core {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusb2_pins
+>> +	>;
+>> +
+>>  	uart2_pins: pinmux_uart2_pins {
+>>  		pinctrl-single,pins = <
+>>  			OMAP3_CORE1_IOPAD(0x216c, PIN_INPUT | MUX_MODE1)	/* mcbsp3_dx.uart2_cts */
+>> @@ -116,6 +139,19 @@
+>>  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
+>>  		>;
+>>  	};
+>> +
+>> +	hsusb2_pins: pinmux_hsusb2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
+>> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
+>> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
+>> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
+>> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
+>> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+>> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
+>> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
+>> +		>;
+>> +	};
+>>  };
+>>  
+>>  &i2c1 {
+>> @@ -177,6 +213,14 @@
+>>  	power = <50>;
+>>  };
+>>  
+>> +&usbhshost {
+>> +	port2-mode = "ehci-phy";
+>> +};
+>> +
+>> +&usbhsehci {
+>> +	phys = <0 &hsusb2_phy>;
+>> +};
+>> +
+>>  &uart2 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart2_pins>;
+>> diff --git a/arch/arm/boot/dts/omap3-overo-storm.dtsi b/arch/arm/boot/dts/omap3-overo-storm.dtsi
+>> index c235ae8..6cb418b 100644
+>> --- a/arch/arm/boot/dts/omap3-overo-storm.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-overo-storm.dtsi
+>> @@ -10,6 +10,22 @@
+>>  #include "omap3-overo-base.dtsi"
+>>  
+>>  &omap3_pmx_core2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <
+>> +			&hsusb2_2_pins
+>> +	>;
+>> +
+>> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+>> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+>> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+>> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+>> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+>> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
 > 
-> let me just answer this. Zynq is device with hardcoded dual arm cortex-a9 + some IPs
-> and programmable logic.
-> It means if you add Microblaze to PL or another CPU then you get multi architecture setup.
+> If you don't use the OMAP3x30_CORE2_IOPAD() macro then these definitions can fit in omap3-overo-base.dtsi.
+> The offsets will be taken care of if you place them within &omap3_pmx_core2 {} . e.g.
+> 
+> +                       0x50 (PIN_OUTPUT | MUX_MODE3)           /* etk_d10.hsusb2_clk */
+> +                       0x52 (PIN_OUTPUT | MUX_MODE3)           /* etk_d11.hsusb2_stp */
+> +                       0x54 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d12.hsusb2_dir */
+> +                       0x56 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d13.hsusb2_nxt */
+> +                       0x58 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d14.hsusb2_data0 */
+> +                       0x5a (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d15.hsusb2_data1 */
+> 
+> Do you think this is better?
+> 
 
-Sorry for the confusion, I'm not talking about
-more-than-one-architecture-in-a-FPGA, but the feature of the ARM-Linux
-Kernel to run on different ARM architecture. For example, it's possible
-to start the same kernel on a freescale imx6 and a the new marvel ebu
-platform. If the Zynq Kernel supports this feature, too, we should not
-limit to ARCH_ZYNQ, but use ARM instead.
+I do not think that this could work. Let's take for example hsusb2_clk
+et let's do the math. Here, 0x50 is the offset inside omap3_pmx_core2
+pinctrl, so:
 
-Marc
+        hsusb2_clk  omap3_pmx_core2      hsusb2_clk
+         offset        base addr.       PADCONF addr.
+          ----        ----------         ----------
+OMAP34xx: 0x50        0x480025d8         0x48002628  *NO*
+OMAP36xx: 0x50        0x480025a0         0x480025F0  *ok*
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Looking at the TRM, the PADCONF address for hsusb2_clk is 0x480025F0 in
+both cases. Thus we will be wrong on OMAP34xx (offset should be 0x18
+instead of 0x50). Thus so far, I do not see any magical solution apart
+putting the omap3_pmx_core2 pins in a SoC-dependant .dtsi file.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/2b41668b/attachment.sig>
+I already expressed my concerns [1] about having a different base
+address for omap3_pmx_core2 depending on the SoC (although I do
+understand the rational behind). This makes cross-SoC platforms more
+difficult to maintain.
+
+Regards,
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289874
