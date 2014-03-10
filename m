@@ -1,29 +1,45 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Mon, 10 Mar 2014 12:55:36 +0100
-Subject: [PATCH] regulator: tps65910: fix interrupt documentation link
-Message-ID: <1394452536-9595-1-git-send-email-yegorslists@googlemail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Mar 2014 11:57:04 +0000
+Subject: [PATCH 2/4] documentaion: DT: allow a A5 compatible string in
+ global timer
+In-Reply-To: <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
+References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
+ <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
+Message-ID: <20140310115703.GI14999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On Mon, Mar 10, 2014 at 11:51:32AM +0000, Matthew Leach wrote:
+> The global timer is present on the Cortex A5. Add a compatibility
+> string to the DT binding to allow a Cortex A5 global timer.
+> 
+> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- Documentation/devicetree/bindings/mfd/tps65910.txt |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-diff --git a/Documentation/devicetree/bindings/mfd/tps65910.txt b/Documentation/devicetree/bindings/mfd/tps65910.txt
-index b4bd98a..38833e6 100644
---- a/Documentation/devicetree/bindings/mfd/tps65910.txt
-+++ b/Documentation/devicetree/bindings/mfd/tps65910.txt
-@@ -11,7 +11,7 @@ Required properties:
- - #interrupt-cells: the number of cells to describe an IRQ, this should be 2.
-   The first cell is the IRQ number.
-   The second cell is the flags, encoded as the trigger masks from
--  Documentation/devicetree/bindings/interrupts.txt
-+  Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
- - regulators: This is the list of child nodes that specify the regulator
-   initialization data for defined regulators. Not all regulators for the given
-   device need to be present. The definition for each of these nodes is defined
--- 
-1.7.7
+Mark.
+
+> ---
+>  Documentation/devicetree/bindings/arm/global_timer.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+> index 1e54898..0932891 100644
+> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+> @@ -4,8 +4,10 @@
+>  
+>  ** Timer node required properties:
+>  
+> -- compatible : Should be "arm,cortex-a9-global-timer"
+> -		Driver supports versions r2p0 and above.
+> +- compatible : should contain
+> +	     * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
+> +	     * "arm,cortex-a9-global-timer" for Cortex-A9 global timers
+> +	         or any compatible implementation.
+>  
+>  - interrupts : One interrupt to each core
+>  
+> -- 
+> 1.8.5.3
+> 
