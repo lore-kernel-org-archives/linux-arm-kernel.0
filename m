@@ -1,43 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Mar 2014 11:29:29 +0000
-Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
-In-Reply-To: <20140310105808.GE2815@lukather>
-References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140307160836.GM21483@n2100.arm.linux.org.uk>
- <20140310105808.GE2815@lukather>
-Message-ID: <20140310112929.GY21483@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 10 Mar 2014 12:36:12 +0100
+Subject: [PATCH V2 1/5] ARM: shmobile: r8a7791: add IIC0/1 clock macros
+In-Reply-To: <1394450820-8158-1-git-send-email-wsa@the-dreams.de>
+References: <1394450820-8158-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <9236675.ot3B0M2rgc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 11:58:08AM +0100, Maxime Ripard wrote:
-> On Fri, Mar 07, 2014 at 04:08:36PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
-> > > @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
-> > >  exit_free_irq:
-> > >  	free_irq(drv_data->irq, drv_data);
-> > >  exit_reset:
-> > > -	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
-> > > +	if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
-> > > +	    !IS_ERR(drv_data->rstc))
-> > >  		reset_control_assert(drv_data->rstc);
-> > 
-> > Another question is... why do we need to check pd->dev.of_node here?
-> > If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
-> > controller node, so drv_data->rstc is either going to be a valid
-> > pointer, or it's going to be an error pointer - neither
-> > reset_control_get() nor devm_reset_control_get return NULL.
-> 
-> Following back on this as I was doing the patch, actually,
-> drv_data->rstc will be NULL if we're not probed by DT, and hence never
-> call reset_control_get, that would set an error pointer.
-> 
-> But then, we can use IS_ERR_OR_NULL on drv_data->rstc.
+Hi Wolfram,
 
-I think you can also move the devm_reset_control_get() into the main
-probe function: you're only checking for -EPROBE_DEFER from it to fail,
-allowing other errors to continue with the driver init.  This means
-that on non-OF, devm_reset_control_get() will fail with -ENOENT.
+Thank you for the patches.
+
+For the whole series,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+On Monday 10 March 2014 12:26:56 Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
+> 
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> ---
+> 
+> Changes since V1: kept sorting intact
+> 
+>  include/dt-bindings/clock/r8a7791-clock.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/include/dt-bindings/clock/r8a7791-clock.h
+> b/include/dt-bindings/clock/r8a7791-clock.h index
+> 30f82f286e29..2df1a11faeb3 100644
+> --- a/include/dt-bindings/clock/r8a7791-clock.h
+> +++ b/include/dt-bindings/clock/r8a7791-clock.h
+> @@ -51,6 +51,8 @@
+>  #define R8A7791_CLK_SDHI1		12
+>  #define R8A7791_CLK_SDHI0		14
+>  #define R8A7791_CLK_MMCIF0		15
+> +#define R8A7791_CLK_IIC0		18
+> +#define R8A7791_CLK_IIC1		23
+>  #define R8A7791_CLK_SSUSB		28
+>  #define R8A7791_CLK_CMT1		29
+>  #define R8A7791_CLK_USBDMAC0		30
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+
+Laurent Pinchart
