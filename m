@@ -1,38 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 12:37:48 +0000
-Subject: [PATCH v3 5/5] ARM: dts: STiH407: Add B2120 board support
-In-Reply-To: <1394203251-25361-6-git-send-email-maxime.coquelin@st.com>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-6-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20140310123748.GV14976@lee--X1>
+Date: Mon, 10 Mar 2014 12:46:23 +0000
+Subject: [PATCH 2/3] mfd: sec-core: Add of_compatible strings for MFD cells
+In-Reply-To: <1394454858-3139-3-git-send-email-k.kozlowski@samsung.com>
+References: <1394454858-3139-1-git-send-email-k.kozlowski@samsung.com>
+ <1394454858-3139-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140310124623.GA18561@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> B2120 HDK is the reference board for STiH407 SoC.
-> It has the following characteristics:
->  - 1GB DDR3
->  - 8GB eMMC / SD-Card slot
->  - 32MB NOR Flash
->  - 1 x Gbit Ethernet
->  - 1 x USB 3.0 port
->  - 1 x Mini-PCIe
->  - 1 x SATA
->  - 1 x HDMI output
->  - 1 x HDMI input
->  - 1 x SPDIF
+> Add of_compatible strings for S5M8767 RTC, S5M8767 clock and S2MPS14
+> clock MFD cells.
 > 
-> This patch only introduces basic functionnalities, such as I2C and UART.
-> 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/Makefile          |  3 +-
->  arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 80 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+>  drivers/mfd/sec-core.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+> index d163c66edebb..e8ac2e3c1f58 100644
+> --- a/drivers/mfd/sec-core.c
+> +++ b/drivers/mfd/sec-core.c
+> @@ -57,8 +57,10 @@ static const struct mfd_cell s5m8767_devs[] = {
+>  		.name = "s5m8767-pmic",
+>  	}, {
+>  		.name = "s5m-rtc",
+> +		.of_compatible = "samsung,s5m8767-rtc",
+>  	}, {
+>  		.name = "s5m8767-clk",
+> +		.of_compatible = "samsung,s5m8767-clk",
+>  	}
+>  };
+>  
+> @@ -77,6 +79,7 @@ static const struct mfd_cell s2mps14_devs[] = {
+>  		.name = "s2mps14-rtc",
+>  	}, {
+>  		.name = "s2mps14-clk",
+> +		.of_compatible = "samsung,s2mps14-clk",
+>  	}
+>  };
 
-Patch looks pretty inert:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Any reason for not applying compatible strings for the other devices?
 
 -- 
 Lee Jones
