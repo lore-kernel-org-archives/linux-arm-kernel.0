@@ -1,29 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 14:17:54 +0000
-Subject: [PATCH v9 2/9] mfd: omap-usb-host: Always fail on clk_get() error
-In-Reply-To: <1393510711-4697-3-git-send-email-rogerq@ti.com>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
- <1393510711-4697-3-git-send-email-rogerq@ti.com>
-Message-ID: <20140310141754.GC15558@lee--X1>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 10 Mar 2014 14:25:31 +0000
+Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
+In-Reply-To: <531D0D0D.4050703@gmail.com>
+References: <531CF864.9040406@gmail.com>
+ <20140309.203001.1318893833441564547.davem@davemloft.net>
+ <531D094C.1090205@gmail.com>
+ <20140309.204101.47552917508273123.davem@davemloft.net>
+ <531D0D0D.4050703@gmail.com>
+Message-ID: <20140310142531.1fde5797@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Be more strict and always fail on clk_get() error.
+On Mon, 10 Mar 2014 01:53:33 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> On 03/10/2014 01:41 AM, David Miller wrote:
+> > From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Date: Mon, 10 Mar 2014 01:37:32 +0100
+> >
+> >> The mechanism is manual, no automatic way to determine it.
+> >
+> > We recognize BIOS and ACPI bugs and work around them, by looking at
+> > version information and whatnot, so you really can't convince me that
+> > something similar can't be done here perhaps in the platform code.
 > 
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  drivers/mfd/omap-usb-host.c | 62 +++++++++++++++++++++++++++++----------------
->  1 file changed, 40 insertions(+), 22 deletions(-)
+> Hmm, if the is a way to determine the version of that particual u-boot
+> I'd be happy to exploit that information.
 
-I like to principle of the patch assuming that the devices would be
-useless without their clocks.
+If there isn't a way for a kernel to determine the U-boot version then
+maybe that should get fixed instead. That also solves your problem
+because if you can't find the uboot version you know its too old.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alan
