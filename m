@@ -1,80 +1,43 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 11 Mar 2014 02:09:08 +0530
-Subject: [PATCH v3 30/52] arm64,
- hw_breakpoint.c: Fix CPU hotplug callback registration
-In-Reply-To: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
-References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140310203907.10746.60164.stgit@srivatsabhat.in.ibm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 10 Mar 2014 16:45:49 -0400
+Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
+ PHY DTS entries
+In-Reply-To: <CAPw-ZTmwFZjKT2+CUUp73TDXJcXy-bEY_sTNg-TtH-COzDnCfw@mail.gmail.com>
+References: <1394213289-29565-1-git-send-email-lho@apm.com>
+ <1394213289-29565-2-git-send-email-lho@apm.com>
+ <1394213289-29565-3-git-send-email-lho@apm.com>
+ <1394213289-29565-4-git-send-email-lho@apm.com>
+ <CAPw-ZTmwFZjKT2+CUUp73TDXJcXy-bEY_sTNg-TtH-COzDnCfw@mail.gmail.com>
+Message-ID: <20140310204549.GJ25290@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subsystems that want to register CPU hotplug callbacks, as well as perform
-initialization for the CPUs that are already online, often do it as shown
-below:
+On Sun, Mar 09, 2014 at 10:23:33PM -0700, Loc Ho wrote:
+> Hi Tejun,
+> 
+> On Fri, Mar 7, 2014 at 9:28 AM, Loc Ho <lho@apm.com> wrote:
+> 
+> > This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
+> > PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
+> >
+> > Signed-off-by: Loc Ho <lho@apm.com>
+> > Signed-off-by: Tuan Phan <tphan@apm.com>
+> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> > ---
+> >  arch/arm64/boot/dts/apm-storm.dtsi |   75
+> > ++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 75 insertions(+), 0 deletions(-)
+> >
+> >
+> Kishon had pulled in the PHY doc/driver patches. Will you pulling in the
+> PHY DTS and the SATA host driver patches soon?
 
-	get_online_cpus();
+Kishon, is the following branch the right one to pull into
+libata/for-3.15?
 
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
+ git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
 
-	register_cpu_notifier(&foobar_cpu_notifier);
+Thanks.
 
-	put_online_cpus();
-
-This is wrong, since it is prone to ABBA deadlocks involving the
-cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-with CPU hotplug operations).
-
-Instead, the correct and race-free way of performing the callback
-registration is:
-
-	cpu_notifier_register_begin();
-
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
-
-	/* Note the use of the double underscored version of the API */
-	__register_cpu_notifier(&foobar_cpu_notifier);
-
-	cpu_notifier_register_done();
-
-
-Fix the hw-breakpoint code in arm64 by using this latter form of callback
-registration.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
-
- arch/arm64/kernel/hw_breakpoint.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index f17f581..bee7897 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -913,6 +913,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	pr_info("found %d breakpoint and %d watchpoint registers.\n",
- 		core_num_brps, core_num_wrps);
- 
-+	cpu_notifier_register_begin();
-+
- 	/*
- 	 * Reset the breakpoint resources. We assume that a halting
- 	 * debugger will leave the world in a nice state for us.
-@@ -927,7 +929,10 @@ static int __init arch_hw_breakpoint_init(void)
- 			      TRAP_HWBKPT, "hw-watchpoint handler");
- 
- 	/* Register hotplug notifier. */
--	register_cpu_notifier(&hw_breakpoint_reset_nb);
-+	__register_cpu_notifier(&hw_breakpoint_reset_nb);
-+
-+	cpu_notifier_register_done();
-+
- 	/* Register cpu_suspend hw breakpoint restore hook */
- 	cpu_suspend_set_dbg_restorer(hw_breakpoint_reset);
- 
+-- 
+tejun
