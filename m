@@ -1,50 +1,96 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 10 Mar 2014 10:28:26 +0000
-Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
-In-Reply-To: <20140309.234032.873557698878535571.davem@davemloft.net>
-References: <531D094C.1090205@gmail.com>
- <20140309.204101.47552917508273123.davem@davemloft.net>
- <531D0D0D.4050703@gmail.com>
- <20140309.234032.873557698878535571.davem@davemloft.net>
-Message-ID: <531D93CA.6050801@gmail.com>
+Date: Mon, 10 Mar 2014 10:49:53 +0000
+Subject: [PATCH] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394419893.15968.88.camel@deadeye.wl.decadent.org.uk>
+References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394419893.15968.88.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <531D98D1.4000707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 03:40 AM, David Miller wrote:
-> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Date: Mon, 10 Mar 2014 01:53:33 +0100
->
->> On 03/10/2014 01:41 AM, David Miller wrote:
->>> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Date: Mon, 10 Mar 2014 01:37:32 +0100
->>>
->>>> The mechanism is manual, no automatic way to determine it.
->>>
->>> We recognize BIOS and ACPI bugs and work around them, by looking at
->>> version information and whatnot, so you really can't convince me that
->>> something similar can't be done here perhaps in the platform code.
+On 03/10/2014 02:51 AM, Ben Hutchings wrote:
+> On Mon, 2014-03-10 at 02:01 +0100, Sebastian Hesselbarth wrote:
+>> phy_ethtool_get_wol is a helper to get current WOL settings from
+>> a phy device. When using this helper on a PHY without .get_wol
+>> callback, struct ethtool_wolinfo is never set-up correctly and
+>> may contain misleading information about WOL status.
 >>
->> Hmm, if the is a way to determine the version of that particual u-boot
->> I'd be happy to exploit that information. But I honestly doubt that.
->> Compared to u-boot bootloader and kernel interaction, BIOS and ACPI
->> are well-defined protocols.
+>> To fix this, always zero relevant fields of struct ethtool_wolinfo
+>> regardless of .get_wol callback availability.
+>
+> I think it's the caller's responsibility to zero out struct
+> ethtool_wolinfo.  That is what ethtool_get_wol() does.
+
+Actually, phy_ethtool_get_wol is the caller here. This belongs to
+a set of helpers that deal with phy_device, not netdev.
+
+> Maybe you could split ethtool_get_wol() like we did
+> ethtool_get_settings(), to support in-kernel invocation of ETHTOOL_GWOL?
+
+Looking at the other users of phy_ethtool_get_wol (mv643xx_eth and
+cpsw), both drivers use this helper to determine what to pass back
+on the corresponding ethtool_get_wol call.
+
+BTW, both drivers above do zero ethtool_wolinfo before calling
+phy_ethtool_get_wol. I can either zero it in phy_suspend too or we
+deal with it properly in phy_ethtool_get_wol instead:
+
+void phy_ethtool_get_wol(struct phy_device *phydev, struct 
+ethtool_wolinfo *wol)
+{
+	memset(wol, 0, sizeof(*wol));
+
+	if (phydev && phydev->drv->get_wol)
+		phydev->drv->get_wol(phydev, wol);
+}
+
+That would also simplify above drivers down to e.g:
+
+static void cpsw_get_wol(struct net_device *ndev, struct ethtool_wolinfo 
+*wol)
+{
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	int slave_no = cpsw_slave_index(priv);
+	phy_ethtool_get_wol(priv->slaves[slave_no].phy, wol);
+}
+
+instead of:
+
+static void cpsw_get_wol(struct net_device *ndev, struct ethtool_wolinfo 
+*wol)
+{
+	struct cpsw_priv *priv = netdev_priv(ndev);
+	int slave_no = cpsw_slave_index(priv);
+
+	wol->supported = 0;
+	wol->wolopts = 0;
+
+	if (priv->slaves[slave_no].phy)
+		phy_ethtool_get_wol(priv->slaves[slave_no].phy, wol);
+}
+
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Cc: David Miller <davem@davemloft.net>
+>> Cc: Florian Fainelli <f.fainelli@gmail.com>
+>> Cc: netdev at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   drivers/net/phy/phy.c | 1 +
+>>   1 file changed, 1 insertion(+)
 >>
->> I personally, would prefer everybody should update his broken
->> bootloaders, but that will just not happen.
+>> diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+>> index 19c9eca0ef26..62a7cd401e1c 100644
+>> --- a/drivers/net/phy/phy.c
+>> +++ b/drivers/net/phy/phy.c
+>> @@ -1092,6 +1092,7 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
+>>
+>>   void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
+>>   {
+>> +	wol->supported = wol->wolopts = 0;
+>>   	if (phydev->drv->get_wol)
+>>   		phydev->drv->get_wol(phydev, wol);
+>>   }
 >
-> What you can do is have a test that _perhaps_ covers a "broader than
-> reality" list of broken bootloader cases.
->
-> Then you have something the bootloader can provide which indicates
-> that it has been fixed.
-
-I think we can just pass the workaround responsibility back to the
-bootloader. You rejected both easy-to-maintain workarounds for good
-reasons, both bootloaders I know of can be fixed by just resuming the
-PHY by bootloader commands. Users of this two boards can prepend their
-tftpboot commands with an appropriate write to BMCR.
-
-Let's just ignore this for now and wait for a really unfixable
-bootloader.
-
-Sebastian
