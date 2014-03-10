@@ -1,42 +1,61 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 10 Mar 2014 08:58:02 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzldIHVzYjogY2hpcGlkZWE6IHVzYm1pc2M6IEFkZCBV?=
- =?UTF-8?B?U0IgSG9zdCBzdXBwb3J0IGZvciBpLk1YMjUvaS5NWDM1IENQVXM=?=
-In-Reply-To: <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Mar 2014 13:03:24 +0800
+Subject: [PATCH 6/9] ARM: dts: i.MX35: Add USB support.
+In-Reply-To: <1394211863-7569-6-git-send-email-denis@eukrea.com>
 References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
- <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
-Message-ID: <1394427482.225153574@f354.i.mail.ru>
+ <1394211863-7569-6-git-send-email-denis@eukrea.com>
+Message-ID: <20140310050322.GC15218@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????????,  9 ????? 2014, 22:21 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
-> Hi Denis,
+On Fri, Mar 07, 2014 at 06:04:20PM +0100, Denis Carikli wrote:
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  arch/arm/boot/dts/imx35.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> On Fri, Mar 7, 2014 at 2:04 PM, Denis Carikli <denis@eukrea.com> wrote:
-> 
-> > +static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
-> > +{
-> > +       void __iomem *reg = NULL;
-> 
-> This variable is not used and causes a warning. Please remove it.
-> 
-> After applying this patch things go further when I boot with a USB
-> thumb connected to the USB Host1 port:
-...
-> (Not sure why it says full-speed device. When I connect the same
-> device to a PC it says high-speed)
-...
-> (Then system hangs here).
-> 
-> If I boot without the USB thumb connected, then I reach the prompt,
-> however after inserting the USB pen drive into USBH1 there is no
-> detection.
-> 
-> Any ideas?
+> diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+> index e59ccb4..1c15b56 100644
+> --- a/arch/arm/boot/dts/imx35.dtsi
+> +++ b/arch/arm/boot/dts/imx35.dtsi
+> @@ -292,6 +292,15 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			usbphy0: usbphy at 0 {
+> +				compatible = "usb-nop-xceiv";
+> +			};
+> +
+> +			usbphy1: usbphy at 1 {
+> +				compatible = "usb-nop-xceiv";
+> +			};
+> +
+> +
 
-Fabio, start with to make work USB port on your board in the bootloader.
-Then with the previous driver (ehci-mxc).
-Most likely problem is a wrong (or missing) clock.
-As I mentioned earlier, DTS has incorrect clock nodes.
+Can we put these (also imx25.dtsi) in the same way that imx51.dtsi
+organizes it?
 
----
+Shawn
+
+>  			usbotg: usb at 53ff4000 {
+>  				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
+>  				reg = <0x53ff4000 0x0200>;
+> @@ -299,6 +308,7 @@
+>  				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
+>  				clock-names = "ipg", "ahb", "per";
+>  				fsl,usbmisc = <&usbmisc 0>;
+> +				fsl,usbphy = <&usbphy0>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -309,6 +319,7 @@
+>  				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
+>  				clock-names = "ipg", "ahb", "per";
+>  				fsl,usbmisc = <&usbmisc 1>;
+> +				fsl,usbphy = <&usbphy1>;
+>  				status = "disabled";
+>  			};
+>  
+> -- 
+> 1.7.9.5
+> 
