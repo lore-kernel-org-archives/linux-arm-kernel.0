@@ -1,23 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 10 Mar 2014 08:19:03 -0300
-Subject: [PATCH 1/9] usb: chipidea: usbmisc: Add USB Host support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <20140310065520.469cac2e@e6520eb>
-References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
- <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
- <20140310065520.469cac2e@e6520eb>
-Message-ID: <CAOMZO5Do3GU9aYzTffOoD7sYSYwtQU4wVSEmW78aF+c8179QuQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 10 Mar 2014 12:26:56 +0100
+Subject: [PATCH V2 1/5] ARM: shmobile: r8a7791: add IIC0/1 clock macros
+Message-ID: <1394450820-8158-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-On Mon, Mar 10, 2014 at 2:55 AM, Eric B?nard <eric@eukrea.com> wrote:
-> Hi Fabio,
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+---
 
->> (Not sure why it says full-speed device. When I connect the same
->> device to a PC it says high-speed)
->>
-> because i.MX25 and i.MX35 only have a full speed phy on the host port.
+Changes since V1: kept sorting intact
 
-This makes sense, thanks.
+ include/dt-bindings/clock/r8a7791-clock.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index 30f82f286e29..2df1a11faeb3 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -51,6 +51,8 @@
+ #define R8A7791_CLK_SDHI1		12
+ #define R8A7791_CLK_SDHI0		14
+ #define R8A7791_CLK_MMCIF0		15
++#define R8A7791_CLK_IIC0		18
++#define R8A7791_CLK_IIC1		23
+ #define R8A7791_CLK_SSUSB		28
+ #define R8A7791_CLK_CMT1		29
+ #define R8A7791_CLK_USBDMAC0		30
+-- 
+1.9.0
