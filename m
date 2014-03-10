@@ -1,40 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Mar 2014 18:01:31 +0000
-Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
- driver support
-In-Reply-To: <531DF931.1060108@ti.com>
-References: <1392755543-28335-1-git-send-email-nm@ti.com>
- <1392755543-28335-4-git-send-email-nm@ti.com>
- <20140224015826.GU25940@sirena.org.uk> <530B594F.2030500@ti.com>
- <20140303035426.GC2411@sirena.org.uk> <531DF250.5060100@ti.com>
- <20140310172221.GT28112@sirena.org.uk> <531DF931.1060108@ti.com>
-Message-ID: <20140310180131.GZ28112@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Mar 2014 11:03:42 -0700
+Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <531DD6A8.7010406@epfl.ch>
+References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+ <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
+ <531D9452.6040501@ti.com> <531DD6A8.7010406@epfl.ch>
+Message-ID: <20140310180341.GC4882@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 12:41:05PM -0500, Nishanth Menon wrote:
+* Florian Vaussard <florian.vaussard@epfl.ch> [140310 08:17]:
+> On 03/10/2014 11:30 AM, Roger Quadros wrote:
+> >
+> > If you don't use the OMAP3x30_CORE2_IOPAD() macro then these definitions can fit in omap3-overo-base.dtsi.
+> > The offsets will be taken care of if you place them within &omap3_pmx_core2 {} . e.g.
+> > 
+> > +                       0x50 (PIN_OUTPUT | MUX_MODE3)           /* etk_d10.hsusb2_clk */
+> > +                       0x52 (PIN_OUTPUT | MUX_MODE3)           /* etk_d11.hsusb2_stp */
+> > +                       0x54 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d12.hsusb2_dir */
+> > +                       0x56 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d13.hsusb2_nxt */
+> > +                       0x58 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d14.hsusb2_data0 */
+> > +                       0x5a (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d15.hsusb2_data1 */
+> > 
+> > Do you think this is better?
+> > 
+> 
+> I do not think that this could work. Let's take for example hsusb2_clk
+> et let's do the math. Here, 0x50 is the offset inside omap3_pmx_core2
+> pinctrl, so:
+> 
+>         hsusb2_clk  omap3_pmx_core2      hsusb2_clk
+>          offset        base addr.       PADCONF addr.
+>           ----        ----------         ----------
+> OMAP34xx: 0x50        0x480025d8         0x48002628  *NO*
+> OMAP36xx: 0x50        0x480025a0         0x480025F0  *ok*
+> 
+> Looking at the TRM, the PADCONF address for hsusb2_clk is 0x480025F0 in
+> both cases. Thus we will be wrong on OMAP34xx (offset should be 0x18
+> instead of 0x50). Thus so far, I do not see any magical solution apart
+> putting the omap3_pmx_core2 pins in a SoC-dependant .dtsi file.
+> 
+> I already expressed my concerns [1] about having a different base
+> address for omap3_pmx_core2 depending on the SoC (although I do
+> understand the rational behind). This makes cross-SoC platforms more
+> difficult to maintain.
 
-> The only other options are:
-> a) Abstract it at a higher level at "user drivers", since they are
-> aware of the sequencing needs - but this partially defeats the
-> purpose, unless ofcourse, we do a tricky implementation such as:
-> clk a, b, c -> prenotifiers in a, postnotifiers in c (which as you
-> mentioned is a little trickier to get right).
-> b) introduce a higher level generic dvfs function[1] which does not
-> seem very attractive either.
+Yeah the muxing should always be possible to do at board level.
 
-> Any other suggestions other than limiting the usage(and documenting it
-> so) and hoping for a future evolution to take this into consideration?
+Just the use of external pulls for some boards will make it hard
+to have anything common. If you want something common, you can
+have something like omap36xx-usb-xyz.dtsi as long as it's always
+wired up the same way.
 
-Something might be doable with telling the clock API about maintianing
-ratios between clocks?  I do think we should have an idea where we'd go
-with such requirements, even if we don't currently handle it, so that we
-can hopefully avoid another round of refactoring everything but it
-doesn't seem 100% essential, just very nice to have.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/b5dd9a96/attachment.sig>
+Regards,
+
+Tony
+ 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289874
+> 
