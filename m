@@ -1,48 +1,33 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Mon, 10 Mar 2014 11:51:33 +0000
-Subject: [PATCH 3/4] dts: ca5: add the global timer for the A5
-In-Reply-To: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
-References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <1394452294-24552-4-git-send-email-matthew.leach@arm.com>
+Date: Mon, 10 Mar 2014 11:51:30 +0000
+Subject: [PATCH 0/4] Add support for the Cortex A5 global timer
+Message-ID: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex A5 contains a global timer: add the appropriate device tree
-node.
+This patch series adds support for the global timer with the Cortex
+A5. This is relatively simple patch series and mainly consists of:
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ - Update a check in the drive probe code for an unusable global timer
+   to be non-specific to the A9.
+ - Add the appropriate device tree node and Kconfig options.
+ - Add a compatible node for the specifc A5 global timer in the DT
+   binding.
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index c544a55..d2709b7 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -88,6 +88,14 @@
- 		interrupts = <1 13 0x304>;
- 	};
- 
-+	timer at 2c000200 {
-+		compatible = "arm,cortex-a5-global-timer",
-+		             "arm,cortex-a9-global-timer";
-+		reg = <0x2c000200 0x20>;
-+		interrupts = <1 11 0x304>;
-+		clocks = <&oscclk0>;
-+	};
-+
- 	watchdog at 2c000620 {
- 		compatible = "arm,cortex-a5-twd-wdt";
- 		reg = <0x2c000620 0x20>;
-@@ -120,7 +128,7 @@
- 		compatible = "arm,vexpress,config-bus";
- 		arm,vexpress,config-bridge = <&v2m_sysreg>;
- 
--		osc at 0 {
-+		oscclk0: osc at 0 {
- 			/* CPU and internal AXI reference clock */
- 			compatible = "arm,vexpress-osc";
- 			arm,vexpress-sysreg,func = <1 0>;
+Any comments welcome.
+Matt
+
+Matthew Leach (4):
+  clocksource: arm_global_timer: Only check for unusable timer on A9
+  documentaion: DT: allow a A5 compatible string in global timer
+  dts: ca5: add the global timer for the A5
+  KConfig: Vexpress: build the ARM_GLOBAL_TIMER with vexpress platform
+
+ Documentation/devicetree/bindings/arm/global_timer.txt |  6 ++++--
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts                | 10 +++++++++-
+ arch/arm/mach-vexpress/Kconfig                         |  1 +
+ drivers/clocksource/arm_global_timer.c                 |  5 +++--
+ 4 files changed, 17 insertions(+), 5 deletions(-)
+
 -- 
 1.8.5.3
