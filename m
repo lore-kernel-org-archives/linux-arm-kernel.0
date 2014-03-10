@@ -1,83 +1,349 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 10 Mar 2014 18:40:58 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <CAL_JsqLppZHjND_LFMxscR0WCD4Ox7vF0fDbQFoYg=TENXxY8Q@mail.gmail.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	<20140228162752.GU21483@n2100.arm.linux.org.uk>	<5310BDE3.60603@ti.com>	<20140228165628.GX21483@n2100.arm.linux.org.uk>	<53143796.2050309@ti.com>
- <CAL_JsqLppZHjND_LFMxscR0WCD4Ox7vF0fDbQFoYg=TENXxY8Q@mail.gmail.com>
-Message-ID: <531DEB1A.5090509@ti.com>
+From: noreply.rgenoud@gmail.com (Richard Genoud)
+Date: Mon, 10 Mar 2014 17:45:49 +0100
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling modem
+ lines
+In-Reply-To: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+GPIO.
+This will be useful for many boards which have a serial controller that
+only handle CTS/RTS pins (or even just RX/TX).
 
-On 10/03/14 18:05, Rob Herring wrote:
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ Documentation/serial/driver            |  25 ++++++
+ drivers/tty/serial/Kconfig             |   3 +
+ drivers/tty/serial/Makefile            |   3 +
+ drivers/tty/serial/serial_mctrl_gpio.c | 143 +++++++++++++++++++++++++++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h | 110 +++++++++++++++++++++++++
+ 5 files changed, 284 insertions(+)
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 
->> Russell's point was that these connector bindings are very generic, i.e.
->> they are not for any particular chip from a particular vendor, but for
->> any connector for DVI, HDMI or analog-tv. And he's worried that maybe we
->> shouldn't define such generic bindings without consulting the whole
->> device-tree community (i.e including non-linux users).
-> 
-> So re-work it to be generic and send it out. DT maintainers would
-> rarely disagree that something shouldn't be made generic.
-
-They (in this series) are already designed to be generic.
-
-I should perhaps re-word the question: we are concerned whether these
-bindings are good for all the users, not just us, and whether there
-already exists something that overlaps.
-
-Afaik, there's nothing overlapping. And I don't see why they wouldn't be
-good for all users (with the few minor modifications that have been
-discussed in this thread). But, if I gathered right, Russell would like
-some kind of ack from someone who might know better than us.
-
-So is it enough to have posted these, and gotten acks from the people
-involved, or should we get acks from DT maintainers also?
-
-Is there a way to get the attention of, say, BSD people, or should we
-just presume they'll follow the list?
-
->> So the question is, is there such a community and a forum to bring up
->> this kind of things? If yes, should we bring this up there? If yes, what
->> kind of things in general should be brought into the attention of
->> non-linux users?
-> 
-> devicetree list is just that. It is not just for Linux. There is the
-> newly created devicetree-spec at vger.kernel.org which is for more
-> core/common binding discussion.
-
-Ok.
-
->> What I wonder here is that while a thing like DVI connector is, of
->> course, more generic than, say, "ti,tfp410" encoder chip, but isn't the
->> case still the same: we're defining global bindings for hardware that
->> should work for everyone, not only Linux users?
-> 
-> Defining the connectors in DT is a useful thing although mainly when
-> you have multiple connectors of the same type. Labels for composite,
-> SVideo, VGA, DVI, HDMI seem less useful to me. Describing position or
-> printed label (like front vs. rear connections) seem more useful to
-> me.
-
-My point above was that it feels mentally easier to define bindings for
-one particular IP block or chip, than defining bindings for a more
-generic thing like "HDMI connector". But, in the end, I believe they
-both should go through similar review, and there's no such difference.
-
-As for the labels, they can be anything that makes sense for that
-particular board. It can be "HDMI Front", if such makes sense, or
-"HDMI-2" if the connector has such physical printed label. Or, say,
-"Main LCD", "Secondary LCD". It's a free form text that is given to the
-user.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/d894abf5/attachment-0001.sig>
+diff --git a/Documentation/serial/driver b/Documentation/serial/driver
+index c3a7689a90e6..3bba1aeb799c 100644
+--- a/Documentation/serial/driver
++++ b/Documentation/serial/driver
+@@ -429,3 +429,28 @@ thus:
+ 		struct uart_port	port;
+ 		int			my_stuff;
+ 	};
++
++Modem control lines via GPIO
++----------------------------
++
++Some helpers are provided in order to set/get modem control lines via GPIO.
++
++mctrl_gpio_init(dev, idx):
++	This will get the {cts,rts,...}-gpios from device tree if they are
++	present and request them, set direction etc, and return an
++	allocated structure. devm_* functions are used, so there's no need
++	to call mctrl_gpio_free().
++
++mctrl_gpio_free(dev, gpios):
++	This will free the requested gpios in mctrl_gpio_init().
++	As devm_* function are used, there's generally no need to call
++	this function.
++
++mctrl_gpio_to_gpiod(gpios, gidx)
++	This returns the gpio structure associated to the modem line index.
++
++mctrl_gpio_set(gpios, mctrl):
++	This will sets the gpios according to the mctrl state.
++
++mctrl_gpio_get(gpios, mctrl):
++	This will update mctrl with the gpios values.
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 2e6d8ddc4425..7e8f15cfb8d0 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1509,4 +1509,7 @@ config SERIAL_ST_ASC_CONSOLE
+ 
+ endmenu
+ 
++config SERIAL_MCTRL_GPIO
++	tristate
++
+ endif # TTY
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 3680854fef41..bcf31da267dd 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -87,3 +87,6 @@ obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
+ obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
+ obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
+ obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
++
++# GPIOLIB helpers for modem control lines
++obj-$(CONFIG_SERIAL_MCTRL_GPIO) += serial_mctrl_gpio.o
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+new file mode 100644
+index 000000000000..bf9560ffe3f4
+--- /dev/null
++++ b/drivers/tty/serial/serial_mctrl_gpio.c
+@@ -0,0 +1,143 @@
++/*
++ * Helpers for controlling modem lines via GPIO
++ *
++ * Copyright (C) 2014 Paratronic S.A.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/err.h>
++#include <linux/device.h>
++#include <linux/gpio/consumer.h>
++#include <uapi/asm-generic/termios.h>
++
++#include "serial_mctrl_gpio.h"
++
++struct mctrl_gpios {
++	struct gpio_desc *gpio[UART_GPIO_MAX];
++};
++
++static const struct {
++	const char *name;
++	unsigned int mctrl;
++	bool dir_out;
++} mctrl_gpios_desc[UART_GPIO_MAX] = {
++	{ "cts", TIOCM_CTS, false, },
++	{ "dsr", TIOCM_DSR, false, },
++	{ "dcd", TIOCM_CD, false, },
++	{ "rng", TIOCM_RNG, false, },
++	{ "rts", TIOCM_RTS, true, },
++	{ "dtr", TIOCM_DTR, true, },
++	{ "out1", TIOCM_OUT1, true, },
++	{ "out2", TIOCM_OUT2, true, },
++};
++
++void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
++{
++	enum mctrl_gpio_idx i;
++
++	if (IS_ERR_OR_NULL(gpios))
++		return;
++
++	for (i = 0; i < UART_GPIO_MAX; i++)
++		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
++		    mctrl_gpios_desc[i].dir_out)
++			gpiod_set_value(gpios->gpio[i],
++					!!(mctrl & mctrl_gpios_desc[i].mctrl));
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_set);
++
++struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
++				      enum mctrl_gpio_idx gidx)
++{
++	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
++		return gpios->gpio[gidx];
++	else
++		return NULL;
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
++
++unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
++{
++	enum mctrl_gpio_idx i;
++
++	/*
++	 * return it unchanged if the structure is not allocated
++	 */
++	if (IS_ERR_OR_NULL(gpios))
++		return *mctrl;
++
++	for (i = 0; i < UART_GPIO_MAX; i++) {
++		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
++		    !mctrl_gpios_desc[i].dir_out) {
++			if (gpiod_get_value(gpios->gpio[i]))
++				*mctrl |= mctrl_gpios_desc[i].mctrl;
++			else
++				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
++		}
++	}
++
++	return *mctrl;
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_get);
++
++struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
++{
++	struct mctrl_gpios *gpios;
++	enum mctrl_gpio_idx i;
++	int err;
++
++	gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
++	if (!gpios)
++		return ERR_PTR(-ENOMEM);
++
++	for (i = 0; i < UART_GPIO_MAX; i++) {
++		gpios->gpio[i] = devm_gpiod_get_index(dev,
++						      mctrl_gpios_desc[i].name,
++						      idx);
++
++		/*
++		 * The GPIOs are maybe not all filled,
++		 * this is not an error.
++		 */
++		if (IS_ERR_OR_NULL(gpios->gpio[i]))
++			continue;
++
++		if (mctrl_gpios_desc[i].dir_out)
++			err = gpiod_direction_output(gpios->gpio[i], 0);
++		else
++			err = gpiod_direction_input(gpios->gpio[i]);
++		if (err) {
++			dev_dbg(dev, "Unable to set direction for %s GPIO",
++				mctrl_gpios_desc[i].name);
++			devm_gpiod_put(dev, gpios->gpio[i]);
++			gpios->gpio[i] = NULL;
++		}
++	}
++
++	return gpios;
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_init);
++
++void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
++{
++	enum mctrl_gpio_idx i;
++
++	if (IS_ERR_OR_NULL(gpios))
++		return;
++
++	for (i = 0; i < UART_GPIO_MAX; i++)
++		if (!IS_ERR_OR_NULL(gpios->gpio[i]))
++			devm_gpiod_put(dev, gpios->gpio[i]);
++	devm_kfree(dev, gpios);
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_free);
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
+new file mode 100644
+index 000000000000..400ba0494a17
+--- /dev/null
++++ b/drivers/tty/serial/serial_mctrl_gpio.h
+@@ -0,0 +1,110 @@
++/*
++ * Helpers for controlling modem lines via GPIO
++ *
++ * Copyright (C) 2014 Paratronic S.A.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __SERIAL_MCTRL_GPIO__
++#define __SERIAL_MCTRL_GPIO__
++
++#include <linux/err.h>
++#include <linux/device.h>
++#include <linux/gpio/consumer.h>
++
++enum mctrl_gpio_idx {
++	UART_GPIO_CTS,
++	UART_GPIO_DSR,
++	UART_GPIO_DCD,
++	UART_GPIO_RNG,
++	UART_GPIO_RI = UART_GPIO_RNG,
++	UART_GPIO_RTS,
++	UART_GPIO_DTR,
++	UART_GPIO_OUT1,
++	UART_GPIO_OUT2,
++	UART_GPIO_MAX,
++};
++
++/*
++ * Opaque descriptor for modem lines controlled by GPIOs
++ */
++struct mctrl_gpios;
++
++#ifdef CONFIG_GPIOLIB
++
++/*
++ * Set state of the modem control output lines via GPIOs.
++ */
++void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl);
++
++/*
++ * Get state of the modem control output lines from GPIOs.
++ * The mctrl flags are updated and returned.
++ */
++unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl);
++
++/*
++ * Returns the associated struct gpio_desc to the modem line gidx
++ */
++struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
++				      enum mctrl_gpio_idx gidx);
++
++/*
++ * Request and set direction of modem control lines GPIOs.
++ * devm_* functions are used, so there's no need to call mctrl_gpio_free().
++ * Returns a pointer to the allocated mctrl structure if ok, -ENOMEM on
++ * allocation error.
++ */
++struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
++
++/*
++ * Free the mctrl_gpios structure.
++ * Normally, this function will not be called, as the GPIOs will
++ * be disposed of by the resource management code.
++ */
++void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios);
++
++#else /* GPIOLIB */
++
++static inline
++void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
++{
++}
++
++static inline
++unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
++{
++	return *mctrl;
++}
++
++static inline
++struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
++				      enum mctrl_gpio_idx gidx)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline
++struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline
++void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
++{
++}
++
++#endif /* GPIOLIB */
++
++#endif
+-- 
+1.8.5.5
