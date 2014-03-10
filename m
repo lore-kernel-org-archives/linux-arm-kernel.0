@@ -1,121 +1,89 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Mar 2014 20:17:18 +0100
-Subject: [PATCHv3 1/8] Documentation: dt: iio: improve atmel-adc documentation
+Date: Mon, 10 Mar 2014 20:17:24 +0100
+Subject: [PATCHv3 7/8] ARM: at91/dt: sama5d3: remove useless adc properties
 In-Reply-To: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394479045-31852-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394479045-31852-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This corrects the example by adding #address-cells, #size-cells and a reg for
-each trigger to comply to the ePAPR, as suggested by Mark Rutland in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234184.html
+Remove the properties that are not used anymore by the at91_adc driver and fix
+the atmel,adc-use-external-triggers property name.
 
-Also, it removes the properties that are not used anymore, to stop propagating
-them.
-Also fixes atmel,adc-use-external-triggers property name.
-
-Finally, fixes a few typos.
+Also, add #address-cells, #size-cells and a reg for each trigger to comply to
+the ePAPR.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/atmel-adc.txt          | 33 +++++++++++-----------
- 1 file changed, 17 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/sama5d3.dtsi    | 13 +++++++------
+ arch/arm/boot/dts/sama5d3xdm.dtsi |  1 -
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-index d1061469f63d..82061c7e4fea 100644
---- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-@@ -5,32 +5,32 @@ Required properties:
-     <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
-   - reg: Should contain ADC registers location and length
-   - interrupts: Should contain the IRQ line for the ADC
--  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
-+  - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
-     device
-   - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
-     defined in the datasheet
-   - atmel,adc-vref: Reference voltage in millivolts for the conversions
--  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
-+  - atmel,adc-res: List of resolutions in bits supported by the ADC. List size
- 		   must be two at least.
-   - atmel,adc-res-names: Contains one identifier string for each resolution
- 			 in atmel,adc-res property. "lowres" and "highres"
- 			 identifiers are required.
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 26d7ed510c96..73ad828296b2 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -239,6 +239,8 @@
+ 			};
  
- Optional properties:
--  - atmel,adc-use-external: Boolean to enable of external triggers
-+  - atmel,adc-use-external-triggers: Boolean to enable the external triggers
-   - atmel,adc-use-res: String corresponding to an identifier from
- 		       atmel,adc-res-names property. If not specified, the highest
- 		       resolution will be used.
-   - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
-   - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
--  - atmel,adc-ts-wires: Number of touch screen wires. Should be 4 or 5. If this
--                        value is set, then adc driver will enable touch screen
-+  - atmel,adc-ts-wires: Number of touchscreen wires. Should be 4 or 5. If this
-+                        value is set, then the adc driver will enable touchscreen
-                         support.
--    NOTE: when adc touch screen enabled, the adc hardware trigger will be
--          disabled. Since touch screen will occupied the trigger register.
-+    NOTE: when adc touchscreen is enabled, the adc hardware trigger will be
-+          disabled. Since touchscreen will occupy the trigger register.
-   - atmel,adc-ts-pressure-threshold: a pressure threshold for touchscreen. It
--                                     make touch detect more precision.
-- 
-+                                     makes touch detection more precise.
-+
- Optional trigger Nodes:
-   - Required properties:
-     * trigger-name: Name of the trigger exposed to the user
-@@ -41,40 +41,41 @@ Optional trigger Nodes:
+ 			adc0: adc at f8018000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				compatible = "atmel,at91sam9x5-adc";
+ 				reg = <0xf8018000 0x100>;
+ 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+@@ -261,35 +263,34 @@
+ 				clocks = <&adc_clk>,
+ 					 <&adc_op_clk>;
+ 				clock-names = "adc_clk", "adc_op_clk";
+-				atmel,adc-channel-base = <0x50>;
+ 				atmel,adc-channels-used = <0xfff>;
+-				atmel,adc-drdy-mask = <0x1000000>;
+-				atmel,adc-num-channels = <12>;
+ 				atmel,adc-startup-time = <40>;
+-				atmel,adc-status-register = <0x30>;
+-				atmel,adc-trigger-register = <0xc0>;
+-				atmel,adc-use-external;
++				atmel,adc-use-external-triggers;
+ 				atmel,adc-vref = <3000>;
+ 				atmel,adc-res = <10 12>;
+ 				atmel,adc-res-names = "lowres", "highres";
+ 				status = "disabled";
  
- Examples:
- adc0: adc at fffb0000 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
- 	compatible = "atmel,at91sam9260-adc";
- 	reg = <0xfffb0000 0x100>;
--	interrupts = <20 4>;
--	atmel,adc-channel-base = <0x30>;
-+	interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
- 	atmel,adc-channels-used = <0xff>;
--	atmel,adc-drdy-mask = <0x10000>;
--	atmel,adc-num-channels = <8>;
- 	atmel,adc-startup-time = <40>;
--	atmel,adc-status-register = <0x1c>;
--	atmel,adc-trigger-register = <0x08>;
--	atmel,adc-use-external;
-+	atmel,adc-use-external-triggers;
- 	atmel,adc-vref = <3300>;
- 	atmel,adc-res = <8 10>;
- 	atmel,adc-res-names = "lowres", "highres";
- 	atmel,adc-use-res = "lowres";
+ 				trigger at 0 {
++					reg = <0>;
+ 					trigger-name = "external-rising";
+ 					trigger-value = <0x1>;
+ 					trigger-external;
+ 				};
+ 				trigger at 1 {
++					reg = <1>;
+ 					trigger-name = "external-falling";
+ 					trigger-value = <0x2>;
+ 					trigger-external;
+ 				};
+ 				trigger at 2 {
++					reg = <2>;
+ 					trigger-name = "external-any";
+ 					trigger-value = <0x3>;
+ 					trigger-external;
+ 				};
+ 				trigger at 3 {
++					reg = <3>;
+ 					trigger-name = "continuous";
+ 					trigger-value = <0x6>;
+ 				};
+diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+index 0b8f5d106ff2..035ab72b3990 100644
+--- a/arch/arm/boot/dts/sama5d3xdm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
+@@ -23,7 +23,6 @@
+ 			};
  
- 	trigger at 0 {
-+		reg = <0>;
- 		trigger-name = "external-rising";
- 		trigger-value = <0x1>;
- 		trigger-external;
- 	};
- 	trigger at 1 {
-+		reg = <1>;
- 		trigger-name = "external-falling";
- 		trigger-value = <0x2>;
- 		trigger-external;
- 	};
- 
- 	trigger at 2 {
-+		reg = <2>;
- 		trigger-name = "external-any";
- 		trigger-value = <0x3>;
- 		trigger-external;
- 	};
- 
- 	trigger at 3 {
-+		reg = <3>;
- 		trigger-name = "continuous";
- 		trigger-value = <0x6>;
- 	};
+ 			adc0: adc at f8018000 {
+-				atmel,adc-clock-rate = <1000000>;
+ 				atmel,adc-ts-wires = <4>;
+ 				atmel,adc-ts-pressure-threshold = <10000>;
+ 				status = "okay";
 -- 
 1.8.3.2
