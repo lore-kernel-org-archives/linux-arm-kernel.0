@@ -1,40 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Mar 2014 20:16:25 +0100
-Subject: [PATCH v6 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1469359.kil5iaOqdU@wuerfel>
-References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
- <2115856.ZTdgp5fkma@wuerfel>
- <20140310163343.GY6457@e106497-lin.cambridge.arm.com>
- <1469359.kil5iaOqdU@wuerfel>
-Message-ID: <CAMuHMdWzm1D83zquwuQVKwbqRdXmSw7u1ui7iZyC3VGdGhn0HA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 10 Mar 2014 20:17:20 +0100
+Subject: [PATCHv3 3/8] ARM: at91/dt: at91-ariag25: remove useless adc
+ properties
+In-Reply-To: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394479045-31852-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 7:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> arch/avr32/include/asm/io.h:#define IO_SPACE_LIMIT    0xffffffff
->> arch/frv/include/asm/io.h:#define IO_SPACE_LIMIT      0xffffffff
->
-> They have no MMU, and the code relies on the port number to match
-> both the virtual and the physical address. You could be right about
-> these, but I would guess that the code also needs some other
-> changes if we want to make it work on nommu kernels. It also depends
-> on whether the I/O bus address is the same as the CPU address, or
-> if it starts at bus address 0.
+Remove the properties that are not used anymore by the at91_adc driver.
 
->> arch/m68k/include/asm/io_no.h:#define IO_SPACE_LIMIT 0xffffffff
->
-> This looks like a mistake, it should be smaller
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Douglas Gilbert <dgilbert@interlog.com>
+---
+ arch/arm/boot/dts/at91-ariag25.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-io_no.h is for nommu.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
+index cce45f5177f9..55ab6180e350 100644
+--- a/arch/arm/boot/dts/at91-ariag25.dts
++++ b/arch/arm/boot/dts/at91-ariag25.dts
+@@ -129,7 +129,6 @@
+ 			adc0: adc at f804c000 {
+ 				status = "okay";
+ 				atmel,adc-channels-used = <0xf>;
+-				atmel,adc-num-channels = <4>;
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+-- 
+1.8.3.2
