@@ -1,31 +1,64 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 10 Mar 2014 11:10:56 +0000
-Subject: [PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for
- indices field
-In-Reply-To: <20140310105116.GG14999@e106331-lin.cambridge.arm.com>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
- <1394196400-17112-3-git-send-email-ben.dooks@codethink.co.uk>
- <20140310105116.GG14999@e106331-lin.cambridge.arm.com>
-Message-ID: <531D9DC0.7020100@codethink.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Mar 2014 12:12:10 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix reset controller handling
+Message-ID: <1394449930-29696-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/14 10:51, Mark Rutland wrote:
-> On Fri, Mar 07, 2014 at 12:46:40PM +0000, Ben Dooks wrote:
->> Add comaptibiltiy for older device trees by checking to see if
->> the clock-indices property is there and falling back to the
->> older renesas,clock-indices field.
->
-> Why are these two separate patches? This temporarily breaks
-> compatibility.
+The reset framework recently gained optional stubs when CONFIG_RESET_CONTROLLER
+is not selected. It also introduced a function reset_get_optional, that is also
+dummy-defined whenever the framework isn't enabled, for drivers that needs an
+optional reset controller.
 
-Given I've not had time to change any of the device trees
-for the renesas series it isn't currently an issue.
+Switch to this function, since the mv64xxx driver is in this case. This also
+fixes a compilation breakage whenever the reset framework wasn't selected:
 
-I left it separate to make it easier to remove once the changes
-are through.
+drivers/i2c/busses/i2c-mv64xxx.c:771:2: error: implicit declaration of function 'devm_reset_control_get'
 
+While we're at it, remove the redundant test on dev.of_node surrounding the
+calls to reset framework functions, since it will either be a valid pointer, an
+error pointer in the case where we called reset_get_optional without an of_node
+pointer or if it failed, or NULL if we're not loaded through DT.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+
+Obviously, this patch depends on Philipp Zabel's "reset: Add optional resets
+and stubs" patch that he merged and will send a pull request for.
+
+ drivers/i2c/busses/i2c-mv64xxx.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 203a5482a866..a09af20342ed 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -768,7 +768,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 	}
+ 	drv_data->irq = irq_of_parse_and_map(np, 0);
+ 
+-	drv_data->rstc = devm_reset_control_get(dev, NULL);
++	drv_data->rstc = devm_reset_control_get_optional(dev, NULL);
+ 	if (IS_ERR(drv_data->rstc)) {
+ 		if (PTR_ERR(drv_data->rstc) == -EPROBE_DEFER) {
+ 			rc = -EPROBE_DEFER;
+@@ -900,7 +900,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+ exit_free_irq:
+ 	free_irq(drv_data->irq, drv_data);
+ exit_reset:
+-	if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
++	if (!IS_ERR_OR_NULL(drv_data->rstc))
+ 		reset_control_assert(drv_data->rstc);
+ exit_clk:
+ #if defined(CONFIG_HAVE_CLK)
+@@ -920,7 +920,7 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+ 
+ 	i2c_del_adapter(&drv_data->adapter);
+ 	free_irq(drv_data->irq, drv_data);
+-	if (dev->dev.of_node && !IS_ERR(drv_data->rstc))
++	if (!IS_ERR_OR_NULL(drv_data->rstc))
+ 		reset_control_assert(drv_data->rstc);
+ #if defined(CONFIG_HAVE_CLK)
+ 	/* Not all platforms have a clk */
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.9.0
