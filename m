@@ -1,65 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Mar 2014 10:45:58 +0000
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <20140309115514.GY28112@sirena.org.uk>
-References: <20140309115514.GY28112@sirena.org.uk>
-Message-ID: <20140310104558.GB8830@mudshark.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Mar 2014 10:51:17 +0000
+Subject: [PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for
+ indices field
+In-Reply-To: <1394196400-17112-3-git-send-email-ben.dooks@codethink.co.uk>
+References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1394196400-17112-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20140310105116.GG14999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 09, 2014 at 11:55:14AM +0000, Mark Brown wrote:
-> Hi all,
+On Fri, Mar 07, 2014 at 12:46:40PM +0000, Ben Dooks wrote:
+> Add comaptibiltiy for older device trees by checking to see if
+> the clock-indices property is there and falling back to the
+> older renesas,clock-indices field.
 
-Hi Mark,
+Why are these two separate patches? This temporarily breaks
+compatibility.
 
-> After merging the arm-soc tree, today's linux-next build (20140309)
-> failed for arm64 defconfig like this:
 > 
-> /home/broonie/next/next/drivers/irqchip/irq-gic.c: In function 'gic_raise_softirq':
-> /home/broonie/next/next/drivers/irqchip/irq-gic.c:666:2: error: implicit declaration of function 'dmb' [-Werror=implicit-function-declaration]
->   dmb(ishst);
->   ^
+> This can be removed once all device-trees are converted.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  drivers/clk/shmobile/clk-mstp.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+> index 95a2aa7..fe63d40 100644
+> --- a/drivers/clk/shmobile/clk-mstp.c
+> +++ b/drivers/clk/shmobile/clk-mstp.c
+> @@ -156,6 +156,7 @@ cpg_mstp_clock_register(const char *name, const char *parent_name,
+>  static void __init cpg_mstp_clocks_init(struct device_node *np)
+>  {
+>  	struct mstp_clock_group *group;
+> +	const char *idxname;
+>  	struct clk **clks;
+>  	unsigned int i;
+>  
+> @@ -184,6 +185,11 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
+>  	for (i = 0; i < MSTP_MAX_CLOCKS; ++i)
+>  		clks[i] = ERR_PTR(-ENOENT);
+>  
+> +	if (of_find_property(np, "clock-indices", &i))
 
-Damnit, that's because we ended up going with dmb instead of dsb after it
-(surprisingly) turned out to be sufficient. The simple patch below fixes the
-problem -- Catalin, can we get this into -next please?
-
-I have an extra patch which actually makes use of the options, but we should
-get things building again first.
+s/&i/NULL/ (or use of_property_read_bool).
 
 Cheers,
+Mark.
 
-Will
-
---->8
-
->From bacbd4af61a671ad21f58197ed16116ff41b54cd Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Mon, 10 Mar 2014 10:36:52 +0000
-Subject: [PATCH] arm64: barriers: add dmb barrier
-
-Commit 8adbf57fc429 ("irqchip: gic: use dmb ishst instead of dsb when
-raising a softirq") added an explicit dmb(...) call to the GIC driver.
-
-This patch adds a simple dmb() macro to arm64, which expands to a DMB SY
-instruction.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/barrier.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 409ca370cfe2..66eb7648043b 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -25,6 +25,7 @@
- #define wfi()		asm volatile("wfi" : : : "memory")
- 
- #define isb()		asm volatile("isb" : : : "memory")
-+#define dmb(opt)	asm volatile("dmb sy" : : : "memory")
- #define dsb(opt)	asm volatile("dsb sy" : : : "memory")
- 
- #define mb()		dsb()
--- 
-1.8.2.2
+> +		idxname = "clock-indices";
+> +	else
+> +		idxname = "renesas,clock-indices";
+> +
+>  	for (i = 0; i < MSTP_MAX_CLOCKS; ++i) {
+>  		const char *parent_name;
+>  		const char *name;
+> @@ -197,8 +203,7 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
+>  			continue;
+>  
+>  		parent_name = of_clk_get_parent_name(np, i);
+> -		ret = of_property_read_u32_index(np, "clock-indices", i,
+> -						 &clkidx);
+> +		ret = of_property_read_u32_index(np, idxname, i, &clkidx);
+>  		if (parent_name == NULL || ret < 0)
+>  			break;
+>  
+> -- 
+> 1.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
