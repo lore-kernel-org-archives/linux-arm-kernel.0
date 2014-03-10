@@ -1,61 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Mar 2014 16:51:37 +0000
-Subject: [PATCH 2/4] documentaion: DT: allow a A5 compatible string in
- global timer
-In-Reply-To: <CAL_JsqLE6pWJMRvXbOOca4fFb9OUieMimnuxxo4AFKkSMiFvsg@mail.gmail.com>
-References: <1394452294-24552-1-git-send-email-matthew.leach@arm.com>
- <1394452294-24552-3-git-send-email-matthew.leach@arm.com>
- <CAL_JsqLE6pWJMRvXbOOca4fFb9OUieMimnuxxo4AFKkSMiFvsg@mail.gmail.com>
-Message-ID: <20140310165137.GO14999@e106331-lin.cambridge.arm.com>
+From: noreply.rgenoud@gmail.com (Richard Genoud)
+Date: Mon, 10 Mar 2014 17:45:48 +0100
+Subject: [PATCH v6 0/3] tty/serial: Add helpers to use GPIOs to control modem
+ lines and implement atmel_serial.c
+Message-ID: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 04:27:09PM +0000, Rob Herring wrote:
-> On Mon, Mar 10, 2014 at 6:51 AM, Matthew Leach <matthew.leach@arm.com> wrote:
-> > The global timer is present on the Cortex A5. Add a compatibility
-> > string to the DT binding to allow a Cortex A5 global timer.
-> >
-> > Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/global_timer.txt | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-> > index 1e54898..0932891 100644
-> > --- a/Documentation/devicetree/bindings/arm/global_timer.txt
-> > +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-> > @@ -4,8 +4,10 @@
-> >
-> >  ** Timer node required properties:
-> >
-> > -- compatible : Should be "arm,cortex-a9-global-timer"
-> > -               Driver supports versions r2p0 and above.
-> 
-> Shouldn't you keep this information for the A9?
+The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
+but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
+Moreover, even if the controller can handle CTS/RTS, the dedicated
+CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
 
-To me it feels like documenting the driver rather than the binding for
-the hardware.
+So this patchset adds the possibility to control those lines via GPIO,
+as it is done for RTS in the patch "switch atmel serial to use gpiolib"
 
-I'm happy to retain notes about the constraints imposed by Linux
-drivers, but I'd prefer if it were the exception rather than the rule.
+As it was suggested by Alexander Shiyan, I made that available for
+every board.
 
-Mark.
+Patch 1 implements the generic helpers to control modem lines via GPIO
+Patch 2 implements modem control lines in atmel_serial atmel_serial.
+Patch 3 implements the interrupts of CTS/DSR/DCD/RI in atmel_serial.
 
-> 
-> > +- compatible : should contain
-> > +            * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
-> > +            * "arm,cortex-a9-global-timer" for Cortex-A9 global timers
-> > +                or any compatible implementation.
-> >
-> >  - interrupts : One interrupt to each core
-> >
-> > --
-> > 1.8.5.3
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I've taken into account lasts remarks that Alexander made me off-list.
+
+This is based on next-20140307 + [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
+(It has been acked by Linus, but I don't think it has been applied in a tree yet)
+
+Tested on at91sam9g35, with a null modem cable between 2 serial ports,
+one with CTS/RTS controlled by the USART controller, the other via GPIO,
+full duplex transfers.
+Did some tests also with null modem cables on a PC, and with real modems.
+And a lot of rings tested with ioctl TIOCMIWAIT, TIOCGICOUNT, TIOCMGET (and TIOCMSET, for RTS/DTR)
+
+Updates from v5:
+	- Add UART_GPIO_RNG.
+	- Add atmel-serial documentation that was lost in v3 !
+	- switched a dev_warn to dev_dbg.
+	- remove checks (irq >= 0) in interrupt handler.
+	- simplified a !IS_ERR_OR_NULL(gpiod) test to just gpiod
+	- fixed a bug in rollback code in atmel_serial.c
+
+Updates from v4:
+	- patches "tty/serial: at91: remove unused open/close hooks" and
+	"tty/serial: at91: use dev_err instead of printk" have been picked
+	by Greg on tty tree.
+	- As Alexander pointed out, IS_ERR_OR_NULL() was replaced by a simple
+	check againts NULL in patch 1/3
+	- in path 1/3, a warning is produced instead of an error when we can't set
+	the direction of a GPIO.
+
+Updates from v3:
+	- add static keyword on struct uart0_gpios_table.
+	- add use an index at the mctrl_gpio_init() function to make it
+	usable by driver that allocates several ports at once.
+	- hide struct gpio_desc from users.
+	- patch "pinctrl: at91: implement get_direction" has been picked by Linus.
+	- patch "ARM: at91: gpio: implement get_direction" has been acked by Linus.
+
+Updates from v2:
+	- remove UART_GPIO_MIN/UART_GPIO_MAX_INPUT and use a direction
+	boolean instead.
+	- implement get_direction in at91 pinctrl and mach-at91/gpio.c.
+	- remove the get_mctrl_gpio_name() function that was used for
+	logs only.
+	- split atmel_serial.c patch in 2.
+	- use a gpio lookup table to declare modem gpios in platform
+	devices boards. So there's no more special case for platform
+	data gpios in atmel_serial.c.
+
+Updates from v1:
+	- Instead of controlling modem signal only on atmel board, the
+	code is now available for every board.
+	- The active low flag from device tree is now used.
+
+Richard Genoud (3):
+  tty/serial: Add GPIOLIB helpers for controlling modem lines
+  tty/serial: at91: use mctrl_gpio helpers
+  tty/serial: at91: add interrupts for modem control lines
+
+ .../devicetree/bindings/serial/atmel-usart.txt     |  12 +-
+ Documentation/serial/driver                        |  25 +++
+ arch/arm/mach-at91/at91rm9200_devices.c            |  16 +-
+ arch/arm/mach-at91/at91sam9260_devices.c           |   7 -
+ arch/arm/mach-at91/at91sam9261_devices.c           |   4 -
+ arch/arm/mach-at91/at91sam9263_devices.c           |   4 -
+ arch/arm/mach-at91/at91sam9g45_devices.c           |   5 -
+ arch/arm/mach-at91/at91sam9rl_devices.c            |   5 -
+ drivers/tty/serial/Kconfig                         |   4 +
+ drivers/tty/serial/Makefile                        |   3 +
+ drivers/tty/serial/atmel_serial.c                  | 230 +++++++++++++++++----
+ drivers/tty/serial/serial_mctrl_gpio.c             | 143 +++++++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h             | 110 ++++++++++
+ include/linux/platform_data/atmel.h                |   1 -
+ 14 files changed, 496 insertions(+), 73 deletions(-)
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
+
+-- 
+1.8.5.5
