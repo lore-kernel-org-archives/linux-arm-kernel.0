@@ -1,37 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Mar 2014 15:40:33 +0100
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <1394461668.2270.47.camel@shinybook.infradead.org>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
- <5345792.VhzckVI5HA@wuerfel>
- <1394461668.2270.47.camel@shinybook.infradead.org>
-Message-ID: <4828160.ZrKNlE4ee8@wuerfel>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 10 Mar 2014 14:44:14 +0000
+Subject: [PATCH v6 6/6] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <201403081815.08829.arnd@arndb.de>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394020137-1830-7-git-send-email-Liviu.Dudau@arm.com>
+ <201403081815.08829.arnd@arndb.de>
+Message-ID: <20140310144414.GT6457@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 March 2014 07:27:48 David Woodhouse wrote:
+On Sat, Mar 08, 2014 at 05:15:08PM +0000, Arnd Bergmann wrote:
+> On Wednesday 05 March 2014, Liviu Dudau wrote:
+> > +
+> > +	pr_debug("Parsing ranges property...\n");
+> > +	for_each_of_pci_range(&parser, &range) {
+> > +		/* Read next ranges element */
+> > +		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> > +				range.pci_space, range.pci_addr);
+> > +		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> > +					range.cpu_addr, range.size);
+> > +
+> > +		/*
+> > +		 * If we failed translation or got a zero-sized region
+> > +		 * then skip this range
+> > +		 */
+> > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > +			continue;
+> > +
+> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > +		if (!res)
+> > +			return -ENOMEM;
+> > +
+> > +		of_pci_range_to_resource(&range, dev, res);
+> > +
+> > +		if (resource_type(res) == IORESOURCE_IO)
+> > +			*io_base = range.cpu_addr;
+> > +
+> > +		pci_add_resource_offset(resources, res,
+> > +				res->start - range.pci_addr);
+> > +	}
 > 
-> > There are multiple reasons why
-> > we have to pass the dmaengine device to the dma-mapping API at the moment
-> > rather than the slave device, but in essence it comes down to the engine
-> > being the one that is the master on its parent bus. A trivial example
-> > where it goes wrong would be the slave living on a 32-bit noncoherent bus
-> > and the master living on a 64-bit coherent bus.
+> As mentioned regarding the pci_register_io_range() helper, x86
+> would not enter the 'resource_type(res) == IORESOURCE_IO' code path,
+> which on the one hand is fine so we can return an error from
+> pci_register_io_range() there, but I think it will lead to
+> io_base getting an uninitialized content.
 > 
-> That's true in the general case, certainly. But in this case we're
-> basically just talking about different functions of a multifunction
-> device. 
+> There could also be other reasons why pci_register_io_range() fails,
+> e.g. because the space is exhausted, and I think we should try to
+> catch that here and skip the pci_add_resource_offset() and io_base
+> assignment then.
 
-Ah, I thought you were talking about a generic SoC with lots of units
-on it.
+Hi Arnd,
 
-> It may turn out that we need the *flexibility* to specify which
-> device shall be used for DMA mappings for a given channel, even if in
-> *most* cases it ends up being the DMA controller itself.
+I will try to improve the error handling in the next patchset version.
+However I am still confused about the earlier discussion on
+pci_register_io_range(). Your suggestion initially was to return an
+error in the default weak implementation, but in your last email you
+are talking about returning 'port'. My idea when I've introduced the
+helper function was that it would return an error if it fails to
+register the IO range and zero otherwise. I agree that we can treat
+the default 'do nothing with the IO range' case as an error, with
+the caveat that will force architectures that use this code to
+provide their own implementation of pci_register_io_range() in order
+to avoid failure, even for the cases where the architecture has a 1:1
+mapping between IO and CPU addresses.
 
-Yes, that would probably work with a helper function that can
-pull the right device structure out of the ACPI description (or
-whatever the DMA engine needs) given the dma channel pointer, or
-fall back to the dma engine.
+I've just noticed that my home server has silently dropped my reply
+to you from the 7th of March, so I'm going to resend it using ARM's
+setup.
 
-	Arnd
+Best regards,
+Liviu
+
+
+> 
+> 	Arnd
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
