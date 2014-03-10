@@ -1,47 +1,37 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 10 Mar 2014 11:36:58 +0800
-Subject: clk: hisilicon: add hi3620_mmc_clks
-In-Reply-To: <20140303121335.GA10177@elgon.mountain>
-References: <20140303121335.GA10177@elgon.mountain>
-Message-ID: <531D335A.5060309@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 09 Mar 2014 23:40:32 -0400 (EDT)
+Subject: [PATCH] net: phy: Add sysfs attribute to prevent PHY suspend
+In-Reply-To: <531D0D0D.4050703@gmail.com>
+References: <531D094C.1090205@gmail.com>
+ <20140309.204101.47552917508273123.davem@davemloft.net>
+ <531D0D0D.4050703@gmail.com>
+Message-ID: <20140309.234032.873557698878535571.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Mon, 10 Mar 2014 01:53:33 +0100
 
-Thanks Dan
+> On 03/10/2014 01:41 AM, David Miller wrote:
+>> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Date: Mon, 10 Mar 2014 01:37:32 +0100
+>>
+>>> The mechanism is manual, no automatic way to determine it.
+>>
+>> We recognize BIOS and ACPI bugs and work around them, by looking at
+>> version information and whatnot, so you really can't convince me that
+>> something similar can't be done here perhaps in the platform code.
+> 
+> Hmm, if the is a way to determine the version of that particual u-boot
+> I'd be happy to exploit that information. But I honestly doubt that.
+> Compared to u-boot bootloader and kernel interaction, BIOS and ACPI
+> are well-defined protocols.
+> 
+> I personally, would prefer everybody should update his broken
+> bootloaders, but that will just not happen.
 
-Sorry, not check with smatch, only check with checkpatch.pl & sparse.
-Will take care next time.
+What you can do is have a test that _perhaps_ covers a "broader than
+reality" list of broken bootloader cases.
 
-On 03/03/2014 08:13 PM, Dan Carpenter wrote:
-> Hello Zhangfei Gao,
->
-> The patch 62ac983b6141: "clk: hisilicon: add hi3620_mmc_clks" from
-> Jan 13, 2014, leads to the following static checker warning:
->
-> 	drivers/clk/hisilicon/clk-hi3620.c:338 mmc_clk_delay()
-> 	warn: always true condition '(para >= 0) => (0-u32max >= 0)'
->
-> drivers/clk/hisilicon/clk-hi3620.c
->     334  static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
->     335  {
->     336          u32 i;
->     337
->     338          if (para >= 0) {
->                      ^^^^^^^^^
-> Wat?
->
->     339                  for (i = 0; i < len; i++) {
->     340                          if (para % 2)
->     341                                  val |= 1 << (off + i);
->     342                          else
->     343                                  val &= ~(1 << (off + i));
->     344                          para = para >> 1;
->     345                  }
->     346          }
->     347          return val;
->     348  }
->
-> regards,
-> dan carpenter
->
+Then you have something the bootloader can provide which indicates
+that it has been fixed.
