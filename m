@@ -1,43 +1,52 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 10 Mar 2014 16:45:49 -0400
-Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
- PHY DTS entries
-In-Reply-To: <CAPw-ZTmwFZjKT2+CUUp73TDXJcXy-bEY_sTNg-TtH-COzDnCfw@mail.gmail.com>
-References: <1394213289-29565-1-git-send-email-lho@apm.com>
- <1394213289-29565-2-git-send-email-lho@apm.com>
- <1394213289-29565-3-git-send-email-lho@apm.com>
- <1394213289-29565-4-git-send-email-lho@apm.com>
- <CAPw-ZTmwFZjKT2+CUUp73TDXJcXy-bEY_sTNg-TtH-COzDnCfw@mail.gmail.com>
-Message-ID: <20140310204549.GJ25290@htj.dyndns.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 10 Mar 2014 21:50:59 +0100
+Subject: [PATCH v2 1/3] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394484661-4554-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 09, 2014 at 10:23:33PM -0700, Loc Ho wrote:
-> Hi Tejun,
-> 
-> On Fri, Mar 7, 2014 at 9:28 AM, Loc Ho <lho@apm.com> wrote:
-> 
-> > This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
-> > PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
-> >
-> > Signed-off-by: Loc Ho <lho@apm.com>
-> > Signed-off-by: Tuan Phan <tphan@apm.com>
-> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> > ---
-> >  arch/arm64/boot/dts/apm-storm.dtsi |   75
-> > ++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 75 insertions(+), 0 deletions(-)
-> >
-> >
-> Kishon had pulled in the PHY doc/driver patches. Will you pulling in the
-> PHY DTS and the SATA host driver patches soon?
+phy_ethtool_get_wol is a helper to get current WOL settings from
+a phy device. When using this helper on a PHY without .get_wol
+callback, struct ethtool_wolinfo is never set-up correctly and
+may contain misleading information about WOL status.
 
-Kishon, is the following branch the right one to pull into
-libata/for-3.15?
+To fix this, always zero struct ethtool_wolinfo regardless of
+.get_wol callback availability.
 
- git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- clear whole struct ethtool_wolinfo
+- check for non-NULL phy_device
 
-Thanks.
+Cc: David Miller <davem@davemloft.net>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/phy/phy.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 19c9eca0ef26..dae1fa8aa23d 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -1092,7 +1092,9 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
+ 
+ void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
+ {
+-	if (phydev->drv->get_wol)
++	memset(wol, 0, sizeof(*wol));
++
++	if (phydev && phydev->drv->get_wol)
+ 		phydev->drv->get_wol(phydev, wol);
+ }
+ EXPORT_SYMBOL(phy_ethtool_get_wol);
 -- 
-tejun
+1.8.5.3
