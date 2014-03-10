@@ -1,30 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 10 Mar 2014 12:32:45 -0300
-Subject: [PATCH 1/9] usb: chipidea: usbmisc: Add USB Host support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <CAOMZO5BJafTT8bOftmdRRCAdUJJLh_pzR9wEdtp8TGQYRZ0KMQ@mail.gmail.com>
-References: <1394211863-7569-1-git-send-email-denis@eukrea.com>
- <CAOMZO5DPK41DqNT7b_eV2owqPvAsqHZ7zgkqDVSmPUx2Bv2TVA@mail.gmail.com>
- <1394427482.225153574@f354.i.mail.ru>
- <CAOMZO5BJafTT8bOftmdRRCAdUJJLh_pzR9wEdtp8TGQYRZ0KMQ@mail.gmail.com>
-Message-ID: <CAOMZO5BMR9pWvH4uk4PRPMQK+PGRgfKfe9JpAd0A2rP10kA=rg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Mar 2014 16:34:04 +0100
+Subject: [PATCH v4 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
+References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <2475487.axlvKsBQ0c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On Monday 10 March 2014 15:41:51 Maxime Ripard wrote:
 
-On Mon, Mar 10, 2014 at 8:16 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> +/*
+> + * Hardware representation of the LLI
+> + *
+> + * The hardware will be fed the physical address of this structure,
+> + * and read its content in order to start the transfer.
+> + */
+> +struct sun6i_dma_lli {
+> +	u32			cfg;
+> +	u32			src;
+> +	u32			dst;
+> +	u32			len;
+> +	u32			para;
+> +	u32			p_lli_next;
+> +	struct sun6i_dma_lli	*v_lli_next;
+> +} __packed;
 
-> Denis,
->
-> Could you please resend 4/9 by changing the clocks nodes in the OTG
-> and Host1 ports as shown above?
+It looks strange to have a pointer in a hardware structure, since
+the pointer doesn't make sense to the device.
 
-Thinking more about it, it would be better to send the USB clock
-change as a separate patch.
+Also, the '__packed' attribute seems strange. Are you sure
+you want to reduce the alignment from 4 bytes to 1 byte?
 
-I can submit the dts changes to the linux-arm-kernel list later today.
+> +static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
+> +{
+> +	struct sun6i_dma_dev *sdev = dev_id;
+> +	struct sun6i_vchan *vchan;
+> +	struct sun6i_pchan *pchan;
+> +	int i, j, ret = IRQ_NONE;
+> +	u32 status;
+> +
+> +	for (i = 0; i < 2; i++) {
+> +		status = readl(sdev->base + DMA_IRQ_STAT(i));
+> +		if (!status)
+> +			continue;
+> +
+> +		dev_dbg(sdev->slave.dev, "DMA irq status %s: 0x%x\n",
+> +			i ? "high" : "low", status);
+> +
+> +		writel(status, sdev->base + DMA_IRQ_STAT(i));
+> +
+> +		for (j = 0; (j < 8) && status; j++) {
+> +			if (status & DMA_IRQ_QUEUE) {
+> +				pchan = sdev->pchans + j;
+> +				vchan = pchan->vchan;
+> +
+> +				if (vchan) {
+> +					unsigned long flags;
+> +
+> +					spin_lock_irqsave(&vchan->vc.lock,
+> +							  flags);
 
-Regards,
+Interrupts are already disabled here.
 
-Fabio Estevam
+> +	sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(sdc->clk)) {
+> +		dev_err(&pdev->dev, "No clock specified\n");
+> +		return PTR_ERR(sdc->clk);
+> +	}
+> +
+> +	mux = devm_clk_get(&pdev->dev, "ahb1_mux");
+> +	if (IS_ERR(mux)) {
+> +		dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> +		return PTR_ERR(mux);
+> +	}
+> +
+> +	pll6 = devm_clk_get(&pdev->dev, "pll6");
+> +	if (IS_ERR(pll6)) {
+> +		dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> +		return PTR_ERR(pll6);
+> +	}
+> +
+> +	ret = clk_set_parent(mux, pll6);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> +		return ret;
+> +	}
+
+Neither "pll6" nor "ahb1_mux" are listed in the DT binding. Also, why
+is it the driver's business to set the parent?
+
+	Arnd
