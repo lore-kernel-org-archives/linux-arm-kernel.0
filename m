@@ -1,38 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Mar 2014 13:14:49 +0800
-Subject: [PATCH v3] ARM: dts: vf610-twr: Add support for sdhc1
-In-Reply-To: <1394124034-21452-1-git-send-email-cosminstefan.stoica@freescale.com>
-References: <1394124034-21452-1-git-send-email-cosminstefan.stoica@freescale.com>
-Message-ID: <20140310051446.GE15218@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  9 Mar 2014 22:42:09 -0700
+Subject: [PATCH] ARM: enable ARM_HAS_SG_CHAIN for multiplatform
+Message-ID: <1394430129-30297-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 06:40:34PM +0200, Stoica Cosmin Stefan wrote:
-> From: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> 
-> The kernel was not able to boot from SD card because sdhc support
-> was not present into the dts.
-> 
-> A new entry for sdhc1 was added for vf610-twr board based on the
-> compatible entry present on imx53.
-> 
-> After applying these changes, the kernel is able to boot successfully
-> from SD card.
-> 
-> Changes v2-v3:
-> Use tabs instead of spaces for identaion
-> Changes according to Shawn Guo's comments:
-> - rebased on Shawn Guo's latest for-next tree
-> - remove EOL at EOF
-> 
-> Changes v1-v2:
-> According to Shawn Guo's comments:
-> - moved esdhc1 node before fec0 in board dts file;
-> - reformatted clocks line;
-> - removed duplicate property (bus-width) in dtsi file.
-> 
-> Signed-off-by: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> Signed-off-by: Chircu Bogdan <Bogdan.Chircu@freescale.com>
-> Signed-off-by: Eddy Petrisor <eddy.petrisor@freescale.com>
+Enable ARM_HAS_SG_CHAIN for all multiplatform targets, it makes sense
+to enable on all "modern" platforms; downsides are limited for platforms
+that don't need it.
 
-Applied, thanks.
+Requested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+
+I'll apply this to next/soc in lack of better places. I did a build+boot
+test across my set of machines earlier today and it didn't seem to cause
+any problems.
+
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a5833f792e56..271a54d5d26f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -307,6 +307,7 @@ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+ 	depends on MMU
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_HAS_SG_CHAIN
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
+ 	select CLKSRC_OF
+-- 
+1.8.4.1.601.g02b3b1d
