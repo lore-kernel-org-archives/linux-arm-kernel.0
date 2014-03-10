@@ -1,170 +1,66 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Mar 2014 12:30:42 +0200
-Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
-In-Reply-To: <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
- <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <531D9452.6040501@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 10 Mar 2014 12:32:18 +0200
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <1394201859.16309.14.camel@paszta.hi.pengutronix.de>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>		<1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>		<20140228155937.GQ21483@n2100.arm.linux.org.uk>	<5310B567.7040605@ti.com>		<20140228162327.GT21483@n2100.arm.linux.org.uk>	<5316E31F.9050308@ti.com>	
+ <CAMuHMdWVSfKrudBhE7FW-ZWBvMOLWjrQZvn1qZUfRt_H+P7A2w@mail.gmail.com>	
+ <53183730.5060205@ti.com>
+ <1394201859.16309.14.camel@paszta.hi.pengutronix.de>
+Message-ID: <531D94B2.4040304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On 03/07/2014 09:22 PM, Florian Vaussard wrote:
-> Add the High-Speed USB PHY.
+On 07/03/14 16:17, Philipp Zabel wrote:
+> Hi,
 > 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3-overo-base.dtsi  | 44 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-overo-storm.dtsi | 16 ++++++++++++
->  arch/arm/boot/dts/omap3-overo.dtsi       | 16 ++++++++++++
->  3 files changed, 76 insertions(+)
+> Am Donnerstag, den 06.03.2014, 10:52 +0200 schrieb Tomi Valkeinen:
+
+>> analog;
+>> digital-single-link;
+>> digital-dual-link;
+>>
+>> My reasoning to the format I chose was basically that when a connector
+>> supports 'digital', it contains TMDS clock and TMDS data for link 1.
+>> Adding dual link to that adds only TMDS data for link 2, so the second
+>> data link is kind of an additional feature, marked with a flag.
+>>
+>> Not a very big argument, and I'm fine with other format suggestions.
 > 
-> diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
-> index edac70e..13d1ad2 100644
-> --- a/arch/arm/boot/dts/omap3-overo-base.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
-> @@ -30,6 +30,24 @@
->  		ti,codec = <&twl_audio>;
->  	};
->  
-> +	/* HS USB Port 2 Power */
-> +	hsusb2_power: hsusb2_power_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
-> +		vcc-supply = <&hsusb2_power>;
-> +	};
-> +
->  	/* Regulator to trigger the nPoweron signal of the Wifi module */
->  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
->  		compatible = "regulator-fixed";
-> @@ -64,6 +82,11 @@
->  };
->  
->  &omap3_pmx_core {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_pins
-> +	>;
-> +
->  	uart2_pins: pinmux_uart2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3_CORE1_IOPAD(0x216c, PIN_INPUT | MUX_MODE1)	/* mcbsp3_dx.uart2_cts */
-> @@ -116,6 +139,19 @@
->  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
->  		>;
->  	};
-> +
-> +	hsusb2_pins: pinmux_hsusb2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
-> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
-> +		>;
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -177,6 +213,14 @@
->  	power = <50>;
->  };
->  
-> +&usbhshost {
-> +	port2-mode = "ehci-phy";
-> +};
-> +
-> +&usbhsehci {
-> +	phys = <0 &hsusb2_phy>;
-> +};
-> +
->  &uart2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart2_pins>;
-> diff --git a/arch/arm/boot/dts/omap3-overo-storm.dtsi b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> index c235ae8..6cb418b 100644
-> --- a/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> @@ -10,6 +10,22 @@
->  #include "omap3-overo-base.dtsi"
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
-> +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-
-If you don't use the OMAP3x30_CORE2_IOPAD() macro then these definitions can fit in omap3-overo-base.dtsi.
-The offsets will be taken care of if you place them within &omap3_pmx_core2 {} . e.g.
-
-+                       0x50 (PIN_OUTPUT | MUX_MODE3)           /* etk_d10.hsusb2_clk */
-+                       0x52 (PIN_OUTPUT | MUX_MODE3)           /* etk_d11.hsusb2_stp */
-+                       0x54 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d12.hsusb2_dir */
-+                       0x56 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d13.hsusb2_nxt */
-+                       0x58 (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d14.hsusb2_data0 */
-+                       0x5a (PIN_INPUT_PULLDOWN | MUX_MODE3)   /* etk_d15.hsusb2_data1 */
-
-Do you think this is better?
-
-cheers,
--roger
-
-
-> +		>;
-> +	};
-> +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index 95c59b2..c37b130 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -10,6 +10,22 @@
->  #include "omap3-overo-base.dtsi"
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
-> +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +		>;
-> +	};
-> +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
+> I'd prefer the analog / digital / dual-link variant for aesthetic
+> reasons. But looking at other connector types, I wonder if this should
+> be generalized even more:
 > 
+> For HDMI/DVI (digital) single-link means one clock pair and 3 TMDS data
+> pairs, dual-link means one clock pair and 6 data pairs.
+> 
+> On LVDS connectors, there usually are one clock pair and three (18-bit)
+> or four (24-bit) LVDS data pairs, in dual channel configuration two
+> clock pairs and 6 or 8 data pairs are used.
+> 
+> For DisplayPort there is no separate clock pair, but 1 to 4 data pairs,
+> and MIPI DSI again has one clock pair and a one or more data pairs.
+> 
+> There are already optional endpoint configuration properties
+> 'data-lanes' and 'clock-lanes' for MIPI CSI-2 defined in
+> Documentation/devicetree/bindings/media/video-interfaces.txt.
+> Could/should this be aligned with the same?
+
+Hmm. Well, at least for HDMI and DP we anyway need the connector type,
+which tells the form factor, and it also tells the TMDS details. So, we
+could define the lanes in a common way, but we'd still need extra
+information.
+
+For MIPI DSI and (I believe) LVDS, we don't need connectors. Connectors,
+as described in this binding, are meant for standard hotpluggable
+connectors to which you can connect any device that has that same connector.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140310/6e78afa8/attachment.sig>
