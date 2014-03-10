@@ -1,35 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Mar 2014 14:34:43 +0000
-Subject: [PATCH v9 4/9] mfd: omap-usb-host: Use clock names as per
- function for reference clocks
-In-Reply-To: <1393510711-4697-5-git-send-email-rogerq@ti.com>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
- <1393510711-4697-5-git-send-email-rogerq@ti.com>
-Message-ID: <20140310143443.GE15558@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Mar 2014 15:37:18 +0100
+Subject: [PATCH for 3.14] ARM: at91: fix network interface ordering for
+ sama5d36
+Message-ID: <1394462238-22313-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Use a meaningful name for the reference clocks so that it indicates the function.
-> 
-> Update the OMAP4+ USB Host node as well to be in sync with the changes.
-> 
-> CC: Beno?t Cousson <bcousson@baylibre.com>
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap4.dtsi |  6 ++++++
->  arch/arm/boot/dts/omap5.dtsi |  6 ++++++
->  drivers/mfd/omap-usb-host.c  | 12 ++++++------
->  3 files changed, 18 insertions(+), 6 deletions(-)
+From: Boris BREZILLON <b.brezillon.dev@gmail.com>
 
-The code looks fine and I queried the name change semantics before and
-was satisfied with your answer, so as long as this patch has been
-tested and nothing is broken:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+On the newly introduced sama5d36, Gigabit and 10/100 Ethernet network
+interfaces are probed in a different order than for the sama5d35.
+Moreover, users are accustomed to this order in bootloaders and backports
+for older kernel revisions.
+So this patch switches DT node order as it is done for the other dual-Ethernet
+sama5d3 SoC.
+Better interface numbering which does not depend on DT node order is being
+developed for stronger interface identification.
 
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Olof, Arnd and Kevin,
+
+I would like to include this fix in 3.14-final.
+I do not have anymore patch for an at91-3.14-fixes branch so I only send this
+single patch to you. Can you still take it?
+
+Thanks, best regards,
+
+ arch/arm/boot/dts/sama5d36.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
+index 6c31c26e6cc0..db58cad6acd3 100644
+--- a/arch/arm/boot/dts/sama5d36.dtsi
++++ b/arch/arm/boot/dts/sama5d36.dtsi
+@@ -8,8 +8,8 @@
+  */
+ #include "sama5d3.dtsi"
+ #include "sama5d3_can.dtsi"
+-#include "sama5d3_emac.dtsi"
+ #include "sama5d3_gmac.dtsi"
++#include "sama5d3_emac.dtsi"
+ #include "sama5d3_lcd.dtsi"
+ #include "sama5d3_mci2.dtsi"
+ #include "sama5d3_tcb1.dtsi"
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.2
