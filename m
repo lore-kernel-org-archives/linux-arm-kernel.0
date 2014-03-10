@@ -1,98 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Mar 2014 13:49:37 +0100
-Subject: [PATCH 6/8] mmc: mmci: Mask IRQs for all variants during runtime
- suspend
-In-Reply-To: <CAPDyKFr3fjuZa1mDK-FV5gEBynos5ox7LtKf-kMgiSupPiKpJw@mail.gmail.com>
-References: <1393671371-2398-1-git-send-email-ulf.hansson@linaro.org>
- <1393671371-2398-7-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFr3fjuZa1mDK-FV5gEBynos5ox7LtKf-kMgiSupPiKpJw@mail.gmail.com>
-Message-ID: <CAPDyKFrMhHpwdoXpnG87zw2s=FPsvhfZoM4941ETbUNqFG75EQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 10 Mar 2014 14:49:21 +0200
+Subject: [PATCH v2 1/8] ARM: dts: dra7: Initialize USB_DPLL
+In-Reply-To: <1394197751-28984-2-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-2-git-send-email-rogerq@ti.com>
+Message-ID: <1394455761-19226-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 March 2014 13:46, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 1 March 2014 11:56, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> In runtime suspended state, we are not expecting IRQs and thus we can
->> safely mask them, not only for pwrreg_nopower variants but for all.
->>
->> Obviously we then also need to make sure we restore the IRQ mask while
->> becoming runtime resumed.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Hi Russell,
->
-> I suppose we have discussed and sorted out the concerns you had around
-> this patch!?
->
-> It's available in your patch tracker, would be nice to get it merged
-> for 3.15, if that's possible.
->
-> Kind regards
-> Uffe
+USB_DPLL must be initialized and locked at boot so that
+USB modules can work.
 
-Sorry for spamming, this went to the wrong addresses. Let's try again.
+Program USB_DLL_M2 output to half rate as well.
 
-Kind regards
-Uffe
+Patch depends on
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg101300.html
 
->
->> ---
->>  drivers/mmc/host/mmci.c |   23 +++++++++++------------
->>  1 file changed, 11 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index b931226..178868a 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -1758,35 +1758,34 @@ static void mmci_save(struct mmci_host *host)
->>  {
->>         unsigned long flags;
->>
->> -       if (host->variant->pwrreg_nopower) {
->> -               spin_lock_irqsave(&host->lock, flags);
->> +       spin_lock_irqsave(&host->lock, flags);
->>
->> -               writel(0, host->base + MMCIMASK0);
->> +       writel(0, host->base + MMCIMASK0);
->> +       if (host->variant->pwrreg_nopower) {
->>                 writel(0, host->base + MMCIDATACTRL);
->>                 writel(0, host->base + MMCIPOWER);
->>                 writel(0, host->base + MMCICLOCK);
->> -               mmci_reg_delay(host);
->> -
->> -               spin_unlock_irqrestore(&host->lock, flags);
->>         }
->> +       mmci_reg_delay(host);
->>
->> +       spin_unlock_irqrestore(&host->lock, flags);
->>  }
->>
->>  static void mmci_restore(struct mmci_host *host)
->>  {
->>         unsigned long flags;
->>
->> -       if (host->variant->pwrreg_nopower) {
->> -               spin_lock_irqsave(&host->lock, flags);
->> +       spin_lock_irqsave(&host->lock, flags);
->>
->> +       if (host->variant->pwrreg_nopower) {
->>                 writel(host->clk_reg, host->base + MMCICLOCK);
->>                 writel(host->datactrl_reg, host->base + MMCIDATACTRL);
->>                 writel(host->pwr_reg, host->base + MMCIPOWER);
->> -               writel(MCI_IRQENABLE, host->base + MMCIMASK0);
->> -               mmci_reg_delay(host);
->> -
->> -               spin_unlock_irqrestore(&host->lock, flags);
->>         }
->> +       writel(MCI_IRQENABLE, host->base + MMCIMASK0);
->> +       mmci_reg_delay(host);
->> +
->> +       spin_unlock_irqrestore(&host->lock, flags);
->>  }
->>
->>  static int mmci_runtime_suspend(struct device *dev)
->> --
->> 1.7.9.5
->>
+CC: Mike Turquette <mturquette@linaro.org>
+CC: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 597979b..f376923 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -815,3 +815,11 @@
+ };
+ 
+ /include/ "dra7xx-clocks.dtsi"
++
++&dpll_usb_ck {
++        default-rate = <960000000>;
++};
++
++&dpll_usb_m2_ck {
++	default-rate = <480000000>;
++};
+-- 
+1.8.3.2
