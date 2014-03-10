@@ -1,73 +1,33 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 10 Mar 2014 08:28:59 -0700
-Subject: [PATCH 1/5] drivers: input: keyboard: st-keyscan: add keyscan
- driver
-In-Reply-To: <20140310114819.GO14976@lee--X1>
-References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
- <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
- <20140310114819.GO14976@lee--X1>
-Message-ID: <20140310152859.GA29054@core.coreip.homeip.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Mar 2014 15:29:11 +0000
+Subject: [PATCH] mfd: tps65218: Fix reported randconfig error
+Message-ID: <1394465351-14764-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Reported error was:
 
-On Mon, Mar 10, 2014 at 11:48:19AM +0000, Lee Jones wrote:
-> Hi Gabi,
-> 
-> Sorry for the delay. It was a hectic week last week.
-> 
-> As promised:
-> 
-> > This patch adds ST Keyscan driver to use the keypad hw a subset
-> > of ST boards provide. Specific board setup will be put in the
-> > given dt.
-> > 
-> > Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-> > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> Are you sure these are in the correct order?
-> 
-> What is the history of this commit?
-> 
-> > ---
-> >  .../devicetree/bindings/input/st-keypad.txt        |  50 ++++
-> 
-> This should be submitted as a seperate patch.
+  ERROR: "regmap_del_irq_chip" [drivers/mfd/tps65218.ko] undefined!
+    when CONFIG_REGMAP_IRQ is not enabled.
 
-Why do we have such requirement? To me it would make more sense to add
-binding documentation in the same commit as the code that uses these
-bindings.
+Cc: Mark Brown <broonie@kernel.org>
+Reported-by: Randy Dunlap <rdunlap@infradead.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-[...]
-
-> > +
-> > +	error = matrix_keypad_parse_of_params(dev, &pdata->num_out_pads,
-> > +			&pdata->num_in_pads);
-> > +	if (error) {
-> > +		dev_err(dev, "failed to parse keypad params\n");
-> > +		return error;
-> 
-> Nit: It's pretty unusual to use this for a standard error handling
-> variable. Consider 'ret' or 'err' as a replacement.
-
-I like "error", in fact there are a lot of these in input. I use "error" for
-data that is only returned from error path and "retval" when the same
-variable is returned in both success and error paths.
-
-> > +
-> > +	input_dev->id.bustype = BUS_HOST;
-> > +	input_dev->id.vendor = 0x0001;
-> > +	input_dev->id.product = 0x0001;
-> > +	input_dev->id.version = 0x0100;
-> 
-> Any chance we can #define these?
-
-Even better would be not use 0x0001 as vendor as there (unfortunately)
-quite a few other drivers use it already. Either omit or chose something
-else. Does ST have PCI or USB VID assigned?
-
-Thanks.
-
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 7c443f2..456a7e7 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -864,6 +864,7 @@ config MFD_TPS65218
+ 	depends on I2C
+ 	select MFD_CORE
+ 	select REGMAP_I2C
++	select REGMAP_IRQ
+ 	help
+ 	  If you say yes here you get support for the TPS65218 series of
+ 	  Power Management chips.
 -- 
-Dmitry
+1.8.3.2
