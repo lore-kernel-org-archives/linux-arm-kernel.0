@@ -1,44 +1,31 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 10 Mar 2014 01:12:43 +0100
-Subject: [PATCH v4 1/5] clk/samsung: add support for multiple clock
- providers
-In-Reply-To: <1393931558-23502-2-git-send-email-rahul.sharma@samsung.com>
-References: <1393931558-23502-1-git-send-email-rahul.sharma@samsung.com>
- <1393931558-23502-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <531D037B.2080708@gmail.com>
+Date: Mon, 10 Mar 2014 01:20:30 +0100
+Subject: [PATCH 2/2] dt-bindings: clock: Move exynos-audss-clk.h to
+ dt-bindings/clock
+In-Reply-To: <1394085884-13081-3-git-send-email-tushar.behera@linaro.org>
+References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
+ <1394085884-13081-3-git-send-email-tushar.behera@linaro.org>
+Message-ID: <531D054E.70008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 04.03.2014 12:12, Rahul Sharma wrote:
-> Samsung CCF helper functions do not provide support to
-> register multiple Clock Providers for a given SoC. Due to
-> this limitation SoC platforms are not able to use these
-> helpers for registering multiple clock providers and are
-> forced to bypass this layer.
+On 06.03.2014 07:04, Tushar Behera wrote:
+> Most of the clock related dt-binding header files are located in
+> dt-bindings/clock folder. It would be good to keep all the similar
+> header files at a single location.
 >
-> This layer is modified accordingly to enable the support.
->
-> Clock file for exynos4, exynos5250, exynos5420, exynos5440
-> and S3c64xx are also modified as per changed helper functions.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> CC: Kukjin Kim <kgene.kim@samsung.com>
+> CC: Tomasz Figa <t.figa@samsung.com>
 > ---
->   drivers/clk/samsung/clk-exynos4.c    |   47 +++++++-------
->   drivers/clk/samsung/clk-exynos5250.c |   25 +++++---
->   drivers/clk/samsung/clk-exynos5420.c |   24 ++++---
->   drivers/clk/samsung/clk-exynos5440.c |   18 +++---
->   drivers/clk/samsung/clk-pll.c        |   14 +++--
->   drivers/clk/samsung/clk-s3c64xx.c    |   44 +++++++------
->   drivers/clk/samsung/clk.c            |  115 +++++++++++++++++++---------------
->   drivers/clk/samsung/clk.h            |   72 ++++++++++++++-------
->   8 files changed, 210 insertions(+), 149 deletions(-)
+>   arch/arm/boot/dts/exynos5250.dtsi                  |    2 +-
+>   arch/arm/boot/dts/exynos5420.dtsi                  |    2 +-
+>   drivers/clk/samsung/clk-exynos-audss.c             |    2 +-
+>   .../dt-bindings/{clk => clock}/exynos-audss-clk.h  |    0
+>   4 files changed, 3 insertions(+), 3 deletions(-)
+>   rename include/dt-bindings/{clk => clock}/exynos-audss-clk.h (100%)
 
-This patch looks good. However in the meantime two series adding s3c2412 
-and s3c2416 clock drivers have been merged through Kgene's tree and this 
-patch should be rebased on top of this. I have pulled those drivers to 
-my tree as well, to samsung-next branch.
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
