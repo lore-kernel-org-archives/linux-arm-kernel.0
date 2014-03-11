@@ -1,116 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Mar 2014 19:29:35 +0100
-Subject: [PATCH] ARM: prima2: build reset code standalone
-Message-ID: <3158149.XI9lgY9por@wuerfel>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 12 Mar 2014 00:02:40 +0530
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CAJe_Zhej0-i4uEPvXr3XH_8Qzd7SD-3yvJOp+MW4j+KJ8rt1PQ@mail.gmail.com>
+References: <1394104717-3100-1-git-send-email-sthokal@xilinx.com>
+ <1394104717-3100-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1y1sOozVU=iAsotWG-q3N=SogjHjZ=iF04CiXF89eeOg@mail.gmail.com>
+ <CA+mB=1J6Lzy5fZ6+fU0xY5zLyeDtrjtUpJCYdM7eL-tsQ+jUVA@mail.gmail.com>
+ <CAJe_Zhej0-i4uEPvXr3XH_8Qzd7SD-3yvJOp+MW4j+KJ8rt1PQ@mail.gmail.com>
+Message-ID: <CA+mB=1JMsUojCE4+AtR2D5znNBv=YXGiFxLkJeJ77cZdTgCuZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prima2 platform code currently depends on the rstc
-implementation and that in turn depends on the reset
-controller framework. This removes the platform dependency
-by letting the driver access arm_pm_restart directly
-to turn the driver into a standalone entity, and also
-removes the dependency on the reset controller framework
-by using "if (IS_ENABLED(CONFIG_RESET_CONTROLLER))". This
-will cause all code that is used for the reset controller
-to be dropped by the compiler if the framework is disabled.
+On Tue, Mar 11, 2014 at 7:14 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 11 March 2014 00:00, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> On Mon, Mar 10, 2014 at 9:30 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Thu, Mar 6, 2014 at 7:18 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>
+>>>> +static struct dma_async_tx_descriptor *
+>>>> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+>>>> +                                struct dma_interleaved_template *xt,
+>>>> +                                unsigned long flags)
+>>>> +{
+>>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>>> +       struct xilinx_vdma_tx_descriptor *desc;
+>>>> +       struct xilinx_vdma_tx_segment *segment;
+>>>> +       struct xilinx_vdma_tx_segment *prev = NULL;
+>>>> +       int i;
+>>>> +
+>>>> +       if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM))
+>>>> +               return NULL;
+>>>> +
+>>>> +       if (!xt->numf || !xt->sgl[0].size)
+>>>> +               return NULL;
+>>>> +
+>>>> +       /* Allocate a transaction descriptor. */
+>>>> +       desc = xilinx_vdma_alloc_tx_descriptor(chan);
+>>>> +       if (!desc)
+>>>> +               return NULL;
+>>>> +
+>>>> +       dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+>>>> +       desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
+>>>> +       desc->async_tx.cookie = 0;
+>>>> +       async_tx_ack(&desc->async_tx);
+>>>> +
+>>>> +       /* Build the list of transaction segments. */
+>>>> +       for (i = 0; i < xt->frame_size; i++) {
+>>>> +               struct xilinx_vdma_desc_hw *hw;
+>>>> +
+>>>> +               /* Allocate the link descriptor from DMA pool */
+>>>> +               segment = xilinx_vdma_alloc_tx_segment(chan);
+>>>> +               if (!segment)
+>>>> +                       goto error;
+>>>> +
+>>>> +               /* Fill in the hardware descriptor */
+>>>> +               hw = &segment->hw;
+>>>> +               hw->vsize = xt->numf;
+>>>> +               hw->hsize = xt->sgl[0].size;
+>>>> +               hw->stride = xt->sgl[0].icg <<
+>>>> +                               XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT;
+>>>>
+>>> It seems the xt->frame_size is (should be?) always going to be 1?
+>>> If yes, the for-loop isn't needed.
+>>> If no, you should probably use 'i' as the index to sgl[], and not always 0.
+>>
+>> It can be either
+>> '1':  User can queue each segment and submit all the segments at once as a
+>>       single async tx descriptor.  I am using this for scatter-gather mode of
+>>       operation where the src_start/dst_start is different for each segment.
+>> 'Number of frames':  In this case the driver gets contiguous frame buffer memory
+>>       and it prepares segments with addresses as multiples of
+>> src_start/dst_start.
+>>
+> Quoting you from earlier thread ....
+> " In video frame context,
+> chunk.size -> hsize
+> chunk.icg -> stride
+> numf -> vsize
+> and frame_size is always 1 as it will have only one chunk in a line. "
+>  ... which makes sense.
+>
+> I hope you realize that, 'frame_size' denotes the number of chunks in
+> a frame and 'numf' denotes the number of frames in the transfer
+> request. It seems wrong when you assume  vsize:=numf  but
+> frame_size>1 ... i.e, each horizontal video line has two or more
+> dis-contiguous chunks?   This might work for client drivers written
+> specifically for Xilinx AXI Video DMAC but will fail over any other
+> controller driver.
+>
+>  IMO, xilinx_vdma.c should expect only 1 video frame per
+> device_prep_interleaved_dma() call (i.e, vsize=numf and frame_size==1)
+>   Let the client driver submit 1/2/.../16 requests before kick
+> starting the DMA. Upon  dma_async_tx_descriptor.callback(), the client
+> 'refills' the frame and re-queues it back. This should work because
+> the video-frames' attributes and locations are not going to change
+> within a session.
+>
+>> Please let me know if you see any issues in this implementation.
+>>
+> I am ok if you want the driver upstream now and want to 'fix' it when
+> you actually start seeing problems :)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+I agree with you and I have no issues in fixing this now.  I will fix
+it in my v6
+with the driver accepting only one frame/interleave_dma call.
 
-The problem only shows up in our for-next branch, I'd apply the
-patch right away if I get an Ack.
+But, I feel this information has to be documented to the description of
+interleaved_dma API as it is leading to interpret the members of this
+structure differently wrt video frame terminology.
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 3b8865a..47c7819 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -37,7 +37,6 @@ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_io,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = atlas6_dt_match,
--	.restart	= sirfsoc_restart,
- MACHINE_END
- #endif
- 
-@@ -53,7 +52,6 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	.dma_zone_size	= SZ_256M,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = prima2_dt_match,
--	.restart	= sirfsoc_restart,
- MACHINE_END
- #endif
- 
-@@ -69,6 +67,5 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_io,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = marco_dt_match,
--	.restart	= sirfsoc_restart,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index 4b768060..07d3e5e 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -23,7 +23,6 @@ extern void sirfsoc_secondary_startup(void);
- extern void sirfsoc_cpu_die(unsigned int cpu);
- 
- extern void __init sirfsoc_of_irq_init(void);
--extern void sirfsoc_restart(enum reboot_mode, const char *);
- extern asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs);
- 
- #ifndef CONFIG_DEBUG_LL
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index a599767..4887a2a 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -17,9 +17,11 @@
- #include <linux/reboot.h>
- #include <linux/reset-controller.h>
- 
-+#include <asm/system_misc.h>
-+
- #define SIRFSOC_RSTBIT_NUM	64
- 
--void __iomem *sirfsoc_rstc_base;
-+static void __iomem *sirfsoc_rstc_base;
- static DEFINE_MUTEX(rstc_lock);
- 
- static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
-@@ -71,6 +73,13 @@ static struct reset_controller_dev sirfsoc_reset_controller = {
- 	.nr_resets = SIRFSOC_RSTBIT_NUM,
- };
- 
-+#define SIRFSOC_SYS_RST_BIT  BIT(31)
-+
-+static void sirfsoc_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	writel(SIRFSOC_SYS_RST_BIT, sirfsoc_rstc_base);
-+}
-+
- static int sirfsoc_rstc_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -81,8 +90,10 @@ static int sirfsoc_rstc_probe(struct platform_device *pdev)
- 	}
- 
- 	sirfsoc_reset_controller.of_node = np;
-+	arm_pm_restart = sirfsoc_restart;
- 
--	reset_controller_register(&sirfsoc_reset_controller);
-+	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
-+		reset_controller_register(&sirfsoc_reset_controller);
- 
- 	return 0;
- }
-@@ -107,10 +118,3 @@ static int __init sirfsoc_rstc_init(void)
- 	return platform_driver_register(&sirfsoc_rstc_driver);
- }
- subsys_initcall(sirfsoc_rstc_init);
--
--#define SIRFSOC_SYS_RST_BIT  BIT(31)
--
--void sirfsoc_restart(enum reboot_mode mode, const char *cmd)
--{
--	writel(SIRFSOC_SYS_RST_BIT, sirfsoc_rstc_base);
--}
+Thanks
+Srikanth
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
