@@ -1,41 +1,88 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 11 Mar 2014 11:55:01 +0100
-Subject: [PATCH v2][ 5/8] ARM: dts: mbimxsd25 baseboard: Add USB support
+Date: Tue, 11 Mar 2014 11:55:00 +0100
+Subject: [PATCH v2][ 4/8] ARM: dts: imx25.dtsi: Fix USB support.
 In-Reply-To: <1394535304-10240-1-git-send-email-denis@eukrea.com>
 References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394535304-10240-5-git-send-email-denis@eukrea.com>
+Message-ID: <1394535304-10240-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Fabio Estevam <fabio.estevam@freescale.com>
+
+This patch was adapted from the thread named
+"USB Host support for mx25" on linux-usb at vger.kernel.org
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 Changelog v1->v2:
-- With the clock fix patches, the usb gadget also work.
-  So I've set the otg port to otg instead of host.
+- The usbphy nodes were made to look like the ones in imx53.dtsi
+- The patch was rebased on top of the clock fixes commits.
 ---
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/imx25.dtsi |   27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-index 62fb3da..ad12da3 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -172,3 +172,16 @@
- 	fsl,uart-has-rtscts;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 829791e..16bc571 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -482,22 +482,13 @@
+ 				clocks = <&clks 99>;
+ 			};
+ 
+-			usbphy1: usbphy at 1 {
+-				compatible = "nop-usbphy";
+-				status = "disabled";
+-			};
+-
+-			usbphy2: usbphy at 2 {
+-				compatible = "nop-usbphy";
+-				status = "disabled";
+-			};
+-
+ 			usbotg: usb at 53ff4000 {
+ 				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4000 0x0200>;
+ 				interrupts = <37>;
+ 				clocks = <&clks 70>;
+ 				fsl,usbmisc = <&usbmisc 0>;
++				fsl,usbphy = <&usbphy1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -507,6 +498,7 @@
+ 				interrupts = <35>;
+ 				clocks = <&clks 70>;
+ 				fsl,usbmisc = <&usbmisc 1>;
++				fsl,usbphy = <&usbphy2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -516,7 +508,6 @@
+ 				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
+ 				clock-names = "ipg", "ahb", "per";
+ 				reg = <0x53ff4600 0x00f>;
+-				status = "disabled";
+ 			};
+ 
+ 			dryice at 53ffc000 {
+@@ -548,4 +539,18 @@
+ 			};
+ 		};
+ 	};
++
++	usbphy {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "simple-bus";
++
++		usbphy1: usbphy at 1 {
++			compatible = "usb-nop-xceiv";
++		};
++
++		usbphy2: usbphy at 2 {
++			compatible = "usb-nop-xceiv";
++		};
++	};
  };
-+
-+&usbhost1 {
-+	phy_type = "serial";
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	phy_type = "utmi";
-+	dr_mode = "otg";
-+	external-vbus-divider;
-+	status = "okay";
-+};
 -- 
 1.7.9.5
