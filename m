@@ -1,33 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 11 Mar 2014 12:09:08 +0100
-Subject: [PATCH v3] i2c:at91: Add device tree property to set
- clock-frequency
-In-Reply-To: <C7EB5260-2285-4572-9D73-15312BB09F65@jcrosoft.com>
-References: <1394511938-28653-1-git-send-email-mark.roszko@gmail.com>
- <C7EB5260-2285-4572-9D73-15312BB09F65@jcrosoft.com>
-Message-ID: <20140311110908.GB24766@katana>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Mar 2014 11:12:34 +0000
+Subject: [PATCH v3 2/5] pinctrl: st: Enhance the controller to manage
+ unavailable registers
+In-Reply-To: <531EC6C0.4080202@st.com>
+References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
+ <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
+ <20140310091707.GD14976@lee--X1> <531EC6C0.4080202@st.com>
+Message-ID: <20140311111234.GA21216@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Examples :
-> > @@ -23,6 +24,7 @@ i2c0: i2c at fff84000 {
-> > 	#address-cells = <1>;
-> > 	#size-cells = <0>;
-> > 	clocks = <&twi0_clk>;
-> > +	clock-frequency = <400000>;
-> > 
-> The bindings is wrong it?s not the bus frequency but the max frequency
-> 
-> as you describe the bus not the device frequency. And this is this one that limit the bus
+> >>From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> >>
+> >>This patch adds a new logic inside the st pinctrl to manage
+> >>an unsupported scenario: some sysconfig are not available!
+> >>
+> >>This is the case of STiH407 where, although documented, the
+> >>following registers from SYSCFG_FLASH have been removed from the SoC.
+> >>
+> >>SYSTEM_CONFIG3040
+> >>    Output Enable pad control for all PIO Alternate Functions
+> >>and
+> >>SYSTEM_ CONFIG3050
+> >>    Pull Up pad control for all PIO Alternate Functions
+> >>
+> >>Without managing this condition an imprecise external abort
+> >>will be detect.
+> >>
+> >>To do this the patch also reviews the st_parse_syscfgs
+> >>and other routines to manipulate the registers only if
+> >>actually available.
+> >>In any case, for example the st_parse_syscfgs detected
+> >>an error condition but no action was made in the
+> >>st_pctl_probe_dt.
+> >>
+> >>Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> >>Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 
-It is not wrong, it is since "the beginning" the way i2c bus speeds are
-described. It is well known that, in fact, the devices should have a
-speed limiting property, yet nobody has sent in patches so far.
+No problem with any of your comments. Once the fixups have been made,
+feel free to apply my:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/636d36cf/attachment.sig>
+  Acked-by: Lee Jones <lee.jones@linaro.org>  
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
