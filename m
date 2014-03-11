@@ -1,122 +1,56 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Tue, 11 Mar 2014 15:38:07 +0530
-Subject: [RFC 4/6] sched: powerpc: create a dedicated topology table
-In-Reply-To: <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <531EE087.7050707@linux.vnet.ibm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 11 Mar 2014 10:14:52 +0000
+Subject: [RFC PATCH V2 4/4] arm64: mm: implement get_user_pages_fast
+In-Reply-To: <20140211154859.GG3748@arm.com>
+References: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+ <1391703531-12845-5-git-send-email-steve.capper@linaro.org>
+ <20140211154859.GG3748@arm.com>
+Message-ID: <20140311101451.GA3660@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+On Tue, Feb 11, 2014 at 03:48:59PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 04:18:51PM +0000, Steve Capper wrote:
+> > An implementation of get_user_pages_fast for arm64. It is based on the
+> > arm implementation (it has the added ability to walk huge puds) which
+> > is loosely on the PowerPC implementation. We disable interrupts in the
+> > walker to prevent the call_rcu_sched pagetable freeing code from
+> > running under us.
+> > 
+> > We also explicitly fire an IPI in the Transparent HugePage splitting
+> > case to prevent splits from interfering with the fast_gup walker.
+> > As THP splits are relatively rare, this should not have a noticable
+> > overhead.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/pgtable.h |   4 +
+> >  arch/arm64/mm/Makefile           |   2 +-
+> >  arch/arm64/mm/gup.c              | 297 +++++++++++++++++++++++++++++++++++++++
+> 
+> Why don't you make a generic gup.c implementation and let architectures
+> select it? I don't see much arm64-specific code in here.
 
-On 03/05/2014 12:48 PM, Vincent Guittot wrote:
-> Create a dedicated topology table for handling asymetric feature.
-> The current proposal creates a new level which describes which groups of CPUs
-> take adavantge of SD_ASYM_PACKING. The useless level will be removed during the
-> build of the sched_domain topology.
-> 
-> Another solution would be to set SD_ASYM_PACKING in the sd_flags of SMT level
-> during the boot sequence and before the build of the sched_domain topology.
+Hi Catalin,
+I've had a stab at generalising the gup, but I've found that it varies
+too much between architectures to make this practical for me:
+ * x86 blocks on TLB invalidate so does not need the speculative page
+   cache logic. Also x86 does not have 64-bit single-copy atomicity for
+   pte reads, so needs a work around.
+ * mips is similar-ish to x86.
+ * powerpc has extra is_hugepd codepaths to identify huge pages.
+ * superh has sub-architecture pte flags and no 64-bit single-copy
+   atomicity.
+ * sparc has hypervisor tlb logic for the pte flags.
+ * s390 has extra pmd derefence logic and extra barriers that I do not
+   quite understand.
 
-Is the below what you mean as the other solution? If it is so, I would
-strongly recommend this approach rather than adding another level to the
-topology level to represent the asymmetric behaviour.
+My plan was to introduce pte_special(.) for arm with LPAE, add
+pte_special logic to fast_gup and share the fast_gup between arm and
+arm64.
 
-+static struct sched_domain_topology_level powerpc_topology[] = {
-+#ifdef CONFIG_SCHED_SMT
-+	{ cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
-SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() },
-+#endif
-+	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
-+	{ NULL, },
-+};
+Does this approach sound reasonable?
 
-Regards
-Preeti U Murthy
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  arch/powerpc/kernel/smp.c |   35 +++++++++++++++++++++++++++--------
->  kernel/sched/core.c       |    6 ------
->  2 files changed, 27 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-> index ac2621a..75da054 100644
-> --- a/arch/powerpc/kernel/smp.c
-> +++ b/arch/powerpc/kernel/smp.c
-> @@ -755,6 +755,32 @@ int setup_profiling_timer(unsigned int multiplier)
->  	return 0;
->  }
-> 
-> +#ifdef CONFIG_SCHED_SMT
-> +/* cpumask of CPUs with asymetric SMT dependancy */
-> +static const struct cpumask *cpu_asmt_mask(int cpu)
-> +{
-> +	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
-> +		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
-> +		return topology_thread_cpumask(cpu);
-> +	}
-> +	return cpumask_of(cpu);
-> +}
-> +#endif
-> +
-> +static struct sched_domain_topology_level powerpc_topology[] = {
-> +#ifdef CONFIG_SCHED_SMT
-> +	{ cpu_asmt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES | SD_ASYM_PACKING, SD_INIT_NAME(ASMT) },
-> +	{ cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES, SD_INIT_NAME(SMT) },
-> +#endif
-> +	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
-> +	{ NULL, },
-> +};
-> +
-> +static void __init set_sched_topology(void)
-> +{
-> +	sched_domain_topology = powerpc_topology;
-> +}
-> +
->  void __init smp_cpus_done(unsigned int max_cpus)
->  {
->  	cpumask_var_t old_mask;
-> @@ -779,15 +805,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
-> 
->  	dump_numa_cpu_topology();
-> 
-> -}
-> +	set_sched_topology();
-> 
-> -int arch_sd_sibling_asym_packing(void)
-> -{
-> -	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
-> -		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
-> -		return SD_ASYM_PACKING;
-> -	}
-> -	return 0;
->  }
-> 
->  #ifdef CONFIG_HOTPLUG_CPU
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index 3479467..7606de0 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -5818,11 +5818,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
->  	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
->  }
-> 
-> -int __weak arch_sd_sibling_asym_packing(void)
-> -{
-> -       return 0*SD_ASYM_PACKING;
-> -}
-> -
->  /*
->   * Initializers for schedule domains
->   * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
-> @@ -6000,7 +5995,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
->  	if (sd->flags & SD_SHARE_CPUPOWER) {
->  		sd->imbalance_pct = 110;
->  		sd->smt_gain = 1178; /* ~15% */
-> -		sd->flags |= arch_sd_sibling_asym_packing();
-> 
->  	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
->  		sd->imbalance_pct = 117;
-> 
+Thanks,
+-- 
+Steve
