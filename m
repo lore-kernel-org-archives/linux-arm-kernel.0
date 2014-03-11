@@ -1,162 +1,125 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:34:15 +0100
-Subject: [PATCH 1/3] ARM: dts: overo: Add support for DVI output
-In-Reply-To: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394541257-25605-2-git-send-email-florian.vaussard@epfl.ch>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 11 Mar 2014 12:35:13 +0000
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <531DD8C3.5050006@xilinx.com>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <CAL_JsqL3V7Gmkx5MoAhzwbM8Po6QURUY+g3ytxs+H_u-FLR6SQ@mail.gmail.com>
+ <531DD8C3.5050006@xilinx.com>
+Message-ID: <21dba33d-9def-43e1-becd-335f6cb5fd83@CO9EHSMHS011.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Summit and Tobi expansion boards have a HDMI connector with a TFP410
-encoder. Add a common include file for this configuration, and then
-use it for Summit and Tobi.
+Hi Michal,
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap3-overo-common-dvi.dtsi    | 109 +++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-summit-common.dtsi |   1 +
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi   |   1 +
- 3 files changed, 111 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
+> -----Original Message-----
+> From: Michal Simek [mailto:michal.simek at xilinx.com]
+> Sent: Monday, March 10, 2014 8:53 PM
+> To: Rob Herring
+> Cc: Appana Durga Kedareswara Rao; Wolfgang Grandegger; Marc Kleine-
+> Budde; Michal Simek; Grant Likely; Rob Herring; linux-can at vger.kernel.org;
+> netdev; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga
+> Kedareswara Rao
+> Subject: Re: [PATCH v5] can: xilinx CAN controller support.
+>
+> On 03/10/2014 04:15 PM, Rob Herring wrote:
+> > On Tue, Mar 4, 2014 at 7:20 AM, Kedareswara rao Appana
+> > <appana.durga.rao@xilinx.com> wrote:
+> >> This patch adds xilinx CAN controller support.
+> >> This driver supports both ZYNQ CANPS and Soft IP AXI CAN controller.
+> >>
+> >> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> >> ---
+> >> This patch is rebased on the 3.14 rc5 kernel.
+> >> Changes for v5:
+> >> - Updated the driver with the review comments.
+> >> - Remove the check for the tx fifo full interrupt condition
+> >>   form Tx interrupt routine as we are checking it in the _xmit
+> >>   routine.
+> >> - Clearing the txok interrupt in the tx interrupt routine for
+> >>   every Tx can frame.
+> >> Changes for v4:
+> >> - Added check for the tx fifo full interrupt condition in
+> >>   Tx interrupt routine.
+> >> - Added be iohelper functions.
+> >> - Moved the clock enable/disable to probe/remove because of
+> >>   Added big endian support for AXI CAN controller case(reading
+> >>   a register during probe for that we need to enable clock).
+> >> Changes for v3:
+> >> - Updated the driver with the review comments.
+> >> - Modified the tranmit logic as per Marc suggestion.
+> >> - Enabling the clock when the interface is up to reduce the
+> >>   Power consumption.
+> >> Changes for v2:
+> >> - Updated with the review comments.
+> >> - Removed the unnecessary debug prints.
+> >> - include tx,rx fifo depths in ZYNQ CANPS case also.
+> >> ---
+> >>  .../devicetree/bindings/net/can/xilinx_can.txt     |   45 +
+> >>  drivers/net/can/Kconfig                            |    7 +
+> >>  drivers/net/can/Makefile                           |    1 +
+> >>  drivers/net/can/xilinx_can.c                       | 1195 ++++++++++++++++++++
+> >>  4 files changed, 1248 insertions(+), 0 deletions(-)  create mode
+> >> 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> >>  create mode 100644 drivers/net/can/xilinx_can.c
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> >> b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> >> new file mode 100644
+> >> index 0000000..0e57103
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+> >> @@ -0,0 +1,45 @@
+> >> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
+> >> +---------------------------------------------------------
+> >> +
+> >> +Required properties:
+> >> +- compatible           : Should be "xlnx,zynq-can-1.00.a" for Zynq CAN
+> >> +                         controllers and "xlnx,axi-can-1.00.a" for Axi CAN
+> >> +                         controllers.
+> >> +- reg                  : Physical base address and size of the Axi CAN/Zynq
+> >> +                         CANPS registers map.
+> >> +- interrupts           : Property with a value describing the interrupt
+> >> +                         number.
+> >> +- interrupt-parent     : Must be core interrupt controller
+> >> +- clock-names          : List of input clock names - "ref_clk", "aper_clk"
+> >> +                         (See clock bindings for details. Two clocks are
+> >> +                          required for Zynq CAN. For Axi CAN
+> >> +                          case it is one(ref_clk)).
+> >> +- clocks               : Clock phandles (see clock bindings for details).
+> >> +- tx-fifo-depth                : Can Tx fifo depth.
+> >> +- rx-fifo-depth                : Can Rx fifo depth.
+> >> +
+> >> +
+> >> +Example:
+> >> +
+> >> +For Zynq CANPS Dts file:
+> >> +       zynq_can_0: zynq-can at e0008000 {
+> >
+> > The preferred node name convention is to use the type of device. There
+> > is no standard in this case, but I would use just "can at ...".
+> >
+> > Otherwise, for the binding:
+> >
+> > Acked-by: Rob Herring <robh@kernel.org>
+>
+> Thanks Rob for your ACK.
+>
+> Kedar: You have got more things to change from Marc that's why please
+> change this too.
+>
+Thanks Rob for the ACk
+Michal@  I  will do
 
-diff --git a/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi b/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
-new file mode 100644
-index 0000000..6fb5d1e
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * DVI output for some Gumstix Overo boards (Tobi and Summit)
-+ */
-+
-+&omap3_pmx_core {
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl.i2c3_scl */
-+			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda.i2c3_sda */
-+		>;
-+	};
-+
-+	dss_dpi_pins: pinmux_dss_dpi_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
-+			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
-+			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
-+			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
-+			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
-+			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
-+			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
-+			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
-+			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
-+			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
-+			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
-+			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
-+			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
-+			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
-+			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
-+			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
-+			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
-+			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
-+			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
-+			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
-+			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
-+			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
-+			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
-+			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
-+			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
-+			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
-+			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
-+			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
-+		>;
-+	};
-+};
-+
-+&dss {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins
-+		     &i2c3_pins>;
-+
-+	dpi_out: endpoint {
-+		remote-endpoint = <&tfp410_in>;
-+		data-lines = <24>;
-+	};
-+};
-+
-+/ {
-+	aliases {
-+		display0 = &dvi0;
-+	};
-+
-+	tfp410: encoder at 0 {
-+		compatible = "ti,tfp410";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tfp410_in: endpoint at 0 {
-+					remote-endpoint = <&dpi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tfp410_out: endpoint at 0 {
-+					remote-endpoint = <&dvi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dvi0: connector at 0 {
-+		compatible = "dvi-connector";
-+		label = "dvi";
-+
-+		i2c-bus = <&i2c3>;
-+
-+		dvi_connector_in: endpoint {
-+			remote-endpoint = <&tfp410_out>;
-+		};
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-summit-common.dtsi b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
-index 999d1cd..0ac97ba 100644
---- a/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
-@@ -11,6 +11,7 @@
-  */
- 
- #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-dvi.dtsi"
- 
- / {
- 	leds {
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-index 13df50b..9e24b6a 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-@@ -11,6 +11,7 @@
-  */
- 
- #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-dvi.dtsi"
- 
- / {
- 	leds {
--- 
-1.8.3.2
+Regards,
+Kedar.
+
+
+> Thanks,
+> Michal
+>
+>
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
