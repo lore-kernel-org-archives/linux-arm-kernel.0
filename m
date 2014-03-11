@@ -1,48 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 10 Mar 2014 19:52:01 -0700
-Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
-In-Reply-To: <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
-References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
- <20140309183523.GD22881@quad.lixom.net>
- <531CFA28.9020600@gmail.com>
- <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
- <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
-Message-ID: <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 11 Mar 2014 11:07:57 +0800
+Subject: [PATCH] Disable Subpage nand write when using Atmel PMECC
+In-Reply-To: <20140307080251.GI31517@norris-Latitude-E6410>
+References: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
+ <53194432.50104@atmel.com> <20140307080251.GI31517@norris-Latitude-E6410>
+Message-ID: <531E7E0D.6080605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Olof Johansson wrote:
->>
->> >> Hi,
->> >>
->> >> I don't see a single cc or acked-by line from Mike Turquette here. I'll
->> >> hold
->> >> off until he's had a chance to take a look at these ones; I suspect
->> >> they'll be
->> >> fine since it's mostly code refactoring though.
->> >
->> >
->> > I guess I should have ACKed them too, but it felt kind of strange to ACK
->> my
->> > own patches. ;)
->> >
->> > Anyway, for all samsung-clk patches:
->> >
->> > Acked-by: Tomasz Figa <t.figa@samsung.com>
->>
->> Yeah, self-acking doesn't make much sense. :)
->>
->> I'm mostly worried about patches touching other subsystems without the
->> other maintainer being aware of it or having reviewed them. As I said,
->> these mostly look like refactorings but it's still good habit.
->>
-> OK, agreed, I think Mike knew about that though. Let's wait for Mike's
-> response.
+Hi, Brian
+
+On 3/7/2014 4:02 PM, Brian Norris wrote:
+> On Fri, Mar 07, 2014 at 11:59:46AM +0800, Josh Wu wrote:
+>> On 3/3/2014 7:15 PM, Herve Codina wrote:
+>>> Crash detected on sam5d35 and its pmecc nand ecc controller.
+>>>
+>>> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+>>> (nand_base.c) when we write a sub page.
+>>> chip->ecc.hwctl function is not set when we are using PMECC controller.
+>>> As a workaround, set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+>>> order to disable sub page access in nand_write_page.
+>>>
+>>>
+>>> Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+>> Acked-by: Josh Wu <josh.wu@atmel.com>
+> Pushed to l2-mtd.git. Thanks!
+
+Sorry for the later thought. But I think this patch should go to the 
+stable Linux branch
+since any subpage write will cause crash in SAMA5D3 and AT91SAM9X5.
+So is it possible to add a tag: "Cc: stable at vger.kernel.org" for this 
+commit?
+
+Best Regards,
+Josh Wu
+
 >
-> BTW, should I sort out the branch again if Mike gives ack on that?
-
-If I hear from Mike that he's OK with it then I can merge it, no need to rebase.
-
-
--Olof
+> Brian
