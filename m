@@ -1,35 +1,48 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 11 Mar 2014 16:54:49 +0900
-Subject: [PATCH 0/5] ARM: dts: exynos: Add missing dt data to bring kernel of
- Exynos4x12
-Message-ID: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 11 Mar 2014 16:54:51 +0900
+Subject: [PATCH 2/5] ARM: dts: exynos4x12: Add PMU dt data to support
+ PMU(Perforamnce Monitoring Unit)
+In-Reply-To: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add missing dt data of Exynos4x12 to bring up kernel feature and
-code clean.
+ARM CPU has its own performance profiling unit(PMU, Perforamnce Monitoring Unit).
+This patch add PMU dt data to support PMU which count cache hit and miss events.
 
-exynos4x12/exynos4412/exynos4212.dtsi
-- Add ADC (Analog and Digital Converter) to get raw data
-- Add PMU (Performance Monitoring Unit) for perf event
-- Add gps_alive power domain to remove power leakage when gps-alive isn't used
-- Remove duplicate dt data of interrput combiner controller
+PMU interrput list of Exynos4212
+- <2 2> : INTG2[2] - PMUIRQ[0] for CPU0
+- <3 2> : INTG3[2] - PMUIRQ[1] for CPU1
 
-exynos4412-trats.dts
-- Add ADC dt data with ntc thermistor child to read temperature
+PMU interrput list of Exynos4412
+- <2 2> : INTG2[2], PMUIRQ[0] for CPU0
+- <3 2> : INTG3[2], PMUIRQ[1] for CPU1
+- <18 2> : INTG18[2], PMUIRQ[2] : CPU2
+- <19 2> : INTG19[2], PMUIRQ[3] : CPU3
 
-Chanwoo Choi (5):
-  ARM: dts: exynos4x12: Add ADC's dt data to read raw data
-  ARM: dts: exynos4x12: Add PMU dt data to support PMU(Perforamnce Monitoring Unit)
-  ARM: dts: exynos4x12: Add GPS_ALIVE power domain
-  ARM: dts: exynos: Move common dt data for interrupt combiner controller
-  ARM: dts: exynos4412-trats2: Add ADC's dt data to get temperature of SoC/battery
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4x12.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- arch/arm/boot/dts/exynos4212.dtsi       | 13 ++++---------
- arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi       | 14 ++++----------
- arch/arm/boot/dts/exynos4x12.dtsi       | 31 +++++++++++++++++++++++++++++++
- 4 files changed, 60 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 5a3e551..1ec77f6 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -31,6 +31,12 @@
+ 		mshc0 = &mshc_0;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
++	};
++
+ 	pd_isp: isp-power-domain at 10023CA0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023CA0 0x20>;
 -- 
 1.8.0
