@@ -1,133 +1,104 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 11 Mar 2014 15:24:07 -0300
-Subject: [PATCH 2/2] ARM: dts: imx25-pdk: Add audio support
-In-Reply-To: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
-References: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1394562247-14898-2-git-send-email-fabio.estevam@freescale.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 11 Mar 2014 13:24:59 -0500
+Subject: [PATCH v3] ARM: vDSO gettimeofday using generic timer architecture
+In-Reply-To: <20140311141759.GA11826@linaro.org>
+References: <1393813295-27376-1-git-send-email-nathan_lynch@mentor.com>
+ <20140311141759.GA11826@linaro.org>
+Message-ID: <531F54FB.2040707@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx25pdk has a sgtl5000 codec connected to the I2C1 port.
+On 03/11/2014 09:17 AM, Steve Capper wrote:
+> On Sun, Mar 02, 2014 at 08:21:35PM -0600, Nathan Lynch wrote:
+>> Provide fast userspace implementations of gettimeofday and
+>> clock_gettime on systems that implement the generic timers extension
+>> defined in ARMv7.  This follows the example of arm64 in conception but
+>> significantly differs in some aspects of the implementation (C vs
+>> assembly, mainly).
+>
+> I've given this a test with simple C program on an Arndale board
+> (running A15 with 3.14-rc6 and LPAE) and it worked well. I also short
+> circuited the VDSO to always fallback on syscalls and that worked well
+> too.
+> 
+> So please add:
+> Tested-by: Steve Capper <steve.capper@linaro.org>
 
-Add support for it.
+Thank you Steve!
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx25-pdk.dts | 76 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index 7a6d21f..ca3fea5 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -34,9 +34,48 @@
- 			gpio = <&gpio2 3 0>;
- 			enable-active-high;
- 		};
-+
-+		reg_2p5v: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "2P5V";
-+			regulator-min-microvolt = <2500000>;
-+			regulator-max-microvolt = <2500000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_3p3v: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx25-pdk-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx25-pdk-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
-@@ -54,8 +93,32 @@
- 	status = "okay";
- };
- 
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	codec: sgtl5000 at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clks 129>;
-+		VDDA-supply = <&reg_2p5v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+};
-+
- &iomuxc {
- 	imx25-pdk {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX25_PAD_RW__AUD4_TXFS			0xe0
-+				MX25_PAD_OE__AUD4_TXC			0xe0
-+				MX25_PAD_EB0__AUD4_TXD			0xe0
-+				MX25_PAD_EB1__AUD4_RXD			0xe0
-+			>;
-+		};
-+
- 		pinctrl_esdhc1: esdhc1grp {
- 			fsl,pins = <
- 				MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
-@@ -85,6 +148,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
-+				MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX25_PAD_UART1_RTS__UART1_RTS		0xe0
-@@ -101,6 +171,12 @@
- 	status = "okay";
- };
- 
-+&ssi1 {
-+	codec-handle = <&codec>;
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
--- 
-1.8.1.2
+>> +/* Avoid undefined symbols that can be referenced by routines brought
+>> + * in from libgcc.  libgcc's __div0, __aeabi_idiv0 and __aeabi_ldiv0
+>> + * can call raise(3); here they are defined to loop forever: divide by
+>> + * zero should not be possible in this code.
+>> + */
+> 
+> I can't see any way a divide by zero could occur with this code, but I
+> am paranoid that any future functions added to the vdso could divide by
+> zero and lead to hanging behaviour. Would it be better to fail more
+> explicitly?
+
+Probably.  It puzzles me that these __*div0 routines are pulled in when
+the file has only a division by constant, and I haven't found a way to
+suppress this.  But if we're stuck with it, some kind of trap is likely
+better, I agree.
+
+
+>> +void __div0(void)
+>> +{
+>> +	for (;;)
+>> +		;
+>> +}
+>> +
+>> +void __aeabi_idiv0(void)
+>> +{
+>> +	for (;;)
+>> +		;
+>> +}
+>> +
+>> +void __aeabi_ldiv0(void)
+>> +{
+>> +	for (;;)
+>> +		;
+>> +}
+>> +
+>> +void __aeabi_unwind_cpp_pr0(void)
+>> +{
+>> +}
+>> +
+>> +void __aeabi_unwind_cpp_pr1(void)
+>> +{
+>> +}
+>> +
+>> +void __aeabi_unwind_cpp_pr2(void)
+>> +{
+>> +}
+>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+>> index 1f8fed94c2a4..84898cf4b030 100644
+>> --- a/arch/arm/mm/Kconfig
+>> +++ b/arch/arm/mm/Kconfig
+>> @@ -825,6 +825,21 @@ config KUSER_HELPERS
+>>  	  Say N here only if you are absolutely certain that you do not
+>>  	  need these helpers; otherwise, the safe option is to say Y.
+>>  
+>> +config VDSO
+>> +	bool "Enable vDSO for acceleration of some system calls"
+>> +	depends on AEABI && MMU
+>> +	default y if ARM_ARCH_TIMER
+> 
+> I would argue that it would be good to have the VDSO on consistently
+> for all AEABI with MMU as syscalls are used as fallbacks anyway.
+
+Falling back to syscall when conditions require it (e.g. a clock id the
+vDSO doesn't handle, or clocksource != generic timer) is essential to
+correct operation of the vDSO.  So while I don't necessarily disagree
+with making CONFIG_VDSO default to y unconditionally, I don't follow
+your reasoning :-)
+
+My reasoning for 'default y if ARM_ARCH_TIMER' is that the vDSO without
+the generic timer imposes a small overhead without much benefit.  The
+_COARSE clock ids are handled regardless of clocksource, but I have the
+impression that users of those are rare.
+
+Anyway, I don't have a strongly-held position on the default setting for
+CONFIG_VDSO.  Just thought I would explain how I arrived at what I wrote.
