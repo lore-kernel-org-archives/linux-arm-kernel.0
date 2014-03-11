@@ -1,65 +1,150 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Mar 2014 10:50:00 -0700
-Subject: [PATCH v5 0/9] Use regmap+devm+DT in pm8xxx input drivers
-In-Reply-To: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <531F4CC8.5010202@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 11 Mar 2014 18:01:50 +0000
+Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
+In-Reply-To: <20140307230856.GE9985@codeaurora.org>
+References: <20140116113332.GC25540@e102568-lin.cambridge.arm.com>
+ <20140116180505.GA30925@codeaurora.org>
+ <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+ <20140116192617.GA13785@codeaurora.org>
+ <20140117102109.GA22544@e102568-lin.cambridge.arm.com>
+ <20140219002043.GE14769@codeaurora.org>
+ <20140225111655.GA6855@e102568-lin.cambridge.arm.com>
+ <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
+ <20140226120103.GA25326@e102568-lin.cambridge.arm.com>
+ <20140307230856.GE9985@codeaurora.org>
+Message-ID: <20140311180150.GD25796@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping?
+On Fri, Mar 07, 2014 at 11:08:56PM +0000, Stephen Boyd wrote:
+> On 02/26, Lorenzo Pieralisi wrote:
+> > On Tue, Feb 25, 2014 at 08:48:38PM +0000, Kumar Gala wrote:
+> > > 
+> > > On Feb 25, 2014, at 5:16 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > > > 
+> > > > As I mentioned, I do not like the idea of adding compatible properties
+> > > > just to force the kernel to create platform devices out of device tree
+> > > > nodes. On top of that I would avoid adding a compatible property
+> > > > to the cpus node (after all properties like enable-method are common for all
+> > > > cpus but still duplicated), my only concern being backward compatibility
+> > > > here (ie if we do that for interrupts, we should do that also for other
+> > > > common cpu nodes properties, otherwise we have different rules for
+> > > > different properties).
+> > > > 
+> > > > I think you can then add interrupts to cpu nodes ("qcom,krait" specific),
+> > > > and as you mentioned create a platform device for that.
+> > > > 
+> > > > Thanks,
+> > > > Lorenzo
+> > > 
+> > > So I agree with the statement about adding compatibles just to create platform devices is wrong.  However its seems perfectly reasonable for a cpu node to have a compatible property.  I don't see why a CPU is any different from any other device described in a DT.
+> > 
+> > I was referring to the /cpus node, not to individual cpu nodes, where
+> > the compatible property is already present now.
+> > 
+> 
+> Ok I think I'll go ahead with moving the interrupts into each cpu node, i.e.:
+> 
+>         cpus {  
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> 
+>                 cpu at 0 { 
+>                         compatible = "qcom,krait";
+>                         device_type = "cpu";
+>                         reg = <0>;
+>                         interrupts = <1 14 0x304>;
+>                         next-level-cache = <&L2>;
+>                 };
+> 
+>                 cpu at 1 { 
+>                         compatible = "qcom,krait";
+>                         device_type = "cpu";
+>                         reg = <1>;
+>                         interrupts = <1 14 0x304>;
+>                         next-level-cache = <&L2>;
+>                 };
+> 
+>                 L2: l2-cache {
+>                         compatible = "cache";
+>                         interrupts = <0 2 0x4>;
+> 		};
+> 	};
+> 
+> Or should we be expressing the L1 cache as well? Something like:
+> 
+>         cpus {  
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> 
+>                 cpu at 0 { 
+>                         compatible = "qcom,krait";
+>                         device_type = "cpu";
+>                         reg = <0>;
+>                         next-level-cache = <&L1_0>;
+> 
+> 			L1_0: l1-cache {
+> 				compatible = "arm,arch-cache";
+> 				interrupts = <1 14 0x304>;
+> 				next-level-cache = <&L2>;
+> 			}
+>                 };
+> 
+>                 cpu at 1 { 
+>                         compatible = "qcom,krait";
+>                         device_type = "cpu";
+>                         reg = <1>;
+>                         next-level-cache = <&L1_1>;
+> 
+> 			L1_1: l1-cache {
+> 				compatible = "arm,arch-cache";
+> 				interrupts = <1 14 0x304>;
+> 				next-level-cache = <&L2>;
+> 			}
+>                 };
+> 
+>                 L2: l2-cache {
+>                         compatible = "arm,arch-cache";
+>                         interrupts = <0 2 0x4>;
+> 		};
+> 	};
+> 
+> (I'm also wondering if the 3rd cell of the interrupt binding
+> should only indicate the CPU that the interrupt property is
+> inside?)
 
-On 03/04/14 10:34, Stephen Boyd wrote:
-> These patches move the pm8xxx input drivers over to use devm_* APIs
-> and regmap. This breaks the dependency of these drivers on the pm8xxx
-> specific read/write calls and also simplifies the probe code a bit.
-> Finally we add devicetree support to these drivers so they can be probed
-> on the platforms that are supported upstream.
->
-> Changes since v4:
->  * Added reg property to bindings
->  * Added linux,* properties to keypad binding
->
-> Changes since v3:
->  * Dropped devm conversion patch for pwrkey
->  * Fixed compilation of keypad
->
-> Changes since v2:
->  * Rebased to v3.14-rc3
->
-> Changes since v1:
->  * Picked up Dmitry's version of devm for pwrkey
->  * Added DT bindings and parsing patches
->  * Dropped patches picked up by Dmitry
->
-> Stephen Boyd (9):
->   Input: pmic8xxx-keypad - Fix build by removing gpio configuration
->   Input: pmic8xxx-keypad - Migrate to devm_* APIs
->   Input: pmic8xxx-keypad - Migrate to regmap APIs
->   Input: pmic8xxx-keypad - Migrate to DT
->   Input: pmic8xxx-pwrkey - Migrate to DT
->   Input: pm8xxx-vibrator - Add DT match table
->   devicetree: bindings: Document PM8921/8058 keypads
->   devicetree: bindings: Document PM8921/8058 power keys
->   devicetree: bindings: Document PM8921/8058 vibrators
->
->  .../bindings/input/qcom,pm8xxx-keypad.txt          |  89 ++++++
->  .../bindings/input/qcom,pm8xxx-pwrkey.txt          |  46 +++
->  .../devicetree/bindings/input/qcom,pm8xxx-vib.txt  |  22 ++
->  drivers/input/keyboard/pmic8xxx-keypad.c           | 348 ++++++++-------------
->  drivers/input/misc/pm8xxx-vibrator.c               |   8 +
->  drivers/input/misc/pmic8xxx-pwrkey.c               |  33 +-
->  include/linux/input/pmic8xxx-keypad.h              |  52 ---
->  include/linux/input/pmic8xxx-pwrkey.h              |  31 --
->  8 files changed, 316 insertions(+), 313 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-keypad.txt
->  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
->  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-vib.txt
->  delete mode 100644 include/linux/input/pmic8xxx-keypad.h
->  delete mode 100644 include/linux/input/pmic8xxx-pwrkey.h
->
+I am not aware of interrupts associated with vanilla :) "arm,arch-cache"
+objects, so I think that should be handled as a "qcom,krait" specific property
+(in the cpu node), or you should add another cache binding (compatible) for
+that.
 
+As you might have noticed (idle states thread) I am keen on defining objects
+for L1 caches explicitly, that patch still requires an ACK though (and
+you need to update it since you cannot add an interrupt property for all
+"arm,arch-cache" objects. I am sorry for being a pain, but I do not
+think that's correct from a HW description standpoint).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Finally we can have the edac driver look for a "qcom,krait"
+> compatible node in cpus that it can create a platform device for,
+> i.e..
+> 
+> static int __init krait_edac_driver_init(void)
+> {
+>         struct device_node *np;
+> 
+>         np = of_get_cpu_node(0, NULL);
+>         if (!np)
+>                 return 0;
+> 
+>         if (!krait_edacp && of_device_is_compatible(np, "qcom,krait"))
+>                 krait_edacp = of_platform_device_create(np, "krait_edac", NULL);
+>         of_node_put(np);
+> 
+>         return platform_driver_register(&krait_edac_driver);
+> }
+> module_init(krait_edac_driver_init);
+
+It seems fine to me, but it requires an ACK from platform bus and DT
+maintainers.
+
+Lorenzo
