@@ -1,48 +1,93 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Mar 2014 14:16:05 +0900
-Subject: [PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
-In-Reply-To: <1394196400-17112-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
- <1394196400-17112-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20140311051605.GB3649@verge.net.au>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Tue, 11 Mar 2014 05:27:39 +0000
+Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <20140310020051.GA15218@S2101-09.ap.freescale.net>
+References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
+ <201403060541.21665.marex@denx.de>
+ <50e0997786a0459eb08c9d92813253f9@BL2PR03MB338.namprd03.prod.outlook.com>
+ <201403061257.42755.marex@denx.de>
+ <20140310020051.GA15218@S2101-09.ap.freescale.net>
+Message-ID: <1d35d91fd0f1414587edf47ab03e20ae@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 12:46:39PM +0000, Ben Dooks wrote:
-> With the addition of clock-indices, we need to change the renesas
-> clock implementation to use these instead of the local definition.
+On Thu, Mar 10, 2014 at 10:01:42 AM, Marek Vasut wrote:
+> On Thu, Mar 06, 2014 at 12:57:42PM +0100, Marek Vasut wrote:
+> > On Thursday, March 06, 2014 at 06:02:03 AM, Yao Yuan wrote:
+> > > On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
+> > > > On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
+> > > > > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
+> > > > > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
+> > > > > > > Add dma support for i2c. This function depend on DMA driver.
+> > > > > > > You can turn on it by write both the dmas and dma-name
+> > > > > > > properties in dts node.
+> > > > > > >
+> > > > > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > > > > > > ---
+> > > > > >
+> > > > > > [...]
+> > > > > >
+> > > > > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
+> > > > > > > platform_device
+> > > > > >
+> > > > > > *pdev)
+> > > > > >
+> > > > > > >  	void __iomem *base;
+> > > > > > >  	int irq, ret;
+> > > > > > >  	u32 bitrate;
+> > > > > > >
+> > > > > > > +	u32 phy_addr;
+> > > > > > >
+> > > > > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+> > > > > > >
+> > > > > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
+> > > > > > > platform_device
+> > > > > >
+> > > > > > *pdev)
+> > > > > >
+> > > > > > >  	}
+> > > > > > >
+> > > > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > > > >
+> > > > > > > +	phy_addr = res->start;
+> > > > > >
+> > > > > > Uh ... Shawn, I really think I am lost here. Don't you need to
+> > > > > > map this memory before you can use it for DMA ? The DMA
+> > > > > > mapping function should give you the physical address and is
+> > > > > > the right way to go about this instead of pulling the address
+> from here, no ?
+> > > > > >
+> > > > > > I might be wrong here, I am rather uncertain, so please help me
+> out.
+> > > > > > Thanks!
+> > > > >
+> > > > > Hi, Marek, Thanks for your suggestion.
+> > > > > Here you can review the code in include/linux/ioport.h The
+> > > > > resource->start describes the entity on the CPU bus as a
+> > > > > resource->starting
+> > > > > physical address. So I thinks it can used for dma directly.
+> > > >
+> > > > This doesn't feel right for some reason. If this is a register
+> > > > area, you should
+> > > > ioremap() it. If it's a memory area you do DMA to/from, you need
+> > > > to make sure you correctly flush/invalidate caches and properly
+> > > > handle the effects the write buffer might have. But I have a
+> > > > feeling you actually do DMA to/from register space here ?
+> > >
+> > > Yes, It's a register area. But I don't know why I should ioremap()
+> > > it? It's a bus address and DMA can use it directly. Is there some
+> > > problem for my understanding ?
+> >
+> > I am not too sure here, thus I am poking someone who can clearly answer
+> this.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 2 +-
->  drivers/clk/shmobile/clk-mstp.c                                     | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+> There is already a devm_ioremap_resource() call in the existing code for
+> CPU to access registers in virtual address.  And my understanding on
+> Yuan's patch is that he needs the physical address of I2C DATA register
+> for DMA from/to the controller.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> index 5992dce..02a25d9 100644
-> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> @@ -43,7 +43,7 @@ Example
->  		clock-output-names =
->  			"tpu0", "mmcif1", "sdhi3", "sdhi2",
->  			 "sdhi1", "sdhi0", "mmcif0";
-> -		renesas,clock-indices = <
-> +		clock-indices = <
->  			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
->  			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
->  			R8A7790_CLK_MMCIF0
-> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> index 42d5912..95a2aa7 100644
-> --- a/drivers/clk/shmobile/clk-mstp.c
-> +++ b/drivers/clk/shmobile/clk-mstp.c
-> @@ -197,7 +197,7 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
->  			continue;
->  
->  		parent_name = of_clk_get_parent_name(np, i);
-> -		ret = of_property_read_u32_index(np, "renesas,clock-indices", i,
-> +		ret = of_property_read_u32_index(np, "clock-indices", i,
->  						 &clkidx);
->  		if (parent_name == NULL || ret < 0)
->  			break;
+> Shawn
 
-Won't this break compatibility with existing DTBs?
+Thanks you Shawn. Yes, it is. DMA need the physical address which resource->start is.
+
+And Hi Marek, How about you? Is there someone who can clearly answer this some and should I send the next version? 
