@@ -1,50 +1,31 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 11 Mar 2014 08:43:18 +0200
-Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>	
- <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>	
- <20140228155937.GQ21483@n2100.arm.linux.org.uk>
- <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
-Message-ID: <531EB086.8040404@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Mar 2014 07:50:24 +0100
+Subject: [PATCH v6 6/6] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140310215600.GA14968@bart.dudau.co.uk>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+ <1469359.kil5iaOqdU@wuerfel> <20140310215600.GA14968@bart.dudau.co.uk>
+Message-ID: <4254618.BlpDUOctDb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 18:25, Philipp Zabel wrote:
-
-> dvi-connector {
-> 	compatible = "dvi-connector";
-> 	ddc-i2c-bus = <&i2c3>;
+On Monday 10 March 2014 21:56:00 Liviu Dudau wrote:
 > 
-> 	port {
-> 		dvi_d_in: endpoint at 0 {
-> 			remote-endpoint = <&sii902x_out>;
-> 		};
-> 		dvi_a_in: endpoint at 1 {
-> 			remote-endpoint = <&tve_out>;
-> 		};
-> 	};
-> };
+> PCI_IOBASE is always defined. See the discussion with Russell on this subject.
 > 
-> It should be possible to let the connector know that those two endpoints
-> are connected to a TMDS source and to a VGA source, respectively.
+> include/asm-generic/io.h has at line 118:
+> 
+> #ifndef PCI_IOBASE
+> #define PCI_IOBASE ((void __iomem *) 0)
+> #endif
 
-I have not worked with boards that would have the analog part, so just
-wondering about the above.
+That is only defined for those that use asm-generic/pci.h, which most architectures
+don't.
+ 
+> I will go with my idea tomorrow. arm64 overwrite the implementation anyway, I
+> find it cleaner rather than having to do #ifdefs and/or ifs.
 
-The above would mean that either digital or analog is in use, but not
-both. Was that the intention? From the connector's perspective, the
-analog and digital pins are separate, and I think they can be used at
-the same time. That kind of sounds like the analog and digital pins
-should be represented as separate ports.
+I'd really hope we can get to a point where arm64 doesn't need any architecture
+specific code for this. It doesn't do anything special.
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/22de5d0b/attachment.sig>
+	Arnd
