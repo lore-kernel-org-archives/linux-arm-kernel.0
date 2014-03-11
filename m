@@ -1,21 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 11 Mar 2014 12:15:00 +0000
-Subject: Query on patch to be upstream ?
-In-Reply-To: <CAD15agah=aWBHARXVNRgpxg1wepq+o=LML8bMms4ULpwuY_J0A@mail.gmail.com>
-References: <CAD15agah=aWBHARXVNRgpxg1wepq+o=LML8bMms4ULpwuY_J0A@mail.gmail.com>
-Message-ID: <20140311121500.GH31104@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 11 Mar 2014 13:15:49 +0100
+Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
+In-Reply-To: <20140311112342.GE21216@lee--X1>
+References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
+ <531EEA39.50504@st.com> <20140311112342.GE21216@lee--X1>
+Message-ID: <531EFE75.9010709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 08:46:24PM +0000, Ritesh Harjani wrote:
-> Your Patch (arm64: Implement coherent DMA API based on swiotlb) from
-> your devel branch going upstream (without modifications) ?
 
-That's the plan. But once we get the system topology or Santosh's dma I
-coherent DT bindings plan to make it DT-driven on whether a device is
-coherent or not. For now we need some solution as I get people asking
-about cache management for DMA buffers (though none of them got back
-with a Tested-by ;)).
 
--- 
-Catalin
+On 03/11/2014 12:23 PM, Lee Jones wrote:
+>>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>>
+>>> This patch adds support to rev E board of B2020 which has few minor
+>>> changes :
+>>> 	PHY reset PIO (Change from PIO30 to PIO07)
+>>> 	Power LED(Green) Control(Change from PIO47 to PIO13)
+>>
+>> I thought we decided last October to support only one revision of
+>> the b2020 board.
+>>
+>> The idea was to create an external git to provide DTS for all our
+>> boards, and only have a minimal subset in in the kernel.
+>
+> Ah, I was unaware of that conversation/decision. If that's the case we
+> can scrap this submission along with the following patch.
+
+In fact we had the discussion together with Arnd (IIRC) on #armlinux :)
+
+The reason is we wanted to avoid flooding arch/arm/dts/ with all the 
+possible combinations of board revisions.
+
+The idea was to put in place a git repository at stlinux.com to provide 
+the DTS for all the STi boards, and try to keep arch/arm/dts/sti* simple.
+
+>
+> JOOI, what happens if I want to boot Mainline on my revE board? It
+> won't be fully functional will it? That will be a shame. The LEDs, not
+> so much, but networking is a pretty big piece of functionality to
+> lose.
+
+I agree this is not comfortable.
+
+The problem is that your patch is not enough. We would need to create 
+much more files, because for example, the i2c used are not the same 
+between rev. C and rev. E.
+
+It gives theses files only for b2020 support:
+   arch/arm/boot/dts/stih415-b2020.dts
+   arch/arm/boot/dts/stih416-b2020e.dts
+   arch/arm/boot/dts/stih41x-b2020e.dtsi
+   arch/arm/boot/dts/stih416-b2020.dts
+   arch/arm/boot/dts/stih41x-b2020.dtsi
+   arch/arm/boot/dts/stih41x-b2020x.dtsi
+
+Regards,
+Maxime
