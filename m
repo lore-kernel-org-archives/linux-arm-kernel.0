@@ -1,47 +1,34 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 11 Mar 2014 14:16:23 +0200
-Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
-In-Reply-To: <20140311120259.GI21216@lee--X1>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
- <531ECDCB.4060700@ti.com> <20140311120259.GI21216@lee--X1>
-Message-ID: <531EFE97.1090202@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Mar 2014 13:18:19 +0100
+Subject: [PATCH 2/3] ARM/leds: move ARM Versatile LED driver to leds
+ subsystem
+In-Reply-To: <1393510075.460580224@f137.i.mail.ru>
+References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+ <1393509500-26002-2-git-send-email-linus.walleij@linaro.org>
+ <1393510075.460580224@f137.i.mail.ru>
+Message-ID: <CACRpkdb+nLnjM7PUtkzmSJLjEC7FOH65sgOB6m-BUPB8YMzxiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2014 02:02 PM, Lee Jones wrote:
->>> Hi,
->>>
->>> This patchset brings up USB Host ports and Ethernet port on
->>> the OMAP5 uEVM board.
->>>
->>> It also does some cleanup with respect to DT clock binding
->>> for the mfd/omap-usb-host driver.
->>>
->>> Please queue these for -next.
->>>
->>> Lee,
->>>
->>> I've folded some platform data dependent patches with mfd patches
->>> so that they don't break functionality when applied individually.
->>> You can safely pull in all MFD patches (1 to 6).
->>>
->>> Tony & Benoit,
->>>
->>> Can you please accept patches 7, 8 and 9?
->>
->> Tony has already picked up 7,8 and 9 through omap-soc tree.
->>
->> Since you acked most patches except 5 and 6, are you fine if Tony takes
->> all the patches 1 to 4 in this series via omap-soc tree?
->>
->> What about patches 5 and 6?
-> 
-> Any patches which are orthogonal can just be sucked into whichever tree
-> they belong in. If there are inter-subsystem dependencies I'd prefer
-> to take them and issue a immutable branch pull-request to the other
-> maintainers.
-> 
-Awesome. That would be great, thanks.
+On Thu, Feb 27, 2014 at 3:07 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> ???????, 27 ??????? 2014, 14:58 +01:00 ?? Linus Walleij <linus.walleij@linaro.org>:
+>> Now that we have converted this driver to a real platform device
+>> module-based thing, we move the driver down into the LEDs
+>> subsystem and rename the config option to LEDS_VERSATILE.
+>
+> In fact, it can be converted to use basic-mmio-gpio => leds-gpio.
 
-cheers,
--roger
+Hm, yeah I see what you mean. However this register is not described
+as a GPIO register, and on all Versatile/RealView boards these signals
+are soldered to LEDs, so they are not general purpose at all.
+
+On some systems without "real" GPIO the above would lead to
+compiling in the entire gpiolib (149 KB) just to do this.
+
+I would agree more with inventing something like leds-mmio as a
+separate refactoring after this, i.e. a driver for any memory-mapped
+LED, which should cover a few cases. What do you think about this
+idea?
+
+Yours,
+Linus Walleij
