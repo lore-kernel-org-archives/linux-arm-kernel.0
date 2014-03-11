@@ -1,64 +1,94 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 11 Mar 2014 11:46:43 +0100
-Subject: [PATCH v2 0/7] tty: xuartps: Rebranding + DT documentation
-In-Reply-To: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <531EE993.80400@monstr.eu>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 11 Mar 2014 11:49:29 +0100
+Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
+In-Reply-To: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
+References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <531EEA39.50504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
-> Hi,
-> 
-> this series rebrands the Xilinx PS UART driver as Cadence UART and
-> documents its DT bindings (+ some clean up along the way).
-> 
-> The rebranding goes as far as reasonable. Things like file name, kconfig
-> symbols and other things with user space impact are left as is. Please
-> refer to the discussion in the RFC threads[1-2] for more details.
-> 
-> Similar the DT binding has been extended. In addition to the new and
-> preferred Cadence binding, the current xuartps binding is maintained.
-> Though, only the Cadence names for clock-names are documented.
-> 
-> References:
->  [1]  https://lkml.org/lkml/2014/3/4/405
->  [2]  https://lkml.org/lkml/2014/3/7/450
-> 
-> v2:
->  - no changes regarding the patches
->  - fixed (I sincerely hope) email recipients
-> 
-> Changes from the latest RFC:
->  - squashed function/symbol renaming into 'tty: xuartps: Rebrand driver
->    as Cadence UART'
->  - Revised the commit message of 'tty: xuartps: Don't write IRQ disable
->    register to enable interrupts' (was 'tty: xuartps: Remove bogus
->    comment and register write'
+Hi Lee,
 
-One more thing. I was thinking this is based on my 3 patches I have
-already sent to mainline. But as I see they are not applied yet.
+On 03/11/2014 11:22 AM, Lee Jones wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
+> This patch adds support to rev E board of B2020 which has few minor
+> changes :
+> 	PHY reset PIO (Change from PIO30 to PIO07)
+> 	Power LED(Green) Control(Change from PIO47 to PIO13)
 
-https://lkml.org/lkml/2014/1/21/107
-https://lkml.org/lkml/2014/1/21/101
-http://www.spinics.net/lists/arm-kernel/msg302796.html
+I thought we decided last October to support only one revision of the 
+b2020 board.
 
-Thanks,
-Michal
+The idea was to create an external git to provide DTS for all our 
+boards, and only have a minimal subset in in the kernel.
 
+Regards,
+Maxime
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/39360ad4/attachment.sig>
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> ---
+>   arch/arm/boot/dts/Makefile               |  3 ++-
+>   arch/arm/boot/dts/stih416-b2020-revE.dts | 36 ++++++++++++++++++++++++++++++++
+>   2 files changed, 38 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 0320303..325218a 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -278,7 +278,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+>   dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+>   	stih416-b2000.dtb \
+>   	stih415-b2020.dtb \
+> -	stih416-b2020.dtb
+> +	stih416-b2020.dtb \
+> +	stih416-b2020-revE.dtb
+>   dtb-$(CONFIG_ARCH_SUNXI) += \
+>   	sun4i-a10-a1000.dtb \
+>   	sun4i-a10-cubieboard.dtb \
+> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> new file mode 100644
+> index 0000000..bcb9d00
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> @@ -0,0 +1,36 @@
+> +/*
+> + * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
+> + * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +#include "stih416.dtsi"
+> +#include "stih41x-b2020.dtsi"
+> +/ {
+> +        model = "STih416 B2020 REV. E";
+> +	compatible = "st,stih416", "st,stih416-b2020";
+> +
+> +	soc {
+> +
+> +		leds {
+> +			compatible	= "gpio-leds";
+> +			red {
+> +				#gpio-cells = <1>;
+> +				label	= "Front Panel LED";
+> +				gpios	= <&PIO4 1>;
+> +				linux,default-trigger	= "heartbeat";
+> +			};
+> +			green {
+> +				gpios	= <&PIO1 3>;
+> +				default-state = "off";
+> +			};
+> +		};
+> +
+> +		ethernet1: ethernet at fef08000 {
+> +			snps,reset-gpio 	= <&PIO0 7>;
+> +		};
+> +	};
+> +};
+>
