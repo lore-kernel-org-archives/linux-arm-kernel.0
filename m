@@ -1,29 +1,31 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 11 Mar 2014 18:13:08 -0400
-Subject: [GIT PULL] ARM: mach-bcm: bcm281xx clock driver
-In-Reply-To: <20140311200432.GF31877@quad.lixom.net>
-References: <20140306044816.GA26681@beef>
- <20140311200432.GF31877@quad.lixom.net>
-Message-ID: <20140311221308.GM25092@beef>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 11 Mar 2014 15:13:59 -0700
+Subject: [PATCH] ARM: zynq: Add OCM driver
+In-Reply-To: <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
+References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
+ <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
+Message-ID: <e870cbc7-5934-4a14-aab4-416cdfd1627d@VA3EHSMHS007.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 01:04:32PM -0700, Olof Johansson wrote:
-> On Wed, Mar 05, 2014 at 11:48:16PM -0500, Matt Porter wrote:
-> > The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
-> > 
-> >   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/drivers
-> > 
-> > for you to fetch changes up to 1a5823c9209f0435347fcc079cf9b0dc01882db0:
-> > 
-> >   clk: bcm281xx: don't disable unused peripheral clocks (2014-02-24 13:50:36 -0500)
+On Tue, 2014-03-11 at 02:31PM -0700, Olof Johansson wrote:
+> Hi Michal,
 > 
-> Looks like this one was already merged.
+> Sorry for the late review, I didn't notice the driver when it was
+> posted and I only saw it now with the pull request. Comments below.
+> 
+> 
+> On Mon, Jan 6, 2014 at 7:36 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> > The driver provide memory allocator which can
+> > be used by others drivers to allocate memory inside OCM.
+> > All location for 64kB blocks are supported
+> > and driver is trying to allocate the largest continuous
+> > block of memory.
+> 
+> I don't think you explain what OCM is anywhere, what is it? Since
+> you're reusing the generic SRAM driver I'm suspecting it's related?
 
-Yes, Arnd and I did this one f2f last week as part of a howto video.
+It stands for 'On-Chip Memory'. For Zynq that is a RAM consisting of
+four 64k chunks that can be individually mapped to a high or low address.
 
--Matt
+	S?ren
