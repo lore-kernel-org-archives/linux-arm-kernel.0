@@ -1,30 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Mar 2014 11:15:04 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <1394018461-757-1-git-send-email-holler@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 11 Mar 2014 12:15:55 +0200
+Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
+In-Reply-To: <20140310154105.GA4882@atomide.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <531823C5.1020008@ti.com> <20140307164929.GC3789@atomide.com>
+ <531DBCA8.80507@ti.com> <20140310154105.GA4882@atomide.com>
+Message-ID: <531EE25B.9060201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 5, 2014 at 12:21 PM, Alexander Holler <holler@ahsoftware.de> wrote:
+On 10/03/14 17:41, Tony Lindgren wrote:
 
-> The driver missed an of_xlate function to translate gpio numbers
-> as found in the DT to the correct chip and number.
->
-> While there I've set #gpio_cells to a fixed value of 2.
->
-> I've used gpio-pxa.c as template for those changes and tested my changes
-> successfully on a da850 board using entries for gpio-leds in a DT. So I didn't
-> reinvent the wheel but just copied and tested stuff.
->
-> Thanks to Grygorii Strashko for the hint to the existing code in gpio-pxa.
->
-> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>> How about do a pull request for just the .dts changes against current
+>>> omap-for-v3.15/dt branch ASAP for me so I can pull it in? That is assuming
+>>> that just the .dts changes alone won't break anything.
+>>
+>> Unfortunately they do break. At least pinmuxing is moved from the global
+>> definitions to be handled by the respective display drivers, and there
+>> are some regulator_name hacks that the DT patches remove.
+> 
+> OK. Will that cause regressions for omap3 as that's still also booting
+> in legacy mode?
 
-This v2 version applied, thanks!
+No, I don't think so. The problems revolve around the pdata-quirks, with
+current DSS support when booting with DT. It's rather difficult to split
+the series so that it could be merged freely in multiple parts.
 
-Yours,
-Linus Walleij
+If I split the series into three parts: 1) .dts changes 2) main DSS DT
+changes 3) removal of pdata-quirks etc, I run into problems. Both 1) and
+2) work fine individually, but when both are merged, there are two
+competing systems, the proper DT stuff and the pdata-quirks stuff. And I
+haven't found out a simple way to manage that, as the whole display
+support is split into multiple independent devices.
+
+One option would be to combine 1) and 3), so that when they are merged,
+there would be proper DT data, and the pdata-quirks would be removed so
+that it wouldn't be messing everything up. But that would, of course,
+mean that after merging 1+3, the display wouldn't work on those boards
+that rely on pdata-quirks, until 2) is merged.
+
+>> I think those changes could be removed from my patches, and then added
+>> back later when everything else has been merged.
+> 
+> Or you could have a second branch that also merges in omap-for-v3.15/dt
+> branch that you can send later towards the merge window after the arm-soc
+> changes have been merged. If you want to do that, then feel free to add
+> my ack also for the .dts changes:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> If however those changes get postponed to v3.16, it's best that you'll
+> redo the branch as I'm sure we'll have other merge issues for v3.16.
+
+Ok. At the moment I feel that the easiest option would be to keep the
+DSS DT series as it is, but merge omap-for-v3.15/dt to it and solve the
+conflicts. I'd keep that branch separate from the fbdev changes, so that
+I could send the DSS DT pull request later, when arm-soc has been pulled.
+
+>> The bigger issue is that suddenly there's lots of discussion about the
+>> display DT bindings. If those are not resolved very soon, I guess I have
+>> no choice but to again skip the merge window for the DSS DT changes.
+> 
+> OK, some of these more bindings can take easily six months to reach
+> some kind of resolution. You may be able to use TI specific unstable
+> bindings meanwhile if that makese sense.
+
+Yep. I don't know... If the whole port/endpoint system that I currently
+use is changed totally, it might be painful to support both the TI
+specific bindings with the old format and the newer format.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/7eadf63a/attachment-0001.sig>
