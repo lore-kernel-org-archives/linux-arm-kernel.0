@@ -1,42 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Mar 2014 12:53:51 +0000
-Subject: [PATCH] cpufreq: enable ARM drivers on arm64
-In-Reply-To: <531F0115.4000109@arm.com>
-References: <1393208877-15797-1-git-send-email-broonie@kernel.org>
- <531F0115.4000109@arm.com>
-Message-ID: <20140311125351.GQ28112@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Mar 2014 13:06:09 +0000
+Subject: Qualcomm PMIC8XXX keypad never worked?
+In-Reply-To: <8206209.oc1V5pPVYT@wuerfel>
+References: <5887114.1jrNo21sGX@wuerfel> <20140311120056.GH21216@lee--X1>
+ <8206209.oc1V5pPVYT@wuerfel>
+Message-ID: <20140311130609.GL21216@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 12:27:01PM +0000, Sudeep Holla wrote:
+> > > Something in the MFD_PM8XXX driver must have changed recently that now allows
+> > > the KEYBOARD_PMIC8XXX driver to be enabled. Unfortunately, it does not build
+> > > because of a dependency on the <linux/mfd/pm8xxx/gpio.h> header file that
+> > > does not exist.
+> > 
+> > I have it?
+> > 
+> > -rw-r--r-- 1 lee lee 2147 Dec 18 11:52 include/linux/mfd/pm8xxx/core.h
+> 
+> This is core.h, not gpio.h
 
-> Sorry for late response, looks like Rafael has pulled this change, but ...
+Hmmm... so it is. I think I'm going senile!
 
-> >+menu "Power management options"
-> >+
-> >+source "kernel/power/Kconfig"
-> >+
-> >+source "drivers/cpufreq/Kconfig"
-> >+
-> >+endmenu
+> > > In order to keep 'make randconfig' working on my test box, I have disabled
+> > > this driver, but it would be nice of someone could have a look into fixing it.
+> > 
+> > Can you send me the config that breaks please?
+> 
+> appended below. You might need more patches to build this, but you will get the
+> error if you just try building the input driver.
 
-> Is this patch based on recent kernels ? If so, either it should have caused
-> conflicts or silently duplicated the entries. "Power management options" are
-> already present.
+Okay, I've recreated the error.
 
-Yes, it was against -next.  It looks like either the original patch had
-the duplication or it crept in there during the rather lengthy time
-between submission and acceptance.
+I think it's this commit that's causing your error:
 
-> Also to be more consistent it with menu options, I would prefer this to be
-> placed under "CPU Power Management" like CPUIdle.
+  https://lkml.org/lkml/2013/12/10/903
 
-I'll submit an incremental patch for this; in general the best thing to
-do once things have been applied is to send a patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/bf531325/attachment.sig>
+... but the MFD isn't broken, so I guess your solution is the most
+elegant. If it's not fixed soon, I guess we should think about ripping
+it out. It's obvoious that no-one cares, as it's been broken for
+nearly 3 years.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
