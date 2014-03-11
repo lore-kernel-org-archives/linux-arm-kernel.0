@@ -1,43 +1,53 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 11 Mar 2014 16:41:29 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzNdIEFSTS9sZWRzOiBtb3ZlIEFSTSBWZXJzYXRpbGUg?=
- =?UTF-8?B?TEVEIGRyaXZlciB0byBsZWRzIHN1YnN5c3RlbQ==?=
-In-Reply-To: <1394540634.21334.27.camel@hornet>
-References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdb+nLnjM7PUtkzmSJLjEC7FOH65sgOB6m-BUPB8YMzxiA@mail.gmail.com>
- <1394540634.21334.27.camel@hornet>
-Message-ID: <1394541689.595951116@f330.i.mail.ru>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 11 Mar 2014 18:11:56 +0530
+Subject: [GIT PULL 4/4] omap crossbar support for v3.15
+In-Reply-To: <20140310163620.GB4882@atomide.com>
+References: <pull-1393802089-910509>
+ <5313bcc5.a8fc440a.467f.7ba2SMTPIN_ADDED_MISSING@mx.google.com>
+ <20140309073347.GL16310@quad.lixom.net> <20140310163620.GB4882@atomide.com>
+Message-ID: <531F0494.1040105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????, 11 ????? 2014, 12:23 UTC ?? Pawel Moll <pawel.moll@arm.com>:
-> On Tue, 2014-03-11 at 12:18 +0000, Linus Walleij wrote:
-> > On Thu, Feb 27, 2014 at 3:07 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> > > ???????, 27 ??????? 2014, 14:58 +01:00 ?? Linus Walleij <linus.walleij@linaro.org>:
-> > >> Now that we have converted this driver to a real platform device
-> > >> module-based thing, we move the driver down into the LEDs
-> > >> subsystem and rename the config option to LEDS_VERSATILE.
-> > >
-> > > In fact, it can be converted to use basic-mmio-gpio => leds-gpio.
-> > 
-> > Hm, yeah I see what you mean. However this register is not described
-> > as a GPIO register, and on all Versatile/RealView boards these signals
-> > are soldered to LEDs, so they are not general purpose at all.
-> > 
-> > On some systems without "real" GPIO the above would lead to
-> > compiling in the entire gpiolib (149 KB) just to do this.
-> > 
-> > I would agree more with inventing something like leds-mmio as a
-> > separate refactoring after this, i.e. a driver for any memory-mapped
-> > LED, which should cover a few cases. What do you think about this
-> > idea?
-> 
-> Something like this?
-> http://thread.gmane.org/gmane.linux.kernel/1387110 ;-)
-> 
-> But seriously speaking, I did exactly what Alexander mentioned on VE,
-> considering the SYS_LED & alikes as "pseudo-gpios".
+Tony,
 
-It turns out everything has already been invented :)
+On Monday 10 March 2014 10:06 PM, Tony Lindgren wrote:
+> * Olof Johansson <olof@lixom.net> [140308 23:36]:
+>> On Sun, Mar 02, 2014 at 03:14:49PM -0800, Tony Lindgren wrote:
+>>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>>
+>>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/crossbar-signed
+>>>
+>>> for you to fetch changes up to 9594274201ac3c67d5c569aae63792e58bcd33e6:
+>>>
+>>>   Merge branch 'crossbar_3.14_rc1' of git://github.com/Sricharanti/sricharan into omap-for-v3.15/crossbar (2014-02-28 13:35:02 -0800)
+>>>
+>>> ----------------------------------------------------------------
+>>>
+>>> Add support for GIC crossbar that routes interrupts on newer omaps.
+>>>
+>>> Looks like people wanted these merged via the omap tree as it's
+>>> the only user for the GIC crossbar.
+>>>
+>>> ----------------------------------------------------------------
+>>> Sricharan R (4):
+>>>       DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+>>>       DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+>>>       ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+>>>       ARM: DRA: Enable Crossbar IP support for DRA7XX
+>> Whoa, lots of caps on those driver subjects. I don't think we need those
+>> in the future, lower case is just fine (and DRIVERS: usually isn't used).
+> Oops yeah I had them as "irqchip: crossbar" and "irqchip: irq-gic" in
+> my earlier branch for v3.14 that did not get merged, but this time I
+> pulled from Sricharan.
+>
+> Scricharan, maybe use less yelling naming for any follow-up patches?
+>  
+  Will make sure that there are no caps in the follow up patches.
 
----
+Regards,
+ Sricharan
