@@ -1,89 +1,74 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 11 Mar 2014 09:32:51 +0100
-Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
-References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
- <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
- <531DA900.5060202@monstr.eu>
- <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
-Message-ID: <531ECA33.8050803@monstr.eu>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 11 Mar 2014 09:40:26 +0100
+Subject: [PATCH] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394493477.23624.21.camel@deadeye.wl.decadent.org.uk>
+References: <1394413270-7169-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394419893.15968.88.camel@deadeye.wl.decadent.org.uk>
+ <531D98D1.4000707@gmail.com>
+ <1394493477.23624.21.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <531ECBFA.5010300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2014 11:32 PM, S?ren Brinkmann wrote:
-> On Mon, 2014-03-10 at 12:58PM +0100, Michal Simek wrote:
->> On 03/10/2014 11:56 AM, Mark Rutland wrote:
->>> On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary Kalluri wrote:
->>>> Added EDAC support for reporting the ecc errors of zynq ddr controller.
->>>> The ddr ecc controller corrects single bit errors and detects double bit
->>>> errors
+On 03/11/2014 12:17 AM, Ben Hutchings wrote:
+> On Mon, 2014-03-10 at 10:49 +0000, Sebastian Hesselbarth wrote:
+>> On 03/10/2014 02:51 AM, Ben Hutchings wrote:
+>>> On Mon, 2014-03-10 at 02:01 +0100, Sebastian Hesselbarth wrote:
+>>>> phy_ethtool_get_wol is a helper to get current WOL settings from
+>>>> a phy device. When using this helper on a PHY without .get_wol
+>>>> callback, struct ethtool_wolinfo is never set-up correctly and
+>>>> may contain misleading information about WOL status.
 >>>>
->>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->>>> ---
->>>>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
->>>>  drivers/edac/Kconfig                               |    7 +
->>>>  drivers/edac/Makefile                              |    1 +
->>>>  drivers/edac/zynq_edac.c                           |  613 ++++++++++++++++++++
->>>>  4 files changed, 639 insertions(+), 0 deletions(-)
->>>>  create mode 100644 Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>  create mode 100644 drivers/edac/zynq_edac.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/edac/zynq_edac.txt b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>> new file mode 100644
->>>> index 0000000..c21ff83
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>> @@ -0,0 +1,18 @@
->>>> +Zynq EDAC driver, it does reports the DDR ECC single bit errors that are
->>>> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
->>>> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
->>>> +
->>>> +Required properties:
->>>> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
+>>>> To fix this, always zero relevant fields of struct ethtool_wolinfo
+>>>> regardless of .get_wol callback availability.
 >>>
->>> Is this an or or a xor?
+>>> I think it's the caller's responsibility to zero out struct
+>>> ethtool_wolinfo.  That is what ethtool_get_wol() does.
 >>
->> Compatible string should be just xlnx,zynq-ddrc-1.00.a.
->> Nothing with ps7.
-> 
-> Isn't this vendor IP? IMHO, this should be something completely
-> different. Or if you want some Zynq-specific compat string it should
-> refer to an actual version string associated with Zynq. 1.00.a is not,
-> AFAIK.
+>> Actually, phy_ethtool_get_wol is the caller here. This belongs to
+>> a set of helpers that deal with phy_device, not netdev.
+>
+> Right, but ethtool_get_wol() is further up the stack and is responsible
+> for initialising the struct to defaults.
 
-I have checked with Punnaiah that this is Synopsys DDR memory controller.
-Zynq is based on 1.4 version with some customization.
-It means I think reasonable solution is
-call it drivers/edac/synopsys_edac.c
-rename zynq_ in driver to synopsys_ and
-use xlnx,zynq-ddrc-1.00.a compatible string because zynq is not using
-clean synopsys version.
+Ok, currently we have 3 users of phy_ethtool_get_wol():
+- mv643xx_eth and cpsw use that in their .get_wol callback that is
+   called on ethtool_get_wol().
+- phy_suspend to determine if it is safe to suspend a PHY
 
-I am not getting point why you don't like 1.00.a suffix here.
-Because of historical point of view compatible strings should be different
-for early silicon, silicon v1, silicon v2, silicon v3, etc
-but we haven't used it at all that's why we can use xilinx scheme
-which we are using for our soft IPs.
+With phy_suspend, I could use a kernel-compatible __ethtool_get_wol()
+but that requires to have an .attached_dev as __ethtool_get_wol()
+takes netdev. This would limit phy_suspend to attached PHYs while
+even non-attached PHYs should be suspended.
 
-Does it sound reasonable?
+OTOH, if we don't want phy_ethtool_get_wol to clear out ethtool_wol and
+no dependency on .attached_dev, phy_suspend is the only place to
+properly initialize ethtool_wol on this level.
 
-Thanks,
-Michal
+>>> Maybe you could split ethtool_get_wol() like we did
+>>> ethtool_get_settings(), to support in-kernel invocation of ETHTOOL_GWOL?
+>>
+>> Looking at the other users of phy_ethtool_get_wol (mv643xx_eth and
+>> cpsw), both drivers use this helper to determine what to pass back
+>> on the corresponding ethtool_get_wol call.
+>>
+>> BTW, both drivers above do zero ethtool_wolinfo before calling
+>> phy_ethtool_get_wol. I can either zero it in phy_suspend too or we
+>> deal with it properly in phy_ethtool_get_wol instead:
+>>
+>> void phy_ethtool_get_wol(struct phy_device *phydev, struct
+>> ethtool_wolinfo *wol)
+>> {
+>> 	memset(wol, 0, sizeof(*wol));
+>>
+>> 	if (phydev && phydev->drv->get_wol)
+>> 		phydev->drv->get_wol(phydev, wol);
+>> }
+> [...]
+>
+> This trashes wol->cmd.  Don't do that.
 
+You are right on this one, I'll missed it and will fix it up.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/ab2f6be7/attachment.sig>
+Sebastian
