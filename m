@@ -1,48 +1,54 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 11 Mar 2014 16:54:51 +0900
-Subject: [PATCH 2/5] ARM: dts: exynos4x12: Add PMU dt data to support
- PMU(Perforamnce Monitoring Unit)
+Date: Tue, 11 Mar 2014 16:54:50 +0900
+Subject: [PATCH 1/5] ARM: dts: exynos4x12: Add ADC's dt data to read raw data
 In-Reply-To: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
 References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1394524494-30641-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM CPU has its own performance profiling unit(PMU, Perforamnce Monitoring Unit).
-This patch add PMU dt data to support PMU which count cache hit and miss events.
+This patch add ADC(Analog to Digital Converter)'s dt data to get raw data
+with IIO subsystem. Usually, ADC is used to check temperature, jack type, and
+so on.
 
-PMU interrput list of Exynos4212
-- <2 2> : INTG2[2] - PMUIRQ[0] for CPU0
-- <3 2> : INTG3[2] - PMUIRQ[1] for CPU1
+Register map
+- <0x126C0000 0x100> : ADC register's base address
+- <0x10020718 0x4> : ADC_PHY_CONTROL, TS-ADC control register address
 
-PMU interrput list of Exynos4412
-- <2 2> : INTG2[2], PMUIRQ[0] for CPU0
-- <3 2> : INTG3[2], PMUIRQ[1] for CPU1
-- <18 2> : INTG18[2], PMUIRQ[2] : CPU2
-- <19 2> : INTG19[2], PMUIRQ[3] : CPU3
+Clock
+- <&clock 326> : ADC clock (clock name :'tsadc')
+
+Interrupt
+- INTG10[3] : ADC for General ADC
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos4x12.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/exynos4x12.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 5a3e551..1ec77f6 100644
+index 5c412aa..5a3e551 100644
 --- a/arch/arm/boot/dts/exynos4x12.dtsi
 +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -31,6 +31,12 @@
- 		mshc0 = &mshc_0;
+@@ -80,6 +80,18 @@
+ 		};
  	};
  
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
++	adc: adc at 126C0000 {
++		compatible = "samsung,exynos-adc-v1";
++		reg = <0x126C0000 0x100>, <0x10020718 0x4>;
 +		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
++		interrupts = <10 3>;
++		clocks = <&clock 326>;
++		clock-names = "adc";
++		#io-channel-cells = <1>;
++		io-channel-ranges;
++		status = "disabled";
 +	};
 +
- 	pd_isp: isp-power-domain at 10023CA0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023CA0 0x20>;
+ 	pinctrl_2: pinctrl at 03860000 {
+ 		compatible = "samsung,exynos4x12-pinctrl";
+ 		reg = <0x03860000 0x1000>;
 -- 
 1.8.0
