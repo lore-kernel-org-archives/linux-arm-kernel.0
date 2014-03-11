@@ -1,152 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 14:31:21 -0700
-Subject: [PATCH] ARM: zynq: Add OCM driver
-In-Reply-To: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
-References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
-Message-ID: <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 11 Mar 2014 16:49:10 -0500
+Subject: [PATCH 00/10] arch/arm OMAP IOMMU patches for 3.15
+In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
+References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
+Message-ID: <531F84D6.8070101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Paul,
 
-Sorry for the late review, I didn't notice the driver when it was
-posted and I only saw it now with the pull request. Comments below.
-
-
-On Mon, Jan 6, 2014 at 7:36 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> The driver provide memory allocator which can
-> be used by others drivers to allocate memory inside OCM.
-> All location for 64kB blocks are supported
-> and driver is trying to allocate the largest continuous
-> block of memory.
-
-I don't think you explain what OCM is anywhere, what is it? Since
-you're reusing the generic SRAM driver I'm suspecting it's related?
-
-> diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
-> new file mode 100644
-> index 0000000..64cb5e8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
-> @@ -0,0 +1,17 @@
-> +Device tree bindings for Zynq's OCM
-> +
-> +The OCM is divided to 4 64kB segments which can be separately configured
-> +to low or high location. Location is controlled via SLCR.
-> +
-> +Required properties:
-> + compatible: Compatibility string. Must be "xlnx,zynq-ocm-1.0".
-> + reg: Specify the base and size of the OCM registers in the memory map.
-> +      E.g.: reg = <0xf800c000 0x1000>;
-> +
-> +Example:
-> +ocmc: ocmc at f800c000 {
-> +       compatible =  "xlnx,zynq-ocm-1.0";
-> +       interrupt-parent = <&intc>;
-> +       interrupts = <0 3 4>;
-> +       reg = <0xf800c000 0x1000>;
-> +} ;
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 1d942e2..4929be5 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -66,6 +66,13 @@
->                         cache-level = <2>;
->                 };
+On 03/05/2014 06:24 PM, Suman Anna wrote:
+> Hi Paul, Benoit,
 >
-> +               ocmc: ocmc at f800c000 {
-> +                       compatible = "xlnx,zynq-ocm-1.0";
-> +                       interrupt-parent = <&intc>;
-> +                       interrupts = <0 3 4>;
-> +                       reg = <0xf800c000 0x1000>;
-> +               } ;
-> +
->                 uart0: uart at e0000000 {
->                         compatible = "xlnx,xuartps";
->                         status = "disabled";
-> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-> index 323e505..f3e6ce4 100644
-> --- a/arch/arm/mach-zynq/Kconfig
-> +++ b/arch/arm/mach-zynq/Kconfig
-> @@ -15,5 +15,6 @@ config ARCH_ZYNQ
->         select CADENCE_TTC_TIMER
->         select ARM_GLOBAL_TIMER
->         select MFD_SYSCON
-> +       select GENERIC_ALLOCATOR
->         help
->           Support for Xilinx Zynq ARM Cortex A9 Platform
-> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-> index 1b25d92..626f64b 100644
-> --- a/arch/arm/mach-zynq/Makefile
-> +++ b/arch/arm/mach-zynq/Makefile
-> @@ -3,7 +3,7 @@
->  #
+> This is a repost as per Tony's request [3] of all the OMAP IOMMU DT support
+> patches that are under arch/arm. The series just assimilates patches 8
+> through 13 from the v3 OMAP IOMMU DT adaptation for 3.15 series [1], and
+> all the v2 patches from the OMAP IOMMU DTS nodes [2].
 >
->  # Common support
-> -obj-y                          := common.o slcr.o
-> +obj-y                          := common.o slcr.o zynq_ocm.o
->  CFLAGS_REMOVE_hotplug.o                =-march=armv6k
->  CFLAGS_hotplug.o               =-Wa,-march=armv7-a -mcpu=cortex-a9
->  obj-$(CONFIG_HOTPLUG_CPU)      += hotplug.o
-> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> index b097844..953f6a1 100644
-> --- a/arch/arm/mach-zynq/common.h
-> +++ b/arch/arm/mach-zynq/common.h
-> @@ -24,6 +24,7 @@ extern int zynq_early_slcr_init(void);
->  extern void zynq_slcr_system_reset(void);
->  extern void zynq_slcr_cpu_stop(int cpu);
->  extern void zynq_slcr_cpu_start(int cpu);
-> +extern u32 zynq_slcr_get_ocm_config(void);
+> The only change made with respect to the patches above is in the OMAP4
+> and OMAP5 DTS nodes - I have adjusted the reg sizes from 0xff to 0x100.
 >
->  #ifdef CONFIG_SMP
->  extern void secondary_startup(void);
-> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> index c1f1499..9a37ab3 100644
-> --- a/arch/arm/mach-zynq/slcr.c
-> +++ b/arch/arm/mach-zynq/slcr.c
-> @@ -26,6 +26,7 @@
->  #define SLCR_PS_RST_CTRL_OFFSET                0x200 /* PS Software Reset Control */
->  #define SLCR_A9_CPU_RST_CTRL_OFFSET    0x244 /* CPU Software Reset Control */
->  #define SLCR_REBOOT_STATUS_OFFSET      0x258 /* PS Reboot Status */
-> +#define SLCR_OCM_CFG_OFFSET            0x910 /* OCM Address Mapping */
->
->  #define SLCR_UNLOCK_MAGIC              0xDF0D
->  #define SLCR_A9_CPU_CLKSTOP            0x10
-> @@ -107,6 +108,20 @@ void zynq_slcr_system_reset(void)
->  }
->
->  /**
-> + * zynq_slcr_get_ocm_config - Get SLCR OCM config
-> + *
-> + * return:     OCM config bits
-> + */
-> +u32 zynq_slcr_get_ocm_config(void)
-> +{
-> +       u32 val;
-> +
-> +       zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
-> +
-> +       return val;
-> +}
-> +
-> +/**
->   * zynq_slcr_cpu_start - Start cpu
->   * @cpu:       cpu number
->   */
-> diff --git a/arch/arm/mach-zynq/zynq_ocm.c b/arch/arm/mach-zynq/zynq_ocm.c
-> new file mode 100644
-> index 0000000..034a65b
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/zynq_ocm.c
-> @@ -0,0 +1,243 @@
-> +/*
-> + * Copyright (C) 2013 Xilinx
-> + *
-> + * Based on "Generic on-chip SRAM allocation driver"
+> Can you please provide your acks on the hwmod patches and DTS
+> patches?
 
-We're not adding new drivers under arch/arm, so if you need this
-driver then you should either merge it under drivers/ somewhere, or
-look at extending the generic driver in a way that you can reuse it.
+Ping. Can you review and provide your acks for Patches 2 and 5 (the 
+hwmod patches) for Tony to pick up all the patches in the series?
 
+regards
+Suman
 
--Olof
+>
+> [1] http://marc.info/?l=linux-omap&m=139362022805667&w=2
+> [2] http://marc.info/?l=linux-omap&m=139362062805816&w=2
+> [3] http://marc.info/?l=linux-omap&m=139404802021252&w=2
+>
+> Florian Vaussard (4):
+>    ARM: OMAP3: remove deprecated CONFIG_OMAP_IOMMU_IVA2
+>    ARM: dts: OMAP3: Update ISP IOMMU node
+>    ARM: dts: OMAP3: Add IVA IOMMU node
+>    ARM: dts: OMAP4: Add IOMMU nodes
+>
+> Suman Anna (6):
+>    ARM: OMAP3: fix iva mmu programming issues
+>    ARM: OMAP2+: change the ISP device archdata MMU name for DT
+>    ARM: OMAP2+: use pdata quirks for iommu reset lines
+>    ARM: OMAP5: hwmod data: add mmu data for ipu & dsp
+>    ARM: OMAP2+: extend iommu pdata-quirks to OMAP5
+>    ARM: dts: OMAP5: Add IOMMU nodes
+>
+>   arch/arm/boot/dts/omap3.dtsi                | 15 ++++--
+>   arch/arm/boot/dts/omap4.dtsi                | 15 ++++++
+>   arch/arm/boot/dts/omap5.dtsi                | 15 ++++++
+>   arch/arm/mach-omap2/clockdomains3xxx_data.c |  2 +-
+>   arch/arm/mach-omap2/devices.c               |  3 ++
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 12 ++---
+>   arch/arm/mach-omap2/omap_hwmod_54xx_data.c  | 83 +++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/pdata-quirks.c          | 24 +++++++++
+>   arch/arm/plat-omap/Kconfig                  |  3 --
+>   9 files changed, 157 insertions(+), 15 deletions(-)
+>
