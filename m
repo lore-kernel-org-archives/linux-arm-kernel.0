@@ -1,76 +1,80 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 11 Mar 2014 11:04:19 -0700
-Subject: Query on patch to be upstream ?
-In-Reply-To: <20140311121500.GH31104@arm.com>
-Message-ID: <1394561059-29307-1-git-send-email-lauraa@codeaurora.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 11 Mar 2014 15:24:06 -0300
+Subject: [PATCH 1/2] ARM: mx25: Add CLKO support
+Message-ID: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With one caveat below, you can add
+CLKO support is a clock output on mx25 which can output many of the internal 
+clock sources. It is useful for debugging purpose or also for driving the 
+audio codec for example.
 
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
-
-for "arm64: Implement coherent DMA API based on swiotlb"
-
-Thanks,
-Laura
-
--- 8< --
-From: Laura Abbott <lauraa@codeaurora.org>
-Date: Thu, 6 Mar 2014 21:05:41 -0800
-Subject: [PATCH] arm64: Use custom mmap function for noncoherent dma ops
-
-The non-coherent dma ops remap memory with appropriate attributes.
-This remapped address cannot be used with virt_to_page which
-dma_common_mmap uses. Implement a custom (but very similar) function
-which correctly calculates the physical address and remaps to userspace.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm64/mm/dma-mapping.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/clock/imx25-clock.txt |  3 +++
+ arch/arm/mach-imx/clk-imx25.c                           | 15 ++++++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e923a5b..5ac7a14 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -194,9 +194,36 @@ static void arm64_swiotlb_sync_sg_for_device(struct device *dev,
- 			       sg->length, dir);
+diff --git a/Documentation/devicetree/bindings/clock/imx25-clock.txt b/Documentation/devicetree/bindings/clock/imx25-clock.txt
+index db4f2f0..ceaf3134 100644
+--- a/Documentation/devicetree/bindings/clock/imx25-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx25-clock.txt
+@@ -139,6 +139,9 @@ clocks and IDs.
+ 	uart5_ipg		124
+ 	reserved		125
+ 	wdt_ipg			126
++	cko_div			127
++	cko_sel			128
++	clo			129
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index dc36e6c..2416bec 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -62,6 +62,10 @@ static struct clk_onecell_data clk_data;
+ 
+ static const char *cpu_sel_clks[] = { "mpll", "mpll_cpu_3_4", };
+ static const char *per_sel_clks[] = { "ahb", "upll", };
++static const char *cko_sel_clks[] = { "dummy", "osc", "cpu", "ahb", 
++				      "ipg", "dummy", "dummy", "dummy",
++				      "dummy", "dummy", "per0", "per2",
++				      "per13", "per14", "usbotg_ahb", "dummy",};
+ 
+ enum mx25_clks {
+ 	dummy, osc, mpll, upll, mpll_cpu_3_4, cpu_sel, cpu, ahb, usb_div, ipg,
+@@ -82,7 +86,7 @@ enum mx25_clks {
+ 	pwm2_ipg, pwm3_ipg, pwm4_ipg, rngb_ipg, reserved16, scc_ipg, sdma_ipg,
+ 	sim1_ipg, sim2_ipg, slcdc_ipg, spba_ipg, ssi1_ipg, ssi2_ipg, tsc_ipg,
+ 	uart1_ipg, uart2_ipg, uart3_ipg, uart4_ipg, uart5_ipg, reserved17,
+-	wdt_ipg, clk_max
++	wdt_ipg, cko_div, cko_sel, cko, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -117,6 +121,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
+ 	clk[per13_sel] = imx_clk_mux("per13_sel", ccm(CCM_MCR), 13, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
+ 	clk[per14_sel] = imx_clk_mux("per14_sel", ccm(CCM_MCR), 14, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
+ 	clk[per15_sel] = imx_clk_mux("per15_sel", ccm(CCM_MCR), 15, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
++	clk[cko_div] = imx_clk_divider("cko_div", "cko_sel", ccm(CCM_MCR), 24, 6);
++	clk[cko_sel] = imx_clk_mux("cko_sel", ccm(CCM_MCR), 20, 4, cko_sel_clks, ARRAY_SIZE(cko_sel_clks));
++	clk[cko] = imx_clk_gate("cko", "cko_div", ccm(CCM_MCR),  30);
+ 	clk[per0] = imx_clk_divider("per0", "per0_sel", ccm(CCM_PCDR0), 0, 6);
+ 	clk[per1] = imx_clk_divider("per1", "per1_sel", ccm(CCM_PCDR0), 8, 6);
+ 	clk[per2] = imx_clk_divider("per2", "per2_sel", ccm(CCM_PCDR0), 16, 6);
+@@ -230,6 +237,12 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+ 
++	/*
++	 * Let's initially set up CLKO parent as ipg, since this configuration
++	 * is used on some imx25 board designs to clock the audio codec.
++	 */
++	clk_set_parent(clk[cko_sel], clk[ipg]);
++
+ 	return 0;
  }
  
-+int arm64_swiotlb_mmap(struct device *dev, struct vm_area_struct *vma,
-+		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		 struct dma_attrs *attrs)
-+{
-+	int ret = -ENXIO;
-+	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
-+					PAGE_SHIFT;
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
-+	unsigned long off = vma->vm_pgoff;
-+
-+	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
-+
-+	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-+		return ret;
-+
-+	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      vma->vm_end - vma->vm_start,
-+				      vma->vm_page_prot);
-+	}
-+
-+	return ret;
-+}
-+
- struct dma_map_ops noncoherent_swiotlb_dma_ops = {
- 	.alloc = arm64_swiotlb_alloc_noncoherent,
- 	.free = arm64_swiotlb_free_noncoherent,
-+	.mmap = arm64_swiotlb_mmap,
- 	.map_page = arm64_swiotlb_map_page,
- 	.unmap_page = arm64_swiotlb_unmap_page,
- 	.map_sg = arm64_swiotlb_map_sg_attrs,
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.2
