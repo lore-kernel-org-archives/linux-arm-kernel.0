@@ -1,61 +1,38 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 11 Mar 2014 16:49:10 -0500
-Subject: [PATCH 00/10] arch/arm OMAP IOMMU patches for 3.15
-In-Reply-To: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
-Message-ID: <531F84D6.8070101@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Mar 2014 14:26:07 -0700
+Subject: [PATCH 3/7] ARM: zynq: Hang iomapped slcr address on device_node
+In-Reply-To: <ae4583176ee5c9d8a8a2d53c000b86711eb66287.1389018985.git.michal.simek@xilinx.com>
+References: <cover.1389018985.git.michal.simek@xilinx.com>
+ <ae4583176ee5c9d8a8a2d53c000b86711eb66287.1389018985.git.michal.simek@xilinx.com>
+Message-ID: <CAOesGMjzNWXs26T2ZxGi=ASk2ETk0P5re-QdfwGT6O8M=5tDkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Mon, Jan 6, 2014 at 6:36 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>
+> For later usage by zynq clk driver.
+>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>  arch/arm/mach-zynq/slcr.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+> index 9746de7..2891dcf 100644
+> --- a/arch/arm/mach-zynq/slcr.c
+> +++ b/arch/arm/mach-zynq/slcr.c
+> @@ -121,6 +121,8 @@ int __init zynq_early_slcr_init(void)
+>                 BUG();
+>         }
+>
+> +       np->data = (__force void *)zynq_slcr_base;
 
-On 03/05/2014 06:24 PM, Suman Anna wrote:
-> Hi Paul, Benoit,
->
-> This is a repost as per Tony's request [3] of all the OMAP IOMMU DT support
-> patches that are under arch/arm. The series just assimilates patches 8
-> through 13 from the v3 OMAP IOMMU DT adaptation for 3.15 series [1], and
-> all the v2 patches from the OMAP IOMMU DTS nodes [2].
->
-> The only change made with respect to the patches above is in the OMAP4
-> and OMAP5 DTS nodes - I have adjusted the reg sizes from 0xff to 0x100.
->
-> Can you please provide your acks on the hwmod patches and DTS
-> patches?
 
-Ping. Can you review and provide your acks for Patches 2 and 5 (the 
-hwmod patches) for Tony to pick up all the patches in the series?
+This is quite unusual, we normally remap again if needed. Is there a
+reason you can't just have the driver request the resource and map it
+like most other ones do?
 
-regards
-Suman
 
->
-> [1] http://marc.info/?l=linux-omap&m=139362022805667&w=2
-> [2] http://marc.info/?l=linux-omap&m=139362062805816&w=2
-> [3] http://marc.info/?l=linux-omap&m=139404802021252&w=2
->
-> Florian Vaussard (4):
->    ARM: OMAP3: remove deprecated CONFIG_OMAP_IOMMU_IVA2
->    ARM: dts: OMAP3: Update ISP IOMMU node
->    ARM: dts: OMAP3: Add IVA IOMMU node
->    ARM: dts: OMAP4: Add IOMMU nodes
->
-> Suman Anna (6):
->    ARM: OMAP3: fix iva mmu programming issues
->    ARM: OMAP2+: change the ISP device archdata MMU name for DT
->    ARM: OMAP2+: use pdata quirks for iommu reset lines
->    ARM: OMAP5: hwmod data: add mmu data for ipu & dsp
->    ARM: OMAP2+: extend iommu pdata-quirks to OMAP5
->    ARM: dts: OMAP5: Add IOMMU nodes
->
->   arch/arm/boot/dts/omap3.dtsi                | 15 ++++--
->   arch/arm/boot/dts/omap4.dtsi                | 15 ++++++
->   arch/arm/boot/dts/omap5.dtsi                | 15 ++++++
->   arch/arm/mach-omap2/clockdomains3xxx_data.c |  2 +-
->   arch/arm/mach-omap2/devices.c               |  3 ++
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 12 ++---
->   arch/arm/mach-omap2/omap_hwmod_54xx_data.c  | 83 +++++++++++++++++++++++++++++
->   arch/arm/mach-omap2/pdata-quirks.c          | 24 +++++++++
->   arch/arm/plat-omap/Kconfig                  |  3 --
->   9 files changed, 157 insertions(+), 15 deletions(-)
->
+-Olof
