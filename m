@@ -1,62 +1,50 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Tue, 11 Mar 2014 13:48:28 +0000
-Subject: [PATCH 2/6] sched: rework of sched_domain topology definition
-In-Reply-To: <CAKfTPtDHfXxheXBoPeAxMGROroHa7YrW7y_RCB9nSoKCeTa66w@mail.gmail.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <1394003906-11630-3-git-send-email-vincent.guittot@linaro.org>
- <53175A3C.8010100@arm.com>
- <CAKfTPtC1_t78hvOw9u-t1BqUZj_dO3WFYp2OjX=RFZP-A7zSbg@mail.gmail.com>
- <20140311103119.GW9987@twins.programming.kicks-ass.net>
- <CAKfTPtDHfXxheXBoPeAxMGROroHa7YrW7y_RCB9nSoKCeTa66w@mail.gmail.com>
-Message-ID: <531F142C.2030203@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 11 Mar 2014 14:56:47 +0100
+Subject: [PATCH v3 1/5] ARM: STi: Add STiH407 SoC support
+In-Reply-To: <20140310123405.GU14976@lee--X1>
+References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
+ <1394203251-25361-2-git-send-email-maxime.coquelin@st.com>
+ <20140310123405.GU14976@lee--X1>
+Message-ID: <531F161F.9040804@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/14 13:27, Vincent Guittot wrote:
-> On 11 March 2014 11:31, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Thu, Mar 06, 2014 at 04:32:35PM +0800, Vincent Guittot wrote:
->>>> Never got the new name DIE for CPU? Might confuse people when they use
->>>> /proc/sys/kernel/sched_domain/cpuX/domainY/name or sched_domain_debug_one().
->>>
->>> In fact, CPU is also confusing because it's used for different things.
->>> But if it makes things even more confusing, i can come back to CPU
->>
->> Yeah, not sure DIE is the right thing either; because there's multi-die
->> packages that get classified under CPU :-)
->>
->> Take for example the Core 2 Quad, which was 2 dual core dies glued
->> together in a single package.
->>
->> There's also the AMD bulldozer which glued two dies into a single
->> package; but for those its not a problem because each die is a separate
->> numa node, so there DIE would actually be the correct term and PACKAGE
->> would be wrong.
->>
->> So while CPU sucks, I'm not sure we can come up with anything that's
->> actually correct. That said; we could try for something less wrong than
->> CPU :-)
-> 
-> OK
-> 
-> Dietmar,
-> 
-> Have you got another naming that DIE that could suit better ?
-> otherwise i will keep it
+Sorry, I missed this one.
 
-If backward compatibility is not an issue here, keep it.
-
--- Dietmar
-
-> 
-> Vincent
-> 
+On 03/10/2014 01:34 PM, Lee Jones wrote:
+>> This patch adds support to STiH407 SoC.
 >>
->> I'm not sure there are a lot of people who see/know the names of these
->> domains to be bothered by a change in them; it might be limited to just
->> us for all I know.
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>> ---
+>>   Documentation/arm/sti/stih407-overview.txt    | 18 ++++++++++++++++++
+>>   Documentation/devicetree/bindings/arm/sti.txt | 15 +++++++++++++++
+>>   arch/arm/mach-sti/Kconfig                     |  9 +++++++++
+>>   arch/arm/mach-sti/board-dt.c                  |  1 +
+>>   4 files changed, 43 insertions(+)
+>>   create mode 100644 Documentation/arm/sti/stih407-overview.txt
+>>   create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+>
+> <snip>
+>
+>> +config SOC_STIH407
+>> +	bool "STiH407 STMicroelectronics Consumer Electronics family"
+>> +	default y
+>> +	help
+>> +	  This enables support for STMicroelectronics Digital Consumer
+>> +	  Electronics family StiH407 parts, primarily targeted at set-top-box
+>> +	  and other digital audio/video applications using Flattened Device
+>> +	  Trees.
+>> +
+>
+> Are these configs actually used for something?
+Not currently, but it is going to happen (for reset controller).
+
+I will add it only when I'll send the reset controller driver for STiH407.
+
+Regards,
+Maxime
+
+>
+> <snip>
+>
