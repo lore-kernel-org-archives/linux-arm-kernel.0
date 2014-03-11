@@ -1,475 +1,1766 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 11 Mar 2014 11:46:13 -0400
-Subject: [PATCH v3 3/5] regulator: add bcm590xx regulator driver
-In-Reply-To: <1394552775-31264-1-git-send-email-mporter@linaro.org>
-References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
-Message-ID: <1394552775-31264-4-git-send-email-mporter@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 11 Mar 2014 08:47:06 -0700
+Subject: [PATCH v2 5/7] tty: xuartps: Rebrand driver as Cadence UART
+In-Reply-To: <08f123a4-5045-4ad1-909d-1c23eabee1c9@CO9EHSMHS023.ehs.local>
+References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394487610-2419-6-git-send-email-soren.brinkmann@xilinx.com>
+ <08f123a4-5045-4ad1-909d-1c23eabee1c9@CO9EHSMHS023.ehs.local>
+Message-ID: <6218b762-79dd-4ef7-b5ec-0a4ff82c3181@AM1EHSMHS005.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a regulator driver for the BCM590xx PMU voltage regulators.
-The driver supports LDOs and DCDCs in normal mode only. There is
-no support for low-power mode or power sequencing.
+On Tue, 2014-03-11 at 09:50AM +0100, Michal Simek wrote:
+> On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
+> > Zynq's UART is Cadence IP. Make this visible in the prompt in kconfig
+> > and additional comments in the driver.
+> > This also renames functions and symbols, as far as possible without
+> > breaking user space API, to reflect the Cadence origin. This is achieved
+> > through simple search and replace:
+> >  - s/XUARTPS/CDNS_UART/g
+> >  - s/xuartps/cdns_uart/g
+> > The only exception is PORT_XUARTPS, which stays as is, due to its
+> > exposure to user space.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  drivers/tty/serial/Kconfig         |   9 +-
+> >  drivers/tty/serial/xilinx_uartps.c | 908 +++++++++++++++++++------------------
+> >  include/uapi/linux/serial_core.h   |   2 +-
+> >  3 files changed, 471 insertions(+), 448 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> > index a3815eaed421..1294284342bc 100644
+> > --- a/drivers/tty/serial/Kconfig
+> > +++ b/drivers/tty/serial/Kconfig
+> > @@ -1368,18 +1368,19 @@ config SERIAL_MXS_AUART_CONSOLE
+> >  	  Enable a MXS AUART port to be the system console.
+> >  
+> >  config SERIAL_XILINX_PS_UART
+> > -	tristate "Xilinx PS UART support"
+> > +	tristate "Cadence (Xilinx Zynq) UART support"
+> >  	depends on OF
+> >  	select SERIAL_CORE
+> >  	help
+> > -	  This driver supports the Xilinx PS UART port.
+> > +	  This driver supports the Cadence UART. It is found e.g. in Xilinx
+> > +	  Zynq.
+> >  
+> >  config SERIAL_XILINX_PS_UART_CONSOLE
+> > -	bool "Xilinx PS UART console support"
+> > +	bool "Cadence UART console support"
+> >  	depends on SERIAL_XILINX_PS_UART=y
+> >  	select SERIAL_CORE_CONSOLE
+> >  	help
+> > -	  Enable a Xilinx PS UART port to be the system console.
+> > +	  Enable a Cadence UART port to be the system console.
+> >  
+> >  config SERIAL_AR933X
+> >  	tristate "AR933X serial port support"
+> > diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> > index a39c2d290902..f8729eabe302 100644
+> > --- a/drivers/tty/serial/xilinx_uartps.c
+> > +++ b/drivers/tty/serial/xilinx_uartps.c
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * Xilinx PS UART driver
+> > + * Cadence UART driver (found in Xilinx Zynq)
+> >   *
+> >   * 2011 - 2014 (C) Xilinx Inc.
+> >   *
+> > @@ -8,6 +8,10 @@
+> >   * License as published by the Free Software Foundation;
+> >   * either version 2 of the License, or (at your option) any
+> >   * later version.
+> > + *
+> > + * This driver has originally been pushed by Xilinx using a Zynq-branding. This
+> > + * still shows in the naming of this file, the kconfig symbols and some symbols
+> > + * in the code.
+> >   */
+> >  
+> >  #if defined(CONFIG_SERIAL_XILINX_PS_UART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+> > @@ -27,16 +31,16 @@
+> >  #include <linux/of.h>
+> >  #include <linux/module.h>
+> >  
+> > -#define XUARTPS_TTY_NAME	"ttyPS"
+> > -#define XUARTPS_NAME		"xuartps"
+> > -#define XUARTPS_MAJOR		0	/* use dynamic node allocation */
+> > -#define XUARTPS_MINOR		0	/* works best with devtmpfs */
+> > -#define XUARTPS_NR_PORTS	2
+> > -#define XUARTPS_FIFO_SIZE	64	/* FIFO size */
+> > -#define XUARTPS_REGISTER_SPACE	0xFFF
+> > +#define CDNS_UART_TTY_NAME	"ttyPS"
+> > +#define CDNS_UART_NAME		"xuartps"
+> > +#define CDNS_UART_MAJOR		0	/* use dynamic node allocation */
+> > +#define CDNS_UART_MINOR		0	/* works best with devtmpfs */
+> > +#define CDNS_UART_NR_PORTS	2
+> > +#define CDNS_UART_FIFO_SIZE	64	/* FIFO size */
+> > +#define CDNS_UART_REGISTER_SPACE	0xFFF
+> >  
+> > -#define xuartps_readl(offset)		ioread32(port->membase + offset)
+> > -#define xuartps_writel(val, offset)	iowrite32(val, port->membase + offset)
+> > +#define cdns_uart_readl(offset)		ioread32(port->membase + offset)
+> > +#define cdns_uart_writel(val, offset)	iowrite32(val, port->membase + offset)
+> >  
+> >  /* Rx Trigger level */
+> >  static int rx_trigger_level = 56;
+> > @@ -49,35 +53,35 @@ module_param(rx_timeout, uint, S_IRUGO);
+> >  MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
+> >  
+> >  /* Register offsets for the UART. */
+> > -#define XUARTPS_CR_OFFSET	0x00  /* Control Register */
+> > -#define XUARTPS_MR_OFFSET	0x04  /* Mode Register */
+> > -#define XUARTPS_IER_OFFSET	0x08  /* Interrupt Enable */
+> > -#define XUARTPS_IDR_OFFSET	0x0C  /* Interrupt Disable */
+> > -#define XUARTPS_IMR_OFFSET	0x10  /* Interrupt Mask */
+> > -#define XUARTPS_ISR_OFFSET	0x14  /* Interrupt Status */
+> > -#define XUARTPS_BAUDGEN_OFFSET	0x18  /* Baud Rate Generator */
+> > -#define XUARTPS_RXTOUT_OFFSET	0x1C  /* RX Timeout */
+> > -#define XUARTPS_RXWM_OFFSET	0x20  /* RX FIFO Trigger Level */
+> > -#define XUARTPS_MODEMCR_OFFSET	0x24  /* Modem Control */
+> > -#define XUARTPS_MODEMSR_OFFSET	0x28  /* Modem Status */
+> > -#define XUARTPS_SR_OFFSET	0x2C  /* Channel Status */
+> > -#define XUARTPS_FIFO_OFFSET	0x30  /* FIFO */
+> > -#define XUARTPS_BAUDDIV_OFFSET	0x34  /* Baud Rate Divider */
+> > -#define XUARTPS_FLOWDEL_OFFSET	0x38  /* Flow Delay */
+> > -#define XUARTPS_IRRX_PWIDTH_OFFSET 0x3C /* IR Minimum Received Pulse Width */
+> > -#define XUARTPS_IRTX_PWIDTH_OFFSET 0x40 /* IR Transmitted pulse Width */
+> > -#define XUARTPS_TXWM_OFFSET	0x44  /* TX FIFO Trigger Level */
+> > +#define CDNS_UART_CR_OFFSET		0x00  /* Control Register */
+> > +#define CDNS_UART_MR_OFFSET		0x04  /* Mode Register */
+> > +#define CDNS_UART_IER_OFFSET		0x08  /* Interrupt Enable */
+> > +#define CDNS_UART_IDR_OFFSET		0x0C  /* Interrupt Disable */
+> > +#define CDNS_UART_IMR_OFFSET		0x10  /* Interrupt Mask */
+> > +#define CDNS_UART_ISR_OFFSET		0x14  /* Interrupt Status */
+> > +#define CDNS_UART_BAUDGEN_OFFSET	0x18  /* Baud Rate Generator */
+> > +#define CDNS_UART_RXTOUT_OFFSET		0x1C  /* RX Timeout */
+> > +#define CDNS_UART_RXWM_OFFSET		0x20  /* RX FIFO Trigger Level */
+> > +#define CDNS_UART_MODEMCR_OFFSET	0x24  /* Modem Control */
+> > +#define CDNS_UART_MODEMSR_OFFSET	0x28  /* Modem Status */
+> > +#define CDNS_UART_SR_OFFSET		0x2C  /* Channel Status */
+> > +#define CDNS_UART_FIFO_OFFSET		0x30  /* FIFO */
+> > +#define CDNS_UART_BAUDDIV_OFFSET	0x34  /* Baud Rate Divider */
+> > +#define CDNS_UART_FLOWDEL_OFFSET	0x38  /* Flow Delay */
+> > +#define CDNS_UART_IRRX_PWIDTH_OFFSET	0x3C  /* IR Min Received Pulse Width */
+> > +#define CDNS_UART_IRTX_PWIDTH_OFFSET	0x40  /* IR Transmitted pulse Width */
+> > +#define CDNS_UART_TXWM_OFFSET		0x44  /* TX FIFO Trigger Level */
+> >  
+> >  /* Control Register Bit Definitions */
+> > -#define XUARTPS_CR_STOPBRK	0x00000100  /* Stop TX break */
+> > -#define XUARTPS_CR_STARTBRK	0x00000080  /* Set TX break */
+> > -#define XUARTPS_CR_TX_DIS	0x00000020  /* TX disabled. */
+> > -#define XUARTPS_CR_TX_EN	0x00000010  /* TX enabled */
+> > -#define XUARTPS_CR_RX_DIS	0x00000008  /* RX disabled. */
+> > -#define XUARTPS_CR_RX_EN	0x00000004  /* RX enabled */
+> > -#define XUARTPS_CR_TXRST	0x00000002  /* TX logic reset */
+> > -#define XUARTPS_CR_RXRST	0x00000001  /* RX logic reset */
+> > -#define XUARTPS_CR_RST_TO	0x00000040  /* Restart Timeout Counter */
+> > +#define CDNS_UART_CR_STOPBRK	0x00000100  /* Stop TX break */
+> > +#define CDNS_UART_CR_STARTBRK	0x00000080  /* Set TX break */
+> > +#define CDNS_UART_CR_TX_DIS	0x00000020  /* TX disabled. */
+> > +#define CDNS_UART_CR_TX_EN	0x00000010  /* TX enabled */
+> > +#define CDNS_UART_CR_RX_DIS	0x00000008  /* RX disabled. */
+> > +#define CDNS_UART_CR_RX_EN	0x00000004  /* RX enabled */
+> > +#define CDNS_UART_CR_TXRST	0x00000002  /* TX logic reset */
+> > +#define CDNS_UART_CR_RXRST	0x00000001  /* RX logic reset */
+> > +#define CDNS_UART_CR_RST_TO	0x00000040  /* Restart Timeout Counter */
+> >  
+> >  /*
+> >   * Mode Register:
+> > @@ -85,22 +89,22 @@ MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
+> >   * format. If this register is modified during transmission or reception,
+> >   * data validity cannot be guaranteed.
+> >   */
+> > -#define XUARTPS_MR_CLKSEL		0x00000001  /* Pre-scalar selection */
+> > -#define XUARTPS_MR_CHMODE_L_LOOP	0x00000200  /* Local loop back mode */
+> > -#define XUARTPS_MR_CHMODE_NORM		0x00000000  /* Normal mode */
+> > +#define CDNS_UART_MR_CLKSEL		0x00000001  /* Pre-scalar selection */
+> > +#define CDNS_UART_MR_CHMODE_L_LOOP	0x00000200  /* Local loop back mode */
+> > +#define CDNS_UART_MR_CHMODE_NORM	0x00000000  /* Normal mode */
+> >  
+> > -#define XUARTPS_MR_STOPMODE_2_BIT	0x00000080  /* 2 stop bits */
+> > -#define XUARTPS_MR_STOPMODE_1_BIT	0x00000000  /* 1 stop bit */
+> > +#define CDNS_UART_MR_STOPMODE_2_BIT	0x00000080  /* 2 stop bits */
+> > +#define CDNS_UART_MR_STOPMODE_1_BIT	0x00000000  /* 1 stop bit */
+> >  
+> > -#define XUARTPS_MR_PARITY_NONE		0x00000020  /* No parity mode */
+> > -#define XUARTPS_MR_PARITY_MARK		0x00000018  /* Mark parity mode */
+> > -#define XUARTPS_MR_PARITY_SPACE		0x00000010  /* Space parity mode */
+> > -#define XUARTPS_MR_PARITY_ODD		0x00000008  /* Odd parity mode */
+> > -#define XUARTPS_MR_PARITY_EVEN		0x00000000  /* Even parity mode */
+> > +#define CDNS_UART_MR_PARITY_NONE	0x00000020  /* No parity mode */
+> > +#define CDNS_UART_MR_PARITY_MARK	0x00000018  /* Mark parity mode */
+> > +#define CDNS_UART_MR_PARITY_SPACE	0x00000010  /* Space parity mode */
+> > +#define CDNS_UART_MR_PARITY_ODD		0x00000008  /* Odd parity mode */
+> > +#define CDNS_UART_MR_PARITY_EVEN	0x00000000  /* Even parity mode */
+> >  
+> > -#define XUARTPS_MR_CHARLEN_6_BIT	0x00000006  /* 6 bits data */
+> > -#define XUARTPS_MR_CHARLEN_7_BIT	0x00000004  /* 7 bits data */
+> > -#define XUARTPS_MR_CHARLEN_8_BIT	0x00000000  /* 8 bits data */
+> > +#define CDNS_UART_MR_CHARLEN_6_BIT	0x00000006  /* 6 bits data */
+> > +#define CDNS_UART_MR_CHARLEN_7_BIT	0x00000004  /* 7 bits data */
+> > +#define CDNS_UART_MR_CHARLEN_8_BIT	0x00000000  /* 8 bits data */
+> >  
+> >  /*
+> >   * Interrupt Registers:
+> > @@ -113,20 +117,20 @@ MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
+> >   * Reading either IER or IDR returns 0x00.
+> >   * All four registers have the same bit definitions.
+> >   */
+> > -#define XUARTPS_IXR_TOUT	0x00000100 /* RX Timeout error interrupt */
+> > -#define XUARTPS_IXR_PARITY	0x00000080 /* Parity error interrupt */
+> > -#define XUARTPS_IXR_FRAMING	0x00000040 /* Framing error interrupt */
+> > -#define XUARTPS_IXR_OVERRUN	0x00000020 /* Overrun error interrupt */
+> > -#define XUARTPS_IXR_TXFULL	0x00000010 /* TX FIFO Full interrupt */
+> > -#define XUARTPS_IXR_TXEMPTY	0x00000008 /* TX FIFO empty interrupt */
+> > -#define XUARTPS_ISR_RXEMPTY	0x00000002 /* RX FIFO empty interrupt */
+> > -#define XUARTPS_IXR_RXTRIG	0x00000001 /* RX FIFO trigger interrupt */
+> > -#define XUARTPS_IXR_RXFULL	0x00000004 /* RX FIFO full interrupt. */
+> > -#define XUARTPS_IXR_RXEMPTY	0x00000002 /* RX FIFO empty interrupt. */
+> > -#define XUARTPS_IXR_MASK	0x00001FFF /* Valid bit mask */
+> > +#define CDNS_UART_IXR_TOUT	0x00000100 /* RX Timeout error interrupt */
+> > +#define CDNS_UART_IXR_PARITY	0x00000080 /* Parity error interrupt */
+> > +#define CDNS_UART_IXR_FRAMING	0x00000040 /* Framing error interrupt */
+> > +#define CDNS_UART_IXR_OVERRUN	0x00000020 /* Overrun error interrupt */
+> > +#define CDNS_UART_IXR_TXFULL	0x00000010 /* TX FIFO Full interrupt */
+> > +#define CDNS_UART_IXR_TXEMPTY	0x00000008 /* TX FIFO empty interrupt */
+> > +#define CDNS_UART_ISR_RXEMPTY	0x00000002 /* RX FIFO empty interrupt */
+> > +#define CDNS_UART_IXR_RXTRIG	0x00000001 /* RX FIFO trigger interrupt */
+> > +#define CDNS_UART_IXR_RXFULL	0x00000004 /* RX FIFO full interrupt. */
+> > +#define CDNS_UART_IXR_RXEMPTY	0x00000002 /* RX FIFO empty interrupt. */
+> > +#define CDNS_UART_IXR_MASK	0x00001FFF /* Valid bit mask */
+> >  
+> >  /* Goes in read_status_mask for break detection as the HW doesn't do it*/
+> > -#define XUARTPS_IXR_BRK		0x80000000
+> > +#define CDNS_UART_IXR_BRK	0x80000000
+> >  
+> >  /*
+> >   * Channel Status Register:
+> > @@ -134,41 +138,42 @@ MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
+> >   * to monitor the status of bits in the channel interrupt status register,
+> >   * even if these are masked out by the interrupt mask register.
+> >   */
+> > -#define XUARTPS_SR_RXEMPTY	0x00000002 /* RX FIFO empty */
+> > -#define XUARTPS_SR_TXEMPTY	0x00000008 /* TX FIFO empty */
+> > -#define XUARTPS_SR_TXFULL	0x00000010 /* TX FIFO full */
+> > -#define XUARTPS_SR_RXTRIG	0x00000001 /* Rx Trigger */
+> > +#define CDNS_UART_SR_RXEMPTY	0x00000002 /* RX FIFO empty */
+> > +#define CDNS_UART_SR_TXEMPTY	0x00000008 /* TX FIFO empty */
+> > +#define CDNS_UART_SR_TXFULL	0x00000010 /* TX FIFO full */
+> > +#define CDNS_UART_SR_RXTRIG	0x00000001 /* Rx Trigger */
+> >  
+> >  /* baud dividers min/max values */
+> > -#define XUARTPS_BDIV_MIN	4
+> > -#define XUARTPS_BDIV_MAX	255
+> > -#define XUARTPS_CD_MAX		65535
+> > +#define CDNS_UART_BDIV_MIN	4
+> > +#define CDNS_UART_BDIV_MAX	255
+> > +#define CDNS_UART_CD_MAX	65535
+> >  
+> >  /**
+> > - * struct xuartps - device data
+> > + * struct cdns_uart - device data
+> >   * @port:		Pointer to the UART port
+> > - * @refclk:		Reference clock
+> > - * @aperclk:		APB clock
+> > + * @uartclk:		Reference clock
+> > + * @pclk:		APB clock
+> >   * @baud:		Current baud rate
+> >   * @clk_rate_change_nb:	Notifier block for clock changes
+> >   */
+> > -struct xuartps {
+> > +struct cdns_uart {
+> >  	struct uart_port	*port;
+> > -	struct clk		*refclk;
+> > -	struct clk		*aperclk;
+> > +	struct clk		*uartclk;
+> > +	struct clk		*pclk;
+> >  	unsigned int		baud;
+> >  	struct notifier_block	clk_rate_change_nb;
+> >  };
+> > -#define to_xuartps(_nb) container_of(_nb, struct xuartps, clk_rate_change_nb);
+> > +#define to_cdns_uart(_nb) container_of(_nb, struct cdns_uart, \
+> > +		clk_rate_change_nb);
+> >  
+> >  /**
+> > - * xuartps_isr - Interrupt handler
+> > + * cdns_uart_isr - Interrupt handler
+> >   * @irq: Irq number
+> >   * @dev_id: Id of the port
+> >   *
+> >   * Return: IRQHANDLED
+> >   */
+> > -static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> > +static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
+> >  {
+> >  	struct uart_port *port = (struct uart_port *)dev_id;
+> >  	unsigned long flags;
+> > @@ -181,42 +186,42 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  	/* Read the interrupt status register to determine which
+> >  	 * interrupt(s) is/are active.
+> >  	 */
+> > -	isrstatus = xuartps_readl(XUARTPS_ISR_OFFSET);
+> > +	isrstatus = cdns_uart_readl(CDNS_UART_ISR_OFFSET);
+> >  
+> >  	/*
+> >  	 * There is no hardware break detection, so we interpret framing
+> >  	 * error with all-zeros data as a break sequence. Most of the time,
+> >  	 * there's another non-zero byte at the end of the sequence.
+> >  	 */
+> > -	if (isrstatus & XUARTPS_IXR_FRAMING) {
+> > -		while (!(xuartps_readl(XUARTPS_SR_OFFSET) &
+> > -					XUARTPS_SR_RXEMPTY)) {
+> > -			if (!xuartps_readl(XUARTPS_FIFO_OFFSET)) {
+> > -				port->read_status_mask |= XUARTPS_IXR_BRK;
+> > -				isrstatus &= ~XUARTPS_IXR_FRAMING;
+> > +	if (isrstatus & CDNS_UART_IXR_FRAMING) {
+> > +		while (!(cdns_uart_readl(CDNS_UART_SR_OFFSET) &
+> > +					CDNS_UART_SR_RXEMPTY)) {
+> > +			if (!cdns_uart_readl(CDNS_UART_FIFO_OFFSET)) {
+> > +				port->read_status_mask |= CDNS_UART_IXR_BRK;
+> > +				isrstatus &= ~CDNS_UART_IXR_FRAMING;
+> >  			}
+> >  		}
+> > -		xuartps_writel(XUARTPS_IXR_FRAMING, XUARTPS_ISR_OFFSET);
+> > +		cdns_uart_writel(CDNS_UART_IXR_FRAMING, CDNS_UART_ISR_OFFSET);
+> >  	}
+> >  
+> >  	/* drop byte with parity error if IGNPAR specified */
+> > -	if (isrstatus & port->ignore_status_mask & XUARTPS_IXR_PARITY)
+> > -		isrstatus &= ~(XUARTPS_IXR_RXTRIG | XUARTPS_IXR_TOUT);
+> > +	if (isrstatus & port->ignore_status_mask & CDNS_UART_IXR_PARITY)
+> > +		isrstatus &= ~(CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT);
+> >  
+> >  	isrstatus &= port->read_status_mask;
+> >  	isrstatus &= ~port->ignore_status_mask;
+> >  
+> > -	if ((isrstatus & XUARTPS_IXR_TOUT) ||
+> > -		(isrstatus & XUARTPS_IXR_RXTRIG)) {
+> > +	if ((isrstatus & CDNS_UART_IXR_TOUT) ||
+> > +		(isrstatus & CDNS_UART_IXR_RXTRIG)) {
+> >  		/* Receive Timeout Interrupt */
+> > -		while ((xuartps_readl(XUARTPS_SR_OFFSET) &
+> > -			XUARTPS_SR_RXEMPTY) != XUARTPS_SR_RXEMPTY) {
+> > -			data = xuartps_readl(XUARTPS_FIFO_OFFSET);
+> > +		while ((cdns_uart_readl(CDNS_UART_SR_OFFSET) &
+> > +			CDNS_UART_SR_RXEMPTY) != CDNS_UART_SR_RXEMPTY) {
+> > +			data = cdns_uart_readl(CDNS_UART_FIFO_OFFSET);
+> >  
+> >  			/* Non-NULL byte after BREAK is garbage (99%) */
+> >  			if (data && (port->read_status_mask &
+> > -						XUARTPS_IXR_BRK)) {
+> > -				port->read_status_mask &= ~XUARTPS_IXR_BRK;
+> > +						CDNS_UART_IXR_BRK)) {
+> > +				port->read_status_mask &= ~CDNS_UART_IXR_BRK;
+> >  				port->icount.brk++;
+> >  				if (uart_handle_break(port))
+> >  					continue;
+> > @@ -240,17 +245,17 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  
+> >  			port->icount.rx++;
+> >  
+> > -			if (isrstatus & XUARTPS_IXR_PARITY) {
+> > +			if (isrstatus & CDNS_UART_IXR_PARITY) {
+> >  				port->icount.parity++;
+> >  				status = TTY_PARITY;
+> > -			} else if (isrstatus & XUARTPS_IXR_FRAMING) {
+> > +			} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
+> >  				port->icount.frame++;
+> >  				status = TTY_FRAME;
+> > -			} else if (isrstatus & XUARTPS_IXR_OVERRUN) {
+> > +			} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
+> >  				port->icount.overrun++;
+> >  			}
+> >  
+> > -			uart_insert_char(port, isrstatus, XUARTPS_IXR_OVERRUN,
+> > +			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
+> >  					data, status);
+> >  		}
+> >  		spin_unlock(&port->lock);
+> > @@ -259,10 +264,10 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  	}
+> >  
+> >  	/* Dispatch an appropriate handler */
+> > -	if ((isrstatus & XUARTPS_IXR_TXEMPTY) == XUARTPS_IXR_TXEMPTY) {
+> > +	if ((isrstatus & CDNS_UART_IXR_TXEMPTY) == CDNS_UART_IXR_TXEMPTY) {
+> >  		if (uart_circ_empty(&port->state->xmit)) {
+> > -			xuartps_writel(XUARTPS_IXR_TXEMPTY,
+> > -						XUARTPS_IDR_OFFSET);
+> > +			cdns_uart_writel(CDNS_UART_IXR_TXEMPTY,
+> > +						CDNS_UART_IDR_OFFSET);
+> >  		} else {
+> >  			numbytes = port->fifosize;
+> >  			/* Break if no more data available in the UART buffer */
+> > @@ -270,12 +275,12 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  				if (uart_circ_empty(&port->state->xmit))
+> >  					break;
+> >  				/* Get the data from the UART circular buffer
+> > -				 * and write it to the xuartps's TX_FIFO
+> > +				 * and write it to the cdns_uart's TX_FIFO
+> >  				 * register.
+> >  				 */
+> > -				xuartps_writel(
+> > +				cdns_uart_writel(
+> >  					port->state->xmit.buf[port->state->xmit.
+> > -					tail], XUARTPS_FIFO_OFFSET);
+> > +					tail], CDNS_UART_FIFO_OFFSET);
+> >  
+> >  				port->icount.tx++;
+> >  
+> > @@ -293,7 +298,7 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  		}
+> >  	}
+> >  
+> > -	xuartps_writel(isrstatus, XUARTPS_ISR_OFFSET);
+> > +	cdns_uart_writel(isrstatus, CDNS_UART_ISR_OFFSET);
+> >  
+> >  	/* be sure to release the lock and tty before leaving */
+> >  	spin_unlock_irqrestore(&port->lock, flags);
+> > @@ -302,7 +307,7 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >  }
+> >  
+> >  /**
+> > - * xuartps_calc_baud_divs - Calculate baud rate divisors
+> > + * cdns_uart_calc_baud_divs - Calculate baud rate divisors
+> >   * @clk: UART module input clock
+> >   * @baud: Desired baud rate
+> >   * @rbdiv: BDIV value (return value)
+> > @@ -321,8 +326,8 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+> >   *			baud rate generate register
+> >   *			baud rate clock divisor register
+> >   */
+> > -static unsigned int xuartps_calc_baud_divs(unsigned int clk, unsigned int baud,
+> > -		u32 *rbdiv, u32 *rcd, int *div8)
+> > +static unsigned int cdns_uart_calc_baud_divs(unsigned int clk,
+> > +		unsigned int baud, u32 *rbdiv, u32 *rcd, int *div8)
+> >  {
+> >  	u32 cd, bdiv;
+> >  	unsigned int calc_baud;
+> > @@ -330,16 +335,16 @@ static unsigned int xuartps_calc_baud_divs(unsigned int clk, unsigned int baud,
+> >  	unsigned int bauderror;
+> >  	unsigned int besterror = ~0;
+> >  
+> > -	if (baud < clk / ((XUARTPS_BDIV_MAX + 1) * XUARTPS_CD_MAX)) {
+> > +	if (baud < clk / ((CDNS_UART_BDIV_MAX + 1) * CDNS_UART_CD_MAX)) {
+> >  		*div8 = 1;
+> >  		clk /= 8;
+> >  	} else {
+> >  		*div8 = 0;
+> >  	}
+> >  
+> > -	for (bdiv = XUARTPS_BDIV_MIN; bdiv <= XUARTPS_BDIV_MAX; bdiv++) {
+> > +	for (bdiv = CDNS_UART_BDIV_MIN; bdiv <= CDNS_UART_BDIV_MAX; bdiv++) {
+> >  		cd = DIV_ROUND_CLOSEST(clk, baud * (bdiv + 1));
+> > -		if (cd < 1 || cd > XUARTPS_CD_MAX)
+> > +		if (cd < 1 || cd > CDNS_UART_CD_MAX)
+> >  			continue;
+> >  
+> >  		calc_baud = clk / (cd * (bdiv + 1));
+> > @@ -364,47 +369,47 @@ static unsigned int xuartps_calc_baud_divs(unsigned int clk, unsigned int baud,
+> >  }
+> >  
+> >  /**
+> > - * xuartps_set_baud_rate - Calculate and set the baud rate
+> > + * cdns_uart_set_baud_rate - Calculate and set the baud rate
+> >   * @port: Handle to the uart port structure
+> >   * @baud: Baud rate to set
+> >   * Return: baud rate, requested baud when possible, or actual baud when there
+> >   *	   was too much error, zero if no valid divisors are found.
+> >   */
+> > -static unsigned int xuartps_set_baud_rate(struct uart_port *port,
+> > +static unsigned int cdns_uart_set_baud_rate(struct uart_port *port,
+> >  		unsigned int baud)
+> >  {
+> >  	unsigned int calc_baud;
+> >  	u32 cd = 0, bdiv = 0;
+> >  	u32 mreg;
+> >  	int div8;
+> > -	struct xuartps *xuartps = port->private_data;
+> > +	struct cdns_uart *cdns_uart = port->private_data;
+> >  
+> > -	calc_baud = xuartps_calc_baud_divs(port->uartclk, baud, &bdiv, &cd,
+> > +	calc_baud = cdns_uart_calc_baud_divs(port->uartclk, baud, &bdiv, &cd,
+> >  			&div8);
+> >  
+> >  	/* Write new divisors to hardware */
+> > -	mreg = xuartps_readl(XUARTPS_MR_OFFSET);
+> > +	mreg = cdns_uart_readl(CDNS_UART_MR_OFFSET);
+> >  	if (div8)
+> > -		mreg |= XUARTPS_MR_CLKSEL;
+> > +		mreg |= CDNS_UART_MR_CLKSEL;
+> >  	else
+> > -		mreg &= ~XUARTPS_MR_CLKSEL;
+> > -	xuartps_writel(mreg, XUARTPS_MR_OFFSET);
+> > -	xuartps_writel(cd, XUARTPS_BAUDGEN_OFFSET);
+> > -	xuartps_writel(bdiv, XUARTPS_BAUDDIV_OFFSET);
+> > -	xuartps->baud = baud;
+> > +		mreg &= ~CDNS_UART_MR_CLKSEL;
+> > +	cdns_uart_writel(mreg, CDNS_UART_MR_OFFSET);
+> > +	cdns_uart_writel(cd, CDNS_UART_BAUDGEN_OFFSET);
+> > +	cdns_uart_writel(bdiv, CDNS_UART_BAUDDIV_OFFSET);
+> > +	cdns_uart->baud = baud;
+> >  
+> >  	return calc_baud;
+> >  }
+> >  
+> >  #ifdef CONFIG_COMMON_CLK
+> >  /**
+> > - * xuartps_clk_notitifer_cb - Clock notifier callback
+> > + * cdns_uart_clk_notitifer_cb - Clock notifier callback
+> >   * @nb:		Notifier block
+> >   * @event:	Notify event
+> >   * @data:	Notifier data
+> >   * Return:	NOTIFY_OK or NOTIFY_DONE on success, NOTIFY_BAD on error.
+> >   */
+> > -static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> > +static int cdns_uart_clk_notifier_cb(struct notifier_block *nb,
+> >  		unsigned long event, void *data)
+> >  {
+> >  	u32 ctrl_reg;
+> > @@ -412,9 +417,9 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> >  	int locked = 0;
+> >  	struct clk_notifier_data *ndata = data;
+> >  	unsigned long flags = 0;
+> > -	struct xuartps *xuartps = to_xuartps(nb);
+> > +	struct cdns_uart *cdns_uart = to_cdns_uart(nb);
+> >  
+> > -	port = xuartps->port;
+> > +	port = cdns_uart->port;
+> >  	if (port->suspended)
+> >  		return NOTIFY_OK;
+> >  
+> > @@ -428,20 +433,20 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> >  		 * Find out if current baud-rate can be achieved with new clock
+> >  		 * frequency.
+> >  		 */
+> > -		if (!xuartps_calc_baud_divs(ndata->new_rate, xuartps->baud,
+> > +		if (!cdns_uart_calc_baud_divs(ndata->new_rate, cdns_uart->baud,
+> >  					&bdiv, &cd, &div8)) {
+> >  			dev_warn(port->dev, "clock rate change rejected\n");
+> >  			return NOTIFY_BAD;
+> >  		}
+> >  
+> > -		spin_lock_irqsave(&xuartps->port->lock, flags);
+> > +		spin_lock_irqsave(&cdns_uart->port->lock, flags);
+> >  
+> >  		/* Disable the TX and RX to set baud rate */
+> > -		ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -		ctrl_reg |= XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS;
+> > -		xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +		ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +		ctrl_reg |= CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS;
+> > +		cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> > -		spin_unlock_irqrestore(&xuartps->port->lock, flags);
+> > +		spin_unlock_irqrestore(&cdns_uart->port->lock, flags);
+> >  
+> >  		return NOTIFY_OK;
+> >  	}
+> > @@ -451,25 +456,25 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> >  		 * frequency.
+> >  		 */
+> >  
+> > -		spin_lock_irqsave(&xuartps->port->lock, flags);
+> > +		spin_lock_irqsave(&cdns_uart->port->lock, flags);
+> >  
+> >  		locked = 1;
+> >  		port->uartclk = ndata->new_rate;
+> >  
+> > -		xuartps->baud = xuartps_set_baud_rate(xuartps->port,
+> > -				xuartps->baud);
+> > +		cdns_uart->baud = cdns_uart_set_baud_rate(cdns_uart->port,
+> > +				cdns_uart->baud);
+> >  		/* fall through */
+> >  	case ABORT_RATE_CHANGE:
+> >  		if (!locked)
+> > -			spin_lock_irqsave(&xuartps->port->lock, flags);
+> > +			spin_lock_irqsave(&cdns_uart->port->lock, flags);
+> >  
+> >  		/* Set TX/RX Reset */
+> > -		ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -		ctrl_reg |= XUARTPS_CR_TXRST | XUARTPS_CR_RXRST;
+> > -		xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +		ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +		ctrl_reg |= CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST;
+> > +		cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> > -		while (xuartps_readl(XUARTPS_CR_OFFSET) &
+> > -				(XUARTPS_CR_TXRST | XUARTPS_CR_RXRST))
+> > +		while (cdns_uart_readl(CDNS_UART_CR_OFFSET) &
+> > +				(CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST))
+> >  			cpu_relax();
+> >  
+> >  		/*
+> > @@ -477,13 +482,13 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> >  		 * enable bit and RX enable bit to enable the transmitter and
+> >  		 * receiver.
+> >  		 */
+> > -		xuartps_writel(rx_timeout, XUARTPS_RXTOUT_OFFSET);
+> > -		ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -		ctrl_reg &= ~(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS);
+> > -		ctrl_reg |= XUARTPS_CR_TX_EN | XUARTPS_CR_RX_EN;
+> > -		xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +		cdns_uart_writel(rx_timeout, CDNS_UART_RXTOUT_OFFSET);
+> > +		ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +		ctrl_reg &= ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS);
+> > +		ctrl_reg |= CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN;
+> > +		cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> > -		spin_unlock_irqrestore(&xuartps->port->lock, flags);
+> > +		spin_unlock_irqrestore(&cdns_uart->port->lock, flags);
+> >  
+> >  		return NOTIFY_OK;
+> >  	default:
+> > @@ -493,35 +498,35 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+> >  #endif
+> >  
+> >  /**
+> > - * xuartps_start_tx -  Start transmitting bytes
+> > + * cdns_uart_start_tx -  Start transmitting bytes
+> >   * @port: Handle to the uart port structure
+> >   */
+> > -static void xuartps_start_tx(struct uart_port *port)
+> > +static void cdns_uart_start_tx(struct uart_port *port)
+> >  {
+> >  	unsigned int status, numbytes = port->fifosize;
+> >  
+> >  	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+> >  		return;
+> >  
+> > -	status = xuartps_readl(XUARTPS_CR_OFFSET);
+> > +	status = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> >  	/* Set the TX enable bit and clear the TX disable bit to enable the
+> >  	 * transmitter.
+> >  	 */
+> > -	xuartps_writel((status & ~XUARTPS_CR_TX_DIS) | XUARTPS_CR_TX_EN,
+> > -		XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel((status & ~CDNS_UART_CR_TX_DIS) | CDNS_UART_CR_TX_EN,
+> > +		CDNS_UART_CR_OFFSET);
+> >  
+> > -	while (numbytes-- && ((xuartps_readl(XUARTPS_SR_OFFSET) &
+> > -				XUARTPS_SR_TXFULL)) != XUARTPS_SR_TXFULL) {
+> > +	while (numbytes-- && ((cdns_uart_readl(CDNS_UART_SR_OFFSET) &
+> > +				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+> >  		/* Break if no more data available in the UART buffer */
+> >  		if (uart_circ_empty(&port->state->xmit))
+> >  			break;
+> >  
+> >  		/* Get the data from the UART circular buffer and
+> > -		 * write it to the xuartps's TX_FIFO register.
+> > +		 * write it to the cdns_uart's TX_FIFO register.
+> >  		 */
+> > -		xuartps_writel(
+> > +		cdns_uart_writel(
+> >  			port->state->xmit.buf[port->state->xmit.tail],
+> > -			XUARTPS_FIFO_OFFSET);
+> > +			CDNS_UART_FIFO_OFFSET);
+> >  		port->icount.tx++;
+> >  
+> >  		/* Adjust the tail of the UART buffer and wrap
+> > @@ -530,90 +535,90 @@ static void xuartps_start_tx(struct uart_port *port)
+> >  		port->state->xmit.tail = (port->state->xmit.tail + 1) &
+> >  					(UART_XMIT_SIZE - 1);
+> >  	}
+> > -	xuartps_writel(XUARTPS_IXR_TXEMPTY, XUARTPS_ISR_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_IXR_TXEMPTY, CDNS_UART_ISR_OFFSET);
+> >  	/* Enable the TX Empty interrupt */
+> > -	xuartps_writel(XUARTPS_IXR_TXEMPTY, XUARTPS_IER_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_IXR_TXEMPTY, CDNS_UART_IER_OFFSET);
+> >  
+> >  	if (uart_circ_chars_pending(&port->state->xmit) < WAKEUP_CHARS)
+> >  		uart_write_wakeup(port);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_stop_tx - Stop TX
+> > + * cdns_uart_stop_tx - Stop TX
+> >   * @port: Handle to the uart port structure
+> >   */
+> > -static void xuartps_stop_tx(struct uart_port *port)
+> > +static void cdns_uart_stop_tx(struct uart_port *port)
+> >  {
+> >  	unsigned int regval;
+> >  
+> > -	regval = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	regval |= XUARTPS_CR_TX_DIS;
+> > +	regval = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	regval |= CDNS_UART_CR_TX_DIS;
+> >  	/* Disable the transmitter */
+> > -	xuartps_writel(regval, XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(regval, CDNS_UART_CR_OFFSET);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_stop_rx - Stop RX
+> > + * cdns_uart_stop_rx - Stop RX
+> >   * @port: Handle to the uart port structure
+> >   */
+> > -static void xuartps_stop_rx(struct uart_port *port)
+> > +static void cdns_uart_stop_rx(struct uart_port *port)
+> >  {
+> >  	unsigned int regval;
+> >  
+> > -	regval = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	regval |= XUARTPS_CR_RX_DIS;
+> > +	regval = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	regval |= CDNS_UART_CR_RX_DIS;
+> >  	/* Disable the receiver */
+> > -	xuartps_writel(regval, XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(regval, CDNS_UART_CR_OFFSET);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_tx_empty -  Check whether TX is empty
+> > + * cdns_uart_tx_empty -  Check whether TX is empty
+> >   * @port: Handle to the uart port structure
+> >   *
+> >   * Return: TIOCSER_TEMT on success, 0 otherwise
+> >   */
+> > -static unsigned int xuartps_tx_empty(struct uart_port *port)
+> > +static unsigned int cdns_uart_tx_empty(struct uart_port *port)
+> >  {
+> >  	unsigned int status;
+> >  
+> > -	status = xuartps_readl(XUARTPS_ISR_OFFSET) & XUARTPS_IXR_TXEMPTY;
+> > +	status = cdns_uart_readl(CDNS_UART_ISR_OFFSET) & CDNS_UART_IXR_TXEMPTY;
+> >  	return status ? TIOCSER_TEMT : 0;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_break_ctl - Based on the input ctl we have to start or stop
+> > + * cdns_uart_break_ctl - Based on the input ctl we have to start or stop
+> >   *			transmitting char breaks
+> >   * @port: Handle to the uart port structure
+> >   * @ctl: Value based on which start or stop decision is taken
+> >   */
+> > -static void xuartps_break_ctl(struct uart_port *port, int ctl)
+> > +static void cdns_uart_break_ctl(struct uart_port *port, int ctl)
+> >  {
+> >  	unsigned int status;
+> >  	unsigned long flags;
+> >  
+> >  	spin_lock_irqsave(&port->lock, flags);
+> >  
+> > -	status = xuartps_readl(XUARTPS_CR_OFFSET);
+> > +	status = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> >  
+> >  	if (ctl == -1)
+> > -		xuartps_writel(XUARTPS_CR_STARTBRK | status,
+> > -					XUARTPS_CR_OFFSET);
+> > +		cdns_uart_writel(CDNS_UART_CR_STARTBRK | status,
+> > +					CDNS_UART_CR_OFFSET);
+> >  	else {
+> > -		if ((status & XUARTPS_CR_STOPBRK) == 0)
+> > -			xuartps_writel(XUARTPS_CR_STOPBRK | status,
+> > -					 XUARTPS_CR_OFFSET);
+> > +		if ((status & CDNS_UART_CR_STOPBRK) == 0)
+> > +			cdns_uart_writel(CDNS_UART_CR_STOPBRK | status,
+> > +					 CDNS_UART_CR_OFFSET);
+> >  	}
+> >  	spin_unlock_irqrestore(&port->lock, flags);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_set_termios - termios operations, handling data length, parity,
+> > + * cdns_uart_set_termios - termios operations, handling data length, parity,
+> >   *				stop bits, flow control, baud rate
+> >   * @port: Handle to the uart port structure
+> >   * @termios: Handle to the input termios structure
+> >   * @old: Values of the previously saved termios structure
+> >   */
+> > -static void xuartps_set_termios(struct uart_port *port,
+> > +static void cdns_uart_set_termios(struct uart_port *port,
+> >  				struct ktermios *termios, struct ktermios *old)
+> >  {
+> >  	unsigned int cval = 0;
+> > @@ -624,25 +629,26 @@ static void xuartps_set_termios(struct uart_port *port,
+> >  	spin_lock_irqsave(&port->lock, flags);
+> >  
+> >  	/* Empty the receive FIFO 1st before making changes */
+> > -	while ((xuartps_readl(XUARTPS_SR_OFFSET) &
+> > -		 XUARTPS_SR_RXEMPTY) != XUARTPS_SR_RXEMPTY) {
+> > -		xuartps_readl(XUARTPS_FIFO_OFFSET);
+> > +	while ((cdns_uart_readl(CDNS_UART_SR_OFFSET) &
+> > +		 CDNS_UART_SR_RXEMPTY) != CDNS_UART_SR_RXEMPTY) {
+> > +		cdns_uart_readl(CDNS_UART_FIFO_OFFSET);
+> >  	}
+> >  
+> >  	/* Disable the TX and RX to set baud rate */
+> > -	ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	ctrl_reg |= XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS;
+> > -	xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +	ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	ctrl_reg |= CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS;
+> > +	cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> >  	/*
+> >  	 * Min baud rate = 6bps and Max Baud Rate is 10Mbps for 100Mhz clk
+> >  	 * min and max baud should be calculated here based on port->uartclk.
+> >  	 * this way we get a valid baud and can safely call set_baud()
+> >  	 */
+> > -	minbaud = port->uartclk / ((XUARTPS_BDIV_MAX + 1) * XUARTPS_CD_MAX * 8);
+> > -	maxbaud = port->uartclk / (XUARTPS_BDIV_MIN + 1);
+> > +	minbaud = port->uartclk /
+> > +			((CDNS_UART_BDIV_MAX + 1) * CDNS_UART_CD_MAX * 8);
+> > +	maxbaud = port->uartclk / (CDNS_UART_BDIV_MIN + 1);
+> >  	baud = uart_get_baud_rate(port, termios, old, minbaud, maxbaud);
+> > -	baud = xuartps_set_baud_rate(port, baud);
+> > +	baud = cdns_uart_set_baud_rate(port, baud);
+> >  	if (tty_termios_baud_rate(termios))
+> >  		tty_termios_encode_baud_rate(termios, baud, baud);
+> >  
+> > @@ -650,52 +656,52 @@ static void xuartps_set_termios(struct uart_port *port,
+> >  	uart_update_timeout(port, termios->c_cflag, baud);
+> >  
+> >  	/* Set TX/RX Reset */
+> > -	ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	ctrl_reg |= XUARTPS_CR_TXRST | XUARTPS_CR_RXRST;
+> > -	xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +	ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	ctrl_reg |= CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST;
+> > +	cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> >  	/*
+> >  	 * Clear the RX disable and TX disable bits and then set the TX enable
+> >  	 * bit and RX enable bit to enable the transmitter and receiver.
+> >  	 */
+> > -	ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	ctrl_reg &= ~(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS);
+> > -	ctrl_reg |= XUARTPS_CR_TX_EN | XUARTPS_CR_RX_EN;
+> > -	xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +	ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	ctrl_reg &= ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS);
+> > +	ctrl_reg |= CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN;
+> > +	cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> > -	xuartps_writel(rx_timeout, XUARTPS_RXTOUT_OFFSET);
+> > +	cdns_uart_writel(rx_timeout, CDNS_UART_RXTOUT_OFFSET);
+> >  
+> > -	port->read_status_mask = XUARTPS_IXR_TXEMPTY | XUARTPS_IXR_RXTRIG |
+> > -			XUARTPS_IXR_OVERRUN | XUARTPS_IXR_TOUT;
+> > +	port->read_status_mask = CDNS_UART_IXR_TXEMPTY | CDNS_UART_IXR_RXTRIG |
+> > +			CDNS_UART_IXR_OVERRUN | CDNS_UART_IXR_TOUT;
+> >  	port->ignore_status_mask = 0;
+> >  
+> >  	if (termios->c_iflag & INPCK)
+> > -		port->read_status_mask |= XUARTPS_IXR_PARITY |
+> > -		XUARTPS_IXR_FRAMING;
+> > +		port->read_status_mask |= CDNS_UART_IXR_PARITY |
+> > +		CDNS_UART_IXR_FRAMING;
+> >  
+> >  	if (termios->c_iflag & IGNPAR)
+> > -		port->ignore_status_mask |= XUARTPS_IXR_PARITY |
+> > -			XUARTPS_IXR_FRAMING | XUARTPS_IXR_OVERRUN;
+> > +		port->ignore_status_mask |= CDNS_UART_IXR_PARITY |
+> > +			CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN;
+> >  
+> >  	/* ignore all characters if CREAD is not set */
+> >  	if ((termios->c_cflag & CREAD) == 0)
+> > -		port->ignore_status_mask |= XUARTPS_IXR_RXTRIG |
+> > -			XUARTPS_IXR_TOUT | XUARTPS_IXR_PARITY |
+> > -			XUARTPS_IXR_FRAMING | XUARTPS_IXR_OVERRUN;
+> > +		port->ignore_status_mask |= CDNS_UART_IXR_RXTRIG |
+> > +			CDNS_UART_IXR_TOUT | CDNS_UART_IXR_PARITY |
+> > +			CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN;
+> >  
+> > -	mode_reg = xuartps_readl(XUARTPS_MR_OFFSET);
+> > +	mode_reg = cdns_uart_readl(CDNS_UART_MR_OFFSET);
+> >  
+> >  	/* Handling Data Size */
+> >  	switch (termios->c_cflag & CSIZE) {
+> >  	case CS6:
+> > -		cval |= XUARTPS_MR_CHARLEN_6_BIT;
+> > +		cval |= CDNS_UART_MR_CHARLEN_6_BIT;
+> >  		break;
+> >  	case CS7:
+> > -		cval |= XUARTPS_MR_CHARLEN_7_BIT;
+> > +		cval |= CDNS_UART_MR_CHARLEN_7_BIT;
+> >  		break;
+> >  	default:
+> >  	case CS8:
+> > -		cval |= XUARTPS_MR_CHARLEN_8_BIT;
+> > +		cval |= CDNS_UART_MR_CHARLEN_8_BIT;
+> >  		termios->c_cflag &= ~CSIZE;
+> >  		termios->c_cflag |= CS8;
+> >  		break;
+> > @@ -703,133 +709,135 @@ static void xuartps_set_termios(struct uart_port *port,
+> >  
+> >  	/* Handling Parity and Stop Bits length */
+> >  	if (termios->c_cflag & CSTOPB)
+> > -		cval |= XUARTPS_MR_STOPMODE_2_BIT; /* 2 STOP bits */
+> > +		cval |= CDNS_UART_MR_STOPMODE_2_BIT; /* 2 STOP bits */
+> >  	else
+> > -		cval |= XUARTPS_MR_STOPMODE_1_BIT; /* 1 STOP bit */
+> > +		cval |= CDNS_UART_MR_STOPMODE_1_BIT; /* 1 STOP bit */
+> >  
+> >  	if (termios->c_cflag & PARENB) {
+> >  		/* Mark or Space parity */
+> >  		if (termios->c_cflag & CMSPAR) {
+> >  			if (termios->c_cflag & PARODD)
+> > -				cval |= XUARTPS_MR_PARITY_MARK;
+> > +				cval |= CDNS_UART_MR_PARITY_MARK;
+> >  			else
+> > -				cval |= XUARTPS_MR_PARITY_SPACE;
+> > +				cval |= CDNS_UART_MR_PARITY_SPACE;
+> >  		} else {
+> >  			if (termios->c_cflag & PARODD)
+> > -				cval |= XUARTPS_MR_PARITY_ODD;
+> > +				cval |= CDNS_UART_MR_PARITY_ODD;
+> >  			else
+> > -				cval |= XUARTPS_MR_PARITY_EVEN;
+> > +				cval |= CDNS_UART_MR_PARITY_EVEN;
+> >  		}
+> >  	} else {
+> > -		cval |= XUARTPS_MR_PARITY_NONE;
+> > +		cval |= CDNS_UART_MR_PARITY_NONE;
+> >  	}
+> >  	cval |= mode_reg & 1;
+> > -	xuartps_writel(cval, XUARTPS_MR_OFFSET);
+> > +	cdns_uart_writel(cval, CDNS_UART_MR_OFFSET);
+> >  
+> >  	spin_unlock_irqrestore(&port->lock, flags);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_startup - Called when an application opens a xuartps port
+> > + * cdns_uart_startup - Called when an application opens a cdns_uart port
+> >   * @port: Handle to the uart port structure
+> >   *
+> >   * Return: 0 on success, negative errno otherwise
+> >   */
+> > -static int xuartps_startup(struct uart_port *port)
+> > +static int cdns_uart_startup(struct uart_port *port)
+> >  {
+> >  	unsigned int retval = 0, status = 0;
+> >  
+> > -	retval = request_irq(port->irq, xuartps_isr, 0, XUARTPS_NAME,
+> > +	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
+> >  								(void *)port);
+> >  	if (retval)
+> >  		return retval;
+> >  
+> >  	/* Disable the TX and RX */
+> > -	xuartps_writel(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS,
+> > -						XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
+> > +						CDNS_UART_CR_OFFSET);
+> >  
+> >  	/* Set the Control Register with TX/RX Enable, TX/RX Reset,
+> >  	 * no break chars.
+> >  	 */
+> > -	xuartps_writel(XUARTPS_CR_TXRST | XUARTPS_CR_RXRST,
+> > -				XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST,
+> > +				CDNS_UART_CR_OFFSET);
+> >  
+> > -	status = xuartps_readl(XUARTPS_CR_OFFSET);
+> > +	status = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> >  
+> >  	/* Clear the RX disable and TX disable bits and then set the TX enable
+> >  	 * bit and RX enable bit to enable the transmitter and receiver.
+> >  	 */
+> > -	xuartps_writel((status & ~(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS))
+> > -			| (XUARTPS_CR_TX_EN | XUARTPS_CR_RX_EN |
+> > -			XUARTPS_CR_STOPBRK), XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel((status & ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS))
+> > +			| (CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN |
+> > +			CDNS_UART_CR_STOPBRK), CDNS_UART_CR_OFFSET);
+> >  
+> >  	/* Set the Mode Register with normal mode,8 data bits,1 stop bit,
+> >  	 * no parity.
+> >  	 */
+> > -	xuartps_writel(XUARTPS_MR_CHMODE_NORM | XUARTPS_MR_STOPMODE_1_BIT
+> > -		| XUARTPS_MR_PARITY_NONE | XUARTPS_MR_CHARLEN_8_BIT,
+> > -		 XUARTPS_MR_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_MR_CHMODE_NORM | CDNS_UART_MR_STOPMODE_1_BIT
+> > +		| CDNS_UART_MR_PARITY_NONE | CDNS_UART_MR_CHARLEN_8_BIT,
+> > +		 CDNS_UART_MR_OFFSET);
+> >  
+> >  	/*
+> >  	 * Set the RX FIFO Trigger level to use most of the FIFO, but it
+> >  	 * can be tuned with a module parameter
+> >  	 */
+> > -	xuartps_writel(rx_trigger_level, XUARTPS_RXWM_OFFSET);
+> > +	cdns_uart_writel(rx_trigger_level, CDNS_UART_RXWM_OFFSET);
+> >  
+> >  	/*
+> >  	 * Receive Timeout register is enabled but it
+> >  	 * can be tuned with a module parameter
+> >  	 */
+> > -	xuartps_writel(rx_timeout, XUARTPS_RXTOUT_OFFSET);
+> > +	cdns_uart_writel(rx_timeout, CDNS_UART_RXTOUT_OFFSET);
+> >  
+> >  	/* Clear out any pending interrupts before enabling them */
+> > -	xuartps_writel(xuartps_readl(XUARTPS_ISR_OFFSET), XUARTPS_ISR_OFFSET);
+> > +	cdns_uart_writel(cdns_uart_readl(CDNS_UART_ISR_OFFSET),
+> > +			CDNS_UART_ISR_OFFSET);
+> >  
+> >  	/* Set the Interrupt Registers with desired interrupts */
+> > -	xuartps_writel(XUARTPS_IXR_TXEMPTY | XUARTPS_IXR_PARITY |
+> > -		XUARTPS_IXR_FRAMING | XUARTPS_IXR_OVERRUN |
+> > -		XUARTPS_IXR_RXTRIG | XUARTPS_IXR_TOUT, XUARTPS_IER_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_IXR_TXEMPTY | CDNS_UART_IXR_PARITY |
+> > +		CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN |
+> > +		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
+> > +		CDNS_UART_IER_OFFSET);
+> >  
+> >  	return retval;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_shutdown - Called when an application closes a xuartps port
+> > + * cdns_uart_shutdown - Called when an application closes a cdns_uart port
+> >   * @port: Handle to the uart port structure
+> >   */
+> > -static void xuartps_shutdown(struct uart_port *port)
+> > +static void cdns_uart_shutdown(struct uart_port *port)
+> >  {
+> >  	int status;
+> >  
+> >  	/* Disable interrupts */
+> > -	status = xuartps_readl(XUARTPS_IMR_OFFSET);
+> > -	xuartps_writel(status, XUARTPS_IDR_OFFSET);
+> > +	status = cdns_uart_readl(CDNS_UART_IMR_OFFSET);
+> > +	cdns_uart_writel(status, CDNS_UART_IDR_OFFSET);
+> >  
+> >  	/* Disable the TX and RX */
+> > -	xuartps_writel(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS,
+> > -				 XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
+> > +				 CDNS_UART_CR_OFFSET);
+> >  	free_irq(port->irq, port);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_type - Set UART type to xuartps port
+> > + * cdns_uart_type - Set UART type to cdns_uart port
+> >   * @port: Handle to the uart port structure
+> >   *
+> >   * Return: string on success, NULL otherwise
+> >   */
+> > -static const char *xuartps_type(struct uart_port *port)
+> > +static const char *cdns_uart_type(struct uart_port *port)
+> >  {
+> > -	return port->type == PORT_XUARTPS ? XUARTPS_NAME : NULL;
+> > +	return port->type == PORT_XUARTPS ? CDNS_UART_NAME : NULL;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_verify_port - Verify the port params
+> > + * cdns_uart_verify_port - Verify the port params
+> >   * @port: Handle to the uart port structure
+> >   * @ser: Handle to the structure whose members are compared
+> >   *
+> >   * Return: 0 on success, negative errno otherwise.
+> >   */
+> > -static int xuartps_verify_port(struct uart_port *port,
+> > +static int cdns_uart_verify_port(struct uart_port *port,
+> >  					struct serial_struct *ser)
+> >  {
+> >  	if (ser->type != PORT_UNKNOWN && ser->type != PORT_XUARTPS)
+> > @@ -846,167 +854,167 @@ static int xuartps_verify_port(struct uart_port *port,
+> >  }
+> >  
+> >  /**
+> > - * xuartps_request_port - Claim the memory region attached to xuartps port,
+> > - *				called when the driver adds a xuartps port via
+> > + * cdns_uart_request_port - Claim the memory region attached to cdns_uart port,
+> > + *				called when the driver adds a cdns_uart port via
+> >   *				uart_add_one_port()
+> >   * @port: Handle to the uart port structure
+> >   *
+> >   * Return: 0 on success, negative errno otherwise.
+> >   */
+> > -static int xuartps_request_port(struct uart_port *port)
+> > +static int cdns_uart_request_port(struct uart_port *port)
+> >  {
+> > -	if (!request_mem_region(port->mapbase, XUARTPS_REGISTER_SPACE,
+> > -					 XUARTPS_NAME)) {
+> > +	if (!request_mem_region(port->mapbase, CDNS_UART_REGISTER_SPACE,
+> > +					 CDNS_UART_NAME)) {
+> >  		return -ENOMEM;
+> >  	}
+> >  
+> > -	port->membase = ioremap(port->mapbase, XUARTPS_REGISTER_SPACE);
+> > +	port->membase = ioremap(port->mapbase, CDNS_UART_REGISTER_SPACE);
+> >  	if (!port->membase) {
+> >  		dev_err(port->dev, "Unable to map registers\n");
+> > -		release_mem_region(port->mapbase, XUARTPS_REGISTER_SPACE);
+> > +		release_mem_region(port->mapbase, CDNS_UART_REGISTER_SPACE);
+> >  		return -ENOMEM;
+> >  	}
+> >  	return 0;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_release_port - Release UART port
+> > + * cdns_uart_release_port - Release UART port
+> >   * @port: Handle to the uart port structure
+> >   *
+> > - * Release the memory region attached to a xuartps port. Called when the
+> > - * driver removes a xuartps port via uart_remove_one_port().
+> > + * Release the memory region attached to a cdns_uart port. Called when the
+> > + * driver removes a cdns_uart port via uart_remove_one_port().
+> >   */
+> > -static void xuartps_release_port(struct uart_port *port)
+> > +static void cdns_uart_release_port(struct uart_port *port)
+> >  {
+> > -	release_mem_region(port->mapbase, XUARTPS_REGISTER_SPACE);
+> > +	release_mem_region(port->mapbase, CDNS_UART_REGISTER_SPACE);
+> >  	iounmap(port->membase);
+> >  	port->membase = NULL;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_config_port - Configure UART port
+> > + * cdns_uart_config_port - Configure UART port
+> >   * @port: Handle to the uart port structure
+> >   * @flags: If any
+> >   */
+> > -static void xuartps_config_port(struct uart_port *port, int flags)
+> > +static void cdns_uart_config_port(struct uart_port *port, int flags)
+> >  {
+> > -	if (flags & UART_CONFIG_TYPE && xuartps_request_port(port) == 0)
+> > +	if (flags & UART_CONFIG_TYPE && cdns_uart_request_port(port) == 0)
+> >  		port->type = PORT_XUARTPS;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_get_mctrl - Get the modem control state
+> > + * cdns_uart_get_mctrl - Get the modem control state
+> >   * @port: Handle to the uart port structure
+> >   *
+> >   * Return: The modem control state
+> >   */
+> > -static unsigned int xuartps_get_mctrl(struct uart_port *port)
+> > +static unsigned int cdns_uart_get_mctrl(struct uart_port *port)
+> >  {
+> >  	return TIOCM_CTS | TIOCM_DSR | TIOCM_CAR;
+> >  }
+> >  
+> > -static void xuartps_set_mctrl(struct uart_port *port, unsigned int mctrl)
+> > +static void cdns_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
+> >  {
+> >  	/* N/A */
+> >  }
+> >  
+> > -static void xuartps_enable_ms(struct uart_port *port)
+> > +static void cdns_uart_enable_ms(struct uart_port *port)
+> >  {
+> >  	/* N/A */
+> >  }
+> >  
+> >  #ifdef CONFIG_CONSOLE_POLL
+> > -static int xuartps_poll_get_char(struct uart_port *port)
+> > +static int cdns_uart_poll_get_char(struct uart_port *port)
+> >  {
+> >  	u32 imr;
+> >  	int c;
+> >  
+> >  	/* Disable all interrupts */
+> > -	imr = xuartps_readl(XUARTPS_IMR_OFFSET);
+> > -	xuartps_writel(imr, XUARTPS_IDR_OFFSET);
+> > +	imr = cdns_uart_readl(CDNS_UART_IMR_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IDR_OFFSET);
+> >  
+> >  	/* Check if FIFO is empty */
+> > -	if (xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_RXEMPTY)
+> > +	if (cdns_uart_readl(CDNS_UART_SR_OFFSET) & CDNS_UART_SR_RXEMPTY)
+> >  		c = NO_POLL_CHAR;
+> >  	else /* Read a character */
+> > -		c = (unsigned char) xuartps_readl(XUARTPS_FIFO_OFFSET);
+> > +		c = (unsigned char) cdns_uart_readl(CDNS_UART_FIFO_OFFSET);
+> >  
+> >  	/* Enable interrupts */
+> > -	xuartps_writel(imr, XUARTPS_IER_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IER_OFFSET);
+> >  
+> >  	return c;
+> >  }
+> >  
+> > -static void xuartps_poll_put_char(struct uart_port *port, unsigned char c)
+> > +static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
+> >  {
+> >  	u32 imr;
+> >  
+> >  	/* Disable all interrupts */
+> > -	imr = xuartps_readl(XUARTPS_IMR_OFFSET);
+> > -	xuartps_writel(imr, XUARTPS_IDR_OFFSET);
+> > +	imr = cdns_uart_readl(CDNS_UART_IMR_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IDR_OFFSET);
+> >  
+> >  	/* Wait until FIFO is empty */
+> > -	while (!(xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_TXEMPTY))
+> > +	while (!(cdns_uart_readl(CDNS_UART_SR_OFFSET) & CDNS_UART_SR_TXEMPTY))
+> >  		cpu_relax();
+> >  
+> >  	/* Write a character */
+> > -	xuartps_writel(c, XUARTPS_FIFO_OFFSET);
+> > +	cdns_uart_writel(c, CDNS_UART_FIFO_OFFSET);
+> >  
+> >  	/* Wait until FIFO is empty */
+> > -	while (!(xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_TXEMPTY))
+> > +	while (!(cdns_uart_readl(CDNS_UART_SR_OFFSET) & CDNS_UART_SR_TXEMPTY))
+> >  		cpu_relax();
+> >  
+> >  	/* Enable interrupts */
+> > -	xuartps_writel(imr, XUARTPS_IER_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IER_OFFSET);
+> >  
+> >  	return;
+> >  }
+> >  #endif
+> >  
+> > -static struct uart_ops xuartps_ops = {
+> > -	.set_mctrl	= xuartps_set_mctrl,
+> > -	.get_mctrl	= xuartps_get_mctrl,
+> > -	.enable_ms	= xuartps_enable_ms,
+> > -	.start_tx	= xuartps_start_tx,
+> > -	.stop_tx	= xuartps_stop_tx,
+> > -	.stop_rx	= xuartps_stop_rx,
+> > -	.tx_empty	= xuartps_tx_empty,
+> > -	.break_ctl	= xuartps_break_ctl,
+> > -	.set_termios	= xuartps_set_termios,
+> > -	.startup	= xuartps_startup,
+> > -	.shutdown	= xuartps_shutdown,
+> > -	.type		= xuartps_type,
+> > -	.verify_port	= xuartps_verify_port,
+> > -	.request_port	= xuartps_request_port,
+> > -	.release_port	= xuartps_release_port,
+> > -	.config_port	= xuartps_config_port,
+> > +static struct uart_ops cdns_uart_ops = {
+> > +	.set_mctrl	= cdns_uart_set_mctrl,
+> > +	.get_mctrl	= cdns_uart_get_mctrl,
+> > +	.enable_ms	= cdns_uart_enable_ms,
+> > +	.start_tx	= cdns_uart_start_tx,
+> > +	.stop_tx	= cdns_uart_stop_tx,
+> > +	.stop_rx	= cdns_uart_stop_rx,
+> > +	.tx_empty	= cdns_uart_tx_empty,
+> > +	.break_ctl	= cdns_uart_break_ctl,
+> > +	.set_termios	= cdns_uart_set_termios,
+> > +	.startup	= cdns_uart_startup,
+> > +	.shutdown	= cdns_uart_shutdown,
+> > +	.type		= cdns_uart_type,
+> > +	.verify_port	= cdns_uart_verify_port,
+> > +	.request_port	= cdns_uart_request_port,
+> > +	.release_port	= cdns_uart_release_port,
+> > +	.config_port	= cdns_uart_config_port,
+> >  #ifdef CONFIG_CONSOLE_POLL
+> > -	.poll_get_char	= xuartps_poll_get_char,
+> > -	.poll_put_char	= xuartps_poll_put_char,
+> > +	.poll_get_char	= cdns_uart_poll_get_char,
+> > +	.poll_put_char	= cdns_uart_poll_put_char,
+> >  #endif
+> >  };
+> >  
+> > -static struct uart_port xuartps_port[2];
+> > +static struct uart_port cdns_uart_port[2];
+> >  
+> >  /**
+> > - * xuartps_get_port - Configure the port from the platform device resource info
+> > + * cdns_uart_get_port - Configure the port from platform device resource info
+> >   *
+> >   * Return: Pointer to a uart_port or NULL for failure
+> >   */
+> > -static struct uart_port *xuartps_get_port(void)
+> > +static struct uart_port *cdns_uart_get_port(void)
+> >  {
+> >  	struct uart_port *port;
+> >  	int id;
+> >  
+> >  	/* Find the next unused port */
+> > -	for (id = 0; id < XUARTPS_NR_PORTS; id++)
+> > -		if (xuartps_port[id].mapbase == 0)
+> > +	for (id = 0; id < CDNS_UART_NR_PORTS; id++)
+> > +		if (cdns_uart_port[id].mapbase == 0)
+> >  			break;
+> >  
+> > -	if (id >= XUARTPS_NR_PORTS)
+> > +	if (id >= CDNS_UART_NR_PORTS)
+> >  		return NULL;
+> >  
+> > -	port = &xuartps_port[id];
+> > +	port = &cdns_uart_port[id];
+> >  
+> >  	/* At this point, we've got an empty uart_port struct, initialize it */
+> >  	spin_lock_init(&port->lock);
+> > @@ -1016,8 +1024,8 @@ static struct uart_port *xuartps_get_port(void)
+> >  	port->type	= PORT_UNKNOWN;
+> >  	port->iotype	= UPIO_MEM32;
+> >  	port->flags	= UPF_BOOT_AUTOCONF;
+> > -	port->ops	= &xuartps_ops;
+> > -	port->fifosize	= XUARTPS_FIFO_SIZE;
+> > +	port->ops	= &cdns_uart_ops;
+> > +	port->fifosize	= CDNS_UART_FIFO_SIZE;
+> >  	port->line	= id;
+> >  	port->dev	= NULL;
+> >  	return port;
+> > @@ -1025,37 +1033,37 @@ static struct uart_port *xuartps_get_port(void)
+> >  
+> >  #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
+> >  /**
+> > - * xuartps_console_wait_tx - Wait for the TX to be full
+> > + * cdns_uart_console_wait_tx - Wait for the TX to be full
+> >   * @port: Handle to the uart port structure
+> >   */
+> > -static void xuartps_console_wait_tx(struct uart_port *port)
+> > +static void cdns_uart_console_wait_tx(struct uart_port *port)
+> >  {
+> > -	while ((xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_TXEMPTY)
+> > -				!= XUARTPS_SR_TXEMPTY)
+> > +	while ((cdns_uart_readl(CDNS_UART_SR_OFFSET) & CDNS_UART_SR_TXEMPTY)
+> > +				!= CDNS_UART_SR_TXEMPTY)
+> >  		barrier();
+> >  }
+> >  
+> >  /**
+> > - * xuartps_console_putchar - write the character to the FIFO buffer
+> > + * cdns_uart_console_putchar - write the character to the FIFO buffer
+> >   * @port: Handle to the uart port structure
+> >   * @ch: Character to be written
+> >   */
+> > -static void xuartps_console_putchar(struct uart_port *port, int ch)
+> > +static void cdns_uart_console_putchar(struct uart_port *port, int ch)
+> >  {
+> > -	xuartps_console_wait_tx(port);
+> > -	xuartps_writel(ch, XUARTPS_FIFO_OFFSET);
+> > +	cdns_uart_console_wait_tx(port);
+> > +	cdns_uart_writel(ch, CDNS_UART_FIFO_OFFSET);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_console_write - perform write operation
+> > + * cdns_uart_console_write - perform write operation
+> >   * @co: Handle to the console
+> >   * @s: Pointer to character array
+> >   * @count: No of characters
+> >   */
+> > -static void xuartps_console_write(struct console *co, const char *s,
+> > +static void cdns_uart_console_write(struct console *co, const char *s,
+> >  				unsigned int count)
+> >  {
+> > -	struct uart_port *port = &xuartps_port[co->index];
+> > +	struct uart_port *port = &cdns_uart_port[co->index];
+> >  	unsigned long flags;
+> >  	unsigned int imr, ctrl;
+> >  	int locked = 1;
+> > @@ -1066,45 +1074,45 @@ static void xuartps_console_write(struct console *co, const char *s,
+> >  		spin_lock_irqsave(&port->lock, flags);
+> >  
+> >  	/* save and disable interrupt */
+> > -	imr = xuartps_readl(XUARTPS_IMR_OFFSET);
+> > -	xuartps_writel(imr, XUARTPS_IDR_OFFSET);
+> > +	imr = cdns_uart_readl(CDNS_UART_IMR_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IDR_OFFSET);
+> >  
+> >  	/*
+> >  	 * Make sure that the tx part is enabled. Set the TX enable bit and
+> >  	 * clear the TX disable bit to enable the transmitter.
+> >  	 */
+> > -	ctrl = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -	xuartps_writel((ctrl & ~XUARTPS_CR_TX_DIS) | XUARTPS_CR_TX_EN,
+> > -		XUARTPS_CR_OFFSET);
+> > +	ctrl = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +	cdns_uart_writel((ctrl & ~CDNS_UART_CR_TX_DIS) | CDNS_UART_CR_TX_EN,
+> > +		CDNS_UART_CR_OFFSET);
+> >  
+> > -	uart_console_write(port, s, count, xuartps_console_putchar);
+> > -	xuartps_console_wait_tx(port);
+> > +	uart_console_write(port, s, count, cdns_uart_console_putchar);
+> > +	cdns_uart_console_wait_tx(port);
+> >  
+> > -	xuartps_writel(ctrl, XUARTPS_CR_OFFSET);
+> > +	cdns_uart_writel(ctrl, CDNS_UART_CR_OFFSET);
+> >  
+> >  	/* restore interrupt state */
+> > -	xuartps_writel(imr, XUARTPS_IER_OFFSET);
+> > +	cdns_uart_writel(imr, CDNS_UART_IER_OFFSET);
+> >  
+> >  	if (locked)
+> >  		spin_unlock_irqrestore(&port->lock, flags);
+> >  }
+> >  
+> >  /**
+> > - * xuartps_console_setup - Initialize the uart to default config
+> > + * cdns_uart_console_setup - Initialize the uart to default config
+> >   * @co: Console handle
+> >   * @options: Initial settings of uart
+> >   *
+> >   * Return: 0 on success, negative errno otherwise.
+> >   */
+> > -static int __init xuartps_console_setup(struct console *co, char *options)
+> > +static int __init cdns_uart_console_setup(struct console *co, char *options)
+> >  {
+> > -	struct uart_port *port = &xuartps_port[co->index];
+> > +	struct uart_port *port = &cdns_uart_port[co->index];
+> >  	int baud = 9600;
+> >  	int bits = 8;
+> >  	int parity = 'n';
+> >  	int flow = 'n';
+> >  
+> > -	if (co->index < 0 || co->index >= XUARTPS_NR_PORTS)
+> > +	if (co->index < 0 || co->index >= CDNS_UART_NR_PORTS)
+> >  		return -EINVAL;
+> >  
+> >  	if (!port->mapbase) {
+> > @@ -1118,53 +1126,53 @@ static int __init xuartps_console_setup(struct console *co, char *options)
+> >  	return uart_set_options(port, co, baud, parity, bits, flow);
+> >  }
+> >  
+> > -static struct uart_driver xuartps_uart_driver;
+> > +static struct uart_driver cdns_uart_uart_driver;
+> >  
+> > -static struct console xuartps_console = {
+> > -	.name	= XUARTPS_TTY_NAME,
+> > -	.write	= xuartps_console_write,
+> > +static struct console cdns_uart_console = {
+> > +	.name	= CDNS_UART_TTY_NAME,
+> > +	.write	= cdns_uart_console_write,
+> >  	.device	= uart_console_device,
+> > -	.setup	= xuartps_console_setup,
+> > +	.setup	= cdns_uart_console_setup,
+> >  	.flags	= CON_PRINTBUFFER,
+> >  	.index	= -1, /* Specified on the cmdline (e.g. console=ttyPS ) */
+> > -	.data	= &xuartps_uart_driver,
+> > +	.data	= &cdns_uart_uart_driver,
+> >  };
+> >  
+> >  /**
+> > - * xuartps_console_init - Initialization call
+> > + * cdns_uart_console_init - Initialization call
+> >   *
+> >   * Return: 0 on success, negative error otherwise.
+> >   */
+> > -static int __init xuartps_console_init(void)
+> > +static int __init cdns_uart_console_init(void)
+> >  {
+> > -	register_console(&xuartps_console);
+> > +	register_console(&cdns_uart_console);
+> >  	return 0;
+> >  }
+> >  
+> > -console_initcall(xuartps_console_init);
+> > +console_initcall(cdns_uart_console_init);
+> >  
+> >  #endif /* CONFIG_SERIAL_XILINX_PS_UART_CONSOLE */
+> >  
+> > -static struct uart_driver xuartps_uart_driver = {
+> > +static struct uart_driver cdns_uart_uart_driver = {
+> >  	.owner		= THIS_MODULE,
+> > -	.driver_name	= XUARTPS_NAME,
+> > -	.dev_name	= XUARTPS_TTY_NAME,
+> > -	.major		= XUARTPS_MAJOR,
+> > -	.minor		= XUARTPS_MINOR,
+> > -	.nr		= XUARTPS_NR_PORTS,
+> > +	.driver_name	= CDNS_UART_NAME,
+> > +	.dev_name	= CDNS_UART_TTY_NAME,
+> > +	.major		= CDNS_UART_MAJOR,
+> > +	.minor		= CDNS_UART_MINOR,
+> > +	.nr		= CDNS_UART_NR_PORTS,
+> >  #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
+> > -	.cons		= &xuartps_console,
+> > +	.cons		= &cdns_uart_console,
+> >  #endif
+> >  };
+> >  
+> >  #ifdef CONFIG_PM_SLEEP
+> >  /**
+> > - * xuartps_suspend - suspend event
+> > + * cdns_uart_suspend - suspend event
+> >   * @device: Pointer to the device structure
+> >   *
+> >   * Return: 0
+> >   */
+> > -static int xuartps_suspend(struct device *device)
+> > +static int cdns_uart_suspend(struct device *device)
+> >  {
+> >  	struct uart_port *port = dev_get_drvdata(device);
+> >  	struct tty_struct *tty;
+> > @@ -1183,23 +1191,24 @@ static int xuartps_suspend(struct device *device)
+> >  	 * Call the API provided in serial_core.c file which handles
+> >  	 * the suspend.
+> >  	 */
+> > -	uart_suspend_port(&xuartps_uart_driver, port);
+> > +	uart_suspend_port(&cdns_uart_uart_driver, port);
+> >  	if (console_suspend_enabled && !may_wake) {
+> > -		struct xuartps *xuartps = port->private_data;
+> > +		struct cdns_uart *cdns_uart = port->private_data;
+> >  
+> > -		clk_disable(xuartps->refclk);
+> > -		clk_disable(xuartps->aperclk);
+> > +		clk_disable(cdns_uart->uartclk);
+> > +		clk_disable(cdns_uart->pclk);
+> >  	} else {
+> >  		unsigned long flags = 0;
+> >  
+> >  		spin_lock_irqsave(&port->lock, flags);
+> >  		/* Empty the receive FIFO 1st before making changes */
+> > -		while (!(xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_RXEMPTY))
+> > -			xuartps_readl(XUARTPS_FIFO_OFFSET);
+> > +		while (!(cdns_uart_readl(CDNS_UART_SR_OFFSET) &
+> > +					CDNS_UART_SR_RXEMPTY))
+> > +			cdns_uart_readl(CDNS_UART_FIFO_OFFSET);
+> >  		/* set RX trigger level to 1 */
+> > -		xuartps_writel(1, XUARTPS_RXWM_OFFSET);
+> > +		cdns_uart_writel(1, CDNS_UART_RXWM_OFFSET);
+> >  		/* disable RX timeout interrups */
+> > -		xuartps_writel(XUARTPS_IXR_TOUT, XUARTPS_IDR_OFFSET);
+> > +		cdns_uart_writel(CDNS_UART_IXR_TOUT, CDNS_UART_IDR_OFFSET);
+> >  		spin_unlock_irqrestore(&port->lock, flags);
+> >  	}
+> >  
+> > @@ -1207,12 +1216,12 @@ static int xuartps_suspend(struct device *device)
+> >  }
+> >  
+> >  /**
+> > - * xuartps_resume - Resume after a previous suspend
+> > + * cdns_uart_resume - Resume after a previous suspend
+> >   * @device: Pointer to the device structure
+> >   *
+> >   * Return: 0
+> >   */
+> > -static int xuartps_resume(struct device *device)
+> > +static int cdns_uart_resume(struct device *device)
+> >  {
+> >  	struct uart_port *port = dev_get_drvdata(device);
+> >  	unsigned long flags = 0;
+> > @@ -1230,83 +1239,95 @@ static int xuartps_resume(struct device *device)
+> >  	}
+> >  
+> >  	if (console_suspend_enabled && !may_wake) {
+> > -		struct xuartps *xuartps = port->private_data;
+> > +		struct cdns_uart *cdns_uart = port->private_data;
+> >  
+> > -		clk_enable(xuartps->aperclk);
+> > -		clk_enable(xuartps->refclk);
+> > +		clk_enable(cdns_uart->pclk);
+> > +		clk_enable(cdns_uart->uartclk);
+> >  
+> >  		spin_lock_irqsave(&port->lock, flags);
+> >  
+> >  		/* Set TX/RX Reset */
+> > -		ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -		ctrl_reg |= XUARTPS_CR_TXRST | XUARTPS_CR_RXRST;
+> > -		xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > -		while (xuartps_readl(XUARTPS_CR_OFFSET) &
+> > -				(XUARTPS_CR_TXRST | XUARTPS_CR_RXRST))
+> > +		ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +		ctrl_reg |= CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST;
+> > +		cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> > +		while (cdns_uart_readl(CDNS_UART_CR_OFFSET) &
+> > +				(CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST))
+> >  			cpu_relax();
+> >  
+> >  		/* restore rx timeout value */
+> > -		xuartps_writel(rx_timeout, XUARTPS_RXTOUT_OFFSET);
+> > +		cdns_uart_writel(rx_timeout, CDNS_UART_RXTOUT_OFFSET);
+> >  		/* Enable Tx/Rx */
+> > -		ctrl_reg = xuartps_readl(XUARTPS_CR_OFFSET);
+> > -		ctrl_reg &= ~(XUARTPS_CR_TX_DIS | XUARTPS_CR_RX_DIS);
+> > -		ctrl_reg |= XUARTPS_CR_TX_EN | XUARTPS_CR_RX_EN;
+> > -		xuartps_writel(ctrl_reg, XUARTPS_CR_OFFSET);
+> > +		ctrl_reg = cdns_uart_readl(CDNS_UART_CR_OFFSET);
+> > +		ctrl_reg &= ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS);
+> > +		ctrl_reg |= CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN;
+> > +		cdns_uart_writel(ctrl_reg, CDNS_UART_CR_OFFSET);
+> >  
+> >  		spin_unlock_irqrestore(&port->lock, flags);
+> >  	} else {
+> >  		spin_lock_irqsave(&port->lock, flags);
+> >  		/* restore original rx trigger level */
+> > -		xuartps_writel(rx_trigger_level, XUARTPS_RXWM_OFFSET);
+> > +		cdns_uart_writel(rx_trigger_level, CDNS_UART_RXWM_OFFSET);
+> >  		/* enable RX timeout interrupt */
+> > -		xuartps_writel(XUARTPS_IXR_TOUT, XUARTPS_IER_OFFSET);
+> > +		cdns_uart_writel(CDNS_UART_IXR_TOUT, CDNS_UART_IER_OFFSET);
+> >  		spin_unlock_irqrestore(&port->lock, flags);
+> >  	}
+> >  
+> > -	return uart_resume_port(&xuartps_uart_driver, port);
+> > +	return uart_resume_port(&cdns_uart_uart_driver, port);
+> >  }
+> >  #endif /* ! CONFIG_PM_SLEEP */
+> >  
+> > -static SIMPLE_DEV_PM_OPS(xuartps_dev_pm_ops, xuartps_suspend, xuartps_resume);
+> > +static SIMPLE_DEV_PM_OPS(cdns_uart_dev_pm_ops, cdns_uart_suspend,
+> > +		cdns_uart_resume);
+> >  
+> >  /**
+> > - * xuartps_probe - Platform driver probe
+> > + * cdns_uart_probe - Platform driver probe
+> >   * @pdev: Pointer to the platform device structure
+> >   *
+> >   * Return: 0 on success, negative error otherwise.
+> >   */
+> > -static int xuartps_probe(struct platform_device *pdev)
+> > +static int cdns_uart_probe(struct platform_device *pdev)
+> >  {
+> >  	int rc;
+> >  	struct uart_port *port;
+> >  	struct resource *res, *res2;
+> > -	struct xuartps *xuartps_data;
+> > +	struct cdns_uart *cdns_uart_data;
+> >  
+> > -	xuartps_data = devm_kzalloc(&pdev->dev, sizeof(*xuartps_data),
+> > +	cdns_uart_data = devm_kzalloc(&pdev->dev, sizeof(*cdns_uart_data),
+> >  			GFP_KERNEL);
+> > -	if (!xuartps_data)
+> > +	if (!cdns_uart_data)
+> >  		return -ENOMEM;
+> >  
+> > -	xuartps_data->aperclk = devm_clk_get(&pdev->dev, "aper_clk");
+> > -	if (IS_ERR(xuartps_data->aperclk)) {
+> > -		dev_err(&pdev->dev, "aper_clk clock not found.\n");
+> > -		return PTR_ERR(xuartps_data->aperclk);
+> > +	cdns_uart_data->pclk = devm_clk_get(&pdev->dev, "pclk");
+> > +	if (IS_ERR(cdns_uart_data->pclk)) {
+> > +		cdns_uart_data->pclk = devm_clk_get(&pdev->dev, "aper_clk");
+> > +		if (!IS_ERR(cdns_uart_data->pclk))
+> > +			dev_err(&pdev->dev, "clock name 'aper_clk' is deprecated.\n");
+> > +	}
+> > +	if (IS_ERR(cdns_uart_data->pclk)) {
+> > +		dev_err(&pdev->dev, "pclk clock not found.\n");
+> > +		return PTR_ERR(cdns_uart_data->pclk);
+> > +	}
+> > +
+> > +	cdns_uart_data->uartclk = devm_clk_get(&pdev->dev, "uart_clk");
+> > +	if (IS_ERR(cdns_uart_data->uartclk)) {
+> > +		cdns_uart_data->uartclk = devm_clk_get(&pdev->dev, "ref_clk");
+> > +		if (!IS_ERR(cdns_uart_data->uartclk))
+> > +			dev_err(&pdev->dev, "clock name 'ref_clk' is deprecated.\n");
+> >  	}
+> > -	xuartps_data->refclk = devm_clk_get(&pdev->dev, "ref_clk");
+> > -	if (IS_ERR(xuartps_data->refclk)) {
+> > -		dev_err(&pdev->dev, "ref_clk clock not found.\n");
+> > -		return PTR_ERR(xuartps_data->refclk);
+> > +	if (IS_ERR(cdns_uart_data->uartclk)) {
+> > +		dev_err(&pdev->dev, "uart_clk clock not found.\n");
+> > +		return PTR_ERR(cdns_uart_data->uartclk);
+> >  	}
+> >  
+> > -	rc = clk_prepare_enable(xuartps_data->aperclk);
+> > +	rc = clk_prepare_enable(cdns_uart_data->pclk);
+> >  	if (rc) {
+> > -		dev_err(&pdev->dev, "Unable to enable APER clock.\n");
+> > +		dev_err(&pdev->dev, "Unable to enable pclk clock.\n");
+> >  		return rc;
+> >  	}
+> > -	rc = clk_prepare_enable(xuartps_data->refclk);
+> > +	rc = clk_prepare_enable(cdns_uart_data->uartclk);
+> >  	if (rc) {
+> >  		dev_err(&pdev->dev, "Unable to enable device clock.\n");
+> > -		goto err_out_clk_dis_aper;
+> > +		goto err_out_clk_dis_pclk;
+> >  	}
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > @@ -1322,15 +1343,15 @@ static int xuartps_probe(struct platform_device *pdev)
+> >  	}
+> >  
+> >  #ifdef CONFIG_COMMON_CLK
+> > -	xuartps_data->clk_rate_change_nb.notifier_call =
+> > -			xuartps_clk_notifier_cb;
+> > -	if (clk_notifier_register(xuartps_data->refclk,
+> > -				&xuartps_data->clk_rate_change_nb))
+> > +	cdns_uart_data->clk_rate_change_nb.notifier_call =
+> > +			cdns_uart_clk_notifier_cb;
+> > +	if (clk_notifier_register(cdns_uart_data->uartclk,
+> > +				&cdns_uart_data->clk_rate_change_nb))
+> >  		dev_warn(&pdev->dev, "Unable to register clock notifier.\n");
+> >  #endif
+> >  
+> >  	/* Initialize the port structure */
+> > -	port = xuartps_get_port();
+> > +	port = cdns_uart_get_port();
+> >  
+> >  	if (!port) {
+> >  		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
+> > @@ -1344,11 +1365,11 @@ static int xuartps_probe(struct platform_device *pdev)
+> >  		port->mapbase = res->start;
+> >  		port->irq = res2->start;
+> >  		port->dev = &pdev->dev;
+> > -		port->uartclk = clk_get_rate(xuartps_data->refclk);
+> > -		port->private_data = xuartps_data;
+> > -		xuartps_data->port = port;
+> > +		port->uartclk = clk_get_rate(cdns_uart_data->uartclk);
+> > +		port->private_data = cdns_uart_data;
+> > +		cdns_uart_data->port = port;
+> >  		platform_set_drvdata(pdev, port);
+> > -		rc = uart_add_one_port(&xuartps_uart_driver, port);
+> > +		rc = uart_add_one_port(&cdns_uart_uart_driver, port);
+> >  		if (rc) {
+> >  			dev_err(&pdev->dev,
+> >  				"uart_add_one_port() failed; err=%i\n", rc);
+> > @@ -1359,88 +1380,89 @@ static int xuartps_probe(struct platform_device *pdev)
+> >  
+> >  err_out_notif_unreg:
+> >  #ifdef CONFIG_COMMON_CLK
+> > -	clk_notifier_unregister(xuartps_data->refclk,
+> > -			&xuartps_data->clk_rate_change_nb);
+> > +	clk_notifier_unregister(cdns_uart_data->uartclk,
+> > +			&cdns_uart_data->clk_rate_change_nb);
+> >  #endif
+> >  err_out_clk_disable:
+> > -	clk_disable_unprepare(xuartps_data->refclk);
+> > -err_out_clk_dis_aper:
+> > -	clk_disable_unprepare(xuartps_data->aperclk);
+> > +	clk_disable_unprepare(cdns_uart_data->uartclk);
+> > +err_out_clk_dis_pclk:
+> > +	clk_disable_unprepare(cdns_uart_data->pclk);
+> >  
+> >  	return rc;
+> >  }
+> >  
+> >  /**
+> > - * xuartps_remove - called when the platform driver is unregistered
+> > + * cdns_uart_remove - called when the platform driver is unregistered
+> >   * @pdev: Pointer to the platform device structure
+> >   *
+> >   * Return: 0 on success, negative error otherwise.
+> >   */
+> > -static int xuartps_remove(struct platform_device *pdev)
+> > +static int cdns_uart_remove(struct platform_device *pdev)
+> >  {
+> >  	struct uart_port *port = platform_get_drvdata(pdev);
+> > -	struct xuartps *xuartps_data = port->private_data;
+> > +	struct cdns_uart *cdns_uart_data = port->private_data;
+> >  	int rc;
+> >  
+> > -	/* Remove the xuartps port from the serial core */
+> > +	/* Remove the cdns_uart port from the serial core */
+> >  #ifdef CONFIG_COMMON_CLK
+> > -	clk_notifier_unregister(xuartps_data->refclk,
+> > -			&xuartps_data->clk_rate_change_nb);
+> > +	clk_notifier_unregister(cdns_uart_data->uartclk,
+> > +			&cdns_uart_data->clk_rate_change_nb);
+> >  #endif
+> > -	rc = uart_remove_one_port(&xuartps_uart_driver, port);
+> > +	rc = uart_remove_one_port(&cdns_uart_uart_driver, port);
+> >  	port->mapbase = 0;
+> > -	clk_disable_unprepare(xuartps_data->refclk);
+> > -	clk_disable_unprepare(xuartps_data->aperclk);
+> > +	clk_disable_unprepare(cdns_uart_data->uartclk);
+> > +	clk_disable_unprepare(cdns_uart_data->pclk);
+> >  	return rc;
+> >  }
+> >  
+> >  /* Match table for of_platform binding */
+> > -static struct of_device_id xuartps_of_match[] = {
+> > -	{ .compatible = "xlnx,xuartps", },
+> > +static struct of_device_id cdns_uart_of_match[] = {
+> > +	{ .compatible = "xlnx,cdns_uart", },
+> > +	{ .compatible = "cdns,uart-r1p8", },
+> >  	{}
+> 
+> This doesn't fit with binding doc.
+> 
+> +Required properties:
+> +- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
+> 
+> You have removed xlnx,xuartps from driver and introduce new one cdns_uart.
+> I think it was done by sed.
 
-Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- drivers/regulator/Kconfig              |   8 +
- drivers/regulator/Makefile             |   1 +
- drivers/regulator/bcm590xx-regulator.c | 413 +++++++++++++++++++++++++++++++++
- 3 files changed, 422 insertions(+)
- create mode 100644 drivers/regulator/bcm590xx-regulator.c
+Argh, a victim of the search and replace, right. Good catch. It should be
+xlnx,xuartps, just as it has been before.
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 6a79328..1169a42 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -139,6 +139,14 @@ config REGULATOR_AS3722
- 	  AS3722 PMIC. This will enable support for all the software
- 	  controllable DCDC/LDO regulators.
- 
-+config REGULATOR_BCM590XX
-+	tristate "Broadcom BCM590xx PMU Regulators"
-+	depends on MFD_BCM590XX
-+	help
-+	  This driver provides support for the voltage regulators on the
-+	  BCM590xx PMUs. This will enable support for the software
-+	  controllable LDO/Switching regulators.
-+
- config REGULATOR_DA903X
- 	tristate "Dialog Semiconductor DA9030/DA9034 regulators"
- 	depends on PMIC_DA903X
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 979f9dd..e1ab514 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
- obj-$(CONFIG_REGULATOR_ARIZONA) += arizona-micsupp.o arizona-ldo1.o
- obj-$(CONFIG_REGULATOR_AS3711) += as3711-regulator.o
- obj-$(CONFIG_REGULATOR_AS3722) += as3722-regulator.o
-+obj-$(CONFIG_REGULATOR_BCM590XX) += bcm590xx-regulator.o
- obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
- obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
- obj-$(CONFIG_REGULATOR_DA9055)	+= da9055-regulator.o
-diff --git a/drivers/regulator/bcm590xx-regulator.c b/drivers/regulator/bcm590xx-regulator.c
-new file mode 100644
-index 0000000..e6b2e8e
---- /dev/null
-+++ b/drivers/regulator/bcm590xx-regulator.c
-@@ -0,0 +1,413 @@
-+/*
-+ * Broadcom BCM590xx regulator driver
-+ *
-+ * Copyright 2014 Linaro Limited
-+ * Author: Matt Porter <mporter@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under  the terms of the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/bcm590xx.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
-+#include <linux/slab.h>
-+
-+/* Register defs */
-+#define BCM590XX_RFLDOPMCTRL1	0x60
-+#define BCM590XX_IOSR1PMCTRL1	0x7a
-+#define BCM590XX_IOSR2PMCTRL1	0x7c
-+#define BCM590XX_CSRPMCTRL1	0x7e
-+#define BCM590XX_SDSR1PMCTRL1	0x82
-+#define BCM590XX_SDSR2PMCTRL1	0x86
-+#define BCM590XX_MSRPMCTRL1	0x8a
-+#define BCM590XX_VSRPMCTRL1	0x8e
-+#define BCM590XX_REG_ENABLE	BIT(7)
-+
-+#define BCM590XX_RFLDOCTRL	0x96
-+#define BCM590XX_CSRVOUT1	0xc0
-+#define BCM590XX_LDO_VSEL_MASK	GENMASK(5, 3)
-+#define BCM590XX_SR_VSEL_MASK	GENMASK(5, 0)
-+
-+/* LDO regulator IDs */
-+#define BCM590XX_REG_RFLDO	0
-+#define BCM590XX_REG_CAMLDO1	1
-+#define BCM590XX_REG_CAMLDO2	2
-+#define BCM590XX_REG_SIMLDO1	3
-+#define BCM590XX_REG_SIMLDO2	4
-+#define BCM590XX_REG_SDLDO	5
-+#define BCM590XX_REG_SDXLDO	6
-+#define BCM590XX_REG_MMCLDO1	7
-+#define BCM590XX_REG_MMCLDO2	8
-+#define BCM590XX_REG_AUDLDO	9
-+#define BCM590XX_REG_MICLDO	10
-+#define BCM590XX_REG_USBLDO	11
-+#define BCM590XX_REG_VIBLDO	12
-+
-+/* DCDC regulator IDs */
-+#define BCM590XX_REG_CSR	13
-+#define BCM590XX_REG_IOSR1	14
-+#define BCM590XX_REG_IOSR2	15
-+#define BCM590XX_REG_MSR	16
-+#define BCM590XX_REG_SDSR1	17
-+#define BCM590XX_REG_SDSR2	18
-+#define BCM590XX_REG_VSR	19
-+
-+#define BCM590XX_NUM_REGS	20
-+
-+#define BCM590XX_REG_IS_LDO(n)	(n < BCM590XX_REG_CSR)
-+
-+struct bcm590xx_board {
-+	struct regulator_init_data *bcm590xx_pmu_init_data[BCM590XX_NUM_REGS];
-+};
-+
-+/* LDO group A: supported voltages in microvolts */
-+static const unsigned int ldo_a_table[] = {
-+	1200000, 1800000, 2500000, 2700000, 2800000,
-+	2900000, 3000000, 3300000,
-+};
-+
-+/* LDO group C: supported voltages in microvolts */
-+static const unsigned int ldo_c_table[] = {
-+	3100000, 1800000, 2500000, 2700000, 2800000,
-+	2900000, 3000000, 3300000,
-+};
-+
-+/* DCDC group CSR: supported voltages in microvolts */
-+static const struct regulator_linear_range dcdc_csr_ranges[] = {
-+	REGULATOR_LINEAR_RANGE(860000, 2, 50, 10000),
-+	REGULATOR_LINEAR_RANGE(1360000, 51, 55, 20000),
-+	REGULATOR_LINEAR_RANGE(900000, 56, 63, 0),
-+};
-+
-+/* DCDC group IOSR1: supported voltages in microvolts */
-+static const struct regulator_linear_range dcdc_iosr1_ranges[] = {
-+	REGULATOR_LINEAR_RANGE(860000, 2, 51, 10000),
-+	REGULATOR_LINEAR_RANGE(1500000, 52, 52, 0),
-+	REGULATOR_LINEAR_RANGE(1800000, 53, 53, 0),
-+	REGULATOR_LINEAR_RANGE(900000, 54, 63, 0),
-+};
-+
-+/* DCDC group SDSR1: supported voltages in microvolts */
-+static const struct regulator_linear_range dcdc_sdsr1_ranges[] = {
-+	REGULATOR_LINEAR_RANGE(860000, 2, 50, 10000),
-+	REGULATOR_LINEAR_RANGE(1340000, 51, 51, 0),
-+	REGULATOR_LINEAR_RANGE(900000, 52, 63, 0),
-+};
-+
-+struct bcm590xx_info {
-+	const char *name;
-+	const char *vin_name;
-+	u8 n_voltages;
-+	const unsigned int *volt_table;
-+	u8 n_linear_ranges;
-+	const struct regulator_linear_range *linear_ranges;
-+};
-+
-+#define BCM590XX_REG_TABLE(_name, _table) \
-+	{ \
-+		.name = #_name, \
-+		.n_voltages = ARRAY_SIZE(_table), \
-+		.volt_table = _table, \
-+	}
-+
-+#define BCM590XX_REG_RANGES(_name, _ranges) \
-+	{ \
-+		.name = #_name, \
-+		.n_linear_ranges = ARRAY_SIZE(_ranges), \
-+		.linear_ranges = _ranges, \
-+	}
-+
-+static struct bcm590xx_info bcm590xx_regs[] = {
-+	BCM590XX_REG_TABLE(rfldo, ldo_a_table),
-+	BCM590XX_REG_TABLE(camldo1, ldo_c_table),
-+	BCM590XX_REG_TABLE(camldo2, ldo_c_table),
-+	BCM590XX_REG_TABLE(simldo1, ldo_a_table),
-+	BCM590XX_REG_TABLE(simldo2, ldo_a_table),
-+	BCM590XX_REG_TABLE(sdldo, ldo_c_table),
-+	BCM590XX_REG_TABLE(sdxldo, ldo_a_table),
-+	BCM590XX_REG_TABLE(mmcldo1, ldo_a_table),
-+	BCM590XX_REG_TABLE(mmcldo2, ldo_a_table),
-+	BCM590XX_REG_TABLE(audldo, ldo_a_table),
-+	BCM590XX_REG_TABLE(micldo, ldo_a_table),
-+	BCM590XX_REG_TABLE(usbldo, ldo_a_table),
-+	BCM590XX_REG_TABLE(vibldo, ldo_c_table),
-+	BCM590XX_REG_RANGES(csr, dcdc_csr_ranges),
-+	BCM590XX_REG_RANGES(iosr1, dcdc_iosr1_ranges),
-+	BCM590XX_REG_RANGES(iosr2, dcdc_iosr1_ranges),
-+	BCM590XX_REG_RANGES(msr, dcdc_iosr1_ranges),
-+	BCM590XX_REG_RANGES(sdsr1, dcdc_sdsr1_ranges),
-+	BCM590XX_REG_RANGES(sdsr2, dcdc_iosr1_ranges),
-+	BCM590XX_REG_RANGES(vsr, dcdc_iosr1_ranges),
-+};
-+
-+struct bcm590xx_reg {
-+	struct regulator_desc *desc;
-+	struct bcm590xx *mfd;
-+	struct regulator_dev **rdev;
-+	struct bcm590xx_info **info;
-+};
-+
-+static int bcm590xx_get_vsel_register(int id)
-+{
-+	if (BCM590XX_REG_IS_LDO(id))
-+		return BCM590XX_RFLDOCTRL + id;
-+	else
-+		return BCM590XX_CSRVOUT1 + (id - BCM590XX_REG_CSR) * 3;
-+}
-+
-+static int bcm590xx_get_enable_register(int id)
-+{
-+	int reg = 0;
-+
-+	if (BCM590XX_REG_IS_LDO(id))
-+		reg = BCM590XX_RFLDOPMCTRL1 + id * 2;
-+	else
-+		switch (id) {
-+		case BCM590XX_REG_CSR:
-+			reg = BCM590XX_CSRPMCTRL1;
-+			break;
-+		case BCM590XX_REG_IOSR1:
-+			reg = BCM590XX_IOSR1PMCTRL1;
-+			break;
-+		case BCM590XX_REG_IOSR2:
-+			reg = BCM590XX_IOSR2PMCTRL1;
-+			break;
-+		case BCM590XX_REG_MSR:
-+			reg = BCM590XX_MSRPMCTRL1;
-+			break;
-+		case BCM590XX_REG_SDSR1:
-+			reg = BCM590XX_SDSR1PMCTRL1;
-+			break;
-+		case BCM590XX_REG_SDSR2:
-+			reg = BCM590XX_SDSR2PMCTRL1;
-+			break;
-+		};
-+
-+	return reg;
-+}
-+
-+static struct regulator_ops bcm590xx_ops_ldo = {
-+	.is_enabled		= regulator_is_enabled_regmap,
-+	.enable			= regulator_enable_regmap,
-+	.disable		= regulator_disable_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.list_voltage		= regulator_list_voltage_table,
-+	.map_voltage		= regulator_map_voltage_iterate,
-+};
-+
-+static struct regulator_ops bcm590xx_ops_dcdc = {
-+	.is_enabled		= regulator_is_enabled_regmap,
-+	.enable			= regulator_enable_regmap,
-+	.disable		= regulator_disable_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.list_voltage		= regulator_list_voltage_linear_range,
-+	.map_voltage		= regulator_map_voltage_linear_range,
-+};
-+
-+#define BCM590XX_MATCH(_name, _id) \
-+	{ \
-+		.name = #_name, \
-+		.driver_data = (void *)&bcm590xx_regs[BCM590XX_REG_##_id], \
-+	}
-+
-+static struct of_regulator_match bcm590xx_matches[] = {
-+	BCM590XX_MATCH(rfldo, RFLDO),
-+	BCM590XX_MATCH(camldo1, CAMLDO1),
-+	BCM590XX_MATCH(camldo2, CAMLDO2),
-+	BCM590XX_MATCH(simldo1, SIMLDO1),
-+	BCM590XX_MATCH(simldo2, SIMLDO2),
-+	BCM590XX_MATCH(sdldo, SDLDO),
-+	BCM590XX_MATCH(sdxldo, SDXLDO),
-+	BCM590XX_MATCH(mmcldo1, MMCLDO1),
-+	BCM590XX_MATCH(mmcldo2, MMCLDO2),
-+	BCM590XX_MATCH(audldo, AUDLDO),
-+	BCM590XX_MATCH(micldo, MICLDO),
-+	BCM590XX_MATCH(usbldo, USBLDO),
-+	BCM590XX_MATCH(vibldo, VIBLDO),
-+	BCM590XX_MATCH(csr, CSR),
-+	BCM590XX_MATCH(iosr1, IOSR1),
-+	BCM590XX_MATCH(iosr2, IOSR2),
-+	BCM590XX_MATCH(msr, MSR),
-+	BCM590XX_MATCH(sdsr1, SDSR1),
-+	BCM590XX_MATCH(sdsr2, SDSR2),
-+	BCM590XX_MATCH(vsr, VSR),
-+};
-+
-+static struct bcm590xx_board *bcm590xx_parse_dt_reg_data(
-+		struct platform_device *pdev,
-+		struct of_regulator_match **bcm590xx_reg_matches)
-+{
-+	struct bcm590xx_board *data;
-+	struct device_node *np = pdev->dev.parent->of_node;
-+	struct device_node *regulators;
-+	struct of_regulator_match *matches = bcm590xx_matches;
-+	int count = ARRAY_SIZE(bcm590xx_matches);
-+	int idx = 0;
-+	int ret;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "of node not found\n");
-+		return NULL;
-+	}
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		dev_err(&pdev->dev, "failed to allocate regulator board data\n");
-+		return NULL;
-+	}
-+
-+	np = of_node_get(np);
-+	regulators = of_get_child_by_name(np, "regulators");
-+	if (!regulators) {
-+		dev_warn(&pdev->dev, "regulator node not found\n");
-+		return NULL;
-+	}
-+
-+	ret = of_regulator_match(&pdev->dev, regulators, matches, count);
-+	of_node_put(regulators);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Error parsing regulator init data: %d\n",
-+			ret);
-+		return NULL;
-+	}
-+
-+	*bcm590xx_reg_matches = matches;
-+
-+	for (idx = 0; idx < count; idx++) {
-+		if (!matches[idx].init_data || !matches[idx].of_node)
-+			continue;
-+
-+		data->bcm590xx_pmu_init_data[idx] = matches[idx].init_data;
-+	}
-+
-+	return data;
-+}
-+
-+static int bcm590xx_probe(struct platform_device *pdev)
-+{
-+	struct bcm590xx *bcm590xx = dev_get_drvdata(pdev->dev.parent);
-+	struct bcm590xx_board *pmu_data = NULL;
-+	struct bcm590xx_reg *pmu;
-+	struct regulator_config config = { };
-+	struct bcm590xx_info *info;
-+	struct regulator_init_data *reg_data;
-+	struct regulator_dev *rdev;
-+	struct of_regulator_match *bcm590xx_reg_matches = NULL;
-+	int i;
-+
-+	pmu_data = bcm590xx_parse_dt_reg_data(pdev,
-+					      &bcm590xx_reg_matches);
-+
-+	pmu = devm_kzalloc(&pdev->dev, sizeof(*pmu), GFP_KERNEL);
-+	if (!pmu) {
-+		dev_err(&pdev->dev, "Memory allocation failed for pmu\n");
-+		return -ENOMEM;
-+	}
-+
-+	pmu->mfd = bcm590xx;
-+
-+	platform_set_drvdata(pdev, pmu);
-+
-+	pmu->desc = devm_kzalloc(&pdev->dev, BCM590XX_NUM_REGS *
-+			sizeof(struct regulator_desc), GFP_KERNEL);
-+	if (!pmu->desc) {
-+		dev_err(&pdev->dev, "Memory alloc fails for desc\n");
-+		return -ENOMEM;
-+	}
-+
-+	pmu->info = devm_kzalloc(&pdev->dev, BCM590XX_NUM_REGS *
-+			sizeof(struct bcm590xx_info *), GFP_KERNEL);
-+	if (!pmu->info) {
-+		dev_err(&pdev->dev, "Memory alloc fails for info\n");
-+		return -ENOMEM;
-+	}
-+
-+	pmu->rdev = devm_kzalloc(&pdev->dev, BCM590XX_NUM_REGS *
-+			sizeof(struct regulator_dev *), GFP_KERNEL);
-+	if (!pmu->rdev) {
-+		dev_err(&pdev->dev, "Memory alloc fails for rdev\n");
-+		return -ENOMEM;
-+	}
-+
-+	info = bcm590xx_regs;
-+
-+	for (i = 0; i < BCM590XX_NUM_REGS; i++, info++) {
-+		if (pmu_data)
-+			reg_data = pmu_data->bcm590xx_pmu_init_data[i];
-+		else
-+			reg_data = NULL;
-+
-+		/* Register the regulators */
-+		pmu->info[i] = info;
-+
-+		pmu->desc[i].name = info->name;
-+		pmu->desc[i].supply_name = info->vin_name;
-+		pmu->desc[i].id = i;
-+		pmu->desc[i].volt_table = info->volt_table;
-+		pmu->desc[i].n_voltages = info->n_voltages;
-+		pmu->desc[i].linear_ranges = info->linear_ranges;
-+		pmu->desc[i].n_linear_ranges = info->n_linear_ranges;
-+
-+		if (BCM590XX_REG_IS_LDO(i)) {
-+			pmu->desc[i].ops = &bcm590xx_ops_ldo;
-+			pmu->desc[i].vsel_mask = BCM590XX_LDO_VSEL_MASK;
-+		} else {
-+			pmu->desc[i].ops = &bcm590xx_ops_dcdc;
-+			pmu->desc[i].vsel_mask = BCM590XX_SR_VSEL_MASK;
-+		}
-+
-+		pmu->desc[i].vsel_reg = bcm590xx_get_vsel_register(i);
-+		pmu->desc[i].enable_is_inverted = true;
-+		pmu->desc[i].enable_mask = BCM590XX_REG_ENABLE;
-+		pmu->desc[i].enable_reg = bcm590xx_get_enable_register(i);
-+		pmu->desc[i].type = REGULATOR_VOLTAGE;
-+		pmu->desc[i].owner = THIS_MODULE;
-+
-+		config.dev = bcm590xx->dev;
-+		config.init_data = reg_data;
-+		config.driver_data = pmu;
-+		config.regmap = bcm590xx->regmap;
-+
-+		if (bcm590xx_reg_matches)
-+			config.of_node = bcm590xx_reg_matches[i].of_node;
-+
-+		rdev = devm_regulator_register(&pdev->dev, &pmu->desc[i],
-+					       &config);
-+		if (IS_ERR(rdev)) {
-+			dev_err(bcm590xx->dev,
-+				"failed to register %s regulator\n",
-+				pdev->name);
-+			return PTR_ERR(rdev);
-+		}
-+
-+		pmu->rdev[i] = rdev;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver bcm590xx_regulator_driver = {
-+	.driver = {
-+		.name = "bcm590xx-vregs",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = bcm590xx_probe,
-+};
-+module_platform_driver(bcm590xx_regulator_driver);
-+
-+MODULE_AUTHOR("Matt Porter <mporter@linaro.org>");
-+MODULE_DESCRIPTION("BCM590xx voltage regulator driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:bcm590xx-regulator");
--- 
-1.8.4
+	S?ren
