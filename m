@@ -1,157 +1,114 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 11 Mar 2014 11:43:54 +0200
-Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
-In-Reply-To: <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
- <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <531EDADA.2070106@ti.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Tue, 11 Mar 2014 10:45:58 +0100
+Subject: [BUG] atmel: spi: scheduling while atomic
+In-Reply-To: <B256D81BAE5131468A838E5D7A24364172FF9685@penmbx01>
+References: <5315E33C.5000205@aksignal.cz> <20140304214039.GA4441@piout.net>
+ <5316CA84.4080907@aksignal.cz> <20140307225810.GB2918@piout.net>
+ <CAH+eYFCT-VSP0Ej8jOYVGNgf=ONUjcFs1M8O0HOGNRNX23SW6A@mail.gmail.com>
+ <531D73CB.7040402@aksignal.cz>
+ <B256D81BAE5131468A838E5D7A24364172FF9685@penmbx01>
+Message-ID: <531EDB56.20008@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2014 09:22 PM, Florian Vaussard wrote:
-> Add the High-Speed USB PHY.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Hi,
+patch applied, it helps.
+Is this final solution?
+Thanks
 
-Acked-by: Roger Quadros <rogerq@ti.com>
-
-cheers,
--roger
-
+Dne 10.3.2014 10:08, Yang, Wenyou napsal(a):
+>
+>
+>> -----Original Message-----
+>> From: Ji?? Prchal [mailto:jiri.prchal at aksignal.cz]
+>> Sent: Monday, March 10, 2014 4:12 PM
+>> To: Rabin Vincent; Alexandre Belloni; Yang, Wenyou
+>> Cc: Ferre, Nicolas; linux-arm-kernel at lists.infradead.org;
+>> sboyd at codeaurora.org
+>> Subject: Re: [BUG] atmel: spi: scheduling while atomic
+>>
+>> Hi all,
+>> at first: warning is on all spi devices.
+>> at second: its with CONFIG_PREEMPT=y, without (# CONFIG_PREEMPT_RCU is
+>> not set) is OK, but I wonder if this config will be fast enough for our
+>> usage (nearly RT)?
+>>
+>>
+>> Dne 8.3.2014 01:41, Rabin Vincent napsal(a):
+>>> 2014-03-07 23:58 GMT+01:00 Alexandre Belloni
+>>> <alexandre.belloni@free-electrons.com>:
+>>>> On 05/03/2014 at 07:56:04 +0100, Ji?? Prchal wrote :
+>>>>> [    0.902343] BUG: scheduling while atomic: spi0/383/0x00000002
+>>>>> [    0.906250] Modules linked in:
+>>>>> [    0.906250] CPU: 0 PID: 383 Comm: spi0 Not tainted 3.14.0-
+>> rc4_cpm9g25+ #1
+>>>>> [    0.906250] [<c000d9f4>] (unwind_backtrace) from [<c000bdc0>]
+>> (show_stack+0x10/0x14)
+>>>>> [    0.906250] [<c000bdc0>] (show_stack) from [<c003a224>]
+>> (__schedule_bug+0x48/0x60)
+>>>>> [    0.906250] [<c003a224>] (__schedule_bug) from [<c0390294>]
+>> (__schedule+0x60/0x484)
+>>>>> [    0.906250] [<c0390294>] (__schedule) from [<c038feac>]
+>> (schedule_timeout+0x17c/0x1ac)
+>>>>> [    0.906250] [<c038feac>] (schedule_timeout) from [<c039111c>]
+>> (wait_for_common+0x10c/0x1f0)
+>>>>> [    0.906250] [<c039111c>] (wait_for_common) from [<c0249228>]
+>> (atmel_spi_transfer_one_message+0x71c/0xa48)
+>>>>> [    0.906250] [<c0249228>] (atmel_spi_transfer_one_message) from
+>> [<c0246624>] (spi_pump_messages+0x210/0x238)
+>>>>> [    0.906250] [<c0246624>] (spi_pump_messages) from [<c00343d0>]
+>> (kthread_worker_fn+0x15c/0x1b4)
+>>>>> [    0.906250] [<c00343d0>] (kthread_worker_fn) from [<c0034534>]
+>> (kthread+0xb8/0xcc)
+>>>>> [    0.906250] [<c0034534>] (kthread) from [<c0009510>]
+>> (ret_from_fork+0x14/0x24)
+>>>>> [    0.906250] at25 spi0.0: 128 KByte at25 eeprom, pagesize 512
+>>>>
+>>>> Actually, I'm not quite sure how spi_pump_messages can be called from
+>> an
+>>>> atomic context.
+>>>
+>>> spi_pump_messages() is not called from atomic context.  Rather,
+>>> atmel_spi_transfer_one_message() does a spin_lock_irqsave() (via
+>>> atmel_spi_lock()) and then calls atmel_spi_one_transfer(), which calls
+>>> wait_for_completion_timeout().  That's why schedule is being called
+>>> from atomic context.  This was introduced by 8090d6d1a4 ("spi: atmel:
+>>> Refactor spi-atmel to use SPI framework queue"). I think you should
+>>> see the warning with CONFIG_PREEMPT=y.
+>>>
+>
+> Thanks a lot for the report and analysis.
+>
+> --->8--------
+>  From ba2dd7aee12cb09b9ef159251859443e1b055669 Mon Sep 17 00:00:00 2001
+> From: Wenyou Yang <wenyou.yang@atmel.com>
+> Date: Mon, 10 Mar 2014 16:44:33 +0800
+> Subject: [PATCH] spi: atmel: fix BUG: scheduling while atomic with
+>   CONFIG_PREEMPT=y
+>
+> introduced by 8090d6d1a415d3ae1a7208995decfab8f60f4f36
+> ("spi: atmel: Refactor spi-atmel to use SPI framework queue")
+>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > ---
->  arch/arm/boot/dts/omap3-overo-base.dtsi  | 44 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-overo-storm.dtsi | 16 ++++++++++++
->  arch/arm/boot/dts/omap3-overo.dtsi       | 16 ++++++++++++
->  3 files changed, 76 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
-> index edac70e..13d1ad2 100644
-> --- a/arch/arm/boot/dts/omap3-overo-base.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
-> @@ -30,6 +30,24 @@
->  		ti,codec = <&twl_audio>;
->  	};
->  
-> +	/* HS USB Port 2 Power */
-> +	hsusb2_power: hsusb2_power_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio6 8 0>;				/* gpio_168: vbus enable */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
+>   drivers/spi/spi-atmel.c |    4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index b0842f7..e05c3f2 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -1130,8 +1130,12 @@ static int atmel_spi_one_transfer(struct spi_master *master,
+>   			atmel_spi_next_xfer_pio(master, xfer);
+>   		}
+>
+> +		atmel_spi_unlock(as);
 > +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-gpios = <&gpio6 23 GPIO_ACTIVE_LOW>;	/* gpio_183 */
-> +		vcc-supply = <&hsusb2_power>;
-> +	};
+>   		ret = wait_for_completion_timeout(&as->xfer_completion,
+>   							SPI_DMA_TIMEOUT);
+> +		atmel_spi_lock(as);
 > +
->  	/* Regulator to trigger the nPoweron signal of the Wifi module */
->  	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
->  		compatible = "regulator-fixed";
-> @@ -64,6 +82,11 @@
->  };
->  
->  &omap3_pmx_core {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_pins
-> +	>;
-> +
->  	uart2_pins: pinmux_uart2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3_CORE1_IOPAD(0x216c, PIN_INPUT | MUX_MODE1)	/* mcbsp3_dx.uart2_cts */
-> @@ -116,6 +139,19 @@
->  			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
->  		>;
->  	};
-> +
-> +	hsusb2_pins: pinmux_hsusb2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-> +			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-> +			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-> +			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-> +			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-> +			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-> +			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT | MUX_MODE4)		/* i2c2_scl.gpio_168 */
-> +			OMAP3_CORE1_IOPAD(0x21c0, PIN_OUTPUT | MUX_MODE4)		/* i2c2_sda.gpio_183 */
-> +		>;
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -177,6 +213,14 @@
->  	power = <50>;
->  };
->  
-> +&usbhshost {
-> +	port2-mode = "ehci-phy";
-> +};
-> +
-> +&usbhsehci {
-> +	phys = <0 &hsusb2_phy>;
-> +};
-> +
->  &uart2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart2_pins>;
-> diff --git a/arch/arm/boot/dts/omap3-overo-storm.dtsi b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> index c235ae8..6cb418b 100644
-> --- a/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo-storm.dtsi
-> @@ -10,6 +10,22 @@
->  #include "omap3-overo-base.dtsi"
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
-> +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +		>;
-> +	};
-> +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index 95c59b2..c37b130 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -10,6 +10,22 @@
->  #include "omap3-overo-base.dtsi"
->  
->  &omap3_pmx_core2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&hsusb2_2_pins
-> +	>;
-> +
-> +	hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3430_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			OMAP3430_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			OMAP3430_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			OMAP3430_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			OMAP3430_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			OMAP3430_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +		>;
-> +	};
-> +
->  	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
->  		pinctrl-single,pins = <
->  			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-> 
+>   		if (WARN_ON(ret == 0)) {
+>   			dev_err(&spi->dev,
+>   				"spi trasfer timeout, err %d\n", ret);
+>
