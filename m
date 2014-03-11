@@ -1,37 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 11:20:27 +0000
-Subject: [PATCH 2/3] ARM: STi: stih416-b2020: Explicitly include STiH416
- Pinctrl bindings
-In-Reply-To: <531EEADF.5060001@st.com>
+Date: Tue, 11 Mar 2014 11:23:42 +0000
+Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
+In-Reply-To: <531EEA39.50504@st.com>
 References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
- <1394533324-20299-2-git-send-email-lee.jones@linaro.org>
- <531EEADF.5060001@st.com>
-Message-ID: <20140311112027.GD21216@lee--X1>
+ <531EEA39.50504@st.com>
+Message-ID: <20140311112342.GE21216@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >At the moment we're relying on inheriting them from DTSI files which
-> >we're including Ideally we should be specifying these for ourselves.
+> >From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  arch/arm/boot/dts/stih416-b2020-revE.dts | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> >diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >index bcb9d00..4168b019 100644
-> >--- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >@@ -8,6 +8,7 @@
-> >   */
-> >  /dts-v1/;
-> >  #include "stih416.dtsi"
-> >+#include "stih416-pinctrl.dtsi"
-> Isn't this file already included in stih416.dtsi?
+> >This patch adds support to rev E board of B2020 which has few minor
+> >changes :
+> >	PHY reset PIO (Change from PIO30 to PIO07)
+> >	Power LED(Green) Control(Change from PIO47 to PIO13)
+> 
+> I thought we decided last October to support only one revision of
+> the b2020 board.
+> 
+> The idea was to create an external git to provide DTS for all our
+> boards, and only have a minimal subset in in the kernel.
 
-It is, but it's being inherited. I'm unsure if the DT rules are
-different, but in *.c files #includes should be added explicitly in
-the file they are used.
+Ah, I was unaware of that conversation/decision. If that's the case we
+can scrap this submission along with the following patch.
+
+JOOI, what happens if I want to boot Mainline on my revE board? It
+won't be fully functional will it? That will be a shame. The LEDs, not
+so much, but networking is a pretty big piece of functionality to
+lose.
 
 -- 
 Lee Jones
