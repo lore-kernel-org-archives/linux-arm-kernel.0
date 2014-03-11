@@ -1,52 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Mar 2014 10:56:49 +0900
-Subject: [PATCH v2 0/2] ARM: SAMSUNG: remove the rest of local uncompress.h
- files
-In-Reply-To: <6973248.vNO4T7GhE6@phil>
-References: <6973248.vNO4T7GhE6@phil>
-Message-ID: <025401cf3ccd$2a38ee10$7eaaca30$@samsung.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 11 Mar 2014 10:06:27 +0800
+Subject: Common clock: function clock and bus clock
+Message-ID: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Two patches from Sachin Kamat already removed the Exynos-uncompress.h .
-> But in fact all Samsung platforms can use the generic uncompress code
-> without needing local implementation.
-> 
-> Therefore this two-part series removes the rest of the uncompress.h files
-> from all Samsung platforms.
-> 
-> Tested on a s3c2416 and s3c2442 based machine.
-> 
-> The patches should be applied on top of the patches from Sachin Kamat in
-> the v3.15-next/cleanup-samsung branch in the linux-samsung.git
-> 
-> 
-> Heiko Stuebner (2):
->   ARM: SAMSUNG: use generic uncompress.h
->   ARM: SAMSUNG: remove all custom uncompress.h
-> 
->  arch/arm/Kconfig.debug                          |   4 +-
->  arch/arm/mach-s3c24xx/include/mach/uncompress.h |  57 --------
->  arch/arm/mach-s3c64xx/include/mach/uncompress.h |  31 -----
->  arch/arm/mach-s5p64x0/include/mach/uncompress.h |  34 -----
->  arch/arm/mach-s5pc100/include/mach/uncompress.h |  30 ----
->  arch/arm/mach-s5pv210/include/mach/uncompress.h |  28 ----
->  arch/arm/plat-samsung/include/plat/uncompress.h | 175 -------------------
-> -----
->  7 files changed, 2 insertions(+), 357 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/uncompress.h
->  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/uncompress.h
->  delete mode 100644 arch/arm/mach-s5p64x0/include/mach/uncompress.h
->  delete mode 100644 arch/arm/mach-s5pc100/include/mach/uncompress.h
->  delete mode 100644 arch/arm/mach-s5pv210/include/mach/uncompress.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/uncompress.h
-> 
-> --
-> 1.8.5.3
+hi
 
-Looks good to me, will apply.
+I can not find any examples for handling function clock and bus clock
+in drivers/clk/.
 
-Thanks,
-Kukjin
+For a device, it will have a function clock and bus clock. function
+clock will control the fucntionality of this device, while bus clock
+will control the communication part to the bus.
+
+For some SOCes, they do not export bus clock, so from the hardware it
+seems that function clock is combined with bus clock, while for some
+SOCes, they are not.
+
+For most of the device driver, they will enable/disable function clock
+and bus clock both. While for some devices, they may share bus clock,
+and have different function clocks.
+
+In fact, i want to define the APIs as below:
+
+struct clk* soc_register_bus_clock(struct device *dev, char **parent_name, ...);
+This function will  create and register bus clock
+
+struct clk* soc_register_fucntion_clock(struct device *dev, char
+**parent_name, ...);
+This function will create and register function clock
+
+struct clk* soc_register_clk(struct device *dev, char **parent_name);
+This function will create and register a device clock. Then this clock
+is enable, it will enable bus clock and function clock both, and it is
+similar for disabling.
+
+struct clk* soc_register_composite_clk(struct device *dev, char
+*bus_clk_name, char *function_clk_name);
+This function will create and register a composite device clock. When
+enable this clock, it will invoke clk_enable(bus_clk) and
+clk_enable(function_clk) both. It is similar for disabling.
+
+So for the device which has its own control register and bits for
+function clock and bus clock. We can call  soc_register_clk.
+For the device share bus clock with other devices, we create the clock
+for the device by calling  soc_register_composite_clk.
+
+1. Now clk_enable can be preempted by same caller.
+2. For above devices, the bus clock only have enable/disable ops.
+
+Based on above conditions, I think soc_register_composite_clk is fine.
+
+Does anyone have same problems? Will above proposal break common clock rules.
