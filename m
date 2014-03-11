@@ -1,38 +1,33 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 11 Mar 2014 09:20:16 -0400
-Subject: [PATCH v6 0/6] mm: generic early_ioremap support
-In-Reply-To: <20140311120845.GG31104@arm.com>
-References: <1394384444-23182-1-git-send-email-msalter@redhat.com>
- <20140311120845.GG31104@arm.com>
-Message-ID: <1394544016.5094.68.camel@deneb.redhat.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 11 Mar 2014 08:20:13 -0500
+Subject: Qualcomm PMIC8xxx keypad never worked?
+In-Reply-To: <20140311130609.GL21216@lee--X1>
+References: <5887114.1jrNo21sGX@wuerfel> <20140311120056.GH21216@lee--X1>
+ <8206209.oc1V5pPVYT@wuerfel> <20140311130609.GL21216@lee--X1>
+Message-ID: <20140311132013.GO18529@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-11 at 12:08 +0000, Catalin Marinas wrote:
-> Mark,
+On Tue, Mar 11, 2014 at 01:06:09PM +0000, Lee Jones wrote:
+> > > > Something in the MFD_PM8XXX driver must have changed recently that now allows
+> > > > the KEYBOARD_PMIC8XXX driver to be enabled. Unfortunately, it does not build
+> > > > because of a dependency on the <linux/mfd/pm8xxx/gpio.h> header file that
+> > > > does not exist.
 > 
-> On Sun, Mar 09, 2014 at 05:00:38PM +0000, Mark Salter wrote:
-> > This patch series takes the common bits from the x86 early ioremap
-> > implementation and creates a generic implementation which may be used
-> > by other architectures. The early ioremap interfaces are intended for
-> > situations where boot code needs to make temporary virtual mappings
-> > before the normal ioremap interfaces are available. Typically, this
-> > means before paging_init() has run.
-> > 
-> > These patches are layered on top of generic fixmap patches which
-> > were pulled into upstream 3.14-rc kernels.
-> > 
-> > This is version 6 of the patch series. These patches fixmap patches
-> > may be found at:
-> > 
-> >   git://github.com/mosalter/linux.git (early-ioremap-v6 branch)
+> I think it's this commit that's causing your error:
 > 
-> Are there any acks still needed? I think the arch patches in this series
-> have been acked, so I'm happy if hpa or someone else takes the whole
-> series.
+>   https://lkml.org/lkml/2013/12/10/903
+> 
+> ... but the MFD isn't broken, so I guess your solution is the most
+> elegant. If it's not fixed soon, I guess we should think about ripping
+> it out. It's obvoious that no-one cares, as it's been broken for
+> nearly 3 years.
 
-v6 added a documentation patch which is the only one without an ack.
-I was going to give it a few days and then send a pull request
-tomorrow (12-Mar). This being mm related, I thought the mmotm tree
-may be the place for it, but hpa offered the tip tree and it really
-doesn't matter to me which one it goes through.
+Stephen has a pending patchset to cleanup and actually make the pm8xxx
+input drivers work, but they have not been picked up yet:
+
+http://lkml.kernel.org/r/1393958088-1456-1-git-send-email-sboyd at codeaurora.org
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
