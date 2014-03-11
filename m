@@ -1,90 +1,101 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 11 Mar 2014 12:42:08 +0100
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <20140311034607.GA26502@S2101-09.ap.freescale.net>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140311034607.GA26502@S2101-09.ap.freescale.net>
-Message-ID: <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 11 Mar 2014 11:40:43 +0100
+Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <1d35d91fd0f1414587edf47ab03e20ae@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
+ <20140310020051.GA15218@S2101-09.ap.freescale.net>
+ <1d35d91fd0f1414587edf47ab03e20ae@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <201403111140.44044.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-Am Dienstag, den 11.03.2014, 11:46 +0800 schrieb Shawn Guo:
-> On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
-> > Hi,
+On Tuesday, March 11, 2014 at 06:27:39 AM, Yao Yuan wrote:
+> On Thu, Mar 10, 2014 at 10:01:42 AM, Marek Vasut wrote:
+> > On Thu, Mar 06, 2014 at 12:57:42PM +0100, Marek Vasut wrote:
+> > > On Thursday, March 06, 2014 at 06:02:03 AM, Yao Yuan wrote:
+> > > > On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
+> > > > > On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
+> > > > > > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
+> > > > > > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
+> > > > > > > > Add dma support for i2c. This function depend on DMA driver.
+> > > > > > > > You can turn on it by write both the dmas and dma-name
+> > > > > > > > properties in dts node.
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > > > > > > > ---
+> > > > > > > 
+> > > > > > > [...]
+> > > > > > > 
+> > > > > > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
+> > > > > > > > platform_device
+> > > > > > > 
+> > > > > > > *pdev)
+> > > > > > > 
+> > > > > > > >  	void __iomem *base;
+> > > > > > > >  	int irq, ret;
+> > > > > > > >  	u32 bitrate;
+> > > > > > > > 
+> > > > > > > > +	u32 phy_addr;
+> > > > > > > > 
+> > > > > > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+> > > > > > > > 
+> > > > > > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
+> > > > > > > > platform_device
+> > > > > > > 
+> > > > > > > *pdev)
+> > > > > > > 
+> > > > > > > >  	}
+> > > > > > > >  	
+> > > > > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > > > > > 
+> > > > > > > > +	phy_addr = res->start;
+> > > > > > > 
+> > > > > > > Uh ... Shawn, I really think I am lost here. Don't you need to
+> > > > > > > map this memory before you can use it for DMA ? The DMA
+> > > > > > > mapping function should give you the physical address and is
+> > > > > > > the right way to go about this instead of pulling the address
 > > 
-> > this latest version of the imx-drm DT binding patches applies
-> > on top of staging-next and also depends on the OF graph binding
-> > patchset that moves the v4l2_of helpers to drivers/of.
-> > Currently, the two patchsets are also available at:
-> >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
-> >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
+> > from here, no ?
+> > 
+> > > > > > > I might be wrong here, I am rather uncertain, so please help me
+> > 
+> > out.
+> > 
+> > > > > > > Thanks!
+> > > > > > 
+> > > > > > Hi, Marek, Thanks for your suggestion.
+> > > > > > Here you can review the code in include/linux/ioport.h The
+> > > > > > resource->start describes the entity on the CPU bus as a
+> > > > > > resource->starting
+> > > > > > physical address. So I thinks it can used for dma directly.
+> > > > > 
+> > > > > This doesn't feel right for some reason. If this is a register
+> > > > > area, you should
+> > > > > ioremap() it. If it's a memory area you do DMA to/from, you need
+> > > > > to make sure you correctly flush/invalidate caches and properly
+> > > > > handle the effects the write buffer might have. But I have a
+> > > > > feeling you actually do DMA to/from register space here ?
+> > > > 
+> > > > Yes, It's a register area. But I don't know why I should ioremap()
+> > > > it? It's a bus address and DMA can use it directly. Is there some
+> > > > problem for my understanding ?
+> > > 
+> > > I am not too sure here, thus I am poking someone who can clearly answer
+> > 
+> > this.
+> > 
+> > There is already a devm_ioremap_resource() call in the existing code for
+> > CPU to access registers in virtual address.  And my understanding on
+> > Yuan's patch is that he needs the physical address of I2C DATA register
+> > for DMA from/to the controller.
+> > 
+> > Shawn
 > 
-> Hi Philipp,
+> Thanks you Shawn. Yes, it is. DMA need the physical address which
+> resource->start is.
 > 
-> I just came across a couple problems when testing the series on
-> my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
-> using Russell's branch below, which I believe has all the pieces put
-> together.
-> 
->   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
-> 
-> - When I enable HDMI and LVDS support in both kernel build and device
->   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
-> 
-> - When I enable HDMI and LVDS support in kernel build but only LVDS in
->   device tree (keep HDMI disabled in device tree by not changing
->   'status' of HDMI node to 'okay'), LVDS does not even work.  In this
->   case, it seems that the binding of display-subsystem does not succeed.
+> And Hi Marek, How about you? Is there someone who can clearly answer this
+> some and should I send the next version?
 
-Can you check if you get the bound messages from
-drivers/base/component.c:
-
-imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
-imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
-imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
-
-I have tried this branch with a Phytec phyFLEX i.MX6S on PBAB01
-baseboard with EDT 800x480 LVDS panel, and it seems to work.
-The check in drivers/staging/imx-drm/imx-drm-core.c:675 should make sure
-that unavailable (status="disabled") devices are just skipped.
-
-> Please confirm if they are real problems or I'm missing something here.
-
-If the devices are bound, can you check in debugfs whether the panel
-(ldb_di) clock is set correctly?
-I wonder if Russell's DI code makes a decision that the panel clock
-can't be supported from the IPU internal clock. Then you'd need
-something like this to allow setting the video PLL:
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index f6c5af5..f9b90e7 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -258,14 +258,14 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[ipu2_sel]         = imx_clk_mux("ipu2_sel",         base + 0x3c, 14, 2, ipu_sels,          ARRAY_SIZE(ipu_sels));
- 	clk[ldb_di0_sel]      = imx_clk_mux_flags("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
- 	clk[ldb_di1_sel]      = imx_clk_mux_flags("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
--	clk[ipu1_di0_pre_sel] = imx_clk_mux("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
--	clk[ipu1_di1_pre_sel] = imx_clk_mux("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
--	clk[ipu2_di0_pre_sel] = imx_clk_mux("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
--	clk[ipu2_di1_pre_sel] = imx_clk_mux("ipu2_di1_pre_sel", base + 0x38, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
--	clk[ipu1_di0_sel]     = imx_clk_mux("ipu1_di0_sel",     base + 0x34, 0,  3, ipu1_di0_sels,     ARRAY_SIZE(ipu1_di0_sels));
--	clk[ipu1_di1_sel]     = imx_clk_mux("ipu1_di1_sel",     base + 0x34, 9,  3, ipu1_di1_sels,     ARRAY_SIZE(ipu1_di1_sels));
--	clk[ipu2_di0_sel]     = imx_clk_mux("ipu2_di0_sel",     base + 0x38, 0,  3, ipu2_di0_sels,     ARRAY_SIZE(ipu2_di0_sels));
--	clk[ipu2_di1_sel]     = imx_clk_mux("ipu2_di1_sel",     base + 0x38, 9,  3, ipu2_di1_sels,     ARRAY_SIZE(ipu2_di1_sels));
-+	clk[ipu1_di0_pre_sel] = imx_clk_mux_flags("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu1_di1_pre_sel] = imx_clk_mux_flags("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu2_di0_pre_sel] = imx_clk_mux_flags("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu2_di1_pre_sel] = imx_clk_mux_flags("ipu2_di1_pre_sel", base + 0x38, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu1_di0_sel]     = imx_clk_mux_flags("ipu1_di0_sel",     base + 0x34, 0,  3, ipu1_di0_sels,     ARRAY_SIZE(ipu1_di0_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu1_di1_sel]     = imx_clk_mux_flags("ipu1_di1_sel",     base + 0x34, 9,  3, ipu1_di1_sels,     ARRAY_SIZE(ipu1_di1_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu2_di0_sel]     = imx_clk_mux_flags("ipu2_di0_sel",     base + 0x38, 0,  3, ipu2_di0_sels,     ARRAY_SIZE(ipu2_di0_sels), CLK_SET_RATE_PARENT);
-+	clk[ipu2_di1_sel]     = imx_clk_mux_flags("ipu2_di1_sel",     base + 0x38, 9,  3, ipu2_di1_sels,     ARRAY_SIZE(ipu2_di1_sels), CLK_SET_RATE_PARENT);
- 	clk[hsi_tx_sel]       = imx_clk_mux("hsi_tx_sel",       base + 0x30, 28, 1, hsi_tx_sels,       ARRAY_SIZE(hsi_tx_sels));
- 	clk[pcie_axi_sel]     = imx_clk_mux("pcie_axi_sel",     base + 0x18, 10, 1, pcie_axi_sels,     ARRAY_SIZE(pcie_axi_sels));
- 	clk[ssi1_sel]         = imx_clk_fixup_mux("ssi1_sel",   base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),          imx_cscmr1_fixup);
-
-regards
-Philipp
+While I don't quite understand what Shawn wanted to say by the above, please go 
+ahead and send V2 .
