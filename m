@@ -1,160 +1,198 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 11 Mar 2014 14:17:59 +0000
-Subject: [PATCH v3] ARM: vDSO gettimeofday using generic timer architecture
-In-Reply-To: <1393813295-27376-1-git-send-email-nathan_lynch@mentor.com>
-References: <1393813295-27376-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140311141759.GA11826@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 11 Mar 2014 15:31:12 +0100
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <a99feda0-7463-4781-bb73-90b99e65b014@CO9EHSMHS028.ehs.local>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <531DD2C4.5060109@pengutronix.de>
+ <f1e2f08f-05fc-40d3-8437-4c6817d631cb@AM1EHSMHS010.ehs.local>
+ <531F0636.4050608@pengutronix.de>
+ <a99feda0-7463-4781-bb73-90b99e65b014@CO9EHSMHS028.ehs.local>
+Message-ID: <531F1E30.4040203@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 08:21:35PM -0600, Nathan Lynch wrote:
-> Provide fast userspace implementations of gettimeofday and
-> clock_gettime on systems that implement the generic timers extension
-> defined in ARMv7.  This follows the example of arm64 in conception but
-> significantly differs in some aspects of the implementation (C vs
-> assembly, mainly).
+On 03/11/2014 03:08 PM, Appana Durga Kedareswara Rao wrote:
+
+>>>>> +   struct napi_struct napi;
+>>>>> +   u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
+>>>>> +   void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
+>>>>> +                   u32 val);
+>>>>> +   struct net_device *dev;
+>>>>> +   void __iomem *reg_base;
+>>>>> +   unsigned long irq_flags;
+>>>>> +   struct clk *aperclk;
+>>>>> +   struct clk *devclk;
+>>>>
+>>>> Please rename the clock variables to match the names in the DT.
+>>>>
+>>> The clock names are different for axi CAN and CANPS case.
+>>> So will make them as busclk and devclk Are you ok with this?
+>>
+>> Why not "ref_clk" and "aper_clk" as used in the DT?
+>>
+> One of the comments I got from the Soren(sorenb at xilinx.com)
+> Is the  clock-names must match the data sheet.
+> If I Modify the clock names then it is different names for AXI CAN
+> and CANPS case.
+
+Sorry, my faul, I thought the names are already these from the
+datasheet. As S?ren pointed out please use 's_axi_aclk' and
+'can_clk' for the DT and for the the variable names in the private
+struct, too.
+
+The 'official' name of the ip core seems to be axi_can, should we rename
+the driver? I suspect, that Michal wants to keep xilinx in the name for
+marketing reasons :P
+
+[...]
+
+>>>>> +/**
+>>>>> + * xcan_chip_start - This the drivers start routine
+>>>>> + * @ndev:  Pointer to net_device structure
+>>>>> + *
+>>>>> + * This is the drivers start routine.
+>>>>> + * Based on the State of the CAN device it puts
+>>>>> + * the CAN device into a proper mode.
+>>>>> + *
+>>>>> + * Return: 0 on success and failure value on error  */ static int
+>>>>> +xcan_chip_start(struct net_device *ndev) {
+>>>>> +   struct xcan_priv *priv = netdev_priv(ndev);
+>>>>> +   u32 err;
+>>>>> +   unsigned long timeout;
+>>>>> +
+>>>>> +   /* Check if it is in reset mode */
+>>>>> +   err = set_reset_mode(ndev);
+>>>>> +   if (err < 0)
+>>>>> +           return err;
+>>>>> +
+>>>>> +   err = xcan_set_bittiming(ndev);
+>>>>> +   if (err < 0)
+>>>>> +           return err;
+>>>>> +
+>>>>> +   /* Enable interrupts */
+>>>>> +   priv->write_reg(priv, XCAN_IER_OFFSET, XCAN_INTR_ALL);
+>>>>> +
+>>>>> +   /* Check whether it is loopback mode or normal mode  */
+>>>>> +   if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK)
+>>>>> +           /* Put device into loopback mode */
+>>>>> +           priv->write_reg(priv, XCAN_MSR_OFFSET,
+>>>> XCAN_MSR_LBACK_MASK);
+>>>>> +   else
+>>>>> +           /* The device is in normal mode */
+>>>>> +           priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
+>>>>> +
+>>>>> +   if (priv->can.state == CAN_STATE_STOPPED) {
+>>>>
+>>>> Your device is in stopped mode, add you go though set_reset_mode()
+>>>> already.
+>>>
+>>> Will remove this if condition I putted this condition here because in
+>>> set_reset_mode we are putting the Device state in Stopped state.
+>>
+>> So the device is in CAN_STATE_STOPPED, as this code just went through
+>> set_reset_mode() some lines ago. so it makes no sense to check if it
+>> (still) is (the code runs serialized here).
+>>
 > 
-> Clocks supported:
-> - CLOCK_REALTIME
-> - CLOCK_MONOTONIC
-> - CLOCK_REALTIME_COARSE
-> - CLOCK_MONOTONIC_COARSE
+> After removing the if condition and the line(CAN_STATE_STOPPED from
+> the set_reset_mode) the code for chip_start is below It is better to
+> check whether it is really Configured in the loopback or normal mode 
+> That's why kept the loops as it is.
 > 
-> This also provides clock_getres (as arm64 does).
+> static int xcan_chip_start(struct net_device *ndev)
+> {
+>         struct xcan_priv *priv = netdev_priv(ndev);
+>         u32 err;
+>         unsigned long timeout;
 > 
-> Note that while the high-precision realtime and monotonic clock
-> support depends on the generic timers extension, support for
-> clock_getres and coarse clocks is independent of the timer
-> implementation and is provided unconditionally.
+>         /* Check if it is in reset mode */
+>         err = set_reset_mode(ndev);
+>         if (err < 0)
+>                 return err;
 > 
-> Run-time tested on OMAP5 and i.MX6 using a patched glibc[1], verifying
-> that results from the vDSO are consistent with results from the
-> kernel.  Build-tested against arch/arm/configs/*_defconfig with GCC
-> 4.4 and 4.8.  Build-tested with multi_v7_defconfig with GCC 4.[4-8].
+>         err = xcan_set_bittiming(ndev);
+>         if (err < 0)
+>                 return err;
 > 
-> [1] RFC glibc patch here:
-> https://www.sourceware.org/ml/libc-alpha/2014-02/msg00680.html
+>         /* Enable interrupts */
+>         priv->write_reg(priv, XCAN_IER_OFFSET, XCAN_INTR_ALL);
 > 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
+>         /* Check whether it is loopback mode or normal mode  */
+>         if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK)
+>                 /* Put device into loopback mode */
+>                 priv->write_reg(priv, XCAN_MSR_OFFSET, XCAN_MSR_LBACK_MASK);
+>         else
+>                 /* The device is in normal mode */
+>                 priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
 
-Hi Nathan,
-Thanks for sending in a V3.
-I've given this a test with simple C program on an Arndale board
-(running A15 with 3.14-rc6 and LPAE) and it worked well. I also short
-circuited the VDSO to always fallback on syscalls and that worked well
-too.
+What about using two temp variables? Like this (untested, though):
 
-So please add:
-Tested-by: Steve Capper <steve.capper@linaro.org>
+	u32 reg_msg;
+	u32 reg_sr_mask;
 
-Also, I have some feedback below.
+	if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
+		reg_msr = XCAN_MSR_LBACK_MASK;
+		reg_sr_mask = XCAN_SR_LBACK_MASK;
+	} else {
+		reg_msr = 0x0;
+		reg_sr_mask = XCAN_SR_NORMAL_MASK;
+	}
 
-[snip]
+	priv->write_reg(priv, XCAN_MSR_OFFSET, reg_msr);
+	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
 
-> diff --git a/arch/arm/kernel/vdso/vgettimeofday.c b/arch/arm/kernel/vdso/vgettimeofday.c
-> new file mode 100644
-> index 000000000000..d5d12528eed9
-> --- /dev/null
-> +++ b/arch/arm/kernel/vdso/vgettimeofday.c
-> @@ -0,0 +1,330 @@
+	timeout = jiffies + XCAN_TIMEOUT;
+	while (!(priv->read_reg(priv, XCAN_SR_OFFSET) & reg_sr_mask)) {
+		if (time_after(jiffies, timeout)) {
+			netdev_warn(ndev, "time out waiting for correct mode\n")
+			return -ETIMEDOUT;
+			}
+		usleep_range(500, 10000);
+	}
 
-[snip]
-
-> +int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz)
-> +{
-> +	struct timespec ts;
-> +	struct vdso_data *vdata;
-> +	int ret;
-> +
-> +	vdata = __get_datapage();
-> +
-> +	ret = do_realtime(&ts, vdata);
-> +	if (ret)
-> +		return gettimeofday_fallback(tv, tz);
-> +
-> +	if (tv) {
-> +		tv->tv_sec = ts.tv_sec;
-> +		tv->tv_usec = ts.tv_nsec / 1000;
-> +	}
-> +	if (tz) {
-> +		tz->tz_minuteswest = vdata->tz_minuteswest;
-> +		tz->tz_dsttime = vdata->tz_dsttime;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/* Avoid undefined symbols that can be referenced by routines brought
-> + * in from libgcc.  libgcc's __div0, __aeabi_idiv0 and __aeabi_ldiv0
-> + * can call raise(3); here they are defined to loop forever: divide by
-> + * zero should not be possible in this code.
-> + */
-
-I can't see any way a divide by zero could occur with this code, but I
-am paranoid that any future functions added to the vdso could divide by
-zero and lead to hanging behaviour. Would it be better to fail more
-explicitly?
-
-> +void __div0(void)
-> +{
-> +	for (;;)
-> +		;
-> +}
-> +
-> +void __aeabi_idiv0(void)
-> +{
-> +	for (;;)
-> +		;
-> +}
-> +
-> +void __aeabi_ldiv0(void)
-> +{
-> +	for (;;)
-> +		;
-> +}
-> +
-> +void __aeabi_unwind_cpp_pr0(void)
-> +{
-> +}
-> +
-> +void __aeabi_unwind_cpp_pr1(void)
-> +{
-> +}
-> +
-> +void __aeabi_unwind_cpp_pr2(void)
-> +{
-> +}
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 1f8fed94c2a4..84898cf4b030 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -825,6 +825,21 @@ config KUSER_HELPERS
->  	  Say N here only if you are absolutely certain that you do not
->  	  need these helpers; otherwise, the safe option is to say Y.
->  
-> +config VDSO
-> +	bool "Enable vDSO for acceleration of some system calls"
-> +	depends on AEABI && MMU
-> +	default y if ARM_ARCH_TIMER
-
-I would argue that it would be good to have the VDSO on consistently
-for all AEABI with MMU as syscalls are used as fallbacks anyway.
-
-> +	select GENERIC_TIME_VSYSCALL
-> +	help
-> +	  Place in the process address space an ELF shared object
-> +	  providing fast implementations of several system calls,
-> +	  including gettimeofday and clock_gettime.  Systems that
-> +	  implement the ARM architected timer will receive maximum
-> +	  benefit.
-> +
-> +	  You must have glibc 2.20 or later for programs to seamlessly
-> +	  take advantage of this.
-> +
->  config DMA_CACHE_RWFO
->  	bool "Enable read/write for ownership DMA cache maintenance"
->  	depends on CPU_V6K && SMP
-> -- 
-> 1.8.3.1
 > 
+>         priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
+>         timeout = jiffies + XCAN_TIMEOUT;
+>         if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
+>                 while ((priv->read_reg(priv, XCAN_SR_OFFSET)
+>                                 & XCAN_SR_LBACK_MASK) == 0) {
+>                         if (time_after(jiffies, timeout)) {
+>                                 netdev_warn(ndev,
+>                                         "timedout for loopback mode\n");
+>                                 return -ETIMEDOUT;
+>                         }
+>                         usleep_range(500, 10000);
+>                 }
+>         } else {
+>                 while ((priv->read_reg(priv, XCAN_SR_OFFSET)
+>                                 & XCAN_SR_NORMAL_MASK) == 0) {
+>                         if (time_after(jiffies, timeout)) {
+>                                 netdev_warn(ndev,
+>                                         "timedout for normal mode\n");
+>                                 return -ETIMEDOUT;
+>                         }
+>                         usleep_range(500, 10000);
+>                 }
+>         }
+>         netdev_dbg(ndev, "status:#x%08x\n",
+>                         priv->read_reg(priv, XCAN_SR_OFFSET));
+> 
+>         priv->can.state = CAN_STATE_ERROR_ACTIVE;
+>         return 0;
+> }
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/ad23c975/attachment.sig>
