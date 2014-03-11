@@ -1,44 +1,44 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:20:31 +0100
-Subject: [PATCH 3/7] ARM: dts: Add support for the Overo Palo43
+Date: Tue, 11 Mar 2014 13:20:34 +0100
+Subject: [PATCH 6/7] ARM: dts: Add support for the Overo Chestnut43
 In-Reply-To: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394540435-25401-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1394540435-25401-7-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Palo43 is an expansion board for Gumstix Overo products.
+Chestnut43 is an expansion board for Gumstix Overo products.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/Makefile                       |  2 +
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi | 53 ++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-palo43.dts         | 38 +++++++++++++++++
- arch/arm/boot/dts/omap3-overo-storm-palo43.dts   | 38 +++++++++++++++++
- 4 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-palo43.dts
+ arch/arm/boot/dts/Makefile                         |  2 +
+ .../boot/dts/omap3-overo-chestnut43-common.dtsi    | 69 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-chestnut43.dts       | 38 ++++++++++++
+ arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts | 38 ++++++++++++
+ 4 files changed, 147 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
+ create mode 100644 arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0320303..98d508d 100644
+index de5cfcc..7742e69 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -209,6 +209,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-n900.dtb \
- 	omap3-n9.dtb \
+@@ -211,6 +211,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
  	omap3-n950.dtb \
-+	omap3-overo-palo43.dtb \
-+	omap3-overo-storm-palo43.dtb \
- 	omap3-overo-tobi.dtb \
- 	omap3-overo-storm-tobi.dtb \
- 	omap3-gta04.dtb \
-diff --git a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
+ 	omap3-overo-alto35.dtb \
+ 	omap3-overo-storm-alto35.dtb \
++	omap3-overo-chestnut43.dtb \
++	omap3-overo-storm-chestnut43.dtb \
+ 	omap3-overo-gallop43.dtb \
+ 	omap3-overo-storm-gallop43.dtb \
+ 	omap3-overo-palo43.dtb \
+diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
 new file mode 100644
-index 0000000..abea232
+index 0000000..19de6ff
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-@@ -0,0 +1,53 @@
++++ b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
+@@ -0,0 +1,69 @@
 +/*
 + * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
 + *
@@ -48,7 +48,7 @@ index 0000000..abea232
 + */
 +
 +/*
-+ * Palo43 expansion board is manufactured by Gumstix Inc.
++ * Chestnut43 expansion board is manufactured by Gumstix Inc.
 + */
 +
 +#include "omap3-overo-common-peripherals.dtsi"
@@ -92,11 +92,27 @@ index 0000000..abea232
 +	};
 +};
 +
-diff --git a/arch/arm/boot/dts/omap3-overo-palo43.dts b/arch/arm/boot/dts/omap3-overo-palo43.dts
++#include "omap-gpmc-smsc9221.dtsi"
++
++&gpmc {
++	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
++
++	ethernet at gpmc {
++		reg = <5 0 0xff>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176 */
++	};
++};
++
++&lis33de {
++	status = "disabled";
++};
++
+diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43.dts b/arch/arm/boot/dts/omap3-overo-chestnut43.dts
 new file mode 100644
-index 0000000..cedb103
+index 0000000..fe0824a
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-palo43.dts
++++ b/arch/arm/boot/dts/omap3-overo-chestnut43.dts
 @@ -0,0 +1,38 @@
 +/*
 + * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
@@ -107,17 +123,17 @@ index 0000000..cedb103
 + */
 +
 +/*
-+ * Palo43 expansion board is manufactured by Gumstix Inc.
++ * Chestnut43 expansion board is manufactured by Gumstix Inc.
 + */
 +
 +/dts-v1/;
 +
 +#include "omap3-overo.dtsi"
-+#include "omap3-overo-palo43-common.dtsi"
++#include "omap3-overo-chestnut43-common.dtsi"
 +
 +/ {
-+	model = "OMAP35xx Gumstix Overo on Palo43";
-+	compatible = "gumstix,omap3-overo-palo43", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
++	model = "OMAP35xx Gumstix Overo on Chestnut43";
++	compatible = "gumstix,omap3-overo-chestnut43", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
 +};
 +
 +&omap3_pmx_core2 {
@@ -136,11 +152,11 @@ index 0000000..cedb103
 +	};
 +};
 +
-diff --git a/arch/arm/boot/dts/omap3-overo-storm-palo43.dts b/arch/arm/boot/dts/omap3-overo-storm-palo43.dts
+diff --git a/arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts b/arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts
 new file mode 100644
-index 0000000..b585d8f
+index 0000000..7d82fdf
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-storm-palo43.dts
++++ b/arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts
 @@ -0,0 +1,38 @@
 +/*
 + * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
@@ -151,17 +167,17 @@ index 0000000..b585d8f
 + */
 +
 +/*
-+ * Palo43 expansion board is manufactured by Gumstix Inc.
++ * Chestnut43 expansion board is manufactured by Gumstix Inc.
 + */
 +
 +/dts-v1/;
 +
 +#include "omap3-overo-storm.dtsi"
-+#include "omap3-overo-palo43-common.dtsi"
++#include "omap3-overo-chestnut43-common.dtsi"
 +
 +/ {
-+	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Palo43";
-+	compatible = "gumstix,omap3-overo-palo43", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
++	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Chestnut43";
++	compatible = "gumstix,omap3-overo-chestnut43", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
 +};
 +
 +&omap3_pmx_core2 {
