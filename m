@@ -1,55 +1,51 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 12 Mar 2014 00:02:55 +0100
-Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
- phy_ethtool_get_wol
-In-Reply-To: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 11 Mar 2014 19:25:45 -0400
+Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <20140311224517.GA5672@lee--X1>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-3-git-send-email-mporter@linaro.org>
+ <20140311160837.GP21216@lee--X1> <20140311221938.GO25092@beef>
+ <20140311224517.GA5672@lee--X1>
+Message-ID: <20140311232545.GP25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phy_ethtool_get_wol is a helper to get current WOL settings from
-a phy device. When using this helper on a PHY without .get_wol
-callback, struct ethtool_wolinfo is never set-up correctly and
-may contain misleading information about WOL status.
+On Tue, Mar 11, 2014 at 10:45:17PM +0000, Lee Jones wrote:
+> > > > Add a driver for the BCM590xx PMU multi-function devices. The driver
+> > > > initially supports regmap initialization and instantiation of the
+> > > > voltage regulator device function of the PMU.
+> > > > 
+> > > > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > > > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> > > > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > > > ---
+> > > >  drivers/mfd/Kconfig          |  8 ++++
+> > > >  drivers/mfd/Makefile         |  1 +
+> > > >  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
+> > > >  4 files changed, 133 insertions(+)
+> > > >  create mode 100644 drivers/mfd/bcm590xx.c
+> > > >  create mode 100644 include/linux/mfd/bcm590xx.h
+> > > 
+> > > I have a tiny nit that 'ret' doesn't need to be initialised before
+> > > use in probe(), but apart from that...
+> > > 
+> > > Looks pretty sensible:
+> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Ok, thanks. When I get back in front of my desktop I'll send a v4 of
+> > just this patch to address that nit. Mark already applied the regulator
+> > driver from this series, will you be taking this through your tree? For
+> > that matter, I wonder if the binding would also go through your tree
+> > with this driver.
+> 
+> At least the MFD portion and the DT binding doc will go through the
+> MFD tree.
+> 
+> Are there any inter-patch dependencies in the set? If so, we should
+> know about them so we can coordinate a sensible solution.
 
-To fix this, always zero relevant fields of struct ethtool_wolinfo
-regardless of .get_wol callback availability.
+Yes, the regulator driver (3/5) that Mark applied is dependent on this
+patch...the regulator driver includes include/linux/mfd/bcm590xx.h.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
----
-Changelog:
-v1->v2:
-- clear whole struct ethtool_wolinfo
-- check for non-NULL phy_device
-v2->v3:
-- only clear ->supported and ->wolopts (Suggested by Ben Hutchings)
-
-Cc: David Miller <davem@davemloft.net>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Ben Hutchings <ben@decadent.org.uk>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/net/phy/phy.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
-index 19c9eca0ef26..94234a91a50f 100644
---- a/drivers/net/phy/phy.c
-+++ b/drivers/net/phy/phy.c
-@@ -1092,7 +1092,9 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
- 
- void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
- {
--	if (phydev->drv->get_wol)
-+	wol->supported = wol->wolopts = 0;
-+
-+	if (phydev && phydev->drv->get_wol)
- 		phydev->drv->get_wol(phydev, wol);
- }
- EXPORT_SYMBOL(phy_ethtool_get_wol);
--- 
-1.8.5.3
+-Matt
