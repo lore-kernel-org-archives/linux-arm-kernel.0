@@ -1,34 +1,29 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Mar 2014 08:28:40 -0300
-Subject: [PATCH 1/7] ARM: dts: mx25: Fix compatible string for generic USB
- PHY
-In-Reply-To: <20140311075238.4bc0bea2@e6520eb>
-References: <1394484885-21262-1-git-send-email-festevam@gmail.com>
- <20140311075238.4bc0bea2@e6520eb>
-Message-ID: <CAOMZO5D0+28_Omq+k1=XwJdRbvpGFguShYYKQ6dEvgqvF6UyYQ@mail.gmail.com>
+Date: Tue, 11 Mar 2014 08:37:40 -0300
+Subject: [PATCH v2][ 8/8] ARM: imx_v4_v5_defconfig: Enable drivers for
+ i.MX25/i.MX35 USB support.
+In-Reply-To: <1394535304-10240-8-git-send-email-denis@eukrea.com>
+References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
+ <1394535304-10240-8-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5A8bhUj_OKk+y=JT=XFhpjN4dZtA35OzsJLgTQ0jhaO0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Denis,
 
-On Tue, Mar 11, 2014 at 3:52 AM, Eric B?nard <eric@eukrea.com> wrote:
+On Tue, Mar 11, 2014 at 7:55 AM, Denis Carikli <denis@eukrea.com> wrote:
 
-> why don't you use Denis' patches instead of copying them with you as
-> the author ?
+>  CONFIG_USB_EHCI_MXC=y
+> +CONFIG_USB_STORAGE=y
+> +CONFIG_USB_CHIPIDEA=y
+> +CONFIG_USB_CHIPIDEA_UDC=y
+> +CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_NOP_USB_XCEIV=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_USB_ETH=m
+> +CONFIG_USB_MASS_STORAGE=m
 
-Some reasons:
-
-1. The v1 version of the patches is not functional on mx25 due to the
-wrong clock
-2. It is better to separate ARM patches from USB patches as they go
-through different maintainers
-3. In the original patch 4/9 Denis has put me in the From field, so I
-am not 'copying them with me as the author'
-4. It is better to make one change per patch rather than mixing
-different fixes into a single patch.
-
-Anyway I am happy whethever version is applied by the maintainers.
-Just wanted to get USB functional on mx25 ;-)
+I prefer the way you did in the previous version: CONFIG_USB_STORAGE=y
 
 Regards,
 
