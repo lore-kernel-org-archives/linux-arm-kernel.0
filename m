@@ -1,135 +1,122 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 11 Mar 2014 15:41:20 +0530
-Subject: [RFC PATCH v2 1/1] arm64: Add boot time configuration of
- Intermediate Physical Address size
-In-Reply-To: <1394182165-10480-2-git-send-email-mohun106@gmail.com>
-References: <1394182165-10480-1-git-send-email-mohun106@gmail.com>
- <1394182165-10480-2-git-send-email-mohun106@gmail.com>
-Message-ID: <CAC8NTUUJ+E-LS0iG07FXkU2=mGgHZ7e_7=9UkAOLrjsNREtfZg@mail.gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Tue, 11 Mar 2014 15:38:07 +0530
+Subject: [RFC 4/6] sched: powerpc: create a dedicated topology table
+In-Reply-To: <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <531EE087.7050707@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any more comments?
+Hi Vincent,
 
-On Fri, Mar 7, 2014 at 2:19 PM,  <mohun106@gmail.com> wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->
-> ARMv8 supports a range of physical address bit sizes. The PARange bits
-> from ID_AA64MMFR0_EL1 register are read during boot-time and the
-> intermediate physical address size bits are written in the translation
-> control registers (TCR_EL1 and VTCR_EL2).
->
-> There is no change in the VA bits and levels of translation.
->
-> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On 03/05/2014 12:48 PM, Vincent Guittot wrote:
+> Create a dedicated topology table for handling asymetric feature.
+> The current proposal creates a new level which describes which groups of CPUs
+> take adavantge of SD_ASYM_PACKING. The useless level will be removed during the
+> build of the sched_domain topology.
+> 
+> Another solution would be to set SD_ASYM_PACKING in the sd_flags of SMT level
+> during the boot sequence and before the build of the sched_domain topology.
+
+Is the below what you mean as the other solution? If it is so, I would
+strongly recommend this approach rather than adding another level to the
+topology level to represent the asymmetric behaviour.
+
++static struct sched_domain_topology_level powerpc_topology[] = {
++#ifdef CONFIG_SCHED_SMT
++	{ cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
+SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() },
++#endif
++	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
++	{ NULL, },
++};
+
+Regards
+Preeti U Murthy
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 > ---
->  arch/arm64/include/asm/kvm_arm.h       |   15 ++++++---------
->  arch/arm64/include/asm/pgtable-hwdef.h |    5 ++---
->  arch/arm64/kvm/hyp-init.S              |    6 ++++++
->  arch/arm64/mm/proc.S                   |    8 +++++++-
->  4 files changed, 21 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 0eb3986..21ef48d 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -106,7 +106,6 @@
->
->  /* VTCR_EL2 Registers bits */
->  #define VTCR_EL2_PS_MASK       (7 << 16)
-> -#define VTCR_EL2_PS_40B                (2 << 16)
->  #define VTCR_EL2_TG0_MASK      (1 << 14)
->  #define VTCR_EL2_TG0_4K                (0 << 14)
->  #define VTCR_EL2_TG0_64K       (1 << 14)
-> @@ -129,10 +128,9 @@
->   * 64kB pages (TG0 = 1)
->   * 2 level page tables (SL = 1)
->   */
-> -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
-> -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-> -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-> -                                VTCR_EL2_T0SZ_40B)
-> +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
-> +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-> +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
->  #define VTTBR_X                (38 - VTCR_EL2_T0SZ_40B)
->  #else
+>  arch/powerpc/kernel/smp.c |   35 +++++++++++++++++++++++++++--------
+>  kernel/sched/core.c       |    6 ------
+>  2 files changed, 27 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+> index ac2621a..75da054 100644
+> --- a/arch/powerpc/kernel/smp.c
+> +++ b/arch/powerpc/kernel/smp.c
+> @@ -755,6 +755,32 @@ int setup_profiling_timer(unsigned int multiplier)
+>  	return 0;
+>  }
+> 
+> +#ifdef CONFIG_SCHED_SMT
+> +/* cpumask of CPUs with asymetric SMT dependancy */
+> +static const struct cpumask *cpu_asmt_mask(int cpu)
+> +{
+> +	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
+> +		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
+> +		return topology_thread_cpumask(cpu);
+> +	}
+> +	return cpumask_of(cpu);
+> +}
+> +#endif
+> +
+> +static struct sched_domain_topology_level powerpc_topology[] = {
+> +#ifdef CONFIG_SCHED_SMT
+> +	{ cpu_asmt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES | SD_ASYM_PACKING, SD_INIT_NAME(ASMT) },
+> +	{ cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES, SD_INIT_NAME(SMT) },
+> +#endif
+> +	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
+> +	{ NULL, },
+> +};
+> +
+> +static void __init set_sched_topology(void)
+> +{
+> +	sched_domain_topology = powerpc_topology;
+> +}
+> +
+>  void __init smp_cpus_done(unsigned int max_cpus)
+>  {
+>  	cpumask_var_t old_mask;
+> @@ -779,15 +805,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
+> 
+>  	dump_numa_cpu_topology();
+> 
+> -}
+> +	set_sched_topology();
+> 
+> -int arch_sd_sibling_asym_packing(void)
+> -{
+> -	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
+> -		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
+> -		return SD_ASYM_PACKING;
+> -	}
+> -	return 0;
+>  }
+> 
+>  #ifdef CONFIG_HOTPLUG_CPU
+> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+> index 3479467..7606de0 100644
+> --- a/kernel/sched/core.c
+> +++ b/kernel/sched/core.c
+> @@ -5818,11 +5818,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
+>  	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
+>  }
+> 
+> -int __weak arch_sd_sibling_asym_packing(void)
+> -{
+> -       return 0*SD_ASYM_PACKING;
+> -}
+> -
 >  /*
-> @@ -142,10 +140,9 @@
->   * 4kB pages (TG0 = 0)
->   * 3 level page tables (SL = 1)
->   */
-> -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
-> -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-> -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-> -                                VTCR_EL2_T0SZ_40B)
-> +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-> +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-> +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
->  #define VTTBR_X                (37 - VTCR_EL2_T0SZ_40B)
->  #endif
->
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index b1d2e26..f7af66b 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -100,9 +100,9 @@
->  #define PTE_HYP                        PTE_USER
->
->  /*
-> - * 40-bit physical address supported.
-> + * Highest possible physical address supported.
->   */
-> -#define PHYS_MASK_SHIFT                (40)
-> +#define PHYS_MASK_SHIFT                (48)
->  #define PHYS_MASK              ((UL(1) << PHYS_MASK_SHIFT) - 1)
->
->  /*
-> @@ -122,7 +122,6 @@
->  #define TCR_SHARED             ((UL(3) << 12) | (UL(3) << 28))
->  #define TCR_TG0_64K            (UL(1) << 14)
->  #define TCR_TG1_64K            (UL(1) << 30)
-> -#define TCR_IPS_40BIT          (UL(2) << 32)
->  #define TCR_ASID16             (UL(1) << 36)
->  #define TCR_TBI0               (UL(1) << 37)
->
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index 2b0244d..d968796 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -68,6 +68,12 @@ __do_hyp_init:
->         msr     tcr_el2, x4
->
->         ldr     x4, =VTCR_EL2_FLAGS
-> +       /*
-> +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
-> +        * VTCR_EL2.
-> +        */
-> +       mrs     x5, ID_AA64MMFR0_EL1
-> +       bfi     x4, x5, #16, #3
->         msr     vtcr_el2, x4
->
->         mrs     x4, mair_el1
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index e0ef63c..e085ee6 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -209,8 +209,14 @@ ENTRY(__cpu_setup)
->          * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
->          * both user and kernel.
->          */
-> -       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | TCR_IPS_40BIT | \
-> +       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | \
->                       TCR_ASID16 | TCR_TBI0 | (1 << 31)
-> +       /*
-> +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
-> +        * TCR_EL1.
-> +        */
-> +       mrs     x9, ID_AA64MMFR0_EL1
-> +       bfi     x10, x9, #32, #3
->  #ifdef CONFIG_ARM64_64K_PAGES
->         orr     x10, x10, TCR_TG0_64K
->         orr     x10, x10, TCR_TG1_64K
-> --
-> 1.7.1
->
+>   * Initializers for schedule domains
+>   * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
+> @@ -6000,7 +5995,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
+>  	if (sd->flags & SD_SHARE_CPUPOWER) {
+>  		sd->imbalance_pct = 110;
+>  		sd->smt_gain = 1178; /* ~15% */
+> -		sd->flags |= arch_sd_sibling_asym_packing();
+> 
+>  	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
+>  		sd->imbalance_pct = 117;
+> 
