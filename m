@@ -1,55 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Mar 2014 14:24:18 -0700
-Subject: [PATCH] ARM: dts: msm8974: Move arch-timer out of soc node
-Message-ID: <1394573058-18561-1-git-send-email-sboyd@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 11 Mar 2014 22:24:33 +0100
+Subject: [PATCH 0/5] ARM: shmobile: r8a7790: enable IIC(B) cores
+Message-ID: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The architected timer is not a register addressable piece of
-hardware. Instead it's accessed through cp15 accessors. Move it
-to the root of the devicetree to reflect this.
+This series allows r8a7790 boards to use the alternative IIC(B) controller
+handled by the i2c-sh_mobile driver. Since both i2c cores always use the same
+pins only in a different function group, you can easily use this or that core
+for your devices. For that reason, there is currently no enablement on the
+Lager board, since it needs discussion which core we want to have on which bus.
+sh_mobile seems more stable currently, so I'd vote for that.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+Please review and apply if no issues found.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 9d79b98f18bb..d3fe0c21c6f4 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -52,6 +52,15 @@
- 		};
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 2 0xf08>,
-+			     <1 3 0xf08>,
-+			     <1 4 0xf08>,
-+			     <1 1 0xf08>;
-+		clock-frequency = <19200000>;
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -66,15 +75,6 @@
- 			      <0xf9002000 0x1000>;
- 		};
- 
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <1 2 0xf08>,
--				     <1 3 0xf08>,
--				     <1 4 0xf08>,
--				     <1 1 0xf08>;
--			clock-frequency = <19200000>;
--		};
--
- 		timer at f9020000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (5):
+  pinctrl: pfc: r8a7790: add i2c0 muxing
+  pinctrl: pfc: r8a7790: add mux data for IIC(B) cores
+  ARM: shmobile: r8a7790: add IIC0-2 clock macros
+  ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
+  ARM: shmobile: r8a7790: add IIC(B) cores to dtsi
+
+ arch/arm/boot/dts/r8a7790.dtsi            |  71 +++++++++++++---
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c      | 136 +++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r8a7790-clock.h |   3 +
+ 3 files changed, 196 insertions(+), 14 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.0
