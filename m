@@ -1,181 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 11 Mar 2014 15:58:18 +0100
-Subject: [PATCH v6 03/10] Documentation: devicetree: Update Samsung FIMC
- DT binding
-In-Reply-To: <531F11DD.5040300@samsung.com>
-References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
- <1608087.RUCeTiNcRR@avalon> <531F11DD.5040300@samsung.com>
-Message-ID: <24917002.Y0kBkkQHhZ@avalon>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Mar 2014 22:57:53 +0800
+Subject: [PATCH] MAINTAINERS: update IMX kernel git tree
+Message-ID: <1394549873-18272-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Change Shawn's email address to his employer, and move IMX git tree to
+kernel.org.
 
-On Tuesday 11 March 2014 14:38:37 Sylwester Nawrocki wrote:
-> Hi Laurent,
-> 
-> Thanks for your review.
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ MAINTAINERS |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-You're welcome.
-
-> On 11/03/14 13:30, Laurent Pinchart wrote:
-> [...]
-> 
-> >> ---
-> >> 
-> >>  .../devicetree/bindings/media/samsung-fimc.txt     |   34 +++++++++-----
-> >>  1 file changed, 26 insertions(+), 8 deletions(-)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> >> b/Documentation/devicetree/bindings/media/samsung-fimc.txt index
-> >> 96312f6..dbd4020 100644
-> >> --- a/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> >> +++ b/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> >> @@ -32,6 +32,21 @@ way around.
-> >> 
-> >>  The 'camera' node must include at least one 'fimc' child node.
-> >> 
-> >> +Optional properties:
-> >> +
-> >> +- #clock-cells: from the common clock bindings
-> >> (../clock/clock-bindings.txt),
-> >> +  must be 1. A clock provider is associated with the 'camera' node and
-> >> it should
-> >> +  be referenced by external sensors that use clocks provided by the SoC
-> >> on
-> >> +  CAM_*_CLKOUT pins. The clock specifier cell stores an index of a
-> >> clock.
-> >> +  The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks
-> >> respectively.
-> >> +
-> >> +- clock-output-names: from the common clock bindings, should contain
-> >> names of
-> >> +  clocks registered by the camera subsystem corresponding to
-> >> CAM_A_CLKOUT,
-> >> +  CAM_B_CLKOUT output clocks respectively.
-> > 
-> > Wouldn't it be better to document the "cam_mclk_a" and "cam_mclk_b" names
-> > explicitly ? Or do you expect different names to be used in different DT
-> > files ? And as they correspond to the CAM_A_CLKOUT and CAM_B_CLKOUT pins,
-> > shouldn't they be named "cam_a_clkout" and "cam_b_clkout" ?
-> 
-> Basically I could use fixed names for these clocks, I just wanted to keep
-> a possibility to override them in dts to avoid any possible clock name
-> collisions, rather than keep a list of different names per SoC in the
-> driver. Right now fixed names could also be used for all SoCs I'm aware of,
-> nevertheless I would prefer to keep the clock-output-names property.
-> "cam_a_clkout", "cam_b_clkout" may be indeed better names, I'll change
-> that.
-
-OK, variable names are fine with me.
-
-> >> +Note: #clock-cells and clock-output-names are mandatory properties if
-> >> external
-> >> +image sensor devices reference 'camera' device node as a clock provider.
-> >> +
-> > 
-> > What's the reason not to make them always mandatory ? Backward
-> > compatibility only ? If so wouldn't it make sense to document the
-> > properties as mandatory from now on, and treating them as optional in the
-> > driver for backward compatibility ?
-> 
-> Yes, it's for backwards compatibility only. It may be a good idea to just
-> document them as required, since this is how the device is expected to be
-> described in DT from now. I'll just make these a required properties,
-> the driver already handles them as optional.
-
-OK.
-
-> >>  'fimc' device nodes
-> >>  -------------------
-> >> 
-> >> @@ -97,8 +112,8 @@ Image sensor nodes
-> >> 
-> >>  The sensor device nodes should be added to their control bus controller
-> >> 
-> >> (e.g. I2C0) nodes and linked to a port node in the csis or the
-> >> parallel-ports node, using the common video interfaces bindings, defined
-> >> in video-interfaces.txt.
-> >> -The implementation of this bindings requires clock-frequency property to
-> >> be
-> >> -present in the sensor device nodes.
-> >> +An optional clock-frequency property needs to be present in the sensor
-> >> device
-> >> +nodes. Default value when this property is not present is 24 MHz.
-> > 
-> > This bothers me. Having the FIMC driver read the clock-frequence property
-> > from the sensor DT nodes feels like a layering violation. Shouldn't the
-> > sensor drivers call clk_set_rate() explicitly instead ?
-> 
-> It is supposed to do so, after this whole patch series. So the camera
-> controller driver will not need such properties. What do you think about
-> removing this sentence altogether ?
-
-Sure. As the FIMC won't access the clock-frequency property of the sensor 
-anymore after this patch series, let's just drop the mention of clock-
-frequency.
-
-> >>  Example:
-> >> @@ -114,7 +129,7 @@ Example:
-> >>  			vddio-supply = <...>;
-> >>  			
-> >>  			clock-frequency = <24000000>;
-> >> 
-> >> -			clocks = <...>;
-> >> +			clocks = <&camera 1>;
-> >> 
-> >>  			clock-names = "mclk";
-> >>  			
-> >>  			port {
-> >> 
-> >> @@ -135,7 +150,7 @@ Example:
-> >>  			vddio-supply = <...>;
-> >>  			
-> >>  			clock-frequency = <24000000>;
-> >> 
-> >> -			clocks = <...>;
-> >> +			clocks = <&camera 0>;
-> >> 
-> >>  			clock-names = "mclk";
-> >>  			
-> >>  			port {
-> >> 
-> >> @@ -149,12 +164,15 @@ Example:
-> >>  	camera {
-> >>  	
-> >>  		compatible = "samsung,fimc", "simple-bus";
-> >> 
-> >> -		#address-cells = <1>;
-> >> -		#size-cells = <1>;
-> >> -		status = "okay";
-> >> -
-> >> +		clocks = <&clock 132>, <&clock 133>;
-> >> +		clock-names = "sclk_cam0", "sclk_cam1";
-> > 
-> > The documentation mentions that clock-names must contain "sclk_cam0",
-> > "sclk_cam1", "pxl_async0", "pxl_async1". Are the last two optional ? If so
-> > I think you should clarify the description of the clock-names property.
-> > This can be done in a separate patch.
-> 
-> "pxl_async0", "pxl_async1" are mandatory, I'll add them also into
-> this example dts.
-
-OK.
-
-> >> +		#clock-cells = <1>;
-> >> +		clock-output-names = "cam_mclk_a", "cam_mclk_b";
-> >> 
-> >>  		pinctrl-names = "default";
-> >>  		pinctrl-0 = <&cam_port_a_clk_active>;
-> >> 
-> >> +		status = "okay";
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <1>;
-> >> 
-> >>  		/* parallel camera ports */
-> >>  		parallel-ports {
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 85b3dd8..5663cb8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -910,11 +910,11 @@ F:	arch/arm/include/asm/hardware/dec21285.h
+ F:	arch/arm/mach-footbridge/
+ 
+ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+-M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Shawn Guo <shawn.guo@freescale.com>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+ F:	arch/arm/mach-imx/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
