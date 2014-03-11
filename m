@@ -1,48 +1,134 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 11 Mar 2014 12:55:54 -0600
-Subject: [RFC PATCH v2 04/14] mtd: nand: define struct nand_timings
-In-Reply-To: <531DC1A4.7010208@gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
- <531DC1A4.7010208@gmail.com>
-Message-ID: <20140311185554.GD31835@obsidianresearch.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 11 Mar 2014 15:55:47 -0300
+Subject: [PATCH v2 2/2] ARM: dts: imx25-pdk: Add audio support
+In-Reply-To: <1394564147-15437-1-git-send-email-fabio.estevam@freescale.com>
+References: <1394564147-15437-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1394564147-15437-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 02:44:04PM +0100, Boris BREZILLON wrote:
+mx25pdk has a sgtl5000 codec connected to the I2C1 port.
 
-> Some timings are missing here (see Table 55 in the ONFI spec):
+Add support for it.
 
-Right..
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Remove 'regulator-always-on'
 
-The 'mode' covers only the raw electrical parameters needed to
-exchange commands, other timings cover the commands
-themselves. Notably the timing mode does not alter those parameters.
+ arch/arm/boot/dts/imx25-pdk.dts | 74 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-To me it seems tidy to keep the 'mode' timings contained in their own
-struct and find other homes for the other parameters.
-
-> -tR
-> -tBERS
-> -tCCS
-> -tPLEBSY
-> -...
-> 
-> I see at least 3 of those timings that could be useful (for the moment) :
-> - tR: this one should be used to fill the chip_delay field
-> - tPROG and tBERS: could be used within nand_wait to choose the timeo
->   value appropriately.
-
-IIRC these timing values are really only necessary if the controller
-does not support the READY/BUSY input, in that case drivers typically
-seem to use 'chip_delay' which is the maximum possible command
-execution time (a sleep long enough to guarentee that READY/BUSY is
-de-asserted).
-
-> Or should I create a new struct for these timings ?
-> In the latter case how should I name it ?
-
-struct onfi_command_timings ?
-
-Regards,
-Jason
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index 7a6d21f..71743a3 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -34,9 +34,46 @@
+ 			gpio = <&gpio2 3 0>;
+ 			enable-active-high;
+ 		};
++
++		reg_2p5v: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++		};
++
++		reg_3p3v: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++
++	};
++
++	sound {
++		compatible = "fsl,imx25-pdk-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx25-pdk-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
+ 	};
+ };
+ 
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+@@ -54,8 +91,32 @@
+ 	status = "okay";
+ };
+ 
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 129>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
+ &iomuxc {
+ 	imx25-pdk {
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <
++				MX25_PAD_RW__AUD4_TXFS			0xe0
++				MX25_PAD_OE__AUD4_TXC			0xe0
++				MX25_PAD_EB0__AUD4_TXD			0xe0
++				MX25_PAD_EB1__AUD4_RXD			0xe0
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
+@@ -85,6 +146,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
++				MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX25_PAD_UART1_RTS__UART1_RTS		0xe0
+@@ -101,6 +169,12 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	codec-handle = <&codec>;
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+-- 
+1.8.1.2
