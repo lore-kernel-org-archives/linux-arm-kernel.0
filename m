@@ -1,32 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 13:31:35 -0700
-Subject: [GIT PULL 2/2] ARM: bcm2835: DT changes for 3.15
-In-Reply-To: <1394160250-3939-2-git-send-email-swarren@wwwdotorg.org>
-References: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
- <1394160250-3939-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140311203135.GK31877@quad.lixom.net>
+Date: Tue, 11 Mar 2014 13:25:34 -0700
+Subject: ARM: mach-bcm dt updates for 3.15
+In-Reply-To: <20140306063605.GA30045@beef>
+References: <20140306063605.GA30045@beef>
+Message-ID: <20140311202534.GH31877@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 07:44:10PM -0700, Stephen Warren wrote:
-> A variety of features are added to the bcm2835 device trees:
-> - ARM PMU, for perf_event
-> - DMA controller
-> - I2S controller
+On Thu, Mar 06, 2014 at 01:36:05AM -0500, Matt Porter wrote:
+> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
 > 
-> A few cleanups are applied to the DTs too.
-> 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1
+>   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.15-dt
+>   git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/dt
+> 
+> for you to fetch changes up to a33705ee8a8af40bbaa379e4567ca451c38fc0d6:
+> 
+>   ARM: dts: remove bcm11351-brt.dts (2014-03-05 01:28:56 -0500)
+> 
+> ----------------------------------------------------------------
+> ARM: mach-bcm dt updates for 3.15
+> 
+> - add BCM4708 dt support
+> - remove bcm11351-brt
+> - bcm281xx common clock support
 
-Merged, thanks.
+Merged, but I thought you said that the driver peices of common clock
+were a prereq for the DT changes? I didn't see this branch based on the
+driver changes. The only way to guarantee that the driver changes are
+applied before the DT ones are at all times is to base the two branches
+on each other (I.e.  otherwise you might land on a location where only
+the DT change is applied when you bisect).
+
+This isn't super-critical in this case; the only person subjected to
+this problem right now is likely you, so I've merged it anyway. Keep
+it in mind in the future though -- it's one of the quirks of git that
+takes a while to get used to.
 
 
 -Olof
