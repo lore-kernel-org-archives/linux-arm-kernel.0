@@ -1,193 +1,183 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 11 Mar 2014 09:18:08 +0100
-Subject: [PATCH v3 2/5] pinctrl: st: Enhance the controller to manage
- unavailable registers
-In-Reply-To: <20140310091707.GD14976@lee--X1>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-3-git-send-email-maxime.coquelin@st.com>
- <20140310091707.GD14976@lee--X1>
-Message-ID: <531EC6C0.4080202@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Mar 2014 08:23:16 +0000
+Subject: [PATCH v6 01/35] mtd: st_spi_fsm: Allocate resources and register
+ with MTD framework
+In-Reply-To: <20140309053306.GL31517@norris-Latitude-E6410>
+References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
+ <1392735362-1245-2-git-send-email-lee.jones@linaro.org>
+ <20140309053306.GL31517@norris-Latitude-E6410>
+Message-ID: <20140311082316.GJ2839@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is a new driver. It's used to communicate with a special type of
+optimised Serial Flash Controller called the FSM. The FSM uses a subset
+of the SPI protocol to communicate with supported NOR-Flash devices.
 
+Acked-by Angus Clark <angus.clark@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
 
-On 03/10/2014 10:17 AM, Lee Jones wrote:
->> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->>
->> This patch adds a new logic inside the st pinctrl to manage
->> an unsupported scenario: some sysconfig are not available!
->>
->> This is the case of STiH407 where, although documented, the
->> following registers from SYSCFG_FLASH have been removed from the SoC.
->>
->> SYSTEM_CONFIG3040
->>     Output Enable pad control for all PIO Alternate Functions
->> and
->> SYSTEM_ CONFIG3050
->>     Pull Up pad control for all PIO Alternate Functions
->>
->> Without managing this condition an imprecise external abort
->> will be detect.
->>
->> To do this the patch also reviews the st_parse_syscfgs
->> and other routines to manipulate the registers only if
->> actually available.
->> In any case, for example the st_parse_syscfgs detected
->> an error condition but no action was made in the
->> st_pctl_probe_dt.
->>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->
-> These two SOBs need reordering.
-Right,
-this will be changed here and everywhere else in the series.
+Hi Brian,
 
->
->> ---
->>   drivers/pinctrl/pinctrl-st.c | 106 +++++++++++++++++++++++++------------------
->>   1 file changed, 61 insertions(+), 45 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
->> index 9fb66aa..1721611 100644
->> --- a/drivers/pinctrl/pinctrl-st.c
->> +++ b/drivers/pinctrl/pinctrl-st.c
->> @@ -410,25 +410,27 @@ static void st_pinconf_set_config(struct st_pio_control *pc,
->>   	unsigned int oe_value, pu_value, od_value;
->>   	unsigned long mask = BIT(pin);
->>
->> -	regmap_field_read(output_enable, &oe_value);
->> -	regmap_field_read(pull_up, &pu_value);
->> -	regmap_field_read(open_drain, &od_value);
->> -
->> -	/* Clear old values */
->> -	oe_value &= ~mask;
->> -	pu_value &= ~mask;
->> -	od_value &= ~mask;
->> -
->> -	if (config & ST_PINCONF_OE)
->> -		oe_value |= mask;
->> -	if (config & ST_PINCONF_PU)
->> -		pu_value |= mask;
->> -	if (config & ST_PINCONF_OD)
->> -		od_value |= mask;
->> -
->> -	regmap_field_write(output_enable, oe_value);
->> -	regmap_field_write(pull_up, pu_value);
->> -	regmap_field_write(open_drain, od_value);
->> +	if (output_enable) {
->> +		regmap_field_read(output_enable, &oe_value);
->> +		oe_value &= ~mask;
->> +		if (config & ST_PINCONF_OE)
->> +			oe_value |= mask;
->> +		regmap_field_write(output_enable, oe_value);
->> +	}
->> +	if (pull_up) {
->> +		regmap_field_read(pull_up, &pu_value);
->> +		pu_value &= ~mask;
->> +		if (config & ST_PINCONF_PU)
->> +			pu_value |= mask;
->> +		regmap_field_write(pull_up, pu_value);
->> +	}
->> +	if (open_drain) {
->> +		regmap_field_read(open_drain, &od_value);
->> +		od_value &= ~mask;
->> +		if (config & ST_PINCONF_OD)
->> +			od_value |= mask;
->> +		regmap_field_write(open_drain, od_value);
->> +	}
->
-> Nice change.
->
-> Nit: For consistency with the changes below, please consider placing
-> new lines between the 3 outer checks.
-Done
+Sorry about the previous fixup misses. There were a couple of patches
+which I had failed to squash into the pack. Hopefully the rest of the
+review will go more smoothly.
 
->
->>   }
->>
->
-> <snip>
->
->> -static void st_pinconf_get_direction(struct st_pio_control *pc,
->> -	int pin, unsigned long *config)
->> +static void st_pinconf_get_direction(struct st_pio_control *pc, int pin,
->> +				     unsigned long *config)
->
-> Unrelated change?
-Yes this is unrelated.
-I removed this change. It will be sent later with maybe other cosmetic 
-changes.
+Kind regards,
+Lee
+ drivers/mtd/devices/Kconfig      |   8 +++
+ drivers/mtd/devices/Makefile     |   1 +
+ drivers/mtd/devices/st_spi_fsm.c | 107 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 116 insertions(+)
 
->
->>   {
->>   	unsigned int oe_value, pu_value, od_value;
->
-> Is it worth checking for (!config) here?
+diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+index 0128138..1210bc2 100644
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -210,6 +210,14 @@ config MTD_DOCG3
+ 	  M-Systems and now Sandisk. The support is very experimental,
+ 	  and doesn't give access to any write operations.
+ 
++config MTD_ST_SPI_FSM
++	tristate "ST Microelectronics SPI FSM Serial Flash Controller"
++	depends on ARM || SH
++	help
++	  This provides an MTD device driver for the ST Microelectronics
++	  SPI Fast Sequence Mode (FSM) Serial Flash Controller and support
++	  for a subset of connected Serial Flash devices.
++
+ if MTD_DOCG3
+ config BCH_CONST_M
+ 	default 14
+diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
+index d83bd73..c68868f 100644
+--- a/drivers/mtd/devices/Makefile
++++ b/drivers/mtd/devices/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_MTD_NAND_OMAP_BCH)	+= elm.o
+ obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
+ obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
+ obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
++obj-$(CONFIG_MTD_ST_SPI_FSM)    += st_spi_fsm.o
+ 
+ 
+ CFLAGS_docg3.o			+= -I$(src)
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+new file mode 100644
+index 0000000..0de9648
+--- /dev/null
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -0,0 +1,107 @@
++/*
++ * st_spi_fsm.c	- ST Fast Sequence Mode (FSM) Serial Flash Controller
++ *
++ * Author: Angus Clark <angus.clark@st.com>
++ *
++ * Copyright (C) 2010-2014 STicroelectronics Limited
++ *
++ * JEDEC probe based on drivers/mtd/devices/m25p80.c
++ *
++ * This code is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/mtd.h>
++#include <linux/sched.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/of.h>
++
++struct stfsm {
++	struct device		*dev;
++	void __iomem		*base;
++	struct resource		*region;
++	struct mtd_info		mtd;
++	struct mutex		lock;
++};
++
++static int stfsm_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *res;
++	struct stfsm *fsm;
++
++	if (!np) {
++		dev_err(&pdev->dev, "No DT found\n");
++		return -EINVAL;
++	}
++
++	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
++	if (!fsm)
++		return -ENOMEM;
++
++	fsm->dev = &pdev->dev;
++
++	platform_set_drvdata(pdev, fsm);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "Resource not found\n");
++		return -ENODEV;
++	}
++
++	fsm->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(fsm->base)) {
++		dev_err(&pdev->dev,
++			"Failed to reserve memory region [0x%08x-0x%08x]\n",
++			res->start, res->end);
++		return PTR_ERR(fsm->base);
++	}
++
++	mutex_init(&fsm->lock);
++
++	fsm->mtd.dev.parent	= &pdev->dev;
++	fsm->mtd.type		= MTD_NORFLASH;
++	fsm->mtd.writesize	= 4;
++	fsm->mtd.writebufsize	= fsm->mtd.writesize;
++	fsm->mtd.flags		= MTD_CAP_NORFLASH;
++
++	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
++}
++
++static int stfsm_remove(struct platform_device *pdev)
++{
++	struct stfsm *fsm = platform_get_drvdata(pdev);
++	int err;
++
++	err = mtd_device_unregister(&fsm->mtd);
++	if (err)
++		return err;
++
++	return 0;
++}
++
++static struct of_device_id stfsm_match[] = {
++	{ .compatible = "st,spi-fsm", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, stfsm_match);
++
++static struct platform_driver stfsm_driver = {
++	.probe		= stfsm_probe,
++	.remove		= stfsm_remove,
++	.driver		= {
++		.name	= "st-spi-fsm",
++		.owner	= THIS_MODULE,
++		.of_match_table = stfsm_match,
++	},
++};
++module_platform_driver(stfsm_driver);
++
++MODULE_AUTHOR("Angus Clark <angus.clark@st.com>");
++MODULE_DESCRIPTION("ST SPI FSM driver");
++MODULE_LICENSE("GPL");
 
-That would be better indeed.
-But since that lack of safety check was already present before this 
-change, it should be handled in a separate patch.
-
-I'll add this in my todo list.
-
->
->> -	regmap_field_read(pc->oe, &oe_value);
->> -	regmap_field_read(pc->pu, &pu_value);
->> -	regmap_field_read(pc->od, &od_value);
->> +	if (pc->oe) {
->> +		regmap_field_read(pc->oe, &oe_value);
->> +		if (oe_value & BIT(pin))
->> +			ST_PINCONF_PACK_OE(*config);
->> +	}
->>
->> -	if (oe_value & BIT(pin))
->> -		ST_PINCONF_PACK_OE(*config);
->> -	if (pu_value & BIT(pin))
->> -		ST_PINCONF_PACK_PU(*config);
->> -	if (od_value & BIT(pin))
->> -		ST_PINCONF_PACK_OD(*config);
->> +	if (pc->pu) {
->> +		regmap_field_read(pc->pu, &pu_value);
->> +		if (pu_value & BIT(pin))
->> +			ST_PINCONF_PACK_PU(*config);
->> +	}
->>
->> +	if (pc->od) {
->> +		regmap_field_read(pc->od, &od_value);
->> +		if (od_value & BIT(pin))
->> +			ST_PINCONF_PACK_OD(*config);
->> +	}
->>   }
->
-> Nice.
->
->>   static int st_pinconf_get_retime_packed(struct st_pinctrl *info,
->> @@ -1105,8 +1116,21 @@ static int st_pctl_dt_setup_retime(struct st_pinctrl *info,
->>   	return -EINVAL;
->>   }
->>
->> -static int st_parse_syscfgs(struct st_pinctrl *info,
->> -		int bank, struct device_node *np)
->> +
->> +static struct regmap_field *st_pc_get_value(struct device *dev,
->> +					    struct regmap *regmap, int bank,
->> +					    int data, int lsb, int msb)
->> +{
->> +	struct reg_field reg = REG_FIELD((data + bank) * 4, lsb, msb);
->> +
->> +	if (data < 0)
->> +		return NULL;
->
-> What happens is data < 0 and it's used in REG_FIELD?
-Nothing bad, but I agree this is not crystal clear.
-
->
-> Would it make more sense to make this check before calling REG_FIELD?
-Yes, it will be done in the v4.
-
-<snip>
-
-Thanks,
-Maxime
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
