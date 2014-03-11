@@ -1,88 +1,48 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 11 Mar 2014 09:52:37 +0100
-Subject: [PATCH v3 3/5] pinctrl: st: add pinctrl support for the STiH407
- SoC
-In-Reply-To: <20140310144429.GA13661@lee--X1>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-4-git-send-email-maxime.coquelin@st.com>
- <20140310144429.GA13661@lee--X1>
-Message-ID: <531ECED5.1000405@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Mar 2014 09:50:22 +0100
+Subject: [PATCH v4 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <5055473.2ZTHMWo41J@wuerfel>
+References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2475487.axlvKsBQ0c@wuerfel> <20140310165156.GI2815@lukather>
+ <5055473.2ZTHMWo41J@wuerfel>
+Message-ID: <20140311085022.GK2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 10, 2014 at 06:57:00PM +0100, Arnd Bergmann wrote:
+> On Monday 10 March 2014 17:51:56 Maxime Ripard wrote:
+> > > 
+> > > Neither "pll6" nor "ahb1_mux" are listed in the DT binding. Also, why
+> > > is it the driver's business to set the parent?
+> > 
+> > Those are global clocks, so it's not really part pof the driver
+> > binding itself. But I can add them.
+> 
+> No better don't then. Can you change the clk_get() call to pass
+> NULL as the device pointer to clarify this in the source though?
 
+Ok.
+ 
+> > About the reparenting itself, other devices are actually fine having
+> > any parent they want, only the DMA is picky about it (at least, from
+> > what we know), so it made sense to me to put it into the driver
+> > itself. Where would you put it?
+> 
+> Maybe Mike Turquette has an idea. We have in the past discussed
+> about cases where you want the default clock setting to be part
+> of the clock provider in some property. Could that work here?
 
-On 03/10/2014 03:44 PM, Lee Jones wrote:
->> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->>
->> This patch adds the initial support for pinctrl based on H407 SoC.
->>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->
-> SOBs should be in order of submission flow and author's should only be
-> kept if the patch is unchanged. If it's been adapted you will require
-> a re-review and they Acked-by or Reviewed-by tag.
->
->> ---
->>   drivers/pinctrl/pinctrl-st.c | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
->>
->> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
->> index 1721611..d1886b4 100644
->> --- a/drivers/pinctrl/pinctrl-st.c
->> +++ b/drivers/pinctrl/pinctrl-st.c
->> @@ -390,6 +390,19 @@ static const struct st_pctl_data  stih416_data = {
->>   	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
->>   };
->>
->> +static const struct st_pctl_data  stih407_flashdata = {
->
-> Nit: Double space.
-Fixed in upcoming v4.
+You mean in the DT? I guess it would yes.
 
->
->> +	.rt_style	= st_retime_style_none,
->> +	.input_delays	= stih416_delays,
->> +	.ninput_delays	= 14,
->
-> ARRAY_SIZE(stih416_delays)
->
->> +	.output_delays	= stih416_delays,
->> +	.noutput_delays = 14,
->
-> ARRAY_SIZE(stih416_delays)
-Fixed too.
-
-V4 will contain one more patch to fix this also in stih416_data.
-
->
->> +	.alt = 0,
->> +	.oe = -1, /* Not Available */
->> +	.pu = -1, /* Not Available */
->> +	.od = 60,
->> +	.rt = 100,
->> +};
->> +
->>   /* Low level functions.. */
->>   static inline int st_gpio_bank(int gpio)
->>   {
->> @@ -1596,6 +1609,10 @@ static struct of_device_id st_pctl_of_match[] = {
->>   	{ .compatible = "st,stih416-rear-pinctrl", .data = &stih416_data},
->>   	{ .compatible = "st,stih416-fvdp-fe-pinctrl", .data = &stih416_data},
->>   	{ .compatible = "st,stih416-fvdp-lite-pinctrl", .data = &stih416_data},
->> +	{ .compatible = "st,stih407-sbc-pinctrl", .data = &stih416_data},
->> +	{ .compatible = "st,stih407-front-pinctrl", .data = &stih416_data},
->> +	{ .compatible = "st,stih407-rear-pinctrl", .data = &stih416_data},
->> +	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih407_flashdata},
->>   	{ /* sentinel */ }
->>   };
->
-> After the small changes above, feel free to add my:
->    Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Added.
-
-Thanks,
-Maxime
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/58591b9c/attachment.sig>
