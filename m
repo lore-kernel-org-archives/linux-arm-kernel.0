@@ -1,41 +1,43 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:34:17 +0100
-Subject: [PATCH 3/3] ARM: dts: overo: Add support for 3.5'' LCD output
+Date: Tue, 11 Mar 2014 13:34:16 +0100
+Subject: [PATCH 2/3] ARM: dts: overo: Add support for 4.3'' LCD output
 In-Reply-To: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394541257-25605-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1394541257-25605-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alto35 expansion board has a ZIF connector for a 3.5'' LCD.
-Add a common include file for this configuration, and use it
-on Alto35.
+Chestnut43, Gallop43 and Palo43 expansion boards have a ZIF connector
+for a 4.3'' LCD.Add a common include file for this configuration, and
+use it on relevant expansion boards.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-overo-alto35-common.dtsi |   1 +
- arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi  | 145 +++++++++++++++++++++++
- 2 files changed, 146 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
+ .../boot/dts/omap3-overo-chestnut43-common.dtsi    |   1 +
+ arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    | 146 +++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |   1 +
+ arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |   1 +
+ 4 files changed, 149 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
 
-diff --git a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
-index 19d6486..7aae8fb 100644
---- a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
+diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
+index 19de6ff..17b82f8 100644
+--- a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
 @@ -11,6 +11,7 @@
   */
  
  #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-lcd35.dtsi"
++#include "omap3-overo-common-lcd43.dtsi"
  
  #include <dt-bindings/input/input.h>
  
-diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
+diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
 new file mode 100644
-index 0000000..5e0373b3
+index 0000000..c876d0d
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
-@@ -0,0 +1,145 @@
++++ b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
+@@ -0,0 +1,146 @@
 +/*
 + * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
 + *
@@ -118,7 +120,7 @@ index 0000000..5e0373b3
 +	};
 +
 +	lcd0: display at 0 {
-+		compatible = "lg,lb035q02", "panel-dpi";
++		compatible = "samsung,lte430wq-f0c", "panel-dpi";
 +		label = "lcd";
 +
 +		gpios = <&gpio5 16 GPIO_ACTIVE_HIGH		/* gpio_144 */
@@ -129,15 +131,15 @@ index 0000000..5e0373b3
 +		};
 +
 +		panel-timing {
-+			clock-frequency = <6500000>;
-+			hactive = <320>;
-+			vactive = <240>;
-+			hfront-porch = <20>;
-+			hback-porch = <68>;
-+			hsync-len = <2>;
-+			vback-porch = <18>;
++			clock-frequency = <9200000>;
++			hactive = <480>;
++			vactive = <272>;
++			hfront-porch = <8>;
++			hback-porch = <4>;
++			hsync-len = <41>;
++			vback-porch = <2>;
 +			vfront-porch = <4>;
-+			vsync-len = <2>;
++			vsync-len = <10>;
 +
 +			hsync-active = <0>;
 +			vsync-active = <0>;
@@ -181,5 +183,30 @@ index 0000000..5e0373b3
 +		linux,wakeup;
 +	};
 +};
++
+diff --git a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
+index 5e848c2..49d2254 100644
+--- a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include "omap3-overo-common-peripherals.dtsi"
++#include "omap3-overo-common-lcd43.dtsi"
+ 
+ #include <dt-bindings/input/input.h>
+ 
+diff --git a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
+index abea232..087aedf 100644
+--- a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include "omap3-overo-common-peripherals.dtsi"
++#include "omap3-overo-common-lcd43.dtsi"
+ 
+ #include <dt-bindings/input/input.h>
+ 
 -- 
 1.8.3.2
