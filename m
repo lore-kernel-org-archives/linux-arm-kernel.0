@@ -1,38 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 15:35:03 -0700
-Subject: [PATCH] ARM: zynq: Add OCM driver
-In-Reply-To: <e870cbc7-5934-4a14-aab4-416cdfd1627d@VA3EHSMHS007.ehs.local>
-References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
- <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
- <e870cbc7-5934-4a14-aab4-416cdfd1627d@VA3EHSMHS007.ehs.local>
-Message-ID: <CAOesGMiHf9efd8_RGg=0XCR9Qvy8=YUAMLPX-O4yOC8g-e8d9w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Mar 2014 07:39:46 +0900
+Subject: [PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
+In-Reply-To: <531EEE6A.3080802@codethink.co.uk>
+References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1394196400-17112-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20140311051605.GB3649@verge.net.au>
+ <531EEE6A.3080802@codethink.co.uk>
+Message-ID: <20140311223946.GB22767@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 3:13 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Tue, 2014-03-11 at 02:31PM -0700, Olof Johansson wrote:
->> Hi Michal,
->>
->> Sorry for the late review, I didn't notice the driver when it was
->> posted and I only saw it now with the pull request. Comments below.
->>
->>
->> On Mon, Jan 6, 2014 at 7:36 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> > The driver provide memory allocator which can
->> > be used by others drivers to allocate memory inside OCM.
->> > All location for 64kB blocks are supported
->> > and driver is trying to allocate the largest continuous
->> > block of memory.
->>
->> I don't think you explain what OCM is anywhere, what is it? Since
->> you're reusing the generic SRAM driver I'm suspecting it's related?
->
-> It stands for 'On-Chip Memory'. For Zynq that is a RAM consisting of
-> four 64k chunks that can be individually mapped to a high or low address.
+On Tue, Mar 11, 2014 at 11:07:22AM +0000, Ben Dooks wrote:
+> On 11/03/14 05:16, Simon Horman wrote:
+> >On Fri, Mar 07, 2014 at 12:46:39PM +0000, Ben Dooks wrote:
+> >>With the addition of clock-indices, we need to change the renesas
+> >>clock implementation to use these instead of the local definition.
+> >>
+> >>Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> >>---
+> >>  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 2 +-
+> >>  drivers/clk/shmobile/clk-mstp.c                                     | 2 +-
+> >>  2 files changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> >>index 5992dce..02a25d9 100644
+> >>--- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> >>+++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> >>@@ -43,7 +43,7 @@ Example
+> >>  		clock-output-names =
+> >>  			"tpu0", "mmcif1", "sdhi3", "sdhi2",
+> >>  			 "sdhi1", "sdhi0", "mmcif0";
+> >>-		renesas,clock-indices = <
+> >>+		clock-indices = <
+> >>  			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+> >>  			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> >>  			R8A7790_CLK_MMCIF0
+> >>diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+> >>index 42d5912..95a2aa7 100644
+> >>--- a/drivers/clk/shmobile/clk-mstp.c
+> >>+++ b/drivers/clk/shmobile/clk-mstp.c
+> >>@@ -197,7 +197,7 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
+> >>  			continue;
+> >>
+> >>  		parent_name = of_clk_get_parent_name(np, i);
+> >>-		ret = of_property_read_u32_index(np, "renesas,clock-indices", i,
+> >>+		ret = of_property_read_u32_index(np, "clock-indices", i,
+> >>  						 &clkidx);
+> >>  		if (parent_name == NULL || ret < 0)
+> >>  			break;
+> >
+> >Won't this break compatibility with existing DTBs?
+> 
+> That was the point of patch 2.
 
-Ok, yeah, then it definitely should share drivers as much as possible
-with the other vendors.
-
-
--Olof
+Thanks, sorry for missing that.
