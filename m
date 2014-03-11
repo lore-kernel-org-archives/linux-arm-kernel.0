@@ -1,99 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 11 Mar 2014 18:51:54 +0800
-Subject: [PATCH v3] i2c:at91: Add device tree property to set
- clock-frequency
-In-Reply-To: <1394511938-28653-1-git-send-email-mark.roszko@gmail.com>
-References: <1394511938-28653-1-git-send-email-mark.roszko@gmail.com>
-Message-ID: <C7EB5260-2285-4572-9D73-15312BB09F65@jcrosoft.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Tue, 11 Mar 2014 11:54:57 +0100
+Subject: [PATCH v2][ 1/8] ARM: dts: mx25: USB block requires only one clock
+Message-ID: <1394535304-10240-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Mar 11, 2014, at 12:25 PM, Marek Roszko <mark.roszko@gmail.com> wrote:
+Like other imx SoCs only one USB clock is needed on mx25.
 
-> This adds the ability to set "clock-frequency" in the device tree for the at91
-> i2cbus following the naming of other i2c bus implementations. If the property
-> is not set,the clock frequency will default to the previously used define 
-> of 100KHz.
-> 
-> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
-> ---
-> v3:		
-> 		-changed bus_clk_rate to u32
-> v2:
->        -fixed return code usage and check to not compare agaisnt less than zero
-> 
-> ---
-> Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
-> drivers/i2c/busses/i2c-at91.c                      |   10 ++++++++--
-> 2 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> index 4fade84..388f0a2 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-> @@ -12,6 +12,7 @@ Required properties :
-> - clocks: phandles to input clocks.
-> 
-> Optional properties:
-> +- clock-frequency: Desired I2C bus frequency in Hz, otherwise defaults to 100000
-> - Child nodes conforming to i2c bus binding
-> 
-> Examples :
-> @@ -23,6 +24,7 @@ i2c0: i2c at fff84000 {
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	clocks = <&twi0_clk>;
-> +	clock-frequency = <400000>;
-> 
-The bindings is wrong it?s not the bus frequency but the max frequency
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx25.dtsi |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-as you describe the bus not the device frequency. And this is this one that limit the bus
-
-Best Regards,
-J.
-> 	24c512 at 50 {
-> 		compatible = "24c512";
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 843d012..334c851 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -32,7 +32,7 @@
-> #include <linux/slab.h>
-> #include <linux/platform_data/dma-atmel.h>
-> 
-> -#define TWI_CLK_HZ		100000			/* max 400 Kbits/s */
-> +#define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
-> #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
-> #define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
-> 
-> @@ -711,6 +711,7 @@ static int at91_twi_probe(struct platform_device *pdev)
-> 	struct resource *mem;
-> 	int rc;
-> 	u32 phy_addr;
-> +	u32 bus_clk_rate;
-> 
-> 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
-> 	if (!dev)
-> @@ -756,7 +757,12 @@ static int at91_twi_probe(struct platform_device *pdev)
-> 			dev->use_dma = true;
-> 	}
-> 
-> -	at91_calc_twi_clock(dev, TWI_CLK_HZ);
-> +	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
-> +			&bus_clk_rate);
-> +	if (rc)
-> +		bus_clk_rate = DEFAULT_TWI_CLK_HZ;
-> +
-> +	at91_calc_twi_clock(dev, bus_clk_rate);
-> 	at91_init_twi_bus(dev);
-> 
-> 	snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 77bb743..829791e 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -496,8 +496,7 @@
+ 				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4000 0x0200>;
+ 				interrupts = <37>;
+-				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
+-				clock-names = "ipg", "ahb", "per";
++				clocks = <&clks 70>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				status = "disabled";
+ 			};
+@@ -506,8 +505,7 @@
+ 				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4400 0x0200>;
+ 				interrupts = <35>;
+-				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
+-				clock-names = "ipg", "ahb", "per";
++				clocks = <&clks 70>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				status = "disabled";
+ 			};
+-- 
+1.7.9.5
