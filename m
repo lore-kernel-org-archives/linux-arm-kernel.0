@@ -1,83 +1,85 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 11 Mar 2014 15:55:46 -0300
-Subject: [PATCH v2 1/2] ARM: mx25: Add CLKO support
-Message-ID: <1394564147-15437-1-git-send-email-fabio.estevam@freescale.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 11 Mar 2014 20:57:29 +0200
+Subject: [PATCH] ARM: unistd.h: relocate comments back to place
+In-Reply-To: <98efb0a6377be2ae7d92eab50ed30f6258e8a28d.1391455314.git.baruch@tkos.co.il>
+References: <98efb0a6377be2ae7d92eab50ed30f6258e8a28d.1391455314.git.baruch@tkos.co.il>
+Message-ID: <20140311185729.GY4249@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLKO support is a clock output on mx25 which can output many of the internal 
-clock sources. It is useful for debugging purpose or also for driving the 
-audio codec for example.
+Hi Russell,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- None
+On Mon, Feb 03, 2014 at 09:21:54PM +0200, Baruch Siach wrote:
+> Commit cb8db5d45 (UAPI: (Scripted) Disintegrate arch/arm/include/asm) moved
+> these syscall comments out of their context into the UAPI headers. Fix this.
+> 
+> Fixes: cb8db5d4578a ("UAPI: (Scripted) Disintegrate arch/arm/include/asm")
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
 
- Documentation/devicetree/bindings/clock/imx25-clock.txt |  3 +++
- arch/arm/mach-imx/clk-imx25.c                           | 15 ++++++++++++++-
- 2 files changed, 17 insertions(+), 1 deletion(-)
+Is this patch OK for the patch system? It seems trivially correct.
 
-diff --git a/Documentation/devicetree/bindings/clock/imx25-clock.txt b/Documentation/devicetree/bindings/clock/imx25-clock.txt
-index db4f2f0..ceaf3134 100644
---- a/Documentation/devicetree/bindings/clock/imx25-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx25-clock.txt
-@@ -139,6 +139,9 @@ clocks and IDs.
- 	uart5_ipg		124
- 	reserved		125
- 	wdt_ipg			126
-+	cko_div			127
-+	cko_sel			128
-+	clo			129
- 
- Examples:
- 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index dc36e6c..2416bec 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -62,6 +62,10 @@ static struct clk_onecell_data clk_data;
- 
- static const char *cpu_sel_clks[] = { "mpll", "mpll_cpu_3_4", };
- static const char *per_sel_clks[] = { "ahb", "upll", };
-+static const char *cko_sel_clks[] = { "dummy", "osc", "cpu", "ahb", 
-+				      "ipg", "dummy", "dummy", "dummy",
-+				      "dummy", "dummy", "per0", "per2",
-+				      "per13", "per14", "usbotg_ahb", "dummy",};
- 
- enum mx25_clks {
- 	dummy, osc, mpll, upll, mpll_cpu_3_4, cpu_sel, cpu, ahb, usb_div, ipg,
-@@ -82,7 +86,7 @@ enum mx25_clks {
- 	pwm2_ipg, pwm3_ipg, pwm4_ipg, rngb_ipg, reserved16, scc_ipg, sdma_ipg,
- 	sim1_ipg, sim2_ipg, slcdc_ipg, spba_ipg, ssi1_ipg, ssi2_ipg, tsc_ipg,
- 	uart1_ipg, uart2_ipg, uart3_ipg, uart4_ipg, uart5_ipg, reserved17,
--	wdt_ipg, clk_max
-+	wdt_ipg, cko_div, cko_sel, cko, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -117,6 +121,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 	clk[per13_sel] = imx_clk_mux("per13_sel", ccm(CCM_MCR), 13, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
- 	clk[per14_sel] = imx_clk_mux("per14_sel", ccm(CCM_MCR), 14, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
- 	clk[per15_sel] = imx_clk_mux("per15_sel", ccm(CCM_MCR), 15, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	clk[cko_div] = imx_clk_divider("cko_div", "cko_sel", ccm(CCM_MCR), 24, 6);
-+	clk[cko_sel] = imx_clk_mux("cko_sel", ccm(CCM_MCR), 20, 4, cko_sel_clks, ARRAY_SIZE(cko_sel_clks));
-+	clk[cko] = imx_clk_gate("cko", "cko_div", ccm(CCM_MCR),  30);
- 	clk[per0] = imx_clk_divider("per0", "per0_sel", ccm(CCM_PCDR0), 0, 6);
- 	clk[per1] = imx_clk_divider("per1", "per1_sel", ccm(CCM_PCDR0), 8, 6);
- 	clk[per2] = imx_clk_divider("per2", "per2_sel", ccm(CCM_PCDR0), 16, 6);
-@@ -230,6 +237,12 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
- 
-+	/*
-+	 * Let's initially set up CLKO parent as ipg, since this configuration
-+	 * is used on some imx25 board designs to clock the audio codec.
-+	 */
-+	clk_set_parent(clk[cko_sel], clk[ipg]);
-+
- 	return 0;
- }
- 
+baruch
+
+>  arch/arm/include/asm/unistd.h      | 10 ++++++++++
+>  arch/arm/include/uapi/asm/unistd.h | 11 -----------
+>  2 files changed, 10 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+> index acabef1a75df..4229595e5c04 100644
+> --- a/arch/arm/include/asm/unistd.h
+> +++ b/arch/arm/include/asm/unistd.h
+> @@ -15,7 +15,17 @@
+>  
+>  #include <uapi/asm/unistd.h>
+>  
+> +/*
+> + * This may need to be greater than __NR_last_syscall+1 in order to
+> + * account for the padding in the syscall table
+> + */
+>  #define __NR_syscalls  (384)
+> +
+> +/*
+> + * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+> + * __kuser_cmpxchg code in entry-armv.S should be aware of its
+> + * existence.  Don't ever use this from user code.
+> + */
+>  #define __ARM_NR_cmpxchg		(__ARM_NR_BASE+0x00fff0)
+>  
+>  #define __ARCH_WANT_STAT64
+> diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+> index fb5584d0cc05..c3776331f407 100644
+> --- a/arch/arm/include/uapi/asm/unistd.h
+> +++ b/arch/arm/include/uapi/asm/unistd.h
+> @@ -410,11 +410,6 @@
+>  #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
+>  
+>  /*
+> - * This may need to be greater than __NR_last_syscall+1 in order to
+> - * account for the padding in the syscall table
+> - */
+> -
+> -/*
+>   * The following SWIs are ARM private.
+>   */
+>  #define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
+> @@ -425,12 +420,6 @@
+>  #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
+>  
+>  /*
+> - * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+> - * __kuser_cmpxchg code in entry-armv.S should be aware of its
+> - * existence.  Don't ever use this from user code.
+> - */
+> -
+> -/*
+>   * The following syscalls are obsolete and no longer available for EABI.
+>   */
+>  #if !defined(__KERNEL__)
+> -- 
+> 1.8.5.3
+
 -- 
-1.8.1.2
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
