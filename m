@@ -1,188 +1,37 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:20:32 +0100
-Subject: [PATCH 4/7] ARM: dts: Add support for the Overo Gallop43
-In-Reply-To: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394540435-25401-5-git-send-email-florian.vaussard@epfl.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 11 Mar 2014 13:21:17 +0100
+Subject: [PATCH 2/5] ARM: dts: exynos4x12: Add PMU dt data to support
+ PMU(Perforamnce Monitoring Unit)
+In-Reply-To: <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
+References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+ <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <531EFFBD.8050301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gallop43 is an expansion board for Gumstix Overo products.
+Hi Chanwoo,
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/Makefile                         |  2 +
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi | 57 ++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-gallop43.dts         | 38 +++++++++++++++
- arch/arm/boot/dts/omap3-overo-storm-gallop43.dts   | 38 +++++++++++++++
- 4 files changed, 135 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-gallop43.dts
+On 11.03.2014 08:54, Chanwoo Choi wrote:
+> ARM CPU has its own performance profiling unit(PMU, Perforamnce Monitoring Unit).
+> This patch add PMU dt data to support PMU which count cache hit and miss events.
+>
+> PMU interrput list of Exynos4212
+> - <2 2> : INTG2[2] - PMUIRQ[0] for CPU0
+> - <3 2> : INTG3[2] - PMUIRQ[1] for CPU1
+>
+> PMU interrput list of Exynos4412
+> - <2 2> : INTG2[2], PMUIRQ[0] for CPU0
+> - <3 2> : INTG3[2], PMUIRQ[1] for CPU1
+> - <18 2> : INTG18[2], PMUIRQ[2] : CPU2
+> - <19 2> : INTG19[2], PMUIRQ[3] : CPU3
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4x12.dtsi | 6 ++++++
+>   1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 98d508d..bd7821b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -209,6 +209,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-n900.dtb \
- 	omap3-n9.dtb \
- 	omap3-n950.dtb \
-+	omap3-overo-gallop43.dtb \
-+	omap3-overo-storm-gallop43.dtb \
- 	omap3-overo-palo43.dtb \
- 	omap3-overo-storm-palo43.dtb \
- 	omap3-overo-tobi.dtb \
-diff --git a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-new file mode 100644
-index 0000000..5e848c2
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Gallop43 expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+#include "omap3-overo-common-peripherals.dtsi"
-+
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins>;
-+		heartbeat {
-+			label = "overo:red:gpio21";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;		/* gpio_21 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+		gpio22 {
-+			label = "overo:blue:gpio22";
-+			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;		/* gpio_22 */
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&button_pins>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		button0 at 23 {
-+			label = "button0";
-+			linux,code = <BTN_0>;
-+			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;		/* gpio_23 */
-+			gpio-key,wakeup;
-+		};
-+		button1 at 14 {
-+			label = "button1";
-+			linux,code = <BTN_1>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;		/* gpio_14 */
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
-+
-+&usbhshost {
-+	status = "disabled";
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-gallop43.dts b/arch/arm/boot/dts/omap3-overo-gallop43.dts
-new file mode 100644
-index 0000000..241f5c1
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-gallop43.dts
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Gallop43 expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-overo.dtsi"
-+#include "omap3-overo-gallop43-common.dtsi"
-+
-+/ {
-+	model = "OMAP35xx Gumstix Overo on Gallop43";
-+	compatible = "gumstix,omap3-overo-gallop43", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
-+};
-+
-+&omap3_pmx_core2 {
-+	led_pins: pinmux_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3430_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
-+			OMAP3430_CORE2_IOPAD(0x25ec, PIN_OUTPUT | MUX_MODE4)	/* etk_d8.gpio_22 */
-+		>;
-+	};
-+
-+	button_pins: pinmux_button_pins {
-+		pinctrl-single,pins = <
-+			OMAP3430_CORE2_IOPAD(0x25ee, PIN_INPUT | MUX_MODE4)	/* etk_d9.gpio_23 */
-+			OMAP3430_CORE2_IOPAD(0x25dc, PIN_INPUT | MUX_MODE4)	/* etk_d0.gpio_14 */
-+		>;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-storm-gallop43.dts b/arch/arm/boot/dts/omap3-overo-storm-gallop43.dts
-new file mode 100644
-index 0000000..a1b57e0
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-storm-gallop43.dts
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Gallop43 expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-overo-storm.dtsi"
-+#include "omap3-overo-gallop43-common.dtsi"
-+
-+/ {
-+	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Gallop43";
-+	compatible = "gumstix,omap3-overo-gallop43", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
-+};
-+
-+&omap3_pmx_core2 {
-+	led_pins: pinmux_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
-+			OMAP3630_CORE2_IOPAD(0x25ec, PIN_OUTPUT | MUX_MODE4)	/* etk_d8.gpio_22 */
-+		>;
-+	};
-+
-+	button_pins: pinmux_button_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25ee, PIN_INPUT | MUX_MODE4)	/* etk_d9.gpio_23 */
-+			OMAP3630_CORE2_IOPAD(0x25dc, PIN_INPUT | MUX_MODE4)	/* etk_d0.gpio_14 */
-+		>;
-+	};
-+};
-+
--- 
-1.8.3.2
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
