@@ -1,41 +1,59 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 11 Mar 2014 22:48:22 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIEFSTTogZHRzOiBpbXgyNS1wZGs6IEFkZCBhdWRp?=
- =?UTF-8?B?byBzdXBwb3J0?=
-In-Reply-To: <1394562247-14898-2-git-send-email-fabio.estevam@freescale.com>
-References: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
- <1394562247-14898-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1394563702.163280550@f196.i.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Mar 2014 19:51:58 +0100
+Subject: [PATCH] ARM: cache-tauros2: remove ARMv6 code
+Message-ID: <1589565.fmu2VlFkhj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????, 11 ????? 2014, 15:24 -03:00 ?? Fabio Estevam <fabio.estevam@freescale.com>:
-> mx25pdk has a sgtl5000 codec connected to the I2C1 port.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx25-pdk.dts | 76 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-> index 7a6d21f..ca3fea5 100644
-> --- a/arch/arm/boot/dts/imx25-pdk.dts
-> +++ b/arch/arm/boot/dts/imx25-pdk.dts
-> @@ -34,9 +34,48 @@
->  			gpio = <&gpio2 3 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_2p5v: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "2P5V";
-> +			regulator-min-microvolt = <2500000>;
-> +			regulator-max-microvolt = <2500000>;
-> +			regulator-always-on;
+When building a kernel with support for both ARMv6 and ARMv7 but
+no MMU, the call from tauros2_internal_init to adjust_cr causes
+a link error. While that could probably be resolved, we don't
+actually support cache-tauros2 on ARMv6 any more. All PJ4 CPU
+implementations support both ARMv6 and ARMv7 and we already assume
+that we are using them only in ARMv7 mode.
 
-"regulator-always-on" for fixed regulator without GPIO do nothing.
+Removing the ARMv6 code path reduces the code size and avoids
+the linker error.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
+
+
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 1be0f4e..7964ef2 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -229,33 +229,6 @@ static void __init tauros2_internal_init(unsigned int features)
+ 	}
+ #endif
+ 
+-#ifdef CONFIG_CPU_32v6
+-	/*
+-	 * Check whether this CPU lacks support for the v7 hierarchical
+-	 * cache ops.  (PJ4 is in its v6 personality mode if the MMFR3
+-	 * register indicates no support for the v7 hierarchical cache
+-	 * ops.)
+-	 */
+-	if (cpuid_scheme() && (read_mmfr3() & 0xf) == 0) {
+-		/*
+-		 * When Tauros2 is used in an ARMv6 system, the L2
+-		 * enable bit is in the ARMv6 ARM-mandated position
+-		 * (bit [26] of the System Control Register).
+-		 */
+-		if (!(get_cr() & 0x04000000)) {
+-			printk(KERN_INFO "Tauros2: Enabling L2 cache.\n");
+-			adjust_cr(0x04000000, 0x04000000);
+-		}
+-
+-		mode = "ARMv6";
+-		outer_cache.inv_range = tauros2_inv_range;
+-		outer_cache.clean_range = tauros2_clean_range;
+-		outer_cache.flush_range = tauros2_flush_range;
+-		outer_cache.disable = tauros2_disable;
+-		outer_cache.resume = tauros2_resume;
+-	}
+-#endif
+-
+ #ifdef CONFIG_CPU_32v7
+ 	/*
+ 	 * Check whether this CPU has support for the v7 hierarchical
