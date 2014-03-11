@@ -1,68 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Mar 2014 21:27:29 +0800
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140311034607.GA26502@S2101-09.ap.freescale.net>
- <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140311132727.GB26502@S2101-09.ap.freescale.net>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 11 Mar 2014 14:27:12 +0100
+Subject: [PATCH 2/6] sched: rework of sched_domain topology definition
+In-Reply-To: <20140311103119.GW9987@twins.programming.kicks-ass.net>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <1394003906-11630-3-git-send-email-vincent.guittot@linaro.org>
+ <53175A3C.8010100@arm.com>
+ <CAKfTPtC1_t78hvOw9u-t1BqUZj_dO3WFYp2OjX=RFZP-A7zSbg@mail.gmail.com>
+ <20140311103119.GW9987@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtDHfXxheXBoPeAxMGROroHa7YrW7y_RCB9nSoKCeTa66w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 12:42:08PM +0100, Philipp Zabel wrote:
-> Hi Shawn,
-> 
-> Am Dienstag, den 11.03.2014, 11:46 +0800 schrieb Shawn Guo:
-> > On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
-> > > Hi,
-> > > 
-> > > this latest version of the imx-drm DT binding patches applies
-> > > on top of staging-next and also depends on the OF graph binding
-> > > patchset that moves the v4l2_of helpers to drivers/of.
-> > > Currently, the two patchsets are also available at:
-> > >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
-> > >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
-> > 
-> > Hi Philipp,
-> > 
-> > I just came across a couple problems when testing the series on
-> > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
-> > using Russell's branch below, which I believe has all the pieces put
-> > together.
-> > 
-> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
-> > 
-> > - When I enable HDMI and LVDS support in both kernel build and device
-> >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
-> > 
-> > - When I enable HDMI and LVDS support in kernel build but only LVDS in
-> >   device tree (keep HDMI disabled in device tree by not changing
-> >   'status' of HDMI node to 'okay'), LVDS does not even work.  In this
-> >   case, it seems that the binding of display-subsystem does not succeed.
-> 
-> Can you check if you get the bound messages from
-> drivers/base/component.c:
-> 
-> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
-> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
-> imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
-> 
-> I have tried this branch with a Phytec phyFLEX i.MX6S on PBAB01
-> baseboard with EDT 800x480 LVDS panel, and it seems to work.
-> The check in drivers/staging/imx-drm/imx-drm-core.c:675 should make sure
-> that unavailable (status="disabled") devices are just skipped.
+On 11 March 2014 11:31, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Mar 06, 2014 at 04:32:35PM +0800, Vincent Guittot wrote:
+>> > Never got the new name DIE for CPU? Might confuse people when they use
+>> > /proc/sys/kernel/sched_domain/cpuX/domainY/name or sched_domain_debug_one().
+>>
+>> In fact, CPU is also confusing because it's used for different things.
+>> But if it makes things even more confusing, i can come back to CPU
+>
+> Yeah, not sure DIE is the right thing either; because there's multi-die
+> packages that get classified under CPU :-)
+>
+> Take for example the Core 2 Quad, which was 2 dual core dies glued
+> together in a single package.
+>
+> There's also the AMD bulldozer which glued two dies into a single
+> package; but for those its not a problem because each die is a separate
+> numa node, so there DIE would actually be the correct term and PACKAGE
+> would be wrong.
+>
+> So while CPU sucks, I'm not sure we can come up with anything that's
+> actually correct. That said; we could try for something less wrong than
+> CPU :-)
 
-Sorry, Philipp.  The setup in my report is incorrect.  The correct setup
-to see this issue consists of:
+OK
 
-1) build a kernel without HDMI support, i.e. !CONFIG_DRM_IMX_HDMI
+Dietmar,
 
-2) enable HDMI device in DT, i.e. adding the lines below in board dts.
+Have you got another naming that DIE that could suit better ?
+otherwise i will keep it
 
-	&hdmi {
-	       status = "okay";
-	};
+Vincent
 
-Sorry for the confusion.
-
-Shawn
+>
+> I'm not sure there are a lot of people who see/know the names of these
+> domains to be bothered by a change in them; it might be limited to just
+> us for all I know.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
