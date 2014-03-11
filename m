@@ -1,80 +1,133 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 11 Mar 2014 15:24:06 -0300
-Subject: [PATCH 1/2] ARM: mx25: Add CLKO support
-Message-ID: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 11 Mar 2014 15:24:07 -0300
+Subject: [PATCH 2/2] ARM: dts: imx25-pdk: Add audio support
+In-Reply-To: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
+References: <1394562247-14898-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1394562247-14898-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLKO support is a clock output on mx25 which can output many of the internal 
-clock sources. It is useful for debugging purpose or also for driving the 
-audio codec for example.
+mx25pdk has a sgtl5000 codec connected to the I2C1 port.
+
+Add support for it.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- Documentation/devicetree/bindings/clock/imx25-clock.txt |  3 +++
- arch/arm/mach-imx/clk-imx25.c                           | 15 ++++++++++++++-
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx25-pdk.dts | 76 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx25-clock.txt b/Documentation/devicetree/bindings/clock/imx25-clock.txt
-index db4f2f0..ceaf3134 100644
---- a/Documentation/devicetree/bindings/clock/imx25-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx25-clock.txt
-@@ -139,6 +139,9 @@ clocks and IDs.
- 	uart5_ipg		124
- 	reserved		125
- 	wdt_ipg			126
-+	cko_div			127
-+	cko_sel			128
-+	clo			129
- 
- Examples:
- 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index dc36e6c..2416bec 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -62,6 +62,10 @@ static struct clk_onecell_data clk_data;
- 
- static const char *cpu_sel_clks[] = { "mpll", "mpll_cpu_3_4", };
- static const char *per_sel_clks[] = { "ahb", "upll", };
-+static const char *cko_sel_clks[] = { "dummy", "osc", "cpu", "ahb", 
-+				      "ipg", "dummy", "dummy", "dummy",
-+				      "dummy", "dummy", "per0", "per2",
-+				      "per13", "per14", "usbotg_ahb", "dummy",};
- 
- enum mx25_clks {
- 	dummy, osc, mpll, upll, mpll_cpu_3_4, cpu_sel, cpu, ahb, usb_div, ipg,
-@@ -82,7 +86,7 @@ enum mx25_clks {
- 	pwm2_ipg, pwm3_ipg, pwm4_ipg, rngb_ipg, reserved16, scc_ipg, sdma_ipg,
- 	sim1_ipg, sim2_ipg, slcdc_ipg, spba_ipg, ssi1_ipg, ssi2_ipg, tsc_ipg,
- 	uart1_ipg, uart2_ipg, uart3_ipg, uart4_ipg, uart5_ipg, reserved17,
--	wdt_ipg, clk_max
-+	wdt_ipg, cko_div, cko_sel, cko, clk_max
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index 7a6d21f..ca3fea5 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -34,9 +34,48 @@
+ 			gpio = <&gpio2 3 0>;
+ 			enable-active-high;
+ 		};
++
++		reg_2p5v: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "2P5V";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++	};
++
++	sound {
++		compatible = "fsl,imx25-pdk-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx25-pdk-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
+ 	};
  };
  
- static struct clk *clk[clk_max];
-@@ -117,6 +121,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 	clk[per13_sel] = imx_clk_mux("per13_sel", ccm(CCM_MCR), 13, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
- 	clk[per14_sel] = imx_clk_mux("per14_sel", ccm(CCM_MCR), 14, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
- 	clk[per15_sel] = imx_clk_mux("per15_sel", ccm(CCM_MCR), 15, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	clk[cko_div] = imx_clk_divider("cko_div", "cko_sel", ccm(CCM_MCR), 24, 6);
-+	clk[cko_sel] = imx_clk_mux("cko_sel", ccm(CCM_MCR), 20, 4, cko_sel_clks, ARRAY_SIZE(cko_sel_clks));
-+	clk[cko] = imx_clk_gate("cko", "cko_div", ccm(CCM_MCR),  30);
- 	clk[per0] = imx_clk_divider("per0", "per0_sel", ccm(CCM_PCDR0), 0, 6);
- 	clk[per1] = imx_clk_divider("per1", "per1_sel", ccm(CCM_PCDR0), 8, 6);
- 	clk[per2] = imx_clk_divider("per2", "per2_sel", ccm(CCM_PCDR0), 16, 6);
-@@ -230,6 +237,12 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
- 
-+	/*
-+	 * Let's initially set up CLKO parent as ipg, since this configuration
-+	 * is used on some imx25 board designs to clock the audio codec.
-+	 */
-+	clk_set_parent(clk[cko_sel], clk[ipg]);
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
 +
- 	return 0;
- }
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+@@ -54,8 +93,32 @@
+ 	status = "okay";
+ };
  
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks 129>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
+ &iomuxc {
+ 	imx25-pdk {
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <
++				MX25_PAD_RW__AUD4_TXFS			0xe0
++				MX25_PAD_OE__AUD4_TXC			0xe0
++				MX25_PAD_EB0__AUD4_TXD			0xe0
++				MX25_PAD_EB1__AUD4_RXD			0xe0
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
+@@ -85,6 +148,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
++				MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX25_PAD_UART1_RTS__UART1_RTS		0xe0
+@@ -101,6 +171,12 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	codec-handle = <&codec>;
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
 -- 
 1.8.1.2
