@@ -1,100 +1,62 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 11 Mar 2014 19:14:26 +0530
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CA+mB=1J6Lzy5fZ6+fU0xY5zLyeDtrjtUpJCYdM7eL-tsQ+jUVA@mail.gmail.com>
-References: <1394104717-3100-1-git-send-email-sthokal@xilinx.com>
- <1394104717-3100-3-git-send-email-sthokal@xilinx.com>
- <CABb+yY1y1sOozVU=iAsotWG-q3N=SogjHjZ=iF04CiXF89eeOg@mail.gmail.com>
- <CA+mB=1J6Lzy5fZ6+fU0xY5zLyeDtrjtUpJCYdM7eL-tsQ+jUVA@mail.gmail.com>
-Message-ID: <CAJe_Zhej0-i4uEPvXr3XH_8Qzd7SD-3yvJOp+MW4j+KJ8rt1PQ@mail.gmail.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Tue, 11 Mar 2014 13:48:28 +0000
+Subject: [PATCH 2/6] sched: rework of sched_domain topology definition
+In-Reply-To: <CAKfTPtDHfXxheXBoPeAxMGROroHa7YrW7y_RCB9nSoKCeTa66w@mail.gmail.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <1394003906-11630-3-git-send-email-vincent.guittot@linaro.org>
+ <53175A3C.8010100@arm.com>
+ <CAKfTPtC1_t78hvOw9u-t1BqUZj_dO3WFYp2OjX=RFZP-A7zSbg@mail.gmail.com>
+ <20140311103119.GW9987@twins.programming.kicks-ass.net>
+ <CAKfTPtDHfXxheXBoPeAxMGROroHa7YrW7y_RCB9nSoKCeTa66w@mail.gmail.com>
+Message-ID: <531F142C.2030203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2014 00:00, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> On Mon, Mar 10, 2014 at 9:30 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Thu, Mar 6, 2014 at 7:18 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>
->>> +static struct dma_async_tx_descriptor *
->>> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
->>> +                                struct dma_interleaved_template *xt,
->>> +                                unsigned long flags)
->>> +{
->>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>> +       struct xilinx_vdma_tx_descriptor *desc;
->>> +       struct xilinx_vdma_tx_segment *segment;
->>> +       struct xilinx_vdma_tx_segment *prev = NULL;
->>> +       int i;
->>> +
->>> +       if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM))
->>> +               return NULL;
->>> +
->>> +       if (!xt->numf || !xt->sgl[0].size)
->>> +               return NULL;
->>> +
->>> +       /* Allocate a transaction descriptor. */
->>> +       desc = xilinx_vdma_alloc_tx_descriptor(chan);
->>> +       if (!desc)
->>> +               return NULL;
->>> +
->>> +       dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
->>> +       desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
->>> +       desc->async_tx.cookie = 0;
->>> +       async_tx_ack(&desc->async_tx);
->>> +
->>> +       /* Build the list of transaction segments. */
->>> +       for (i = 0; i < xt->frame_size; i++) {
->>> +               struct xilinx_vdma_desc_hw *hw;
->>> +
->>> +               /* Allocate the link descriptor from DMA pool */
->>> +               segment = xilinx_vdma_alloc_tx_segment(chan);
->>> +               if (!segment)
->>> +                       goto error;
->>> +
->>> +               /* Fill in the hardware descriptor */
->>> +               hw = &segment->hw;
->>> +               hw->vsize = xt->numf;
->>> +               hw->hsize = xt->sgl[0].size;
->>> +               hw->stride = xt->sgl[0].icg <<
->>> +                               XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT;
+On 11/03/14 13:27, Vincent Guittot wrote:
+> On 11 March 2014 11:31, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Thu, Mar 06, 2014 at 04:32:35PM +0800, Vincent Guittot wrote:
+>>>> Never got the new name DIE for CPU? Might confuse people when they use
+>>>> /proc/sys/kernel/sched_domain/cpuX/domainY/name or sched_domain_debug_one().
 >>>
->> It seems the xt->frame_size is (should be?) always going to be 1?
->> If yes, the for-loop isn't needed.
->> If no, you should probably use 'i' as the index to sgl[], and not always 0.
->
-> It can be either
-> '1':  User can queue each segment and submit all the segments at once as a
->       single async tx descriptor.  I am using this for scatter-gather mode of
->       operation where the src_start/dst_start is different for each segment.
-> 'Number of frames':  In this case the driver gets contiguous frame buffer memory
->       and it prepares segments with addresses as multiples of
-> src_start/dst_start.
->
-Quoting you from earlier thread ....
-" In video frame context,
-chunk.size -> hsize
-chunk.icg -> stride
-numf -> vsize
-and frame_size is always 1 as it will have only one chunk in a line. "
- ... which makes sense.
+>>> In fact, CPU is also confusing because it's used for different things.
+>>> But if it makes things even more confusing, i can come back to CPU
+>>
+>> Yeah, not sure DIE is the right thing either; because there's multi-die
+>> packages that get classified under CPU :-)
+>>
+>> Take for example the Core 2 Quad, which was 2 dual core dies glued
+>> together in a single package.
+>>
+>> There's also the AMD bulldozer which glued two dies into a single
+>> package; but for those its not a problem because each die is a separate
+>> numa node, so there DIE would actually be the correct term and PACKAGE
+>> would be wrong.
+>>
+>> So while CPU sucks, I'm not sure we can come up with anything that's
+>> actually correct. That said; we could try for something less wrong than
+>> CPU :-)
+> 
+> OK
+> 
+> Dietmar,
+> 
+> Have you got another naming that DIE that could suit better ?
+> otherwise i will keep it
 
-I hope you realize that, 'frame_size' denotes the number of chunks in
-a frame and 'numf' denotes the number of frames in the transfer
-request. It seems wrong when you assume  vsize:=numf  but
-frame_size>1 ... i.e, each horizontal video line has two or more
-dis-contiguous chunks?   This might work for client drivers written
-specifically for Xilinx AXI Video DMAC but will fail over any other
-controller driver.
+If backward compatibility is not an issue here, keep it.
 
- IMO, xilinx_vdma.c should expect only 1 video frame per
-device_prep_interleaved_dma() call (i.e, vsize=numf and frame_size==1)
-  Let the client driver submit 1/2/.../16 requests before kick
-starting the DMA. Upon  dma_async_tx_descriptor.callback(), the client
-'refills' the frame and re-queues it back. This should work because
-the video-frames' attributes and locations are not going to change
-within a session.
+-- Dietmar
 
-> Please let me know if you see any issues in this implementation.
->
-I am ok if you want the driver upstream now and want to 'fix' it when
-you actually start seeing problems :)
+> 
+> Vincent
+> 
+>>
+>> I'm not sure there are a lot of people who see/know the names of these
+>> domains to be bothered by a change in them; it might be limited to just
+>> us for all I know.
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
