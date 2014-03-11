@@ -1,183 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 08:23:16 +0000
-Subject: [PATCH v6 01/35] mtd: st_spi_fsm: Allocate resources and register
- with MTD framework
-In-Reply-To: <20140309053306.GL31517@norris-Latitude-E6410>
-References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
- <1392735362-1245-2-git-send-email-lee.jones@linaro.org>
- <20140309053306.GL31517@norris-Latitude-E6410>
-Message-ID: <20140311082316.GJ2839@lee--X1>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 11 Mar 2014 16:28:05 +0800
+Subject: SMP Documentation?
+In-Reply-To: <531E1100.6060408@borg.org>
+References: <531A52F3.1010303@borg.org> <531E1100.6060408@borg.org>
+Message-ID: <CAGsJ_4yT6nRCBSPUZJHKhukFubK8XhpuGoR7i8wvw2=o210Lkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a new driver. It's used to communicate with a special type of
-optimised Serial Flash Controller called the FSM. The FSM uses a subset
-of the SPI protocol to communicate with supported NOR-Flash devices.
+Kent,
 
-Acked-by Angus Clark <angus.clark@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+2014-03-11 3:22 GMT+08:00 Kent Borg <kentborg@borg.org>:
+> On 03/07/2014 06:14 PM, I wrote:
+>>
+>> Is there any documentation on the semantics of the SMP ops
+>
+>
+> <crickets>
+>
+> It seems there is not any documentation, and no one has lept forward to
+> write some for little ol' me.
+>
+> But fear not!  I noticed mention the SMP work for rockchip going by on the
+> list...and it looks analogous to what I need to do.  So I am going to start
+> cribbing from that.
 
-Hi Brian,
+you can read CSR codes for marco. we have one
+struct smp_operations sirfsoc_smp_ops __initdata = {
+        .smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,
+        .smp_secondary_init     = sirfsoc_secondary_init,
+        .smp_boot_secondary     = sirfsoc_boot_secondary,
+#ifdef CONFIG_HOTPLUG_CPU
+        .cpu_die                = sirfsoc_cpu_die,
+#endif
+};
 
-Sorry about the previous fixup misses. There were a couple of patches
-which I had failed to squash into the pack. Hopefully the rest of the
-review will go more smoothly.
+in sirfsoc_smp_prepare_cpus, we enable SCU for cache coherence of SMP,
+ sirfsoc_secondary_init() is executed by 2nd core which will clear
+pen_release.
+sirfsoc_boot_secondary is the code for the cpu0 to wake up the 2nd
+core, after waking, the cpu0 will wait for 2nd core to set pen_release
+to -1.
 
-Kind regards,
-Lee
- drivers/mtd/devices/Kconfig      |   8 +++
- drivers/mtd/devices/Makefile     |   1 +
- drivers/mtd/devices/st_spi_fsm.c | 107 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 116 insertions(+)
-
-diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
-index 0128138..1210bc2 100644
---- a/drivers/mtd/devices/Kconfig
-+++ b/drivers/mtd/devices/Kconfig
-@@ -210,6 +210,14 @@ config MTD_DOCG3
- 	  M-Systems and now Sandisk. The support is very experimental,
- 	  and doesn't give access to any write operations.
- 
-+config MTD_ST_SPI_FSM
-+	tristate "ST Microelectronics SPI FSM Serial Flash Controller"
-+	depends on ARM || SH
-+	help
-+	  This provides an MTD device driver for the ST Microelectronics
-+	  SPI Fast Sequence Mode (FSM) Serial Flash Controller and support
-+	  for a subset of connected Serial Flash devices.
-+
- if MTD_DOCG3
- config BCH_CONST_M
- 	default 14
-diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
-index d83bd73..c68868f 100644
---- a/drivers/mtd/devices/Makefile
-+++ b/drivers/mtd/devices/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_MTD_NAND_OMAP_BCH)	+= elm.o
- obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
- obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
- obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
-+obj-$(CONFIG_MTD_ST_SPI_FSM)    += st_spi_fsm.o
- 
- 
- CFLAGS_docg3.o			+= -I$(src)
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-new file mode 100644
-index 0000000..0de9648
---- /dev/null
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -0,0 +1,107 @@
-+/*
-+ * st_spi_fsm.c	- ST Fast Sequence Mode (FSM) Serial Flash Controller
-+ *
-+ * Author: Angus Clark <angus.clark@st.com>
-+ *
-+ * Copyright (C) 2010-2014 STicroelectronics Limited
-+ *
-+ * JEDEC probe based on drivers/mtd/devices/m25p80.c
-+ *
-+ * This code is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/sched.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+
-+struct stfsm {
-+	struct device		*dev;
-+	void __iomem		*base;
-+	struct resource		*region;
-+	struct mtd_info		mtd;
-+	struct mutex		lock;
-+};
-+
-+static int stfsm_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct resource *res;
-+	struct stfsm *fsm;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "No DT found\n");
-+		return -EINVAL;
-+	}
-+
-+	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
-+	if (!fsm)
-+		return -ENOMEM;
-+
-+	fsm->dev = &pdev->dev;
-+
-+	platform_set_drvdata(pdev, fsm);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Resource not found\n");
-+		return -ENODEV;
-+	}
-+
-+	fsm->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fsm->base)) {
-+		dev_err(&pdev->dev,
-+			"Failed to reserve memory region [0x%08x-0x%08x]\n",
-+			res->start, res->end);
-+		return PTR_ERR(fsm->base);
-+	}
-+
-+	mutex_init(&fsm->lock);
-+
-+	fsm->mtd.dev.parent	= &pdev->dev;
-+	fsm->mtd.type		= MTD_NORFLASH;
-+	fsm->mtd.writesize	= 4;
-+	fsm->mtd.writebufsize	= fsm->mtd.writesize;
-+	fsm->mtd.flags		= MTD_CAP_NORFLASH;
-+
-+	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
-+}
-+
-+static int stfsm_remove(struct platform_device *pdev)
-+{
-+	struct stfsm *fsm = platform_get_drvdata(pdev);
-+	int err;
-+
-+	err = mtd_device_unregister(&fsm->mtd);
-+	if (err)
-+		return err;
-+
-+	return 0;
-+}
-+
-+static struct of_device_id stfsm_match[] = {
-+	{ .compatible = "st,spi-fsm", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stfsm_match);
-+
-+static struct platform_driver stfsm_driver = {
-+	.probe		= stfsm_probe,
-+	.remove		= stfsm_remove,
-+	.driver		= {
-+		.name	= "st-spi-fsm",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = stfsm_match,
-+	},
-+};
-+module_platform_driver(stfsm_driver);
-+
-+MODULE_AUTHOR("Angus Clark <angus.clark@st.com>");
-+MODULE_DESCRIPTION("ST SPI FSM driver");
-+MODULE_LICENSE("GPL");
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+>
+> Thanks,
+>
+> -kb, the Kent who, alas, will still probably darken your inbox in the
+> future.
+>
+-barry
