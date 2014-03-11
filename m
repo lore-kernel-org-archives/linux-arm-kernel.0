@@ -1,43 +1,45 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 11 Mar 2014 16:54:52 +0900
-Subject: [PATCH 3/5] ARM: dts: exynos4x12: Add GPS_ALIVE power domain
-In-Reply-To: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
-References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1394524494-30641-4-git-send-email-cw00.choi@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Mar 2014 09:00:12 +0100
+Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
+In-Reply-To: <531EAF8F.2040400@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
+ <20140228155937.GQ21483@n2100.arm.linux.org.uk>
+ <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
+ <CAL_JsqJ00Zr1tMoyR1+qHUhsNoc6Kj6s+nTZTkNTwki9HFHq8g@mail.gmail.com>
+ <531EAF8F.2040400@ti.com>
+Message-ID: <CAMuHMdWqt4M5OEXp8y_DR8UEA8GPxJg99cz-HcmMPQB+h+Rh0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add GPS_ALIVE power domain for Exynos4x12 SoC. GPS_ALIVE power domain
-include GPS_BLK for GPS IP. Exynos SoC used generic power-domain driver to
-control power domain. After completed kernel booting, Exynos power-domain driver
-disable un-used power domain to reduce power-consumption/leak.
+On Tue, Mar 11, 2014 at 7:39 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 10/03/14 23:45, Rob Herring wrote:
+>> I like this proposal over the others. Although, would dual link be a
+>
+> I don't like inferring the information. With the above, you can't find
+> out that the DVI connector has digital and analog support before all the
+> drivers are loaded.
+>
+>> single endpoint or 2 endpoints? How would you differentiate that?
+>
+> Hmm, well endpoints for a single port are exclusive. So it's either a
+> single port and a single endpoint, or two ports and two endpoints. I
+> think dual link has to be single port & endpoint, as the TMDS links need
+> to be driven together as a single bus.
+>
+> And dual-link is not really "two links". DVI dual-link means 1 clock
+> lane and 6 data lanes, compared to 1 clock lane and 3 data lanes for
+> single-link.
 
-If GPS_ALIVE power domain isn't registered to Exynos power-domain driver,
-happen power-leakage because GPS_ALIVE_CONFIGURATION is default power on state.
+What about having a property for the number of data lanes?
 
-- 0x10023D00 : GPS_ALIVE_CONFIGURATION register address
+Gr{oetje,eeting}s,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+                        Geert
 
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 1ec77f6..066eb35 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -41,6 +41,11 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023CA0 0x20>;
- 	};
-+	
-+	pd_gps_alive: gps-alive-power-domain at 10023D00 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x10023D00 0x20>;
-+	};
- 
- 	clock: clock-controller at 10030000 {
- 		compatible = "samsung,exynos4412-clock";
--- 
-1.8.0
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
