@@ -1,36 +1,104 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 10:22:04 +0000
-Subject: [PATCH 3/3] ARM: STi: stih41x: Provide a proper header for this DTSI
- file
-In-Reply-To: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
-References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1394533324-20299-3-git-send-email-lee.jones@linaro.org>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Tue, 11 Mar 2014 10:22:52 +0000
+Subject: [PATCH v4 6/7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <20140311100838.GQ2815@lukather>
+References: <1394462512-11620-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394462512-11620-7-git-send-email-maxime.ripard@free-electrons.com>
+ <1394531574.28803.222.camel@smile.fi.intel.com>
+ <20140311100838.GQ2815@lukather>
+Message-ID: <1394533371.28803.226.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also explicitly include STiH416 Clk bindings instead of relying on
-inheriting them from other DTSI files which we happen to include.
+On Tue, 2014-03-11 at 11:08 +0100, Maxime Ripard wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih41x.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+[]
 
-diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
-index f5b9898..32730e5 100644
---- a/arch/arm/boot/dts/stih41x.dtsi
-+++ b/arch/arm/boot/dts/stih41x.dtsi
-@@ -1,3 +1,11 @@
-+/*
-+ * Copyright (C) 2014 STMicroelectronics Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+#include "stih416-clock.dtsi"
- / {
- 	#address-cells = <1>;
- 	#size-cells = <1>;
+> > > +	spin_lock_irq(&sdev->lock);
+> > > +	for (pchan_idx = 0; pchan_idx < NR_MAX_CHANNELS; pchan_idx++) {
+> > > +		pchan = &sdev->pchans[pchan_idx];
+> > > +
+> > > +		if (pchan->vchan == NULL && !list_empty(&sdev->pending)) {
+> > 
+> > !pchan->vchan && ...
+> 
+> Ok.
+> 
+> > And you may decrease indentation level here if you use negative
+> > condition.
+> 
+> Hmmm, I'm not following you here. What do you mean?
+
+for () {
+...
+if (!(your current condition))
+ continue;
+... (do something else with decreased indentation level)
+}
+
+> > > +			vchan = list_first_entry(&sdev->pending,
+> > > +						 struct sun6i_vchan, node);
+> > > +
+> > > +			/* Remove from pending channels */
+> > > +			list_del_init(&vchan->node);
+> > > +			pchan_alloc |= BIT(pchan_idx);
+> > > +
+> > > +			/* Mark this channel allocated */
+> > > +			pchan->vchan = vchan;
+> > > +			vchan->phy = pchan;
+> > > +			dev_dbg(sdev->slave.dev, "pchan %u: alloc vchan %p\n",
+> > > +				pchan->idx, &vchan->vc);
+> > > +		}
+> > > +	}
+> > > +	spin_unlock_irq(&sdev->lock);
+> > > +
+> > > +	for (pchan_idx = 0; pchan_idx < NR_MAX_CHANNELS; pchan_idx++) {
+> > > +		if (pchan_alloc & BIT(pchan_idx)) {
+> > 
+> > Ditto.
+
+Same here.
+
+[]
+
+> > > +#ifdef DEBUG
+> > > +	dev_dbg(chan2dev(chan), "First: %pad\n", &txd->p_lli);
+> > 
+> > dev_dbg is aware of DEBUG. So, please, remove that #ifdef at all.
+> 
+> Yep, but the line just below isn't.
+> 
+> The ifdef here is not really to prevent the call to dev_dbg, but rather...
+> 
+> > > +	for (prev = txd->v_lli; prev != NULL; prev = prev->v_lli_next)
+> 
+> ... this.
+
+It doesn't matter since implementation of sun6i_dma_dump_lli is (and
+actually should be) aware of DEBUG already, because it's dev_dbg based.
+
+> > 
+> > You may remove '!= NULL' part.
+> 
+> Ok.
+> 
+> > > +		sun6i_dma_dump_lli(vchan, prev);
+> > > +#endif
+
+
+
+
 -- 
-1.8.3.2
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
