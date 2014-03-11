@@ -1,43 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 13:25:34 -0700
-Subject: ARM: mach-bcm dt updates for 3.15
-In-Reply-To: <20140306063605.GA30045@beef>
-References: <20140306063605.GA30045@beef>
-Message-ID: <20140311202534.GH31877@quad.lixom.net>
+Date: Tue, 11 Mar 2014 13:35:38 -0700
+Subject: [GIT PULL] omap device tree changes for v3.15, part 2
+In-Reply-To: <20140307175835.GA23749@atomide.com>
+References: <20140307175835.GA23749@atomide.com>
+Message-ID: <20140311203314.GL31877@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 01:36:05AM -0500, Matt Porter wrote:
-> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+On Fri, Mar 07, 2014 at 09:58:36AM -0800, Tony Lindgren wrote:
+> The following changes since commit f777ba1780584b100ab9664cc06d04f3bb273a84:
 > 
->   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+>   Merge tag 'for_3.15/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.15/dt (2014-03-02 14:22:03 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/dt
 > 
-> for you to fetch changes up to a33705ee8a8af40bbaa379e4567ca451c38fc0d6:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-part2
 > 
->   ARM: dts: remove bcm11351-brt.dts (2014-03-05 01:28:56 -0500)
+> for you to fetch changes up to 18c49af3ee9e32a535413a949672bea726699f04:
+> 
+>   ARM: dts: am335x-evmsk: enable dual_emac mode (2014-03-05 11:53:36 -0800)
 > 
 > ----------------------------------------------------------------
-> ARM: mach-bcm dt updates for 3.15
-> 
-> - add BCM4708 dt support
-> - remove bcm11351-brt
-> - bcm281xx common clock support
+> Part two of omap device tree changes enabling driver features
+> in the dts files.
 
-Merged, but I thought you said that the driver peices of common clock
-were a prereq for the DT changes? I didn't see this branch based on the
-driver changes. The only way to guarantee that the driver changes are
-applied before the DT ones are at all times is to base the two branches
-on each other (I.e.  otherwise you might land on a location where only
-the DT change is applied when you bisect).
 
-This isn't super-critical in this case; the only person subjected to
-this problem right now is likely you, so I've merged it anyway. Keep
-it in mind in the future though -- it's one of the quirks of git that
-takes a while to get used to.
-
+Merged, thanks.
 
 -Olof
