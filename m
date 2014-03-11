@@ -1,40 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Mar 2014 11:43:39 +0100
-Subject: [PATCH v6 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140311094641.GA27064@e106497-lin.cambridge.arm.com>
-References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
- <4254618.BlpDUOctDb@wuerfel>
- <20140311094641.GA27064@e106497-lin.cambridge.arm.com>
-Message-ID: <2664356.LLPHGvlG5M@wuerfel>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 11 Mar 2014 11:46:43 +0100
+Subject: [PATCH v2 0/7] tty: xuartps: Rebranding + DT documentation
+In-Reply-To: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <531EE993.80400@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 March 2014 09:46:41 Liviu Dudau wrote:
-> On Tue, Mar 11, 2014 at 06:50:24AM +0000, Arnd Bergmann wrote:
-> > On Monday 10 March 2014 21:56:00 Liviu Dudau wrote:
-> > > 
-> > > PCI_IOBASE is always defined. See the discussion with Russell on this subject.
-> > > 
-> > > include/asm-generic/io.h has at line 118:
-> > > 
-> > > #ifndef PCI_IOBASE
-> > > #define PCI_IOBASE ((void __iomem *) 0)
-> > > #endif
-> > 
-> > That is only defined for those that use asm-generic/pci.h, which most architectures
-> > don't.
+On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
+> Hi,
 > 
-> I think it is defined for anyone that #includes <asm-generic/io.h>. There is no other
-> #ifdef around that.
+> this series rebrands the Xilinx PS UART driver as Cadence UART and
+> documents its DT bindings (+ some clean up along the way).
 > 
+> The rebranding goes as far as reasonable. Things like file name, kconfig
+> symbols and other things with user space impact are left as is. Please
+> refer to the discussion in the RFC threads[1-2] for more details.
+> 
+> Similar the DT binding has been extended. In addition to the new and
+> preferred Cadence binding, the current xuartps binding is maintained.
+> Though, only the Cadence names for clock-names are documented.
+> 
+> References:
+>  [1]  https://lkml.org/lkml/2014/3/4/405
+>  [2]  https://lkml.org/lkml/2014/3/7/450
+> 
+> v2:
+>  - no changes regarding the patches
+>  - fixed (I sincerely hope) email recipients
+> 
+> Changes from the latest RFC:
+>  - squashed function/symbol renaming into 'tty: xuartps: Rebrand driver
+>    as Cadence UART'
+>  - Revised the commit message of 'tty: xuartps: Don't write IRQ disable
+>    register to enable interrupts' (was 'tty: xuartps: Remove bogus
+>    comment and register write'
 
-My mistake, I meant to write asm-generic/io.h.
+One more thing. I was thinking this is based on my 3 patches I have
+already sent to mainline. But as I see they are not applied yet.
 
-On a related note, I would actually prefer to get rid of this PCI_IOBASE
-default and move it into the architectures that really want it like this.
-The default when PCI_IOBASE is not set IMHO should be to also not provide
-inb/outb and ioport_map() helpers, but we need a little more infrastructure
-to actually make the kernel build in all valid configuration when we remove them.
+https://lkml.org/lkml/2014/1/21/107
+https://lkml.org/lkml/2014/1/21/101
+http://www.spinics.net/lists/arm-kernel/msg302796.html
 
-	Arnd
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/39360ad4/attachment.sig>
