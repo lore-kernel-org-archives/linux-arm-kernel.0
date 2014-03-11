@@ -1,45 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Mar 2014 16:51:00 +0100
-Subject: [PATCH] irqchip: sun4i: Fix irq 0 not working
-Message-ID: <1394553060-30298-1-git-send-email-hdegoede@redhat.com>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 11 Mar 2014 08:51:37 -0700
+Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC AHCI SATA host
+ controller DTS entries
+In-Reply-To: <20140311124943.GD11477@htj.dyndns.org>
+References: <1394059489-30706-1-git-send-email-lho@apm.com>
+ <1394059489-30706-2-git-send-email-lho@apm.com>
+ <1394059489-30706-3-git-send-email-lho@apm.com>
+ <1394059489-30706-4-git-send-email-lho@apm.com>
+ <20140311124943.GD11477@htj.dyndns.org>
+Message-ID: <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 2 things:
-1) irq 0 pending
-2) no more irqs pending
+Hi Tejun,
 
-So we must loop always atleast once to make irq 0 work, otherwise irq 0
-will never get serviced and we end up with a hard hang because
-sun4i_handle_irq gets re-entered constantly.
+>> This patch adds APM X-Gene SoC AHCI SATA host controller DTS entries.
+>
+> I pulled the phy branch into libata/for-3.15 but this patch fails to
+> apply.  Can you please regenerate the patches which need to be applied
+> on top of libata/for-3.15.
+>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/irqchip/irq-sun4i.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+Kishon didn't applied the PHY DTS patch. Did you first apply the PHY
+DTS patch? We agreed that you will first pull in the PHY DTS as well
+as the host controller patches. I don't see any reason why it wouldn't
+apply if both DTS is applied. I will pull libata/for-3.15 and check
+out.
 
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index a5438d8..3761bf1 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -140,10 +140,16 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
- {
- 	u32 irq, hwirq;
- 
-+	/*
-+	 * hwirq == 0 can mean one of 2 things:
-+	 * 1) irq 0 pending
-+	 * 2) no more irqs pending
-+	 * So loop always atleast once to make irq 0 work.
-+	 */
- 	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
--	while (hwirq != 0) {
-+	do {
- 		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
- 		handle_IRQ(irq, regs);
- 		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
--	}
-+	} while (hwirq != 0);
- }
--- 
-1.9.0
+-Loc
