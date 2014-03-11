@@ -1,37 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 11 Mar 2014 11:31:19 +0100
-Subject: [PATCH 2/6] sched: rework of sched_domain topology definition
-In-Reply-To: <CAKfTPtC1_t78hvOw9u-t1BqUZj_dO3WFYp2OjX=RFZP-A7zSbg@mail.gmail.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <1394003906-11630-3-git-send-email-vincent.guittot@linaro.org>
- <53175A3C.8010100@arm.com>
- <CAKfTPtC1_t78hvOw9u-t1BqUZj_dO3WFYp2OjX=RFZP-A7zSbg@mail.gmail.com>
-Message-ID: <20140311103119.GW9987@twins.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Mar 2014 11:43:39 +0100
+Subject: [PATCH v6 6/6] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140311094641.GA27064@e106497-lin.cambridge.arm.com>
+References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
+ <4254618.BlpDUOctDb@wuerfel>
+ <20140311094641.GA27064@e106497-lin.cambridge.arm.com>
+Message-ID: <2664356.LLPHGvlG5M@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 04:32:35PM +0800, Vincent Guittot wrote:
-> > Never got the new name DIE for CPU? Might confuse people when they use
-> > /proc/sys/kernel/sched_domain/cpuX/domainY/name or sched_domain_debug_one().
+On Tuesday 11 March 2014 09:46:41 Liviu Dudau wrote:
+> On Tue, Mar 11, 2014 at 06:50:24AM +0000, Arnd Bergmann wrote:
+> > On Monday 10 March 2014 21:56:00 Liviu Dudau wrote:
+> > > 
+> > > PCI_IOBASE is always defined. See the discussion with Russell on this subject.
+> > > 
+> > > include/asm-generic/io.h has at line 118:
+> > > 
+> > > #ifndef PCI_IOBASE
+> > > #define PCI_IOBASE ((void __iomem *) 0)
+> > > #endif
+> > 
+> > That is only defined for those that use asm-generic/pci.h, which most architectures
+> > don't.
 > 
-> In fact, CPU is also confusing because it's used for different things.
-> But if it makes things even more confusing, i can come back to CPU
+> I think it is defined for anyone that #includes <asm-generic/io.h>. There is no other
+> #ifdef around that.
+> 
 
-Yeah, not sure DIE is the right thing either; because there's multi-die
-packages that get classified under CPU :-)
+My mistake, I meant to write asm-generic/io.h.
 
-Take for example the Core 2 Quad, which was 2 dual core dies glued
-together in a single package.
+On a related note, I would actually prefer to get rid of this PCI_IOBASE
+default and move it into the architectures that really want it like this.
+The default when PCI_IOBASE is not set IMHO should be to also not provide
+inb/outb and ioport_map() helpers, but we need a little more infrastructure
+to actually make the kernel build in all valid configuration when we remove them.
 
-There's also the AMD bulldozer which glued two dies into a single
-package; but for those its not a problem because each die is a separate
-numa node, so there DIE would actually be the correct term and PACKAGE
-would be wrong.
-
-So while CPU sucks, I'm not sure we can come up with anything that's
-actually correct. That said; we could try for something less wrong than
-CPU :-)
-
-I'm not sure there are a lot of people who see/know the names of these
-domains to be bothered by a change in them; it might be limited to just
-us for all I know.
+	Arnd
