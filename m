@@ -1,111 +1,41 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 11 Mar 2014 11:54:59 +0100
-Subject: [PATCH v2][ 3/8] usb: chipidea: usbmisc: Add USB Host support for
- i.MX25/i.MX35 CPUs
+Date: Tue, 11 Mar 2014 11:55:01 +0100
+Subject: [PATCH v2][ 5/8] ARM: dts: mbimxsd25 baseboard: Add USB support
 In-Reply-To: <1394535304-10240-1-git-send-email-denis@eukrea.com>
 References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394535304-10240-3-git-send-email-denis@eukrea.com>
+Message-ID: <1394535304-10240-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 Changelog v1->v2:
-- converted two remaining defines to BIT()
-- Removed a variable declaration that was not used in usbmisc_imx25_init
+- With the clock fix patches, the usb gadget also work.
+  So I've set the otg port to otg instead of host.
 ---
- drivers/usb/chipidea/usbmisc_imx.c |   58 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index cd061ab..3523c09 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -21,6 +21,26 @@
- #define MX25_USB_PHY_CTRL_OFFSET	0x08
- #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
- 
-+#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
-+#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
-+#define MXC_EHCI_INTERFACE_MASK		(0xf)
-+
-+#define MX25_OTG_SIC_SHIFT		29
-+#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
-+#define MX25_OTG_PM_BIT			BIT(24)
-+#define MX25_OTG_PP_BIT			BIT(11)
-+#define MX25_OTG_OCPOL_BIT		BIT(3)
-+
-+#define MX25_H1_SIC_SHIFT		21
-+#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
-+#define MX25_H1_PP_BIT			BIT(18)
-+#define MX25_H1_PM_BIT			BIT(16)
-+#define MX25_H1_IPPUE_UP_BIT		BIT(7)
-+#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
-+#define MX25_H1_TLL_BIT			BIT(5)
-+#define MX25_H1_USBTE_BIT		BIT(4)
-+#define MX25_H1_OCPOL_BIT		BIT(2)
-+
- #define MX27_H1_PM_BIT			BIT(8)
- #define MX27_H2_PM_BIT			BIT(16)
- #define MX27_OTG_PM_BIT			BIT(24)
-@@ -50,6 +70,39 @@ struct imx_usbmisc {
- 
- static struct imx_usbmisc *usbmisc;
- 
-+static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
-+{
-+	unsigned long flags;
-+	u32 val = 0;
-+
-+	if (data->index > 1)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&usbmisc->lock, flags);
-+	switch (data->index) {
-+	case 0:
-+		val = readl(usbmisc->base);
-+		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
-+		val |= (MXC_EHCI_INTERFACE_DIFF_UNI & MXC_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-+		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
-+		writel(val, usbmisc->base);
-+		break;
-+	case 1:
-+		val = readl(usbmisc->base);
-+		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
-+		val |= (MXC_EHCI_INTERFACE_SINGLE_UNI & MXC_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
-+		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
-+			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
-+
-+		writel(val, usbmisc->base);
-+
-+		break;
-+	}
-+	spin_unlock_irqrestore(&usbmisc->lock, flags);
-+
-+	return 0;
-+}
-+
- static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- {
- 	void __iomem *reg;
-@@ -159,6 +212,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- }
- 
- static const struct usbmisc_ops imx25_usbmisc_ops = {
-+	.init = usbmisc_imx25_init,
- 	.post = usbmisc_imx25_post,
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index 62fb3da..ad12da3 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+@@ -172,3 +172,16 @@
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
  };
- 
-@@ -200,6 +254,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 		.data = &imx25_usbmisc_ops,
- 	},
- 	{
-+		.compatible = "fsl,imx35-usbmisc",
-+		.data = &imx25_usbmisc_ops,
-+	},
-+	{
- 		.compatible = "fsl,imx27-usbmisc",
- 		.data = &imx27_usbmisc_ops,
- 	},
++
++&usbhost1 {
++	phy_type = "serial";
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbotg {
++	phy_type = "utmi";
++	dr_mode = "otg";
++	external-vbus-divider;
++	status = "okay";
++};
 -- 
 1.7.9.5
