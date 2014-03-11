@@ -1,149 +1,268 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 11 Mar 2014 09:40:01 +0800
-Subject: [PATCH 2/3] clk: hip04: add clock driver
+Date: Tue, 11 Mar 2014 09:40:02 +0800
+Subject: [PATCH 3/3] clk: hisi: remove static variable
 In-Reply-To: <1394502002-31058-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1394502002-31058-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1394502002-31058-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1394502002-31058-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now only fixed rate clocks are appended into the clock driver.
+Remove the static variable. So these common clock register helper could
+be used in more SoCs.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/clk/Makefile                    |  1 +
- drivers/clk/hisilicon/Makefile          |  5 ++-
- drivers/clk/hisilicon/clk-hip04.c       | 54 +++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/hip04-clock.h | 35 +++++++++++++++++++++
- 4 files changed, 94 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/hisilicon/clk-hip04.c
- create mode 100644 include/dt-bindings/clock/hip04-clock.h
+ drivers/clk/hisilicon/clk-hi3620.c | 25 +++++----------
+ drivers/clk/hisilicon/clk-hip04.c  |  8 +++--
+ drivers/clk/hisilicon/clk.c        | 64 ++++++++++++++++++++++++++++----------
+ drivers/clk/hisilicon/clk.h        | 17 ++++++----
+ 4 files changed, 72 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 88af4a3..da39c62 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
- obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
- obj-$(CONFIG_ARCH_BCM_MOBILE)		+= bcm/
- obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
-+obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
- obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)			+= mmp/
-diff --git a/drivers/clk/hisilicon/Makefile b/drivers/clk/hisilicon/Makefile
-index f3f11c4..352269b 100644
---- a/drivers/clk/hisilicon/Makefile
-+++ b/drivers/clk/hisilicon/Makefile
-@@ -2,4 +2,7 @@
- # Hisilicon Clock specific Makefile
- #
+diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+index 38faa469..233eba2 100644
+--- a/drivers/clk/hisilicon/clk-hi3620.c
++++ b/drivers/clk/hisilicon/clk-hi3620.c
+@@ -210,34 +210,25 @@ static struct hisi_gate_clock hi3620_seperated_gate_clks[] __initdata = {
  
--obj-y	+= clk.o clkgate-separated.o clk-hi3620.o clk-hi3716.o
-+obj-y	+= clk.o clkgate-separated.o
-+
-+obj-$(CONFIG_ARCH_HI3xxx)	+= clk-hi3620.o clk-hi3716.o
-+obj-$(CONFIG_ARCH_HIP04)	+= clk-hip04.o
+ static void __init hi3620_clk_init(struct device_node *np)
+ {
+-	void __iomem *base;
++	struct hisi_clock_data *clk_data;
+ 
+-	if (np) {
+-		base = of_iomap(np, 0);
+-		if (!base) {
+-			pr_err("failed to map Hi3620 clock registers\n");
+-			return;
+-		}
+-	} else {
+-		pr_err("failed to find Hi3620 clock node in DTS\n");
++	clk_data = hisi_clk_init(np, HI3620_NR_CLKS);
++	if (!clk_data)
+ 		return;
+-	}
+-
+-	hisi_clk_init(np, HI3620_NR_CLKS);
+ 
+ 	hisi_clk_register_fixed_rate(hi3620_fixed_rate_clks,
+ 				     ARRAY_SIZE(hi3620_fixed_rate_clks),
+-				     base);
++				     clk_data);
+ 	hisi_clk_register_fixed_factor(hi3620_fixed_factor_clks,
+ 				       ARRAY_SIZE(hi3620_fixed_factor_clks),
+-				       base);
++				       clk_data);
+ 	hisi_clk_register_mux(hi3620_mux_clks, ARRAY_SIZE(hi3620_mux_clks),
+-			      base);
++			      clk_data);
+ 	hisi_clk_register_divider(hi3620_div_clks, ARRAY_SIZE(hi3620_div_clks),
+-				  base);
++				  clk_data);
+ 	hisi_clk_register_gate_sep(hi3620_seperated_gate_clks,
+ 				   ARRAY_SIZE(hi3620_seperated_gate_clks),
+-				   base);
++				   clk_data);
+ }
+ CLK_OF_DECLARE(hi3620_clk, "hisilicon,hi3620-clock", hi3620_clk_init);
+ 
 diff --git a/drivers/clk/hisilicon/clk-hip04.c b/drivers/clk/hisilicon/clk-hip04.c
-new file mode 100644
-index 0000000..bdc6cd0
---- /dev/null
+index bdc6cd0..132b57a 100644
+--- a/drivers/clk/hisilicon/clk-hip04.c
 +++ b/drivers/clk/hisilicon/clk-hip04.c
-@@ -0,0 +1,54 @@
-+/*
-+ * Hisilicon HiP04 clock driver
-+ *
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
-+ * Copyright (c) 2013-2014 Linaro Limited.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ *
-+ */
+@@ -45,10 +45,14 @@ static struct hisi_fixed_rate_clock hip04_fixed_rate_clks[] __initdata = {
+ 
+ static void __init hip04_clk_init(struct device_node *np)
+ {
+-	hisi_clk_init(np, HIP04_NR_CLKS);
++	struct hisi_clock_data *clk_data;
 +
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/slab.h>
-+#include <linux/clk.h>
++	clk_data = hisi_clk_init(np, HIP04_NR_CLKS);
++	if (!clk_data)
++		return;
+ 
+ 	hisi_clk_register_fixed_rate(hip04_fixed_rate_clks,
+ 				     ARRAY_SIZE(hip04_fixed_rate_clks),
+-				     NULL);
++				     clk_data);
+ }
+ CLK_OF_DECLARE(hip04_clk, "hisilicon,hip04-clock", hip04_clk_init);
+diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
+index 18fc21f..276f672 100644
+--- a/drivers/clk/hisilicon/clk.c
++++ b/drivers/clk/hisilicon/clk.c
+@@ -37,23 +37,49 @@
+ #include "clk.h"
+ 
+ static DEFINE_SPINLOCK(hisi_clk_lock);
+-static struct clk **clk_table;
+-static struct clk_onecell_data clk_data;
+ 
+-void __init hisi_clk_init(struct device_node *np, int nr_clks)
++struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
++					     int nr_clks)
+ {
++	struct hisi_clock_data *clk_data;
++	struct clk **clk_table;
++	void __iomem *base;
 +
-+#include <dt-bindings/clock/hip04-clock.h>
++	if (np) {
++		base = of_iomap(np, 0);
++		if (!base) {
++			pr_err("failed to map Hisilicon clock registers\n");
++			goto err;
++		}
++	} else {
++		pr_err("failed to find Hisilicon clock node in DTS\n");
++		goto err;
++	}
 +
-+#include "clk.h"
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data) {
++		pr_err("%s: could not allocate clock data\n", __func__);
++		goto err;
++	}
++	clk_data->base = base;
 +
-+/* fixed rate clocks */
-+static struct hisi_fixed_rate_clock hip04_fixed_rate_clks[] __initdata = {
-+	{ HIP04_OSC50M,   "osc50m",   NULL, CLK_IS_ROOT, 50000000, },
-+	{ HIP04_CLK_50M,  "clk50m",   NULL, CLK_IS_ROOT, 50000000, },
-+	{ HIP04_CLK_168M, "clk168m",  NULL, CLK_IS_ROOT, 168750000, },
+ 	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
+ 	if (!clk_table) {
+ 		pr_err("%s: could not allocate clock lookup table\n", __func__);
+-		return;
++		goto err_data;
+ 	}
+-	clk_data.clks = clk_table;
+-	clk_data.clk_num = nr_clks;
+-	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++	clk_data->clk_data.clks = clk_table;
++	clk_data->clk_data.clk_num = nr_clks;
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data->clk_data);
++	return clk_data;
++err_data:
++	kfree(clk_data);
++err:
++	return NULL;
+ }
+ 
+ void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *clks,
+-					 int nums, void __iomem *base)
++					 int nums, struct hisi_clock_data *data)
+ {
+ 	struct clk *clk;
+ 	int i;
+@@ -68,12 +94,13 @@ void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *clks,
+ 			       __func__, clks[i].name);
+ 			continue;
+ 		}
+-		clk_table[clks[i].id] = clk;
++		data->clk_data.clks[clks[i].id] = clk;
+ 	}
+ }
+ 
+ void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *clks,
+-					   int nums, void __iomem *base)
++					   int nums,
++					   struct hisi_clock_data *data)
+ {
+ 	struct clk *clk;
+ 	int i;
+@@ -88,14 +115,15 @@ void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *clks,
+ 			       __func__, clks[i].name);
+ 			continue;
+ 		}
+-		clk_table[clks[i].id] = clk;
++		data->clk_data.clks[clks[i].id] = clk;
+ 	}
+ }
+ 
+ void __init hisi_clk_register_mux(struct hisi_mux_clock *clks,
+-				  int nums, void __iomem *base)
++				  int nums, struct hisi_clock_data *data)
+ {
+ 	struct clk *clk;
++	void __iomem *base = data->base;
+ 	int i;
+ 
+ 	for (i = 0; i < nums; i++) {
+@@ -113,14 +141,15 @@ void __init hisi_clk_register_mux(struct hisi_mux_clock *clks,
+ 		if (clks[i].alias)
+ 			clk_register_clkdev(clk, clks[i].alias, NULL);
+ 
+-		clk_table[clks[i].id] = clk;
++		data->clk_data.clks[clks[i].id] = clk;
+ 	}
+ }
+ 
+ void __init hisi_clk_register_divider(struct hisi_divider_clock *clks,
+-				      int nums, void __iomem *base)
++				      int nums, struct hisi_clock_data *data)
+ {
+ 	struct clk *clk;
++	void __iomem *base = data->base;
+ 	int i;
+ 
+ 	for (i = 0; i < nums; i++) {
+@@ -141,14 +170,15 @@ void __init hisi_clk_register_divider(struct hisi_divider_clock *clks,
+ 		if (clks[i].alias)
+ 			clk_register_clkdev(clk, clks[i].alias, NULL);
+ 
+-		clk_table[clks[i].id] = clk;
++		data->clk_data.clks[clks[i].id] = clk;
+ 	}
+ }
+ 
+ void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *clks,
+-				       int nums, void __iomem *base)
++				       int nums, struct hisi_clock_data *data)
+ {
+ 	struct clk *clk;
++	void __iomem *base = data->base;
+ 	int i;
+ 
+ 	for (i = 0; i < nums; i++) {
+@@ -168,6 +198,6 @@ void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *clks,
+ 		if (clks[i].alias)
+ 			clk_register_clkdev(clk, clks[i].alias, NULL);
+ 
+-		clk_table[clks[i].id] = clk;
++		data->clk_data.clks[clks[i].id] = clk;
+ 	}
+ }
+diff --git a/drivers/clk/hisilicon/clk.h b/drivers/clk/hisilicon/clk.h
+index 4a6beeb..43fa5da 100644
+--- a/drivers/clk/hisilicon/clk.h
++++ b/drivers/clk/hisilicon/clk.h
+@@ -30,6 +30,11 @@
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
+ 
++struct hisi_clock_data {
++	struct clk_onecell_data	clk_data;
++	void __iomem		*base;
 +};
 +
-+static void __init hip04_clk_init(struct device_node *np)
-+{
-+	hisi_clk_init(np, HIP04_NR_CLKS);
-+
-+	hisi_clk_register_fixed_rate(hip04_fixed_rate_clks,
-+				     ARRAY_SIZE(hip04_fixed_rate_clks),
-+				     NULL);
-+}
-+CLK_OF_DECLARE(hip04_clk, "hisilicon,hip04-clock", hip04_clk_init);
-diff --git a/include/dt-bindings/clock/hip04-clock.h b/include/dt-bindings/clock/hip04-clock.h
-new file mode 100644
-index 0000000..695e61c
---- /dev/null
-+++ b/include/dt-bindings/clock/hip04-clock.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
-+ * Copyright (c) 2013-2014 Linaro Limited.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ *
-+ */
-+
-+#ifndef __DTS_HIP04_CLOCK_H
-+#define __DTS_HIP04_CLOCK_H
-+
-+#define HIP04_NONE_CLOCK	0
-+
-+/* fixed rate & fixed factor clocks */
-+#define HIP04_OSC50M		1
-+#define HIP04_CLK_50M		2
-+#define HIP04_CLK_168M		3
-+
-+#define HIP04_NR_CLKS		64
-+
-+#endif	/* __DTS_HIP04_CLOCK_H */
+ struct hisi_fixed_rate_clock {
+ 	unsigned int		id;
+ 	char			*name;
+@@ -89,15 +94,15 @@ struct clk *hisi_register_clkgate_sep(struct device *, const char *,
+ 				void __iomem *, u8,
+ 				u8, spinlock_t *);
+ 
+-void __init hisi_clk_init(struct device_node *, int);
++struct hisi_clock_data __init *hisi_clk_init(struct device_node *, int);
+ void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
+-					int, void __iomem *);
++					int, struct hisi_clock_data *);
+ void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *,
+-					int, void __iomem *);
++					int, struct hisi_clock_data *);
+ void __init hisi_clk_register_mux(struct hisi_mux_clock *, int,
+-				void __iomem *);
++				struct hisi_clock_data *);
+ void __init hisi_clk_register_divider(struct hisi_divider_clock *,
+-				int, void __iomem *);
++				int, struct hisi_clock_data *);
+ void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+-					int, void __iomem *);
++					int, struct hisi_clock_data *);
+ #endif	/* __HISI_CLK_H */
 -- 
 1.8.3.2
