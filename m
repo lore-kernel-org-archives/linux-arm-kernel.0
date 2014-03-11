@@ -1,37 +1,41 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 11 Mar 2014 13:21:17 +0100
-Subject: [PATCH 2/5] ARM: dts: exynos4x12: Add PMU dt data to support
- PMU(Perforamnce Monitoring Unit)
-In-Reply-To: <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
-References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
- <1394524494-30641-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <531EFFBD.8050301@samsung.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 11 Mar 2014 12:23:54 +0000
+Subject: [PATCH 2/3] ARM/leds: move ARM Versatile LED driver to leds
+ subsystem
+In-Reply-To: <CACRpkdb+nLnjM7PUtkzmSJLjEC7FOH65sgOB6m-BUPB8YMzxiA@mail.gmail.com>
+References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+ <1393509500-26002-2-git-send-email-linus.walleij@linaro.org>
+ <1393510075.460580224@f137.i.mail.ru>
+ <CACRpkdb+nLnjM7PUtkzmSJLjEC7FOH65sgOB6m-BUPB8YMzxiA@mail.gmail.com>
+Message-ID: <1394540634.21334.27.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Tue, 2014-03-11 at 12:18 +0000, Linus Walleij wrote:
+> On Thu, Feb 27, 2014 at 3:07 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> > ???????, 27 ??????? 2014, 14:58 +01:00 ?? Linus Walleij <linus.walleij@linaro.org>:
+> >> Now that we have converted this driver to a real platform device
+> >> module-based thing, we move the driver down into the LEDs
+> >> subsystem and rename the config option to LEDS_VERSATILE.
+> >
+> > In fact, it can be converted to use basic-mmio-gpio => leds-gpio.
+> 
+> Hm, yeah I see what you mean. However this register is not described
+> as a GPIO register, and on all Versatile/RealView boards these signals
+> are soldered to LEDs, so they are not general purpose at all.
+> 
+> On some systems without "real" GPIO the above would lead to
+> compiling in the entire gpiolib (149 KB) just to do this.
+> 
+> I would agree more with inventing something like leds-mmio as a
+> separate refactoring after this, i.e. a driver for any memory-mapped
+> LED, which should cover a few cases. What do you think about this
+> idea?
 
-On 11.03.2014 08:54, Chanwoo Choi wrote:
-> ARM CPU has its own performance profiling unit(PMU, Perforamnce Monitoring Unit).
-> This patch add PMU dt data to support PMU which count cache hit and miss events.
->
-> PMU interrput list of Exynos4212
-> - <2 2> : INTG2[2] - PMUIRQ[0] for CPU0
-> - <3 2> : INTG3[2] - PMUIRQ[1] for CPU1
->
-> PMU interrput list of Exynos4412
-> - <2 2> : INTG2[2], PMUIRQ[0] for CPU0
-> - <3 2> : INTG3[2], PMUIRQ[1] for CPU1
-> - <18 2> : INTG18[2], PMUIRQ[2] : CPU2
-> - <19 2> : INTG19[2], PMUIRQ[3] : CPU3
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos4x12.dtsi | 6 ++++++
->   1 file changed, 6 insertions(+)
+Something like this?
+http://thread.gmane.org/gmane.linux.kernel/1387110 ;-)
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+But seriously speaking, I did exactly what Alexander mentioned on VE,
+considering the SYS_LED & alikes as "pseudo-gpios".
 
-Best regards,
-Tomasz
+Pawel
