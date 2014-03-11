@@ -1,43 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 9 Mar 2014 07:39:18 +0100
-Subject: [PATCH 4/7] of: configure the platform device dma_mask and
- dma_pfn_offset
-In-Reply-To: <CAL_JsqLu_16p-8FLjBYt7xQA2eAyiprPML2q5R3fnivZPrvPug@mail.gmail.com>
-References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
- <201403071702.41716.arnd@arndb.de>
- <CAL_JsqLu_16p-8FLjBYt7xQA2eAyiprPML2q5R3fnivZPrvPug@mail.gmail.com>
-Message-ID: <201403090739.18351.arnd@arndb.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 11 Mar 2014 14:34:38 +0100
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <20140311132727.GB26502@S2101-09.ap.freescale.net>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
+ <20140311132727.GB26502@S2101-09.ap.freescale.net>
+Message-ID: <1394544878.4339.7.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 08 March 2014, Rob Herring wrote:
-> On Fri, Mar 7, 2014 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> > a) Follow what we do for PCI devices: assume that we can do DMA_MASK(32)
-> > on any device, and have drivers call dma_set_mask(DMA_MASK(64)) on devices
-> > that would like to do more than that, or call e.g. dma_set_mask(DMA_MASK(28))
-> > for devices that can do less than 32 bit, as given in the argument. This
-> > approach would be most consistent with the way PCI works, but it doesn't
-> > really work well for the case where the mask is less than 32-bit and the
-> > device driver doesn't know that.
-> >
-> > b) Never have to call dma_set_mask() for platform devices and assume that the
-> > platform code sets it up correctly. This would probably be the simpler
-> > solution, and I can't think of any downsides at the moment.
+Am Dienstag, den 11.03.2014, 21:27 +0800 schrieb Shawn Guo:
+> On Tue, Mar 11, 2014 at 12:42:08PM +0100, Philipp Zabel wrote:
+> > Hi Shawn,
+> > 
+> > Am Dienstag, den 11.03.2014, 11:46 +0800 schrieb Shawn Guo:
+> > > On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
+> > > > Hi,
+> > > > 
+> > > > this latest version of the imx-drm DT binding patches applies
+> > > > on top of staging-next and also depends on the OF graph binding
+> > > > patchset that moves the v4l2_of helpers to drivers/of.
+> > > > Currently, the two patchsets are also available at:
+> > > >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
+> > > >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
+> > > 
+> > > Hi Philipp,
+> > > 
+> > > I just came across a couple problems when testing the series on
+> > > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
+> > > using Russell's branch below, which I believe has all the pieces put
+> > > together.
+> > > 
+> > >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
+> > > 
+> > > - When I enable HDMI and LVDS support in both kernel build and device
+> > >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
+> > > 
+> > > - When I enable HDMI and LVDS support in kernel build but only LVDS in
+> > >   device tree (keep HDMI disabled in device tree by not changing
+> > >   'status' of HDMI node to 'okay'), LVDS does not even work.  In this
+> > >   case, it seems that the binding of display-subsystem does not succeed.
+> > 
+> > Can you check if you get the bound messages from
+> > drivers/base/component.c:
+> > 
+> > imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+> > imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+> > imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
+> > 
+> > I have tried this branch with a Phytec phyFLEX i.MX6S on PBAB01
+> > baseboard with EDT 800x480 LVDS panel, and it seems to work.
+> > The check in drivers/staging/imx-drm/imx-drm-core.c:675 should make sure
+> > that unavailable (status="disabled") devices are just skipped.
 > 
-> I don't think we want this. In the case of setting up 64-bit masters,
-> it is typically the device that knows if it can do 64-bit DMA either
-> thru a capabilities register or compatible value. That device specific
-> knowledge should really stay within the device's driver.
+> Sorry, Philipp.  The setup in my report is incorrect.  The correct setup
+> to see this issue consists of:
+> 
+> 1) build a kernel without HDMI support, i.e. !CONFIG_DRM_IMX_HDMI
+> 
+> 2) enable HDMI device in DT, i.e. adding the lines below in board dts.
+> 
+> 	&hdmi {
+> 	       status = "okay";
+> 	};
+> 
+> Sorry for the confusion.
+> 
+This isn't a supported use-case, the componentized device stuff is there
+exactly to ensure that the DRM device is only brought up after all
+active components have an driver attached to them.
 
-So you think we should still set a 64-bit mask in the "ranges" property
-for devices that can only do 32-bit and let the driver figure it out?
-
-I think this approach is much less useful for platform devices than it is
-for PCI devices, where we don't explicitly describe the "ranges" for each
-device. Are you thinking of off-chip or on-chip DMA masters here? If
-on-chip, I don't think it's likely that we would end up with different
-versions of the chip that have the same device on there but not the
-same DMA capabilities.
-
-	Arnd
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
