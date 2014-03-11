@@ -1,62 +1,78 @@
 From: tixy@linaro.org (Jon Medhurst)
-Date: Tue, 11 Mar 2014 16:54:52 +0000
-Subject: [PATCH 1/3] ARM: kprobes: Prevent known test failures stopping other
- tests running
+Date: Tue, 11 Mar 2014 16:54:54 +0000
+Subject: [PATCH 3/3] ARM: kprobes: Fix test code compilation errors for ARMv4
+ targets
 In-Reply-To: <1394556894-18592-1-git-send-email-tixy@linaro.org>
 References: <1394556894-18592-1-git-send-email-tixy@linaro.org>
-Message-ID: <1394556894-18592-2-git-send-email-tixy@linaro.org>
+Message-ID: <1394556894-18592-4-git-send-email-tixy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to a long-standing issue with Thumb symbol lookup [1] the jprobes
-tests fail when built into a kernel compiled as Thumb mode. (They work
-fine for ARM mode kernels or for Thumb when built as a loadable module.)
+Conditionally compile kprobes test cases for ARMv5 instructions to avoid
+compilation errors with ARMv4 targets like:
 
-Rather than have this problem terminate testing prematurely lets instead
-emit an error message and carry on with the main kprobes tests, delaying
-the final failure report until the end.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/063026.html
+/tmp/cc7Tx8ST.s:16740: Error: selected processor does not support ARM mode `clz r0,r0'
 
 Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- arch/arm/kernel/kprobes-test.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/kernel/kprobes-test-arm.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index c2fd06b..6de5e94 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -225,6 +225,7 @@ static int pre_handler_called;
- static int post_handler_called;
- static int jprobe_func_called;
- static int kretprobe_handler_called;
-+static int tests_failed;
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index 8a7428b..f9ed7cf 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -216,6 +216,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_BB_R("bx	r",7,2f,"")
+ 	TEST_BF_R("bxeq	r",14,2f,"")
  
- #define FUNC_ARG1 0x12345678
- #define FUNC_ARG2 0xabcdef
-@@ -461,6 +462,13 @@ static int run_api_tests(long (*func)(long, long))
- 
- 	pr_info("    jprobe\n");
- 	ret = test_jprobe(func);
-+#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
-+	if (ret == -EINVAL) {
-+		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels\n");
-+		tests_failed = ret;
-+		ret = 0;
-+	}
++#if __LINUX_ARM_ARCH__ >= 5
+ 	TEST_R("clz	r0, r",0, 0x0,"")
+ 	TEST_R("clzeq	r7, r",14,0x1,"")
+ 	TEST_R("clz	lr, r",7, 0xffffffff,"")
+@@ -337,6 +338,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word 0xe16f02e1 @ smultt pc, r1, r2")
+ 	TEST_UNSUPPORTED(".word 0xe16002ef @ smultt r0, pc, r2")
+ 	TEST_UNSUPPORTED(".word 0xe1600fe1 @ smultt r0, r1, pc")
 +#endif
- 	if (ret < 0)
- 		return ret;
  
-@@ -1671,6 +1679,8 @@ static int __init run_all_tests(void)
+ 	TEST_GROUP("Multiply and multiply-accumulate")
  
- out:
- 	if (ret == 0)
-+		ret = tests_failed;
-+	if (ret == 0)
- 		pr_info("Finished kprobe tests OK\n");
- 	else
- 		pr_err("kprobe tests failed\n");
+@@ -559,6 +561,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED("ldrsht	r1, [r2], #48")
+ #endif
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
+ 	TEST_RPR(  "strccd	r",8, VAL2,", [r",13,0, ", r",12,48,"]")
+ 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
+@@ -595,6 +598,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word 0xe1efc3d0	@ ldrd r12, [pc, #48]!")
+ 	TEST_UNSUPPORTED(".word 0xe0c9f3d0	@ ldrd pc, [r9], #48")
+ 	TEST_UNSUPPORTED(".word 0xe0c9e3d0	@ ldrd lr, [r9], #48")
++#endif
+ 
+ 	TEST_GROUP("Miscellaneous")
+ 
+@@ -1227,7 +1231,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST_COPROCESSOR( "mrc"two"	0, 0, r0, cr0, cr0, 0")
+ 
+ 	COPROCESSOR_INSTRUCTIONS_ST_LD("","e")
++#if __LINUX_ARM_ARCH__ >= 5
+ 	COPROCESSOR_INSTRUCTIONS_MC_MR("","e")
++#endif
+ 	TEST_UNSUPPORTED("svc	0")
+ 	TEST_UNSUPPORTED("svc	0xffffff")
+ 
+@@ -1287,7 +1293,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST(	"blx	__dummy_thumb_subroutine_odd")
+ #endif /* __LINUX_ARM_ARCH__ >= 6 */
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	COPROCESSOR_INSTRUCTIONS_ST_LD("2","f")
++#endif
+ #if __LINUX_ARM_ARCH__ >= 6
+ 	COPROCESSOR_INSTRUCTIONS_MC_MR("2","f")
+ #endif
 -- 
 1.7.10.4
