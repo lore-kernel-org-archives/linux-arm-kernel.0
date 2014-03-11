@@ -1,86 +1,58 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Tue, 11 Mar 2014 09:51:48 +0100
-Subject: imx-drm: ldb and display power on sequence
-In-Reply-To: <CAH9NwWfz4tBtuKqaJx_E4Y-a5eYwBaBPg2RgO4CFnE1Dfddi8A@mail.gmail.com>
-References: <CAH9NwWcE=4OVHSMKCEuTrFA7JMGEdkxrbX_0OORZ96N1Roi2HQ@mail.gmail.com>
- <1394114410.3622.14.camel@paszta.hi.pengutronix.de>
- <CAH9NwWfz4tBtuKqaJx_E4Y-a5eYwBaBPg2RgO4CFnE1Dfddi8A@mail.gmail.com>
-Message-ID: <CAH9NwWfZ2MFmoXe7aJrE5mA1tsyOaJxbpz_g-AL_-r0dh1LUiQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 11 Mar 2014 09:52:35 +0100
+Subject: [PATCH v2 7/7] ARM: zynq: DT: Migrate UART to Cadence binding
+In-Reply-To: <1394487610-2419-8-git-send-email-soren.brinkmann@xilinx.com>
+References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394487610-2419-8-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <62cd32ad-8743-4d49-a1b6-c178054a9756@CO9EHSMHS011.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-07 12:18 GMT+01:00 Christian Gmeiner <christian.gmeiner@gmail.com>:
-> Hi Philipp,
->
->> Am Donnerstag, den 06.03.2014, 13:34 +0100 schrieb Christian Gmeiner:
->>> Hi all.
->>>
->>> On our custom board design (imx6d) we are using a TFT-display
->>> connceted via LVDS.
->>> The datasheet [0] says that the display needs a defined power up
->>> sequence. I need
->>> to control the following stuff:
->>>
->>> - LCD_ON (gpio2 3)
->>> - Backlight ON (gpio2 0)
->>> - PMW for dimm
->>>
->>> At the moment I have the backlight suff ready:
->>>
->>>        backlight {
->>>                compatible = "pwm-backlight";
->>>                pwms = <&pwm4 0 50000>;
->>>                enable-gpios = <&gpio2 0 0>;
->>>
->>>                brightness-levels = <0 1 2 3 4>;
->>>                default-brightness-level = <4>;
->>>        };
->>>
->>> Now I only need to enable the LCD_ON and wait 40ms before turning on
->>> the LVDS clocks and data.
->>
->> This can be done by adding a regulator-enable-ramp-delay property to the
->> gpio regulator.
->>
->
-> Correct.
->
->>> For this I tought to add a regulator support in
->>> imx_ldb_encoder_commit(..) of imx-ldb.c.
->>>That should give me the correct sequence for
->>> LVDS on to LVDS data/clock. Now I only need to get the pwm-backlight
->>> driver doing its work after ldb is ready.
->>
->> We should rather add drm_panel support to imx-ldb. I have just sent a
->> patch for this.
->> The simple-panel driver already supports regulator and backlight.
->>
->
-> I am still life in the world of a stable kernel called 3.13.6 :) Will
-> backport the simple-panel driver
-> and will have a look at your patches - today.
->
+On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
+> The Zynq UART is Cadence IP and the driver has been renamed accordingly.
+> Migrate the DT to use the new binding for the UART driver.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> This change depends on 'tty: xuartps: Rebrand driver as Cadence UART',
+> which introduces the new clock-names.
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 8b67b19392ec..0ed0d4b0579a 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -67,19 +67,19 @@
+>  		};
+>  
+>  		uart0: uart at e0000000 {
+> -			compatible = "xlnx,xuartps";
+> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>  			status = "disabled";
+>  			clocks = <&clkc 23>, <&clkc 40>;
+> -			clock-names = "ref_clk", "aper_clk";
+> +			clock-names = "uart_clk", "pclk";
+>  			reg = <0xE0000000 0x1000>;
+>  			interrupts = <0 27 4>;
+>  		};
+>  
+>  		uart1: uart at e0001000 {
+> -			compatible = "xlnx,xuartps";
+> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>  			status = "disabled";
+>  			clocks = <&clkc 24>, <&clkc 41>;
+> -			clock-names = "ref_clk", "aper_clk";
+> +			clock-names = "uart_clk", "pclk";
+>  			reg = <0xE0001000 0x1000>;
+>  			interrupts = <0 50 4>;
+>  		};
 
-I backported your patch and updated my dts file. It looks better now
-but one thing is does not work.
-The datasheet says I need to enable the lcd, enable LVDS data and then
-I can enable the backlight.
-With the simple panel following happens:
+This should be at least the part of 5/7 because between 5/7 and 7/7
+driver will fail to probe.
 
-panel_simple_enable:
-- regulator_enable(p->supply);
-- gpio_set_value
-- backlight_update_status
-
-The result of this sequence are graphical glitches and a ghost picture
-on the panel. Need to think
-about it to find a good solution for it. Maybe there should be a 2 way
-init phase for a panel.
-- preinit - turn on power-supply and set gpio
-- init ipu
-- postinit - unblank backlight
-
---
-Christian Gmeiner, MSc
-
-https://soundcloud.com/christian-gmeiner
+Thanks,
+Michal
