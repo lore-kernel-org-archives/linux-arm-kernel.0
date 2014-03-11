@@ -1,23 +1,77 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 11 Mar 2014 14:08:25 +0100
-Subject: [RFC 0/6] rework sched_domain topology description
-In-Reply-To: <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <5317B092.7070805@arm.com>
- <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
- <53186A8A.9060406@arm.com>
- <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
-Message-ID: <20140311130825.GX9987@twins.programming.kicks-ass.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 11 Mar 2014 14:09:00 +0100
+Subject: [PATCH 5/5] ARM: dts: exynos4412-trats2: Add ADC's dt data to get
+ temperature of SoC/battery
+In-Reply-To: <1394524494-30641-6-git-send-email-cw00.choi@samsung.com>
+References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+ <1394524494-30641-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <531F0AEC.7010606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 07, 2014 at 10:47:49AM +0800, Vincent Guittot wrote:
-> Peter,
-> 
-> Was the use of the cpu as a parameter in the initialization of
-> sched_domain's flag a reason for asking for reworking the
-> initialization of sched_domain ?
+Hi Chanwoo,
 
-/me tries very hard to remember.. and fails.
+On 11.03.2014 08:54, Chanwoo Choi wrote:
+> This patch use ADC to get the temperature of SoC/battery by using NTC thermistor
+> driver in hwmon. NTC thermistor driver covnvert ADC's raw data to temperature
+> by using following variables:
+>
+> - pullup-uv    : Voltage
+> - pullup-ohm   : Pull-up resistance
+> - pulldown-ohm : Pull-down resistance
+> - io-channels  : It means ADC channel.
+>
 
-Reading back the linked thread also doesn't seem to jog memory.
+Those properties are well-defined in "ntc,ncp15wb473" DT bindings 
+documentation. There is no need to repeat them here.
+
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
+>   1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 4f851cc..fc517c3 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -106,6 +106,27 @@
+>   		};
+>   	};
+>
+> +	adc: adc at 126C0000 {
+> +		vdd-supply = <&ldo3_reg>;
+> +		status = "okay";
+> +
+> +		ncp15wb473 at 0 {
+
+style: Nodes should have generic names, e.g. thermistor at 0.
+
+Also if node name is suffixed with @unit-address, then the node should 
+have a reg property with its first entry corresponding to the 
+unit-address. Now there is no physical unit-address definition for those 
+thermistors, so they shouldn't use this naming pattern, but rather 
+something like "thermistor-0" or "thermistor-ap".
+
+> +			compatible = "ntc,ncp15wb473";
+> +			pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
+> +			pullup-ohm = <100000>;	 /* 100K */
+> +			pulldown-ohm = <100000>; /* 100K */
+> +			io-channels = <&adc 1>;  /* AP temperature */
+> +		};
+> +
+> +		ncp15wb473 at 1 {
+> +			compatible = "ntc,ncp15wb473";
+> +			pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
+> +			pullup-ohm = <100000>;	 /* 100K */
+> +			pulldown-ohm = <100000>; /* 100K */
+> +			io-channels = <&adc 2>;  /* Battery temperature */
+> +		};
+
+Anyway, I don't think it is correct to place IIO consumers under IIO 
+provider node, because IIO is not a control bus, but rather a resource 
+provider, like GPIO, clock, etc. So both thermistor nodes should be 
+placed outside the adc node. (They might be grouped in a simple-bus 
+subnode, though, to improve readability.)
+
+Best regards,
+Tomasz
