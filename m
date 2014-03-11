@@ -1,88 +1,43 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 11 Mar 2014 11:55:00 +0100
-Subject: [PATCH v2][ 4/8] ARM: dts: imx25.dtsi: Fix USB support.
+Date: Tue, 11 Mar 2014 11:55:03 +0100
+Subject: [PATCH v2][ 7/8] ARM: dts: mbimxsd35 baseboard: Add USB support.
 In-Reply-To: <1394535304-10240-1-git-send-email-denis@eukrea.com>
 References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394535304-10240-4-git-send-email-denis@eukrea.com>
+Message-ID: <1394535304-10240-7-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Fabio Estevam <fabio.estevam@freescale.com>
-
-This patch was adapted from the thread named
-"USB Host support for mx25" on linux-usb at vger.kernel.org
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 Changelog v1->v2:
-- The usbphy nodes were made to look like the ones in imx53.dtsi
-- The patch was rebased on top of the clock fixes commits.
+- With the clock fix patches, the usb gadget also work.
+  So I've set the otg port to otg instead of host.
+- Before I forgott to set dr_mode to host in the usbhost port.
+  That is now fixed.
 ---
- arch/arm/boot/dts/imx25.dtsi |   27 ++++++++++++++++-----------
- 1 file changed, 16 insertions(+), 11 deletions(-)
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 829791e..16bc571 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -482,22 +482,13 @@
- 				clocks = <&clks 99>;
- 			};
- 
--			usbphy1: usbphy at 1 {
--				compatible = "nop-usbphy";
--				status = "disabled";
--			};
--
--			usbphy2: usbphy at 2 {
--				compatible = "nop-usbphy";
--				status = "disabled";
--			};
--
- 			usbotg: usb at 53ff4000 {
- 				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4000 0x0200>;
- 				interrupts = <37>;
- 				clocks = <&clks 70>;
- 				fsl,usbmisc = <&usbmisc 0>;
-+				fsl,usbphy = <&usbphy1>;
- 				status = "disabled";
- 			};
- 
-@@ -507,6 +498,7 @@
- 				interrupts = <35>;
- 				clocks = <&clks 70>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				fsl,usbphy = <&usbphy2>;
- 				status = "disabled";
- 			};
- 
-@@ -516,7 +508,6 @@
- 				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
- 				clock-names = "ipg", "ahb", "per";
- 				reg = <0x53ff4600 0x00f>;
--				status = "disabled";
- 			};
- 
- 			dryice at 53ffc000 {
-@@ -548,4 +539,18 @@
- 			};
- 		};
- 	};
-+
-+	usbphy {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "simple-bus";
-+
-+		usbphy1: usbphy at 1 {
-+			compatible = "usb-nop-xceiv";
-+		};
-+
-+		usbphy2: usbphy at 2 {
-+			compatible = "usb-nop-xceiv";
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+index 71197b9..f04ae91 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -150,3 +150,16 @@
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
  };
++
++&usbhost1 {
++	phy_type = "serial";
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbotg {
++	phy_type = "utmi";
++	dr_mode = "otg";
++	external-vbus-divider;
++	status = "okay";
++};
 -- 
 1.7.9.5
