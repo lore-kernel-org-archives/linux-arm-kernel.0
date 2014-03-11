@@ -1,23 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Mar 2014 18:52:52 +0000
-Subject: [PATCH v3 3/5] regulator: add bcm590xx regulator driver
-In-Reply-To: <1394552775-31264-4-git-send-email-mporter@linaro.org>
-References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
- <1394552775-31264-4-git-send-email-mporter@linaro.org>
-Message-ID: <20140311185252.GX28112@sirena.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 11 Mar 2014 12:55:54 -0600
+Subject: [RFC PATCH v2 04/14] mtd: nand: define struct nand_timings
+In-Reply-To: <531DC1A4.7010208@gmail.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
+ <531DC1A4.7010208@gmail.com>
+Message-ID: <20140311185554.GD31835@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 11:46:13AM -0400, Matt Porter wrote:
-> Add a regulator driver for the BCM590xx PMU voltage regulators.
-> The driver supports LDOs and DCDCs in normal mode only. There is
-> no support for low-power mode or power sequencing.
+On Mon, Mar 10, 2014 at 02:44:04PM +0100, Boris BREZILLON wrote:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/f7b63f13/attachment.sig>
+> Some timings are missing here (see Table 55 in the ONFI spec):
+
+Right..
+
+The 'mode' covers only the raw electrical parameters needed to
+exchange commands, other timings cover the commands
+themselves. Notably the timing mode does not alter those parameters.
+
+To me it seems tidy to keep the 'mode' timings contained in their own
+struct and find other homes for the other parameters.
+
+> -tR
+> -tBERS
+> -tCCS
+> -tPLEBSY
+> -...
+> 
+> I see at least 3 of those timings that could be useful (for the moment) :
+> - tR: this one should be used to fill the chip_delay field
+> - tPROG and tBERS: could be used within nand_wait to choose the timeo
+>   value appropriately.
+
+IIRC these timing values are really only necessary if the controller
+does not support the READY/BUSY input, in that case drivers typically
+seem to use 'chip_delay' which is the maximum possible command
+execution time (a sleep long enough to guarentee that READY/BUSY is
+de-asserted).
+
+> Or should I create a new struct for these timings ?
+> In the latter case how should I name it ?
+
+struct onfi_command_timings ?
+
+Regards,
+Jason
