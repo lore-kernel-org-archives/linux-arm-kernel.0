@@ -1,57 +1,191 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 11 Mar 2014 11:29:13 -0700
-Subject: [PATCH v2 0/7] tty: xuartps: Rebranding + DT documentation
-In-Reply-To: <531EE993.80400@monstr.eu>
-References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
- <531EE993.80400@monstr.eu>
-Message-ID: <b4e6dfe6-ad49-4d81-855b-8dd905665616@VA3EHSMHS039.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Mar 2014 18:29:23 +0000
+Subject: [PATCH v2 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
+References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
+ <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20140311182922.GD3263@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-11 at 11:46AM +0100, Michal Simek wrote:
-> On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
-> > Hi,
-> > 
-> > this series rebrands the Xilinx PS UART driver as Cadence UART and
-> > documents its DT bindings (+ some clean up along the way).
-> > 
-> > The rebranding goes as far as reasonable. Things like file name, kconfig
-> > symbols and other things with user space impact are left as is. Please
-> > refer to the discussion in the RFC threads[1-2] for more details.
-> > 
-> > Similar the DT binding has been extended. In addition to the new and
-> > preferred Cadence binding, the current xuartps binding is maintained.
-> > Though, only the Cadence names for clock-names are documented.
-> > 
-> > References:
-> >  [1]  https://lkml.org/lkml/2014/3/4/405
-> >  [2]  https://lkml.org/lkml/2014/3/7/450
-> > 
-> > v2:
-> >  - no changes regarding the patches
-> >  - fixed (I sincerely hope) email recipients
-> > 
-> > Changes from the latest RFC:
-> >  - squashed function/symbol renaming into 'tty: xuartps: Rebrand driver
-> >    as Cadence UART'
-> >  - Revised the commit message of 'tty: xuartps: Don't write IRQ disable
-> >    register to enable interrupts' (was 'tty: xuartps: Remove bogus
-> >    comment and register write'
+On Mon, Mar 10, 2014 at 10:51:17PM +0000, Kukjin Kim wrote:
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/boot/dts/samsung-gh7.dtsi     | 106 +++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts |  26 ++++++++
+>  2 files changed, 132 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+>  create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
 > 
-> One more thing. I was thinking this is based on my 3 patches I have
-> already sent to mainline. But as I see they are not applied yet.
-> 
-> https://lkml.org/lkml/2014/1/21/107
+> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> new file mode 100644
+> index 0000000..b5e8488
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> @@ -0,0 +1,106 @@
+> +/*
+> + * SAMSUNG GH7 SoC device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/memreserve/ 0x80000000 0x0C400000;
 
-I think my cleanup patch covers these changes as well. I'll see if it
-makes sense to separate out this patch.
+Please have a comment as to what this memreserve is intended to protect.
+This is very large, and we don't want pointless memreserves.
 
-> https://lkml.org/lkml/2014/1/21/101
+What address does the kernel end up getting loaded at on this board?
 
-This is obsolete with the rebranding, IMHO.
+> +
+> +/ {
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		serial0 = "/amba/uart at 12c00000";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 000 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
 
-> http://www.spinics.net/lists/arm-kernel/msg302796.html
+The "arm,armv8" should be a fallback rather than the only entry. The
+precise core should be first (see arch/arm64/boot/dts/apm-storm.dtsi for
+an example).
 
-I can add this to this series.
+> +			reg = <0x0 0x000>;
 
-	S?ren
+Any reason for padding these to three hexadecimal digits (in both the
+reg and unit-address)?
+
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x0 0x8000fff8>;
+> +		};
+> +		cpu at 001 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x001>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x0 0x8000fff8>;
+> +		};
+> +		cpu at 002 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x002>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x0 0x8000fff8>;
+> +		};
+> +		cpu at 003 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x003>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x0 0x8000fff8>;
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller at 1C000000 {
+> +		compatible = "arm,cortex-a15-gic";
+
+We should have a more specific compatible string early in the list here
+too.
+
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x0 0x1C001000 0 0x1000>,	/* GIC Dist */
+> +		      <0x0 0x1C002000 0 0x1000>,	/* GIC CPU */
+> +		      <0x0 0x1C004000 0 0x2000>,	/* GIC VCPU Control */
+> +		      <0x0 0x1C006000 0 0x2000>;	/* GIC VCPU */
+> +		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <1 13 0xff01>,	/* Secure Phys IRQ */
+> +			     <1 14 0xff01>,	/* Non-secure Phys IRQ */
+> +			     <1 11 0xff01>,	/* Virt IRQ */
+> +			     <1 10 0xff01>;	/* Hyp IRQ */
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+
+This is missing a specific compatible string.
+
+> +		interrupts = <0 294 0>,
+> +			     <0 295 0>,
+> +			     <0 296 0>,
+> +			     <0 297 0>,
+> +			     <0 298 0>,
+> +			     <0 299 0>,
+> +			     <0 300 0>,
+> +			     <0 301 0>;
+> +	};
+
+There are four CPUs described, yet eight interrupts here. There should
+be one per CPU.
+
+> +
+> +	amba {
+> +		compatible = "arm,amba-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		serial at 12c00000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0 0x12c00000 0 0x10000>;
+> +			interrupts = <0 418 0>;
+> +		};
+> +
+> +		serial at 12c20000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0 0x12c20000 0 0x10000>;
+> +			interrupts = <0 420 0>;
+> +		};
+
+These are both missing required clocks.
+
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/samsung-ssdk-gh7.dts b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> new file mode 100644
+> index 0000000..47afbc4
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> @@ -0,0 +1,26 @@
+> +/*
+> + * SAMSUNG SSDK-GH7 board device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +#include "samsung-gh7.dtsi"
+> +
+> +/ {
+> +	model = "SAMSUNG SSDK-GH7 board based on GH7 SoC";
+
+Is the "based on GH7 SoC" part necessary? Does the "SSDK-GH7" not give
+that away?
+
+Thanks,
+Mark.
