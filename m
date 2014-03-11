@@ -1,48 +1,37 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 11 Mar 2014 22:06:59 +0100
-Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
- regulators subsystem
-In-Reply-To: <20140311192940.GA28112@sirena.org.uk>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
- <20140303015616.GN2411@sirena.org.uk>
- <20140311192411.GA4193@localhost.fastwebnet.it>
- <20140311192940.GA28112@sirena.org.uk>
-Message-ID: <20140311210659.GA10961@localhost.fastwebnet.it>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Mar 2014 14:22:00 -0700
+Subject: [GIT PULL v2] Xilinx Zynq dt changes for v3.15
+In-Reply-To: <531D73D9.7060207@monstr.eu>
+References: <53061EAD.9000000@monstr.eu>
+ <531D73D9.7060207@monstr.eu>
+Message-ID: <20140311212200.GN31877@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 07:29:40PM +0000, Mark Brown wrote:
-> On Tue, Mar 11, 2014 at 08:24:11PM +0100, Carlo Caione wrote:
-> > On Mon, Mar 03, 2014 at 10:56:16AM +0900, Mark Brown wrote:
+On Mon, Mar 10, 2014 at 09:12:09AM +0100, Michal Simek wrote:
+> Hi,
 > 
-> > > > +	regulators = of_find_node_by_name(np, "regulators");
-> > > > +	if (!regulators) {
-> > > > +		dev_err(&pdev->dev, "regulators node not found\n");
-> > > > +		return -EINVAL;
-> > > > +	}
+> please pull this patch to your arm-soc tree.
 > 
-> > > The driver should be able to start up with no configuration provided at
-> > > all except for the device being registered - the user won't be able to
-> > > change anything but they will be able to read the current state of the
-> > > hardware which can be useful for diagnostics.
+> Changes in v2: Fix incorrect git repo url
 > 
-> > If the device is DT enabled and no configuration is provided for
-> > regulators, these are disabled according to:
+> Thanks,
+> Michal
 > 
-> > http://lxr.linux.no/linux+v3.13.5/drivers/regulator/core.c#L3797
 > 
-> > Am I missing something or do you have any pointer?
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
-> With the above code the driver will return an error and never get as far
-> as registering the regulator.
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.15
+> 
+> for you to fetch changes up to 3795e91d2abb25164dda5687ca680a7ab940c447:
+> 
+>   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
 
-I agree, but if I register the regulators without having the constrains
-defined in the DT, when regulator_init_complete() is
-called, the regulators are disabled powering off the SoC (at least for
-DCDC2 and DCDC3).
+Merged, thanks.
 
-Thanks,
 
--- 
-Carlo Caione
+-Olof
