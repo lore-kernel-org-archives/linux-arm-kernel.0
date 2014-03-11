@@ -1,165 +1,61 @@
-From: eparis@redhat.com (Eric Paris)
-Date: Tue, 11 Mar 2014 17:32:57 -0400
-Subject: [PATCH 1/2] syscall_get_arch: remove useless function arguments
-Message-ID: <1394573578-2558-1-git-send-email-eparis@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Mar 2014 14:33:31 -0700
+Subject: [GIT PULL v2] Xilinx Zynq changes for v3.15
+In-Reply-To: <531D746A.4020903@monstr.eu>
+References: <53061EBA.1080002@monstr.eu>
+ <531D746A.4020903@monstr.eu>
+Message-ID: <20140311213331.GA6429@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every caller of syscall_get_arch() uses current for the task and no
-implementors of the function need args.  So just get rid of both of
-those things.  Admittedly, since these are inline functions we aren't
-wasting stack space, but it just makes the prototypes better.
+On Mon, Mar 10, 2014 at 09:14:34AM +0100, Michal Simek wrote:
+> Hi,
+> 
+> please pull these changes to your arm-soc tree. This branch is based
+> on zynq/dt branch from the second pull request.
+> I have kept OCM patch in this branch because it depends on slcr changes
+> done here. If you want to send another pull request just for this OCM
+> patch based on this branch, please let me know.
+> 
+> Changes in v2: Fix incorrect git repo url
 
-Signed-off-by: Eric Paris <eparis@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mips at linux-mips.org
-Cc: linux390 at de.ibm.com
-Cc: x86 at kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-arch at vger.kernel.org
----
- arch/arm/include/asm/syscall.h  | 3 +--
- arch/mips/include/asm/syscall.h | 2 +-
- arch/mips/kernel/ptrace.c       | 2 +-
- arch/s390/include/asm/syscall.h | 5 ++---
- arch/x86/include/asm/syscall.h  | 8 +++-----
- include/asm-generic/syscall.h   | 4 +---
- kernel/seccomp.c                | 4 ++--
- 7 files changed, 11 insertions(+), 17 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-index 73ddd72..ed805f1 100644
---- a/arch/arm/include/asm/syscall.h
-+++ b/arch/arm/include/asm/syscall.h
-@@ -103,8 +103,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->ARM_r0 + i, args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(struct task_struct *task,
--				   struct pt_regs *regs)
-+static inline int syscall_get_arch(void)
- {
- 	/* ARM tasks don't change audit architectures on the fly. */
- 	return AUDIT_ARCH_ARM;
-diff --git a/arch/mips/include/asm/syscall.h b/arch/mips/include/asm/syscall.h
-index 81c8913..625e709 100644
---- a/arch/mips/include/asm/syscall.h
-+++ b/arch/mips/include/asm/syscall.h
-@@ -101,7 +101,7 @@ extern const unsigned long sys_call_table[];
- extern const unsigned long sys32_call_table[];
- extern const unsigned long sysn32_call_table[];
- 
--static inline int __syscall_get_arch(void)
-+static inline int syscall_get_arch(void)
- {
- 	int arch = EM_MIPS;
- #ifdef CONFIG_64BIT
-diff --git a/arch/mips/kernel/ptrace.c b/arch/mips/kernel/ptrace.c
-index b52e1d2..65ba622 100644
---- a/arch/mips/kernel/ptrace.c
-+++ b/arch/mips/kernel/ptrace.c
-@@ -671,7 +671,7 @@ asmlinkage void syscall_trace_enter(struct pt_regs *regs)
- 	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
- 		trace_sys_enter(regs, regs->regs[2]);
- 
--	audit_syscall_entry(__syscall_get_arch(),
-+	audit_syscall_entry(syscall_get_arch(),
- 			    regs->regs[2],
- 			    regs->regs[4], regs->regs[5],
- 			    regs->regs[6], regs->regs[7]);
-diff --git a/arch/s390/include/asm/syscall.h b/arch/s390/include/asm/syscall.h
-index cd29d2f..bebc0bd 100644
---- a/arch/s390/include/asm/syscall.h
-+++ b/arch/s390/include/asm/syscall.h
-@@ -89,11 +89,10 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		regs->orig_gpr2 = args[0];
- }
- 
--static inline int syscall_get_arch(struct task_struct *task,
--				   struct pt_regs *regs)
-+static inline int syscall_get_arch(void)
- {
- #ifdef CONFIG_COMPAT
--	if (test_tsk_thread_flag(task, TIF_31BIT))
-+	if (test_tsk_thread_flag(current, TIF_31BIT))
- 		return AUDIT_ARCH_S390;
- #endif
- 	return sizeof(long) == 8 ? AUDIT_ARCH_S390X : AUDIT_ARCH_S390;
-diff --git a/arch/x86/include/asm/syscall.h b/arch/x86/include/asm/syscall.h
-index aea284b..7e6d0c4 100644
---- a/arch/x86/include/asm/syscall.h
-+++ b/arch/x86/include/asm/syscall.h
-@@ -91,8 +91,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->bx + i, args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(struct task_struct *task,
--				   struct pt_regs *regs)
-+static inline int syscall_get_arch(void)
- {
- 	return AUDIT_ARCH_I386;
- }
-@@ -221,8 +220,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		}
- }
- 
--static inline int syscall_get_arch(struct task_struct *task,
--				   struct pt_regs *regs)
-+static inline int syscall_get_arch(void)
- {
- #ifdef CONFIG_IA32_EMULATION
- 	/*
-@@ -234,7 +232,7 @@ static inline int syscall_get_arch(struct task_struct *task,
- 	 *
- 	 * x32 tasks should be considered AUDIT_ARCH_X86_64.
- 	 */
--	if (task_thread_info(task)->status & TS_COMPAT)
-+	if (task_thread_info(current)->status & TS_COMPAT)
- 		return AUDIT_ARCH_I386;
- #endif
- 	/* Both x32 and x86_64 are considered "64-bit". */
-diff --git a/include/asm-generic/syscall.h b/include/asm-generic/syscall.h
-index 5b09392..d401e54 100644
---- a/include/asm-generic/syscall.h
-+++ b/include/asm-generic/syscall.h
-@@ -144,8 +144,6 @@ void syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
- 
- /**
-  * syscall_get_arch - return the AUDIT_ARCH for the current system call
-- * @task:	task of interest, must be in system call entry tracing
-- * @regs:	task_pt_regs() of @task
-  *
-  * Returns the AUDIT_ARCH_* based on the system call convention in use.
-  *
-@@ -155,5 +153,5 @@ void syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
-  * Architectures which permit CONFIG_HAVE_ARCH_SECCOMP_FILTER must
-  * provide an implementation of this.
-  */
--int syscall_get_arch(struct task_struct *task, struct pt_regs *regs);
-+int syscall_get_arch(void);
- #endif	/* _ASM_SYSCALL_H */
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index b7a1004..eda2da3 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -95,7 +95,7 @@ u32 seccomp_bpf_load(int off)
- 	if (off == BPF_DATA(nr))
- 		return syscall_get_nr(current, regs);
- 	if (off == BPF_DATA(arch))
--		return syscall_get_arch(current, regs);
-+		return syscall_get_arch();
- 	if (off >= BPF_DATA(args[0]) && off < BPF_DATA(args[6])) {
- 		unsigned long value;
- 		int arg = (off - BPF_DATA(args[0])) / sizeof(u64);
-@@ -351,7 +351,7 @@ static void seccomp_send_sigsys(int syscall, int reason)
- 	info.si_code = SYS_SECCOMP;
- 	info.si_call_addr = (void __user *)KSTK_EIP(current);
- 	info.si_errno = reason;
--	info.si_arch = syscall_get_arch(current, task_pt_regs(current));
-+	info.si_arch = syscall_get_arch();
- 	info.si_syscall = syscall;
- 	force_sig_info(SIGSYS, &info, current);
- }
--- 
-1.8.5.3
+> The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
+> 
+>   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.15
+> 
+> for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
+> 
+>   ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx Zynq cleanup patches for v3.15
+> 
+> - Redesign SLCR initialization to enable
+>   driver developing which targets SLCR space
+> - Add OCM driver
+> - Add SOC_BUS support
+> 
+> ----------------------------------------------------------------
+> Michal Simek (8):
+>       ARM: zynq: Split slcr in two parts
+>       ARM: zynq: Map I/O memory on clkc init
+>       ARM: zynq: Add and use zynq_slcr_read/write() helper functions
+>       ARM: zynq: Introduce zynq_slcr_unlock()
+>       ARM: zynq: Add OCM driver
+
+Looking at the patches in the branch, this is the one I have most concern with.
+I think it will require more work to get it in shape to get merged, as per
+those comments.
+
+I think it's worth to merge the other stuff though, so can you rebuild the
+branch without the OCM driver so we can get the rest in for 3.15 even if the
+OCM piece ends up taking longer?
+
+
+-Olof
