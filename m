@@ -1,47 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 13:06:09 +0000
-Subject: Qualcomm PMIC8XXX keypad never worked?
-In-Reply-To: <8206209.oc1V5pPVYT@wuerfel>
-References: <5887114.1jrNo21sGX@wuerfel> <20140311120056.GH21216@lee--X1>
- <8206209.oc1V5pPVYT@wuerfel>
-Message-ID: <20140311130609.GL21216@lee--X1>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 11 Mar 2014 14:08:25 +0100
+Subject: [RFC 0/6] rework sched_domain topology description
+In-Reply-To: <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <5317B092.7070805@arm.com>
+ <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
+ <53186A8A.9060406@arm.com>
+ <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
+Message-ID: <20140311130825.GX9987@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Something in the MFD_PM8XXX driver must have changed recently that now allows
-> > > the KEYBOARD_PMIC8XXX driver to be enabled. Unfortunately, it does not build
-> > > because of a dependency on the <linux/mfd/pm8xxx/gpio.h> header file that
-> > > does not exist.
-> > 
-> > I have it?
-> > 
-> > -rw-r--r-- 1 lee lee 2147 Dec 18 11:52 include/linux/mfd/pm8xxx/core.h
+On Fri, Mar 07, 2014 at 10:47:49AM +0800, Vincent Guittot wrote:
+> Peter,
 > 
-> This is core.h, not gpio.h
+> Was the use of the cpu as a parameter in the initialization of
+> sched_domain's flag a reason for asking for reworking the
+> initialization of sched_domain ?
 
-Hmmm... so it is. I think I'm going senile!
+/me tries very hard to remember.. and fails.
 
-> > > In order to keep 'make randconfig' working on my test box, I have disabled
-> > > this driver, but it would be nice of someone could have a look into fixing it.
-> > 
-> > Can you send me the config that breaks please?
-> 
-> appended below. You might need more patches to build this, but you will get the
-> error if you just try building the input driver.
-
-Okay, I've recreated the error.
-
-I think it's this commit that's causing your error:
-
-  https://lkml.org/lkml/2013/12/10/903
-
-... but the MFD isn't broken, so I guess your solution is the most
-elegant. If it's not fixed soon, I guess we should think about ripping
-it out. It's obvoious that no-one cares, as it's been broken for
-nearly 3 years.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Reading back the linked thread also doesn't seem to jog memory.
