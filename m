@@ -1,91 +1,146 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:20:28 +0100
-Subject: [PATCH 0/7] ARM: dts: overo: Add new expansion boards
-Message-ID: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
+Date: Tue, 11 Mar 2014 13:20:35 +0100
+Subject: [PATCH 7/7] ARM: dts: Add support for the Overo Summit
+In-Reply-To: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1394540435-25401-8-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Summit is an expansion board for Gumstix Overo products.
 
-This series adds the support for 5 new expansion boards from Gumstix:
-- Palo43
-- Gallop43
-- Chestnut43
-- Alto35
-- Summit
-
-The 1st patch is a preparatory work, in order to factorize some
-peripherals that are common to most Gumstix expansion boards. Patch 2
-adds the support for an accelerometer that is present on most boards.
-
-Palo43, Gallop43 and Chestnut43 are all pretty similar. I tested
-on a Gallop43 (with both OMAP35xx and OMAP36xx Overo).
-
-Alto35 is slightly different. Again, I tested with both OMAP35xx and
-OMAP36xx Overo.
-
-Summit is pretty similar to Tobi. I do not have a Summit at hand,
-but given the similarity with Tobi, it should work fine.
-
-To avoid unnecessary duplications, I put all the common stuff for each
-board inside an omap3-overo-xxx-common.dsti include file. By doing so,
-I can have minimal SoC-specific omap3-overo-xxx.dts (omap34xx based)
-and omap3-overo-storm-xxx.dts (omap36xx based) device trees.
-
-This series depends on my previous Overo series [1]. A complete testing
-tree (including the graphics support, soon to be posted) is available
-at [2].
-
-Regards,
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/111558
-[2] https://github.com/vaussard/linux.git (overo/for-3.15/review1)
-
-Florian Vaussard (7):
-  ARM: dts: overo: Create a file for common Gumstix peripherals
-  ARM: dts: overo: Add LIS33DE accelerometer
-  ARM: dts: Add support for the Overo Palo43
-  ARM: dts: Add support for the Overo Gallop43
-  ARM: dts: Add support for the Overo Alto35
-  ARM: dts: Add support for the Overo Chestnut43
-  ARM: dts: Add support for the Overo Summit
-
- arch/arm/boot/dts/Makefile                         | 10 +++
- arch/arm/boot/dts/omap3-overo-alto35-common.dtsi   | 77 ++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-alto35.dts           | 22 +++++
- .../boot/dts/omap3-overo-chestnut43-common.dtsi    | 69 ++++++++++++++++
- arch/arm/boot/dts/omap3-overo-chestnut43.dts       | 38 +++++++++
- .../boot/dts/omap3-overo-common-peripherals.dtsi   | 94 ++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi | 57 +++++++++++++
- arch/arm/boot/dts/omap3-overo-gallop43.dts         | 38 +++++++++
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   | 53 ++++++++++++
- arch/arm/boot/dts/omap3-overo-palo43.dts           | 38 +++++++++
- arch/arm/boot/dts/omap3-overo-storm-alto35.dts     | 21 +++++
- arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts | 38 +++++++++
- arch/arm/boot/dts/omap3-overo-storm-gallop43.dts   | 38 +++++++++
- arch/arm/boot/dts/omap3-overo-storm-palo43.dts     | 38 +++++++++
- arch/arm/boot/dts/omap3-overo-storm-summit.dts     | 30 +++++++
- arch/arm/boot/dts/omap3-overo-summit-common.dtsi   | 31 +++++++
- arch/arm/boot/dts/omap3-overo-summit.dts           | 30 +++++++
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi     | 38 +--------
- 18 files changed, 725 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-alto35.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-alto35.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-gallop43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-palo43.dts
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/Makefile                       |  2 ++
+ arch/arm/boot/dts/omap3-overo-storm-summit.dts   | 30 +++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-summit-common.dtsi | 31 ++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-summit.dts         | 30 +++++++++++++++++++++++
+ 4 files changed, 93 insertions(+)
  create mode 100644 arch/arm/boot/dts/omap3-overo-storm-summit.dts
  create mode 100644 arch/arm/boot/dts/omap3-overo-summit-common.dtsi
  create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7742e69..6565a7d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -217,6 +217,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-overo-storm-gallop43.dtb \
+ 	omap3-overo-palo43.dtb \
+ 	omap3-overo-storm-palo43.dtb \
++	omap3-overo-summit.dtb \
++	omap3-overo-storm-summit.dtb \
+ 	omap3-overo-tobi.dtb \
+ 	omap3-overo-storm-tobi.dtb \
+ 	omap3-gta04.dtb \
+diff --git a/arch/arm/boot/dts/omap3-overo-storm-summit.dts b/arch/arm/boot/dts/omap3-overo-storm-summit.dts
+new file mode 100644
+index 0000000..a0d7fd8
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-overo-storm-summit.dts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * Summit expansion board is manufactured by Gumstix Inc.
++ */
++
++/dts-v1/;
++
++#include "omap3-overo-storm.dtsi"
++#include "omap3-overo-summit-common.dtsi"
++
++/ {
++	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Summit";
++	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
++};
++
++&omap3_pmx_core2 {
++	led_pins: pinmux_led_pins {
++		pinctrl-single,pins = <
++			OMAP3630_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
++		>;
++	};
++};
++
+diff --git a/arch/arm/boot/dts/omap3-overo-summit-common.dtsi b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
+new file mode 100644
+index 0000000..999d1cd
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * Summit expansion board is manufactured by Gumstix Inc.
++ */
++
++#include "omap3-overo-common-peripherals.dtsi"
++
++/ {
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins>;
++		heartbeat {
++			label = "overo:red:gpio21";
++			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;		/* gpio_21 */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&lis33de {
++	status = "disabled";
++};
++
+diff --git a/arch/arm/boot/dts/omap3-overo-summit.dts b/arch/arm/boot/dts/omap3-overo-summit.dts
+new file mode 100644
+index 0000000..6976560
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-overo-summit.dts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * Summit expansion board is manufactured by Gumstix Inc.
++ */
++
++/dts-v1/;
++
++#include "omap3-overo.dtsi"
++#include "omap3-overo-summit-common.dtsi"
++
++/ {
++	model = "OMAP35xx Gumstix Overo on Summit";
++	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
++};
++
++&omap3_pmx_core2 {
++	led_pins: pinmux_led_pins {
++		pinctrl-single,pins = <
++			OMAP3430_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
++		>;
++	};
++};
++
 -- 
 1.8.3.2
