@@ -1,149 +1,100 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 11 Mar 2014 14:38:37 +0100
-Subject: [PATCH v6 03/10] Documentation: devicetree: Update Samsung FIMC DT
- binding
-In-Reply-To: <1608087.RUCeTiNcRR@avalon>
-References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
- <1394122819-9582-4-git-send-email-s.nawrocki@samsung.com>
- <1608087.RUCeTiNcRR@avalon>
-Message-ID: <531F11DD.5040300@samsung.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 11 Mar 2014 19:14:26 +0530
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CA+mB=1J6Lzy5fZ6+fU0xY5zLyeDtrjtUpJCYdM7eL-tsQ+jUVA@mail.gmail.com>
+References: <1394104717-3100-1-git-send-email-sthokal@xilinx.com>
+ <1394104717-3100-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1y1sOozVU=iAsotWG-q3N=SogjHjZ=iF04CiXF89eeOg@mail.gmail.com>
+ <CA+mB=1J6Lzy5fZ6+fU0xY5zLyeDtrjtUpJCYdM7eL-tsQ+jUVA@mail.gmail.com>
+Message-ID: <CAJe_Zhej0-i4uEPvXr3XH_8Qzd7SD-3yvJOp+MW4j+KJ8rt1PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-Thanks for your review.
-
-On 11/03/14 13:30, Laurent Pinchart wrote:
-[...]
->> ---
->>  .../devicetree/bindings/media/samsung-fimc.txt     |   34 ++++++++++++-----
->>  1 file changed, 26 insertions(+), 8 deletions(-)
+On 11 March 2014 00:00, Srikanth Thokala <sthokal@xilinx.com> wrote:
+> On Mon, Mar 10, 2014 at 9:30 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Thu, Mar 6, 2014 at 7:18 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
 >>
->> diff --git a/Documentation/devicetree/bindings/media/samsung-fimc.txt
->> b/Documentation/devicetree/bindings/media/samsung-fimc.txt index
->> 96312f6..dbd4020 100644
->> --- a/Documentation/devicetree/bindings/media/samsung-fimc.txt
->> +++ b/Documentation/devicetree/bindings/media/samsung-fimc.txt
->> @@ -32,6 +32,21 @@ way around.
->>
->>  The 'camera' node must include at least one 'fimc' child node.
->>
->> +Optional properties:
->> +
->> +- #clock-cells: from the common clock bindings
->> (../clock/clock-bindings.txt),
->> +  must be 1. A clock provider is associated with the 'camera' node and it
->> should
->> +  be referenced by external sensors that use clocks provided by the SoC on
->> +  CAM_*_CLKOUT pins. The clock specifier cell stores an index of a clock.
->> +  The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks respectively.
->> +
->> +- clock-output-names: from the common clock bindings, should contain names
->> of
->> +  clocks registered by the camera subsystem corresponding to CAM_A_CLKOUT,
->> +  CAM_B_CLKOUT output clocks respectively.
-> 
-> Wouldn't it be better to document the "cam_mclk_a" and "cam_mclk_b" names 
-> explicitly ? Or do you expect different names to be used in different DT files 
-> ? And as they correspond to the CAM_A_CLKOUT and CAM_B_CLKOUT pins, shouldn't 
-> they be named "cam_a_clkout" and "cam_b_clkout" ?
+>>> +static struct dma_async_tx_descriptor *
+>>> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+>>> +                                struct dma_interleaved_template *xt,
+>>> +                                unsigned long flags)
+>>> +{
+>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>> +       struct xilinx_vdma_tx_descriptor *desc;
+>>> +       struct xilinx_vdma_tx_segment *segment;
+>>> +       struct xilinx_vdma_tx_segment *prev = NULL;
+>>> +       int i;
+>>> +
+>>> +       if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM))
+>>> +               return NULL;
+>>> +
+>>> +       if (!xt->numf || !xt->sgl[0].size)
+>>> +               return NULL;
+>>> +
+>>> +       /* Allocate a transaction descriptor. */
+>>> +       desc = xilinx_vdma_alloc_tx_descriptor(chan);
+>>> +       if (!desc)
+>>> +               return NULL;
+>>> +
+>>> +       dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+>>> +       desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
+>>> +       desc->async_tx.cookie = 0;
+>>> +       async_tx_ack(&desc->async_tx);
+>>> +
+>>> +       /* Build the list of transaction segments. */
+>>> +       for (i = 0; i < xt->frame_size; i++) {
+>>> +               struct xilinx_vdma_desc_hw *hw;
+>>> +
+>>> +               /* Allocate the link descriptor from DMA pool */
+>>> +               segment = xilinx_vdma_alloc_tx_segment(chan);
+>>> +               if (!segment)
+>>> +                       goto error;
+>>> +
+>>> +               /* Fill in the hardware descriptor */
+>>> +               hw = &segment->hw;
+>>> +               hw->vsize = xt->numf;
+>>> +               hw->hsize = xt->sgl[0].size;
+>>> +               hw->stride = xt->sgl[0].icg <<
+>>> +                               XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT;
+>>>
+>> It seems the xt->frame_size is (should be?) always going to be 1?
+>> If yes, the for-loop isn't needed.
+>> If no, you should probably use 'i' as the index to sgl[], and not always 0.
+>
+> It can be either
+> '1':  User can queue each segment and submit all the segments at once as a
+>       single async tx descriptor.  I am using this for scatter-gather mode of
+>       operation where the src_start/dst_start is different for each segment.
+> 'Number of frames':  In this case the driver gets contiguous frame buffer memory
+>       and it prepares segments with addresses as multiples of
+> src_start/dst_start.
+>
+Quoting you from earlier thread ....
+" In video frame context,
+chunk.size -> hsize
+chunk.icg -> stride
+numf -> vsize
+and frame_size is always 1 as it will have only one chunk in a line. "
+ ... which makes sense.
 
-Basically I could use fixed names for these clocks, I just wanted to keep
-a possibility to override them in dts to avoid any possible clock name
-collisions, rather than keep a list of different names per SoC in the driver. 
-Right now fixed names could also be used for all SoCs I'm aware of, 
-nevertheless I would prefer to keep the clock-output-names property.
-"cam_a_clkout", "cam_b_clkout" may be indeed better names, I'll change
-that.
+I hope you realize that, 'frame_size' denotes the number of chunks in
+a frame and 'numf' denotes the number of frames in the transfer
+request. It seems wrong when you assume  vsize:=numf  but
+frame_size>1 ... i.e, each horizontal video line has two or more
+dis-contiguous chunks?   This might work for client drivers written
+specifically for Xilinx AXI Video DMAC but will fail over any other
+controller driver.
 
->> +Note: #clock-cells and clock-output-names are mandatory properties if
->> external
->> +image sensor devices reference 'camera' device node as a clock provider.
->> +
-> 
-> What's the reason not to make them always mandatory ? Backward compatibility 
-> only ? If so wouldn't it make sense to document the properties as mandatory 
-> from now on, and treating them as optional in the driver for backward 
-> compatibility ?
+ IMO, xilinx_vdma.c should expect only 1 video frame per
+device_prep_interleaved_dma() call (i.e, vsize=numf and frame_size==1)
+  Let the client driver submit 1/2/.../16 requests before kick
+starting the DMA. Upon  dma_async_tx_descriptor.callback(), the client
+'refills' the frame and re-queues it back. This should work because
+the video-frames' attributes and locations are not going to change
+within a session.
 
-Yes, it's for backwards compatibility only. It may be a good idea to just 
-document them as required, since this is how the device is expected to be 
-described in DT from now. I'll just make these a required properties, 
-the driver already handles them as optional.
-
->>  'fimc' device nodes
->>  -------------------
->>
->> @@ -97,8 +112,8 @@ Image sensor nodes
->>  The sensor device nodes should be added to their control bus controller
->> (e.g. I2C0) nodes and linked to a port node in the csis or the
->> parallel-ports node, using the common video interfaces bindings, defined in
->> video-interfaces.txt.
->> -The implementation of this bindings requires clock-frequency property to be
->> -present in the sensor device nodes.
->> +An optional clock-frequency property needs to be present in the sensor
->> device
->> +nodes. Default value when this property is not present is 24 MHz.
-> 
-> This bothers me. Having the FIMC driver read the clock-frequence property from 
-> the sensor DT nodes feels like a layering violation. Shouldn't the sensor 
-> drivers call clk_set_rate() explicitly instead ?
-
-It is supposed to do so, after this whole patch series. So the camera
-controller driver will not need such properties. What do you think about
-removing this sentence altogether ?
-
->>  Example:
->>
->> @@ -114,7 +129,7 @@ Example:
->>  			vddio-supply = <...>;
->>
->>  			clock-frequency = <24000000>;
->> -			clocks = <...>;
->> +			clocks = <&camera 1>;
->>  			clock-names = "mclk";
->>
->>  			port {
->> @@ -135,7 +150,7 @@ Example:
->>  			vddio-supply = <...>;
->>
->>  			clock-frequency = <24000000>;
->> -			clocks = <...>;
->> +			clocks = <&camera 0>;
->>  			clock-names = "mclk";
->>
->>  			port {
->> @@ -149,12 +164,15 @@ Example:
->>
->>  	camera {
->>  		compatible = "samsung,fimc", "simple-bus";
->> -		#address-cells = <1>;
->> -		#size-cells = <1>;
->> -		status = "okay";
->> -
->> +		clocks = <&clock 132>, <&clock 133>;
->> +		clock-names = "sclk_cam0", "sclk_cam1";
-> 
-> The documentation mentions that clock-names must contain "sclk_cam0", 
-> "sclk_cam1", "pxl_async0", "pxl_async1". Are the last two optional ? If so I 
-> think you should clarify the description of the clock-names property. This can 
-> be done in a separate patch.
-
-"pxl_async0", "pxl_async1" are mandatory, I'll add them also into
-this example dts.
-
->> +		#clock-cells = <1>;
->> +		clock-output-names = "cam_mclk_a", "cam_mclk_b";
->>  		pinctrl-names = "default";
->>  		pinctrl-0 = <&cam_port_a_clk_active>;
->> +		status = "okay";
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->>
->>  		/* parallel camera ports */
->>  		parallel-ports {
-
---
-Regards,
-Sylwester
+> Please let me know if you see any issues in this implementation.
+>
+I am ok if you want the driver upstream now and want to 'fix' it when
+you actually start seeing problems :)
