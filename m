@@ -1,72 +1,81 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 12 Mar 2014 04:56:28 +0800
-Subject: [PATCH for 3.14] ARM: at91: fix network interface ordering for
- sama5d36
-In-Reply-To: <1394462238-22313-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1394462238-22313-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <366E83ED-36B1-469F-891C-5B0E8916D85A@jcrosoft.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Mar 2014 14:03:50 -0700
+Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
+In-Reply-To: <20140311180150.GD25796@e102568-lin.cambridge.arm.com>
+References: <20140116180505.GA30925@codeaurora.org>
+ <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+ <20140116192617.GA13785@codeaurora.org>
+ <20140117102109.GA22544@e102568-lin.cambridge.arm.com>
+ <20140219002043.GE14769@codeaurora.org>
+ <20140225111655.GA6855@e102568-lin.cambridge.arm.com>
+ <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
+ <20140226120103.GA25326@e102568-lin.cambridge.arm.com>
+ <20140307230856.GE9985@codeaurora.org>
+ <20140311180150.GD25796@e102568-lin.cambridge.arm.com>
+Message-ID: <20140311210350.GF9985@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/11, Lorenzo Pieralisi wrote:
+> On Fri, Mar 07, 2014 at 11:08:56PM +0000, Stephen Boyd wrote:
+> > 
+> > Or should we be expressing the L1 cache as well? Something like:
+> > 
+> >         cpus {  
+> >                 #address-cells = <1>;
+> >                 #size-cells = <0>;
+> > 
+> >                 cpu at 0 { 
+> >                         compatible = "qcom,krait";
+> >                         device_type = "cpu";
+> >                         reg = <0>;
+> >                         next-level-cache = <&L1_0>;
+> > 
+> > 			L1_0: l1-cache {
+> > 				compatible = "arm,arch-cache";
+> > 				interrupts = <1 14 0x304>;
+> > 				next-level-cache = <&L2>;
+> > 			}
+> >                 };
+> > 
+> >                 cpu at 1 { 
+> >                         compatible = "qcom,krait";
+> >                         device_type = "cpu";
+> >                         reg = <1>;
+> >                         next-level-cache = <&L1_1>;
+> > 
+> > 			L1_1: l1-cache {
+> > 				compatible = "arm,arch-cache";
+> > 				interrupts = <1 14 0x304>;
+> > 				next-level-cache = <&L2>;
+> > 			}
+> >                 };
+> > 
+> >                 L2: l2-cache {
+> >                         compatible = "arm,arch-cache";
+> >                         interrupts = <0 2 0x4>;
+> > 		};
+> > 	};
+> > 
+> > (I'm also wondering if the 3rd cell of the interrupt binding
+> > should only indicate the CPU that the interrupt property is
+> > inside?)
+> 
+> I am not aware of interrupts associated with vanilla :) "arm,arch-cache"
+> objects, so I think that should be handled as a "qcom,krait" specific property
+> (in the cpu node), or you should add another cache binding (compatible) for
+> that.
+> 
+> As you might have noticed (idle states thread) I am keen on defining objects
+> for L1 caches explicitly, that patch still requires an ACK though (and
+> you need to update it since you cannot add an interrupt property for all
+> "arm,arch-cache" objects. I am sorry for being a pain, but I do not
+> think that's correct from a HW description standpoint).
+> 
 
-On Mar 10, 2014, at 10:37 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Ok. s/arm,arch-cache/qcom,arch-cache/ then. I imagine it is easy
+enough to add some bits in the cache binding once it's accepted.
 
-> From: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> 
-> On the newly introduced sama5d36, Gigabit and 10/100 Ethernet network
-> interfaces are probed in a different order than for the sama5d35.
-> Moreover, users are accustomed to this order in bootloaders and backports
-> for older kernel revisions.
-> So this patch switches DT node order as it is done for the other dual-Ethernet
-> sama5d3 SoC.
-> Better interface numbering which does not depend on DT node order is being
-> developed for stronger interface identification.
-
-twick ethernet enumerating by playing on the DT order is week
-
-It?s better to introduce a new property
-
-linux,ethernet-id or something like or simply rely on other information on the userspace to identify the
-proper interface
-
-Nicolas for AT91 keep me in Cc
-
-Best Regards,
-J.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Olof, Arnd and Kevin,
-> 
-> I would like to include this fix in 3.14-final.
-> I do not have anymore patch for an at91-3.14-fixes branch so I only send this
-> single patch to you. Can you still take it?
-> 
-> Thanks, best regards,
-> 
-> arch/arm/boot/dts/sama5d36.dtsi | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
-> index 6c31c26e6cc0..db58cad6acd3 100644
-> --- a/arch/arm/boot/dts/sama5d36.dtsi
-> +++ b/arch/arm/boot/dts/sama5d36.dtsi
-> @@ -8,8 +8,8 @@
->  */
-> #include "sama5d3.dtsi"
-> #include "sama5d3_can.dtsi"
-> -#include "sama5d3_emac.dtsi"
-> #include "sama5d3_gmac.dtsi"
-> +#include "sama5d3_emac.dtsi"
-> #include "sama5d3_lcd.dtsi"
-> #include "sama5d3_mci2.dtsi"
-> #include "sama5d3_tcb1.dtsi"
-> -- 
-> 1.8.2.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
