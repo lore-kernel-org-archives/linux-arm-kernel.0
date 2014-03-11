@@ -1,75 +1,45 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 11 Mar 2014 08:50:57 -0700
-Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <531ECA33.8050803@monstr.eu>
-References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
- <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
- <531DA900.5060202@monstr.eu>
- <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
- <531ECA33.8050803@monstr.eu>
-Message-ID: <21bfd874-8084-4d23-b973-42a0e50157bc@AM1EHSMHS009.ehs.local>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Mar 2014 16:51:00 +0100
+Subject: [PATCH] irqchip: sun4i: Fix irq 0 not working
+Message-ID: <1394553060-30298-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-11 at 09:32AM +0100, Michal Simek wrote:
-> On 03/10/2014 11:32 PM, S?ren Brinkmann wrote:
-> > On Mon, 2014-03-10 at 12:58PM +0100, Michal Simek wrote:
-> >> On 03/10/2014 11:56 AM, Mark Rutland wrote:
-> >>> On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary Kalluri wrote:
-> >>>> Added EDAC support for reporting the ecc errors of zynq ddr controller.
-> >>>> The ddr ecc controller corrects single bit errors and detects double bit
-> >>>> errors
-> >>>>
-> >>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> >>>> ---
-> >>>>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
-> >>>>  drivers/edac/Kconfig                               |    7 +
-> >>>>  drivers/edac/Makefile                              |    1 +
-> >>>>  drivers/edac/zynq_edac.c                           |  613 ++++++++++++++++++++
-> >>>>  4 files changed, 639 insertions(+), 0 deletions(-)
-> >>>>  create mode 100644 Documentation/devicetree/bindings/edac/zynq_edac.txt
-> >>>>  create mode 100644 drivers/edac/zynq_edac.c
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/edac/zynq_edac.txt b/Documentation/devicetree/bindings/edac/zynq_edac.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..c21ff83
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
-> >>>> @@ -0,0 +1,18 @@
-> >>>> +Zynq EDAC driver, it does reports the DDR ECC single bit errors that are
-> >>>> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
-> >>>> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
-> >>>> +
-> >>>> +Required properties:
-> >>>> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
-> >>>
-> >>> Is this an or or a xor?
-> >>
-> >> Compatible string should be just xlnx,zynq-ddrc-1.00.a.
-> >> Nothing with ps7.
-> > 
-> > Isn't this vendor IP? IMHO, this should be something completely
-> > different. Or if you want some Zynq-specific compat string it should
-> > refer to an actual version string associated with Zynq. 1.00.a is not,
-> > AFAIK.
-> 
-> I have checked with Punnaiah that this is Synopsys DDR memory controller.
-> Zynq is based on 1.4 version with some customization.
-> It means I think reasonable solution is
-> call it drivers/edac/synopsys_edac.c
-> rename zynq_ in driver to synopsys_ and
-> use xlnx,zynq-ddrc-1.00.a compatible string because zynq is not using
-> clean synopsys version.
-> 
-> I am not getting point why you don't like 1.00.a suffix here.
-> Because of historical point of view compatible strings should be different
-> for early silicon, silicon v1, silicon v2, silicon v3, etc
-> but we haven't used it at all that's why we can use xilinx scheme
-> which we are using for our soft IPs.
+SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 2 things:
+1) irq 0 pending
+2) no more irqs pending
 
-Well, but you refer to Zynq which has silicon revisions you can use to
-refer to a specific Zynq version. That matches data sheets. Zynq-1.00.a
-is just completely made up and wouldn't be found in any data sheet.
+So we must loop always atleast once to make irq 0 work, otherwise irq 0
+will never get serviced and we end up with a hard hang because
+sun4i_handle_irq gets re-entered constantly.
 
-	S?ren
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/irqchip/irq-sun4i.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index a5438d8..3761bf1 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -140,10 +140,16 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
+ {
+ 	u32 irq, hwirq;
+ 
++	/*
++	 * hwirq == 0 can mean one of 2 things:
++	 * 1) irq 0 pending
++	 * 2) no more irqs pending
++	 * So loop always atleast once to make irq 0 work.
++	 */
+ 	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+-	while (hwirq != 0) {
++	do {
+ 		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+ 		handle_IRQ(irq, regs);
+ 		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+-	}
++	} while (hwirq != 0);
+ }
+-- 
+1.9.0
