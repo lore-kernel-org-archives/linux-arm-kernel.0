@@ -1,52 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 11 Mar 2014 20:15:04 +0100
-Subject: [PATCH] ARM: shmobile: compile drivers/sh for
- CONFIG_ARCH_SHMOBILE_MULTI
-In-Reply-To: <1566590.zu3Q3sqakp@avalon>
-References: <1389707776-23306-1-git-send-email-ben.dooks@codethink.co.uk>
- <1482392.XFeYNLvUZH@avalon> <20140120155643.GQ17314@sirena.org.uk>
- <1566590.zu3Q3sqakp@avalon>
-Message-ID: <CAMuHMdU4v9=BxTKk-=z4GE55KCuxuPry93OtGrTOzJ5ke8WT=g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Mar 2014 19:29:40 +0000
+Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
+ regulators subsystem
+In-Reply-To: <20140311192411.GA4193@localhost.fastwebnet.it>
+References: <1393692352-10839-1-git-send-email-carlo@caione.org>
+ <1393692352-10839-7-git-send-email-carlo@caione.org>
+ <20140303015616.GN2411@sirena.org.uk>
+ <20140311192411.GA4193@localhost.fastwebnet.it>
+Message-ID: <20140311192940.GA28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, Mar 11, 2014 at 08:24:11PM +0100, Carlo Caione wrote:
+> On Mon, Mar 03, 2014 at 10:56:16AM +0900, Mark Brown wrote:
 
-On Mon, Jan 20, 2014 at 11:52 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 20 January 2014 15:56:43 Mark Brown wrote:
->> On Mon, Jan 20, 2014 at 04:48:10PM +0100, Laurent Pinchart wrote:
->> > The problem isn't as simple as it seems, and more advanced implementations
->> > that would allow listing clocks that should be managed automatically (or
->> > the other way around) would also add another level of complexity. The
->> > required information is platform-dependent, but we currently don't
->> > express it as such in DT.
->>
->> Well, the set of clocks an IP requires will tend to be the same - it's
->> normally just that integrators may have done things like tie them together
->> or decide to spread confusion by renaming them.
->
-> That's the problem :-) How should the runtime PM core be given the list of
-> clocks it needs to manage ? That information needs to come from somewhere.
+> > > +	regulators = of_find_node_by_name(np, "regulators");
+> > > +	if (!regulators) {
+> > > +		dev_err(&pdev->dev, "regulators node not found\n");
+> > > +		return -EINVAL;
+> > > +	}
 
-Stirring the pot again...
+> > The driver should be able to start up with no configuration provided at
+> > all except for the device being registered - the user won't be able to
+> > change anything but they will be able to read the current state of the
+> > hardware which can be useful for diagnostics.
 
-Which clocks a device needs is expressed in DT with CCF.
-In the simple case, the runtime PM core can just control them based on
-device use.
-In the complex case, the driver can regain control using its own pm
-callbacks, right?
+> If the device is DT enabled and no configuration is provided for
+> regulators, these are disabled according to:
 
-Probably I'm still missing something, as I haven't had enough exposure to
-runtime PM and CCF ;-)
+> http://lxr.linux.no/linux+v3.13.5/drivers/regulator/core.c#L3797
 
-Gr{oetje,eeting}s,
+> Am I missing something or do you have any pointer?
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+With the above code the driver will return an error and never get as far
+as registering the regulator.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/fdccf963/attachment-0001.sig>
