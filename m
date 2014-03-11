@@ -1,219 +1,81 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 11 Mar 2014 12:16:11 +0800
-Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
-In-Reply-To: <B256D81BAE5131468A838E5D7A24364172FFB955@penmbx01>
-References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
- <635C1A75-4651-4B2C-AB64-E1D170A1F5F9@jcrosoft.com>
- <B256D81BAE5131468A838E5D7A24364172FF4EC4@penmbx01>
- <B256D81BAE5131468A838E5D7A24364172FFB955@penmbx01>
-Message-ID: <F73ABBC2-BFD3-43D5-9BAB-5D17CD585E89@jcrosoft.com>
+From: mark.roszko@gmail.com (Marek Roszko)
+Date: Tue, 11 Mar 2014 00:25:38 -0400
+Subject: [PATCH v3] i2c:at91: Add device tree property to set clock-frequency
+Message-ID: <1394511938-28653-1-git-send-email-mark.roszko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the ability to set "clock-frequency" in the device tree for the at91
+i2cbus following the naming of other i2c bus implementations. If the property
+is not set,the clock frequency will default to the previously used define 
+of 100KHz.
 
-On Mar 11, 2014, at 9:28 AM, Yang, Wenyou <Wenyou.Yang@atmel.com> wrote:
+Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+---
+v3:		
+		-changed bus_clk_rate to u32
+v2:
+        -fixed return code usage and check to not compare agaisnt less than zero
 
-> Hi JC,
-> 
->> -----Original Message-----
->> From: Yang, Wenyou
->> Sent: Wednesday, March 05, 2014 1:32 PM
->> To: Jean-Christophe PLAGNIOL-VILLARD
->> Cc: linus.walleij at linaro.org; b.brezillon at overkiz.com; <linux-arm-
->> kernel at lists.infradead.org> mailing list; Linux Kernel list;
->> devicetree at vger.kernel.org; robh+dt at kernel.org; pawel.moll at arm.com;
->> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
->> galak at codeaurora.org
->> Subject: RE: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
->> 
->> Hi JC,
->> 
->>> -----Original Message-----
->>> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
->>> Sent: Wednesday, March 05, 2014 12:58 PM
->>> To: Yang, Wenyou
->>> Cc: Jean-Christophe PLAGNIOL-VILLARD; linus.walleij at linaro.org;
->>> b.brezillon at overkiz.com; <linux-arm-kernel@lists.infradead.org>
->>> mailing list; Linux Kernel list; devicetree at vger.kernel.org;
->>> robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
->>> ijc+devicetree at hellion.org.uk; galak at codeaurora.org
->>> Subject: Re: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
->>> 
->>> 
->>> On Mar 5, 2014, at 9:53 AM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
->>> 
->>>> In order to support the pinctrl sleep state.
->>> 
->>> As I said before NACK
->>> 
->>> this is not the job of the pinctrl to describe gpio output or input
->>> state
->> But according to what said in the section "GPIO mode pitfalls" of
->> Documentation/pinctrl.txt.
->> It should be handle by the pinctrl.
->> 
->> If not, to deal with the sleep state will be very complicated.
->> Muxing the pins for FUNCTION to enable peripheral, then twist them over
->> to GPIO mode and use gpio_direction_output() to drive it HIGH or LOW
->> during sleep.
->> 
->> --->8 ------------
->> The solution is to not think that what the datasheet calls "GPIO mode"
->> has to be handled by the <linux/gpio.h> interface. Instead view this as
->> a certain pin config setting. Look in e.g. <linux/pinctrl/pinconf-
->> generic.h> and you find this in the documentation:
->> 
->>  PIN_CONFIG_OUTPUT: this will configure the pin in output, use argument
->>     1 to indicate high level, argument 0 to indicate low level.
->> 
->> So it is perfectly possible to push a pin into "GPIO mode" and drive the
->> line low as part of the usual pin control map.
->> ---<8 ------------
-> 
-> Do you have any feedback?
+---
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |    2 ++
+ drivers/i2c/busses/i2c-at91.c                      |   10 ++++++++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-Here the issue is that you do drive the gpio and use as a gpio
-
-which means you request it as a GPIO so after you can not reswitch it to alternative function
-and the gpio is already requested as alternative function
-
-So basically you mess-up with the gpio API and pinctrl API by bypassing both
-
-Best Regards,
-J.
-
-> 
-> Thanks,
-> Wenyou Yang
-> 
->> 
->>> 
->>> Best Regards,
->>> J.
->>>> 
->>>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->>>> ---
->>>> Hi Linus,
->>>> 
->>>> The patch is based on branch: for-next
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl
->>>> 
->>>> Best Regards,
->>>> Wenyou Yang
->>>> 
->>>> drivers/pinctrl/pinctrl-at91.c     |   31
->>> +++++++++++++++++++++++++++++++
->>>> include/dt-bindings/pinctrl/at91.h |    2 ++
->>>> 2 files changed, 33 insertions(+)
->>>> 
->>>> diff --git a/drivers/pinctrl/pinctrl-at91.c
->>>> b/drivers/pinctrl/pinctrl-at91.c index 5d24aae..fc51e59 100644
->>>> --- a/drivers/pinctrl/pinctrl-at91.c
->>>> +++ b/drivers/pinctrl/pinctrl-at91.c
->>>> @@ -62,6 +62,8 @@ static int gpio_banks;
->>>> #define DEGLITCH	(1 << 2)
->>>> #define PULL_DOWN	(1 << 3)
->>>> #define DIS_SCHMIT	(1 << 4)
->>>> +#define GPIO_OUTPUT_HIGH	(1 << 5)
->>>> +#define GPIO_OUTPUT_LOW		(1 << 6)
->>>> #define DEBOUNCE	(1 << 16)
->>>> #define DEBOUNCE_VAL_SHIFT	17
->>>> #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
->>>> @@ -152,12 +154,15 @@ struct at91_pinctrl_mux_ops {
->>>> 	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
->>>> 	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
->>>> 	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
->>>> +	bool (*get_gpio_output)(void __iomem *pio, unsigned mask);
->>>> +	void (*set_gpio_output)(void __iomem *pio, unsigned mask, bool
->>>> +is_high);
->>>> 	/* irq */
->>>> 	int (*irq_type)(struct irq_data *d, unsigned type); };
->>>> 
->>>> static int gpio_irq_type(struct irq_data *d, unsigned type); static
->>>> int alt_gpio_irq_type(struct irq_data *d, unsigned type);
->>>> +static void at91_mux_gpio_enable(void __iomem *pio, unsigned mask,
->>>> +bool input);
->>>> 
->>>> struct at91_pinctrl {
->>>> 	struct device		*dev;
->>>> @@ -472,6 +477,20 @@ static bool at91_mux_pio3_get_schmitt_trig(void
->>> __iomem *pio, unsigned pin)
->>>> 	return (__raw_readl(pio + PIO_SCHMITT) >> pin) & 0x1; }
->>>> 
->>>> +static bool at91_mux_pio3_get_gpio_output(void __iomem *pio,
->>>> +unsigned
->>>> +pin) {
->>>> +	return (__raw_readl(pio + PIO_ODSR) >> pin) & 0x1; }
->>>> +
->>>> +static void at91_mux_pio3_set_gpio_output(void __iomem *pio,
->>>> +						unsigned mask,
->>>> +						bool is_high)
->>>> +{
->>>> +	at91_mux_gpio_enable(pio, mask, 0);
->>>> +	writel_relaxed(mask, pio + (is_high ? PIO_SODR : PIO_CODR)); }
->>>> +
->>>> +
->>>> static struct at91_pinctrl_mux_ops at91rm9200_ops = {
->>>> 	.get_periph	= at91_mux_get_periph,
->>>> 	.mux_A_periph	= at91_mux_set_A_periph,
->>>> @@ -495,6 +514,8 @@ static struct at91_pinctrl_mux_ops
->>>> at91sam9x5_ops
->>> = {
->>>> 	.set_pulldown	= at91_mux_pio3_set_pulldown,
->>>> 	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
->>>> 	.disable_schmitt_trig = at91_mux_pio3_disable_schmitt_trig,
->>>> +	.get_gpio_output = at91_mux_pio3_get_gpio_output,
->>>> +	.set_gpio_output = at91_mux_pio3_set_gpio_output,
->>>> 	.irq_type	= alt_gpio_irq_type,
->>>> };
->>>> 
->>>> @@ -741,6 +762,10 @@ static int at91_pinconf_get(struct pinctrl_dev
->>> *pctldev,
->>>> 		*config |= PULL_DOWN;
->>>> 	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio,
->>> pin))
->>>> 		*config |= DIS_SCHMIT;
->>>> +	if (info->ops->get_gpio_output) {
->>>> +		*config |= info->ops->get_gpio_output(pio, pin) ?
->>>> +					GPIO_OUTPUT_HIGH : GPIO_OUTPUT_LOW;
->>>> +	}
->>>> 
->>>> 	return 0;
->>>> }
->>>> @@ -778,6 +803,12 @@ static int at91_pinconf_set(struct pinctrl_dev
->>> *pctldev,
->>>> 			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
->>>> 		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
->>>> 			info->ops->disable_schmitt_trig(pio, mask);
->>>> +		if (info->ops->set_gpio_output) {
->>>> +			if (config & GPIO_OUTPUT_HIGH)
->>>> +				info->ops->set_gpio_output(pio, mask, 1);
->>>> +			if (config & GPIO_OUTPUT_LOW)
->>>> +				info->ops->set_gpio_output(pio, mask, 0);
->>>> +		};
->>>> 
->>>> 	} /* for each config */
->>>> 
->>>> diff --git a/include/dt-bindings/pinctrl/at91.h
->>>> b/include/dt-bindings/pinctrl/at91.h
->>>> index 0fee6ff..e799268 100644
->>>> --- a/include/dt-bindings/pinctrl/at91.h
->>>> +++ b/include/dt-bindings/pinctrl/at91.h
->>>> @@ -15,6 +15,8 @@
->>>> #define AT91_PINCTRL_DEGLITCH		(1 << 2)
->>>> #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
->>>> #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
->>>> +#define AT91_PINCTRL_OUTPUT_HIGH	(1 << 5)
->>>> +#define AT91_PINCTRL_OUTPUT_LOW		(1 << 6)
->>>> #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
->>>> #define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
->>>> 
->>>> --
->>>> 1.7.9.5
->>>> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+index 4fade84..388f0a2 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+@@ -12,6 +12,7 @@ Required properties :
+ - clocks: phandles to input clocks.
+ 
+ Optional properties:
++- clock-frequency: Desired I2C bus frequency in Hz, otherwise defaults to 100000
+ - Child nodes conforming to i2c bus binding
+ 
+ Examples :
+@@ -23,6 +24,7 @@ i2c0: i2c at fff84000 {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 	clocks = <&twi0_clk>;
++	clock-frequency = <400000>;
+ 
+ 	24c512 at 50 {
+ 		compatible = "24c512";
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 843d012..334c851 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -32,7 +32,7 @@
+ #include <linux/slab.h>
+ #include <linux/platform_data/dma-atmel.h>
+ 
+-#define TWI_CLK_HZ		100000			/* max 400 Kbits/s */
++#define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
+ #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
+ #define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
+ 
+@@ -711,6 +711,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	struct resource *mem;
+ 	int rc;
+ 	u32 phy_addr;
++	u32 bus_clk_rate;
+ 
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+ 	if (!dev)
+@@ -756,7 +757,12 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 			dev->use_dma = true;
+ 	}
+ 
+-	at91_calc_twi_clock(dev, TWI_CLK_HZ);
++	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
++			&bus_clk_rate);
++	if (rc)
++		bus_clk_rate = DEFAULT_TWI_CLK_HZ;
++
++	at91_calc_twi_clock(dev, bus_clk_rate);
+ 	at91_init_twi_bus(dev);
+ 
+ 	snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
+-- 
+1.7.10.4
