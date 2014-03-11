@@ -1,55 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 11 Mar 2014 12:27:01 +0000
-Subject: [PATCH] cpufreq: enable ARM drivers on arm64
-In-Reply-To: <1393208877-15797-1-git-send-email-broonie@kernel.org>
-References: <1393208877-15797-1-git-send-email-broonie@kernel.org>
-Message-ID: <531F0115.4000109@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 11 Mar 2014 13:28:04 +0100
+Subject: [PATCH 3/5] ARM: dts: exynos4x12: Add GPS_ALIVE power domain
+In-Reply-To: <1394524494-30641-4-git-send-email-cw00.choi@samsung.com>
+References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+ <1394524494-30641-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <531F0154.9040409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Chanwoo,
 
-Sorry for late response, looks like Rafael has pulled this change, but ...
-
-On 24/02/14 02:27, Mark Brown wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 11.03.2014 08:54, Chanwoo Choi wrote:
+> This patch add GPS_ALIVE power domain for Exynos4x12 SoC. GPS_ALIVE power domain
+> include GPS_BLK for GPS IP. Exynos SoC used generic power-domain driver to
+> control power domain. After completed kernel booting, Exynos power-domain driver
+> disable un-used power domain to reduce power-consumption/leak.
 >
-> Enable cpufreq and power kconfig menus on arm64 along with arm cpufreq
-> drivers. The power menu is needed for OPP support. At least on Calxeda
-> systems, the same cpufreq driver is used for arm and arm64 based
-> systems.
+> If GPS_ALIVE power domain isn't registered to Exynos power-domain driver,
+> happen power-leakage because GPS_ALIVE_CONFIGURATION is default power on state.
 >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+> - 0x10023D00 : GPS_ALIVE_CONFIGURATION register address
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->   arch/arm64/Kconfig      | 8 ++++++++
->   drivers/cpufreq/Kconfig | 2 +-
->   2 files changed, 9 insertions(+), 1 deletion(-)
+>   arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index fea7b47..939e95a 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -327,6 +327,14 @@ source "drivers/cpuidle/Kconfig"
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index 1ec77f6..066eb35 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -41,6 +41,11 @@
+>   		compatible = "samsung,exynos4210-pd";
+>   		reg = <0x10023CA0 0x20>;
+>   	};
+> +	
+> +	pd_gps_alive: gps-alive-power-domain at 10023D00 {
+> +		compatible = "samsung,exynos4210-pd";
+> +		reg = <0x10023D00 0x20>;
+> +	};
 >
->   endmenu
->
-> +menu "Power management options"
-> +
-> +source "kernel/power/Kconfig"
-> +
-> +source "drivers/cpufreq/Kconfig"
-> +
-> +endmenu
-> +
 
-Is this patch based on recent kernels ? If so, either it should have caused
-conflicts or silently duplicated the entries. "Power management options" are
-already present.
+Exynos4210 seems to have this power domain as well, so I guess this 
+change should be done to exynos4.dtsi instead.
 
-Also to be more consistent it with menu options, I would prefer this to be
-placed under "CPU Power Management" like CPUIdle.
-
-Regards,
-Sudeep
+Best regards,
+Tomasz
