@@ -1,101 +1,104 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 11 Mar 2014 11:40:43 +0100
-Subject: [PATCH v2 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <1d35d91fd0f1414587edf47ab03e20ae@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1394002352-8380-1-git-send-email-yao.yuan@freescale.com>
- <20140310020051.GA15218@S2101-09.ap.freescale.net>
- <1d35d91fd0f1414587edf47ab03e20ae@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201403111140.44044.marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 11 Mar 2014 08:58:24 -0300
+Subject: [PATCH v2][ 4/8] ARM: dts: imx25.dtsi: Fix USB support.
+In-Reply-To: <1394535304-10240-4-git-send-email-denis@eukrea.com>
+References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
+ <1394535304-10240-4-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5CX9GhKpKLf5JVth8zqt5sEaML8q9pbBgBPXSDKCAueBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 11, 2014 at 06:27:39 AM, Yao Yuan wrote:
-> On Thu, Mar 10, 2014 at 10:01:42 AM, Marek Vasut wrote:
-> > On Thu, Mar 06, 2014 at 12:57:42PM +0100, Marek Vasut wrote:
-> > > On Thursday, March 06, 2014 at 06:02:03 AM, Yao Yuan wrote:
-> > > > On Thu, March 06, 2014 at 12:44:14 PM, Marek Vasut wrote:
-> > > > > On Thursday, March 06, 2014 at 05:36:14 AM, Yao Yuan wrote:
-> > > > > > On Thu, March 06, 2014 at 11:23:50 AM, Marek Vasut wrote:
-> > > > > > > On Wednesday, March 05, 2014 at 07:52:31 AM, Yuan Yao wrote:
-> > > > > > > > Add dma support for i2c. This function depend on DMA driver.
-> > > > > > > > You can turn on it by write both the dmas and dma-name
-> > > > > > > > properties in dts node.
-> > > > > > > > 
-> > > > > > > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > > > > > > > ---
-> > > > > > > 
-> > > > > > > [...]
-> > > > > > > 
-> > > > > > > > @@ -601,6 +826,7 @@ static int i2c_imx_probe(struct
-> > > > > > > > platform_device
-> > > > > > > 
-> > > > > > > *pdev)
-> > > > > > > 
-> > > > > > > >  	void __iomem *base;
-> > > > > > > >  	int irq, ret;
-> > > > > > > >  	u32 bitrate;
-> > > > > > > > 
-> > > > > > > > +	u32 phy_addr;
-> > > > > > > > 
-> > > > > > > >  	dev_dbg(&pdev->dev, "<%s>\n", __func__);
-> > > > > > > > 
-> > > > > > > > @@ -611,6 +837,7 @@ static int i2c_imx_probe(struct
-> > > > > > > > platform_device
-> > > > > > > 
-> > > > > > > *pdev)
-> > > > > > > 
-> > > > > > > >  	}
-> > > > > > > >  	
-> > > > > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > > > > > 
-> > > > > > > > +	phy_addr = res->start;
-> > > > > > > 
-> > > > > > > Uh ... Shawn, I really think I am lost here. Don't you need to
-> > > > > > > map this memory before you can use it for DMA ? The DMA
-> > > > > > > mapping function should give you the physical address and is
-> > > > > > > the right way to go about this instead of pulling the address
-> > 
-> > from here, no ?
-> > 
-> > > > > > > I might be wrong here, I am rather uncertain, so please help me
-> > 
-> > out.
-> > 
-> > > > > > > Thanks!
-> > > > > > 
-> > > > > > Hi, Marek, Thanks for your suggestion.
-> > > > > > Here you can review the code in include/linux/ioport.h The
-> > > > > > resource->start describes the entity on the CPU bus as a
-> > > > > > resource->starting
-> > > > > > physical address. So I thinks it can used for dma directly.
-> > > > > 
-> > > > > This doesn't feel right for some reason. If this is a register
-> > > > > area, you should
-> > > > > ioremap() it. If it's a memory area you do DMA to/from, you need
-> > > > > to make sure you correctly flush/invalidate caches and properly
-> > > > > handle the effects the write buffer might have. But I have a
-> > > > > feeling you actually do DMA to/from register space here ?
-> > > > 
-> > > > Yes, It's a register area. But I don't know why I should ioremap()
-> > > > it? It's a bus address and DMA can use it directly. Is there some
-> > > > problem for my understanding ?
-> > > 
-> > > I am not too sure here, thus I am poking someone who can clearly answer
-> > 
-> > this.
-> > 
-> > There is already a devm_ioremap_resource() call in the existing code for
-> > CPU to access registers in virtual address.  And my understanding on
-> > Yuan's patch is that he needs the physical address of I2C DATA register
-> > for DMA from/to the controller.
-> > 
-> > Shawn
-> 
-> Thanks you Shawn. Yes, it is. DMA need the physical address which
-> resource->start is.
-> 
-> And Hi Marek, How about you? Is there someone who can clearly answer this
-> some and should I send the next version?
+Hi Denis,
 
-While I don't quite understand what Shawn wanted to say by the above, please go 
-ahead and send V2 .
+On Tue, Mar 11, 2014 at 7:55 AM, Denis Carikli <denis@eukrea.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> This patch was adapted from the thread named
+> "USB Host support for mx25" on linux-usb at vger.kernel.org
+>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> Changelog v1->v2:
+> - The usbphy nodes were made to look like the ones in imx53.dtsi
+> - The patch was rebased on top of the clock fixes commits.
+> ---
+>  arch/arm/boot/dts/imx25.dtsi |   27 ++++++++++++++++-----------
+>  1 file changed, 16 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index 829791e..16bc571 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -482,22 +482,13 @@
+>                                 clocks = <&clks 99>;
+>                         };
+>
+> -                       usbphy1: usbphy at 1 {
+> -                               compatible = "nop-usbphy";
+> -                               status = "disabled";
+> -                       };
+> -
+> -                       usbphy2: usbphy at 2 {
+> -                               compatible = "nop-usbphy";
+> -                               status = "disabled";
+> -                       };
+> -
+>                         usbotg: usb at 53ff4000 {
+>                                 compatible = "fsl,imx25-usb", "fsl,imx27-usb";
+>                                 reg = <0x53ff4000 0x0200>;
+>                                 interrupts = <37>;
+>                                 clocks = <&clks 70>;
+>                                 fsl,usbmisc = <&usbmisc 0>;
+> +                               fsl,usbphy = <&usbphy1>;
+>                                 status = "disabled";
+>                         };
+>
+> @@ -507,6 +498,7 @@
+>                                 interrupts = <35>;
+>                                 clocks = <&clks 70>;
+>                                 fsl,usbmisc = <&usbmisc 1>;
+> +                               fsl,usbphy = <&usbphy2>;
+>                                 status = "disabled";
+>                         };
+>
+> @@ -516,7 +508,6 @@
+>                                 clocks = <&clks 9>, <&clks 70>, <&clks 8>;
+>                                 clock-names = "ipg", "ahb", "per";
+>                                 reg = <0x53ff4600 0x00f>;
+> -                               status = "disabled";
+>                         };
+>
+>                         dryice at 53ffc000 {
+> @@ -548,4 +539,18 @@
+>                         };
+>                 };
+>         };
+> +
+> +       usbphy {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               compatible = "simple-bus";
+> +
+> +               usbphy1: usbphy at 1 {
+> +                       compatible = "usb-nop-xceiv";
+> +               };
+> +
+> +               usbphy2: usbphy at 2 {
+> +                       compatible = "usb-nop-xceiv";
+> +               };
+> +       };
+
+Do we really need to put usbphy1 and usbphy2 under 'simple-bus'? This
+is not documented at
+Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt.
+
+I know that other imx SoCs do like this as you marked below the --- line.
+
+In the version I sent yesterday I kept usbphy1/2 in their original
+locations, and have not placed them under 'simple-bus'.
+
+Adding Mark on Cc in case he can confirm it.
+
+Thanks,
+
+Fabio Estevam
