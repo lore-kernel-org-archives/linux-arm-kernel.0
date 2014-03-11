@@ -1,31 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Mar 2014 07:50:24 +0100
-Subject: [PATCH v6 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140310215600.GA14968@bart.dudau.co.uk>
-References: <1394020137-1830-1-git-send-email-Liviu.Dudau@arm.com>
- <1469359.kil5iaOqdU@wuerfel> <20140310215600.GA14968@bart.dudau.co.uk>
-Message-ID: <4254618.BlpDUOctDb@wuerfel>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 11 Mar 2014 07:52:38 +0100
+Subject: [PATCH 1/7] ARM: dts: mx25: Fix compatible string for generic
+ USB PHY
+In-Reply-To: <1394484885-21262-1-git-send-email-festevam@gmail.com>
+References: <1394484885-21262-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140311075238.4bc0bea2@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 March 2014 21:56:00 Liviu Dudau wrote:
-> 
-> PCI_IOBASE is always defined. See the discussion with Russell on this subject.
-> 
-> include/asm-generic/io.h has at line 118:
-> 
-> #ifndef PCI_IOBASE
-> #define PCI_IOBASE ((void __iomem *) 0)
-> #endif
+Hi Fabio,
 
-That is only defined for those that use asm-generic/pci.h, which most architectures
-don't.
- 
-> I will go with my idea tomorrow. arm64 overwrite the implementation anyway, I
-> find it cleaner rather than having to do #ifdefs and/or ifs.
+Le Mon, 10 Mar 2014 17:54:39 -0300,
+Fabio Estevam <festevam@gmail.com> a ?crit :
 
-I'd really hope we can get to a point where arm64 doesn't need any architecture
-specific code for this. It doesn't do anything special.
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> According to Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt, the
+> correct compatible string for the generic USB PHY is 'usb-nop-xceiv'.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx25.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index 77bb743..6088059 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -483,12 +483,12 @@
+>  			};
+>  
+>  			usbphy1: usbphy at 1 {
+> -				compatible = "nop-usbphy";
+> +				compatible = "usb-nop-xceiv";
+>  				status = "disabled";
+>  			};
+>  
+>  			usbphy2: usbphy at 2 {
+> -				compatible = "nop-usbphy";
+> +				compatible = "usb-nop-xceiv";
+>  				status = "disabled";
+>  			};
+>  
 
-	Arnd
+why don't you use Denis' patches instead of copying them with you as
+the author ?
+
+Eric
