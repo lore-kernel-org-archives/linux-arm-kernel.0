@@ -1,37 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 16:08:37 +0000
-Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
-In-Reply-To: <1394552775-31264-3-git-send-email-mporter@linaro.org>
-References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
- <1394552775-31264-3-git-send-email-mporter@linaro.org>
-Message-ID: <20140311160837.GP21216@lee--X1>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Tue, 11 Mar 2014 17:20:07 +0100
+Subject: [PATCH v5 6/8] ARM: dts: sun4i: Add support for mmc
+In-Reply-To: <531F3203.3010807@redhat.com>
+References: <20140211190543.4568.83517.stgit@dizzy-6.o2s.ch>
+ <ac47de94-92ef-4b53-9983-34dd2f9924ea@googlegroups.com>
+ <531F3203.3010807@redhat.com>
+Message-ID: <42261272.Q7MxffSYhm@pagira.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add a driver for the BCM590xx PMU multi-function devices. The driver
-> initially supports regmap initialization and instantiation of the
-> voltage regulator device function of the PMU.
-> 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  drivers/mfd/Kconfig          |  8 ++++
->  drivers/mfd/Makefile         |  1 +
->  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
->  4 files changed, 133 insertions(+)
->  create mode 100644 drivers/mfd/bcm590xx.c
->  create mode 100644 include/linux/mfd/bcm590xx.h
+Hi
+> Oh, good catch, thanks! Fixed in the sunxi-devel branch
+> in my *personal* git repo. I'll also push this to the official linux-sunxi
+> sunxi-devel branch later today.
+Fixed it for the next patch set as well.
 
-I have a tiny nit that 'ret' doesn't need to be initialised before
-use in probe(), but apart from that...
-
-Looks pretty sensible:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-david
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/d84ce28d/attachment.sig>
