@@ -1,27 +1,143 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 13:30:11 -0700
-Subject: [GIT PULL 1/2] ARM: bcm2835: consolidate into mach-bcm/
-In-Reply-To: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
-References: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140311203011.GJ31877@quad.lixom.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 12 Mar 2014 07:37:20 +1100
+Subject: [RFC PATCH] Remove CONFIG_DCACHE_WORD_ACCESS
+In-Reply-To: <1393964591.20435.58.camel@joe-AO722>
+References: <1393964591.20435.58.camel@joe-AO722>
+Message-ID: <1394570240.4840.48.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 07:44:09PM -0700, Stephen Warren wrote:
-> This pull request consists of a single patch which moves files from
-> arch/arm/mach-bcm2835 into mach-bcm, thus consolidating them with
-> support for other Broadcom chips.
+On Tue, 2014-03-04 at 12:23 -0800, Joe Perches wrote:
+> It seems to duplicate CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> so use that instead.
 > 
-> ----------------------------------------------------------------
+> This changes the !CPU_LITTLE_ENDIAN powerpc arch to use unaligned
+> accesses in fs/dcache.c and fs/namei.c as
+> CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is enabled for that arch.
 > 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.15-soc
+> Remove the now unused DCACHE_WORD_ACCESS defines & uses.
 
-Merged, thanks.
+Interesting.. we have word-at-a-time but we never enabled
+DCACHE_WORD_ACCESS, I wonder why that is. In fact, we should
+probably do it for LE as well for P8 if we can make a P8
+only config option...
 
--Olof
+Anton, what do you reckon here ?
+
+Cheers,
+Ben.
+
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  arch/arm/Kconfig                      | 1 -
+>  arch/arm/include/asm/word-at-a-time.h | 4 ++--
+>  arch/arm64/Kconfig                    | 1 -
+>  arch/x86/Kconfig                      | 1 -
+>  fs/Kconfig                            | 4 ----
+>  fs/dcache.c                           | 2 +-
+>  fs/namei.c                            | 2 +-
+>  7 files changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 623a272..d5a2e60 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -12,7 +12,6 @@ config ARM
+>  	select BUILDTIME_EXTABLE_SORT if MMU
+>  	select CLONE_BACKWARDS
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> -	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+>  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>  	select GENERIC_IDLE_POLL_SETUP
+> diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+> index a6d0a29..778b2ad 100644
+> --- a/arch/arm/include/asm/word-at-a-time.h
+> +++ b/arch/arm/include/asm/word-at-a-time.h
+> @@ -54,7 +54,7 @@ static inline unsigned long find_zero(unsigned long mask)
+>  #include <asm-generic/word-at-a-time.h>
+>  #endif
+>  
+> -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  
+>  /*
+>   * Load an unaligned word from kernel space.
+> @@ -94,5 +94,5 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
+>  	return ret;
+>  }
+>  
+> -#endif	/* DCACHE_WORD_ACCESS */
+> +#endif	/* HAVE_EFFICIENT_UNALIGNED_ACCESS */
+>  #endif /* __ASM_ARM_WORD_AT_A_TIME_H */
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 764d682..2d6978c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -13,7 +13,6 @@ config ARM64
+>  	select CLONE_BACKWARDS
+>  	select COMMON_CLK
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> -	select DCACHE_WORD_ACCESS
+>  	select GENERIC_CLOCKEVENTS
+>  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>  	select GENERIC_IOMAP
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index abb261e..60cfa073 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -98,7 +98,6 @@ config X86
+>  	select CLKEVT_I8253
+>  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+>  	select GENERIC_IOMAP
+> -	select DCACHE_WORD_ACCESS
+>  	select GENERIC_SMP_IDLE_THREAD
+>  	select ARCH_WANT_IPC_PARSE_VERSION if X86_32
+>  	select HAVE_ARCH_SECCOMP_FILTER
+> diff --git a/fs/Kconfig b/fs/Kconfig
+> index 312393f..7511271 100644
+> --- a/fs/Kconfig
+> +++ b/fs/Kconfig
+> @@ -4,10 +4,6 @@
+>  
+>  menu "File systems"
+>  
+> -# Use unaligned word dcache accesses
+> -config DCACHE_WORD_ACCESS
+> -       bool
+> -
+>  if BLOCK
+>  
+>  source "fs/ext2/Kconfig"
+> diff --git a/fs/dcache.c b/fs/dcache.c
+> index 265e0ce..4e3c195 100644
+> --- a/fs/dcache.c
+> +++ b/fs/dcache.c
+> @@ -163,7 +163,7 @@ int proc_nr_dentry(ctl_table *table, int write, void __user *buffer,
+>   * Compare 2 name strings, return 0 if they match, otherwise non-zero.
+>   * The strings are both count bytes long, and count is non-zero.
+>   */
+> -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  
+>  #include <asm/word-at-a-time.h>
+>  /*
+> diff --git a/fs/namei.c b/fs/namei.c
+> index 385f781..1ee33ca 100644
+> --- a/fs/namei.c
+> +++ b/fs/namei.c
+> @@ -1618,7 +1618,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
+>   *   the final mask". Again, that could be replaced with a
+>   *   efficient population count instruction or similar.
+>   */
+> -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  
+>  #include <asm/word-at-a-time.h>
+>  
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
