@@ -1,59 +1,47 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 11 Mar 2014 13:15:49 +0100
-Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
-In-Reply-To: <20140311112342.GE21216@lee--X1>
-References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
- <531EEA39.50504@st.com> <20140311112342.GE21216@lee--X1>
-Message-ID: <531EFE75.9010709@st.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 11 Mar 2014 14:16:23 +0200
+Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
+In-Reply-To: <20140311120259.GI21216@lee--X1>
+References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
+ <531ECDCB.4060700@ti.com> <20140311120259.GI21216@lee--X1>
+Message-ID: <531EFE97.1090202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/11/2014 12:23 PM, Lee Jones wrote:
->>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On 03/11/2014 02:02 PM, Lee Jones wrote:
+>>> Hi,
 >>>
->>> This patch adds support to rev E board of B2020 which has few minor
->>> changes :
->>> 	PHY reset PIO (Change from PIO30 to PIO07)
->>> 	Power LED(Green) Control(Change from PIO47 to PIO13)
+>>> This patchset brings up USB Host ports and Ethernet port on
+>>> the OMAP5 uEVM board.
+>>>
+>>> It also does some cleanup with respect to DT clock binding
+>>> for the mfd/omap-usb-host driver.
+>>>
+>>> Please queue these for -next.
+>>>
+>>> Lee,
+>>>
+>>> I've folded some platform data dependent patches with mfd patches
+>>> so that they don't break functionality when applied individually.
+>>> You can safely pull in all MFD patches (1 to 6).
+>>>
+>>> Tony & Benoit,
+>>>
+>>> Can you please accept patches 7, 8 and 9?
 >>
->> I thought we decided last October to support only one revision of
->> the b2020 board.
+>> Tony has already picked up 7,8 and 9 through omap-soc tree.
 >>
->> The idea was to create an external git to provide DTS for all our
->> boards, and only have a minimal subset in in the kernel.
->
-> Ah, I was unaware of that conversation/decision. If that's the case we
-> can scrap this submission along with the following patch.
+>> Since you acked most patches except 5 and 6, are you fine if Tony takes
+>> all the patches 1 to 4 in this series via omap-soc tree?
+>>
+>> What about patches 5 and 6?
+> 
+> Any patches which are orthogonal can just be sucked into whichever tree
+> they belong in. If there are inter-subsystem dependencies I'd prefer
+> to take them and issue a immutable branch pull-request to the other
+> maintainers.
+> 
+Awesome. That would be great, thanks.
 
-In fact we had the discussion together with Arnd (IIRC) on #armlinux :)
-
-The reason is we wanted to avoid flooding arch/arm/dts/ with all the 
-possible combinations of board revisions.
-
-The idea was to put in place a git repository at stlinux.com to provide 
-the DTS for all the STi boards, and try to keep arch/arm/dts/sti* simple.
-
->
-> JOOI, what happens if I want to boot Mainline on my revE board? It
-> won't be fully functional will it? That will be a shame. The LEDs, not
-> so much, but networking is a pretty big piece of functionality to
-> lose.
-
-I agree this is not comfortable.
-
-The problem is that your patch is not enough. We would need to create 
-much more files, because for example, the i2c used are not the same 
-between rev. C and rev. E.
-
-It gives theses files only for b2020 support:
-   arch/arm/boot/dts/stih415-b2020.dts
-   arch/arm/boot/dts/stih416-b2020e.dts
-   arch/arm/boot/dts/stih41x-b2020e.dtsi
-   arch/arm/boot/dts/stih416-b2020.dts
-   arch/arm/boot/dts/stih41x-b2020.dtsi
-   arch/arm/boot/dts/stih41x-b2020x.dtsi
-
-Regards,
-Maxime
+cheers,
+-roger
