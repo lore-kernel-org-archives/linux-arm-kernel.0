@@ -1,151 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 11 Mar 2014 13:30:39 +0100
-Subject: [PATCH v6 03/10] Documentation: devicetree: Update Samsung FIMC
- DT binding
-In-Reply-To: <1394122819-9582-4-git-send-email-s.nawrocki@samsung.com>
-References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
- <1394122819-9582-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1608087.RUCeTiNcRR@avalon>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 11 Mar 2014 08:31:07 -0400
+Subject: [PATCH] arm: LLVMLinux: use static inline in ARM ftrace.h
+In-Reply-To: <531EB4D8.6030207@converseincode.com>
+References: <1392949370-26422-1-git-send-email-behanw@converseincode.com>
+ <531EB4D8.6030207@converseincode.com>
+Message-ID: <20140311083107.6aa2bba4@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Tue, 11 Mar 2014 00:01:44 -0700
+Behan Webster <behanw@converseincode.com> wrote:
 
-Thank you for the patch.
+> On 02/20/14 18:22, behanw at converseincode.com wrote:
+> > From: Behan Webster <behanw@converseincode.com>
+> >
+> > With compilers which follow the C99 standard (like modern versions of gcc and
+> > clang), "extern inline" does the wrong thing (emits code for an externally
+> > linkable version of the inline function). In this case using static inline
+> > and removing the NULL version of return_address in return_address.c does
+> > the right thing.
+> Any input? Is it good as it is?
 
-On Thursday 06 March 2014 17:20:12 Sylwester Nawrocki wrote:
-> This patch documents following updates of the Exynos4 SoC camera subsystem
-> devicetree binding:
-> 
->  - addition of #clock-cells property to 'camera' node - the #clock-cells
->    property is needed when the sensor sub-devices use clock provided by
->    the camera host interface,
->  - addition of an optional clock-output-names property,
->  - change of the clock-frequency at image sensor node from mandatory to
->    an optional property - the sensor devices can now control their clock
->    themselves and there should be no need to require this property by the
->    camera host device binding, a default frequency value can often be used.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes since v5:
->  - none.
-> 
-> Changes since v4:
->  - dropped a requirement of specific order of values in clocks/
->    clock-names properties (Mark) and reference to clock-names in
->    clock-output-names property description (Mark).
-> ---
->  .../devicetree/bindings/media/samsung-fimc.txt     |   34 ++++++++++++-----
->  1 file changed, 26 insertions(+), 8 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> b/Documentation/devicetree/bindings/media/samsung-fimc.txt index
-> 96312f6..dbd4020 100644
-> --- a/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> +++ b/Documentation/devicetree/bindings/media/samsung-fimc.txt
-> @@ -32,6 +32,21 @@ way around.
-> 
->  The 'camera' node must include at least one 'fimc' child node.
-> 
-> +Optional properties:
-> +
-> +- #clock-cells: from the common clock bindings
-> (../clock/clock-bindings.txt),
-> +  must be 1. A clock provider is associated with the 'camera' node and it
-> should
-> +  be referenced by external sensors that use clocks provided by the SoC on
-> +  CAM_*_CLKOUT pins. The clock specifier cell stores an index of a clock.
-> +  The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks respectively.
-> +
-> +- clock-output-names: from the common clock bindings, should contain names
-> of
-> +  clocks registered by the camera subsystem corresponding to CAM_A_CLKOUT,
-> +  CAM_B_CLKOUT output clocks respectively.
+I'm fine with it. But you need approval from the arm folks. I know
+there was some issues with the return_address() code in the past. But
+from the ftrace perspective:
 
-Wouldn't it be better to document the "cam_mclk_a" and "cam_mclk_b" names 
-explicitly ? Or do you expect different names to be used in different DT files 
-? And as they correspond to the CAM_A_CLKOUT and CAM_B_CLKOUT pins, shouldn't 
-they be named "cam_a_clkout" and "cam_b_clkout" ?
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-> +
-> +Note: #clock-cells and clock-output-names are mandatory properties if
-> external
-> +image sensor devices reference 'camera' device node as a clock provider.
-> +
-
-What's the reason not to make them always mandatory ? Backward compatibility 
-only ? If so wouldn't it make sense to document the properties as mandatory 
-from now on, and treating them as optional in the driver for backward 
-compatibility ?
-
->  'fimc' device nodes
->  -------------------
-> 
-> @@ -97,8 +112,8 @@ Image sensor nodes
->  The sensor device nodes should be added to their control bus controller
-> (e.g. I2C0) nodes and linked to a port node in the csis or the
-> parallel-ports node, using the common video interfaces bindings, defined in
-> video-interfaces.txt.
-> -The implementation of this bindings requires clock-frequency property to be
-> -present in the sensor device nodes.
-> +An optional clock-frequency property needs to be present in the sensor
-> device
-> +nodes. Default value when this property is not present is 24 MHz.
-
-This bothers me. Having the FIMC driver read the clock-frequence property from 
-the sensor DT nodes feels like a layering violation. Shouldn't the sensor 
-drivers call clk_set_rate() explicitly instead ?
-
->  Example:
-> 
-> @@ -114,7 +129,7 @@ Example:
->  			vddio-supply = <...>;
-> 
->  			clock-frequency = <24000000>;
-> -			clocks = <...>;
-> +			clocks = <&camera 1>;
->  			clock-names = "mclk";
-> 
->  			port {
-> @@ -135,7 +150,7 @@ Example:
->  			vddio-supply = <...>;
-> 
->  			clock-frequency = <24000000>;
-> -			clocks = <...>;
-> +			clocks = <&camera 0>;
->  			clock-names = "mclk";
-> 
->  			port {
-> @@ -149,12 +164,15 @@ Example:
-> 
->  	camera {
->  		compatible = "samsung,fimc", "simple-bus";
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		status = "okay";
-> -
-> +		clocks = <&clock 132>, <&clock 133>;
-> +		clock-names = "sclk_cam0", "sclk_cam1";
-
-The documentation mentions that clock-names must contain "sclk_cam0", 
-"sclk_cam1", "pxl_async0", "pxl_async1". Are the last two optional ? If so I 
-think you should clarify the description of the clock-names property. This can 
-be done in a separate patch.
-
-> +		#clock-cells = <1>;
-> +		clock-output-names = "cam_mclk_a", "cam_mclk_b";
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&cam_port_a_clk_active>;
-> +		status = "okay";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> 
->  		/* parallel camera ports */
->  		parallel-ports {
-
--- 
-Regards,
-
-Laurent Pinchart
+-- Steve
