@@ -1,41 +1,38 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 11 Mar 2014 18:19:38 -0400
-Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
-In-Reply-To: <20140311160837.GP21216@lee--X1>
-References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
- <1394552775-31264-3-git-send-email-mporter@linaro.org>
- <20140311160837.GP21216@lee--X1>
-Message-ID: <20140311221938.GO25092@beef>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Mar 2014 15:35:03 -0700
+Subject: [PATCH] ARM: zynq: Add OCM driver
+In-Reply-To: <e870cbc7-5934-4a14-aab4-416cdfd1627d@VA3EHSMHS007.ehs.local>
+References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
+ <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
+ <e870cbc7-5934-4a14-aab4-416cdfd1627d@VA3EHSMHS007.ehs.local>
+Message-ID: <CAOesGMiHf9efd8_RGg=0XCR9Qvy8=YUAMLPX-O4yOC8g-e8d9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 04:08:37PM +0000, Lee Jones wrote:
-> > Add a driver for the BCM590xx PMU multi-function devices. The driver
-> > initially supports regmap initialization and instantiation of the
-> > voltage regulator device function of the PMU.
-> > 
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > ---
-> >  drivers/mfd/Kconfig          |  8 ++++
-> >  drivers/mfd/Makefile         |  1 +
-> >  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
-> >  4 files changed, 133 insertions(+)
-> >  create mode 100644 drivers/mfd/bcm590xx.c
-> >  create mode 100644 include/linux/mfd/bcm590xx.h
-> 
-> I have a tiny nit that 'ret' doesn't need to be initialised before
-> use in probe(), but apart from that...
-> 
-> Looks pretty sensible:
->   Acked-by: Lee Jones <lee.jones@linaro.org>
+On Tue, Mar 11, 2014 at 3:13 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Tue, 2014-03-11 at 02:31PM -0700, Olof Johansson wrote:
+>> Hi Michal,
+>>
+>> Sorry for the late review, I didn't notice the driver when it was
+>> posted and I only saw it now with the pull request. Comments below.
+>>
+>>
+>> On Mon, Jan 6, 2014 at 7:36 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> > The driver provide memory allocator which can
+>> > be used by others drivers to allocate memory inside OCM.
+>> > All location for 64kB blocks are supported
+>> > and driver is trying to allocate the largest continuous
+>> > block of memory.
+>>
+>> I don't think you explain what OCM is anywhere, what is it? Since
+>> you're reusing the generic SRAM driver I'm suspecting it's related?
+>
+> It stands for 'On-Chip Memory'. For Zynq that is a RAM consisting of
+> four 64k chunks that can be individually mapped to a high or low address.
 
-Ok, thanks. When I get back in front of my desktop I'll send a v4 of
-just this patch to address that nit. Mark already applied the regulator
-driver from this series, will you be taking this through your tree? For
-that matter, I wonder if the binding would also go through your tree
-with this driver.
+Ok, yeah, then it definitely should share drivers as much as possible
+with the other vendors.
 
--Matt
+
+-Olof
