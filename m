@@ -1,59 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Mar 2014 19:51:58 +0100
-Subject: [PATCH] ARM: cache-tauros2: remove ARMv6 code
-Message-ID: <1589565.fmu2VlFkhj@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Mar 2014 18:52:52 +0000
+Subject: [PATCH v3 3/5] regulator: add bcm590xx regulator driver
+In-Reply-To: <1394552775-31264-4-git-send-email-mporter@linaro.org>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-4-git-send-email-mporter@linaro.org>
+Message-ID: <20140311185252.GX28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a kernel with support for both ARMv6 and ARMv7 but
-no MMU, the call from tauros2_internal_init to adjust_cr causes
-a link error. While that could probably be resolved, we don't
-actually support cache-tauros2 on ARMv6 any more. All PJ4 CPU
-implementations support both ARMv6 and ARMv7 and we already assume
-that we are using them only in ARMv7 mode.
+On Tue, Mar 11, 2014 at 11:46:13AM -0400, Matt Porter wrote:
+> Add a regulator driver for the BCM590xx PMU voltage regulators.
+> The driver supports LDOs and DCDCs in normal mode only. There is
+> no support for low-power mode or power sequencing.
 
-Removing the ARMv6 code path reduces the code size and avoids
-the linker error.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-
-
-diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
-index 1be0f4e..7964ef2 100644
---- a/arch/arm/mm/cache-tauros2.c
-+++ b/arch/arm/mm/cache-tauros2.c
-@@ -229,33 +229,6 @@ static void __init tauros2_internal_init(unsigned int features)
- 	}
- #endif
- 
--#ifdef CONFIG_CPU_32v6
--	/*
--	 * Check whether this CPU lacks support for the v7 hierarchical
--	 * cache ops.  (PJ4 is in its v6 personality mode if the MMFR3
--	 * register indicates no support for the v7 hierarchical cache
--	 * ops.)
--	 */
--	if (cpuid_scheme() && (read_mmfr3() & 0xf) == 0) {
--		/*
--		 * When Tauros2 is used in an ARMv6 system, the L2
--		 * enable bit is in the ARMv6 ARM-mandated position
--		 * (bit [26] of the System Control Register).
--		 */
--		if (!(get_cr() & 0x04000000)) {
--			printk(KERN_INFO "Tauros2: Enabling L2 cache.\n");
--			adjust_cr(0x04000000, 0x04000000);
--		}
--
--		mode = "ARMv6";
--		outer_cache.inv_range = tauros2_inv_range;
--		outer_cache.clean_range = tauros2_clean_range;
--		outer_cache.flush_range = tauros2_flush_range;
--		outer_cache.disable = tauros2_disable;
--		outer_cache.resume = tauros2_resume;
--	}
--#endif
--
- #ifdef CONFIG_CPU_32v7
- 	/*
- 	 * Check whether this CPU has support for the v7 hierarchical
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140311/f7b63f13/attachment.sig>
