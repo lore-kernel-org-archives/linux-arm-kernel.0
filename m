@@ -1,32 +1,34 @@
 From: brezillonboris@gmail.com (Boris BREZILLON)
-Date: Tue, 11 Mar 2014 10:00:31 +0100
-Subject: [PATCH v3 0/4] clk: at91: better support for the PCKs
-Message-ID: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
+Date: Tue, 11 Mar 2014 10:00:33 +0100
+Subject: [PATCH v3 2/4] clk: at91: propagate rate change on system clks
+In-Reply-To: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1394528435-23734-3-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris BREZILLON <b.brezillon@overkiz.com>
 
-This serie implements a better support for the Programmable Clocks.
-The first two patch are related to changing the rate of the PCKs.
-The 3rd patch is a fix to handle properly the PCKRDY interrupt.
-The last patch is a small optimzation/simplification of the determine_rate
-algorithm for the PCK.
+System clks are just gates, and thus do not provide any rate operations.
+Authorize clk rate change to be propagated to system clk parents.
 
-Changes since v2:
-- remove unnecessary CLK_SET_RATE_GATE flag from system clk setting
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/clk/at91/clk-system.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Boris BREZILLON (2):
-  clk: at91: replace prog clk round_rate with determine_rate
-  clk: at91: propagate rate change on system clks
-
-Jean-Jacques Hiblot (2):
-  clk: at91: fix programmable clk irq handling
-  clk: at91: optimization of the set_rate callback
-
- drivers/clk/at91/clk-programmable.c |  202 +++++++++++------------------------
- drivers/clk/at91/clk-system.c       |   76 +++++++++++--
- 2 files changed, 126 insertions(+), 152 deletions(-)
-
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index 8f7c043..48c89fe 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -84,7 +84,7 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+ 	 * (see drivers/memory) which would request and enable the ddrck clock.
+ 	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
+ 	 */
+-	init.flags = CLK_IGNORE_UNUSED;
++	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
+ 
+ 	sys->id = id;
+ 	sys->hw.init = &init;
 -- 
 1.7.9.5
