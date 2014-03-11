@@ -1,31 +1,60 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 11 Mar 2014 12:55:48 -0400
-Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC AHCI SATA host
- controller DTS entries
-In-Reply-To: <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
-References: <1394059489-30706-1-git-send-email-lho@apm.com>
- <1394059489-30706-2-git-send-email-lho@apm.com>
- <1394059489-30706-3-git-send-email-lho@apm.com>
- <1394059489-30706-4-git-send-email-lho@apm.com>
- <20140311124943.GD11477@htj.dyndns.org>
- <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
-Message-ID: <20140311165548.GA20776@mtj.dyndns.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 11 Mar 2014 10:10:50 -0700
+Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
+In-Reply-To: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <CAGVrzcbxmWE+1drcyNK7K1a4ta6Pp1-Kc4xv7x0vDSumZen1fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Loc.
+2014-03-06 9:45 GMT-08:00 Florian Fainelli <f.fainelli@gmail.com>:
+> Hi all,
+>
+> This patchset adds very minimal support for the BCM63138 SoC which is
+> a xDSL SoC using a dual Cortex A9 CPU complex.
+>
+> Future work will focus on:
+>
+> - clock device/driver/providers
+> - SMP support (already working)
+> - DT'fying drivers/tty/serial/bcm63xx_uart.c to be usable
 
-On Tue, Mar 11, 2014 at 08:51:37AM -0700, Loc Ho wrote:
-> Kishon didn't applied the PHY DTS patch. Did you first apply the PHY
-> DTS patch? We agreed that you will first pull in the PHY DTS as well
-> as the host controller patches. I don't see any reason why it wouldn't
-> apply if both DTS is applied. I will pull libata/for-3.15 and check
-> out.
+Gentle ping, patch 2 should not be too controversial and could
+probably be queued for a next 3.14-rc pull request?
 
-Can you please repost patches to apply on top of the current
-libata/for-3.15?
+>
+> Florian Fainelli (6):
+>   ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
+>   ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
+>   ARM: BCM63XX: add low-level UART debug support
+>   ARM: BCM63XX: add BCM63138 minimal Device Tree
+>   ARM: BCM63XX: add BCM963138DVT Reference platform DTS
+>   MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
+>
+>  .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
+>  MAINTAINERS                                        |  10 ++
+>  arch/arm/Kconfig.debug                             |  20 +++-
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/bcm63138.dtsi                    | 109 +++++++++++++++++++++
+>  arch/arm/boot/dts/bcm63138dvt.dts                  |  18 ++++
+>  arch/arm/include/debug/bcm63xxx.S                  |  33 +++++++
+>  arch/arm/mach-bcm/Kconfig                          |  20 ++++
+>  arch/arm/mach-bcm/Makefile                         |   2 +
+>  arch/arm/mach-bcm/bcm63xx.h                        |  29 ++++++
+>  arch/arm/mach-bcm/board_bcm63xx.c                  |  94 ++++++++++++++++++
+>  11 files changed, 342 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+>  create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
+>  create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
+>  create mode 100644 arch/arm/include/debug/bcm63xxx.S
+>  create mode 100644 arch/arm/mach-bcm/bcm63xx.h
+>  create mode 100644 arch/arm/mach-bcm/board_bcm63xx.c
+>
+> --
+> 1.8.3.2
+>
 
-Thanks.
+
 
 -- 
-tejun
+Florian
