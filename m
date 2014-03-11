@@ -1,73 +1,37 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Mar 2014 16:55:47 +0100
-Subject: [PATCH v5 6/8] ARM: dts: sun4i: Add support for mmc
-In-Reply-To: <ac47de94-92ef-4b53-9983-34dd2f9924ea@googlegroups.com>
-References: <20140211190543.4568.83517.stgit@dizzy-6.o2s.ch>
- <20140211193423.4568.34947.stgit@dizzy-6.o2s.ch>
- <ac47de94-92ef-4b53-9983-34dd2f9924ea@googlegroups.com>
-Message-ID: <531F3203.3010807@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Mar 2014 16:08:37 +0000
+Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <1394552775-31264-3-git-send-email-mporter@linaro.org>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-3-git-send-email-mporter@linaro.org>
+Message-ID: <20140311160837.GP21216@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Oh, good catch, thanks! Fixed in the sunxi-devel branch
-in my *personal* git repo. I'll also push this to the official linux-sunxi
-sunxi-devel branch later today.
-
-Regards,
-
-Hans
-
-
-
-On 03/10/2014 10:49 PM, mr.nuke.me at gmail.com wrote:
-> On Tuesday, February 11, 2014 1:34:25 PM UTC-6, David Lanzend?rfer wrote:
->> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> index b139ee6..20b976a 100644
->> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> @@ -33,6 +33,14 @@
->>  			};
->>  		
->>  		};
->> +		mmc0: mmc at 01c0f000 {
->> +			pinctrl-names = "default", "default";
->> +			pinctrl-0 = <&mmc0_pins_a>;
->> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
->> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
->> +			status = "okay";
->> +		};
->> +
->>  		pinctrl at 01c20800 {
->>  		
->>  			led_pins_cubieboard: led_pins at 0 {
->>  			
->>  				allwinner,pins = "PH20", "PH21";
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi
->> b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index 9044c53..d040d37 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -330,6 +330,46 @@
->>  			#size-cells = <0>;
->>  		
->>  		};
->> +		mmc0: mmc at 01c0f000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
+> Add a driver for the BCM590xx PMU multi-function devices. The driver
+> initially supports regmap initialization and instantiation of the
+> voltage regulator device function of the PMU.
 > 
-> Should be "allwinner,sun4i-a10-mmc", or we will hang the MMC driver on A10.
-> 
->> +		mmc1: mmc at 01c10000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
-> ditto
-> 
->> +		mmc2: mmc at 01c11000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
-> ditto
-> 
->> +		mmc3: mmc at 01c12000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
-> ditto
-> 
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> ---
+>  drivers/mfd/Kconfig          |  8 ++++
+>  drivers/mfd/Makefile         |  1 +
+>  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
+>  4 files changed, 133 insertions(+)
+>  create mode 100644 drivers/mfd/bcm590xx.c
+>  create mode 100644 include/linux/mfd/bcm590xx.h
+
+I have a tiny nit that 'ret' doesn't need to be initialised before
+use in probe(), but apart from that...
+
+Looks pretty sensible:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
