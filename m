@@ -1,26 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Mar 2014 13:21:59 -0700
-Subject: [GIT PULL] ARM: mach-bcm soc updates for 3.15
-In-Reply-To: <20140306062040.GA29526@beef>
-References: <20140306062040.GA29526@beef>
-Message-ID: <20140311202159.GG31877@quad.lixom.net>
+Date: Tue, 11 Mar 2014 13:31:35 -0700
+Subject: [GIT PULL 2/2] ARM: bcm2835: DT changes for 3.15
+In-Reply-To: <1394160250-3939-2-git-send-email-swarren@wwwdotorg.org>
+References: <1394160250-3939-1-git-send-email-swarren@wwwdotorg.org>
+ <1394160250-3939-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140311203135.GK31877@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 01:20:40AM -0500, Matt Porter wrote:
-> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+On Thu, Mar 06, 2014 at 07:44:10PM -0700, Stephen Warren wrote:
+> A variety of features are added to the bcm2835 device trees:
+> - ARM PMU, for perf_event
+> - DMA controller
+> - I2S controller
 > 
->   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+> A few cleanups are applied to the DTs too.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> 
+>   Linus 3.14-rc1
 > 
 > are available in the git repository at:
 > 
->   git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/soc-2
-> 
-> for you to fetch changes up to fdf4850cb5b2e5e549a18b8b41abb001bfb19e9c:
-> 
->   ARM: BCM5301X: workaround suppress fault (2014-03-06 00:36:04 -0500)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.15-dt
 
-Merged into next/soc.
+Merged, thanks.
 
 
 -Olof
