@@ -1,39 +1,39 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 11 Mar 2014 11:07:57 +0800
-Subject: [PATCH] Disable Subpage nand write when using Atmel PMECC
-In-Reply-To: <20140307080251.GI31517@norris-Latitude-E6410>
-References: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
- <53194432.50104@atmel.com> <20140307080251.GI31517@norris-Latitude-E6410>
-Message-ID: <531E7E0D.6080605@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Mar 2014 11:46:11 +0800
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140311034607.GA26502@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Brian
+On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
+> Hi,
+> 
+> this latest version of the imx-drm DT binding patches applies
+> on top of staging-next and also depends on the OF graph binding
+> patchset that moves the v4l2_of helpers to drivers/of.
+> Currently, the two patchsets are also available at:
+>     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
+>     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
 
-On 3/7/2014 4:02 PM, Brian Norris wrote:
-> On Fri, Mar 07, 2014 at 11:59:46AM +0800, Josh Wu wrote:
->> On 3/3/2014 7:15 PM, Herve Codina wrote:
->>> Crash detected on sam5d35 and its pmecc nand ecc controller.
->>>
->>> The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
->>> (nand_base.c) when we write a sub page.
->>> chip->ecc.hwctl function is not set when we are using PMECC controller.
->>> As a workaround, set NAND_NO_SUBPAGE_WRITE for PMECC controller in
->>> order to disable sub page access in nand_write_page.
->>>
->>>
->>> Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
->> Acked-by: Josh Wu <josh.wu@atmel.com>
-> Pushed to l2-mtd.git. Thanks!
+Hi Philipp,
 
-Sorry for the later thought. But I think this patch should go to the 
-stable Linux branch
-since any subpage write will cause crash in SAMA5D3 and AT91SAM9X5.
-So is it possible to add a tag: "Cc: stable at vger.kernel.org" for this 
-commit?
+I just came across a couple problems when testing the series on
+my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
+using Russell's branch below, which I believe has all the pieces put
+together.
 
-Best Regards,
-Josh Wu
+  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
 
->
-> Brian
+- When I enable HDMI and LVDS support in both kernel build and device
+  tree, HDMI seems working fine but LVDS color is corrupted quite badly.
+
+- When I enable HDMI and LVDS support in kernel build but only LVDS in
+  device tree (keep HDMI disabled in device tree by not changing
+  'status' of HDMI node to 'okay'), LVDS does not even work.  In this
+  case, it seems that the binding of display-subsystem does not succeed.
+
+Please confirm if they are real problems or I'm missing something here.
+
+Shawn
