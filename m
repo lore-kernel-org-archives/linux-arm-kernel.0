@@ -1,51 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 11 Mar 2014 13:59:34 +0000
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries
-In-Reply-To: <1394543851-11732-1-git-send-email-broonie@kernel.org>
-References: <1394543851-11732-1-git-send-email-broonie@kernel.org>
-Message-ID: <531F16C6.5030903@arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 11 Mar 2014 09:04:24 -0500
+Subject: [PATCH 2/3] soc: keystone: add QMSS driver
+In-Reply-To: <531E2C55.70702@ti.com>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>	<1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_Jsq+O660oV9FtthG3gTkVOhL0ku-UHSrkt-ROauu1iNpbaA@mail.gmail.com>
+ <531E2C55.70702@ti.com>
+Message-ID: <5EE98053-31B8-4679-AAE2-4F026C61D1D4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On 11/03/14 13:17, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
->
-> Probably due to rebasing over the lengthy time it took to get the patch
-> merged commit addea9ef055b (cpufreq: enable ARM drivers on arm64) added
-> a duplicate Power management options section.  Add CPUfreq to the CPU
-> power management section and remove a duplicate include of the main
-> power section.
->
+On Mar 10, 2014, at 4:19 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-This looks fine to me, but since commit addea9ef055b is only in Rafael's
-next tree, Catalin can't take this, so it makes sense to go through Rafael's
-tree, right ?
+>>> +  -- reg-names         : Names for the above register regions. The name to be
+>>> +                         used is as follows:
+>>> +                         - "config" : Queue configuration region.
+>>> +                         - "status" : Queue status RAM.
+>>> +                         - "region" : Descriptor memory setup region.
+>>> +                         - "push"   : Queue Management/Queue Proxy region.
+>>> +                         - "pop"    : Queue Management/Queue Proxy region.
+>>> +                         - "peek"   : Queue Peek region.
+>> 
+>> reg-names should be optional. Also you have the order different from
+>> reg. Be consistent as to what is the correct order.
+>> 
+> We thought of using reg-names to remove the ordering to index
+> the regs. So if we make the reg-names optional, then indexing
+> by order will be used. We can do that.
 
-Regards,
-Sudeep
+We keep having this conversation, why does reg-names need to be optional for new bindings?
 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->   arch/arm64/Kconfig | 6 ------
->   1 file changed, 6 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index a3c40d65128b..2474c24dc229 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -318,12 +318,6 @@ menu "CPU Power Management"
->
->   source "drivers/cpuidle/Kconfig"
->
-> -endmenu
-> -
-> -menu "Power management options"
-> -
-> -source "kernel/power/Kconfig"
-> -
->   source "drivers/cpufreq/Kconfig"
->
->   endmenu
->
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
