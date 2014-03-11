@@ -1,39 +1,54 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 10 Mar 2014 22:36:44 -0700
-Subject: [PATCH] Disable Subpage nand write when using Atmel PMECC
-In-Reply-To: <531E7E0D.6080605@atmel.com>
-References: <1393845329-18175-1-git-send-email-Herve.CODINA@celad.com>
- <53194432.50104@atmel.com>
- <20140307080251.GI31517@norris-Latitude-E6410>
- <531E7E0D.6080605@atmel.com>
-Message-ID: <20140311053644.GM31517@norris-Latitude-E6410>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 11 Mar 2014 11:34:44 +0530
+Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
+ PHY DTS entries
+In-Reply-To: <20140310204549.GJ25290@htj.dyndns.org>
+References: <1394213289-29565-1-git-send-email-lho@apm.com>
+ <1394213289-29565-2-git-send-email-lho@apm.com>
+ <1394213289-29565-3-git-send-email-lho@apm.com>
+ <1394213289-29565-4-git-send-email-lho@apm.com>
+ <CAPw-ZTmwFZjKT2+CUUp73TDXJcXy-bEY_sTNg-TtH-COzDnCfw@mail.gmail.com>
+ <20140310204549.GJ25290@htj.dyndns.org>
+Message-ID: <531EA77C.103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 11:07:57AM +0800, Josh Wu wrote:
-> On 3/7/2014 4:02 PM, Brian Norris wrote:
-> >On Fri, Mar 07, 2014 at 11:59:46AM +0800, Josh Wu wrote:
-> >>On 3/3/2014 7:15 PM, Herve Codina wrote:
-> >>>Crash detected on sam5d35 and its pmecc nand ecc controller.
-> >>>
-> >>>The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
-> >>>(nand_base.c) when we write a sub page.
-> >>>chip->ecc.hwctl function is not set when we are using PMECC controller.
-> >>>As a workaround, set NAND_NO_SUBPAGE_WRITE for PMECC controller in
-> >>>order to disable sub page access in nand_write_page.
-> >>>
-> >>>
-> >>>Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
-> >>Acked-by: Josh Wu <josh.wu@atmel.com>
-> >Pushed to l2-mtd.git. Thanks!
-> 
-> Sorry for the later thought. But I think this patch should go to the
-> stable Linux branch
-> since any subpage write will cause crash in SAMA5D3 and AT91SAM9X5.
-> So is it possible to add a tag: "Cc: stable at vger.kernel.org" for
-> this commit?
 
-Done, thanks for mentioning it! I was thinking of this when I applied
-it, actually.
 
-Brian
+On Tuesday 11 March 2014 02:15 AM, Tejun Heo wrote:
+> On Sun, Mar 09, 2014 at 10:23:33PM -0700, Loc Ho wrote:
+>> Hi Tejun,
+>>
+>> On Fri, Mar 7, 2014 at 9:28 AM, Loc Ho <lho@apm.com> wrote:
+>>
+>>> This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
+>>> PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
+>>>
+>>> Signed-off-by: Loc Ho <lho@apm.com>
+>>> Signed-off-by: Tuan Phan <tphan@apm.com>
+>>> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>>> ---
+>>>   arch/arm64/boot/dts/apm-storm.dtsi |   75
+>>> ++++++++++++++++++++++++++++++++++++
+>>>   1 files changed, 75 insertions(+), 0 deletions(-)
+>>>
+>>>
+>> Kishon had pulled in the PHY doc/driver patches. Will you pulling in the
+>> PHY DTS and the SATA host driver patches soon?
+>
+> Kishon, is the following branch the right one to pull into
+> libata/for-3.15?
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+
+
+My PULL request to Greg has this..
+git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git 
+tags/for_3.15
+
+Btw you can add my
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+for this patch.
+
+Thanks
+Kishon
