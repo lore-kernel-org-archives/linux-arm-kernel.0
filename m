@@ -1,145 +1,96 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Mar 2014 13:20:35 +0100
-Subject: [PATCH 7/7] ARM: dts: Add support for the Overo Summit
+Date: Tue, 11 Mar 2014 13:20:30 +0100
+Subject: [PATCH 2/7] ARM: dts: overo: Add LIS33DE accelerometer
 In-Reply-To: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1394540435-25401-8-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1394540435-25401-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Summit is an expansion board for Gumstix Overo products.
+The LIS33DE accelerometer is used on several Gumstix expansion boards,
+thus add the DT node to omap3-overo-common-peripherals.dtsi.
+
+For the boards that do not have the accelerometer (like Tobi), mark the
+status as disabled.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/Makefile                       |  2 ++
- arch/arm/boot/dts/omap3-overo-storm-summit.dts   | 30 +++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-summit-common.dtsi | 31 ++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-summit.dts         | 30 +++++++++++++++++++++++
- 4 files changed, 93 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-summit.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-summit-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
+ .../boot/dts/omap3-overo-common-peripherals.dtsi   | 44 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi     |  4 ++
+ 2 files changed, 48 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7742e69..6565a7d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -217,6 +217,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-overo-storm-gallop43.dtb \
- 	omap3-overo-palo43.dtb \
- 	omap3-overo-storm-palo43.dtb \
-+	omap3-overo-summit.dtb \
-+	omap3-overo-storm-summit.dtb \
- 	omap3-overo-tobi.dtb \
- 	omap3-overo-storm-tobi.dtb \
- 	omap3-gta04.dtb \
-diff --git a/arch/arm/boot/dts/omap3-overo-storm-summit.dts b/arch/arm/boot/dts/omap3-overo-storm-summit.dts
-new file mode 100644
-index 0000000..a0d7fd8
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-storm-summit.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Summit expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-overo-storm.dtsi"
-+#include "omap3-overo-summit-common.dtsi"
-+
+diff --git a/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi b/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
+index bca81ae..5831bcc 100644
+--- a/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
+@@ -10,6 +10,22 @@
+  * Peripherals common to all Gumstix Overo boards (Tobi, Summit, Palo43,...)
+  */
+ 
 +/ {
-+	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Summit";
-+	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
-+};
++	lis33_3v3: lis33-3v3-reg {
++		compatible = "regulator-fixed";
++		regulator-name = "lis33-3v3-reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
 +
-+&omap3_pmx_core2 {
-+	led_pins: pinmux_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
-+		>;
++	lis33_1v8: lis33-1v8-reg {
++		compatible = "regulator-fixed";
++		regulator-name = "lis33-1v8-reg";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
 +	};
 +};
 +
-diff --git a/arch/arm/boot/dts/omap3-overo-summit-common.dtsi b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
-new file mode 100644
-index 0000000..999d1cd
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-summit-common.dtsi
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ &omap3_pmx_core {
+ 	i2c3_pins: pinmux_i2c3_pins {
+ 		pinctrl-single,pins = <
+@@ -37,6 +53,34 @@
+ 		reg = <0x51>;
+ 		pagesize = <8>;
+ 	};
 +
-+/*
-+ * Summit expansion board is manufactured by Gumstix Inc.
-+ */
++	lis33de: lis33de at 1d {
++		compatible = "st,lis33de", "st,lis3lv02d";
++		reg = <0x1d>;
++		Vdd-supply = <&lis33_1v8>;
++		Vdd_IO-supply = <&lis33_3v3>;
 +
-+#include "omap3-overo-common-peripherals.dtsi"
-+
-+/ {
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins>;
-+		heartbeat {
-+			label = "overo:red:gpio21";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;		/* gpio_21 */
-+			linux,default-trigger = "heartbeat";
-+		};
++		st,click-single-x;
++		st,click-single-y;
++		st,click-single-z;
++		st,click-thresh-x = <10>;
++		st,click-thresh-y = <10>;
++		st,click-thresh-z = <10>;
++		st,irq1-click;
++		st,irq2-click;
++		st,wakeup-x-lo;
++		st,wakeup-x-hi;
++		st,wakeup-y-lo;
++		st,wakeup-y-hi;
++		st,wakeup-z-lo;
++		st,wakeup-z-hi;
++		st,min-limit-x = <120>;
++		st,min-limit-y = <120>;
++		st,min-limit-z = <140>;
++		st,max-limit-x = <550>;
++		st,max-limit-y = <550>;
++		st,max-limit-z = <750>;
 +	};
-+};
-+
+ };
+ 
+ &mmc3 {
+diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+index 060eb77..13df50b 100644
+--- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+@@ -35,3 +35,7 @@
+ 	};
+ };
+ 
 +&lis33de {
 +	status = "disabled";
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-summit.dts b/arch/arm/boot/dts/omap3-overo-summit.dts
-new file mode 100644
-index 0000000..6976560
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-summit.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Summit expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-overo.dtsi"
-+#include "omap3-overo-summit-common.dtsi"
-+
-+/ {
-+	model = "OMAP35xx Gumstix Overo on Summit";
-+	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
-+};
-+
-+&omap3_pmx_core2 {
-+	led_pins: pinmux_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3430_CORE2_IOPAD(0x25ea, PIN_OUTPUT | MUX_MODE4)	/* etk_d7.gpio_21 */
-+		>;
-+	};
 +};
 +
 -- 
