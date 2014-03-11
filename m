@@ -1,36 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 11:23:42 +0000
-Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
-In-Reply-To: <531EEA39.50504@st.com>
-References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
- <531EEA39.50504@st.com>
-Message-ID: <20140311112342.GE21216@lee--X1>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 11 Mar 2014 08:28:40 -0300
+Subject: [PATCH 1/7] ARM: dts: mx25: Fix compatible string for generic USB
+ PHY
+In-Reply-To: <20140311075238.4bc0bea2@e6520eb>
+References: <1394484885-21262-1-git-send-email-festevam@gmail.com>
+ <20140311075238.4bc0bea2@e6520eb>
+Message-ID: <CAOMZO5D0+28_Omq+k1=XwJdRbvpGFguShYYKQ6dEvgqvF6UyYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >
-> >This patch adds support to rev E board of B2020 which has few minor
-> >changes :
-> >	PHY reset PIO (Change from PIO30 to PIO07)
-> >	Power LED(Green) Control(Change from PIO47 to PIO13)
-> 
-> I thought we decided last October to support only one revision of
-> the b2020 board.
-> 
-> The idea was to create an external git to provide DTS for all our
-> boards, and only have a minimal subset in in the kernel.
+Hi Eric,
 
-Ah, I was unaware of that conversation/decision. If that's the case we
-can scrap this submission along with the following patch.
+On Tue, Mar 11, 2014 at 3:52 AM, Eric B?nard <eric@eukrea.com> wrote:
 
-JOOI, what happens if I want to boot Mainline on my revE board? It
-won't be fully functional will it? That will be a shame. The LEDs, not
-so much, but networking is a pretty big piece of functionality to
-lose.
+> why don't you use Denis' patches instead of copying them with you as
+> the author ?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Some reasons:
+
+1. The v1 version of the patches is not functional on mx25 due to the
+wrong clock
+2. It is better to separate ARM patches from USB patches as they go
+through different maintainers
+3. In the original patch 4/9 Denis has put me in the From field, so I
+am not 'copying them with me as the author'
+4. It is better to make one change per patch rather than mixing
+different fixes into a single patch.
+
+Anyway I am happy whethever version is applied by the maintainers.
+Just wanted to get USB functional on mx25 ;-)
+
+Regards,
+
+Fabio Estevam
