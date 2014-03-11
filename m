@@ -1,116 +1,29 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 11 Mar 2014 16:11:35 -0600
-Subject: [PATCH v16 4/4] arm64: Add APM X-Gene SoC AHCI SATA host controller
- DTS entries
-In-Reply-To: <1394575895-7039-4-git-send-email-lho@apm.com>
-References: <1394575895-7039-1-git-send-email-lho@apm.com>
- <1394575895-7039-2-git-send-email-lho@apm.com>
- <1394575895-7039-3-git-send-email-lho@apm.com>
- <1394575895-7039-4-git-send-email-lho@apm.com>
-Message-ID: <1394575895-7039-5-git-send-email-lho@apm.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 11 Mar 2014 18:13:08 -0400
+Subject: [GIT PULL] ARM: mach-bcm: bcm281xx clock driver
+In-Reply-To: <20140311200432.GF31877@quad.lixom.net>
+References: <20140306044816.GA26681@beef>
+ <20140311200432.GF31877@quad.lixom.net>
+Message-ID: <20140311221308.GM25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC AHCI SATA host controller DTS entries.
+On Tue, Mar 11, 2014 at 01:04:32PM -0700, Olof Johansson wrote:
+> On Wed, Mar 05, 2014 at 11:48:16PM -0500, Matt Porter wrote:
+> > The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+> > 
+> >   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/drivers
+> > 
+> > for you to fetch changes up to 1a5823c9209f0435347fcc079cf9b0dc01882db0:
+> > 
+> >   clk: bcm281xx: don't disable unused peripheral clocks (2014-02-24 13:50:36 -0500)
+> 
+> Looks like this one was already merged.
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+Yes, Arnd and I did this one f2f last week as part of a howto video.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index c78ddcf..2a03e96 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -262,5 +304,38 @@
- 			apm,tx-boost-gain = <31 31 31 31 31 31>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 10>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-phy";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-phy";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-phy";
-+		};
- 	};
- };
--- 
-1.5.5
+-Matt
