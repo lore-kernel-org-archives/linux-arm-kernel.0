@@ -1,24 +1,31 @@
-From: tixy@linaro.org (Jon Medhurst)
-Date: Tue, 11 Mar 2014 16:54:51 +0000
-Subject: [PATCH 0/3] Fixes for kprobes test issues
-Message-ID: <1394556894-18592-1-git-send-email-tixy@linaro.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 11 Mar 2014 12:55:48 -0400
+Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC AHCI SATA host
+ controller DTS entries
+In-Reply-To: <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
+References: <1394059489-30706-1-git-send-email-lho@apm.com>
+ <1394059489-30706-2-git-send-email-lho@apm.com>
+ <1394059489-30706-3-git-send-email-lho@apm.com>
+ <1394059489-30706-4-git-send-email-lho@apm.com>
+ <20140311124943.GD11477@htj.dyndns.org>
+ <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
+Message-ID: <20140311165548.GA20776@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series fixes issues found with the kprobes tests during
-testing of Dave Long's latest ARM uprobe patches [1]. Whilst these fixes
-are based on top of that series all the bugs are already present in the
-kernel tree.
+Hello, Loc.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238862.html
+On Tue, Mar 11, 2014 at 08:51:37AM -0700, Loc Ho wrote:
+> Kishon didn't applied the PHY DTS patch. Did you first apply the PHY
+> DTS patch? We agreed that you will first pull in the PHY DTS as well
+> as the host controller patches. I don't see any reason why it wouldn't
+> apply if both DTS is applied. I will pull libata/for-3.15 and check
+> out.
 
-Contents:
+Can you please repost patches to apply on top of the current
+libata/for-3.15?
 
-Jon Medhurst (3):
-      ARM: kprobes: Prevent known test failures stopping other tests running
-      ARM: kprobes: Disallow instructions with PC and register specified shift
-      ARM: kprobes: Fix test code compilation errors for ARMv4 targets
+Thanks.
 
- arch/arm/kernel/kprobes-test-arm.c |   33 +++++++++++++++++++++------------
- arch/arm/kernel/kprobes-test.c     |   10 ++++++++++
- arch/arm/kernel/probes-arm.c       |    6 +++---
+-- 
+tejun
