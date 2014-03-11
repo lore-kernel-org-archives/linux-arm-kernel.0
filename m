@@ -1,94 +1,42 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 11 Mar 2014 11:49:29 +0100
-Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
-In-Reply-To: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 11 Mar 2014 11:52:15 +0100
+Subject: [PATCH 2/3] ARM: STi: stih416-b2020: Explicitly include STiH416
+ Pinctrl bindings
+In-Reply-To: <1394533324-20299-2-git-send-email-lee.jones@linaro.org>
 References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <531EEA39.50504@st.com>
+ <1394533324-20299-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <531EEADF.5060001@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+
 
 On 03/11/2014 11:22 AM, Lee Jones wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> At the moment we're relying on inheriting them from DTSI files which
+> we're including Ideally we should be specifying these for ourselves.
 >
-> This patch adds support to rev E board of B2020 which has few minor
-> changes :
-> 	PHY reset PIO (Change from PIO30 to PIO07)
-> 	Power LED(Green) Control(Change from PIO47 to PIO13)
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih416-b2020-revE.dts | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> index bcb9d00..4168b019 100644
+> --- a/arch/arm/boot/dts/stih416-b2020-revE.dts
+> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> @@ -8,6 +8,7 @@
+>    */
+>   /dts-v1/;
+>   #include "stih416.dtsi"
+> +#include "stih416-pinctrl.dtsi"
+Isn't this file already included in stih416.dtsi?
 
-I thought we decided last October to support only one revision of the 
-b2020 board.
+>   #include "stih41x-b2020.dtsi"
+>   / {
+>           model = "STih416 B2020 REV. E";
+>
 
-The idea was to create an external git to provide DTS for all our 
-boards, and only have a minimal subset in in the kernel.
+For the next revision, could you please add kernel at stlinux.com in cc?
 
 Regards,
 Maxime
-
->
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> ---
->   arch/arm/boot/dts/Makefile               |  3 ++-
->   arch/arm/boot/dts/stih416-b2020-revE.dts | 36 ++++++++++++++++++++++++++++++++
->   2 files changed, 38 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 0320303..325218a 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -278,7 +278,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
->   dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
->   	stih416-b2000.dtb \
->   	stih415-b2020.dtb \
-> -	stih416-b2020.dtb
-> +	stih416-b2020.dtb \
-> +	stih416-b2020-revE.dtb
->   dtb-$(CONFIG_ARCH_SUNXI) += \
->   	sun4i-a10-a1000.dtb \
->   	sun4i-a10-cubieboard.dtb \
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> new file mode 100644
-> index 0000000..bcb9d00
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> @@ -0,0 +1,36 @@
-> +/*
-> + * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-> + * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +#include "stih416.dtsi"
-> +#include "stih41x-b2020.dtsi"
-> +/ {
-> +        model = "STih416 B2020 REV. E";
-> +	compatible = "st,stih416", "st,stih416-b2020";
-> +
-> +	soc {
-> +
-> +		leds {
-> +			compatible	= "gpio-leds";
-> +			red {
-> +				#gpio-cells = <1>;
-> +				label	= "Front Panel LED";
-> +				gpios	= <&PIO4 1>;
-> +				linux,default-trigger	= "heartbeat";
-> +			};
-> +			green {
-> +				gpios	= <&PIO1 3>;
-> +				default-state = "off";
-> +			};
-> +		};
-> +
-> +		ethernet1: ethernet at fef08000 {
-> +			snps,reset-gpio 	= <&PIO0 7>;
-> +		};
-> +	};
-> +};
->
