@@ -1,52 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 13:07:15 +0000
-Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
-In-Reply-To: <531EFE97.1090202@ti.com>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
- <531ECDCB.4060700@ti.com> <20140311120259.GI21216@lee--X1>
- <531EFE97.1090202@ti.com>
-Message-ID: <20140311130715.GM21216@lee--X1>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 11 Mar 2014 14:17:19 +0100
+Subject: [RFC 0/6] rework sched_domain topology description
+In-Reply-To: <531B0FDA.2040302@arm.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <5317B092.7070805@arm.com>
+ <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
+ <53186A8A.9060406@arm.com>
+ <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
+ <531B0FDA.2040302@arm.com>
+Message-ID: <20140311131719.GY9987@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Mar 08, 2014 at 12:40:58PM +0000, Dietmar Eggemann wrote:
+> >
+> >I don't have a strong opinion about using or not a cpu argument for
+> >setting the flags of a level (it was part of the initial proposal
+> >before we start to completely rework the build of sched_domain)
+> >Nevertheless, I see one potential concern that you can have completely
+> >different flags configuration of the same sd level of 2 cpus.
+> 
+> Could you elaborate a little bit further regarding the last sentence? Do you
+> think that those completely different flags configuration would make it
+> impossible, that the load-balance code could work at all at this sd?
 
-> >>> This patchset brings up USB Host ports and Ethernet port on
-> >>> the OMAP5 uEVM board.
-> >>>
-> >>> It also does some cleanup with respect to DT clock binding
-> >>> for the mfd/omap-usb-host driver.
-> >>>
-> >>> Please queue these for -next.
-> >>>
-> >>> Lee,
-> >>>
-> >>> I've folded some platform data dependent patches with mfd patches
-> >>> so that they don't break functionality when applied individually.
-> >>> You can safely pull in all MFD patches (1 to 6).
-> >>>
-> >>> Tony & Benoit,
-> >>>
-> >>> Can you please accept patches 7, 8 and 9?
-> >>
-> >> Tony has already picked up 7,8 and 9 through omap-soc tree.
-> >>
-> >> Since you acked most patches except 5 and 6, are you fine if Tony takes
-> >> all the patches 1 to 4 in this series via omap-soc tree?
-> >>
-> >> What about patches 5 and 6?
-> > 
-> > Any patches which are orthogonal can just be sucked into whichever tree
-> > they belong in. If there are inter-subsystem dependencies I'd prefer
-> > to take them and issue a immutable branch pull-request to the other
-> > maintainers.
-> > 
-> Awesome. That would be great, thanks.
+So a problem with such an interfaces is that is makes it far too easy to
+generate completely broken domains.
 
-That does mean I need a) all of the Maintainer Acks and b) you to tell
-me which ones need to go through a single tree.
+You can, for two cpus in the same domain provide, different flags; such
+a configuration doesn't make any sense at all.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Now I see why people would like to have this; but unless we can make it
+robust I'd be very hesitant to go this route.
