@@ -1,75 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Mar 2014 13:23:10 +0000
-Subject: [PATCH 1/3] ARM: DT: STi: Add support to B2020 revision E board.
-In-Reply-To: <531EFE75.9010709@st.com>
-References: <1394533324-20299-1-git-send-email-lee.jones@linaro.org>
- <531EEA39.50504@st.com> <20140311112342.GE21216@lee--X1>
- <531EFE75.9010709@st.com>
-Message-ID: <20140311132310.GN21216@lee--X1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Mar 2014 21:27:29 +0800
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <1394538128.3772.15.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140311132727.GB26502@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >>>
-> >>>This patch adds support to rev E board of B2020 which has few minor
-> >>>changes :
-> >>>	PHY reset PIO (Change from PIO30 to PIO07)
-> >>>	Power LED(Green) Control(Change from PIO47 to PIO13)
-> >>
-> >>I thought we decided last October to support only one revision of
-> >>the b2020 board.
-> >>
-> >>The idea was to create an external git to provide DTS for all our
-> >>boards, and only have a minimal subset in in the kernel.
-> >
-> >Ah, I was unaware of that conversation/decision. If that's the case we
-> >can scrap this submission along with the following patch.
+On Tue, Mar 11, 2014 at 12:42:08PM +0100, Philipp Zabel wrote:
+> Hi Shawn,
 > 
-> In fact we had the discussion together with Arnd (IIRC) on #armlinux :)
-
-I remember discussing {cpu,machine}_is() implementations with regards
-to handling quirks. I wasn't aware that this culminated in the
-decision above. When it comes to things like PIO line or other key
-hardware changes through revisions, I fully expect this to be
-described inside a .dts file.
-
-> The reason is we wanted to avoid flooding arch/arm/dts/ with all the
-> possible combinations of board revisions.
+> Am Dienstag, den 11.03.2014, 11:46 +0800 schrieb Shawn Guo:
+> > On Wed, Mar 05, 2014 at 10:20:51AM +0100, Philipp Zabel wrote:
+> > > Hi,
+> > > 
+> > > this latest version of the imx-drm DT binding patches applies
+> > > on top of staging-next and also depends on the OF graph binding
+> > > patchset that moves the v4l2_of helpers to drivers/of.
+> > > Currently, the two patchsets are also available at:
+> > >     git://git.pengutronix.de/git/pza/linux.git topic/of-graph
+> > >     git://git.pengutronix.de/git/pza/linux.git topic/imx-drm-dt
+> > 
+> > Hi Philipp,
+> > 
+> > I just came across a couple problems when testing the series on
+> > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
+> > using Russell's branch below, which I believe has all the pieces put
+> > together.
+> > 
+> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
+> > 
+> > - When I enable HDMI and LVDS support in both kernel build and device
+> >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
+> > 
+> > - When I enable HDMI and LVDS support in kernel build but only LVDS in
+> >   device tree (keep HDMI disabled in device tree by not changing
+> >   'status' of HDMI node to 'okay'), LVDS does not even work.  In this
+> >   case, it seems that the binding of display-subsystem does not succeed.
 > 
-> The idea was to put in place a git repository at stlinux.com to
-> provide the DTS for all the STi boards, and try to keep
-> arch/arm/dts/sti* simple.
-
-I can certainly sympathise with the reasoning, but for me fetching DTS
-files from an external Git repo sounds unnecessarily tiresome. I had
-thought about creating some per-vendor directories in there to
-simplify the format a little, but then I guess we're back to square
-one of the old arch/arm/mach-* situation.
-
-> >JOOI, what happens if I want to boot Mainline on my revE board? It
-> >won't be fully functional will it? That will be a shame. The LEDs, not
-> >so much, but networking is a pretty big piece of functionality to
-> >lose.
+> Can you check if you get the bound messages from
+> drivers/base/component.c:
 > 
-> I agree this is not comfortable.
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+> imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
 > 
-> The problem is that your patch is not enough. We would need to
-> create much more files, because for example, the i2c used are not
-> the same between rev. C and rev. E.
-> 
-> It gives theses files only for b2020 support:
->   arch/arm/boot/dts/stih415-b2020.dts
->   arch/arm/boot/dts/stih416-b2020e.dts
->   arch/arm/boot/dts/stih41x-b2020e.dtsi
->   arch/arm/boot/dts/stih416-b2020.dts
->   arch/arm/boot/dts/stih41x-b2020.dtsi
->   arch/arm/boot/dts/stih41x-b2020x.dtsi
+> I have tried this branch with a Phytec phyFLEX i.MX6S on PBAB01
+> baseboard with EDT 800x480 LVDS panel, and it seems to work.
+> The check in drivers/staging/imx-drm/imx-drm-core.c:675 should make sure
+> that unavailable (status="disabled") devices are just skipped.
 
-Right, but you're also talking about supporting two different SoCs
-there too, so I guess that's not so bad?
+Sorry, Philipp.  The setup in my report is incorrect.  The correct setup
+to see this issue consists of:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1) build a kernel without HDMI support, i.e. !CONFIG_DRM_IMX_HDMI
+
+2) enable HDMI device in DT, i.e. adding the lines below in board dts.
+
+	&hdmi {
+	       status = "okay";
+	};
+
+Sorry for the confusion.
+
+Shawn
