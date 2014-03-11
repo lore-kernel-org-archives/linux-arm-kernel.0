@@ -1,50 +1,51 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 11 Mar 2014 14:56:47 +0100
-Subject: [PATCH v3 1/5] ARM: STi: Add STiH407 SoC support
-In-Reply-To: <20140310123405.GU14976@lee--X1>
-References: <1394203251-25361-1-git-send-email-maxime.coquelin@st.com>
- <1394203251-25361-2-git-send-email-maxime.coquelin@st.com>
- <20140310123405.GU14976@lee--X1>
-Message-ID: <531F161F.9040804@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 11 Mar 2014 13:59:34 +0000
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries
+In-Reply-To: <1394543851-11732-1-git-send-email-broonie@kernel.org>
+References: <1394543851-11732-1-git-send-email-broonie@kernel.org>
+Message-ID: <531F16C6.5030903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I missed this one.
+Hi Mark,
 
-On 03/10/2014 01:34 PM, Lee Jones wrote:
->> This patch adds support to STiH407 SoC.
->>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->> ---
->>   Documentation/arm/sti/stih407-overview.txt    | 18 ++++++++++++++++++
->>   Documentation/devicetree/bindings/arm/sti.txt | 15 +++++++++++++++
->>   arch/arm/mach-sti/Kconfig                     |  9 +++++++++
->>   arch/arm/mach-sti/board-dt.c                  |  1 +
->>   4 files changed, 43 insertions(+)
->>   create mode 100644 Documentation/arm/sti/stih407-overview.txt
->>   create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+On 11/03/14 13:17, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 >
-> <snip>
+> Probably due to rebasing over the lengthy time it took to get the patch
+> merged commit addea9ef055b (cpufreq: enable ARM drivers on arm64) added
+> a duplicate Power management options section.  Add CPUfreq to the CPU
+> power management section and remove a duplicate include of the main
+> power section.
 >
->> +config SOC_STIH407
->> +	bool "STiH407 STMicroelectronics Consumer Electronics family"
->> +	default y
->> +	help
->> +	  This enables support for STMicroelectronics Digital Consumer
->> +	  Electronics family StiH407 parts, primarily targeted at set-top-box
->> +	  and other digital audio/video applications using Flattened Device
->> +	  Trees.
->> +
->
-> Are these configs actually used for something?
-Not currently, but it is going to happen (for reset controller).
 
-I will add it only when I'll send the reset controller driver for STiH407.
+This looks fine to me, but since commit addea9ef055b is only in Rafael's
+next tree, Catalin can't take this, so it makes sense to go through Rafael's
+tree, right ?
 
 Regards,
-Maxime
+Sudeep
 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>   arch/arm64/Kconfig | 6 ------
+>   1 file changed, 6 deletions(-)
 >
-> <snip>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a3c40d65128b..2474c24dc229 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -318,12 +318,6 @@ menu "CPU Power Management"
+>
+>   source "drivers/cpuidle/Kconfig"
+>
+> -endmenu
+> -
+> -menu "Power management options"
+> -
+> -source "kernel/power/Kconfig"
+> -
+>   source "drivers/cpufreq/Kconfig"
+>
+>   endmenu
 >
