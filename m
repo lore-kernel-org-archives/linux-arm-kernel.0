@@ -1,41 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Mar 2014 14:35:36 +0000
-Subject: [PATCH v5 0/7] arm64: Add ftrace support
-In-Reply-To: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
- <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140311143535.GE7944@mudshark.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 11 Mar 2014 22:44:14 +0800
+Subject: [PATCH 2/3] soc: keystone: add QMSS driver
+In-Reply-To: <5EE98053-31B8-4679-AAE2-4F026C61D1D4@codeaurora.org>
+References: <1393629520-12713-1-git-send-email-santosh.shilimkar@ti.com>	<1393629520-12713-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_Jsq+O660oV9FtthG3gTkVOhL0ku-UHSrkt-ROauu1iNpbaA@mail.gmail.com>
+ <531E2C55.70702@ti.com> <5EE98053-31B8-4679-AAE2-4F026C61D1D4@codeaurora.org>
+Message-ID: <531F213E.50807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On Fri, Feb 28, 2014 at 05:18:37AM +0000, AKASHI Takahiro wrote:
-> This patchset implements a function tracer on arm64.
-> There was another implementation from Cavium network, but both of us agreed
-> to use my patchset as future base. He is supposed to review this code, too.
+On Tuesday 11 March 2014 10:04 PM, Kumar Gala wrote:
 > 
-> The only issue that I had some concern on was "fault protection" code
-> in prepare_ftrace_return(). With discussions with Steven and Tim (as author
-> of arm ftrace), I removed that code since I'm not quite sure about possibility
-> of "fault" occurrences in this function.
+> On Mar 10, 2014, at 4:19 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 > 
-> The code is tested on ARMv8 Fast Model with the following tracers & events:
->      function tracer with dynamic ftrace
->      function graph tracer with dynamic ftrace
->      syscall tracepoint
->      irqsoff & preemptirqsoff (which use CALLER_ADDRx)
-> and also verified with in-kernel tests, FTRACE_SELFTEST, FTRACE_STARTUP_TEST
-> and EVENT_TRACE_TEST_SYSCALLS.
+>>>> +  -- reg-names         : Names for the above register regions. The name to be
+>>>> +                         used is as follows:
+>>>> +                         - "config" : Queue configuration region.
+>>>> +                         - "status" : Queue status RAM.
+>>>> +                         - "region" : Descriptor memory setup region.
+>>>> +                         - "push"   : Queue Management/Queue Proxy region.
+>>>> +                         - "pop"    : Queue Management/Queue Proxy region.
+>>>> +                         - "peek"   : Queue Peek region.
+>>>
+>>> reg-names should be optional. Also you have the order different from
+>>> reg. Be consistent as to what is the correct order.
+>>>
+>> We thought of using reg-names to remove the ordering to index
+>> the regs. So if we make the reg-names optional, then indexing
+>> by order will be used. We can do that.
 > 
-> Prerequisites are:
->  * "arm64: Add regs_return_value() in syscall.h"
->  * "arm64: make a single hook to syscall_trace() for all syscall features" patch
+> We keep having this conversation, why does reg-names need to be optional for new bindings?
+> 
+I guess the question is for Rob.
 
-It looks like there might be some more dependencies that that. Do you have a
-branch anywhere containing this series, along with all the dependencies so I
-can have a play?
-
-Cheers,
-
-Will
+Regards,
+Santosh
