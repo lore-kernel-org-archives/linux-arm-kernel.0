@@ -1,43 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Mar 2014 07:45:18 +0900
-Subject: [PATCH v2 2/3] arm64: defconfig: Enable ARCH_GH7 by default
-In-Reply-To: <20140311120145.GE31104@arm.com>
-References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
- <1394491879-5320-3-git-send-email-kgene.kim@samsung.com>
- <20140311120145.GE31104@arm.com>
-Message-ID: <531F91FE.4010609@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Mar 2014 22:45:17 +0000
+Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <20140311221938.GO25092@beef>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-3-git-send-email-mporter@linaro.org>
+ <20140311160837.GP21216@lee--X1> <20140311221938.GO25092@beef>
+Message-ID: <20140311224517.GA5672@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/14 21:01, Catalin Marinas wrote:
-> On Mon, Mar 10, 2014 at 10:51:18PM +0000, Kukjin Kim wrote:
->> This patch adds support for Samsung GH7 SoC in arm64/Kconfig and
->> enable Samsung GH7 based SSDK_GH7 in single defconfig for arm64.
->>
->> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
->> Cc: Catalin Marinas<catalin.marinas@arm.com>
->> ---
->>   arch/arm64/Kconfig           | 3 +++
->>   arch/arm64/boot/dts/Makefile | 1 +
->>   arch/arm64/configs/defconfig | 1 +
->>   3 files changed, 5 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index dd4327f..f0f2bf2 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -111,6 +111,9 @@ source "kernel/Kconfig.freezer"
->>
->>   menu "Platform selection"
->>
->> +config ARCH_GH7
->> +	bool
->
-> You should add some text here so that people can disable it. The aim is
-> single Image by default but I think we should let people disable certain
-> platforms for more targeted deployments.
->
-OK, I'll add and re-submit with Cc'ing dt mailing list.
+> > > Add a driver for the BCM590xx PMU multi-function devices. The driver
+> > > initially supports regmap initialization and instantiation of the
+> > > voltage regulator device function of the PMU.
+> > > 
+> > > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> > > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > > ---
+> > >  drivers/mfd/Kconfig          |  8 ++++
+> > >  drivers/mfd/Makefile         |  1 +
+> > >  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
+> > >  4 files changed, 133 insertions(+)
+> > >  create mode 100644 drivers/mfd/bcm590xx.c
+> > >  create mode 100644 include/linux/mfd/bcm590xx.h
+> > 
+> > I have a tiny nit that 'ret' doesn't need to be initialised before
+> > use in probe(), but apart from that...
+> > 
+> > Looks pretty sensible:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Ok, thanks. When I get back in front of my desktop I'll send a v4 of
+> just this patch to address that nit. Mark already applied the regulator
+> driver from this series, will you be taking this through your tree? For
+> that matter, I wonder if the binding would also go through your tree
+> with this driver.
 
-Thanks,
-Kukjin
+At least the MFD portion and the DT binding doc will go through the
+MFD tree.
+
+Are there any inter-patch dependencies in the set? If so, we should
+know about them so we can coordinate a sensible solution.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
