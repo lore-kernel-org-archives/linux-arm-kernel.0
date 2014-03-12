@@ -1,36 +1,31 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Mar 2014 00:38:58 +0000
-Subject: [linux-sunxi] Re: [PATCH 6/7] regulator: AXP20x: Add support for
- regulators subsystem
-In-Reply-To: <20140311210659.GA10961@localhost.fastwebnet.it>
-References: <1393692352-10839-1-git-send-email-carlo@caione.org>
- <1393692352-10839-7-git-send-email-carlo@caione.org>
- <20140303015616.GN2411@sirena.org.uk>
- <20140311192411.GA4193@localhost.fastwebnet.it>
- <20140311192940.GA28112@sirena.org.uk>
- <20140311210659.GA10961@localhost.fastwebnet.it>
-Message-ID: <20140312003858.GG28112@sirena.org.uk>
+Date: Wed, 12 Mar 2014 00:40:30 +0000
+Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <20140311232545.GP25092@beef>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-3-git-send-email-mporter@linaro.org>
+ <20140311160837.GP21216@lee--X1> <20140311221938.GO25092@beef>
+ <20140311224517.GA5672@lee--X1> <20140311232545.GP25092@beef>
+Message-ID: <20140312004030.GH28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 10:06:59PM +0100, Carlo Caione wrote:
-> On Tue, Mar 11, 2014 at 07:29:40PM +0000, Mark Brown wrote:
+On Tue, Mar 11, 2014 at 07:25:45PM -0400, Matt Porter wrote:
+> On Tue, Mar 11, 2014 at 10:45:17PM +0000, Lee Jones wrote:
 
-> > With the above code the driver will return an error and never get as far
-> > as registering the regulator.
+> > Are there any inter-patch dependencies in the set? If so, we should
+> > know about them so we can coordinate a sensible solution.
 
-> I agree, but if I register the regulators without having the constrains
-> defined in the DT, when regulator_init_complete() is
-> called, the regulators are disabled powering off the SoC (at least for
-> DCDC2 and DCDC3).
+> Yes, the regulator driver (3/5) that Mark applied is dependent on this
+> patch...the regulator driver includes include/linux/mfd/bcm590xx.h.
 
-Right, but the kernel will say what it's doing before it does so and
-then the user can provide the appropriate setup in DT to force things
-on.
+There's no actual dependency though - the regulator driver can only be
+built if the MFD is enabled in Kconfig since it depends on it so until
+the MFD is present in the tree it won't get built.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/816efa6f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/d57ecd17/attachment.sig>
