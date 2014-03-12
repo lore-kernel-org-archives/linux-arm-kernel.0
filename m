@@ -1,42 +1,28 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 12 Mar 2014 16:26:26 +0100
-Subject: [PATCH v4 0/6] Add STiH407 SoC and reference board support
-In-Reply-To: <CACRpkdboBkzcJC35-BNvVYmS_t9Cd204AVz4rZasKtNJp0yE4g@mail.gmail.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
- <CACRpkdboBkzcJC35-BNvVYmS_t9Cd204AVz4rZasKtNJp0yE4g@mail.gmail.com>
-Message-ID: <53207CA2.4090309@st.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 12 Mar 2014 08:31:40 -0700
+Subject: [PATCH RESEND] usb: at91-udc: fix irq and iomem resource retrieval
+In-Reply-To: <532075EC.7060809@atmel.com>
+References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+ <1392210209-22142-1-git-send-email-nicolas.ferre@atmel.com>
+ <532075EC.7060809@atmel.com>
+Message-ID: <20140312153140.GA8141@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Mar 12, 2014 at 03:57:48PM +0100, Nicolas Ferre wrote:
+> On 12/02/2014 14:03, Nicolas Ferre :
+> > From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > 
+> > When using dt resources retrieval (interrupts and reg properties) there is
+> > no predefined order for these resources in the platform dev resource
+> > table. Also don't expect the number of resource to be always 2.
+> > 
+> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Cc: stable <stable@vger.kernel.org> # 3.4
+> 
+> Gentle ping, after having resent the patch itself.
 
-On 03/12/2014 03:20 PM, Linus Walleij wrote:
-> On Wed, Mar 12, 2014 at 9:50 AM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
->
->> This series adds basic support to the STMicroelectronics STiH407 SoC and its
->> B2120 reference board. The STiH407 is a dual-core ARM Cortex-A9 CPU aimed at
->> STB market.
->>
->> Changes since v3:
->
-> I've applied the pinctrl changes to the pinctrl tree, please push all the
-> DTS[i] changes through ARM SoC.
-As mentioned in the cover-letter, the DTS changes are based on arm_soc's 
-for-next branch.
-
-Do you mean I should send a pull request for these three patches?
-
-
->
-> There is no need to keep DTS and subsystem changes in sync as
-> the DTS'es are supposed to be maintained in separation in the
-> future anyway.
->
-
-Understood.
-
-Thanks,
-Maxime
-> Yours,
-> Linus Walleij
->
+It helps if you send it to the correct maintainer, remember,
+scripts/get_maintainer.pl is your friend...
