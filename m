@@ -1,90 +1,43 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 12 Mar 2014 11:39:55 +0100
-Subject: [PATCH 5/5] ARM: shmobile: r8a7790: add IIC(B) cores to dtsi
-In-Reply-To: <1394573078-20767-6-git-send-email-wsa@the-dreams.de>
+Date: Wed, 12 Mar 2014 11:40:57 +0100
+Subject: [PATCH 0/5] ARM: shmobile: r8a7790: enable IIC(B) cores
+In-Reply-To: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
 References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
- <1394573078-20767-6-git-send-email-wsa@the-dreams.de>
-Message-ID: <1722114.RHS5FXLvLd@avalon>
+Message-ID: <2570845.PngjMN9sWk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Wolfram,
 
-Thank you for the patch.
+On Tuesday 11 March 2014 22:24:33 Wolfram Sang wrote:
+> This series allows r8a7790 boards to use the alternative IIC(B) controller
+> handled by the i2c-sh_mobile driver. Since both i2c cores always use the
+> same pins only in a different function group, you can easily use this or
+> that core for your devices. For that reason, there is currently no
+> enablement on the Lager board, since it needs discussion which core we want
+> to have on which bus. sh_mobile seems more stable currently, so I'd vote
+> for that.
 
-On Tuesday 11 March 2014 22:24:38 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
->  arch/arm/boot/dts/r8a7790.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 9e15fb9858e7..5b357480d8bf 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -24,6 +24,10 @@
->  		i2c1 = &i2c1;
->  		i2c2 = &i2c2;
->  		i2c3 = &i2c3;
-> +		i2c4 = &i2c4;
-> +		i2c5 = &i2c5;
-> +		i2c6 = &i2c6;
-> +		i2c7 = &i2c7;
->  		spi0 = &qspi;
->  		spi1 = &msiof0;
->  		spi2 = &msiof1;
-> @@ -236,6 +240,46 @@
->  		status = "disabled";
->  	};
-> 
-> +	i2c4: i2c at e6500000 {
+Do you have a short list of pros and cons from a hardware point of view ?
 
-As for the other patches, iic0-iic3 ?
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6500000 0 0x425>;
-> +		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c5: i2c at e6510000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6510000 0 0x425>;
-> +		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC1>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c6: i2c at e6520000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6520000 0 0x425>;
-> +		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC2>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c7: i2c at e60b0000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe60b0000 0 0x425>;
-> +		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp9_clks R8A7790_CLK_IICDVFS>;
-> +		status = "disabled";
-> +	};
-> +
->  	mmcif0: mmcif at ee200000 {
->  		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
->  		reg = <0 0xee200000 0 0x80>;
+> Please review and apply if no issues found.
+> 
+> Thanks,
+> 
+>    Wolfram
+> 
+> 
+> Wolfram Sang (5):
+>   pinctrl: pfc: r8a7790: add i2c0 muxing
+>   pinctrl: pfc: r8a7790: add mux data for IIC(B) cores
+>   ARM: shmobile: r8a7790: add IIC0-2 clock macros
+>   ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
+>   ARM: shmobile: r8a7790: add IIC(B) cores to dtsi
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi            |  71 +++++++++++++---
+>  drivers/pinctrl/sh-pfc/pfc-r8a7790.c      | 136 ++++++++++++++++++++++++++-
+>  include/dt-bindings/clock/r8a7790-clock.h |   3 +
+>  3 files changed, 196 insertions(+), 14 deletions(-)
 
 -- 
 Regards,
