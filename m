@@ -1,31 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Mar 2014 00:40:30 +0000
-Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
-In-Reply-To: <20140311232545.GP25092@beef>
-References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
- <1394552775-31264-3-git-send-email-mporter@linaro.org>
- <20140311160837.GP21216@lee--X1> <20140311221938.GO25092@beef>
- <20140311224517.GA5672@lee--X1> <20140311232545.GP25092@beef>
-Message-ID: <20140312004030.GH28112@sirena.org.uk>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Tue, 11 Mar 2014 17:41:22 -0700
+Subject: Freescale PFUZE100 PMIC
+Message-ID: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 07:25:45PM -0400, Matt Porter wrote:
-> On Tue, Mar 11, 2014 at 10:45:17PM +0000, Lee Jones wrote:
+Hi All,
 
-> > Are there any inter-patch dependencies in the set? If so, we should
-> > know about them so we can coordinate a sensible solution.
+I was trying to enable the PFUZE100 regulator driver
+(pfuze100-regulator) on linux 3.13.0. The PMIC is connected to the
+i2c2 bus.
 
-> Yes, the regulator driver (3/5) that Mark applied is dependent on this
-> patch...the regulator driver includes include/linux/mfd/bcm590xx.h.
+&i2c2 {
+   .....
+   pmic: pfuze100 at 08 {
+          compatible = "fsl,pfuze100";
+          reg = <0x08>;
 
-There's no actual dependency though - the regulator driver can only be
-built if the MFD is enabled in Kconfig since it depends on it so until
-the MFD is present in the tree it won't get built.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/d57ecd17/attachment.sig>
+          regulators {
+                 ......
+          };
+   };
+}
+
+After loading the driver, I was getting an error:
+pfuze100-regulator 0-0008: unrecognized pfuze chip ID!
+
+Then, I printed the return value of i2c_transfer function and got -5.
+
+
+Is there anything that I forgot?. I tried to use the i2cget in
+userspace and I was able to communicate it to the device.
+
+Regards,
+
+john
