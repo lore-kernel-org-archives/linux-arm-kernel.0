@@ -1,186 +1,58 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Wed, 12 Mar 2014 17:00:48 +0530
-Subject: [PATCH 1/3] clk: s2mps11: Add support for S2MPS14 clocks
-In-Reply-To: <1394454858-3139-2-git-send-email-k.kozlowski@samsung.com>
-References: <1394454858-3139-1-git-send-email-k.kozlowski@samsung.com>
- <1394454858-3139-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAKew6eVEAmxg+fMeeduOwZvxjDdv3Zbu8cNCq7krk5mEq4BKmw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Mar 2014 11:33:47 +0000
+Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
+In-Reply-To: <531FE40C.1060709@wwwdotorg.org>
+References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
+ <531FE40C.1060709@wwwdotorg.org>
+Message-ID: <20140312113346.GA9347@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 6:04 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
-> s2mps11 clock driver.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+Hi guys,
 
-Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+On Wed, Mar 12, 2014 at 04:35:24AM +0000, Stephen Warren wrote:
+> On 03/10/2014 03:21 PM, Vince Weaver wrote:
+> > I buit the current
+> > 	git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
+> > kernel on a Raspberry Pi.
+> > 
+> > I used 
+> > 	make bcm2835_defconfig
+> > 	make zImage
+> > but the results zImage hung at boot.
+> > 
+> > It turned out that for some reason 
+> > 	CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y
+> > and
+> > 	CONFIG_ARCH_USE_BUILTIN_BSWAP=y
+> 
+> Hmm. I thought that ARMv6 didn't have efficient unaligned accesses, but
+> I suppose it must; ARM selects HAVE_EFFICIENT_UNALIGNED_ACCESS for
+> v6/v6k/v7. BUILTIN_BSWAP seems innocuous. Can you verify which of those
+> two options actually causes problems for you?
 
-Just a trivial thing, Kconfig description can also be updated.
+So just to confirm: enabling those options in the kernel you are compiling
+results in an image that you can't boot? We're not talking about the host
+kernel here.
 
-Regards,
-Yadwinder
+I just took the tree you mentioned above, merged together 3.14-rc6,
+for-3.15/soc and for-3.15/dt. Using the defconfig (+ appended dtb options)
+and cross-compiling with a dated linaro toolchain, it booted fine on my rpi:
 
->  drivers/clk/clk-s2mps11.c |   61 ++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 46 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-> index 508875535e1e..8dafb552274f 100644
-> --- a/drivers/clk/clk-s2mps11.c
-> +++ b/drivers/clk/clk-s2mps11.c
-> @@ -1,7 +1,7 @@
->  /*
->   * clk-s2mps11.c - Clock driver for S2MPS11.
->   *
-> - * Copyright (C) 2013 Samsung Electornics
-> + * Copyright (C) 2013,2014 Samsung Electornics
->   *
->   * This program is free software; you can redistribute  it and/or modify it
->   * under  the terms of  the GNU General  Public License as published by the
-> @@ -13,10 +13,6 @@
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
->   *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> - *
->   */
->
->  #include <linux/module.h>
-> @@ -27,6 +23,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/platform_device.h>
->  #include <linux/mfd/samsung/s2mps11.h>
-> +#include <linux/mfd/samsung/s2mps14.h>
->  #include <linux/mfd/samsung/s5m8767.h>
->  #include <linux/mfd/samsung/core.h>
->
-> @@ -125,7 +122,21 @@ static struct clk_init_data s2mps11_clks_init[S2MPS11_CLKS_NUM] = {
->         },
->  };
->
-> -static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
-> +static struct clk_init_data s2mps14_clks_init[S2MPS11_CLKS_NUM] = {
-> +       [S2MPS11_CLK_AP] = {
-> +               .name = "s2mps14_ap",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +       [S2MPS11_CLK_BT] = {
-> +               .name = "s2mps14_bt",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +};
-> +
-> +static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev,
-> +               struct clk_init_data *clks_init)
->  {
->         struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
->         struct device_node *clk_np;
-> @@ -145,9 +156,12 @@ static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
->         if (!clk_table)
->                 return ERR_PTR(-ENOMEM);
->
-> -       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +               if (!clks_init[i].name)
-> +                       continue; /* Skip clocks not present in some devices */
->                 of_property_read_string_index(clk_np, "clock-output-names", i,
-> -                               &s2mps11_clks_init[i].name);
-> +                               &clks_init[i].name);
-> +       }
->
->         return clk_np;
->  }
-> @@ -158,6 +172,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
->         struct device_node *clk_np = NULL;
->         unsigned int s2mps11_reg;
-> +       struct clk_init_data *clks_init;
->         int i, ret = 0;
->         u32 val;
->
-> @@ -168,25 +183,33 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->
->         s2mps11_clk = s2mps11_clks;
->
-> -       clk_np = s2mps11_clk_parse_dt(pdev);
-> -       if (IS_ERR(clk_np))
-> -               return PTR_ERR(clk_np);
-> -
->         switch (platform_get_device_id(pdev)->driver_data) {
->         case S2MPS11X:
->                 s2mps11_reg = S2MPS11_REG_RTC_CTRL;
-> +               clks_init = s2mps11_clks_init;
-> +               break;
-> +       case S2MPS14X:
-> +               s2mps11_reg = S2MPS14_REG_RTCCTRL;
-> +               clks_init = s2mps14_clks_init;
->                 break;
->         case S5M8767X:
->                 s2mps11_reg = S5M8767_REG_CTRL1;
-> +               clks_init = s2mps11_clks_init;
->                 break;
->         default:
->                 dev_err(&pdev->dev, "Invalid device type\n");
->                 return -EINVAL;
->         };
->
-> +       clk_np = s2mps11_clk_parse_dt(pdev, clks_init);
-> +       if (IS_ERR(clk_np))
-> +               return PTR_ERR(clk_np);
-> +
->         for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
-> +               if (!clks_init[i].name)
-> +                       continue; /* Skip clocks not present in some devices */
->                 s2mps11_clk->iodev = iodev;
-> -               s2mps11_clk->hw.init = &s2mps11_clks_init[i];
-> +               s2mps11_clk->hw.init = &clks_init[i];
->                 s2mps11_clk->mask = 1 << i;
->                 s2mps11_clk->reg = s2mps11_reg;
->
-> @@ -220,8 +243,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         }
->
->         if (clk_table) {
-> -               for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +               for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +                       /* Skip clocks not present on S2MPS14 */
-> +                       if (!clks_init[i].name)
-> +                               continue;
->                         clk_table[i] = s2mps11_clks[i].clk;
-> +               }
->
->                 clk_data.clks = clk_table;
->                 clk_data.clk_num = S2MPS11_CLKS_NUM;
-> @@ -250,14 +277,18 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
->         struct s2mps11_clk *s2mps11_clks = platform_get_drvdata(pdev);
->         int i;
->
-> -       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +               if (!s2mps11_clks[i].lookup)
-> +                       continue; /* Skip clocks not present in some devices */
->                 clkdev_drop(s2mps11_clks[i].lookup);
-> +       }
->
->         return 0;
->  }
->
->  static const struct platform_device_id s2mps11_clk_id[] = {
->         { "s2mps11-clk", S2MPS11X},
-> +       { "s2mps14-clk", S2MPS14X},
->         { "s5m8767-clk", S5M8767X},
->         { },
->  };
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+  Uncompressing Linux... done, booting the kernel.
+  [    0.000000] Booting Linux on physical CPU 0x0
+  [    0.000000] Initializing cgroup subsys cpuset
+  [    0.000000] Initializing cgroup subsys cpu
+  [    0.000000] Initializing cgroup subsys cpuacct
+  [    0.000000] Linux version 3.14.0-rc6+ (will at tiny-lites) (gcc version 4.8.2 20130603 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.06 - Linaro GCC 2013.06) ) #8 Wed Mar 12 10:51:44 GMT 2014
+  [    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387d
+  [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+  [    0.000000] Machine model: Raspberry Pi Model B
+  [    0.000000] bootconsole [earlycon0] enabled
+  [    0.000000] Memory policy: Data cache writeback
+  [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 97536
+  [...]
+
+Which compiler are you using?
+
+Will
