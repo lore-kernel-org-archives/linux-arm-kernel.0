@@ -1,93 +1,141 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Mar 2014 17:50:15 +0100
-Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <20140312161344.GA3000@xsjandreislx>
-References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
- <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
- <531DA900.5060202@monstr.eu>
- <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
- <531ECA33.8050803@monstr.eu> <20140311155057.GJ13293@xsjandreislx>
- <c7840b9d-4c03-4680-9a0e-fb256f3743b4@AM1EHSMHS010.ehs.local>
- <20140312161344.GA3000@xsjandreislx>
-Message-ID: <345f2b89-660c-4eac-bee2-ea8debdc5fbc@CH1EHSMHS031.ehs.local>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Mar 2014 16:54:12 +0000
+Subject: [RFC PATCH v2 1/1] arm64: Add boot time configuration of
+ Intermediate Physical Address size
+In-Reply-To: <CAC8NTUUJ+E-LS0iG07FXkU2=mGgHZ7e_7=9UkAOLrjsNREtfZg@mail.gmail.com>
+References: <1394182165-10480-1-git-send-email-mohun106@gmail.com>
+ <1394182165-10480-2-git-send-email-mohun106@gmail.com>
+ <CAC8NTUUJ+E-LS0iG07FXkU2=mGgHZ7e_7=9UkAOLrjsNREtfZg@mail.gmail.com>
+Message-ID: <20140312165411.GO17083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2014 05:13 PM, S?ren Brinkmann wrote:
-> On Wed, 2014-03-12 at 11:27AM +0100, Michal Simek wrote:
->> On 03/11/2014 04:50 PM, S?ren Brinkmann wrote:
->>> On Tue, 2014-03-11 at 09:32AM +0100, Michal Simek wrote:
->>>> On 03/10/2014 11:32 PM, S?ren Brinkmann wrote:
->>>>> On Mon, 2014-03-10 at 12:58PM +0100, Michal Simek wrote:
->>>>>> On 03/10/2014 11:56 AM, Mark Rutland wrote:
->>>>>>> On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary Kalluri wrote:
->>>>>>>> Added EDAC support for reporting the ecc errors of zynq ddr controller.
->>>>>>>> The ddr ecc controller corrects single bit errors and detects double bit
->>>>>>>> errors
->>>>>>>>
->>>>>>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->>>>>>>> ---
->>>>>>>>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
->>>>>>>>  drivers/edac/Kconfig                               |    7 +
->>>>>>>>  drivers/edac/Makefile                              |    1 +
->>>>>>>>  drivers/edac/zynq_edac.c                           |  613 ++++++++++++++++++++
->>>>>>>>  4 files changed, 639 insertions(+), 0 deletions(-)
->>>>>>>>  create mode 100644 Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>>  create mode 100644 drivers/edac/zynq_edac.c
->>>>>>>>
->>>>>>>> diff --git a/Documentation/devicetree/bindings/edac/zynq_edac.txt b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>> new file mode 100644
->>>>>>>> index 0000000..c21ff83
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>> @@ -0,0 +1,18 @@
->>>>>>>> +Zynq EDAC driver, it does reports the DDR ECC single bit errors that are
->>>>>>>> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
->>>>>>>> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
->>>>>>>> +
->>>>>>>> +Required properties:
->>>>>>>> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
->>>>>>>
->>>>>>> Is this an or or a xor?
->>>>>>
->>>>>> Compatible string should be just xlnx,zynq-ddrc-1.00.a.
->>>>>> Nothing with ps7.
->>>>>
->>>>> Isn't this vendor IP? IMHO, this should be something completely
->>>>> different. Or if you want some Zynq-specific compat string it should
->>>>> refer to an actual version string associated with Zynq. 1.00.a is not,
->>>>> AFAIK.
->>>>
->>>> I have checked with Punnaiah that this is Synopsys DDR memory controller.
->>>> Zynq is based on 1.4 version with some customization.
->>>> It means I think reasonable solution is
->>>> call it drivers/edac/synopsys_edac.c
->>>> rename zynq_ in driver to synopsys_ and
->>>> use xlnx,zynq-ddrc-1.00.a compatible string because zynq is not using
->>>> clean synopsys version.
->>>>
->>>> I am not getting point why you don't like 1.00.a suffix here.
->>>> Because of historical point of view compatible strings should be different
->>>> for early silicon, silicon v1, silicon v2, silicon v3, etc
->>>> but we haven't used it at all that's why we can use xilinx scheme
->>>> which we are using for our soft IPs.
->>>
->>> Well, but you refer to Zynq which has silicon revisions you can use to
->>> refer to a specific Zynq version. That matches data sheets. Zynq-1.00.a
->>> is just completely made up and wouldn't be found in any data sheet.
->>
->> I didn't reply this one but we discussed this with Soren over phone.
->> No problem to use Synopsys version A07 according TRM.
->>
->> Then compatible string is
->> xlnx,zynq-ddrc-A07 and file name is synopsys_edac.c
-> 
-> This seems to make sense. I'm never sure whether leading zeros are
-> actually needed and tend to remove them, but in general this looks like
-> a reasonable string to identify Zynq's DDR controller.
+On Tue, Mar 11, 2014 at 10:11:20AM +0000, Radha Mohan wrote:
+> Any more comments?
 
-A07 I found in Zynq TRM and probably has any conection to synopsys version scheme.
+It looks fine to me but I'd like an ack from Marc as well on the KVM
+bits.
 
-Thanks,
-Michal
+Patch below for reference. Thanks.
+
+> On Fri, Mar 7, 2014 at 2:19 PM,  <mohun106@gmail.com> wrote:
+> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >
+> > ARMv8 supports a range of physical address bit sizes. The PARange bits
+> > from ID_AA64MMFR0_EL1 register are read during boot-time and the
+> > intermediate physical address size bits are written in the translation
+> > control registers (TCR_EL1 and VTCR_EL2).
+> >
+> > There is no change in the VA bits and levels of translation.
+> >
+> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_arm.h       |   15 ++++++---------
+> >  arch/arm64/include/asm/pgtable-hwdef.h |    5 ++---
+> >  arch/arm64/kvm/hyp-init.S              |    6 ++++++
+> >  arch/arm64/mm/proc.S                   |    8 +++++++-
+> >  4 files changed, 21 insertions(+), 13 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> > index 0eb3986..21ef48d 100644
+> > --- a/arch/arm64/include/asm/kvm_arm.h
+> > +++ b/arch/arm64/include/asm/kvm_arm.h
+> > @@ -106,7 +106,6 @@
+> >
+> >  /* VTCR_EL2 Registers bits */
+> >  #define VTCR_EL2_PS_MASK       (7 << 16)
+> > -#define VTCR_EL2_PS_40B                (2 << 16)
+> >  #define VTCR_EL2_TG0_MASK      (1 << 14)
+> >  #define VTCR_EL2_TG0_4K                (0 << 14)
+> >  #define VTCR_EL2_TG0_64K       (1 << 14)
+> > @@ -129,10 +128,9 @@
+> >   * 64kB pages (TG0 = 1)
+> >   * 2 level page tables (SL = 1)
+> >   */
+> > -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
+> > -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+> > -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
+> > -                                VTCR_EL2_T0SZ_40B)
+> > +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+> > +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> > +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> >  #define VTTBR_X                (38 - VTCR_EL2_T0SZ_40B)
+> >  #else
+> >  /*
+> > @@ -142,10 +140,9 @@
+> >   * 4kB pages (TG0 = 0)
+> >   * 3 level page tables (SL = 1)
+> >   */
+> > -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
+> > -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+> > -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
+> > -                                VTCR_EL2_T0SZ_40B)
+> > +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+> > +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> > +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> >  #define VTTBR_X                (37 - VTCR_EL2_T0SZ_40B)
+> >  #endif
+> >
+> > diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> > index b1d2e26..f7af66b 100644
+> > --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> > +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> > @@ -100,9 +100,9 @@
+> >  #define PTE_HYP                        PTE_USER
+> >
+> >  /*
+> > - * 40-bit physical address supported.
+> > + * Highest possible physical address supported.
+> >   */
+> > -#define PHYS_MASK_SHIFT                (40)
+> > +#define PHYS_MASK_SHIFT                (48)
+> >  #define PHYS_MASK              ((UL(1) << PHYS_MASK_SHIFT) - 1)
+> >
+> >  /*
+> > @@ -122,7 +122,6 @@
+> >  #define TCR_SHARED             ((UL(3) << 12) | (UL(3) << 28))
+> >  #define TCR_TG0_64K            (UL(1) << 14)
+> >  #define TCR_TG1_64K            (UL(1) << 30)
+> > -#define TCR_IPS_40BIT          (UL(2) << 32)
+> >  #define TCR_ASID16             (UL(1) << 36)
+> >  #define TCR_TBI0               (UL(1) << 37)
+> >
+> > diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> > index 2b0244d..d968796 100644
+> > --- a/arch/arm64/kvm/hyp-init.S
+> > +++ b/arch/arm64/kvm/hyp-init.S
+> > @@ -68,6 +68,12 @@ __do_hyp_init:
+> >         msr     tcr_el2, x4
+> >
+> >         ldr     x4, =VTCR_EL2_FLAGS
+> > +       /*
+> > +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> > +        * VTCR_EL2.
+> > +        */
+> > +       mrs     x5, ID_AA64MMFR0_EL1
+> > +       bfi     x4, x5, #16, #3
+> >         msr     vtcr_el2, x4
+> >
+> >         mrs     x4, mair_el1
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > index e0ef63c..e085ee6 100644
+> > --- a/arch/arm64/mm/proc.S
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -209,8 +209,14 @@ ENTRY(__cpu_setup)
+> >          * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
+> >          * both user and kernel.
+> >          */
+> > -       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | TCR_IPS_40BIT | \
+> > +       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | \
+> >                       TCR_ASID16 | TCR_TBI0 | (1 << 31)
+> > +       /*
+> > +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
+> > +        * TCR_EL1.
+> > +        */
+> > +       mrs     x9, ID_AA64MMFR0_EL1
+> > +       bfi     x10, x9, #32, #3
+> >  #ifdef CONFIG_ARM64_64K_PAGES
+> >         orr     x10, x10, TCR_TG0_64K
+> >         orr     x10, x10, TCR_TG1_64K
+> > --
+> > 1.7.1
