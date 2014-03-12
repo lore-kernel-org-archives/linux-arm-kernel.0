@@ -1,28 +1,74 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 12 Mar 2014 10:43:45 +0100
-Subject: [PATCHv5 9/9] ARM: at91: switch sam9rl to common clock framework
+Date: Wed, 12 Mar 2014 10:43:41 +0100
+Subject: [PATCHv5 5/9] ARM: at91: prepare sam9 dt boards transition to common
+ clk
 In-Reply-To: <1394617425-641-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394617425-641-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1394617425-641-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1394617425-641-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Boris BREZILLON <b.brezillon@overkiz.com>
+
+This patch prepare the transition to common clk for sam9 dt boards by
+replacing the timer init callback.
+
+Clocks registration cannot be done in early init callback (as formerly done
+by the old clk implementation) because it requires dynamic allocation
+which is not ready yet during early init.
+
+In the other hand, at91 clocks must be registered before
+at91sam926x_pit_init is called because PIT (Periodic Interval Timer) driver
+request the master clk (mck).
+
+A new function (at91sam9_dt_timer_init) is created to fullfil these needs.
+This function registers all at91 clks using the dt definition before
+calling the PIT init function.
+The device tree clock registration is enabled only if common clk is
+selected. Else the old clk registration is been done during
+at91_dt_initialize call.
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-at91/board-dt-sam9.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 4f0e800e7e71..7013b7b66a1e 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -137,7 +137,6 @@ config SOC_AT91SAM9RL
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
--	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
+diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
+index 3dab868b02fa..575b0be66ca8 100644
+--- a/arch/arm/mach-at91/board-dt-sam9.c
++++ b/arch/arm/mach-at91/board-dt-sam9.c
+@@ -13,6 +13,7 @@
+ #include <linux/gpio.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/clk-provider.h>
  
- config SOC_AT91SAM9G45
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -25,6 +26,14 @@
+ #include "generic.h"
+ 
+ 
++static void __init sam9_dt_timer_init(void)
++{
++#if defined(CONFIG_COMMON_CLK)
++	of_clk_init(NULL);
++#endif
++	at91sam926x_pit_init();
++}
++
+ static const struct of_device_id irq_of_match[] __initconst = {
+ 
+ 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+@@ -43,7 +52,7 @@ static const char *at91_dt_board_compat[] __initdata = {
+ 
+ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= sam9_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91_dt_initialize,
 -- 
 1.8.3.2
