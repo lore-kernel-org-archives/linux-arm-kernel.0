@@ -1,70 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Mar 2014 14:05:22 +0000
-Subject: [PATCHv4 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140312133806.GH21483@n2100.arm.linux.org.uk>
-References: <1392761733-32628-1-git-send-email-lauraa@codeaurora.org>
- <1392761733-32628-3-git-send-email-lauraa@codeaurora.org>
- <20140312085401.GB21483@n2100.arm.linux.org.uk> <53205CA1.1090502@ti.com>
- <20140312133806.GH21483@n2100.arm.linux.org.uk>
-Message-ID: <20140312140522.GI21483@n2100.arm.linux.org.uk>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 12 Mar 2014 10:07:12 -0400
+Subject: [PATCH v5 0/5] BCM59056 PMU regulator support
+Message-ID: <1394633237-16837-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:38:06PM +0000, Russell King - ARM Linux wrote:
-> Try booting a machine with 2G of RAM with page offset set to 3GB and
-> highmem enabled - it will fail as per the above.
+The BCM59056 is a multi-function power management unit used with the
+BCM281xx family of SoCs. This series adds an MFD and voltage regulator
+driver to support the BCM59056. The bcm28155-ap DT support is updated
+to enable use of regulators on the otg and sdhci peripherals.
 
-BTW, simple way to test this on any ARM platform:
+Changes since v4:
+	- clarify binding wording: regulators is a child node rather than
+	  a property and the list of ldos/dcdcs are node names
+	- remove unused #address-cells and #size-cells properties from
+	  the binding and dtsi
 
-Build with PAGE_OFFSET=3GB and highmem enabled.  Pass vmalloc=1G on the
-kernel command line to force maximal vmalloc region (which should push
-lowmem down to the minimum of 32MB.)  The remainder will be highmem.
+Changes since v3:
+	- remove needless init of local ret variable in mfd driver probe
 
-Now, with Laura's patch applied, some platforms do boot but the result
-is rather odd:
+Changes since v2:
+	- Move to mfd_add_devices() approach, eliminating representation
+	  of the regulator block as a hardware subdevice. Regulators are
+	  listed in the PMU binding and referenced via the parent device
+	  of_node by the regulator driver.
+	- Allow mfd driver to build as module
+	- Remove regulator constraints from the .dtsi include only the
+	  board-specific constraints in the board .dts.
 
-vmalloc area is too big, limiting to 976MB
+Changes since v1:
+        - renamed to bcm590xx to accomodate future family parts
+        - remove use of subsys_initcall
+        - fix BCM590XX_MAX_REGISTER value
+        - remove unused chip id in mfd of/i2c matching
+        - switch to of_platform_populate() in mfd
+        - update binding to single document with regulators as optional
+          properties in the regulator subdevice IP description
+        - remove unused regulator get/set mode ops
+        - remove unneeded regulator NULL constraint check
+        - regulators property is optional, allow the driver to probe
+          when it is missing
+        - move of_node presence check into bcm590xx_parse_dt_reg_data()
 
-So, the vmalloc=1G has done the right thing here, but:
 
-Memory: 507404K/523264K available (3839K kernel code, 230K rwdata, 1388K rodata, 211K init, 5266K bss, 15860K reserved, 0K highmem)
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
-    lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
-    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-      .text : 0xc0008000 - 0xc0522f34   (5228 kB)
-      .init : 0xc0523000 - 0xc0557fc0   ( 212 kB)
-      .data : 0xc0558000 - 0xc0591980   ( 231 kB)
-       .bss : 0xc0591988 - 0xc0ab6220   (5267 kB)
+Matt Porter (5):
+  mfd: add bcm590xx pmu DT binding
+  mfd: add bcm590xx pmu driver
+  regulator: add bcm590xx regulator driver
+  ARM: configs: bcm_defconfig: enable bcm590xx regulator support
+  ARM: dts: add bcm590xx pmu support and enable for bcm28155-ap
 
-something has overriden it, and we end up with no highmem.  Without
-Laura's patch, it all behaves correctly:
-
-vmalloc area is too big, limiting to 976MB
-...
-Memory: 507932K/523264K available (3839K kernel code, 230K rwdata, 1388K rodata, 211K init, 5266K bss, 15332K reserved, 490496K highmem)
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    vmalloc : 0xc2800000 - 0xff000000   ( 968 MB)
-    lowmem  : 0xc0000000 - 0xc2000000   (  32 MB)
-    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-      .text : 0xc0008000 - 0xc0522f34   (5228 kB)
-      .init : 0xc0523000 - 0xc0557fc0   ( 212 kB)
-      .data : 0xc0558000 - 0xc0591980   ( 231 kB)
-       .bss : 0xc0591988 - 0xc0ab6260   (5267 kB)
-
-So... the more I look at the boot results from last night's autobuild,
-the more stuff appears to be broken with this meminfo removal.
-
-Therefore, I have to wonder what kind of testing was done with these
-patches - I suspect the test consisted of "does it boot" without looking
-at any of the details about what memory was where.
+ Documentation/devicetree/bindings/mfd/bcm590xx.txt |  37 ++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |  47 ++-
+ arch/arm/boot/dts/bcm59056.dtsi                    |  74 ++++
+ arch/arm/configs/bcm_defconfig                     |   7 +
+ drivers/mfd/Kconfig                                |   8 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/bcm590xx.c                             |  93 +++++
+ drivers/regulator/Kconfig                          |   8 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/bcm590xx-regulator.c             | 413 +++++++++++++++++++++
+ include/linux/mfd/bcm590xx.h                       |  31 ++
+ 11 files changed, 719 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/bcm590xx.txt
+ create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
+ create mode 100644 drivers/mfd/bcm590xx.c
+ create mode 100644 drivers/regulator/bcm590xx-regulator.c
+ create mode 100644 include/linux/mfd/bcm590xx.h
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.4
