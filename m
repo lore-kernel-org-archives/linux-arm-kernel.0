@@ -1,59 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 12 Mar 2014 11:53:58 -0500
-Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
-In-Reply-To: <53208CDD.7030106@ti.com>
-References: <1394639330-1288-1-git-send-email-balbi@ti.com>
- <53208CDD.7030106@ti.com>
-Message-ID: <20140312165358.GE919@saruman.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Mar 2014 10:04:25 -0700
+Subject: [PATCH 00/10] arch/arm OMAP IOMMU patches for 3.15
+In-Reply-To: <531F84D6.8070101@ti.com>
+References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
+ <531F84D6.8070101@ti.com>
+Message-ID: <20140312170424.GA30897@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 12:35:41AM +0800, Santosh Shilimkar wrote:
-> On Wednesday 12 March 2014 11:48 PM, Felipe Balbi wrote:
-> > Currently, even when building keystone only
-> > kernel builds, DTB won't get build because
-> > we lack a Makefile rule to get it compiled.
-> > 
-> > This patch adds that rule so mainline kernel
-> > users have a chance to use up-to-date DTB on
-> > keystone 2 platforms.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >
-> We have been building dtbs with explicit command
-> instead of dtbs since it was just one dtb so far
-> supported. Was planning to add the rule once more
-> boards get added. Now with Lamarr and Edision in
-> for next merge window, will do that post 3.15-rc1.
+* Suman Anna <s-anna@ti.com> [140311 14:52]:
+> Hi Paul,
 > 
-> > note that I just tried this on top of linux-next
-> > (commit 69d5cdda16b3c9767b82d80b07edb9bb056448e3)
-> > and, even though dtb builds fine, I still couldn't
-> > get keystone_defconfig uImage to boot fine.
-> > 
-> > It's probably my LOADADDR which is wrong.
-> > 
-> > Santosh, what's the LOADADDR I should be using
-> > for keystone boots ?
+> On 03/05/2014 06:24 PM, Suman Anna wrote:
+> >Hi Paul, Benoit,
 > >
-> LOADADDR is same 0x80008000. You might have missed
+> >This is a repost as per Tony's request [3] of all the OMAP IOMMU DT support
+> >patches that are under arch/arm. The series just assimilates patches 8
+> >through 13 from the v3 OMAP IOMMU DT adaptation for 3.15 series [1], and
+> >all the v2 patches from the OMAP IOMMU DTS nodes [2].
+> >
+> >The only change made with respect to the patches above is in the OMAP4
+> >and OMAP5 DTS nodes - I have adjusted the reg sizes from 0xff to 0x100.
+> >
+> >Can you please provide your acks on the hwmod patches and DTS
+> >patches?
+> 
+> Ping. Can you review and provide your acks for Patches 2 and 5 (the
+> hwmod patches) for Tony to pick up all the patches in the series?
 
-tried that, didn't help.
+Applied all with Paul's acks into omap-for-v3.15/dt. As it's getting
+so late to the merge window, no guarantees it will actually get
+pulled.
 
-> to configure the environment u-boot variable to
-> disable higher address space switch.
-> 'setenv mem_lpae 0'. Also ensure to update
+For the pdata-quirks.c changes, I assume you are working on
+implementing the reset driver mentioned in the related patch?
 
-hmm, that might do it. Will try after upgrading u-boot to latest
-release.
+Regards,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/1469d685/attachment.sig>
+Tony
