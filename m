@@ -1,72 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Mar 2014 14:11:13 -0700
-Subject: [PATCH v3 5/5] drivers: bus: omap_l3: Change pr_crit() to
- dev_err() when IRQ request fails
-In-Reply-To: <5320CBFF.3000909@ti.com>
-References: <1393937293-6036-1-git-send-email-peter.ujfalusi@ti.com>
- <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
- <5315E522.9090606@ti.com> <5316CE17.6010201@ti.com>
- <20140312172854.GD30897@atomide.com> <5320CBFF.3000909@ti.com>
-Message-ID: <20140312211113.GH1996@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 12 Mar 2014 18:16:52 -0300
+Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
+In-Reply-To: <20140312220756.02f5b006@e6520eb>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
+ <1390410577-22073-4-git-send-email-denis@eukrea.com>
+ <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+ <20140312184048.4b6dbb21@e6520eb>
+ <CAOMZO5Dux0Cq9desLAotznLa0=kznFPyPvAHKtida6y3gC6SQQ@mail.gmail.com>
+ <20140312220756.02f5b006@e6520eb>
+Message-ID: <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [140312 14:08]:
-> On Thursday 13 March 2014 01:28 AM, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [140304 23:14]:
-> >> On 03/04/2014 04:37 PM, Santosh Shilimkar wrote:
-> >>> On Tuesday 04 March 2014 08:48 PM, Peter Ujfalusi wrote:
-> >>>> Use dev_err() which will going to print the driver's name as well and the
-> >>>> KERN_ERR level is sufficient in this case (we also print via dev_err when
-> >>>> there is an error with the mem resources)
-> >>>>
-> >>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> ---
-> >>>>  drivers/bus/omap_l3_noc.c | 7 +++----
-> >>>>  1 file changed, 3 insertions(+), 4 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> >>>> index 0eff48585ae3..972691a668a3 100644
-> >>>> --- a/drivers/bus/omap_l3_noc.c
-> >>>> +++ b/drivers/bus/omap_l3_noc.c
-> >>>> @@ -158,8 +158,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
-> >>>>  	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
-> >>>>  			       IRQF_DISABLED, "l3-dbg-irq", l3);
-> >>>>  	if (ret) {
-> >>>> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> >>>> -						l3->debug_irq);
-> >>>> +		dev_err(&pdev->dev, "request_irq failed for %d\n",
-> >>>> +			l3->debug_irq);
-> >>>>  		return ret;
-> >>>>  	}
-> >>>>  
-> >>>> @@ -167,8 +167,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
-> >>>>  	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
-> >>>>  			       IRQF_DISABLED, "l3-app-irq", l3);
-> >>>>  	if (ret)
-> >>>> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> >>>> -						l3->app_irq);
-> >>>> +		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
-> >>>>  
-> >>>>  	return ret;
-> >>>>  }
-> >>>>
-> >>> So this one change in the log level. If I look at now, may be dev_err
-> >>> is fine but the change is not same.
-> >>
-> >> Not sure what you mean by 'the change is not same'?
-> >> I just picked the old series and rebased it on linux-next, the patch is the
-> >> same as it was back in May 2013:
-> >> https://lkml.org/lkml/2013/5/2/205
-> >>
-> >> And yes, I have shortened the texts in the print, but the meaning of the
-> >> prints have not changed.
-> > 
-> > Santosh, got any more comments on this series?
-> > 
-> Nope. looks good
+Hi Eric,
 
-OK probably best that Arnd or Olof picks these directly:
+On Wed, Mar 12, 2014 at 6:07 PM, Eric B?nard <eric@eukrea.com> wrote:
 
-Acked-by: Tony Lindgren <tony@atomide.com> 
+> if you have an oscilloscope, can you probe PIXCLK, HSYNC, VSYNC and DE
+> to check the signals are properly configured vs the datasheet of your
+> display.
+
+Yes, I have measured VSYNC and there is no activity on this line.
+
+Also tried 3.13 with a non-dt kernel and the same issue is seen.
+
+Running FSL 2.6.31 I can see VSYNC at 57Hz and Tux on the display, so
+the hardware is good.
+
+At least for me imxfb seems to be broken even for the non-dt case.
+
+Regards,
+
+Fabio Estevam
