@@ -1,90 +1,19 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Mar 2014 19:02:05 +0100
-Subject: [GIT PULL] at91: cleanup for 3.15 #1
-Message-ID: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Mar 2014 18:03:42 +0000
+Subject: [PATCH 1/2] arm64: debug: make local symbols static
+In-Reply-To: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
+References: <000001cf3834$9667e5c0$c337b140$%han@samsung.com>
+Message-ID: <20140312180341.GV17083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Wed, Mar 05, 2014 at 05:34:32AM +0000, Jingoo Han wrote:
+> Make local symbols static, because these are used only in this
+> file.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 
-This is the first AT91 pull-request for 3.15, and a cleanup one. The most of it
-is the conversion of two more Atmel SoCs to Device Tree. These are older that
-the ones already converted. Moreover, they already use the CCF so there is no
-need to come back on this later (maybe to remove some code when the other
-non-DT boards are converted as well).
-The defconfig update was needed because they were pretty old and some
-interesting options were missing.
-
-Thanks, best regards,
-
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
-
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-
-for you to fetch changes up to 050208dfd0d725c307e6ad3442d9f809501091cd:
-
-  ARM: at91: add PWM clock (2014-03-12 18:23:45 +0100)
-
-----------------------------------------------------------------
-First batch of AT91 cleanup for 3.15
-- some updates on the defconfig front
-- two SoCs converted to Device Tree: sam9261 and sam9rl
-  (with use of CCF!)
-- a little PWM clock update that goes on top of this
-
-----------------------------------------------------------------
-Alexandre Belloni (11):
-      ARM: at91/defconfig: refresh at91sam9rl_defconfig
-      ARM: at91/defconfig: remove useless configuration in at91sam9260_9g20_defconfig
-      ARM: at91/defconfig: refresh at91sam9260_9g20_defconfig
-      ARM: at91: prepare at91sam9rl DT transition
-      ARM: at91: Add at91sam9rl DT SoC support
-      ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
-      ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
-      ARM: at91: prepare common clk transition for sam9rl SoCs
-      ARM: at91/dt: define at91sam9rl clocks
-      ARM: at91/dt: define main clk frequency of at91sam9rlek
-      ARM: at91: switch sam9rl to common clock framework
-
-Bo Shen (1):
-      ARM: at91: add PWM clock
-
-Boris BREZILLON (1):
-      ARM: at91: prepare sam9 dt boards transition to common clk
-
-Jean-Jacques Hiblot (6):
-      ARM: at91: dt: Add at91sam9261 dt SoC support
-      ARM: at91: dt: defconfig: Added the sam9261 to the list of DT-enabled SOCs
-      ARM: at91: dt: sam9261: Device Tree support for the at91sam9261ek
-      ARM: at91: updated the at91_dt_defconfig with support for the ADS7846
-      ARM: at91: prepare common clk transition for sam9261 SoC
-      ARM: at91: move sam9261 SoC to common clk
-
- arch/arm/boot/dts/Makefile                  |   4 +
- arch/arm/boot/dts/at91sam9261.dtsi          | 735 +++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9261ek.dts         | 211 ++++++++
- arch/arm/boot/dts/at91sam9rl.dtsi           | 802 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9rlek.dts          | 157 ++++++
- arch/arm/configs/at91_dt_defconfig          |   3 +
- arch/arm/configs/at91sam9260_9g20_defconfig |   9 +-
- arch/arm/configs/at91sam9rl_defconfig       |  10 +-
- arch/arm/mach-at91/Kconfig                  |   2 -
- arch/arm/mach-at91/at91sam9261.c            |  25 +-
- arch/arm/mach-at91/at91sam9263.c            |   1 +
- arch/arm/mach-at91/at91sam9g45.c            |   1 +
- arch/arm/mach-at91/at91sam9n12.c            |   1 +
- arch/arm/mach-at91/at91sam9rl.c             |  24 +-
- arch/arm/mach-at91/at91sam9x5.c             |   1 +
- arch/arm/mach-at91/board-dt-sam9.c          |  11 +-
- 16 files changed, 1981 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+Applied (both). Thanks.
 
 -- 
-Nicolas Ferre
+Catalin
