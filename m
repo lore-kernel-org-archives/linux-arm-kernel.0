@@ -1,36 +1,24 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 12 Mar 2014 12:16:44 -0300
-Subject: [PATCH 6/6] clk: mvebu: Update binding documentation for the core
- divider clock
-In-Reply-To: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1394637404-7651-7-git-send-email-ezequiel.garcia@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Mar 2014 15:18:57 +0000 (UTC)
+Subject: [PATCH 05/10] ARM: OMAP5: hwmod data: add mmu data for ipu & dsp
+In-Reply-To: <1394065459-16409-6-git-send-email-s-anna@ti.com>
+References: <1394065459-16409-1-git-send-email-s-anna@ti.com>
+ <1394065459-16409-6-git-send-email-s-anna@ti.com>
+Message-ID: <alpine.DEB.2.02.1403121518340.8574@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Core Divider clock support two new compatible strings for Armada
-375 and Armada 380 SoCs. Add the compatible strings to the documentation.
+On Wed, 5 Mar 2014, Suman Anna wrote:
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+> A new MMU hwmod class and data structures are created
+> to represent the MMUs within the IPU and DSP processor
+> subsystems in OMAP5. The MMUs in OMAP5 are identical to
+> those in OMAP4.
+> 
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-index c62391f..520562a 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-@@ -4,7 +4,10 @@ The following is a list of provided IDs and clock names on Armada 370/XP:
-  0 = nand (NAND clock)
- 
- Required properties:
--- compatible : must be "marvell,armada-370-corediv-clock"
-+- compatible : must be "marvell,armada-370-corediv-clock",
-+		       "marvell,armada-375-corediv-clock",
-+		       "marvell,armada-380-corediv-clock",
-+
- - reg : must be the register address of Core Divider control register
- - #clock-cells : from common clock binding; shall be set to 1
- - clocks : must be set to the parent's phandle
--- 
-1.9.0
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+- Paul
