@@ -1,47 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 13 Mar 2014 00:17:27 +0300
-Subject: [PATCH 4/6] ARM: mvebu: Add support for NAND controller in Armada
- 38x SoC
-In-Reply-To: <1394637404-7651-5-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1394637404-7651-5-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5320CEE7.6020506@cogentembedded.com>
+From: imp@bsdimp.com (Warner Losh)
+Date: Wed, 12 Mar 2014 14:18:27 -0600
+Subject: [RFC PATCH v2 04/14] mtd: nand: define struct nand_timings
+In-Reply-To: <20140312190737.GA27388@obsidianresearch.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
+ <531DC1A4.7010208@gmail.com> <20140311185554.GD31835@obsidianresearch.com>
+ <53208F7D.8090104@gmail.com> <20140312190737.GA27388@obsidianresearch.com>
+Message-ID: <5B3F0425-9D7A-4D22-86A0-2E870E25396A@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 03/12/2014 06:16 PM, Ezequiel Garcia wrote:
+On Mar 12, 2014, at 1:07 PM, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
 
-> The Armada 38x SoC family has a NAND controller, compatible
-> with the controller in Armada 370/375/XP SoCs. Add support for
-> it in the devicetree file.
+> On Wed, Mar 12, 2014 at 05:46:53PM +0100, Boris BREZILLON wrote:
+>> I'm not a big fan of this name. I think timing structs should not
+>> contain onfi in their names, because these timings are also
+>> available on non ONFI chips.
+> 
+> Explicitly defering to the ONFI spec makes it clear what the
+> definition of the timing parameter actually is.
 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->   arch/arm/boot/dts/armada-38x.dtsi | 10 ++++++++++
->   1 file changed, 10 insertions(+)
+This is good, since ONFI is a very public spec.
 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 76cc27e..18d8f80 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -345,6 +345,16 @@
->   				clocks = <&mainpll>;
->   				clock-output-names = "nand";
->   			};
-> +
-> +			nand at d0000 {
+> If JEDEC has a different model then drivers will need to configure
+> their interfaces a little differently.
 
-    ePAPR standard [1] tells us:
+JEDEC?s spec is just a public as ONFI?s, but in the past at least it has been difficult
+to get without purchase.
 
-The name of a node should be somewhat generic, reflecting the function of the 
-device and not its precise programming model. If appropriate, the name should 
-be one of the following choices:
+> So we might end up with a jedec_sdr_timings too :|
 
-[...]
-? flash
+And onfi_ddr_timings and jedec_ddr_timings since those timing modes are appearing
+on shipping parts.
 
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+Warner
