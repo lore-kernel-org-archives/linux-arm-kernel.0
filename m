@@ -1,29 +1,91 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Mar 2014 13:45:04 +0000
-Subject: [PATCH v4 1/5] mfd: add bcm590xx pmu DT binding
-In-Reply-To: <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
-References: <1394580837-8331-1-git-send-email-mporter@linaro.org>
- <1394580837-8331-2-git-send-email-mporter@linaro.org>
- <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
-Message-ID: <20140312134504.GT28112@sirena.org.uk>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 12 Mar 2014 14:47:28 +0100
+Subject: [RFC 0/6] rework sched_domain topology description
+In-Reply-To: <532060E7.7010203@arm.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <5317B092.7070805@arm.com>
+ <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
+ <53186A8A.9060406@arm.com>
+ <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
+ <531B0FDA.2040302@arm.com>
+ <20140311131719.GY9987@twins.programming.kicks-ass.net>
+ <532060E7.7010203@arm.com>
+Message-ID: <CAKfTPtC3Y7s=n205MND24tLrsT+-3+JhWHebxcBkwAuaMngDhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:33:39PM +0000, Mark Rutland wrote:
-> On Tue, Mar 11, 2014 at 11:33:53PM +0000, Matt Porter wrote:
+On 12 March 2014 14:28, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 11/03/14 13:17, Peter Zijlstra wrote:
+>> On Sat, Mar 08, 2014 at 12:40:58PM +0000, Dietmar Eggemann wrote:
+>>>>
+>>>> I don't have a strong opinion about using or not a cpu argument for
+>>>> setting the flags of a level (it was part of the initial proposal
+>>>> before we start to completely rework the build of sched_domain)
+>>>> Nevertheless, I see one potential concern that you can have completely
+>>>> different flags configuration of the same sd level of 2 cpus.
+>>>
+>>> Could you elaborate a little bit further regarding the last sentence? Do you
+>>> think that those completely different flags configuration would make it
+>>> impossible, that the load-balance code could work at all at this sd?
+>>
+>> So a problem with such an interfaces is that is makes it far too easy to
+>> generate completely broken domains.
+>
+> I see the point. What I'm still struggling with is to understand why
+> this interface is worse then the one where we set-up additional,
+> adjacent sd levels with new cpu_foo_mask functions plus different static
+> sd-flags configurations and rely on the sd degenerate functionality in
+> the core scheduler to fold these levels together to achieve different
+> per cpu sd flags configurations.
 
-> > +			rfldo_reg: rfldo {
-> > +				regulator-min-microvolt = <1200000>;
-> > +				regulator-max-microvolt = <3300000>;
+The main difference is that all CPUs has got the same levels at the
+initial state and then the degenerate sequence can decide that it's
+worth removing a level and if it will not create unsuable domains.
 
-> Are any specific properties required on these children?
-
-Regulator nodes can be completely empty (or missing) - for most drivers
-there's nothing driver specific, the standard binding covers everything.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/a2fa89e2/attachment.sig>
+>
+> IMHO, exposing struct sched_domain_topology_level bar_topology[] to the
+> arch is the reason why the core scheduler has to check if the arch
+> provides a sane sd setup in both cases.
+>
+>>
+>> You can, for two cpus in the same domain provide, different flags; such
+>> a configuration doesn't make any sense at all.
+>>
+>> Now I see why people would like to have this; but unless we can make it
+>> robust I'd be very hesitant to go this route.
+>>
+>
+> By making it robust, I guess you mean that the core scheduler has to
+> check that the provided set-ups are sane, something like the following
+> code snippet in sd_init()
+>
+> if (WARN_ONCE(tl->sd_flags & ~TOPOLOGY_SD_FLAGS,
+>                 "wrong sd_flags in topology description\n"))
+>         tl->sd_flags &= ~TOPOLOGY_SD_FLAGS;
+>
+> but for per cpu set-up's.
+> Obviously, this check has to be in sync with the usage of these flags in
+> the core scheduler algorithms. This comprises probably that a subset of
+> these topology sd flags has to be set for all cpus in a sd level whereas
+> other can be set only for some cpus.
+>
+>>
+>>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
