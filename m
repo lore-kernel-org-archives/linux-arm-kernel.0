@@ -1,28 +1,68 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 11 Mar 2014 22:18:29 -0700
-Subject: Qualcomm PMIC8XXX keypad never worked?
-In-Reply-To: <20140311130609.GL21216@lee--X1>
-References: <5887114.1jrNo21sGX@wuerfel> <20140311120056.GH21216@lee--X1>
- <8206209.oc1V5pPVYT@wuerfel> <20140311130609.GL21216@lee--X1>
-Message-ID: <CAJAp7OgF235DNLC9aaxh15SPwVir9QBjgfi_C1gvmX-o3bHZ9g@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 12 Mar 2014 07:01:38 +0100
+Subject: [PATCH v2 7/7] ARM: zynq: DT: Migrate UART to Cadence binding
+In-Reply-To: <20140311154847.GI13293@xsjandreislx>
+References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394487610-2419-8-git-send-email-soren.brinkmann@xilinx.com>
+ <62cd32ad-8743-4d49-a1b6-c178054a9756@CO9EHSMHS011.ehs.local>
+ <20140311154847.GI13293@xsjandreislx>
+Message-ID: <44c9eddf-9f61-4219-8564-a3019dc0fd87@AM1EHSMHS021.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 6:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
-[snip]
->
-> ... but the MFD isn't broken, so I guess your solution is the most
-> elegant. If it's not fixed soon, I guess we should think about ripping
-> it out. It's obvoious that no-one cares, as it's been broken for
-> nearly 3 years.
+On 03/11/2014 04:48 PM, S?ren Brinkmann wrote:
+> On Tue, 2014-03-11 at 09:52AM +0100, Michal Simek wrote:
+>> On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
+>>> The Zynq UART is Cadence IP and the driver has been renamed accordingly.
+>>> Migrate the DT to use the new binding for the UART driver.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>> This change depends on 'tty: xuartps: Rebrand driver as Cadence UART',
+>>> which introduces the new clock-names.
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++----
+>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> index 8b67b19392ec..0ed0d4b0579a 100644
+>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> @@ -67,19 +67,19 @@
+>>>  		};
+>>>  
+>>>  		uart0: uart at e0000000 {
+>>> -			compatible = "xlnx,xuartps";
+>>> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>>>  			status = "disabled";
+>>>  			clocks = <&clkc 23>, <&clkc 40>;
+>>> -			clock-names = "ref_clk", "aper_clk";
+>>> +			clock-names = "uart_clk", "pclk";
+>>>  			reg = <0xE0000000 0x1000>;
+>>>  			interrupts = <0 27 4>;
+>>>  		};
+>>>  
+>>>  		uart1: uart at e0001000 {
+>>> -			compatible = "xlnx,xuartps";
+>>> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>>>  			status = "disabled";
+>>>  			clocks = <&clkc 24>, <&clkc 41>;
+>>> -			clock-names = "ref_clk", "aper_clk";
+>>> +			clock-names = "uart_clk", "pclk";
+>>>  			reg = <0xE0001000 0x1000>;
+>>>  			interrupts = <0 50 4>;
+>>>  		};
+>>
+>> This should be at least the part of 5/7 because between 5/7 and 7/7
+>> driver will fail to probe.
+> 
+> The driver should never fail to probe. The old bindings will continue to
+> work. So, only dependency for this is, the new clock names must be
+> merged in. So, it has to be rather late in the series.
 
-Stephen Boyd have a series out on these drivers; fixing this, turning
-them DT and some other goodies.
+We discussed this over phone and yes, I have missed that.
 
-The related part for this would be:
-https://patchwork.kernel.org/patch/3765191/
-
-Unfortunately lkml.org seems down, so I can't link to the series.
-
-Regards,
-Bjorn
+Thanks,
+Michal
