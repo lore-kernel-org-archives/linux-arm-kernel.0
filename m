@@ -1,59 +1,46 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 12 Mar 2014 22:45:53 +0100
-Subject: [PATCH 1/3] spi: bitbang: fix shift for getmosi
-In-Reply-To: <20140312162418.GU28112@sirena.org.uk>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-2-git-send-email-m.grzeschik@pengutronix.de>
- <20140312162418.GU28112@sirena.org.uk>
-Message-ID: <20140312214553.GQ3327@book.gsilab.sittig.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 13 Mar 2014 05:59:09 +0800
+Subject: [PATCH] ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
+In-Reply-To: <1394660600-3771-1-git-send-email-nm@ti.com>
+References: <1394660600-3771-1-git-send-email-nm@ti.com>
+Message-ID: <5320D8AD.5000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 16:24 +0000, Mark Brown wrote:
+On Thursday 13 March 2014 05:43 AM, Nishanth Menon wrote:
+> Just like IS_PM34XX_ERRATUM, IS_PM44XX_ERRATUM is valid only if
+> CONFIG_PM is enabled, else, disabling CONFIG_PM results in build
+> failure complaining about the following:
+> arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
+> :(.text+0x8a70): undefined reference to `pm44xx_errata'
 > 
-> On Wed, Mar 12, 2014 at 04:53:35PM +0100, Michael Grzeschik wrote:
-> > The driver needs to shift the word bit after reading the mosi bit.
-> > Otherwise the return word will have an Off-by-one bit value.
+Not entirely accurate since CPU hotplug doesn't depend on CONFIG_PM
+
+> Fixes: c962184 (ARM: OMAP4: PM: add errata support)
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
 > 
-> This isn't exactly new code...  do we understand why nobody has noticed
-> this before?
-
-I too suspect that the bug (if there is any) is elsewhere.
-
-> > @@ -61,10 +61,10 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
-> >  		spidelay(nsecs);
-> >  
-> >  		/* sample MSB (from slave) on leading edge */
-> > -		word <<= 1;
-> >  		if ((flags & SPI_MASTER_NO_RX) == 0)
-> >  			word |= getmiso(spi);
-> >  		setsck(spi, cpol);
-> > +		word <<= 1;
-> >  	}
+> Patch based on: v3.14-rc6
+> Reported originally with a randconfig defconfig: http://slexy.org/view/s21U7eF4k1
 > 
-> Just looking at the context here it's not obvious to me that this is
-> helping - it means that the last bit we read is going to be shifted
-> which seems wrong, we ought to be reading into LSB.
+But without the PM sleep code, hotplug won't work either.
+SO I think its ok assumption in this particular case
 
-It might be more robust to 
-
-  if (!(flags & SPI_MASTER_NO_RX) && getmiso(spi))
-    word |= 1;
-    
-instead.  This decouples the construction of the received bits
-buffer from whatever the getmiso() implementation might look
-like.  That's just a thought after the recent GPIO discussion
-about whether 1/0 is given or should not be assumed (and I still
-suspect that "!!x" need not result in exactly 1/0 values).
-
-And I agree with Mark that the "late shift" is most probably
-wrong.  Just noticed the resend too late and responded in the
-other thread.
-
-
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+>  arch/arm/mach-omap2/pm.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 7bdd22a..d4d0fce 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -103,7 +103,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+>  
+>  #define PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD	(1 << 0)
+>  
+> -#if defined(CONFIG_ARCH_OMAP4)
+> +#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+>  extern u16 pm44xx_errata;
+>  #define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
+>  #else
+> 
