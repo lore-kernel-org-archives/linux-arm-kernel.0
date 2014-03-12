@@ -1,35 +1,67 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 12 Mar 2014 11:11:29 -0700
-Subject: Freescale PFUZE100 PMIC
-In-Reply-To: <20140312072418.GC1629@pengutronix.de>
-References: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
- <4fc2f7234ca047bca85893b3da86f940@BLUPR03MB036.namprd03.prod.outlook.com>
- <CACUGKYM_HTEZU8a+g2iZyYOyEq6i=0_G-b1UzhmZd9wKR0Q+OA@mail.gmail.com>
- <bb5794dd31214dc9ad3d244ee81334af@BLUPR03MB036.namprd03.prod.outlook.com>
- <CACUGKYMM6ctLfULBGu0xUX3GD=ibcf53YuKvT8A3nFF6Z-diLg@mail.gmail.com>
- <CACUGKYO16r097SLcid_igZJoEiin2D=EokjtKjMgYVWx9WLcgQ@mail.gmail.com>
- <20140312072418.GC1629@pengutronix.de>
-Message-ID: <CACUGKYMvA9ycxzRwgF==FkA2_ocpT6j8HjixvmAHZMJhM8jzrQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Mar 2014 19:19:46 +0100
+Subject: [PATCHv3 0/8] at91_adc: documentation and device tree cleanups
+In-Reply-To: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1394479045-31852-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5320A542.5020101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a mistake on my part. I overlook at the i2c bus in schematic, my
-mapping was incorrect.
+On 10/03/2014 20:17, Alexandre Belloni :
+> The first patch synchronise the documentation with the actual code and correct
+> the example.
+> 
+> The second patch move the documentation to the correct location (under iio/adc)
+> 
+> The remaining patches correct the device trees that are using the adc, mainly
+> removing unused properties and making the binding compliant with the ePAPR.
 
-Regards,
+On the whole series:
 
-john
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Wed, Mar 12, 2014 at 12:24 AM, Robert Schwebel
-<r.schwebel@pengutronix.de> wrote:
-> On Tue, Mar 11, 2014 at 07:30:48PM -0700, John Tobias wrote:
->> I got it working now... thanks.
->
-> For the record: what did you do to fix it?
->
-> rsc
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+and stacked on at91-3.15-dt.
+
+I think that the little modifications to the documentation can also go
+the arm-soc way: there is no fundamental change to the binding, only
+more coherence added.
+
+Bye,
+
+> Changes in v3:
+>  - also remove the useless atmel,adc-clock-rate
+> 
+> Changes in v2:
+>  - add #address-cells, #size-cells and a reg for each trigger to comply to the
+>    ePAPR instead of removing the unit-address.
+>  - also correct the atmel,adc-use-external-triggers property name in the
+>    documentation and in the device tree that got it wrong.
+> 
+> Alexandre Belloni (8):
+>   Documentation: dt: iio: improve atmel-adc documentation
+>   Documentation: dt: iio: move arm/atmel-adc.txt to iio/adc/at91_adc.txt
+>   ARM: at91/dt: at91-ariag25: remove useless adc properties
+>   ARM: at91/dt: at91sam9260: remove useless adc properties
+>   ARM: at91/dt: at91sam9g45: remove useless adc properties
+>   ARM: at91/dt: at91sam9x5: remove useless adc properties
+>   ARM: at91/dt: sama5d3: remove useless adc properties
+>   ARM: at91/dt: at91-cosino: remove useless adc properties
+> 
+>  .../devicetree/bindings/arm/atmel-adc.txt          | 81 ---------------------
+>  .../devicetree/bindings/iio/adc/at91_adc.txt       | 82 ++++++++++++++++++++++
+>  arch/arm/boot/dts/at91-ariag25.dts                 |  1 -
+>  arch/arm/boot/dts/at91-cosino.dtsi                 |  1 -
+>  arch/arm/boot/dts/at91-cosino_mega2560.dts         |  1 -
+>  arch/arm/boot/dts/at91sam9260.dtsi                 | 11 +--
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 | 11 +--
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  | 13 ++--
+>  arch/arm/boot/dts/sama5d3.dtsi                     | 13 ++--
+>  arch/arm/boot/dts/sama5d3xdm.dtsi                  |  1 -
+>  10 files changed, 108 insertions(+), 107 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+> 
+
+
+-- 
+Nicolas Ferre
