@@ -1,68 +1,76 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Mar 2014 07:01:38 +0100
-Subject: [PATCH v2 7/7] ARM: zynq: DT: Migrate UART to Cadence binding
-In-Reply-To: <20140311154847.GI13293@xsjandreislx>
-References: <1394487610-2419-1-git-send-email-soren.brinkmann@xilinx.com>
- <1394487610-2419-8-git-send-email-soren.brinkmann@xilinx.com>
- <62cd32ad-8743-4d49-a1b6-c178054a9756@CO9EHSMHS011.ehs.local>
- <20140311154847.GI13293@xsjandreislx>
-Message-ID: <44c9eddf-9f61-4219-8564-a3019dc0fd87@AM1EHSMHS021.ehs.local>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 12 Mar 2014 15:01:54 +0900
+Subject: [PATCH 5/5] ARM: dts: exynos4412-trats2: Add ADC's dt data to get
+ temperature of SoC/battery
+In-Reply-To: <531F0AEC.7010606@samsung.com>
+References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
+ <1394524494-30641-6-git-send-email-cw00.choi@samsung.com>
+ <531F0AEC.7010606@samsung.com>
+Message-ID: <531FF852.8090502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2014 04:48 PM, S?ren Brinkmann wrote:
-> On Tue, 2014-03-11 at 09:52AM +0100, Michal Simek wrote:
->> On 03/10/2014 10:40 PM, Soren Brinkmann wrote:
->>> The Zynq UART is Cadence IP and the driver has been renamed accordingly.
->>> Migrate the DT to use the new binding for the UART driver.
->>>
->>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> ---
->>> This change depends on 'tty: xuartps: Rebrand driver as Cadence UART',
->>> which introduces the new clock-names.
->>> ---
->>>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++----
->>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->>> index 8b67b19392ec..0ed0d4b0579a 100644
->>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->>> @@ -67,19 +67,19 @@
->>>  		};
->>>  
->>>  		uart0: uart at e0000000 {
->>> -			compatible = "xlnx,xuartps";
->>> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
->>>  			status = "disabled";
->>>  			clocks = <&clkc 23>, <&clkc 40>;
->>> -			clock-names = "ref_clk", "aper_clk";
->>> +			clock-names = "uart_clk", "pclk";
->>>  			reg = <0xE0000000 0x1000>;
->>>  			interrupts = <0 27 4>;
->>>  		};
->>>  
->>>  		uart1: uart at e0001000 {
->>> -			compatible = "xlnx,xuartps";
->>> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
->>>  			status = "disabled";
->>>  			clocks = <&clkc 24>, <&clkc 41>;
->>> -			clock-names = "ref_clk", "aper_clk";
->>> +			clock-names = "uart_clk", "pclk";
->>>  			reg = <0xE0001000 0x1000>;
->>>  			interrupts = <0 50 4>;
->>>  		};
->>
->> This should be at least the part of 5/7 because between 5/7 and 7/7
->> driver will fail to probe.
+Hi Tomasz,
+
+On 03/11/2014 10:09 PM, Tomasz Figa wrote:
+> Hi Chanwoo,
 > 
-> The driver should never fail to probe. The old bindings will continue to
-> work. So, only dependency for this is, the new clock names must be
-> merged in. So, it has to be rather late in the series.
+> On 11.03.2014 08:54, Chanwoo Choi wrote:
+>> This patch use ADC to get the temperature of SoC/battery by using NTC thermistor
+>> driver in hwmon. NTC thermistor driver covnvert ADC's raw data to temperature
+>> by using following variables:
+>>
+>> - pullup-uv    : Voltage
+>> - pullup-ohm   : Pull-up resistance
+>> - pulldown-ohm : Pull-down resistance
+>> - io-channels  : It means ADC channel.
+>>
+> 
+> Those properties are well-defined in "ntc,ncp15wb473" DT bindings documentation. There is no need to repeat them here.
+> 
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
+>>   1 file changed, 21 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+>> index 4f851cc..fc517c3 100644
+>> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+>> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+>> @@ -106,6 +106,27 @@
+>>           };
+>>       };
+>>
+>> +    adc: adc at 126C0000 {
+>> +        vdd-supply = <&ldo3_reg>;
+>> +        status = "okay";
+>> +
+>> +        ncp15wb473 at 0 {
+> 
+> style: Nodes should have generic names, e.g. thermistor at 0.
+> 
+> Also if node name is suffixed with @unit-address, then the node should have a reg property with its first entry corresponding to the unit-address. Now there is no physical unit-address definition for those thermistors, so they shouldn't use this naming pattern, but rather something like "thermistor-0" or "thermistor-ap".
 
-We discussed this over phone and yes, I have missed that.
+OK I'll rename thermistor dt name.
+> 
+>> +            compatible = "ntc,ncp15wb473";
+>> +            pullup-uv = <1800000>;     /* VCC_1.8V_AP */
+>> +            pullup-ohm = <100000>;     /* 100K */
+>> +            pulldown-ohm = <100000>; /* 100K */
+>> +            io-channels = <&adc 1>;  /* AP temperature */
+>> +        };
+>> +
+>> +        ncp15wb473 at 1 {
+>> +            compatible = "ntc,ncp15wb473";
+>> +            pullup-uv = <1800000>;     /* VCC_1.8V_AP */
+>> +            pullup-ohm = <100000>;     /* 100K */
+>> +            pulldown-ohm = <100000>; /* 100K */
+>> +            io-channels = <&adc 2>;  /* Battery temperature */
+>> +        };
+> 
+> Anyway, I don't think it is correct to place IIO consumers under IIO provider node, because IIO is not a control bus, but rather a resource provider, like GPIO, clock, etc. So both thermistor nodes should be placed outside the adc node. (They might be grouped in a simple-bus subnode, though, to improve readability.)
 
-Thanks,
-Michal
+OK, I'll move ntc_thermistor node outside of ADC dt node.
+
+Best Regards,
+Chanwoo Choi
