@@ -1,39 +1,43 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 12 Mar 2014 13:32:58 +0900
-Subject: [PATCH v2 1/4] clk: samsung: add new Kconfig for Samsung common clock
- options
+Date: Wed, 12 Mar 2014 13:33:00 +0900
+Subject: [PATCH v2 3/4] ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and
+ ARCH_S3C64XX
 In-Reply-To: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1394598781-3848-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1394598781-3848-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new Kconfig file for adding new config option
-as COMMON_CLK_SAMSUNG for Samsung common clock. This patch also
-moves S3C24XX specific clock options here in this file.
+This patch selects COMMON_CLK_SAMSUNG for EXYNOS and S3C64XX SoC
+and removes COMMON_CLK selection as COMMON_CLK_SAMSUNG selects it's dependency.
 
+CC: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/clk/samsung/Kconfig |   11 +++++++++++
- 1 file changed, 11 insertions(+)
- create mode 100644 drivers/clk/samsung/Kconfig
+ arch/arm/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
-new file mode 100644
-index 0000000..26eb446
---- /dev/null
-+++ b/drivers/clk/samsung/Kconfig
-@@ -0,0 +1,11 @@
-+config COMMON_CLK_SAMSUNG
-+	bool
-+	select COMMON_CLK
-+
-+config S3C2412_COMMON_CLK
-+	bool
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e254198..0c15aa7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -755,7 +755,7 @@ config ARCH_S3C64XX
+ 	select ARM_VIC
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_SAMSUNG_PWM
+-	select COMMON_CLK
 +	select COMMON_CLK_SAMSUNG
-+
-+config S3C2443_COMMON_CLK
-+	bool
+ 	select CPU_V6K
+ 	select GENERIC_CLOCKEVENTS
+ 	select GPIO_SAMSUNG
+@@ -834,7 +834,7 @@ config ARCH_EXYNOS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ARM_GIC
+-	select COMMON_CLK
 +	select COMMON_CLK_SAMSUNG
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_S3C2410_I2C if I2C
 -- 
 1.7.9.5
