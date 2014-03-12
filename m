@@ -1,87 +1,28 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 12 Mar 2014 10:12:28 +0530
-Subject: [RFC 4/6] sched: powerpc: create a dedicated topology table
-In-Reply-To: <CAKfTPtCJEX7qknTb85FqJfuT03oNFN3rTOncy5Df37w65+GX8Q@mail.gmail.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
- <531EE087.7050707@linux.vnet.ibm.com>
- <CAKfTPtCJEX7qknTb85FqJfuT03oNFN3rTOncy5Df37w65+GX8Q@mail.gmail.com>
-Message-ID: <531FE5B4.6090502@linux.vnet.ibm.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 11 Mar 2014 22:18:29 -0700
+Subject: Qualcomm PMIC8XXX keypad never worked?
+In-Reply-To: <20140311130609.GL21216@lee--X1>
+References: <5887114.1jrNo21sGX@wuerfel> <20140311120056.GH21216@lee--X1>
+ <8206209.oc1V5pPVYT@wuerfel> <20140311130609.GL21216@lee--X1>
+Message-ID: <CAJAp7OgF235DNLC9aaxh15SPwVir9QBjgfi_C1gvmX-o3bHZ9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2014 06:48 PM, Vincent Guittot wrote:
-> On 11 March 2014 11:08, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->> Hi Vincent,
->>
->> On 03/05/2014 12:48 PM, Vincent Guittot wrote:
->>> Create a dedicated topology table for handling asymetric feature.
->>> The current proposal creates a new level which describes which groups of CPUs
->>> take adavantge of SD_ASYM_PACKING. The useless level will be removed during the
->>> build of the sched_domain topology.
->>>
->>> Another solution would be to set SD_ASYM_PACKING in the sd_flags of SMT level
->>> during the boot sequence and before the build of the sched_domain topology.
->>
->> Is the below what you mean as the other solution? If it is so, I would
->> strongly recommend this approach rather than adding another level to the
->> topology level to represent the asymmetric behaviour.
->>
->> +static struct sched_domain_topology_level powerpc_topology[] = {
->> +#ifdef CONFIG_SCHED_SMT
->> +       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
->> SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() },
->> +#endif
->> +       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->> +       { NULL, },
->> +};
-> 
-> Not exactly like that but something like below
-> 
-> +static struct sched_domain_topology_level powerpc_topology[] = {
-> +#ifdef CONFIG_SCHED_SMT
-> + { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
-> SD_INIT_NAME(SMT) },
-> +#endif
-> + { cpu_cpu_mask, SD_INIT_NAME(DIE) },
-> + { NULL, },
-> +};
-> +
-> +static void __init set_sched_topology(void)
-> +{
-> +#ifdef CONFIG_SCHED_SMT
-> + powerpc_topology[0].sd_flags |= arch_sd_sibling_asym_packing();
-> +#endif
-> + sched_domain_topology = powerpc_topology;
-> +}
+On Tue, Mar 11, 2014 at 6:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
+[snip]
+>
+> ... but the MFD isn't broken, so I guess your solution is the most
+> elegant. If it's not fixed soon, I guess we should think about ripping
+> it out. It's obvoious that no-one cares, as it's been broken for
+> nearly 3 years.
 
-I think we can set it in powerpc_topology[] and not bother about setting
-additional flags outside of this array. It is clearer this way.
+Stephen Boyd have a series out on these drivers; fixing this, turning
+them DT and some other goodies.
 
-On an additional note, on powerpc we would want to clear the
-SD_SHARE_POWERDOMAIN flag at the CPU domain. On Power8, considering we
-have 8 threads per core, we would want to consolidate tasks atleast upto
-4 threads without significant performance impact before spilling over to
-the other cores. By doing so, besides making use of the higher power of
-the core we could do cpuidle management at the core level for the
-remaining idle cores as a result of this consolidation.
+The related part for this would be:
+https://patchwork.kernel.org/patch/3765191/
 
-So the powerpc_topology[] would be something like the below:
+Unfortunately lkml.org seems down, so I can't link to the series.
 
-+static struct sched_domain_topology_level powerpc_topology[] = {
-+#ifdef CONFIG_SCHED_SMT
-+       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
-SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() | SD_SHARE_POWERDOMAIN },
-+#endif
-+       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
-+       { NULL, },
-+};
-
-The amount of consolidation to the threads in a core, we will probably
-take care of it in cpu capacity or a similar parameter, but the above
-topology level would be required to request the scheduler to try
-consolidating tasks to cores till the cpu capacity(3/4/5 threads) has
-exceeded.
-
-Regards
-Preeti U Murthy
+Regards,
+Bjorn
