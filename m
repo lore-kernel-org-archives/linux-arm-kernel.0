@@ -1,40 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Mar 2014 10:39:53 -0700
-Subject: [PATCH] ARM: dts: am335x-evmsk: enable DMA controller for USB
-In-Reply-To: <1394465217-24171-1-git-send-email-yegorslists@googlemail.com>
-References: <1394465217-24171-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <20140312173952.GB1996@atomide.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Wed, 12 Mar 2014 18:40:48 +0100
+Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
+In-Reply-To: <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
+ <1390410577-22073-4-git-send-email-denis@eukrea.com>
+ <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+Message-ID: <20140312184048.4b6dbb21@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* yegorslists at googlemail.com <yegorslists@googlemail.com> [140310 08:30]:
-> From: Yegor Yefremov <yegorslists@googlemail.com>
+Hi Fabio,
+
+Le Wed, 12 Mar 2014 14:27:25 -0300,
+Fabio Estevam <festevam@gmail.com> a ?crit :
+> Any ideas?
 > 
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> ---
->  arch/arm/boot/dts/am335x-evmsk.dts |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> index fa19271..ec08f6f 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -384,6 +384,10 @@
->  		status = "okay";
->  		dr_mode = "host";
->  	};
-> +
-> +	dma-controller at 07402000  {
-> +		status = "okay";
-> +	};
->  };
->  
->  &epwmss2 {
+do you drive the signal LCD_EN GPIO3_17 ?
 
-Thanks applying into omap-for-v.15/dt with the subject line as
-the description also. No guarantees this will get merged as we're
-so close to the merge window already.
-
-Regards,
-
-Tony
+Eric
