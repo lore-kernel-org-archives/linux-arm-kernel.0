@@ -1,68 +1,56 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 12 Mar 2014 13:07:37 -0600
-Subject: [RFC PATCH v2 04/14] mtd: nand: define struct nand_timings
-In-Reply-To: <53208F7D.8090104@gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-5-git-send-email-b.brezillon.dev@gmail.com>
- <531DC1A4.7010208@gmail.com>
- <20140311185554.GD31835@obsidianresearch.com>
- <53208F7D.8090104@gmail.com>
-Message-ID: <20140312190737.GA27388@obsidianresearch.com>
+From: vincent.weaver@maine.edu (Vince Weaver)
+Date: Wed, 12 Mar 2014 15:20:19 -0400 (EDT)
+Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
+In-Reply-To: <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
+References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
+ <531FE40C.1060709@wwwdotorg.org>
+ <20140312113346.GA9347@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
+Message-ID: <alpine.DEB.2.10.1403121512370.2805@vincent-weaver-1.um.maine.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 05:46:53PM +0100, Boris BREZILLON wrote:
+On Wed, 12 Mar 2014, Vince Weaver wrote:
 
-> >>I see at least 3 of those timings that could be useful (for the moment) :
-> >>- tR: this one should be used to fill the chip_delay field
-> >>- tPROG and tBERS: could be used within nand_wait to choose the timeo
-> >>   value appropriately.
-> >IIRC these timing values are really only necessary if the controller
-> >does not support the READY/BUSY input, in that case drivers typically
-> >seem to use 'chip_delay' which is the maximum possible command
-> >execution time (a sleep long enough to guarentee that READY/BUSY is
-> >de-asserted).
-
-> You're right about tR (or chip_delay): it's only used when there are
-> no R/B pin.  I experienced it when I tried the RB_NONE case in the
-> sunxi driver: the default chip_delay set by the NAND core code was
-> too small to fit the NAND chip requirements.
+> On Wed, 12 Mar 2014, Will Deacon wrote:
+> > 
+> > I just took the tree you mentioned above, merged together 3.14-rc6,
+> > for-3.15/soc and for-3.15/dt. Using the defconfig (+ appended dtb options)
+> > and cross-compiling with a dated linaro toolchain, it booted fine on my rpi:
+> > 
+> >   Uncompressing Linux... done, booting the kernel.
+> >   [    0.000000] Booting Linux on physical CPU 0x0
+> >   [    0.000000] Initializing cgroup subsys cpuset
+> >   [    0.000000] Initializing cgroup subsys cpu
+> >   [    0.000000] Initializing cgroup subsys cpuacct
+> >   [    0.000000] Linux version 3.14.0-rc6+ (will at tiny-lites) (gcc version 4.8.2 20130603 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.06 - Linaro GCC 2013.06) ) #8 Wed Mar 12 10:51:44 GMT 2014
+> >   [    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387d
+> >   [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+> >   [    0.000000] Machine model: Raspberry Pi Model B
+> >   [    0.000000] bootconsole [earlycon0] enabled
+> >   [    0.000000] Memory policy: Data cache writeback
+> >   [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 97536
+> >   [...]
+> > 
+> > Which compiler are you using?
 > 
-> Anyway, I really think the chip_delay field should be set according
-> to NAND chip characteristics not harcoded in NAND controller driver
-> code (as currently done).
+> it's the gcc 4.6.3 that comes with the version of raspian on the rasp-pi 
+> (I'm compiling natively).  Let me try again and double check there weren't 
+> any other changes.
 
-Drivers these days are often taking this value from the DT node
-property 'chip-delay'. I think this would be nice to have in common
-code too...
+I re-built from scratch using the bcm2835_defconfig and again it hangs at 
+boot, actually it looks like it hangs just after
 
-> tPROG and tBERS, would be used in nand_wait function and do not
-> depend on the R/B pin.  These are just used as timeouts.
+	Uncompressing Linux...
 
-tPROG/tBERS have that special mode where R/B remains asserted but you
-can still issue a status read to the chip to check on the command, so
-the timeout required here is just a big number to detect failed NAND
-controllers, it isn't really too important to have an exact value..
+on the serial console.
 
-> >>Or should I create a new struct for these timings ?
-> >>In the latter case how should I name it ?
-> >struct onfi_command_timings ?
-> 
-> I'm not a big fan of this name. I think timing structs should not
-> contain onfi in their names, because these timings are also
-> available on non ONFI chips.
+The only difference in .config between a working config and the hanging 
+one are
+	CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+	CONFIG_ARCH_USE_BUILTIN_BSWAP
 
-Explicitly defering to the ONFI spec makes it clear what the
-definition of the timing parameter actually is.
+Unfortunately my machine is remote and I won't be able to get in and 
+reboot it and do more testing until probably Friday.
 
-If JEDEC has a different model then drivers will need to configure
-their interfaces a little differently.
-
-So we might end up with a jedec_sdr_timings too :|
-
-> What do you think ?
-
-I'd focus on getting the bus timings working before tackling too much
-more ...
-
-Jason
+Vince
