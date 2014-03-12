@@ -1,136 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 12 Mar 2014 14:27:25 -0300
-Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
-In-Reply-To: <1390410577-22073-4-git-send-email-denis@eukrea.com>
-References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
- <1390410577-22073-4-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Mar 2014 10:28:55 -0700
+Subject: [PATCH v3 5/5] drivers: bus: omap_l3: Change pr_crit() to
+ dev_err() when IRQ request fails
+In-Reply-To: <5316CE17.6010201@ti.com>
+References: <1393937293-6036-1-git-send-email-peter.ujfalusi@ti.com>
+ <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
+ <5315E522.9090606@ti.com> <5316CE17.6010201@ti.com>
+Message-ID: <20140312172854.GD30897@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [140304 23:14]:
+> On 03/04/2014 04:37 PM, Santosh Shilimkar wrote:
+> > On Tuesday 04 March 2014 08:48 PM, Peter Ujfalusi wrote:
+> >> Use dev_err() which will going to print the driver's name as well and the
+> >> KERN_ERR level is sufficient in this case (we also print via dev_err when
+> >> there is an error with the mem resources)
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> >> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> ---
+> >>  drivers/bus/omap_l3_noc.c | 7 +++----
+> >>  1 file changed, 3 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+> >> index 0eff48585ae3..972691a668a3 100644
+> >> --- a/drivers/bus/omap_l3_noc.c
+> >> +++ b/drivers/bus/omap_l3_noc.c
+> >> @@ -158,8 +158,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
+> >>  	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
+> >>  			       IRQF_DISABLED, "l3-dbg-irq", l3);
+> >>  	if (ret) {
+> >> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
+> >> -						l3->debug_irq);
+> >> +		dev_err(&pdev->dev, "request_irq failed for %d\n",
+> >> +			l3->debug_irq);
+> >>  		return ret;
+> >>  	}
+> >>  
+> >> @@ -167,8 +167,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
+> >>  	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
+> >>  			       IRQF_DISABLED, "l3-app-irq", l3);
+> >>  	if (ret)
+> >> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
+> >> -						l3->app_irq);
+> >> +		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
+> >>  
+> >>  	return ret;
+> >>  }
+> >>
+> > So this one change in the log level. If I look at now, may be dev_err
+> > is fine but the change is not same.
+> 
+> Not sure what you mean by 'the change is not same'?
+> I just picked the old series and rebased it on linux-next, the patch is the
+> same as it was back in May 2013:
+> https://lkml.org/lkml/2013/5/2/205
+> 
+> And yes, I have shortened the texts in the print, but the meaning of the
+> prints have not changed.
 
-On Wed, Jan 22, 2014 at 3:09 PM, Denis Carikli <denis@eukrea.com> wrote:
-> The CMO-QVGA(With backlight), DVI-VGA and DVI-SVGA displays
-> were added.
-
-I am trying the same on a mx25pdk and these are my changes:
-
-arch/arm/boot/dts/imx25-pdk.dts | 60 +++++++++++++++++++++++++++++++++++++++++
- drivers/video/fbdev/imxfb.c     |  2 +-
- 2 files changed, 61 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index cccd8fe..700ae1c 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -21,6 +21,26 @@
-         reg = <0x80000000 0x4000000>;
-     };
-
-+    display: display {
-+        model = "CLAA057VC01CW";
-+        native-mode = <&timing0>;
-+        bits-per-pixel = <16>;
-+        fsl,pcr = <0xfa208b80>;
-+        display-timings {
-+            timing0: 640x480 {
-+                hactive = <640>;
-+                vactive = <480>;
-+                hback-porch = <114>;
-+                hfront-porch = <45>;
-+                hsync-len = <1>;
-+                vback-porch = <11>;
-+                vfront-porch = <33>;
-+                vsync-len = <1>;
-+                clock-frequency = <25000000>;
-+            };
-+        };
-+    };
-+
-     regulators {
-         compatible = "simple-bus";
-         #address-cells = <1>;
-@@ -98,6 +118,16 @@
-     status = "okay";
- };
-
-+&lcdc {
-+    display = <&display>;
-+    fsl,lpccr = <0x00a903ff>;
-+    fsl,lscr1 = <0x00120300>;
-+    fsl,dmacr = <0x00020010>;
-+    pinctrl-names = "default";
-+    pinctrl-0 = <&pinctrl_lcd>;
-+    status = "okay";
-+};
-+
- &fec {
-     phy-mode = "rmii";
-     pinctrl-names = "default";
-@@ -170,6 +200,36 @@
-             >;
-         };
-
-+        pinctrl_lcd: lcdgrp {
-+            fsl,pins = <
-+                MX25_PAD_LD0__LD0        0x80000000
-+                MX25_PAD_LD1__LD1        0x80000000
-+                MX25_PAD_LD2__LD2        0x80000000
-+                MX25_PAD_LD3__LD3        0x80000000
-+                MX25_PAD_LD4__LD4        0x80000000
-+                MX25_PAD_LD5__LD5        0x80000000
-+                MX25_PAD_LD6__LD6        0x80000000
-+                MX25_PAD_LD7__LD7        0x80000000
-+                MX25_PAD_LD8__LD8        0x80000000
-+                MX25_PAD_LD9__LD9        0x80000000
-+                MX25_PAD_LD10__LD10        0x80000000
-+                MX25_PAD_LD11__LD11        0x80000000
-+                MX25_PAD_LD12__LD12        0x80000000
-+                MX25_PAD_LD13__LD13        0x80000000
-+                MX25_PAD_LD14__LD14        0x80000000
-+                MX25_PAD_LD15__LD15        0x80000000
-+                MX25_PAD_GPIO_E__LD16        0x80000000
-+                MX25_PAD_GPIO_F__LD17        0x80000000
-+                MX25_PAD_HSYNC__HSYNC        0x80000000
-+                MX25_PAD_VSYNC__VSYNC        0x80000000
-+                MX25_PAD_LSCLK__LSCLK        0x80000000
-+                MX25_PAD_OE_ACD__OE_ACD        0x80000000
-+                MX25_PAD_CONTRAST__CONTRAST    0x80000000
-+            >;
-+        };
-+
-+
-+
-         pinctrl_i2c1: i2c1grp {
-             fsl,pins = <
-                 MX25_PAD_I2C1_CLK__I2C1_CLK        0x80000000
-diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-index 086e024..45cc30b 100644
---- a/drivers/video/fbdev/imxfb.c
-+++ b/drivers/video/fbdev/imxfb.c
-@@ -671,8 +671,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
-
-         fbi->lscr1 = IMXFB_LSCR1_DEFAULT;
-         of_property_read_u32(np, "fsl,lscr1", &fbi->lscr1);
--
-         of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
-+        of_property_read_u32(np, "fsl,lpccr", &fbi->pwmr);
-     }
-
-     return 0;
-
-This last hunk if from an earlier patch from you. (I suggest you to
-resend it since the location of imxfb.c has changed in linux-next).
-
-Is there any other imxfb patch I am missing?
-
-I turned on the backlight supply via bootloader (kernel still does not
-support MC34704 PMIC yet), but the LCD screen is white and I cannot
-see the Linux logo. The /dev/fb0 does exist though.
-
-Any ideas?
+Santosh, got any more comments on this series?
 
 Regards,
 
-Fabio Estevam
+Tony
+ 
+> > Apart from above comment, rest of the series looks fine to me.
+> > Feel free to add my ack...
+> 
+> Thanks.
+> 
+> -- 
+> P?ter
