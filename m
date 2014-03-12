@@ -1,113 +1,96 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 12 Mar 2014 11:23:58 +0100
-Subject: [PATCH 1/5] pinctrl: pfc: r8a7790: add i2c0 muxing
-In-Reply-To: <1394573078-20767-2-git-send-email-wsa@the-dreams.de>
-References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
- <1394573078-20767-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <2710482.IIJcHq53An@avalon>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 12 Mar 2014 11:22:37 +0100
+Subject: [PATCHv5 0/9] Device tree support for the at91sam9rlek
+In-Reply-To: <5320352B.7040707@gmail.com>
+References: <1394617425-641-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5320334C.7060206@atmel.com> <5320352B.7040707@gmail.com>
+Message-ID: <5320356D.3010703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Le 12/03/2014 11:21, Boris BREZILLON a ?crit :
+> Le 12/03/2014 11:13, Nicolas Ferre a ?crit :
+>> On 12/03/2014 10:43, Alexandre Belloni :
+>>> This series adds DT support for the at91sam9rl SoC, then the 
+>>> at91sam9rl-ek
+>>> evaluation board.
+>>>
+>>> While the at91sam9rl dtsi should be almost complete (still missing 
+>>> LCD and
+>>> touchscreen bits). The at91sam9rlek DT now support the following tested
+>>> features:
+>>>   - MMC
+>>>   - dbgu
+>>>   - usart1
+>>>   - watchdog
+>>>   - nand
+>>>   - leds
+>>>   - buttons
+>>>   - common clock framework
+>>>
+>>> Next:
+>>>   - spi
+>>>   - dataflash
+>>>   - i2c
+>>>   - lcd
+>>>   - touchscreen
+>>>   - usb gadget
+>>>   - audio
+>>>
+>>> Changes since v4:
+>>>   - correct a typo in the pwm clock name
+>>>   - add an entry for the pwm clock in the board file lookup table
+>>>   - reorder pinctrl nodes alphabetically
+>>>
+>>> Changes since v3:
+>>>   - reordered nand
+>>>   - removed ADC and USB gadget definition as they were not working. 
+>>> They will
+>>>     come with another set of patches adding proper support.
+>>>
+>>> Alexandre Belloni (8):
+>>>    ARM: at91: prepare at91sam9rl DT transition
+>>>    ARM: at91: Add at91sam9rl DT SoC support
+>>>    ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
+>>>    ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
+>>>    ARM: at91: prepare common clk transition for sam9rl SoCs
+>>>    ARM: at91/dt: define at91sam9rl clocks
+>>>    ARM: at91/dt: define main clk frequency of at91sam9rlek
+>>>    ARM: at91: switch sam9rl to common clock framework
+>>>
+>>> Boris BREZILLON (1):
+>>>    ARM: at91: prepare sam9 dt boards transition to common clk
+>> The series seems ready for inclusion. I stack the whole series on our
+>> at91-3.15-cleanup branch with my:
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> You can add my
+>
+> Acked-by: Boris BREZILLON <b.brezillon.dev@gmail>
+Oops:
 
-Thank you for the patch.
-
-On Tuesday 11 March 2014 22:24:34 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Add the muxing for the last missing i2c rcar core.
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c index c381ae63c508..bd21022cf9bf
-> 100644
-> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> @@ -782,6 +782,7 @@ enum {
->  	USB1_PWEN_MARK, AUDIO_CLKOUT_D_MARK, USB1_OVC_MARK,
->  	TCLK1_B_MARK,
-> 
-> +	I2C0_SCL_MARK, I2C0_SDA_MARK,
->  	I2C3_SCL_MARK, I2C3_SDA_MARK,
->  	PINMUX_MARK_END,
->  };
-> @@ -1722,6 +1723,9 @@ static const u16 pinmux_data[] = {
->  	PINMUX_IPSR_DATA(IP16_7, USB1_OVC),
->  	PINMUX_IPSR_MODSEL_DATA(IP16_7, TCLK1_B, SEL_TMU1_1),
-> 
-> +	PINMUX_DATA(I2C0_SCL_MARK, FN_SEL_IIC0_1),
-> +	PINMUX_DATA(I2C0_SDA_MARK, FN_SEL_IIC0_1),
-> +
->  	PINMUX_DATA(I2C3_SCL_MARK, FN_SEL_IICDVFS_1),
->  	PINMUX_DATA(I2C3_SDA_MARK, FN_SEL_IICDVFS_1),
->  };
-> @@ -1735,6 +1739,8 @@ static const struct sh_pfc_pin pinmux_pins[] = {
->  	PINMUX_GPIO_GP_ALL(),
-> 
->  	/* Pins not associated with a GPIO port */
-> +	SH_PFC_PIN_NAMED(ROW_GROUP_A('G'), 15, AG15),
-> +	SH_PFC_PIN_NAMED(ROW_GROUP_A('F'), 15, AF15),
-
-I would swap those two lines to keep pin entries sorted alphabetically.
-
->  	SH_PFC_PIN_NAMED(ROW_GROUP_A('J'), 15, AJ15),
->  	SH_PFC_PIN_NAMED(ROW_GROUP_A('H'), 15, AH15),
-
-I realize that those two lines should be swapped as well. You could do so in 
-the same patch.
-
->  };
-> @@ -2054,6 +2060,14 @@ static const unsigned int hscif1_ctrl_b_pins[] = {
->  static const unsigned int hscif1_ctrl_b_mux[] = {
->  	HRTS1_N_B_MARK, HCTS1_N_B_MARK,
->  };
-> +/* - I2C0
-> ------------------------------------------------------------------- */
-> +static const unsigned int i2c0_pins[] = {
-> +	/* SCL, SDA */
-> +	PIN_A_NUMBER('G', 15), PIN_A_NUMBER('F', 15),
-> +};
-> +static const unsigned int i2c0_mux[] = {
-> +	I2C0_SCL_MARK, I2C0_SDA_MARK,
-> +};
->  /* - I2C1
-> ------------------------------------------------------------------- */
-> static const unsigned int i2c1_pins[] = {
->  	/* SCL, SDA */
-> @@ -3626,6 +3640,7 @@ static const struct sh_pfc_pin_group pinmux_groups[] =
-> { SH_PFC_PIN_GROUP(hscif1_data_b),
->  	SH_PFC_PIN_GROUP(hscif1_clk_b),
->  	SH_PFC_PIN_GROUP(hscif1_ctrl_b),
-> +	SH_PFC_PIN_GROUP(i2c0),
->  	SH_PFC_PIN_GROUP(i2c1),
->  	SH_PFC_PIN_GROUP(i2c1_b),
->  	SH_PFC_PIN_GROUP(i2c1_c),
-> @@ -3895,6 +3910,10 @@ static const char * const hscif1_groups[] = {
->  	"hscif1_ctrl_b",
->  };
-> 
-> +static const char * const i2c0_groups[] = {
-> +	"i2c0",
-> +};
-> +
->  static const char * const i2c1_groups[] = {
->  	"i2c1",
->  	"i2c1_b",
-> @@ -4203,6 +4222,7 @@ static const struct sh_pfc_function pinmux_functions[]
-> = { SH_PFC_FUNCTION(eth),
->  	SH_PFC_FUNCTION(hscif0),
->  	SH_PFC_FUNCTION(hscif1),
-> +	SH_PFC_FUNCTION(i2c0),
->  	SH_PFC_FUNCTION(i2c1),
->  	SH_PFC_FUNCTION(i2c2),
->  	SH_PFC_FUNCTION(i2c3),
-
--- 
-Regards,
-
-Laurent Pinchart
+Acked-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>
+> Thanks.
+>
+> Best Regards,
+>
+> Boris
+>>
+>> Thanks a lot.
+>>
+>>
+>>>   arch/arm/boot/dts/Makefile         | 2 +
+>>>   arch/arm/boot/dts/at91sam9rl.dtsi  | 802 
+>>> +++++++++++++++++++++++++++++++++++++
+>>>   arch/arm/boot/dts/at91sam9rlek.dts | 157 ++++++++
+>>>   arch/arm/configs/at91_dt_defconfig |   1 +
+>>>   arch/arm/mach-at91/Kconfig         |   1 -
+>>>   arch/arm/mach-at91/at91sam9rl.c    |  23 +-
+>>>   arch/arm/mach-at91/board-dt-sam9.c |  11 +-
+>>>   7 files changed, 994 insertions(+), 3 deletions(-)
+>>>   create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+>>>   create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+>>>
+>>
+>
