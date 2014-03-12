@@ -1,187 +1,68 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 11 Mar 2014 19:33:57 -0400
-Subject: [PATCH v4 5/5] ARM: dts: add bcm590xx pmu support and enable for
- bcm28155-ap
-In-Reply-To: <1394580837-8331-1-git-send-email-mporter@linaro.org>
-References: <1394580837-8331-1-git-send-email-mporter@linaro.org>
-Message-ID: <1394580837-8331-6-git-send-email-mporter@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 11 Mar 2014 19:15:45 -0500
+Subject: [PATCH 4/7] of: configure the platform device dma_mask and
+ dma_pfn_offset
+In-Reply-To: <201403090739.18351.arnd@arndb.de>
+References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>
+ <201403071702.41716.arnd@arndb.de>
+ <CAL_JsqLu_16p-8FLjBYt7xQA2eAyiprPML2q5R3fnivZPrvPug@mail.gmail.com>
+ <201403090739.18351.arnd@arndb.de>
+Message-ID: <CAL_Jsq+KPpqmF3eU49AeWO2Q0d4uBon_67+zUz6dXKtfsjA3Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dtsi to support the BCM590xx PMUs used by the BCM281xx family
-of SoCs. Enable regulators for use with the dwc2 and sdhci on
-bcm28155-ap.
+On Sun, Mar 9, 2014 at 12:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 08 March 2014, Rob Herring wrote:
+>> On Fri, Mar 7, 2014 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> > a) Follow what we do for PCI devices: assume that we can do DMA_MASK(32)
+>> > on any device, and have drivers call dma_set_mask(DMA_MASK(64)) on devices
+>> > that would like to do more than that, or call e.g. dma_set_mask(DMA_MASK(28))
+>> > for devices that can do less than 32 bit, as given in the argument. This
+>> > approach would be most consistent with the way PCI works, but it doesn't
+>> > really work well for the case where the mask is less than 32-bit and the
+>> > device driver doesn't know that.
+>> >
+>> > b) Never have to call dma_set_mask() for platform devices and assume that the
+>> > platform code sets it up correctly. This would probably be the simpler
+>> > solution, and I can't think of any downsides at the moment.
+>>
+>> I don't think we want this. In the case of setting up 64-bit masters,
+>> it is typically the device that knows if it can do 64-bit DMA either
+>> thru a capabilities register or compatible value. That device specific
+>> knowledge should really stay within the device's driver.
+>
+> So you think we should still set a 64-bit mask in the "ranges" property
+> for devices that can only do 32-bit and let the driver figure it out?
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Signed-off-by: Matt Porter <mporter@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- arch/arm/boot/dts/bcm28155-ap.dts | 47 +++++++++++++++++++++++-
- arch/arm/boot/dts/bcm59056.dtsi   | 77 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 123 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
+No, I think option a makes more sense. BTW, don't you mean dma-ranges?
+A device has it's own mask which is typically going to be 32 or
+64-bit. The core code may not know what the device supports, so the
+device has to set it's own mask. I don't see a way around that. DT is
+not a good option because it is discoverable in some cases.
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 5ff2382..99ff0c1 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -46,7 +46,11 @@
- 
- 	i2c at 3500d000 {
- 		status="okay";
--		clock-frequency = <400000>;
-+		clock-frequency = <100000>;
-+
-+		pmu: pmu at 8 {
-+			reg = <0x08>;
-+		};
- 	};
- 
- 	sdio1: sdio at 3f180000 {
-@@ -57,16 +61,22 @@
- 	sdio2: sdio at 3f190000 {
- 		non-removable;
- 		max-frequency = <48000000>;
-+		vmmc-supply = <&camldo1_reg>;
-+		vqmmc-supply = <&iosr1_reg>;
- 		status = "okay";
- 	};
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
- 		cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
-+		vmmc-supply = <&sdldo_reg>;
-+		vqmmc-supply = <&sdxldo_reg>;
- 		status = "okay";
- 	};
- 
- 	usbotg: usb at 3f120000 {
-+		vusb_d-supply = <&usbldo_reg>;
-+		vusb_a-supply = <&iosr1_reg>;
- 		status = "okay";
- 	};
- 
-@@ -74,3 +84,38 @@
- 		status = "okay";
- 	};
- };
-+
-+#include "bcm59056.dtsi"
-+
-+&pmu {
-+	compatible = "brcm,bcm59056";
-+	interrupts = <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
-+	regulators {
-+		camldo1_reg: camldo1 {
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+
-+		sdldo_reg: sdldo {
-+			regulator-min-microvolt = <3000000>;
-+			regulator-max-microvolt = <3000000>;
-+		};
-+
-+		sdxldo_reg: sdxldo {
-+			regulator-min-microvolt = <2700000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+
-+		usbldo_reg: usbldo {
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		iosr1_reg: iosr1 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm59056.dtsi b/arch/arm/boot/dts/bcm59056.dtsi
-new file mode 100644
-index 0000000..0fa1577
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm59056.dtsi
-@@ -0,0 +1,77 @@
-+/*
-+* Copyright 2014 Linaro Limited
-+* Author: Matt Porter <mporter@linaro.org>
-+*
-+* This program is free software; you can redistribute it and/or modify it
-+* under  the terms of the GNU General  Public License as published by the
-+* Free Software Foundation;  either version 2 of the License, or (at your
-+* option) any later version.
-+*/
-+
-+&pmu {
-+	compatible = "brcm,bcm59056";
-+	regulators {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rfldo_reg: rfldo {
-+		};
-+
-+		camldo1_reg: camldo1 {
-+		};
-+
-+		camldo2_reg: camldo2 {
-+		};
-+
-+		simldo1_reg: simldo1 {
-+		};
-+
-+		simldo2_reg: simldo2 {
-+		};
-+
-+		sdldo_reg: sdldo {
-+		};
-+
-+		sdxldo_reg: sdxldo {
-+		};
-+
-+		mmcldo1_reg: mmcldo1 {
-+		};
-+
-+		mmcldo2_reg: mmcldo2 {
-+		};
-+
-+		audldo_reg: audldo {
-+		};
-+
-+		micldo_reg: micldo {
-+		};
-+
-+		usbldo_reg: usbldo {
-+		};
-+
-+		vibldo_reg: vibldo {
-+		};
-+
-+		csr_reg: csr {
-+		};
-+
-+		iosr1_reg: iosr1 {
-+		};
-+
-+		iosr2_reg: iosr2 {
-+		};
-+
-+		msr_reg: msr {
-+		};
-+
-+		sdsr1_reg: sdsr1 {
-+		};
-+
-+		sdsr2_reg: sdsr2 {
-+		};
-+
-+		vsr_reg: vsr {
-+		};
-+	};
-+};
--- 
-1.8.4
+Isn't the question here how do we handle restrictions added by the
+bus? It seems while this series adds support for handling dma-ranges
+to set the default case, it also needs to handle when the driver sets
+the mask. Is this not simply a matter of having dma_set_mask also
+parse dma-ranges (or reuse a saved bus mask)?
+
+> I think this approach is much less useful for platform devices than it is
+> for PCI devices, where we don't explicitly describe the "ranges" for each
+> device. Are you thinking of off-chip or on-chip DMA masters here? If
+> on-chip, I don't think it's likely that we would end up with different
+> versions of the chip that have the same device on there but not the
+> same DMA capabilities.
+
+Sounds like a challenge to h/w designers. :)
+
+I'm mainly thinking about the midway case where all masters are 32-bit
+except AHCI which is 64-bit. The core libahci sets the mask based on
+the capabilities register regardless of PCI or platform bus. Requiring
+this to be setup by the platform or in the DT seems like a step
+backwards. A slightly more complicated case would be something like
+midway, but with RAM starting at say 2GB and DMA masters have the same
+view as the cpu (i.e. no offset). Then the platform does need to set
+the mask to (2^31 -1).
+
+Rob
