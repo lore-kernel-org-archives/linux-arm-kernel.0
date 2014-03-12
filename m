@@ -1,134 +1,114 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 12 Mar 2014 13:40:19 +0000
-Subject: [RFC PATCH V3 2/6] arm: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1394631623-17883-3-git-send-email-steve.capper@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 12 Mar 2014 14:45:14 +0100
+Subject: [PATCH] irqchip: sun4i: Fix irq 0 not working
+In-Reply-To: <20140312100935.GY2815@lukather>
+References: <1394553060-30298-1-git-send-email-hdegoede@redhat.com>
+ <20140312100935.GY2815@lukather>
+Message-ID: <532064EA.1070308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to implement fast_get_user_pages we need to ensure that the
-page table walker is protected from page table pages being freed from
-under it.
+Hi,
 
-One way to achieve this is to have the walker disable interrupts, and
-rely on IPIs from the TLB flushing code blocking before the page table
-pages are freed.
+On 03/12/2014 11:09 AM, Maxime Ripard wrote:
+> Hi,
+> 
+> On Tue, Mar 11, 2014 at 04:51:00PM +0100, Hans de Goede wrote:
+>> SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 2 things:
+>> 1) irq 0 pending
+>> 2) no more irqs pending
+>>
+>> So we must loop always atleast once to make irq 0 work, otherwise irq 0
+>> will never get serviced and we end up with a hard hang because
+>> sun4i_handle_irq gets re-entered constantly.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  drivers/irqchip/irq-sun4i.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+>> index a5438d8..3761bf1 100644
+>> --- a/drivers/irqchip/irq-sun4i.c
+>> +++ b/drivers/irqchip/irq-sun4i.c
+>> @@ -140,10 +140,16 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
+>>  {
+>>  	u32 irq, hwirq;
+>>  
+>> +	/*
+>> +	 * hwirq == 0 can mean one of 2 things:
+>> +	 * 1) irq 0 pending
+>> +	 * 2) no more irqs pending
+> 
+> 3) spurious interrupt.
+> 
+>> +	 * So loop always atleast once to make irq 0 work.
+>> +	 */
+>>  	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+>> -	while (hwirq != 0) {
+>> +	do {
+> 
+> I'd at least lookup in the pending register to see if the interrupt 0
+> was actually triggered. Otherwise, you could end up with spurious
+> handler calls on the interrupt 0.
 
-On some ARM platforms we have hardware TLB invalidation, thus the TLB
-flushing code won't necessarily broadcast IPIs. Also spuriously
-broadcasting IPIs can hurt system performance if done too often.
+Yes, I was already worrying about this myself after sending the patch,
+and considered reading pending too.
 
-This problem has already been solved on PowerPC and Sparc by batching
-up page table pages belonging to more than one mm_user, then scheduling
-an rcu_sched callback to free the pages. If one were to disable
-interrupts, that would delay the scheduling interrupts thus block the
-page table pages being freed. This logic has also been promoted to core
-code and is activated when one enables HAVE_RCU_TABLE_FREE.
+> 
+>>  		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+>>  		handle_IRQ(irq, regs);
+>>  		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+> 
+> And you end up with the same issue if there's a first != 0 interrupt,
+> and then the interrupt 0.
 
-This patch enables HAVE_RCU_TABLE_FREE and incorporates it into the
-existing ARM TLB logic.
+No, before my fix sun4i_handle_irq would be called continuously since we
+were never handling irq 0, so if this happens we will simply drop out
+of sun4i_handle_irq only to immediately get recalled, this does make this
+scenario more expensive, but things will still work, while it saves an
+also not cheap read from SUN4I_IRQ_PENDING_REG(0) for each regular
+interrupt.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm/Kconfig           |  1 +
- arch/arm/include/asm/tlb.h | 38 ++++++++++++++++++++++++++++++++++++--
- 2 files changed, 37 insertions(+), 2 deletions(-)
+Note I agree the spurious irq case is an issue, as said that has me
+worried too.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1594945..7d5340d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -58,6 +58,7 @@ config ARM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
- 	select HAVE_PERF_USER_STACK_DUMP
-+	select HAVE_RCU_TABLE_FREE if SMP
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_UID16
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index 0baf7f0..eaf7578 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -35,12 +35,39 @@
- 
- #define MMU_GATHER_BUNDLE	8
- 
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+static inline void __tlb_remove_table(void *_table)
-+{
-+	free_page_and_swap_cache((struct page *)_table);
-+}
-+
-+struct mmu_table_batch {
-+	struct rcu_head		rcu;
-+	unsigned int		nr;
-+	void			*tables[0];
-+};
-+
-+#define MAX_TABLE_BATCH		\
-+	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
-+
-+extern void tlb_table_flush(struct mmu_gather *tlb);
-+extern void tlb_remove_table(struct mmu_gather *tlb, void *table);
-+
-+#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
-+#else
-+#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
-+#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
-+
- /*
-  * TLB handling.  This allows us to remove pages from the page
-  * tables, and efficiently handle the TLB issues.
-  */
- struct mmu_gather {
- 	struct mm_struct	*mm;
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+	struct mmu_table_batch	*batch;
-+	unsigned int		need_flush;
-+#endif
- 	unsigned int		fullmm;
- 	struct vm_area_struct	*vma;
- 	unsigned long		start, end;
-@@ -101,6 +128,9 @@ static inline void __tlb_alloc_page(struct mmu_gather *tlb)
- static inline void tlb_flush_mmu(struct mmu_gather *tlb)
- {
- 	tlb_flush(tlb);
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+	tlb_table_flush(tlb);
-+#endif
- 	free_pages_and_swap_cache(tlb->pages, tlb->nr);
- 	tlb->nr = 0;
- 	if (tlb->pages == tlb->local)
-@@ -119,6 +149,10 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
- 	tlb->pages = tlb->local;
- 	tlb->nr = 0;
- 	__tlb_alloc_page(tlb);
-+
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+	tlb->batch = NULL;
-+#endif
- }
- 
- static inline void
-@@ -195,7 +229,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- 	tlb_add_flush(tlb, addr + SZ_1M);
- #endif
- 
--	tlb_remove_page(tlb, pte);
-+	tlb_remove_entry(tlb, pte);
- }
- 
- static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
-@@ -203,7 +237,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- {
- #ifdef CONFIG_ARM_LPAE
- 	tlb_add_flush(tlb, addr);
--	tlb_remove_page(tlb, virt_to_page(pmdp));
-+	tlb_remove_entry(tlb, virt_to_page(pmdp));
- #endif
- }
- 
--- 
-1.8.1.4
+> What about something like:
+> 
+> while (1) {
+> 	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+> 	if (!hwirq)
+> 		if (!(readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0)) & BIT(0)))
+> 			break;
+>
+> 	irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+> 	handle_IRQ(irq, regs);
+> }
+
+Yes that should work nicely, but for the straight path it means reading pending
+once for each interrupt.
+
+I agree we need to read pending before calling handle_IRQ for irq 0, but
+we only need to do so if the first read from SUN4I_IRQ_VECTOR_REG == 0,
+on any subsequent reads from SUN4I_IRQ_VECTOR_REG returning 0 we can exit
+immediately, in the worst case we'll get called again, and then do the
+right thing.
+
+IE something like this:
+
+	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+	/* Ensure hwirq == 0 is because of irq 0 pending */
+	if (hwirq == 0 && !(readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0)) & BIT(0)))
+		return;
+	do {
+		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+		handle_IRQ(irq, regs);
+		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+	} while (hwirq);
+
+Note untested, and this might be unnecessary optimization. So let me know which
+version you prefer and I'll give it a test run.
+
+Regards,
+
+Hans
