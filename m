@@ -1,49 +1,80 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 12 Mar 2014 11:01:58 +0100
-Subject: [PATCH v3][ 9/9] ARM: imx_v4_v5_defconfig: Enable drivers for
- i.MX25/i.MX35 USB support.
-In-Reply-To: <1394618518-13803-1-git-send-email-denis@eukrea.com>
-References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394618518-13803-9-git-send-email-denis@eukrea.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Mar 2014 11:09:35 +0100
+Subject: [PATCH] irqchip: sun4i: Fix irq 0 not working
+In-Reply-To: <1394553060-30298-1-git-send-email-hdegoede@redhat.com>
+References: <1394553060-30298-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140312100935.GY2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-Changelog v2->v3:
-- Extra gadget drivers additions were removed from this patch.
+Hi,
 
-Changelog v1->v2:
-- With the clock fix patches, the usb gadget also work.
-  So I've addeed it to this patch too.
-- CONFIG_USB_OTG_FSM=y was not needed, so it was removed.
----
- arch/arm/configs/imx_v4_v5_defconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+On Tue, Mar 11, 2014 at 04:51:00PM +0100, Hans de Goede wrote:
+> SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 2 things:
+> 1) irq 0 pending
+> 2) no more irqs pending
+> 
+> So we must loop always atleast once to make irq 0 work, otherwise irq 0
+> will never get serviced and we end up with a hard hang because
+> sun4i_handle_irq gets re-entered constantly.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/irqchip/irq-sun4i.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+> index a5438d8..3761bf1 100644
+> --- a/drivers/irqchip/irq-sun4i.c
+> +++ b/drivers/irqchip/irq-sun4i.c
+> @@ -140,10 +140,16 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
+>  {
+>  	u32 irq, hwirq;
+>  
+> +	/*
+> +	 * hwirq == 0 can mean one of 2 things:
+> +	 * 1) irq 0 pending
+> +	 * 2) no more irqs pending
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index f1aeb7d..ec9b365 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -80,6 +80,7 @@ CONFIG_MTD_UBI=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
- CONFIG_ATA=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- CONFIG_CS89x0=y
-@@ -153,6 +154,11 @@ CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_UDC=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_SDHCI=y
+3) spurious interrupt.
+
+> +	 * So loop always atleast once to make irq 0 work.
+> +	 */
+>  	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+> -	while (hwirq != 0) {
+> +	do {
+
+I'd at least lookup in the pending register to see if the interrupt 0
+was actually triggered. Otherwise, you could end up with spurious
+handler calls on the interrupt 0.
+
+>  		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+>  		handle_IRQ(irq, regs);
+>  		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+
+And you end up with the same issue if there's a first != 0 interrupt,
+and then the interrupt 0.
+
+What about something like:
+
+while (1) {
+	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+	if (!hwirq)
+		if (!(readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0)) & BIT(0)))
+			break;
+
+	irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+	handle_IRQ(irq, regs);
+}
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/7d937b9c/attachment.sig>
