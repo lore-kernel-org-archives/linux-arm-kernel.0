@@ -1,94 +1,43 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 12 Mar 2014 09:46:34 -0400
-Subject: [PATCH v4 1/5] mfd: add bcm590xx pmu DT binding
-In-Reply-To: <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
-References: <1394580837-8331-1-git-send-email-mporter@linaro.org>
- <1394580837-8331-2-git-send-email-mporter@linaro.org>
- <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
-Message-ID: <20140312134634.GR25092@beef>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 12 Mar 2014 22:01:27 +0800
+Subject: [GIT PULL 1/2] ARM: Keystone DTS updates for 3.15
+In-Reply-To: <20140311200116.GD31877@quad.lixom.net>
+References: <1394005703-6624-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140311200116.GD31877@quad.lixom.net>
+Message-ID: <532068B7.2060805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:33:39PM +0000, Mark Rutland wrote:
-> On Tue, Mar 11, 2014 at 11:33:53PM +0000, Matt Porter wrote:
-> > Add a DT binding for the BCM590xx PMUs. The binding inherits from
-> > the generic regulator bindings.
-> > 
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/bcm590xx.txt | 41 ++++++++++++++++++++++
-> >  1 file changed, 41 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/bcm590xx.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/bcm590xx.txt b/Documentation/devicetree/bindings/mfd/bcm590xx.txt
-> > new file mode 100644
-> > index 0000000..2300246
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/bcm590xx.txt
-> > @@ -0,0 +1,41 @@
-> > +-------------------------------
-> > +BCM590xx Power Management Units
-> > +-------------------------------
-> > +
-> > +Required properties:
-> > +- compatible: "brcm,bcm59056"
-> > +- reg: I2C slave address
-> > +- interrupts: interrupt for the PMU. Generic interrupt client node bindings
-> > +  are described in interrupt-controller/interrupts.txt
+On Wednesday 12 March 2014 04:01 AM, Olof Johansson wrote:
+> On Wed, Mar 05, 2014 at 03:48:22PM +0800, Santosh Shilimkar wrote:
+>> Hi Arm-soc folks,
+>>
+>> Please pull below keystone DTS updates for 3.15. It merges cleanly with
+>> arm-soc 'for-next' and 'next/dt' heads.
+>>
+>> Please note that you get a trivial merge conflict while merging to the
+>> latest Linus tip, because of bug fix commit 565bbdcd3b{ARM: keystone:
+>> dts: fix clkvcp3 control register address} which got merged post
+>> 3.14-rc5. If it needs to be avoided then I need to rebase the PULL
+>> request on top of 3.14-rc6 when it gets tagged. Do let me know if
+>> thats needed.
+>>
+>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>
+>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
+>>
+>> for you to fetch changes up to 82c04f71ecacf225cdd0ea96ec91f28ca9db70a1:
+>>
+>>   ARM: dts: keystone: add AEMIF/NAND device entry (2014-02-28 21:05:24 -0500)
 > 
-> This all looks sane.
+> Merged. See comments on the per-board table in keystone.c, but that can be
+> rolled back and changed on top of this.
 > 
-> > +
-> > +------------------
-> > +Voltage Regulators
-> > +------------------
-> > +
-> > +Optional properties:
-> > +- regulators: This is the list of child nodes that specify the regulator
-> > +  initialization data for defined regulators.  Generic regulator bindings
-> > +  are described in regulator/regulator.txt.
-> 
-> This is a subnode, not a property. How about:
-> 
-> Optional child nodes:
-> 
-> - regulators: container node for regulators follwoing the generic
->   regulator binding in regulator/regulator.txt.
+Thanks. I will follow it up with the comment.
 
-Agreed, I'll reword like that...makes more sense like that.
-
-> > +
-> > +  The valid regulator nodes for BCM59056 are:
-> 
-> s/nodes/node names/
-
-Ok
-
-> > +  	rfldo, camldo1, camldo2, simldo1, simldo2, sdldo, sdxldo,
-> > +	mmcldo1, mmcldo2, audldo, micldo, usbldo, vibldo,
-> > +	csr, iosr1, iosr2, msr, sdsr1, sdsr2, vsr
-> > +
-> > +Example:
-> > +	pmu: bcm59056 at 8 {
-> > +		compatible = "brcm,bcm59056";
-> > +		reg = <0x08>;
-> > +		interrupts = <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
-> > +		regulators {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			rfldo_reg: rfldo {
-> > +				regulator-min-microvolt = <1200000>;
-> > +				regulator-max-microvolt = <3300000>;
-> 
-> Are any specific properties required on these children?
-
-None. The only requirement is that when regulator node exists, the
-node names must match those listed.
-
-I'll send out another version with rewording suggested above.
-
-Thanks,
-Matt
+Regards,
+Santosh
