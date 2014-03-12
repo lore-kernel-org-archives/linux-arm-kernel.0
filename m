@@ -1,64 +1,58 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 12 Mar 2014 10:15:47 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <532017B3.708@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 12 Mar 2014 17:31:25 +0900
+Subject: [PATCH v4 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <1394085963-27553-3-git-send-email-tinamdar@apm.com>
+References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
+ <1394085963-27553-3-git-send-email-tinamdar@apm.com>
+Message-ID: <000001cf3dcd$751a4680$5f4ed380$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-On 28/02/14 14:20, Tomi Valkeinen wrote:
-> Hi,
+On Thursday, March 06, 2014 3:06 PM, Tanmay Inamdar wrote:
 > 
-> This series is a re-send of
-> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
+> This patch adds the device tree nodes for APM X-Gene PCIe controller and
+> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
+> nodes are added.
 > 
-> I'm cc'ing more people, and I want to clarify the contents of the series:
-> 
-> While this has been developed for OMAP, only the first patch is about OMAP
-> bindings. The rest are generic bindings for video components, which can be used
-> on any platform.
-> 
-> The bindings use the V4L2 style video port/endpoint system, described in
-> Documentation/devicetree/bindings/media/video-interfaces.txt, to connect the
-> components. The same port/endpoint bindings are used by Philipp Zabel in his
-> imx-drm patch series.
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm-mustang.dts |    8 ++
+>  arch/arm64/boot/dts/apm-storm.dtsi  |  155 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 163 insertions(+)
 
-This series is a piece of bigger series, which brings DT support for
-OMAP display subsystem. This uses the same V4L2 style ports/endpoints as
-has been discussed recently regarding the series from Philipp. It
-doesn't use the helper code from Philipp, but a custom one as Philipp's
-code didn't exist when I made this, and also because I needed extra
-functionality not present in Philipp's series (which aimed to just move
-the current V4L2 code to a common place).
+[.....]
 
-The main concerns with the ports/endpoints has been the optional 'port'
-node for the case where we have a single endpoint, and the
-double-linking of the endpoints.
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
 
-If I remove the optional 'port' usage from my series, are you ok with me
-proceeding with this series for 3.15, with the double-linked endpoints?
+[.....]
 
-As far as I see, when we come to a conclusion how the linking should be
-made, it's trivial to change the bindings in this series to match it,
-even without needing any compatibility code. I just need to remove the
-other link, and old dts files having double-linking will still work fine.
+> +
+> +		pcie0: pcie at 1f2b0000 {
+> +			status = "disabled";
+> +			device_type = "pci";
+> +			compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+> +			#interrupt-cells = <1>;
+> +			#size-cells = <2>;
+> +			#address-cells = <3>;
+> +			reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+> +				0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+> +			reg-names = "csr", "cfg";
+> +			ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+> +				  0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
+                                                                          ^^^
 
-The reason I want to push this forward asap is that omap4 and omap5 are
-already DT only, and for omap5 we don't have working display without DT
-support for display. For omap4, we have a really hacky way to add
-display support for a few boards, but that is causing major headaches
-and I want to get rid of it.
+I have a question about the fourth number '0xe0' of 'ranges' property.
+Would you let me know what the '0xe0' means?
 
- Tomi
+Best regards,
+Jingoo Han
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/f3b90cfd/attachment-0001.sig>
+> +			dma-ranges = <0x42000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000>;
+> +			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> +			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1
+> +					 0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x1
+> +					 0x0 0x0 0x0 0x3 &gic 0x0 0xc4 0x1
+> +					 0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
+> +			clocks = <&pcie0clk 0>;
+> +		};
