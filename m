@@ -1,59 +1,132 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 12 Mar 2014 12:03:24 +0100
-Subject: [PATCH] clk: exynos4: Add clock ID for ppmuleft/right
-In-Reply-To: <1394608090-25362-1-git-send-email-cw00.choi@samsung.com>
-References: <1394608090-25362-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53203EFC.1020109@samsung.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Wed, 12 Mar 2014 11:04:13 +0000
+Subject: [RFC 4/6] sched: powerpc: create a dedicated topology table
+In-Reply-To: <CAKfTPtDLzOMpVGUqBpMFiN_cwKERFDCqH1zLKsRbrqeD11DzWw@mail.gmail.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
+ <531EE087.7050707@linux.vnet.ibm.com>
+ <CAKfTPtCJEX7qknTb85FqJfuT03oNFN3rTOncy5Df37w65+GX8Q@mail.gmail.com>
+ <531FE5B4.6090502@linux.vnet.ibm.com>
+ <CAKfTPtDLzOMpVGUqBpMFiN_cwKERFDCqH1zLKsRbrqeD11DzWw@mail.gmail.com>
+Message-ID: <53203F2D.4030209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-On 12/03/14 08:08, Chanwoo Choi wrote:
-> There is no gate for the PPMU Left/Right to the LEFT/RIGHTBUS block.
-> So, this patch add ppmuleft/right clock which is used to calculate memory bus
-> utilization by using PPMU(Performance Profiling Monitoring Unit).
+On 12/03/14 07:44, Vincent Guittot wrote:
+> On 12 March 2014 05:42, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> On 03/11/2014 06:48 PM, Vincent Guittot wrote:
+>>> On 11 March 2014 11:08, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>>>> Hi Vincent,
+>>>>
+>>>> On 03/05/2014 12:48 PM, Vincent Guittot wrote:
+>>>>> Create a dedicated topology table for handling asymetric feature.
+>>>>> The current proposal creates a new level which describes which groups of CPUs
+>>>>> take adavantge of SD_ASYM_PACKING. The useless level will be removed during the
+>>>>> build of the sched_domain topology.
+>>>>>
+>>>>> Another solution would be to set SD_ASYM_PACKING in the sd_flags of SMT level
+>>>>> during the boot sequence and before the build of the sched_domain topology.
+>>>>
+>>>> Is the below what you mean as the other solution? If it is so, I would
+>>>> strongly recommend this approach rather than adding another level to the
+>>>> topology level to represent the asymmetric behaviour.
+>>>>
+>>>> +static struct sched_domain_topology_level powerpc_topology[] = {
+>>>> +#ifdef CONFIG_SCHED_SMT
+>>>> +       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
+>>>> SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() },
+>>>> +#endif
+>>>> +       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
+>>>> +       { NULL, },
+>>>> +};
+>>>
+>>> Not exactly like that but something like below
+>>>
+>>> +static struct sched_domain_topology_level powerpc_topology[] = {
+>>> +#ifdef CONFIG_SCHED_SMT
+>>> + { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
+>>> SD_INIT_NAME(SMT) },
+>>> +#endif
+>>> + { cpu_cpu_mask, SD_INIT_NAME(DIE) },
+>>> + { NULL, },
+>>> +};
+>>> +
+>>> +static void __init set_sched_topology(void)
+>>> +{
+>>> +#ifdef CONFIG_SCHED_SMT
+>>> + powerpc_topology[0].sd_flags |= arch_sd_sibling_asym_packing();
+>>> +#endif
+>>> + sched_domain_topology = powerpc_topology;
+>>> +}
+>>
+>> I think we can set it in powerpc_topology[] and not bother about setting
+>> additional flags outside of this array. It is clearer this way.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c   |  2 ++
->  include/dt-bindings/clock/exynos4.h | 26 ++++++++++++++------------
->  2 files changed, 16 insertions(+), 12 deletions(-)
+> IIRC, the arch_sd_sibling_asym_packing of powerpc can be set at
+> runtime which prevents it from being put directly in the table. Or it
+> means that we should use a function pointer in the table for setting
+> flags instead of a static value like the current proposal.
+
+Right,
+
+static struct sched_domain_topology_level powerpc_topology[] = {
+#ifdef CONFIG_SCHED_SMT
+        { cpu_asmt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES |
+SD_ASYM_PACKING, SD_INIT_NAME(ASMT) },
+        { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES |
+arch_sd_sibling_asym_packing() | SD_SHARE_POWERDOMAIN, SD_INIT_NAME(SMT) },
+#endif
+        { cpu_cpu_mask, SD_INIT_NAME(DIE) },
+        { NULL, },
+};
+
+is not compiling:
+
+  CC      arch/powerpc/kernel/smp.o
+arch/powerpc/kernel/smp.c:787:2: error: initializer element is not constant
+arch/powerpc/kernel/smp.c:787:2: error: (near initialization for
+'powerpc_topology[1].sd_flags')
+
+So I'm in favour of a function pointer, even w/o the 'int cpu' parameter
+to circumvent the issue that it is too easy to create broken sd setups.
+
+-- Dietmar
+
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 010f071..3819485 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -717,6 +717,8 @@ static struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
->  			0, 0),
->  	GATE(CLK_AC97, "ac97", "aclk100", GATE_IP_PERIL, 27,
->  			0, 0),
-> +	GATE(CLK_PPMULEFT, "ppmuleft", "aclk200", GATE_IP_LEFTBUS, 1, 0, 0),
-> +	GATE(CLK_PPMURIGHT, "ppmuright", "aclk200", GATE_IP_RIGHTBUS, 1, 0, 0),
->  };
->  
->  /* list of gate clocks supported in exynos4210 soc */
-> diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
-> index 75aff33..cd7fecf 100644
-> --- a/include/dt-bindings/clock/exynos4.h
-> +++ b/include/dt-bindings/clock/exynos4.h
-> @@ -215,20 +215,22 @@
->  #define CLK_SPI1_ISP_SCLK	381 /* Exynos4x12 only */
->  #define CLK_UART_ISP_SCLK	382 /* Exynos4x12 only */
->  #define CLK_TMU_APBIF		383
-> +#define CLK_PPMULEFT		384
-> +#define CLK_PPMURIGHT		385
->  
->  /* mux clocks */
-> -#define CLK_MOUT_FIMC0		384
-
-You must not change the existing clock indices like this, use indexes
-that are currently unused for CLK_PPMU* clocks.
-If you do that the kernel would stop working with existing dtbs.
-This interface is an ABI, so you can't just rearrange the indices
-at will like this.
-
---
-Regards,
-Sylwester
+>>
+>> On an additional note, on powerpc we would want to clear the
+>> SD_SHARE_POWERDOMAIN flag at the CPU domain. On Power8, considering we
+>> have 8 threads per core, we would want to consolidate tasks atleast upto
+>> 4 threads without significant performance impact before spilling over to
+>> the other cores. By doing so, besides making use of the higher power of
+>> the core we could do cpuidle management at the core level for the
+>> remaining idle cores as a result of this consolidation.
+> 
+> OK. i will add the SD_SHARE_POWERDOMAIN like below
+> 
+> Thanks
+> Vincent
+> 
+>>
+>> So the powerpc_topology[] would be something like the below:
+>>
+>> +static struct sched_domain_topology_level powerpc_topology[] = {
+>> +#ifdef CONFIG_SCHED_SMT
+>> +       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
+>> SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() | SD_SHARE_POWERDOMAIN },
+>> +#endif
+>> +       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
+>> +       { NULL, },
+>> +};
+>>
+>> The amount of consolidation to the threads in a core, we will probably
+>> take care of it in cpu capacity or a similar parameter, but the above
+>> topology level would be required to request the scheduler to try
+>> consolidating tasks to cores till the cpu capacity(3/4/5 threads) has
+>> exceeded.
+>>
+>> Regards
+>> Preeti U Murthy
+>>
+>>
+> 
