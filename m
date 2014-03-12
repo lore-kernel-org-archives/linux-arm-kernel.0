@@ -1,48 +1,42 @@
-From: yibin.gong@freescale.com (Yibin Gong)
-Date: Wed, 12 Mar 2014 01:41:41 +0000
-Subject: Freescale PFUZE100 PMIC
-In-Reply-To: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
-References: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
-Message-ID: <4fc2f7234ca047bca85893b3da86f940@BLUPR03MB036.namprd03.prod.outlook.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 11 Mar 2014 21:58:44 -0400
+Subject: [PATCH v5 0/7] arm64: Add ftrace support
+In-Reply-To: <531FBCA8.2080805@linaro.org>
+References: <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <20140311143535.GE7944@mudshark.cambridge.arm.com>
+ <531FBCA8.2080805@linaro.org>
+Message-ID: <20140311215844.70ada249@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
-	I'm little confused by your print log  and dts setting about I2C: 
->From your print log "pfuze100-regulator 0-0008:" we can know this i2c device pfuze should be connected in i2c1. But in your dts setting, you put pfuze in i2c2. Please make sure which i2c interface connected with pfuze and make correct setting in dts.
+On Wed, 12 Mar 2014 10:47:20 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
------Original Message-----
-From: John Tobias [mailto:john.tobias.ph at gmail.com] 
-Sent: Wednesday, March 12, 2014 8:41 AM
-To: <linux-arm-kernel@lists.infradead.org>; Gong Yibin-B38343; Shawn Guo
-Subject: Freescale PFUZE100 PMIC
+> This happens when a header file, elf.h, on "your host machine" does not have
+> definitions of EM_AARCH64 nor R_AARCH64_ABS64 because "recordmcount" is a binary
+> utility on host(x86), not target. It is very likely for most distros.
+> (I mentioned this in the cover letter, but the description might not be clear.)
+> 
+> Possible solutions are:
+> 1) Define both macros directly in scripts/recordmcount.c
+> 2) Use perl version of recordmcount
+> 
+> Currently I take 1), but it is a workaround.
+> 2) should work with my current patch, too. But you need to remove HAVE_C_RECORDCOUNT
+> from arm64/Kconfig.
+> 
+> Which one do you prefer? I will include a fix for 1) in the next revision, anyway.
+> 
 
-Hi All,
+I'd recommend #1, where you add this:
 
-I was trying to enable the PFUZE100 regulator driver
-(pfuze100-regulator) on linux 3.13.0. The PMIC is connected to the
-i2c2 bus.
+/* AARCH64 is new, and most headers don't define it. */
+#ifndef EM_AARCH64
+#define EM_AARCH64  ##
+#define R_AARCH64_ABS64 ##
+#endif
 
-&i2c2 {
-   .....
-   pmic: pfuze100 at 08 {
-          compatible = "fsl,pfuze100";
-          reg = <0x08>;
+Obviously fill in the blank for ##
 
-          regulators {
-                 ......
-          };
-   };
-}
-
-After loading the driver, I was getting an error:
-pfuze100-regulator 0-0008: unrecognized pfuze chip ID!
-
-Then, I printed the return value of i2c_transfer function and got -5.
-
-
-Is there anything that I forgot?. I tried to use the i2cget in userspace and I was able to communicate it to the device.
-
-Regards,
-
-john
+-- Steve
