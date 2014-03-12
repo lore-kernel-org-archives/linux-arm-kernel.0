@@ -1,53 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 12 Mar 2014 11:46:24 -0400
-Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
-In-Reply-To: <CACRpkdbcbMNim9LRkr75Mk5yHfwbA1OAexByHG50qDUPwts4uQ@mail.gmail.com>
-References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140306201803.GL1872@titan.lakedaemon.net>
- <CACRpkda0JCLZUv_KPmwucDh3ko2YbtG2ukMMscSodAbBpiY+zw@mail.gmail.com>
- <20140307035056.GQ1872@titan.lakedaemon.net>
- <CACRpkdbEQSj7jLWT2BFR22m7phwmyKCByhQuFFgHvHoKvQFD5g@mail.gmail.com>
- <20140307134616.GR1872@titan.lakedaemon.net>
- <CACRpkdbcbMNim9LRkr75Mk5yHfwbA1OAexByHG50qDUPwts4uQ@mail.gmail.com>
-Message-ID: <20140312154624.GB7811@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Mar 2014 16:48:13 +0100
+Subject: [PATCH] phy: exynos: fix building as a module
+Message-ID: <10501799.dhM9cVfZmk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 03:02:02PM +0100, Linus Walleij wrote:
-> On Fri, Mar 7, 2014 at 2:46 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Fri, Mar 07, 2014 at 11:56:11AM +0800, Linus Walleij wrote:
-> 
-> >> For a single patch?
-> >
-> > Well, just the doc change and WARN change.  I've already taken the dts
-> > change into mvebu/dt (for arm-soc).
-> 
-> I've applied this patch [3/3] to the pinctrl tree.
+The top-level phy-samsung-usb2 driver may be configured as a
+loadable module, which currently causes link errors because
+of the dependency on the exynos{5250,4x12,4210}_usb2_phy_config
+symbol. Solving this could be achieved by exporting these
+symbols, but as the SoC-specific parts of the driver are not
+currently built as modules, it seems better to just link
+everything into one module and avoid the need for the export.
 
-Ok, thanks.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> > There should be no need for these two to be in mvebu's for-next, so if
-> > it's easier for you to pick them, please do so.
-> >
-> > I'll drop them from mvebu/pinctrl and update mvebu's for-next right now.
-> 
-> No, I mean, please apply patch 1/3 and 2/3 to the mvebu tree.
-> There is no need to sync DTS and pinctrl driver changes. This
-> patch to the pinctrl driver I want to carry however.
-
-Sorry I wasn't clear.  patch 2/3 depends on
-
-  356ca6ce0aa4 devicetree: bindings: update MVEBU pinctrl binding documentation
-
-Which is in the mvebu/pinctrl branch you have merged into your tree.
-
-I usually keep the binding documentation changes in the same branch with
-the code changes so that during a future bisect, the documentation has a
-better chance of being consistent with the code at the point of failure.
-It's a detail thing, I know, but I couldn't find a downside to doing it.
-Well, until now.  :-)
-
-thx,
-
-Jason.
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 2faf78e..7728518 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -13,8 +13,9 @@ obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
+ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+ obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
+ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+-obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-samsung-usb2.o
+-obj-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+-obj-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+-obj-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
++obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
++phy-exynos-usb2-y			+= phy-samsung-usb2.o
++phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
++phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
++phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+ obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
