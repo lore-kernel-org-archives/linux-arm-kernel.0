@@ -1,22 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Mar 2014 22:05:38 -0300
+From: yibin.gong@freescale.com (Yibin Gong)
+Date: Wed, 12 Mar 2014 01:41:41 +0000
 Subject: Freescale PFUZE100 PMIC
 In-Reply-To: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
 References: <CACUGKYN4uaT0xn4fMCqVNXeKYSf_WP+GkpkAb6vagQeGFdJUmw@mail.gmail.com>
-Message-ID: <CAOMZO5DKpz6gRP-9Zvpmdq94UxRzFV=Rfa1mju7Y5JzJ5xOisg@mail.gmail.com>
+Message-ID: <4fc2f7234ca047bca85893b3da86f940@BLUPR03MB036.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 9:41 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
+Hi John,
+	I'm little confused by your print log  and dts setting about I2C: 
+>From your print log "pfuze100-regulator 0-0008:" we can know this i2c device pfuze should be connected in i2c1. But in your dts setting, you put pfuze in i2c2. Please make sure which i2c interface connected with pfuze and make correct setting in dts.
 
-> After loading the driver, I was getting an error:
-> pfuze100-regulator 0-0008: unrecognized pfuze chip ID!
+-----Original Message-----
+From: John Tobias [mailto:john.tobias.ph at gmail.com] 
+Sent: Wednesday, March 12, 2014 8:41 AM
+To: <linux-arm-kernel@lists.infradead.org>; Gong Yibin-B38343; Shawn Guo
+Subject: Freescale PFUZE100 PMIC
 
-Double check the IOMUX settings for the I2C pins.
+Hi All,
 
-You can take a look at imx6sl-evk.dts from linux-next as we do support
-pfuze100 there.
+I was trying to enable the PFUZE100 regulator driver
+(pfuze100-regulator) on linux 3.13.0. The PMIC is connected to the
+i2c2 bus.
+
+&i2c2 {
+   .....
+   pmic: pfuze100 at 08 {
+          compatible = "fsl,pfuze100";
+          reg = <0x08>;
+
+          regulators {
+                 ......
+          };
+   };
+}
+
+After loading the driver, I was getting an error:
+pfuze100-regulator 0-0008: unrecognized pfuze chip ID!
+
+Then, I printed the return value of i2c_transfer function and got -5.
+
+
+Is there anything that I forgot?. I tried to use the i2cget in userspace and I was able to communicate it to the device.
 
 Regards,
 
-Fabio Estevam
+john
