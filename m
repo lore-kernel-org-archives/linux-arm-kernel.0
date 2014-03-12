@@ -1,91 +1,94 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 12 Mar 2014 14:47:28 +0100
-Subject: [RFC 0/6] rework sched_domain topology description
-In-Reply-To: <532060E7.7010203@arm.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <5317B092.7070805@arm.com>
- <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
- <53186A8A.9060406@arm.com>
- <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
- <531B0FDA.2040302@arm.com>
- <20140311131719.GY9987@twins.programming.kicks-ass.net>
- <532060E7.7010203@arm.com>
-Message-ID: <CAKfTPtC3Y7s=n205MND24tLrsT+-3+JhWHebxcBkwAuaMngDhA@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 12 Mar 2014 09:46:34 -0400
+Subject: [PATCH v4 1/5] mfd: add bcm590xx pmu DT binding
+In-Reply-To: <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
+References: <1394580837-8331-1-git-send-email-mporter@linaro.org>
+ <1394580837-8331-2-git-send-email-mporter@linaro.org>
+ <20140312133339.GC17461@e106331-lin.cambridge.arm.com>
+Message-ID: <20140312134634.GR25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2014 14:28, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 11/03/14 13:17, Peter Zijlstra wrote:
->> On Sat, Mar 08, 2014 at 12:40:58PM +0000, Dietmar Eggemann wrote:
->>>>
->>>> I don't have a strong opinion about using or not a cpu argument for
->>>> setting the flags of a level (it was part of the initial proposal
->>>> before we start to completely rework the build of sched_domain)
->>>> Nevertheless, I see one potential concern that you can have completely
->>>> different flags configuration of the same sd level of 2 cpus.
->>>
->>> Could you elaborate a little bit further regarding the last sentence? Do you
->>> think that those completely different flags configuration would make it
->>> impossible, that the load-balance code could work at all at this sd?
->>
->> So a problem with such an interfaces is that is makes it far too easy to
->> generate completely broken domains.
->
-> I see the point. What I'm still struggling with is to understand why
-> this interface is worse then the one where we set-up additional,
-> adjacent sd levels with new cpu_foo_mask functions plus different static
-> sd-flags configurations and rely on the sd degenerate functionality in
-> the core scheduler to fold these levels together to achieve different
-> per cpu sd flags configurations.
+On Wed, Mar 12, 2014 at 01:33:39PM +0000, Mark Rutland wrote:
+> On Tue, Mar 11, 2014 at 11:33:53PM +0000, Matt Porter wrote:
+> > Add a DT binding for the BCM590xx PMUs. The binding inherits from
+> > the generic regulator bindings.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/bcm590xx.txt | 41 ++++++++++++++++++++++
+> >  1 file changed, 41 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/bcm590xx.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/bcm590xx.txt b/Documentation/devicetree/bindings/mfd/bcm590xx.txt
+> > new file mode 100644
+> > index 0000000..2300246
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/bcm590xx.txt
+> > @@ -0,0 +1,41 @@
+> > +-------------------------------
+> > +BCM590xx Power Management Units
+> > +-------------------------------
+> > +
+> > +Required properties:
+> > +- compatible: "brcm,bcm59056"
+> > +- reg: I2C slave address
+> > +- interrupts: interrupt for the PMU. Generic interrupt client node bindings
+> > +  are described in interrupt-controller/interrupts.txt
+> 
+> This all looks sane.
+> 
+> > +
+> > +------------------
+> > +Voltage Regulators
+> > +------------------
+> > +
+> > +Optional properties:
+> > +- regulators: This is the list of child nodes that specify the regulator
+> > +  initialization data for defined regulators.  Generic regulator bindings
+> > +  are described in regulator/regulator.txt.
+> 
+> This is a subnode, not a property. How about:
+> 
+> Optional child nodes:
+> 
+> - regulators: container node for regulators follwoing the generic
+>   regulator binding in regulator/regulator.txt.
 
-The main difference is that all CPUs has got the same levels at the
-initial state and then the degenerate sequence can decide that it's
-worth removing a level and if it will not create unsuable domains.
+Agreed, I'll reword like that...makes more sense like that.
 
->
-> IMHO, exposing struct sched_domain_topology_level bar_topology[] to the
-> arch is the reason why the core scheduler has to check if the arch
-> provides a sane sd setup in both cases.
->
->>
->> You can, for two cpus in the same domain provide, different flags; such
->> a configuration doesn't make any sense at all.
->>
->> Now I see why people would like to have this; but unless we can make it
->> robust I'd be very hesitant to go this route.
->>
->
-> By making it robust, I guess you mean that the core scheduler has to
-> check that the provided set-ups are sane, something like the following
-> code snippet in sd_init()
->
-> if (WARN_ONCE(tl->sd_flags & ~TOPOLOGY_SD_FLAGS,
->                 "wrong sd_flags in topology description\n"))
->         tl->sd_flags &= ~TOPOLOGY_SD_FLAGS;
->
-> but for per cpu set-up's.
-> Obviously, this check has to be in sync with the usage of these flags in
-> the core scheduler algorithms. This comprises probably that a subset of
-> these topology sd flags has to be set for all cpus in a sd level whereas
-> other can be set only for some cpus.
->
->>
->>
->
->
->
->
->
->
->
->
->
->
->
->
->
->
->
->
->
->
+> > +
+> > +  The valid regulator nodes for BCM59056 are:
+> 
+> s/nodes/node names/
+
+Ok
+
+> > +  	rfldo, camldo1, camldo2, simldo1, simldo2, sdldo, sdxldo,
+> > +	mmcldo1, mmcldo2, audldo, micldo, usbldo, vibldo,
+> > +	csr, iosr1, iosr2, msr, sdsr1, sdsr2, vsr
+> > +
+> > +Example:
+> > +	pmu: bcm59056 at 8 {
+> > +		compatible = "brcm,bcm59056";
+> > +		reg = <0x08>;
+> > +		interrupts = <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
+> > +		regulators {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			rfldo_reg: rfldo {
+> > +				regulator-min-microvolt = <1200000>;
+> > +				regulator-max-microvolt = <3300000>;
+> 
+> Are any specific properties required on these children?
+
+None. The only requirement is that when regulator node exists, the
+node names must match those listed.
+
+I'll send out another version with rewording suggested above.
+
+Thanks,
+Matt
