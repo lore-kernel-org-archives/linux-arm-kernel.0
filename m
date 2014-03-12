@@ -1,46 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Mar 2014 17:30:08 +0100
-Subject: [PATCH RESEND] usb: at91-udc: fix irq and iomem resource retrieval
-In-Reply-To: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
-References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1394641808-27919-1-git-send-email-nicolas.ferre@atmel.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 12 Mar 2014 17:30:26 +0100
+Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
+In-Reply-To: <CAPvkgC1sphjikAaUXSEyRMiQ+wDNwgTw-mhL++DzBLGBqMdtTg@mail.gmail.com>
+References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+ <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
+ <20140312141800.GD27965@twins.programming.kicks-ass.net>
+ <CAPvkgC1sphjikAaUXSEyRMiQ+wDNwgTw-mhL++DzBLGBqMdtTg@mail.gmail.com>
+Message-ID: <20140312163026.GI27965@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On Wed, Mar 12, 2014 at 04:20:15PM +0000, Steve Capper wrote:
+> On 12 March 2014 14:18, Peter Zijlstra <peterz@infradead.org> wrote:
+> > Since you just went through the trouble of enabling RCU pagetable
+> > freeing, you might also replace these local_irq_save/restore with
+> > rcu_read_{,un}lock().
+> 
+> Hi Peter,
+> This critical section also needs to block the THP splitting code. At
+> the moment an IPI is broadcast in pmdp_splitting_flush. I'm not sure
+> how to adapt that to block on an rcu_read_lock, I'll have a think.
 
-When using dt resources retrieval (interrupts and reg properties) there is
-no predefined order for these resources in the platform dev resource
-table. Also don't expect the number of resource to be always 2.
+Ah, I've not looked at THP much at all.
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> # 3.4
----
- drivers/usb/gadget/at91_udc.c | 10 ----------
- 1 file changed, 10 deletions(-)
-
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index cea8c20a1425..1926925a52a9 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1709,16 +1709,6 @@ static int at91udc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	if (pdev->num_resources != 2) {
--		DBG("invalid num_resources\n");
--		return -ENODEV;
--	}
--	if ((pdev->resource[0].flags != IORESOURCE_MEM)
--			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
--		DBG("invalid resource type\n");
--		return -ENODEV;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
--- 
-1.8.2.2
+Would it be sufficient to make sure to fail the pmd get_page()
+equivalent early enough?
