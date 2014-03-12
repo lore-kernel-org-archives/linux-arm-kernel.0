@@ -1,28 +1,90 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 12 Mar 2014 21:54:48 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzNdIHNwaTogcHNkZXY6IGFkZCBwYXNzaXZlIHNlcmlh?=
- =?UTF-8?B?bCBkcml2ZXI=?=
-In-Reply-To: <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1394646888.880576709@f181.i.mail.ru>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Mar 2014 19:02:05 +0100
+Subject: [GIT PULL] at91: cleanup for 3.15 #1
+Message-ID: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 12 ????? 2014, 16:53 +01:00 ?? Michael Grzeschik <m.grzeschik@pengutronix.de>:
-> This patch introduces the psdev driver. It is used to communicate to an
-> Altera passive serial connected FPGA by writing into an character
-> device.
-> 
-> It simply initates the protocol on open and clocks the data into the
-> FPGA by using the underlying SPI bus on write. The used SPI bus can also
-> be an bitbang SPI bus. On close it will check for the response of the
-> FPGA and tells if the write process was successful.
+Arnd, Olof, Kevin,
 
-As a suggestion, I want to advise you to use GPIO functions based on
-descriptors (xx_gpiod_xx()) for the new drivers.
-This will simplify code a bit, allows you to use the driver for non-DT boards
-without creating any new global headers for platform_data and eliminate
-the possible confusion with active levels for these GPIOs in the future.
+This is the first AT91 pull-request for 3.15, and a cleanup one. The most of it
+is the conversion of two more Atmel SoCs to Device Tree. These are older that
+the ones already converted. Moreover, they already use the CCF so there is no
+need to come back on this later (maybe to remove some code when the other
+non-DT boards are converted as well).
+The defconfig update was needed because they were pretty old and some
+interesting options were missing.
 
----
+Thanks, best regards,
+
+The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+
+  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+
+for you to fetch changes up to 050208dfd0d725c307e6ad3442d9f809501091cd:
+
+  ARM: at91: add PWM clock (2014-03-12 18:23:45 +0100)
+
+----------------------------------------------------------------
+First batch of AT91 cleanup for 3.15
+- some updates on the defconfig front
+- two SoCs converted to Device Tree: sam9261 and sam9rl
+  (with use of CCF!)
+- a little PWM clock update that goes on top of this
+
+----------------------------------------------------------------
+Alexandre Belloni (11):
+      ARM: at91/defconfig: refresh at91sam9rl_defconfig
+      ARM: at91/defconfig: remove useless configuration in at91sam9260_9g20_defconfig
+      ARM: at91/defconfig: refresh at91sam9260_9g20_defconfig
+      ARM: at91: prepare at91sam9rl DT transition
+      ARM: at91: Add at91sam9rl DT SoC support
+      ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
+      ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
+      ARM: at91: prepare common clk transition for sam9rl SoCs
+      ARM: at91/dt: define at91sam9rl clocks
+      ARM: at91/dt: define main clk frequency of at91sam9rlek
+      ARM: at91: switch sam9rl to common clock framework
+
+Bo Shen (1):
+      ARM: at91: add PWM clock
+
+Boris BREZILLON (1):
+      ARM: at91: prepare sam9 dt boards transition to common clk
+
+Jean-Jacques Hiblot (6):
+      ARM: at91: dt: Add at91sam9261 dt SoC support
+      ARM: at91: dt: defconfig: Added the sam9261 to the list of DT-enabled SOCs
+      ARM: at91: dt: sam9261: Device Tree support for the at91sam9261ek
+      ARM: at91: updated the at91_dt_defconfig with support for the ADS7846
+      ARM: at91: prepare common clk transition for sam9261 SoC
+      ARM: at91: move sam9261 SoC to common clk
+
+ arch/arm/boot/dts/Makefile                  |   4 +
+ arch/arm/boot/dts/at91sam9261.dtsi          | 735 +++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9261ek.dts         | 211 ++++++++
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 802 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9rlek.dts          | 157 ++++++
+ arch/arm/configs/at91_dt_defconfig          |   3 +
+ arch/arm/configs/at91sam9260_9g20_defconfig |   9 +-
+ arch/arm/configs/at91sam9rl_defconfig       |  10 +-
+ arch/arm/mach-at91/Kconfig                  |   2 -
+ arch/arm/mach-at91/at91sam9261.c            |  25 +-
+ arch/arm/mach-at91/at91sam9263.c            |   1 +
+ arch/arm/mach-at91/at91sam9g45.c            |   1 +
+ arch/arm/mach-at91/at91sam9n12.c            |   1 +
+ arch/arm/mach-at91/at91sam9rl.c             |  24 +-
+ arch/arm/mach-at91/at91sam9x5.c             |   1 +
+ arch/arm/mach-at91/board-dt-sam9.c          |  11 +-
+ 16 files changed, 1981 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+
+-- 
+Nicolas Ferre
