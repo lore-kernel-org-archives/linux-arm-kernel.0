@@ -1,309 +1,76 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 12 Mar 2014 19:07:37 +0100
-Subject: [PATCH v3 2/9] mtd: nand: add ONFI timing mode to nand_timings
- converter
+Date: Wed, 12 Mar 2014 19:07:36 +0100
+Subject: =?UTF-8?q?=5BPATCH=20v3=201/9=5D=20mtd=3A=20nand=3A=20define=20struct=20nand=5Ftimings?=
 In-Reply-To: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1394647664-8258-3-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1394647664-8258-2-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a converter to retrieve NAND timings from an ONFI NAND timing mode.
-This only support SDR NAND timings for now.
+Define a struct containing the standard NAND timings as described in NAND
+datasheets.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- drivers/mtd/nand/Makefile       |    2 +-
- drivers/mtd/nand/nand_timings.c |  248 +++++++++++++++++++++++++++++++++++++++
- include/linux/mtd/nand.h        |    4 +
- 3 files changed, 253 insertions(+), 1 deletion(-)
- create mode 100644 drivers/mtd/nand/nand_timings.c
+ include/linux/mtd/nand.h |   49 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-index c970ce7..0b8a822 100644
---- a/drivers/mtd/nand/Makefile
-+++ b/drivers/mtd/nand/Makefile
-@@ -2,7 +2,7 @@
- # linux/drivers/nand/Makefile
- #
- 
--obj-$(CONFIG_MTD_NAND)			+= nand.o
-+obj-$(CONFIG_MTD_NAND)			+= nand.o nand_timings.o
- obj-$(CONFIG_MTD_NAND_ECC)		+= nand_ecc.o
- obj-$(CONFIG_MTD_NAND_BCH)		+= nand_bch.o
- obj-$(CONFIG_MTD_NAND_IDS)		+= nand_ids.o nand_hynix.o
-diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-new file mode 100644
-index 0000000..f66fe95
---- /dev/null
-+++ b/drivers/mtd/nand/nand_timings.c
-@@ -0,0 +1,248 @@
-+/*
-+ *  Copyright (C) 2014 Boris BREZILLON <b.brezillon.dev@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/mtd/nand.h>
-+
-+static const struct nand_sdr_timings onfi_sdr_timings[] = {
-+	/* Mode 0 */
-+	{
-+		.tADL_min = 200000,
-+		.tALH_min = 20000,
-+		.tALS_min = 50000,
-+		.tAR_min = 25000,
-+		.tCEA_max = 100000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 20000,
-+		.tCHZ_max = 100000,
-+		.tCLH_min = 20000,
-+		.tCLR_min = 20000,
-+		.tCLS_min = 50000,
-+		.tCOH_min = 0,
-+		.tCS_min = 70000,
-+		.tDH_min = 20000,
-+		.tDS_min = 40000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 10000,
-+		.tITC_max = 1000000,
-+		.tRC_min = 100000,
-+		.tREA_max = 40000,
-+		.tREH_min = 30000,
-+		.tRHOH_min = 0,
-+		.tRHW_min = 200000,
-+		.tRHZ_max = 200000,
-+		.tRLOH_min = 0,
-+		.tRP_min = 50000,
-+		.tRST_max = 250000000000,
-+		.tWB_max = 200000,
-+		.tRR_min = 40000,
-+		.tWC_min = 100000,
-+		.tWH_min = 30000,
-+		.tWHR_min = 120000,
-+		.tWP_min = 50000,
-+		.tWW_min = 100000,
-+	},
-+	/* Mode 1 */
-+	{
-+		.tADL_min = 100000,
-+		.tALH_min = 10000,
-+		.tALS_min = 25000,
-+		.tAR_min = 10000,
-+		.tCEA_max = 45000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 10000,
-+		.tCHZ_max = 50000,
-+		.tCLH_min = 10000,
-+		.tCLR_min = 10000,
-+		.tCLS_min = 25000,
-+		.tCOH_min = 15000,
-+		.tCS_min = 35000,
-+		.tDH_min = 10000,
-+		.tDS_min = 20000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 0,
-+		.tITC_max = 1000000,
-+		.tRC_min = 50000,
-+		.tREA_max = 30000,
-+		.tREH_min = 15000,
-+		.tRHOH_min = 15000,
-+		.tRHW_min = 100000,
-+		.tRHZ_max = 100000,
-+		.tRLOH_min = 0,
-+		.tRP_min = 25000,
-+		.tRR_min = 20000,
-+		.tRST_max = 500000000,
-+		.tWB_max = 100000,
-+		.tWC_min = 45000,
-+		.tWH_min = 15000,
-+		.tWHR_min = 80000,
-+		.tWP_min = 25000,
-+		.tWW_min = 100000,
-+	},
-+	/* Mode 2 */
-+	{
-+		.tADL_min = 100000,
-+		.tALH_min = 10000,
-+		.tALS_min = 15000,
-+		.tAR_min = 10000,
-+		.tCEA_max = 30000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 10000,
-+		.tCHZ_max = 50000,
-+		.tCLH_min = 10000,
-+		.tCLR_min = 10000,
-+		.tCLS_min = 15000,
-+		.tCOH_min = 15000,
-+		.tCS_min = 25000,
-+		.tDH_min = 5000,
-+		.tDS_min = 15000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 0,
-+		.tITC_max = 1000000,
-+		.tRC_min = 35000,
-+		.tREA_max = 25000,
-+		.tREH_min = 15000,
-+		.tRHOH_min = 15000,
-+		.tRHW_min = 100000,
-+		.tRHZ_max = 100000,
-+		.tRLOH_min = 0,
-+		.tRR_min = 20000,
-+		.tRST_max = 500000000,
-+		.tWB_max = 100000,
-+		.tRP_min = 17000,
-+		.tWC_min = 35000,
-+		.tWH_min = 15000,
-+		.tWHR_min = 80000,
-+		.tWP_min = 17000,
-+		.tWW_min = 100000,
-+	},
-+	/* Mode 3 */
-+	{
-+		.tADL_min = 100000,
-+		.tALH_min = 5000,
-+		.tALS_min = 10000,
-+		.tAR_min = 10000,
-+		.tCEA_max = 25000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 5000,
-+		.tCHZ_max = 50000,
-+		.tCLH_min = 5000,
-+		.tCLR_min = 10000,
-+		.tCLS_min = 10000,
-+		.tCOH_min = 15000,
-+		.tCS_min = 25000,
-+		.tDH_min = 5000,
-+		.tDS_min = 10000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 0,
-+		.tITC_max = 1000000,
-+		.tRC_min = 30000,
-+		.tREA_max = 20000,
-+		.tREH_min = 10000,
-+		.tRHOH_min = 15000,
-+		.tRHW_min = 100000,
-+		.tRHZ_max = 100000,
-+		.tRLOH_min = 0,
-+		.tRP_min = 15000,
-+		.tRR_min = 20000,
-+		.tRST_max = 500000000,
-+		.tWB_max = 100000,
-+		.tWC_min = 30000,
-+		.tWH_min = 10000,
-+		.tWHR_min = 80000,
-+		.tWP_min = 15000,
-+		.tWW_min = 100000,
-+	},
-+	/* Mode 4 */
-+	{
-+		.tADL_min = 70000,
-+		.tALH_min = 5000,
-+		.tALS_min = 10000,
-+		.tAR_min = 10000,
-+		.tCEA_max = 25000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 5000,
-+		.tCHZ_max = 30000,
-+		.tCLH_min = 5000,
-+		.tCLR_min = 10000,
-+		.tCLS_min = 10000,
-+		.tCOH_min = 15000,
-+		.tCS_min = 20000,
-+		.tDH_min = 5000,
-+		.tDS_min = 10000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 0,
-+		.tITC_max = 1000000,
-+		.tRC_min = 25000,
-+		.tREA_max = 20000,
-+		.tREH_min = 10000,
-+		.tRHOH_min = 15000,
-+		.tRHW_min = 100000,
-+		.tRHZ_max = 100000,
-+		.tRLOH_min = 5000,
-+		.tRP_min = 12000,
-+		.tRR_min = 20000,
-+		.tRST_max = 500000000,
-+		.tWB_max = 100000,
-+		.tWC_min = 25000,
-+		.tWH_min = 10000,
-+		.tWHR_min = 80000,
-+		.tWP_min = 12000,
-+		.tWW_min = 100000,
-+	},
-+	/* Mode 5 */
-+	{
-+		.tADL_min = 70000,
-+		.tALH_min = 5000,
-+		.tALS_min = 10000,
-+		.tAR_min = 10000,
-+		.tCEA_max = 25000,
-+		.tCEH_min = 20000,
-+		.tCH_min = 5000,
-+		.tCHZ_max = 30000,
-+		.tCLH_min = 5000,
-+		.tCLR_min = 10000,
-+		.tCLS_min = 10000,
-+		.tCOH_min = 15000,
-+		.tCS_min = 15000,
-+		.tDH_min = 5000,
-+		.tDS_min = 7000,
-+		.tFEAT_max = 1000000,
-+		.tIR_min = 0,
-+		.tITC_max = 1000000,
-+		.tRC_min = 20000,
-+		.tREA_max = 16000,
-+		.tREH_min = 7000,
-+		.tRHOH_min = 15000,
-+		.tRHW_min = 100000,
-+		.tRHZ_max = 100000,
-+		.tRLOH_min = 5000,
-+		.tRP_min = 10000,
-+		.tRR_min = 20000,
-+		.tRST_max = 500000000,
-+		.tWB_max = 100000,
-+		.tWC_min = 20000,
-+		.tWH_min = 7000,
-+		.tWHR_min = 80000,
-+		.tWP_min = 10000,
-+		.tWW_min = 100000,
-+	},
-+};
-+
-+/**
-+ * onfi_async_timing_mode_to_sdr_timings - [NAND Interface] Retrieve NAND
-+ * timings according to the given ONFI timing mode
-+ * @mode: ONFI timing mode
-+ */
-+const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode)
-+{
-+	if (mode < 0 || mode > ARRAY_SIZE(onfi_sdr_timings))
-+		return ERR_PTR(-EINVAL);
-+
-+	return &onfi_sdr_timings[mode];
-+}
-+EXPORT_SYMBOL(onfi_async_timing_mode_to_sdr_timings);
 diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index f3ff3a3..b8e3c2b 100644
+index 389b3c5..f3ff3a3 100644
 --- a/include/linux/mtd/nand.h
 +++ b/include/linux/mtd/nand.h
-@@ -847,6 +847,7 @@ static inline bool nand_is_slc(struct nand_chip *chip)
+@@ -846,4 +846,53 @@ static inline bool nand_is_slc(struct nand_chip *chip)
+ {
  	return chip->bits_per_cell == 1;
  }
- 
 +
- /**
-  * struct nand_sdr_timings - SDR NAND chip timings
-  *
-@@ -895,4 +896,7 @@ struct nand_sdr_timings {
- 	u32 tWW_min;
- };
- 
-+/* convert an ONFI timing mode to its timing characteristics. */
-+const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
++/**
++ * struct nand_sdr_timings - SDR NAND chip timings
++ *
++ * This struct defines the timing requirements of a SDR NAND chip.
++ * These informations can be found in every NAND datasheets and the timings
++ * meaning are described in the ONFI specifications:
++ * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf? (chapter 4.15 Timing
++ * Parameters)
++ *
++ */
++
++struct nand_sdr_timings {
++	u32 tALH_min;
++	u32 tADL_min;
++	u32 tALS_min;
++	u32 tAR_min;
++	u32 tCEA_max;
++	u32 tCEH_min;
++	u32 tCH_min;
++	u32 tCHZ_max;
++	u32 tCLH_min;
++	u32 tCLR_min;
++	u32 tCLS_min;
++	u32 tCOH_min;
++	u32 tCS_min;
++	u32 tDH_min;
++	u32 tDS_min;
++	u32 tFEAT_max;
++	u32 tIR_min;
++	u32 tITC_max;
++	u32 tRC_min;
++	u32 tREA_max;
++	u32 tREH_min;
++	u32 tRHOH_min;
++	u32 tRHW_min;
++	u32 tRHZ_max;
++	u32 tRLOH_min;
++	u32 tRP_min;
++	u32 tRR_min;
++	u64 tRST_max;
++	u32 tWB_max;
++	u32 tWC_min;
++	u32 tWH_min;
++	u32 tWHR_min;
++	u32 tWP_min;
++	u32 tWW_min;
++};
 +
  #endif /* __LINUX_MTD_NAND_H */
 -- 
