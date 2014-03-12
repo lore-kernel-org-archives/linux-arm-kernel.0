@@ -1,76 +1,61 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 12 Mar 2014 09:55:53 -0300
-Subject: [PATCH 2/2] ARM: dts: imx25-pdk: Add CAN support
-In-Reply-To: <1394628953-26788-1-git-send-email-fabio.estevam@freescale.com>
-References: <1394628953-26788-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1394628953-26788-2-git-send-email-fabio.estevam@freescale.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 12 Mar 2014 13:59:50 +0100
+Subject: [PATCH v5 3/9] at91: pinctrl: don't request GPIOs used for
+ interrupts but lock them as IRQ
+In-Reply-To: <1393841162-25339-4-git-send-email-jjhiblot@traphandler.com>
+References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
+ <1393841162-25339-4-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <53205A46.6000304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx25-pdk.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Hi JJ,
 
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index 9507365..c6fa7ed 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -52,6 +52,14 @@
- 			regulator-max-microvolt = <3300000>;
- 		};
- 
-+		reg_can_3v3: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "can-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio4 6 0>;
-+		};
- 	};
- 
- 	sound {
-@@ -75,6 +83,13 @@
- 	status = "okay";
- };
- 
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_can1>;
-+	xceiver-supply = <&reg_can_3v3>;
-+	status = "okay";
-+};
-+
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
-@@ -109,6 +124,12 @@
- 
- &iomuxc {
- 	imx25-pdk {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				MX25_PAD_D14__D14    0x80000000
-+			>;
-+		};
-+
- 		pinctrl_audmux: audmuxgrp {
- 			fsl,pins = <
- 				MX25_PAD_RW__AUD4_TXFS			0xe0
-@@ -118,6 +139,13 @@
- 			>;
- 		};
- 
-+		pinctrl_can1: can1grp {
-+			fsl,pins = <
-+				MX25_PAD_GPIO_A__CAN1_TX		0x0
-+				MX25_PAD_GPIO_B__CAN1_RX		0x0
-+			>;
-+		};
-+
- 		pinctrl_esdhc1: esdhc1grp {
- 			fsl,pins = <
- 				MX25_PAD_SD1_CMD__SD1_CMD		0x80000000
--- 
-1.8.1.2
+IIRC this patch was necessary for the DM9000 device, which is not defined
+in this series anymore.
+And, correct me if I'm wrong, but there's still a discussion about how
+this should be fixed properly (https://lkml.org/lkml/2014/2/25/388).
+
+As a result, shouldn't we remove this patch from this series ?
+
+Best Regards,
+
+Boris
+
+Le 03/03/2014 11:05, Jean-Jacques Hiblot a ?crit :
+> During the xlate stage of the DT interrupt parsing, the at91 pinctrl driver
+> requests the GPIOs that are described as interrupt sources. This prevents a
+> driver to request the gpio later to get its electrical value.
+> This patch replaces the gpio_request with a gpio_lock_as_irq to prevent the
+> gpio to be set as an ouput while allowing a subsequent gpio_request to succeed
+>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   drivers/pinctrl/pinctrl-at91.c | 5 ++---
+>   1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index d990e33..db55b96 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1478,18 +1478,17 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
+>   {
+>   	struct at91_gpio_chip *at91_gpio = d->host_data;
+>   	int ret;
+> -	int pin = at91_gpio->chip.base + intspec[0];
+>   
+>   	if (WARN_ON(intsize < 2))
+>   		return -EINVAL;
+>   	*out_hwirq = intspec[0];
+>   	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>   
+> -	ret = gpio_request(pin, ctrlr->full_name);
+> +	ret = gpio_lock_as_irq(&at91_gpio->chip, intspec[0]);
+>   	if (ret)
+>   		return ret;
+>   
+> -	ret = gpio_direction_input(pin);
+> +	ret = at91_gpio_direction_input(&at91_gpio->chip, intspec[0]);
+>   	if (ret)
+>   		return ret;
+>   
