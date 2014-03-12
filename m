@@ -1,55 +1,70 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Mar 2014 12:27:36 +0900
-Subject: [PATCH 3/5] ARM: dts: exynos4x12: Add GPS_ALIVE power domain
-In-Reply-To: <531F0154.9040409@samsung.com>
+Date: Wed, 12 Mar 2014 12:31:55 +0900
+Subject: [PATCH 1/5] ARM: dts: exynos4x12: Add ADC's dt data to read raw
+ data
+In-Reply-To: <531EFF7F.9010405@samsung.com>
 References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
- <1394524494-30641-4-git-send-email-cw00.choi@samsung.com>
- <531F0154.9040409@samsung.com>
-Message-ID: <531FD428.4000008@samsung.com>
+ <1394524494-30641-2-git-send-email-cw00.choi@samsung.com>
+ <531EFF7F.9010405@samsung.com>
+Message-ID: <531FD52B.8040007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
-On 03/11/2014 09:28 PM, Tomasz Figa wrote:
+On 03/11/2014 09:20 PM, Tomasz Figa wrote:
 > Hi Chanwoo,
 > 
 > On 11.03.2014 08:54, Chanwoo Choi wrote:
->> This patch add GPS_ALIVE power domain for Exynos4x12 SoC. GPS_ALIVE power domain
->> include GPS_BLK for GPS IP. Exynos SoC used generic power-domain driver to
->> control power domain. After completed kernel booting, Exynos power-domain driver
->> disable un-used power domain to reduce power-consumption/leak.
+>> This patch add ADC(Analog to Digital Converter)'s dt data to get raw data
+>> with IIO subsystem. Usually, ADC is used to check temperature, jack type, and
+>> so on.
 >>
->> If GPS_ALIVE power domain isn't registered to Exynos power-domain driver,
->> happen power-leakage because GPS_ALIVE_CONFIGURATION is default power on state.
+> 
+> 8< ---
+> 
+>> Register map
+>> - <0x126C0000 0x100> : ADC register's base address
+>> - <0x10020718 0x4> : ADC_PHY_CONTROL, TS-ADC control register address
 >>
->> - 0x10023D00 : GPS_ALIVE_CONFIGURATION register address
+>> Clock
+>> - <&clock 326> : ADC clock (clock name :'tsadc')
+>>
+>> Interrupt
+>> - INTG10[3] : ADC for General ADC
+> 
+> --- >8
+> 
+> I don't think there is a need to include such data in commit message. A commit message should say what is done and why it's done (and sometimes how it's done, in case of some complex code being added) and I guess that's all.
+
+OK, I'll remove it on patch description.
+
+> 
 >>
 >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >> ---
->>   arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
->>   1 file changed, 5 insertions(+)
+>>   arch/arm/boot/dts/exynos4x12.dtsi | 12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
 >>
 >> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
->> index 1ec77f6..066eb35 100644
+>> index 5c412aa..5a3e551 100644
 >> --- a/arch/arm/boot/dts/exynos4x12.dtsi
 >> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
->> @@ -41,6 +41,11 @@
->>           compatible = "samsung,exynos4210-pd";
->>           reg = <0x10023CA0 0x20>;
+>> @@ -80,6 +80,18 @@
+>>           };
 >>       };
->> +   
->> +    pd_gps_alive: gps-alive-power-domain at 10023D00 {
->> +        compatible = "samsung,exynos4210-pd";
->> +        reg = <0x10023D00 0x20>;
->> +    };
 >>
+>> +    adc: adc at 126C0000 {
+>> +        compatible = "samsung,exynos-adc-v1";
+>> +        reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>> +        interrupt-parent = <&combiner>;
+>> +        interrupts = <10 3>;
+>> +        clocks = <&clock 326>;
 > 
-> Exynos4210 seems to have this power domain as well, so I guess this change should be done to exynos4.dtsi instead.
+> Please use clock macros instead of numbers, as introduced by Andrzej Hajda's patches merged to Kgene's tree.
 > 
-
-You are right. I will modify it.
+OK, I'll modify it.
 
 Thanks,
 Chanwoo Choi
