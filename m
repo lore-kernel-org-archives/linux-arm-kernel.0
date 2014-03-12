@@ -1,58 +1,57 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 12 Mar 2014 13:40:17 +0000
-Subject: [RFC PATCH V3 0/6] get_user_pages_fast for ARM and ARM64
-Message-ID: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+Date: Wed, 12 Mar 2014 13:40:22 +0000
+Subject: [RFC PATCH V3 5/6] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1394631623-17883-6-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-This RFC series implements get_user_pages_fast and __get_user_pages_fast.
-These are required for Transparent HugePages to function correctly, as
-a futex on a THP tail will otherwise result in an infinite loop (due to
-the core implementation of __get_user_pages_fast always returning 0).
-This series may also be beneficial for direct-IO heavy workloads and
-certain KVM workloads.
+In order to implement fast_get_user_pages we need to ensure that the
+page table walker is protected from page table pages being freed from
+under it.
 
-The main changes since RFC V2 are:
- * pte_special logic added to the fast_gup.
- * mmu_gather in arm64 replaced entirely by core implementation.
- * arm and arm64 both reference the same gup.c to prevent code
-   duplication (I'm not sure how much of a good idea that is).
+This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
+to address spaces with multiple users will be call_rcu_sched freed.
+Meaning that disabling interrupts will block the free and protect the
+fast gup page walker.
 
-I have tested the series using the Fast Model for ARM64 and an Arndale
-Board. This series applies to 3.14-rc6 with one additional patch from
-Will Deacon that is currently in Linux next:
- 1971188 ARM: 7985/1: mm: implement pte_accessible for faulting mappings
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/Kconfig           | 1 +
+ arch/arm64/include/asm/tlb.h | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc..6185f95 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -38,6 +38,7 @@ config ARM64
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
++	select HAVE_RCU_TABLE_FREE
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 72cadf5..58a8b78 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -22,6 +22,14 @@
  
-Again, I would really appreciate any comments and/or testers!
-
-Cheers,
---
-Steve
-
-Catalin Marinas (1):
-  arm64: Convert asm/tlb.h to generic mmu_gather
-
-Steve Capper (5):
-  arm: mm: Introduce special ptes for LPAE
-  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm: mm: implement get_user_pages_fast
-  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm64: mm: Activate get_user_pages_fast for arm64
-
- arch/arm/Kconfig                      |   1 +
- arch/arm/include/asm/pgtable-2level.h |   2 +
- arch/arm/include/asm/pgtable-3level.h |  14 ++
- arch/arm/include/asm/pgtable.h        |   3 -
- arch/arm/include/asm/tlb.h            |  38 ++++-
- arch/arm/mm/Makefile                  |   1 +
- arch/arm/mm/gup.c                     | 299 ++++++++++++++++++++++++++++++++++
- arch/arm64/Kconfig                    |   1 +
- arch/arm64/include/asm/pgtable.h      |   6 +
- arch/arm64/include/asm/tlb.h          | 140 +++-------------
- arch/arm64/mm/Makefile                |   4 +-
- 11 files changed, 389 insertions(+), 120 deletions(-)
- create mode 100644 arch/arm/mm/gup.c
-
+ #include <asm-generic/tlb.h>
+ 
++#include <linux/pagemap.h>
++#include <linux/swap.h>
++
++static inline void __tlb_remove_table(void *_table)
++{
++	free_page_and_swap_cache((struct page *)_table);
++}
++
+ /*
+  * There's three ways the TLB shootdown code is used:
+  *  1. Unmapping a range of vmas.  See zap_page_range(), unmap_region().
 -- 
 1.8.1.4
