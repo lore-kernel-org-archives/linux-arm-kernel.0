@@ -1,35 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Mar 2014 16:48:13 +0100
-Subject: [PATCH] phy: exynos: fix building as a module
-Message-ID: <10501799.dhM9cVfZmk@wuerfel>
+Date: Wed, 12 Mar 2014 16:50:20 +0100
+Subject: [PATCH] ARM: always define CONFIG_PHYS_OFFSET on !MMU
+Message-ID: <4902708.0QMcK2ajbq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The top-level phy-samsung-usb2 driver may be configured as a
-loadable module, which currently causes link errors because
-of the dependency on the exynos{5250,4x12,4210}_usb2_phy_config
-symbol. Solving this could be achieved by exporting these
-symbols, but as the SoC-specific parts of the driver are not
-currently built as modules, it seems better to just link
-everything into one module and avoid the need for the export.
+Starting with 006fa2599bf0 "ARM: fix noMMU kallsyms symbol filtering", we
+use CONFIG_PHYS_OFFSET to calculate PAGE_OFFSET and have that passed
+into kallsyms as the start address.
+
+However, CONFIG_PHYS_OFFSET is defined only for platforms that don't
+set NEED_MACH_MEMORY_H. It is possible to build a noMMU kernel for
+these platforms by setting CONFIG_DRAM_BASE to the same value as the
+PLAT_PHYS_OFFSET. This means we can in fact rely on DRAM_BASE to be
+correct already, and implicitly define PHYS_OFFSET to the same value.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 2faf78e..7728518 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -13,8 +13,9 @@ obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
- obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
- obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
- obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
--obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-samsung-usb2.o
--obj-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
--obj-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
--obj-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
-+obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
-+phy-exynos-usb2-y			+= phy-samsung-usb2.o
-+phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
-+phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
-+phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
- obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 72129f3..67314cb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -271,7 +271,7 @@ config NEED_MACH_MEMORY_H
+ 
+ config PHYS_OFFSET
+ 	hex "Physical address of main memory" if MMU
+-	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
++	depends on (!ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H) || !MMU
+ 	default DRAM_BASE if !MMU
+ 	help
+ 
