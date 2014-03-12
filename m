@@ -1,32 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Mar 2014 16:50:20 +0100
-Subject: [PATCH] ARM: always define CONFIG_PHYS_OFFSET on !MMU
-Message-ID: <4902708.0QMcK2ajbq@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 12 Mar 2014 10:48:50 -0500
+Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
+Message-ID: <1394639330-1288-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with 006fa2599bf0 "ARM: fix noMMU kallsyms symbol filtering", we
-use CONFIG_PHYS_OFFSET to calculate PAGE_OFFSET and have that passed
-into kallsyms as the start address.
+Currently, even when building keystone only
+kernel builds, DTB won't get build because
+we lack a Makefile rule to get it compiled.
 
-However, CONFIG_PHYS_OFFSET is defined only for platforms that don't
-set NEED_MACH_MEMORY_H. It is possible to build a noMMU kernel for
-these platforms by setting CONFIG_DRAM_BASE to the same value as the
-PLAT_PHYS_OFFSET. This means we can in fact rely on DRAM_BASE to be
-correct already, and implicitly define PHYS_OFFSET to the same value.
+This patch adds that rule so mainline kernel
+users have a chance to use up-to-date DTB on
+keystone 2 platforms.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 72129f3..67314cb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -271,7 +271,7 @@ config NEED_MACH_MEMORY_H
- 
- config PHYS_OFFSET
- 	hex "Physical address of main memory" if MMU
--	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
-+	depends on (!ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H) || !MMU
- 	default DRAM_BASE if !MMU
- 	help
- 
+note that I just tried this on top of linux-next
+(commit 69d5cdda16b3c9767b82d80b07edb9bb056448e3)
+and, even though dtb builds fine, I still couldn't
+get keystone_defconfig uImage to boot fine.
+
+It's probably my LOADADDR which is wrong.
+
+Santosh, what's the LOADADDR I should be using
+for keystone boots ?
+
+ arch/arm/boot/dts/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ae208a6..52c5231 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -82,6 +82,7 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+ 	ecx-2000.dtb
+ dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+ 	integratorcp.dtb
++dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb
+ kirkwood := \
+ 	kirkwood-b3.dtb \
+ 	kirkwood-cloudbox.dtb \
+-- 
+1.9.0.167.g384364b
