@@ -1,87 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Mar 2014 08:59:00 +0100
-Subject: [PATCH for 3.14] ARM: at91: fix network interface ordering for
- sama5d36
-In-Reply-To: <366E83ED-36B1-469F-891C-5B0E8916D85A@jcrosoft.com>
-References: <1394462238-22313-1-git-send-email-nicolas.ferre@atmel.com>
- <366E83ED-36B1-469F-891C-5B0E8916D85A@jcrosoft.com>
-Message-ID: <532013C4.1000107@atmel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 12 Mar 2014 10:15:47 +0200
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <532017B3.708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2014 21:56, Jean-Christophe PLAGNIOL-VILLARD :
-> 
-> On Mar 10, 2014, at 10:37 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> 
->> From: Boris BREZILLON <b.brezillon.dev@gmail.com>
->>
->> On the newly introduced sama5d36, Gigabit and 10/100 Ethernet network
->> interfaces are probed in a different order than for the sama5d35.
->> Moreover, users are accustomed to this order in bootloaders and backports
->> for older kernel revisions.
->> So this patch switches DT node order as it is done for the other dual-Ethernet
->> sama5d3 SoC.
->> Better interface numbering which does not depend on DT node order is being
->> developed for stronger interface identification.
-> 
-> twick ethernet enumerating by playing on the DT order is week
+Hi Grant,
 
-Absolutely, that is what I said in the commit message.
-
-> It?s better to introduce a new property
+On 28/02/14 14:20, Tomi Valkeinen wrote:
+> Hi,
 > 
-> linux,ethernet-id or something like or simply rely on other information on the userspace to identify the
-> proper interface
-
-We will rely on the alias number ; It's its purpose, after all. I think
-that Boris already have a preliminary patch for the macb driver.
-
-Bye,
-
-> Nicolas for AT91 keep me in Cc
+> This series is a re-send of
+> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
 > 
-> Best Regards,
-> J.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Olof, Arnd and Kevin,
->>
->> I would like to include this fix in 3.14-final.
->> I do not have anymore patch for an at91-3.14-fixes branch so I only send this
->> single patch to you. Can you still take it?
->>
->> Thanks, best regards,
->>
->> arch/arm/boot/dts/sama5d36.dtsi | 2 +-
->> 1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
->> index 6c31c26e6cc0..db58cad6acd3 100644
->> --- a/arch/arm/boot/dts/sama5d36.dtsi
->> +++ b/arch/arm/boot/dts/sama5d36.dtsi
->> @@ -8,8 +8,8 @@
->>  */
->> #include "sama5d3.dtsi"
->> #include "sama5d3_can.dtsi"
->> -#include "sama5d3_emac.dtsi"
->> #include "sama5d3_gmac.dtsi"
->> +#include "sama5d3_emac.dtsi"
->> #include "sama5d3_lcd.dtsi"
->> #include "sama5d3_mci2.dtsi"
->> #include "sama5d3_tcb1.dtsi"
->> -- 
->> 1.8.2.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'm cc'ing more people, and I want to clarify the contents of the series:
 > 
+> While this has been developed for OMAP, only the first patch is about OMAP
+> bindings. The rest are generic bindings for video components, which can be used
+> on any platform.
 > 
+> The bindings use the V4L2 style video port/endpoint system, described in
+> Documentation/devicetree/bindings/media/video-interfaces.txt, to connect the
+> components. The same port/endpoint bindings are used by Philipp Zabel in his
+> imx-drm patch series.
+
+This series is a piece of bigger series, which brings DT support for
+OMAP display subsystem. This uses the same V4L2 style ports/endpoints as
+has been discussed recently regarding the series from Philipp. It
+doesn't use the helper code from Philipp, but a custom one as Philipp's
+code didn't exist when I made this, and also because I needed extra
+functionality not present in Philipp's series (which aimed to just move
+the current V4L2 code to a common place).
+
+The main concerns with the ports/endpoints has been the optional 'port'
+node for the case where we have a single endpoint, and the
+double-linking of the endpoints.
+
+If I remove the optional 'port' usage from my series, are you ok with me
+proceeding with this series for 3.15, with the double-linked endpoints?
+
+As far as I see, when we come to a conclusion how the linking should be
+made, it's trivial to change the bindings in this series to match it,
+even without needing any compatibility code. I just need to remove the
+other link, and old dts files having double-linking will still work fine.
+
+The reason I want to push this forward asap is that omap4 and omap5 are
+already DT only, and for omap5 we don't have working display without DT
+support for display. For omap4, we have a really hacky way to add
+display support for a few boards, but that is causing major headaches
+and I want to get rid of it.
+
+ Tomi
 
 
--- 
-Nicolas Ferre
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/f3b90cfd/attachment-0001.sig>
