@@ -1,83 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Mar 2014 15:20:26 +0100
-Subject: [PATCH] ARM: at91: sama5d3: get rid of atmel_tsadcc driver
-In-Reply-To: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <53206D2A.1090403@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Mar 2014 15:21:53 +0100
+Subject: [PATCH 1/4] pinctrl: tegra: fix some typos and inconsistencies
+In-Reply-To: <531F3C4E.6040708@wwwdotorg.org>
+References: <1394220137-16351-1-git-send-email-swarren@wwwdotorg.org>
+ <531F3C4E.6040708@wwwdotorg.org>
+Message-ID: <CACRpkda2+hqCF5mojk6qJGj27LGWE2BG55GFo482=GNi0gRGiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/2014 17:29, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Touchscreen support for at91_adc has been introduced so we can get rid of
-> atmel_tsadcc.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Tue, Mar 11, 2014 at 5:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/07/2014 12:22 PM, Stephen Warren wrote:
+>> drive_dev3_pins in pinctrl-tegra114.c wasn't used; delete it.
+>>
+>> pinctrl-tegra124.c had quite a few typos. Fix those.
+>>
+>> pinctrl-tegra124.c had a few mismatches between the *_groups[] ararys
+>> and the function lists in tegra124_groups[]. Fix those.
+>
+> Oops. I appear to have sent this first patch separately a couple days
+> earlier and accidentally included another identical copy of it in this
+> series. This series should have only included patches 2..4.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hehe no problem, I'll check patches 2 thru 4 and
+apply as I go along.
 
-stacked on at91-3.15-dt.
-
-Thanks,
-
-> ---
->  arch/arm/boot/dts/sama5d3.dtsi    |   14 +-------------
->  arch/arm/boot/dts/sama5d3xdm.dtsi |    7 +++----
->  2 files changed, 4 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 3d5faf8..26d7ed5 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -239,7 +239,7 @@
->  			};
->  
->  			adc0: adc at f8018000 {
-> -				compatible = "atmel,at91sam9260-adc";
-> +				compatible = "atmel,at91sam9x5-adc";
->  				reg = <0xf8018000 0x100>;
->  				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
-> @@ -295,18 +295,6 @@
->  				};
->  			};
->  
-> -			tsadcc: tsadcc at f8018000 {
-> -				compatible = "atmel,at91sam9x5-tsadcc";
-> -				reg = <0xf8018000 0x4000>;
-> -				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
-> -				atmel,tsadcc_clock = <300000>;
-> -				atmel,filtering_average = <0x03>;
-> -				atmel,pendet_debounce = <0x08>;
-> -				atmel,pendet_sensitivity = <0x02>;
-> -				atmel,ts_sample_hold_time = <0x0a>;
-> -				status = "disabled";
-> -			};
-> -
->  			i2c2: i2c at f801c000 {
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf801c000 0x4000>;
-> diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> index f9bdde5..0b8f5d1 100644
-> --- a/arch/arm/boot/dts/sama5d3xdm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> @@ -23,10 +23,9 @@
->  			};
->  
->  			adc0: adc at f8018000 {
-> -				status = "disabled";
-> -			};
-> -
-> -			tsadcc: tsadcc at f8018000 {
-> +				atmel,adc-clock-rate = <1000000>;
-> +				atmel,adc-ts-wires = <4>;
-> +				atmel,adc-ts-pressure-threshold = <10000>;
->  				status = "okay";
->  			};
->  
-> 
-
-
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
