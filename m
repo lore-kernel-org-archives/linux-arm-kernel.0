@@ -1,31 +1,35 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 12 Mar 2014 09:32:13 -0700
-Subject: [PATCH v15 3/3] arm64: Add APM X-Gene SoC AHCI SATA host
- controller DTS entries
-In-Reply-To: <20140311165548.GA20776@mtj.dyndns.org>
-References: <1394059489-30706-1-git-send-email-lho@apm.com>
- <1394059489-30706-2-git-send-email-lho@apm.com>
- <1394059489-30706-3-git-send-email-lho@apm.com>
- <1394059489-30706-4-git-send-email-lho@apm.com>
- <20140311124943.GD11477@htj.dyndns.org>
- <CAPw-ZTmBSeOXv5ExVAiSkcU=qH3zHp52eVuGBfYYD=7=sjhVgw@mail.gmail.com>
- <20140311165548.GA20776@mtj.dyndns.org>
-Message-ID: <CAPw-ZT=xX9fi6zV8QFmCDAB7dvoLXSh+s1y_k9G0c44ONRbBOg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Mar 2014 16:34:27 +0000
+Subject: [PATCH 3/3] spi: psdev: add passive serial driver
+In-Reply-To: <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
+References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20140312163427.GV28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 12, 2014 at 04:53:37PM +0100, Michael Grzeschik wrote:
 
->> Kishon didn't applied the PHY DTS patch. Did you first apply the PHY
->> DTS patch? We agreed that you will first pull in the PHY DTS as well
->> as the host controller patches. I don't see any reason why it wouldn't
->> apply if both DTS is applied. I will pull libata/for-3.15 and check
->> out.
->
-> Can you please repost patches to apply on top of the current
-> libata/for-3.15?
->
+> This patch introduces the psdev driver. It is used to communicate to an
+> Altera passive serial connected FPGA by writing into an character
+> device.
+> 
+> It simply initates the protocol on open and clocks the data into the
+> FPGA by using the underlying SPI bus on write. The used SPI bus can also
+> be an bitbang SPI bus. On close it will check for the response of the
+> FPGA and tells if the write process was successful.
 
-I posted v16 yetersday with the PHY DTS merged into the SATA host patches.
-
--Loc
+Having read the above I'm still not entirely sure what this is supposed
+to do.  It sounds like it might be something to do with programming
+FPGAs but that doesn't seem like something for the SPI subsystem, it
+sounds like something for a FPGA handling subsystem.  People keep
+talking about that, there's a bunch of other stuff to integrate with
+there like loading DTs for the downloeaded bitstream.  I'm not sure what
+the status is there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/47cf4251/attachment.sig>
