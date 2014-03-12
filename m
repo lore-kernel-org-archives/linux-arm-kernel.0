@@ -1,36 +1,87 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 12 Mar 2014 12:02:58 -0700
-Subject: [PATCH v3 4/9] tty: xuartps: Print warning in clock notifier
+Date: Wed, 12 Mar 2014 12:02:56 -0700
+Subject: [PATCH v3 2/9] tty: xuartps: Initialize ports according to aliases
 In-Reply-To: <1394650983-24780-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1394650983-24780-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1394650983-24780-5-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1394650983-24780-3-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print a warning if the clock notifier rejects a clock frequency change
-to facilitate debugging (see:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/304329/focus=304379)
+From: Michal Simek <michal.simek@xilinx.com>
 
+Register port numbers according to order in DT aliases.
+If aliases are not defined, order in DT is used.
+If aliases are defined, register port id based
+on that.
+This patch ensures proper ttyPS0/1 assignment.
+
+[soren]: Combined integer declarations in probe(), removed warning message
+if no alias is found.
+
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+The alias is an optional feature. Print a warning if it is not provided
+does not seem appropriate.
+---
+ drivers/tty/serial/xilinx_uartps.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 787a12064fa0..814391038abb 100644
+index b2f929e48ddd..2cd0cd456c7a 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -429,8 +429,10 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
- 		 * frequency.
- 		 */
- 		if (!xuartps_calc_baud_divs(ndata->new_rate, xuartps->baud,
--					&bdiv, &cd, &div8))
-+					&bdiv, &cd, &div8)) {
-+			dev_warn(port->dev, "clock rate change rejected\n");
- 			return NOTIFY_BAD;
-+		}
+@@ -1031,17 +1031,21 @@ static struct uart_port xuartps_port[2];
+  * xuartps_get_port - Configure the port from the platform device resource
+  *			info
+  *
++ * @id: Port id
++ *
+  * Return: a pointer to a uart_port or NULL for failure
+  */
+-static struct uart_port *xuartps_get_port(void)
++static struct uart_port *xuartps_get_port(int id)
+ {
+ 	struct uart_port *port;
+-	int id;
  
- 		spin_lock_irqsave(&xuartps->port->lock, flags);
+-	/* Find the next unused port */
+-	for (id = 0; id < XUARTPS_NR_PORTS; id++)
+-		if (xuartps_port[id].mapbase == 0)
+-			break;
++	/* Try the given port id if failed use default method */
++	if (xuartps_port[id].mapbase != 0) {
++		/* Find the next unused port */
++		for (id = 0; id < XUARTPS_NR_PORTS; id++)
++			if (xuartps_port[id].mapbase == 0)
++				break;
++	}
  
+ 	if (id >= XUARTPS_NR_PORTS)
+ 		return NULL;
+@@ -1329,7 +1333,7 @@ static SIMPLE_DEV_PM_OPS(xuartps_dev_pm_ops, xuartps_suspend, xuartps_resume);
+  */
+ static int xuartps_probe(struct platform_device *pdev)
+ {
+-	int rc;
++	int rc, id;
+ 	struct uart_port *port;
+ 	struct resource *res, *res2;
+ 	struct xuartps *xuartps_data;
+@@ -1380,9 +1384,13 @@ static int xuartps_probe(struct platform_device *pdev)
+ 				&xuartps_data->clk_rate_change_nb))
+ 		dev_warn(&pdev->dev, "Unable to register clock notifier.\n");
+ #endif
++	/* Look for a serialN alias */
++	id = of_alias_get_id(pdev->dev.of_node, "serial");
++	if (id < 0)
++		id = 0;
+ 
+ 	/* Initialize the port structure */
+-	port = xuartps_get_port();
++	port = xuartps_get_port(id);
+ 
+ 	if (!port) {
+ 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
 -- 
 1.9.0.1.g4196000
