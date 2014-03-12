@@ -1,35 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Mar 2014 09:46:21 +0000
-Subject: [PATCH v4 2/5] mfd: add bcm590xx pmu driver
-In-Reply-To: <1394580837-8331-3-git-send-email-mporter@linaro.org>
-References: <1394580837-8331-1-git-send-email-mporter@linaro.org>
- <1394580837-8331-3-git-send-email-mporter@linaro.org>
-Message-ID: <20140312094621.GH5672@lee--X1>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 12 Mar 2014 11:01:44 +0100
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <531F0636.4050608@pengutronix.de>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <531DD2C4.5060109@pengutronix.de>
+ <f1e2f08f-05fc-40d3-8437-4c6817d631cb@AM1EHSMHS010.ehs.local>
+ <531F0636.4050608@pengutronix.de>
+Message-ID: <53203088.2070605@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add a driver for the BCM590xx PMU multi-function devices. The driver
-> initially supports regmap initialization and instantiation of the
-> voltage regulator device function of the PMU.
+On 03/11/2014 01:48 PM, Marc Kleine-Budde wrote:
+> On 03/11/2014 01:34 PM, Appana Durga Kedareswara Rao wrote:
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  drivers/mfd/Kconfig          |  8 ++++
->  drivers/mfd/Makefile         |  1 +
->  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
->  4 files changed, 133 insertions(+)
->  create mode 100644 drivers/mfd/bcm590xx.c
->  create mode 100644 include/linux/mfd/bcm590xx.h
+>>>> diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig index
+>>>> 9e7d95d..b180239 100644
+>>>> --- a/drivers/net/can/Kconfig
+>>>> +++ b/drivers/net/can/Kconfig
+>>>> @@ -125,6 +125,13 @@ config CAN_GRCAN
+>>>>       endian syntheses of the cores would need some modifications on
+>>>>       the hardware level to work.
+>>>>
+>>>> +config CAN_XILINXCAN
+>>>> +   tristate "Xilinx CAN"
+>>>> +   depends on ARCH_ZYNQ || MICROBLAZE
+>>>
+>>> Is Zynq multiarch already?
+>> Discussions are going on this
+>> So the final thing that Fengguang ( fengguang.wu at intel.com)
+>> Proposed is
+>>         config CAN_XILINX
+>>         tristate "Xilinx CAN"
+>>         depends on ARCH_ZYNQ || MICROBLAZE || COMPILE_TEST
+>>         depends on COMMON_CLK && HAS_MMIO  # whatever you need for other architectures
+> 
+>> Are you Ok for this?
+> 
+> You have to fill the 2nd depends on with some sane values, though.
 
-Ah, you fixed the nit.
+This should be that one
+config CAN_XILINX
+         tristate "Xilinx CAN"
+         depends on ARCH_ZYNQ || MICROBLAZE || COMPILE_TEST
+         depends on COMMON_CLK && HAS_IOMEM
 
-Applied this one instead then.
+
+Is there any driver which is in CAN which not use MMIO accesses?
+If not, maybe we should just add dependency to
+
+Thanks,
+Michal
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/ac875dcd/attachment.sig>
