@@ -1,38 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Mar 2014 16:24:18 +0000
-Subject: [PATCH 1/3] spi: bitbang: fix shift for getmosi
-In-Reply-To: <1394639617-26917-2-git-send-email-m.grzeschik@pengutronix.de>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-2-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20140312162418.GU28112@sirena.org.uk>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 12 Mar 2014 16:20:15 +0000
+Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
+In-Reply-To: <20140312141800.GD27965@twins.programming.kicks-ass.net>
+References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+ <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
+ <20140312141800.GD27965@twins.programming.kicks-ass.net>
+Message-ID: <CAPvkgC1sphjikAaUXSEyRMiQ+wDNwgTw-mhL++DzBLGBqMdtTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 04:53:35PM +0100, Michael Grzeschik wrote:
-> The driver needs to shift the word bit after reading the mosi bit.
-> Otherwise the return word will have an Off-by-one bit value.
+On 12 March 2014 14:18, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
+>> +int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
+>> +                       struct page **pages)
+>> +{
+>> +     struct mm_struct *mm = current->mm;
+>> +     unsigned long addr, len, end;
+>> +     unsigned long next, flags;
+>> +     pgd_t *pgdp;
+>> +     int nr = 0;
+>> +
+>> +     start &= PAGE_MASK;
+>> +     addr = start;
+>> +     len = (unsigned long) nr_pages << PAGE_SHIFT;
+>> +     end = start + len;
+>> +
+>> +     if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
+>> +                                     start, len)))
+>> +             return 0;
+>> +
+>> +     /*
+>> +      * Disable interrupts, we use the nested form as we can already
+>> +      * have interrupts disabled by get_futex_key.
+>> +      *
+>> +      * With interrupts disabled, we block page table pages from being
+>> +      * freed from under us. See mmu_gather_tlb in asm-generic/tlb.h
+>> +      * for more details.
+>> +      */
+>> +
+>> +     local_irq_save(flags);
+>> +     pgdp = pgd_offset(mm, addr);
+>> +     do {
+>> +             next = pgd_addr_end(addr, end);
+>> +             if (pgd_none(*pgdp))
+>> +                     break;
+>> +             else if (!gup_pud_range(pgdp, addr, next, write, pages, &nr))
+>> +                     break;
+>> +     } while (pgdp++, addr = next, addr != end);
+>> +     local_irq_restore(flags);
+>> +
+>> +     return nr;
+>> +}
+>
+> Since you just went through the trouble of enabling RCU pagetable
+> freeing, you might also replace these local_irq_save/restore with
+> rcu_read_{,un}lock().
 
-This isn't exactly new code...  do we understand why nobody has noticed
-this before?
+Hi Peter,
+This critical section also needs to block the THP splitting code. At
+the moment an IPI is broadcast in pmdp_splitting_flush. I'm not sure
+how to adapt that to block on an rcu_read_lock, I'll have a think.
 
-> @@ -61,10 +61,10 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
->  		spidelay(nsecs);
->  
->  		/* sample MSB (from slave) on leading edge */
-> -		word <<= 1;
->  		if ((flags & SPI_MASTER_NO_RX) == 0)
->  			word |= getmiso(spi);
->  		setsck(spi, cpol);
-> +		word <<= 1;
->  	}
+Cheers,
+-- 
+Steve
 
-Just looking at the context here it's not obvious to me that this is
-helping - it means that the last bit we read is going to be shifted
-which seems wrong, we ought to be reading into LSB.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/7bbc3eaf/attachment.sig>
+>
+> Typically rcu_read_lock() is faster than disabling interrupts; but I've
+> no clue about ARM.
