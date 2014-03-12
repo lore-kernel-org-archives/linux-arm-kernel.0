@@ -1,43 +1,33 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 12 Mar 2014 20:44:54 +0800
-Subject: [PATCH 2/2] ARM: dts: berlin2q: add the Marvell BG2-Q DMP
- device tree
-In-Reply-To: <20140312123759.GB15090@lunn.ch>
-References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
- <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140312200428.23178d69@xhacker> <20140312123759.GB15090@lunn.ch>
-Message-ID: <20140312204454.36a6be85@xhacker>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Mar 2014 12:39:41 +0000
+Subject: [PATCH 4/5] ahci: st: Only build for ST-Micro h/w
+In-Reply-To: <1394627982-23726-1-git-send-email-lee.jones@linaro.org>
+References: <1394627982-23726-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1394627982-23726-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+This device is designed specifically to run on ST-Microelectronics'
+hardware. To ensure no attempts are made to run on anything incompatible
+we add a dependency on ST architecture
 
-On Wed, 12 Mar 2014 05:37:59 -0700
-Andrew Lunn <andrew@lunn.ch> wrote:
+Suggested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/ata/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> > > +/dts-v1/;
-> > > +#include "berlin2q.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Marvell BG2-Q DMP";
-> > > +	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q",
-> > > "marvell,berlin"; +
-> > > +	memory {
-> > > +		device_type = "memory";
-> > > +		reg = <0x00000000 0x40000000>;
-> > 
-> > The memory size of BG2Q DMP is 2GB.
-> 
-> Jisheng
-> 
-> Does this imply that the RAM is inside the SoC package, and that
-> there is no external memory interface which can be used to add more
-> RAM?
-
-Nope. The ram is on the board. After talking with Alex, I think it's 
-reasonable to put the memory node in dts as the original patch does.
-
-However, we need to set the correct memory size of BG2Q DMP board.
-
-Thanks,
-Jisheng
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index f1adb4b..9b4feb7 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -100,6 +100,7 @@ config SATA_AHCI_PLATFORM
+ config AHCI_ST
+ 	tristate "ST AHCI SATA support"
+ 	depends on SATA_AHCI_PLATFORM
++	depends on ARCH_STI
+ 	help
+ 	  This option enables support for ST AHCI SATA controller.
+ 
+-- 
+1.8.3.2
