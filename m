@@ -1,38 +1,28 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 12 Mar 2014 20:05:26 +0900
-Subject: [PATCH 4/5] ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
-In-Reply-To: <1394573078-20767-5-git-send-email-wsa@the-dreams.de>
-References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
- <1394573078-20767-5-git-send-email-wsa@the-dreams.de>
-Message-ID: <CANqRtoQhi=vgLkYQciJska6XogyiJ1REO6HBOHNsPP3ajbq+Ag@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Wed, 12 Mar 2014 12:06:02 +0100
+Subject: [PATCH 0/2] ARM: add initial support for the Marvell BG2-Q DMP
+Message-ID: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+This serie adds the initial support for the Marvell BG2-Q DMP (part of the
+Berlin family). SoC has nodes for cpu, l2 cache controller, interrupt
+controllers, local timer, apb timers and uarts for now.
 
-On Wed, Mar 12, 2014 at 6:24 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
->
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
-> Note: Adding clocks whilst keeping the current sorting is very likely to
-> break a previously working clock IMO. Imagine adding PCIEC clock inbetween IIC0
-> and IIC1 here. Adding chronologically and grouped by similar function blocks is
-> easier to track. An example addition could then look like:
->
->         R8A7790_CLK_TPU0
->         R8A7790_CLK_SDHI3 R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
->         R8A7790_CLK_MMCIF1 R8A7790_CLK_MMCIF0
->         R8A7790_CLK_CMT1
->         R8A7790_CLK_IIC2 R8A7790_CLK_IIC1 R8A7790_CLK_IIC0
-> +       R8A7790_CLK_PCIEC
+Homepage: http://www.marvell.com/digital-entertainment/armada-1500-pro/
 
-Can you please care to explain a bit more about why you see a risk
-here? Is it a risk for typo or something else?
+Antoine T?nart (2):
+  ARM: dts: berlin2q: add the Marvell Armada 1500 pro (BG2Q) device tree
+  ARM: dts: berlin2q: add the Marvell BG2-Q DMP device tree
 
-It looks to me that this is just a matter about adding the entry at
-the right position in several places.
+ Documentation/arm/Marvell/README                   |   5 +
+ .../devicetree/bindings/arm/marvell,berlin.txt     |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/berlin2q-dmp.dts                 |  32 ++++
+ arch/arm/boot/dts/berlin2q.dtsi                    | 167 +++++++++++++++++++++
+ 5 files changed, 207 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/berlin2q-dmp.dts
+ create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
 
-Thanks,
-
-/ magnus
+-- 
+1.8.3.2
