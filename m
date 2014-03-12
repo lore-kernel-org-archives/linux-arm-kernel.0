@@ -1,36 +1,24 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 12 Mar 2014 09:14:39 -0400
-Subject: [PATCH] ARM: dts: bcm28155-ap: leave camldo1 on to fix reboot
-Message-ID: <1394630079-12063-1-git-send-email-mporter@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Mar 2014 13:14:52 +0000
+Subject: [PATCH 0/4] phy: Introduce support for MiPHY365x
+Message-ID: <1394630096-28564-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM28155-AP board has a bootloader that expects the camldo1
-regulator to be enabled on entry. Currently, the camldo1 regulator
-is disabled when no longer in use as is the case during a reboot /
-warm reset. This causes the early bootloader to hang upon entry. Add
-regulator-always-on to the camldo1 constraint to fix reboot.
+Hi Kishon,
 
-Reported-by: Alex Elder <elder@linaro.org>
-Signed-off-by: Matt Porter <mporter@linaro.org>
----
-[Depends on BCM59056 regulator series dts support:
- http://www.gossamer-threads.com/lists/linux/kernel/1885489]
+Sorry for the delay, the last couple of weeks have been pretty hectic.
+Here is the MiPHY365x patchset complete with all the DT Acks applied.
 
- arch/arm/boot/dts/bcm28155-ap.dts | 1 +
- 1 file changed, 1 insertion(+)
+Kind regards,
+Lee
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 99ff0c1..cc1303c 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -94,6 +94,7 @@
- 		camldo1_reg: camldo1 {
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
- 		};
- 
- 		sdldo_reg: sdldo {
--- 
-1.8.4
+ Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  62 +++++++++++
+ arch/arm/boot/dts/stih416-b2020-revE.dts                |   6 +-
+ arch/arm/boot/dts/stih416-b2020.dts                     |   6 ++
+ arch/arm/boot/dts/stih416.dtsi                          |  14 +++
+ drivers/phy/Kconfig                                     |  10 ++
+ drivers/phy/Makefile                                    |   1 +
+ drivers/phy/phy-miphy365x.c                             | 630 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/phy/phy-miphy365x.h                 |  25 +++++
+ 8 files changed, 753 insertions(+), 1 deletion(-)
