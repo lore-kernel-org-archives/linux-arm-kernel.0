@@ -1,68 +1,56 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 12 Mar 2014 18:29:36 -0300
-Subject: [PATCH 4/6] ARM: mvebu: Add support for NAND controller in
- Armada 38x SoC
-In-Reply-To: <5320D3FD.8010704@cogentembedded.com>
-References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1394637404-7651-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <5320CEE7.6020506@cogentembedded.com>
- <20140312203007.GA7396@arch.cereza>
- <5320D3FD.8010704@cogentembedded.com>
-Message-ID: <20140312212936.GA2384@arch.cereza>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Mar 2014 15:35:47 -0600
+Subject: [PATCH] pinctrl: tegra: fix some mistakes in Tegra124
+Message-ID: <1394660147-9927-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 13, Sergei Shtylyov wrote:
-> On 03/12/2014 11:30 PM, Ezequiel Garcia wrote:
-> 
-> >>>The Armada 38x SoC family has a NAND controller, compatible
-> >>>with the controller in Armada 370/375/XP SoCs. Add support for
-> >>>it in the devicetree file.
-> 
-> >>>Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >>>---
-> >>>  arch/arm/boot/dts/armada-38x.dtsi | 10 ++++++++++
-> >>>  1 file changed, 10 insertions(+)
-> 
-> >>>diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> >>>index 76cc27e..18d8f80 100644
-> >>>--- a/arch/arm/boot/dts/armada-38x.dtsi
-> >>>+++ b/arch/arm/boot/dts/armada-38x.dtsi
-> >>>@@ -345,6 +345,16 @@
-> >>>  				clocks = <&mainpll>;
-> >>>  				clock-output-names = "nand";
-> >>>  			};
-> >>>+
-> >>>+			nand at d0000 {
-> 
-> >>    ePAPR standard [1] tells us:
-> 
-> >>The name of a node should be somewhat generic, reflecting the function of
-> >>the device and not its precise programming model. If appropriate, the name
-> >>should be one of the following choices:
-> 
-> >>[...]
-> >>? flash
-> 
-> >I think 'nand' is generic enough, isn't it?
-> 
->    It is but not more generic than "flash". :-)
-> 
+From: Stephen Warren <swarren@nvidia.com>
 
-Right.
+A couple of pairs of pin group names were swapped in the table. This
+caused the wrong register to be programmed. Luckily, this had little
+effect, if any, since the swapped pins were likely to be programmed
+identically.
 
-> >FWIW, quite a few other SoCs have chosen 'nand' for the node name, including
-> >the other Armada variants. Was this a wrong choice?
-> 
->    I guess. There's a lot of wrong choices now all over the
-> arch/arm/boot/dts/ because people are probably not aware of the necessary
-> documentation such as http://devicetree.org/Device_Tree_Usage (pointing to
-> ePAPR and having a passage on the generic device names too).
-> 
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/pinctrl/pinctrl-tegra124.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-OK, I guess it's fine. Let's try to do things from now on, at least. I'll fix
-this and send a new series.
+diff --git a/drivers/pinctrl/pinctrl-tegra124.c b/drivers/pinctrl/pinctrl-tegra124.c
+index d1ec687ddfff..73773706755b 100644
+--- a/drivers/pinctrl/pinctrl-tegra124.c
++++ b/drivers/pinctrl/pinctrl-tegra124.c
+@@ -1,7 +1,7 @@
+ /*
+  * Pinctrl data for the NVIDIA Tegra124 pinmux
+  *
+- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -1804,8 +1804,8 @@ static const struct tegra_pingroup tegra124_groups[] = {
+        PINGROUP(pu4,                    PWM1,       UARTA,      GMI,          DISPLAYB,    PWM1,       0x3194,  N,  N,  N),
+        PINGROUP(pu5,                    PWM2,       UARTA,      GMI,          DISPLAYB,    PWM2,       0x3198,  N,  N,  N),
+        PINGROUP(pu6,                    PWM3,       UARTA,      RSVD3,        GMI,         RSVD3,      0x319c,  N,  N,  N),
+-       PINGROUP(gen1_i2c_scl_pc4,       I2C1,       RSVD2,      RSVD3,        RSVD4,       I2C1,       0x31a0,  Y,  N,  N),
+-       PINGROUP(gen1_i2c_sda_pc5,       I2C1,       RSVD2,      RSVD3,        RSVD4,       I2C1,       0x31a4,  Y,  N,  N),
++       PINGROUP(gen1_i2c_sda_pc5,       I2C1,       RSVD2,      RSVD3,        RSVD4,       I2C1,       0x31a0,  Y,  N,  N),
++       PINGROUP(gen1_i2c_scl_pc4,       I2C1,       RSVD2,      RSVD3,        RSVD4,       I2C1,       0x31a4,  Y,  N,  N),
+        PINGROUP(dap4_fs_pp4,            I2S3,       GMI,        DTV,          RSVD4,       I2S3,       0x31a8,  N,  N,  N),
+        PINGROUP(dap4_din_pp5,           I2S3,       GMI,        RSVD3,        RSVD4,       I2S3,       0x31ac,  N,  N,  N),
+        PINGROUP(dap4_dout_pp6,          I2S3,       GMI,        DTV,          RSVD4,       I2S3,       0x31b0,  N,  N,  N),
+@@ -1942,8 +1942,8 @@ static const struct tegra_pingroup tegra124_groups[] = {
+        PINGROUP(gpio_w3_aud_pw3,        SPI6,       SPI1,       SPI2,         I2C1,        SPI1,       0x33f0,  N,  N,  N),
+        PINGROUP(usb_vbus_en0_pn4,       USB,        RSVD2,      RSVD3,        RSVD4,       USB,        0x33f4,  Y,  N,  N),
+        PINGROUP(usb_vbus_en1_pn5,       USB,        RSVD2,      RSVD3,        RSVD4,       USB,        0x33f8,  Y,  N,  N),
+-       PINGROUP(sdmmc3_clk_lb_out_pee4, SDMMC3,     RSVD2,      RSVD3,        RSVD4,       SDMMC3,     0x33fc,  N,  N,  N),
+-       PINGROUP(sdmmc3_clk_lb_in_pee5,  SDMMC3,     RSVD2,      RSVD3,        RSVD4,       SDMMC3,     0x3400,  N,  N,  N),
++       PINGROUP(sdmmc3_clk_lb_in_pee5,  SDMMC3,     RSVD2,      RSVD3,        RSVD4,       SDMMC3,     0x33fc,  N,  N,  N),
++       PINGROUP(sdmmc3_clk_lb_out_pee4, SDMMC3,     RSVD2,      RSVD3,        RSVD4,       SDMMC3,     0x3400,  N,  N,  N),
+        PINGROUP(gmi_clk_lb,             SDMMC2,     RSVD2,      GMI,          RSVD4,       SDMMC2,     0x3404,  N,  N,  N),
+        PINGROUP(reset_out_n,            RSVD1,      RSVD2,      RSVD3,        RESET_OUT_N, RSVD1,      0x3408,  N,  N,  N),
+        PINGROUP(kb_row16_pt0,           KBC,        RSVD2,      RSVD3,        UARTC,       KBC,        0x340c,  N,  N,  N),
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.5
