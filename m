@@ -1,58 +1,24 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 12 Mar 2014 15:18:00 +0100
-Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
-In-Reply-To: <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
- <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140312141800.GD27965@twins.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Mar 2014 15:19:06 +0100
+Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value
+ for number of delays
+In-Reply-To: <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
+Message-ID: <CACRpkdYBZKcuyNyD08K00COLXPYd7HRrapNaWLAW9SK7o0OVaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
-> +int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> +			  struct page **pages)
-> +{
-> +	struct mm_struct *mm = current->mm;
-> +	unsigned long addr, len, end;
-> +	unsigned long next, flags;
-> +	pgd_t *pgdp;
-> +	int nr = 0;
-> +
-> +	start &= PAGE_MASK;
-> +	addr = start;
-> +	len = (unsigned long) nr_pages << PAGE_SHIFT;
-> +	end = start + len;
-> +
-> +	if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
-> +					start, len)))
-> +		return 0;
-> +
-> +	/*
-> +	 * Disable interrupts, we use the nested form as we can already
-> +	 * have interrupts disabled by get_futex_key.
-> +	 *
-> +	 * With interrupts disabled, we block page table pages from being
-> +	 * freed from under us. See mmu_gather_tlb in asm-generic/tlb.h
-> +	 * for more details.
-> +	 */
-> +
-> +	local_irq_save(flags);
-> +	pgdp = pgd_offset(mm, addr);
-> +	do {
-> +		next = pgd_addr_end(addr, end);
-> +		if (pgd_none(*pgdp))
-> +			break;
-> +		else if (!gup_pud_range(pgdp, addr, next, write, pages, &nr))
-> +			break;
-> +	} while (pgdp++, addr = next, addr != end);
-> +	local_irq_restore(flags);
-> +
-> +	return nr;
-> +}
+On Wed, Mar 12, 2014 at 9:50 AM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
 
-Since you just went through the trouble of enabling RCU pagetable
-freeing, you might also replace these local_irq_save/restore with
-rcu_read_{,un}lock().
+> This patch replaces the raw values with ARRAY_SIZE for assigning the
+> ninput_delays and noutput_delays fields of STiH416's st_pctl_data struct.
+>
+> CC: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Typically rcu_read_lock() is faster than disabling interrupts; but I've
-no clue about ARM.
+Patch applied!
+
+Yours,
+Linus Walleij
