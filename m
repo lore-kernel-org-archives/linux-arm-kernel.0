@@ -1,45 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 12 Mar 2014 17:30:52 -0300
-Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
-In-Reply-To: <CAOMZO5Dux0Cq9desLAotznLa0=kznFPyPvAHKtida6y3gC6SQQ@mail.gmail.com>
-References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
- <1390410577-22073-4-git-send-email-denis@eukrea.com>
- <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
- <20140312184048.4b6dbb21@e6520eb>
- <CAOMZO5Dux0Cq9desLAotznLa0=kznFPyPvAHKtida6y3gC6SQQ@mail.gmail.com>
-Message-ID: <CAOMZO5Adu=5ymDeYeYU8vCLkR--G2H8s6KJ14RmQs3q4ctzmqQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 13 Mar 2014 00:39:09 +0300
+Subject: [PATCH 4/6] ARM: mvebu: Add support for NAND controller in Armada
+ 38x SoC
+In-Reply-To: <20140312203007.GA7396@arch.cereza>
+References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1394637404-7651-5-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5320CEE7.6020506@cogentembedded.com> <20140312203007.GA7396@arch.cereza>
+Message-ID: <5320D3FD.8010704@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis/Eric,
+On 03/12/2014 11:30 PM, Ezequiel Garcia wrote:
 
-On Wed, Mar 12, 2014 at 3:24 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Eric,
->
-> On Wed, Mar 12, 2014 at 2:40 PM, Eric B?nard <eric@eukrea.com> wrote:
->> Hi Fabio,
->>
->> Le Wed, 12 Mar 2014 14:27:25 -0300,
->> Fabio Estevam <festevam@gmail.com> a ?crit :
->>> Any ideas?
->>>
->> do you drive the signal LCD_EN GPIO3_17 ?
->
-> Good point. Even though I am not touching LCD_EN it is at the correct
-> level of 0.
->
-> I get 3.3V at LCD_VCC and VDD_LCDIO. 5V is present at LCD_5V that
-> drives the backlight.
->
-> So the LCD supplies seem to be good.
->
-> The problem should be in some other area.
+>>> The Armada 38x SoC family has a NAND controller, compatible
+>>> with the controller in Armada 370/375/XP SoCs. Add support for
+>>> it in the devicetree file.
 
-Do you know of a kernel version where imxfb is functional?
+>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>> ---
+>>>   arch/arm/boot/dts/armada-38x.dtsi | 10 ++++++++++
+>>>   1 file changed, 10 insertions(+)
 
-I have tried latest linus tree and booted a non-dt kernel on mx25pdk
-and I get the same white display.
+>>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>>> index 76cc27e..18d8f80 100644
+>>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>>> @@ -345,6 +345,16 @@
+>>>   				clocks = <&mainpll>;
+>>>   				clock-output-names = "nand";
+>>>   			};
+>>> +
+>>> +			nand at d0000 {
 
-Regards,
+>>     ePAPR standard [1] tells us:
 
-Fabio Estevam
+>> The name of a node should be somewhat generic, reflecting the function of
+>> the device and not its precise programming model. If appropriate, the name
+>> should be one of the following choices:
+
+>> [...]
+>> ? flash
+
+> I think 'nand' is generic enough, isn't it?
+
+    It is but not more generic than "flash". :-)
+
+> In any case, it seems sane to distinguish a NAND flash from a NOR flash,
+> from a SPI flash.
+
+    I don't know enough about the SPI flashes but this is only a node name, no 
+more, so I think we can afford to be really generic...
+
+> FWIW, quite a few other SoCs have chosen 'nand' for the node name, including
+> the other Armada variants. Was this a wrong choice?
+
+    I guess. There's a lot of wrong choices now all over the 
+arch/arm/boot/dts/ because people are probably not aware of the necessary 
+documentation such as http://devicetree.org/Device_Tree_Usage (pointing to 
+ePAPR and having a passage on the generic device names too).
+
+WBR, Sergei
