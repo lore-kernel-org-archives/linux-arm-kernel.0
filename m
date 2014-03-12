@@ -1,330 +1,88 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 12 Mar 2014 12:26:36 +0200
-Subject: [PATCH] ARM: OMAP5: Add omap5 DSS related hwmod data
-In-Reply-To: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1394619996-3525-2-git-send-email-tomi.valkeinen@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 12 Mar 2014 11:27:13 +0100
+Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <20140311155057.GJ13293@xsjandreislx>
+References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
+ <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
+ <531DA900.5060202@monstr.eu>
+ <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
+ <531ECA33.8050803@monstr.eu> <20140311155057.GJ13293@xsjandreislx>
+Message-ID: <c7840b9d-4c03-4680-9a0e-fb256f3743b4@AM1EHSMHS010.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Archit Taneja <archit@ti.com>
+On 03/11/2014 04:50 PM, S?ren Brinkmann wrote:
+> On Tue, 2014-03-11 at 09:32AM +0100, Michal Simek wrote:
+>> On 03/10/2014 11:32 PM, S?ren Brinkmann wrote:
+>>> On Mon, 2014-03-10 at 12:58PM +0100, Michal Simek wrote:
+>>>> On 03/10/2014 11:56 AM, Mark Rutland wrote:
+>>>>> On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary Kalluri wrote:
+>>>>>> Added EDAC support for reporting the ecc errors of zynq ddr controller.
+>>>>>> The ddr ecc controller corrects single bit errors and detects double bit
+>>>>>> errors
+>>>>>>
+>>>>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+>>>>>> ---
+>>>>>>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
+>>>>>>  drivers/edac/Kconfig                               |    7 +
+>>>>>>  drivers/edac/Makefile                              |    1 +
+>>>>>>  drivers/edac/zynq_edac.c                           |  613 ++++++++++++++++++++
+>>>>>>  4 files changed, 639 insertions(+), 0 deletions(-)
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/edac/zynq_edac.txt
+>>>>>>  create mode 100644 drivers/edac/zynq_edac.c
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/edac/zynq_edac.txt b/Documentation/devicetree/bindings/edac/zynq_edac.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..c21ff83
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
+>>>>>> @@ -0,0 +1,18 @@
+>>>>>> +Zynq EDAC driver, it does reports the DDR ECC single bit errors that are
+>>>>>> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
+>>>>>> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
+>>>>>
+>>>>> Is this an or or a xor?
+>>>>
+>>>> Compatible string should be just xlnx,zynq-ddrc-1.00.a.
+>>>> Nothing with ps7.
+>>>
+>>> Isn't this vendor IP? IMHO, this should be something completely
+>>> different. Or if you want some Zynq-specific compat string it should
+>>> refer to an actual version string associated with Zynq. 1.00.a is not,
+>>> AFAIK.
+>>
+>> I have checked with Punnaiah that this is Synopsys DDR memory controller.
+>> Zynq is based on 1.4 version with some customization.
+>> It means I think reasonable solution is
+>> call it drivers/edac/synopsys_edac.c
+>> rename zynq_ in driver to synopsys_ and
+>> use xlnx,zynq-ddrc-1.00.a compatible string because zynq is not using
+>> clean synopsys version.
+>>
+>> I am not getting point why you don't like 1.00.a suffix here.
+>> Because of historical point of view compatible strings should be different
+>> for early silicon, silicon v1, silicon v2, silicon v3, etc
+>> but we haven't used it at all that's why we can use xilinx scheme
+>> which we are using for our soft IPs.
+> 
+> Well, but you refer to Zynq which has silicon revisions you can use to
+> refer to a specific Zynq version. That matches data sheets. Zynq-1.00.a
+> is just completely made up and wouldn't be found in any data sheet.
 
-Add hwmod data for dss core, dispc dsi1, dsi2, rfbi and hdmi. It's more or less
-similar to omap4 hwmod data.
+I didn't reply this one but we discussed this with Soren over phone.
+No problem to use Synopsys version A07 according TRM.
 
-Signed-off-by: Archit Taneja <archit@ti.com>
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 283 +++++++++++++++++++++++++++++
- 1 file changed, 283 insertions(+)
+Then compatible string is
+xlnx,zynq-ddrc-A07 and file name is synopsys_edac.c
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index e297d6231c3a..c7d33ae26282 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -334,6 +334,235 @@ static struct omap_hwmod omap54xx_dmic_hwmod = {
- };
- 
- /*
-+ * 'dss' class
-+ * display sub-system
-+ */
-+static struct omap_hwmod_class_sysconfig omap54xx_dss_sysc = {
-+	.rev_offs	= 0x0000,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= SYSS_HAS_RESET_STATUS,
-+};
-+
-+static struct omap_hwmod_class omap54xx_dss_hwmod_class = {
-+	.name	= "dss",
-+	.sysc	= &omap54xx_dss_sysc,
-+	.reset	= omap_dss_reset,
-+};
-+
-+/* dss */
-+static struct omap_hwmod_opt_clk dss_opt_clks[] = {
-+	{ .role = "32khz_clk", .clk = "dss_32khz_clk" },
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+	{ .role = "hdmi_clk", .clk = "dss_48mhz_clk" },
-+};
-+
-+static struct omap_hwmod omap54xx_dss_hwmod = {
-+	.name		= "dss_core",
-+	.class		= &omap54xx_dss_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
-+	.main_clk	= "dss_dss_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_DSS_DSS_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= dss_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_opt_clks),
-+};
-+
-+/*
-+ * 'dispc' class
-+ * display controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_dispc_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_MIDLEMODE |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_dispc_hwmod_class = {
-+	.name	= "dispc",
-+	.sysc	= &omap54xx_dispc_sysc,
-+};
-+
-+/* dss_dispc */
-+static struct omap_hwmod_opt_clk dss_dispc_opt_clks[] = {
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+};
-+
-+/* dss_dispc dev_attr */
-+static struct omap_dss_dispc_dev_attr dss_dispc_dev_attr = {
-+	.has_framedonetv_irq	= 1,
-+	.manager_count		= 4,
-+};
-+
-+static struct omap_hwmod omap54xx_dss_dispc_hwmod = {
-+	.name		= "dss_dispc",
-+	.class		= &omap54xx_dispc_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "dss_dss_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
-+	.opt_clks	= dss_dispc_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_dispc_opt_clks),
-+	.dev_attr	= &dss_dispc_dev_attr,
-+};
-+
-+/*
-+ * 'dsi1' class
-+ * display serial interface controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_dsi1_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_dsi1_hwmod_class = {
-+	.name	= "dsi1",
-+	.sysc	= &omap54xx_dsi1_sysc,
-+};
-+
-+/* dss_dsi1_a */
-+static struct omap_hwmod_opt_clk dss_dsi1_a_opt_clks[] = {
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+};
-+
-+static struct omap_hwmod omap54xx_dss_dsi1_a_hwmod = {
-+	.name		= "dss_dsi1",
-+	.class		= &omap54xx_dsi1_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "dss_dss_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
-+	.opt_clks	= dss_dsi1_a_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_dsi1_a_opt_clks),
-+};
-+
-+/* dss_dsi1_c */
-+static struct omap_hwmod_opt_clk dss_dsi1_c_opt_clks[] = {
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+};
-+
-+static struct omap_hwmod omap54xx_dss_dsi1_c_hwmod = {
-+	.name		= "dss_dsi2",
-+	.class		= &omap54xx_dsi1_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "dss_dss_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
-+	.opt_clks	= dss_dsi1_c_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_dsi1_c_opt_clks),
-+};
-+
-+/*
-+ * 'hdmi' class
-+ * hdmi controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_hdmi_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   SIDLE_SMART_WKUP),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class omap54xx_hdmi_hwmod_class = {
-+	.name	= "hdmi",
-+	.sysc	= &omap54xx_hdmi_sysc,
-+};
-+
-+static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+};
-+
-+static struct omap_hwmod omap54xx_dss_hdmi_hwmod = {
-+	.name		= "dss_hdmi",
-+	.class		= &omap54xx_hdmi_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "dss_48mhz_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
-+	.opt_clks	= dss_hdmi_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_hdmi_opt_clks),
-+};
-+
-+/*
-+ * 'rfbi' class
-+ * remote frame buffer interface
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_rfbi_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_rfbi_hwmod_class = {
-+	.name	= "rfbi",
-+	.sysc	= &omap54xx_rfbi_sysc,
-+};
-+
-+/* dss_rfbi */
-+static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
-+	{ .role = "ick", .clk = "l3_iclk_div" },
-+};
-+
-+static struct omap_hwmod omap54xx_dss_rfbi_hwmod = {
-+	.name		= "dss_rfbi",
-+	.class		= &omap54xx_rfbi_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
-+	.opt_clks	= dss_rfbi_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_rfbi_opt_clks),
-+};
-+
-+/*
-  * 'emif' class
-  * external memory interface no1 (wrapper)
-  */
-@@ -1893,6 +2122,54 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__dmic = {
- 	.user		= OCP_USER_MPU,
- };
- 
-+/* l3_main_2 -> dss */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_2 -> dss_dispc */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_dispc = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_dispc_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_2 -> dss_dsi1_a */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_dsi1_a = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_dsi1_a_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_2 -> dss_dsi1_c */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_dsi1_c = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_dsi1_c_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_2 -> dss_hdmi */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_hdmi = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_hdmi_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_2 -> dss_rfbi */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_rfbi = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_dss_rfbi_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* mpu -> emif1 */
- static struct omap_hwmod_ocp_if omap54xx_mpu__emif1 = {
- 	.master		= &omap54xx_mpu_hwmod,
-@@ -2345,6 +2622,12 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_wkup__counter_32k,
- 	&omap54xx_l4_cfg__dma_system,
- 	&omap54xx_l4_abe__dmic,
-+	&omap54xx_l3_main_2__dss,
-+	&omap54xx_l3_main_2__dss_dispc,
-+	&omap54xx_l3_main_2__dss_dsi1_a,
-+	&omap54xx_l3_main_2__dss_dsi1_c,
-+	&omap54xx_l3_main_2__dss_hdmi,
-+	&omap54xx_l3_main_2__dss_rfbi,
- 	&omap54xx_mpu__emif1,
- 	&omap54xx_mpu__emif2,
- 	&omap54xx_l4_wkup__gpio1,
--- 
-1.8.3.2
+Soren: please correct me if I DDRC version is wrong.
+
+Regarding silicon revision in compatible string let's start new thread
+out of this ddrc one.
+
+Thanks,
+Michal
