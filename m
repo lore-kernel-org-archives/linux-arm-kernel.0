@@ -1,35 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Mar 2014 17:14:52 +0000
-Subject: [PATCH v2 1/3] ata: ahci_st: Provide DT bindings for ST's SATA
- implementation
-In-Reply-To: <7613177.7hd4IoKUr4@wuerfel>
-References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
- <20140312114257.GA17461@e106331-lin.cambridge.arm.com>
- <20140312124835.GA22450@lee--X1> <7613177.7hd4IoKUr4@wuerfel>
-Message-ID: <20140312171452.GE22450@lee--X1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Mar 2014 17:15:34 +0000
+Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
+In-Reply-To: <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
+References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+ <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140312171534.GQ17083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +This binding describes a SATA device.
-> > > > +
-> > > > +Required properties:
-> > > > + - compatible         : Must be "st,ahci"
-> > > 
-> > > Is there not a more specific name? This is awfully generic.
-> > 
-> > There isn't one. ST only have one AHCI driver. The driver is named as
-> > generically.
+On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
+> An implementation of get_user_pages_fast for ARM. It is based loosely
+> on the PowerPC implementation. We disable interrupts in the walker to
+> prevent the call_rcu_sched pagetable freeing code from running under
+> us.
 > 
-> If it is this generic, can't you use the completely generic
-> ahci-platform driver and add a "generic-ahci" compatible string
-> to that?
+> We also explicitly fire an IPI in the Transparent HugePage splitting
+> case to prevent splits from interfering with the fast_gup walker.
+> As THP splits are relatively rare, this should not have a noticable
+> overhead.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm/include/asm/pgtable-3level.h |   6 +
+>  arch/arm/mm/Makefile                  |   1 +
+>  arch/arm/mm/gup.c                     | 299 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 306 insertions(+)
+>  create mode 100644 arch/arm/mm/gup.c
 
-It pretty much does. The only 'special' functionality we handle in
-the driver are resets and configuring the OOB. However, both are
-required.
+Is there anything specific to ARM in this gup.c file? Could we make it
+more generic like mm/gup.c?
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
