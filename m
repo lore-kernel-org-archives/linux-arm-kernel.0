@@ -1,45 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 12 Mar 2014 10:48:50 -0500
-Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
-Message-ID: <1394639330-1288-1-git-send-email-balbi@ti.com>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Wed, 12 Mar 2014 16:53:34 +0100
+Subject: [PATCH 0/3] spi: bitbang fixes and passive serial driver
+Message-ID: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, even when building keystone only
-kernel builds, DTB won't get build because
-we lack a Makefile rule to get it compiled.
+This series includes a bugfix and adds LSB mode for the bitbang driver.
+It also includes a new character device driver to passively clock a
+firmware into an FPGA.
 
-This patch adds that rule so mainline kernel
-users have a chance to use up-to-date DTB on
-keystone 2 platforms.
+It is an resend after the cc to linux-arm-kernel list got fixed.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Michael Grzeschik (3):
+  spi: bitbang: fix shift for getmosi
+  spi: bitbang: add lsb first support
+  spi: psdev: add passive serial driver
 
-note that I just tried this on top of linux-next
-(commit 69d5cdda16b3c9767b82d80b07edb9bb056448e3)
-and, even though dtb builds fine, I still couldn't
-get keystone_defconfig uImage to boot fine.
+ drivers/spi/Kconfig            |   9 +
+ drivers/spi/Makefile           |   1 +
+ drivers/spi/spi-bitbang-txrx.h |  98 +++++---
+ drivers/spi/spi-bitbang.c      |   3 +-
+ drivers/spi/spipsdev.c         | 520 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 601 insertions(+), 30 deletions(-)
+ create mode 100644 drivers/spi/spipsdev.c
 
-It's probably my LOADADDR which is wrong.
-
-Santosh, what's the LOADADDR I should be using
-for keystone boots ?
-
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ae208a6..52c5231 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -82,6 +82,7 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
-+dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb
- kirkwood := \
- 	kirkwood-b3.dtb \
- 	kirkwood-cloudbox.dtb \
 -- 
-1.9.0.167.g384364b
+1.9.0
