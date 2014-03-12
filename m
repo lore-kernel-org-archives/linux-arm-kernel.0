@@ -1,53 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Mar 2014 11:49:21 +0100
-Subject: [PATCH] Doc: USB: gadget: atmel_usba correct atmel,vbus-gpio
- meaning
-In-Reply-To: <53109F03.6060506@atmel.com>
-References: <1393515910-15837-1-git-send-email-alexandre.belloni@free-electrons.com>
- <53109F03.6060506@atmel.com>
-Message-ID: <53203BB1.6090105@atmel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Mar 2014 11:57:46 +0100
+Subject: [PATCH 1/3] iio: adc: at91_adc: Repair broken platform_data
+ support
+In-Reply-To: <5318C950.7060900@kernel.org>
+References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394038675-15809-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <5318C950.7060900@kernel.org>
+Message-ID: <20140312105746.GK13905@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/2014 15:36, Nicolas Ferre :
-> On 27/02/2014 16:45, Alexandre Belloni :
->> atmel,at91sam9rl-udc is a USB gadget, it has now means to control vbus.
-> 
-> s/now/no/
-> 
->> atmel,vbus-gpio is in fact used to detect the presence of vbus.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Jonathan,
 
-Stacked in at91-3.15-dt.
-
-Thanks.
-
->> ---
->>  Documentation/devicetree/bindings/usb/atmel-usb.txt | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
->> index 55f51af08bc7..bc2222ca3f2a 100644
->> --- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
->> +++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
->> @@ -57,8 +57,8 @@ Required properties:
->>   - ep childnode: To specify the number of endpoints and their properties.
->>  
->>  Optional properties:
->> - - atmel,vbus-gpio: If present, specifies a gpio that needs to be
->> -   activated for the bus to be powered.
->> + - atmel,vbus-gpio: If present, specifies a gpio that allows to detect whether
->> +   vbus is present (USB is connected).
->>  
->>  Required child node properties:
->>   - name: Name of the endpoint.
->>
+On 06/03/2014 at 19:15:28 +0000, Jonathan Cameron wrote :
+> It's late in the cycle so I'll send this on to Greg KH with a note
+> to say either send it to Linus if he is happy doing so - or send
+> it early in 3.15, then it'll get picked up for stable.
 > 
+> I'll give it a day or so to see if I the at91 maintainers are happy
+> with the other two parts as it is probably cleaner if all 3 go together.
+> 
+> Applied to the fixes-togreg branch of iio.git
 > 
 
+I don't recall seeing you sending that to Greg. Could you do that, along
+with the two other patches that got acked by Nicolas ?
+
+Anyway, if it is too late, we'll push for stable.
+
+Thanks !
 
 -- 
-Nicolas Ferre
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
