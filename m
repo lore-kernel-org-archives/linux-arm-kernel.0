@@ -1,41 +1,40 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 12 Mar 2014 07:25:13 -0700
-Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value
- for number of delays
-In-Reply-To: <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
- <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1394634313.28839.57.camel@joe-AO722>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Mar 2014 15:26:57 +0100
+Subject: [PATCH 3/4] pinctrl: tegra: dynamically calculate function list
+ of groups
+In-Reply-To: <1394220137-16351-3-git-send-email-swarren@wwwdotorg.org>
+References: <1394220137-16351-1-git-send-email-swarren@wwwdotorg.org>
+ <1394220137-16351-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdb5DQ4qm+d3HzJD5wr6ttJdXCb=khumQhU4ebWPvRpjZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-12 at 09:50 +0100, Maxime COQUELIN wrote:
-> This patch replaces the raw values with ARRAY_SIZE for assigning the
-> ninput_delays and noutput_delays fields of STiH416's st_pctl_data struct.
+On Fri, Mar 7, 2014 at 8:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-trivial note:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> The per-SoC data structures for Tegra pinctrl stored some information
+> in a redundant way. Specifically, the list of groups that each function
+> could be muxed onto was stored once explicitly, and also as part of the
+> definition of each group. Eliminate this redundancy, and calculate each
+> function's list of valid groups at pinctrl probe time. This removes
+> thousands of lines of code from the pinctrl driver and ~16K from the
+> vmlinux binary size, and adds only about 500uS to the boot process (on
+> Tegra30; newer SoCs will likely be faster still).
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  drivers/pinctrl/pinctrl-tegra.c    |   38 ++
+>  drivers/pinctrl/pinctrl-tegra.h    |    4 +-
+>  drivers/pinctrl/pinctrl-tegra114.c |  931 +--------------------------
+>  drivers/pinctrl/pinctrl-tegra124.c | 1102 +-------------------------------
+>  drivers/pinctrl/pinctrl-tegra20.c  |  627 +-----------------
+>  drivers/pinctrl/pinctrl-tegra30.c  | 1242 +-----------------------------------
+>  6 files changed, 44 insertions(+), 3900 deletions(-)
 
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-[]
-> @@ -384,9 +384,9 @@ static unsigned int stih416_delays[] = {0, 300, 500, 750, 1000, 1250, 1500,
->  static const struct st_pctl_data  stih416_data = {
->  	.rt_style	= st_retime_style_dedicated,
->  	.input_delays	= stih416_delays,
-> -	.ninput_delays	= 14,
-> +	.ninput_delays	= ARRAY_SIZE(stih416_delays),
->  	.output_delays	= stih416_delays,
-> -	.noutput_delays = 14,
-> +	.noutput_delays = ARRAY_SIZE(stih416_delays),
->  	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
->  };
->  
+You got to love that diffstat.
 
-drivers/pinctrl/pinctrl-st.c-   unsigned int    *input_delays;
-drivers/pinctrl/pinctrl-st.c-   unsigned int    *output_delays;
+Excellent patch Stephen, applied.
 
-It may be better to change these to const unsigned int *
-and change
-
-static unsigned int stih416_delays[] = {
-
-to static const
+Yours,
+Linus Walleij
