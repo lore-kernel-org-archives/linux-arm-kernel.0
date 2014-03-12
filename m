@@ -1,44 +1,111 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 12 Mar 2014 12:33:04 +0200
-Subject: [PATCH] ARM: OMAP5: DSS hwmod data
-In-Reply-To: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <532037E0.1080309@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 12 Mar 2014 11:37:26 +0100
+Subject: [PATCH 4/5] ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
+In-Reply-To: <1394573078-20767-5-git-send-email-wsa@the-dreams.de>
+References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
+ <1394573078-20767-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <4320193.ARaogSuUJi@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 12:26, Tomi Valkeinen wrote:
-> Hi,
+Hi Wolfram,
+
+Thank you for the patch.
+
+On Tuesday 11 March 2014 22:24:37 Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
 > 
-> This patch adds hwmod data for omap5 display subsystem. I have tested this on
-> omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet, as the
-> mainline is missing omap5 HDMI driver.
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> ---
+> Note: Adding clocks whilst keeping the current sorting is very likely to
+> break a previously working clock IMO. Imagine adding PCIEC clock inbetween
+> IIC0 and IIC1 here. Adding chronologically and grouped by similar function
+> blocks is easier to track. An example addition could then look like:
 > 
-> I do see this when booting:
+>  	R8A7790_CLK_TPU0
+>  	R8A7790_CLK_SDHI3 R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+>  	R8A7790_CLK_MMCIF1 R8A7790_CLK_MMCIF0
+>  	R8A7790_CLK_CMT1
+> 	R8A7790_CLK_IIC2 R8A7790_CLK_IIC1 R8A7790_CLK_IIC0
+> +	R8A7790_CLK_PCIEC
 > 
->   omap_hwmod: dss_dispc: cannot be enabled for reset (3)
->   omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
->   omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
->   omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
->   omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+>  arch/arm/boot/dts/r8a7790.dtsi | 27 ++++++++++++++-------------
+>  1 file changed, 14 insertions(+), 13 deletions(-)
 > 
-> But at least DSI works just fine.
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index da69afc9e5cb..9e15fb9858e7 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -702,18 +702,19 @@
+>  		mstp3_clks: mstp3_clks at e615013c {
+>  			compatible = "renesas,r8a7790-mstp-clocks",
+> "renesas,cpg-mstp-clocks";
+>  			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+> -			clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
+> -				 <&cpg_clocks R8A7790_CLK_SD1>,
+> <&cpg_clocks R8A7790_CLK_SD0>,
+> -				 <&mmc0_clk>, <&rclk_clk>;
+> +			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&sd3_clk>,
+> +				 <&sd2_clk>, <&cpg_clocks R8A7790_CLK_SD1>,
+> <&cpg_clocks R8A7790_CLK_SD0>, <&mmc0_clk>,
+> +				 <&hp_clk>, <&hp_clk>, <&rclk_clk>;
+>  			#clock-cells = <1>;
+>  			renesas,clock-indices = <
+> -				R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+> -				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> -				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1
+> +				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1
+> R8A7790_CLK_SDHI3
+> +				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> R8A7790_CLK_MMCIF0
+> +				R8A7790_CLK_IIC0 R8A7790_CLK_IIC1 R8A7790_CLK_CMT1
+> 
+>  			>;
+> 
+>  			clock-output-names =
+> -				"tpu0", "mmcif1", "sdhi3", "sdhi2",
+> -				"sdhi1", "sdhi0", "mmcif0", "cmt1";
+> +				"i2c6", "tpu0", "mmcif1", "sdhi3",
+> +				"sdhi2", "sdhi1", "sdhi0", "mmcif0",
+> +				"i2c4", "i2c5", "cmt1";
 
-Oh, I forgot to say that I tested this on top of the DSS DT branch, and
-unpublished omap5 and omap5-uevm display patches. So if applied to the
-current mainline, the hwmods are not used at all (except the reset at
-boot time, I think).
+What about calling the clocks iic0-iic2 ?
 
-But if this gets merged for 3.15, it'll make adding omap5 DSS support
-easier for 3.16 as the HWMOD data is already there.
+>  		};
+>  		mstp5_clks: mstp5_clks at e6150144 {
+>  			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> @@ -757,16 +758,16 @@
+>  		mstp9_clks: mstp9_clks at e6150994 {
+>  			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+>  			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
+> -			clocks = <&p_clk>, <&p_clk>, <&cpg_clocks R8A7790_CLK_QSPI>,
+> +			clocks = <&p_clk>, <&p_clk>, <&cpg_clocks R8A7790_CLK_QSPI>,
+> <&cp_clk>,
+>  				 <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
+>  			#clock-cells = <1>;
+>  			renesas,clock-indices = <
+> -				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_QSPI_MOD
+> -				R8A7790_CLK_I2C3 R8A7790_CLK_I2C2 R8A7790_CLK_I2C1
+> -				R8A7790_CLK_I2C0
+> +				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_QSPI_MOD
+> R8A7790_CLK_IICDVFS
+> +				R8A7790_CLK_I2C3 R8A7790_CLK_I2C2 R8A7790_CLK_I2C1
+> R8A7790_CLK_I2C0
+>  			>;
+> 
+>  			clock-output-names =
+> -				"rcan1", "rcan0", "qspi_mod", "i2c3", "i2c2", "i2c1", "i2c0";
+> +				"rcan1", "rcan0", "qspi_mod", "i2c7",
 
- Tomi
+And iic3 ?
 
+> +				"i2c3",	"i2c2", "i2c1", "i2c0";
+>  		};
+>  	};
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/73433334/attachment.sig>
+-- 
+Regards,
+
+Laurent Pinchart
