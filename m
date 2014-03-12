@@ -1,153 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Mar 2014 17:17:30 +0000
-Subject: [RFC PATCH v2 1/1] arm64: Add boot time configuration of
- Intermediate Physical Address size
-In-Reply-To: <20140312165411.GO17083@arm.com>
-References: <1394182165-10480-1-git-send-email-mohun106@gmail.com>
- <1394182165-10480-2-git-send-email-mohun106@gmail.com>
- <CAC8NTUUJ+E-LS0iG07FXkU2=mGgHZ7e_7=9UkAOLrjsNREtfZg@mail.gmail.com>
- <20140312165411.GO17083@arm.com>
-Message-ID: <532096AA.9020307@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Mar 2014 10:19:56 -0700
+Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
+In-Reply-To: <531EDAAC.8030509@ti.com>
+References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
+ <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
+ <531D9452.6040501@ti.com> <531DD6A8.7010406@epfl.ch>
+ <531EDAAC.8030509@ti.com>
+Message-ID: <20140312171955.GB30897@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/14 16:54, Catalin Marinas wrote:
-> On Tue, Mar 11, 2014 at 10:11:20AM +0000, Radha Mohan wrote:
->> Any more comments?
+* Roger Quadros <rogerq@ti.com> [140311 02:46]:
 > 
-> It looks fine to me but I'd like an ack from Marc as well on the KVM
-> bits.
-
-Thanks for putting me in the loop Catalin.
-
-> Patch below for reference. Thanks.
+> Any sane design would maintain register offsets but it doesn't seem so with
+> omap34xx vs omap36xx. So my assumption was wrong.
 > 
->> On Fri, Mar 7, 2014 at 2:19 PM,  <mohun106@gmail.com> wrote:
->>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>>
->>> ARMv8 supports a range of physical address bit sizes. The PARange bits
->>> from ID_AA64MMFR0_EL1 register are read during boot-time and the
->>> intermediate physical address size bits are written in the translation
->>> control registers (TCR_EL1 and VTCR_EL2).
->>>
->>> There is no change in the VA bits and levels of translation.
->>>
->>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_arm.h       |   15 ++++++---------
->>>  arch/arm64/include/asm/pgtable-hwdef.h |    5 ++---
->>>  arch/arm64/kvm/hyp-init.S              |    6 ++++++
->>>  arch/arm64/mm/proc.S                   |    8 +++++++-
->>>  4 files changed, 21 insertions(+), 13 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>> index 0eb3986..21ef48d 100644
->>> --- a/arch/arm64/include/asm/kvm_arm.h
->>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>> @@ -106,7 +106,6 @@
->>>
->>>  /* VTCR_EL2 Registers bits */
->>>  #define VTCR_EL2_PS_MASK       (7 << 16)
->>> -#define VTCR_EL2_PS_40B                (2 << 16)
->>>  #define VTCR_EL2_TG0_MASK      (1 << 14)
->>>  #define VTCR_EL2_TG0_4K                (0 << 14)
->>>  #define VTCR_EL2_TG0_64K       (1 << 14)
->>> @@ -129,10 +128,9 @@
->>>   * 64kB pages (TG0 = 1)
->>>   * 2 level page tables (SL = 1)
->>>   */
->>> -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
->>> -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
->>> -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
->>> -                                VTCR_EL2_T0SZ_40B)
->>> +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
->>> +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
->>> +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
->>>  #define VTTBR_X                (38 - VTCR_EL2_T0SZ_40B)
->>>  #else
->>>  /*
->>> @@ -142,10 +140,9 @@
->>>   * 4kB pages (TG0 = 0)
->>>   * 3 level page tables (SL = 1)
->>>   */
->>> -#define VTCR_EL2_FLAGS         (VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
->>> -                                VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
->>> -                                VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
->>> -                                VTCR_EL2_T0SZ_40B)
->>> +#define VTCR_EL2_FLAGS         (VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
->>> +                                VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
->>> +                                VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
->>>  #define VTTBR_X                (37 - VTCR_EL2_T0SZ_40B)
->>>  #endif
->>>
->>> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
->>> index b1d2e26..f7af66b 100644
->>> --- a/arch/arm64/include/asm/pgtable-hwdef.h
->>> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
->>> @@ -100,9 +100,9 @@
->>>  #define PTE_HYP                        PTE_USER
->>>
->>>  /*
->>> - * 40-bit physical address supported.
->>> + * Highest possible physical address supported.
->>>   */
->>> -#define PHYS_MASK_SHIFT                (40)
->>> +#define PHYS_MASK_SHIFT                (48)
->>>  #define PHYS_MASK              ((UL(1) << PHYS_MASK_SHIFT) - 1)
->>>
->>>  /*
->>> @@ -122,7 +122,6 @@
->>>  #define TCR_SHARED             ((UL(3) << 12) | (UL(3) << 28))
->>>  #define TCR_TG0_64K            (UL(1) << 14)
->>>  #define TCR_TG1_64K            (UL(1) << 30)
->>> -#define TCR_IPS_40BIT          (UL(2) << 32)
->>>  #define TCR_ASID16             (UL(1) << 36)
->>>  #define TCR_TBI0               (UL(1) << 37)
->>>
->>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->>> index 2b0244d..d968796 100644
->>> --- a/arch/arm64/kvm/hyp-init.S
->>> +++ b/arch/arm64/kvm/hyp-init.S
->>> @@ -68,6 +68,12 @@ __do_hyp_init:
->>>         msr     tcr_el2, x4
->>>
->>>         ldr     x4, =VTCR_EL2_FLAGS
->>> +       /*
->>> +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
->>> +        * VTCR_EL2.
->>> +        */
->>> +       mrs     x5, ID_AA64MMFR0_EL1
->>> +       bfi     x4, x5, #16, #3
->>>         msr     vtcr_el2, x4
->>>
->>>         mrs     x4, mair_el1
->>> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
->>> index e0ef63c..e085ee6 100644
->>> --- a/arch/arm64/mm/proc.S
->>> +++ b/arch/arm64/mm/proc.S
->>> @@ -209,8 +209,14 @@ ENTRY(__cpu_setup)
->>>          * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
->>>          * both user and kernel.
->>>          */
->>> -       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | TCR_IPS_40BIT | \
->>> +       ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_FLAGS | \
->>>                       TCR_ASID16 | TCR_TBI0 | (1 << 31)
->>> +       /*
->>> +        * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
->>> +        * TCR_EL1.
->>> +        */
->>> +       mrs     x9, ID_AA64MMFR0_EL1
->>> +       bfi     x10, x9, #32, #3
->>>  #ifdef CONFIG_ARM64_64K_PAGES
->>>         orr     x10, x10, TCR_TG0_64K
->>>         orr     x10, x10, TCR_TG1_64K
->>> --
->>> 1.7.1
+> I'll ack this patch.
 
-Looks good to me.
+OK thanks, I'll apply the whole series with your ack to omap-for-v3.15/dt-overo.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Regards,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tony
