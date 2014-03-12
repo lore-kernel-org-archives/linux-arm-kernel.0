@@ -1,47 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 12 Mar 2014 12:16:38 -0300
-Subject: [PATCH 0/6] Armada 380 NAND support
-Message-ID: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Wed, 12 Mar 2014 20:46:31 +0530
+Subject: [PATCH v5 0/3] exynos: arch: add support for exynos5260 SoC
+Message-ID: <1394637394-3960-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the NAND on Armada 380/385 SoCs.
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-The first patch adds a new "armada-380-corediv-clock" compatible
-string, with its proper SoC-specific structure, adding the register
-layout for this SoC family.
+V5:
+  1) Removed SYSRAM related code.
+  2) Fixed mct clocks.
+  3) Add SoC and Board specifc fixed-rate clocks in respective files.
 
-The second and third patches add the devicetree changes to support
-the Core Divider clock.
+V4:
+  1) Removed duplicate MMC Soc property from Board file.
 
-After adding its clock source, the fourth and fifth patches add
-the NAND devicetree changes. The NAND controller is compatible with
-the Armada 370 controller, so we are currently support it using the
-same compatible string.
+V3:
+  1) Addressed review comments from Tomasz figa.
 
-The last patch updates the binding documentation for the Core Divider
-clock, which is missing the information about the already supported
-Armada 375 compatible string.
+V2:
+  1) Split up DT patch into SoC and Board patch.
 
-This series is based on linux-next 20140307. I expect it will apply
-cleanly on v3.15-rc1; if that's not the case, I'll send a rebased patchset.
+This series is dependent on Sachin's patch
+"ARM: EXYNOS: Consolidate CPU init code" at
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/26560
 
-The clock and devicetree changes are mostly independent so they
-can be merged through the clock and mvebu tree respectively.
+This series is based on Kukjin's for-next branch at
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git
 
-Ezequiel Garcia (6):
-  clk: mvebu: Support Armada 380 SoC on the core divider clock
-  ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
-  ARM: mvebu: Add the Core Divider clock to Armada 38x SoCs
-  ARM: mvebu: Add support for NAND controller in Armada 38x SoC
-  ARM: mvebu: Enable NAND controller in Armada 385-DB
-  clk: mvebu: Update binding documentation for the core divider clock
 
- .../bindings/clock/mvebu-corediv-clock.txt         |  5 ++++-
- arch/arm/boot/dts/armada-385-db.dts                | 21 ++++++++++++++++++
- arch/arm/boot/dts/armada-38x.dtsi                  | 25 ++++++++++++++++++++++
- drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++++++++++
- 4 files changed, 73 insertions(+), 1 deletion(-)
+
+Pankaj Dubey (1):
+  ARM: EXYNOS: initial board support for exynos5260 SoC
+
+Rahul Sharma (2):
+  ARM: dts: add dts files for exynos5260 SoC
+  ARM: dts: add dts files for xyref5260 board
+
+ arch/arm/boot/dts/Makefile                      |    1 +
+ arch/arm/boot/dts/exynos5260-pinctrl.dtsi       |  574 +++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts |  110 +++++
+ arch/arm/boot/dts/exynos5260.dtsi               |  400 ++++++++++++++++
+ arch/arm/mach-exynos/Kconfig                    |    4 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c          |    1 +
+ 6 files changed, 1090 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
+ create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
 
 -- 
-1.9.0
+1.7.9.5
