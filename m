@@ -1,84 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Mar 2014 17:43:56 +0900
-Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
-In-Reply-To: <7964326.0VzqzhpvEl@avalon>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
- <7964326.0VzqzhpvEl@avalon>
-Message-ID: <20140312084355.GD25813@verge.net.au>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Wed, 12 Mar 2014 09:50:08 +0100
+Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value for
+ number of delays
+In-Reply-To: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 03:45:03PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> One more comment.
-> 
-> On Wednesday 26 February 2014 16:33:20 Simon Horman wrote:
-> > Declare all core and MSTP clocks currently used by r8a7779-based boards.
-> > 
-> > Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
-> > 
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > v3
-> > * As suggested by Laurent Pinchart
-> >   - Add and use extal_clk
-> >   - Fix bogus status register use for MSTP clocks
-> >   - Fix bogus mstp3_cls to use its own entries rather than
-> >     that of mstp1_clks
-> > 
-> > * Update to use "main" in cpg_clocks as per updated
-> >   binding in previous patch
-> > * Update for new, consolidated and renamed index macros
-> >   - R8A7779_CLK_ETHER
-> >   - R8A7779_CLK_HSCIF
-> >   - R8A7779_CLK_HSPI
-> >   - R8A7779_CLK_MMC0,1
-> >   - R8A7779_CLK_PCIE
-> >   - R8A7779_CLK_USB01,2
-> > ---
-> >  arch/arm/boot/dts/r8a7779.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 129 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> > index d0561d4..240a03e 100644
-> > --- a/arch/arm/boot/dts/r8a7779.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> > @@ -11,6 +11,7 @@
-> > 
-> >  /include/ "skeleton.dtsi"
-> > 
-> > +#include <dt-bindings/clock/r8a7779-clock.h>
-> >  #include <dt-bindings/interrupt-controller/irq.h>
-> > 
-> >  / {
-> > @@ -278,4 +279,132 @@
-> >  		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-> >  		status = "disabled";
-> >  	};
-> > +
-> > +	clocks {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		ranges;
-> > +
-> > +		/* External root clock */
-> > +		extal_clk: extal_clk {
-> > +			compatible = "fixed-clock";
-> > +			#clock-cells = <0>;
-> > +			/* This value must be overriden by the board. */
-> > +			clock-frequency = <0>;
-> > +			clock-output-names = "extal";
-> > +		};
-> > +
-> > +		/* Special CPG clocks */
-> > +		cpg_clocks: cpg_clocks at 0xe6150000 {
-> > +			compatible = "renesas,r8a7779-cpg-clocks";
-> > +			reg = <0 0xe6150000 0 0x1000>;
-> 
-> Copied from H2 ? :-) This should probably be
+This patch replaces the raw values with ARRAY_SIZE for assigning the
+ninput_delays and noutput_delays fields of STiH416's st_pctl_data struct.
 
-Thanks :)
+CC: Lee Jones <lee.jones@linaro.org>
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 39cddaa..e4c4799 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -384,9 +384,9 @@ static unsigned int stih416_delays[] = {0, 300, 500, 750, 1000, 1250, 1500,
+ static const struct st_pctl_data  stih416_data = {
+ 	.rt_style	= st_retime_style_dedicated,
+ 	.input_delays	= stih416_delays,
+-	.ninput_delays	= 14,
++	.ninput_delays	= ARRAY_SIZE(stih416_delays),
+ 	.output_delays	= stih416_delays,
+-	.noutput_delays = 14,
++	.noutput_delays = ARRAY_SIZE(stih416_delays),
+ 	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
+ };
+ 
+-- 
+1.9.0
