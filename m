@@ -1,96 +1,92 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 12 Mar 2014 11:22:37 +0100
-Subject: [PATCHv5 0/9] Device tree support for the at91sam9rlek
-In-Reply-To: <5320352B.7040707@gmail.com>
-References: <1394617425-641-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5320334C.7060206@atmel.com> <5320352B.7040707@gmail.com>
-Message-ID: <5320356D.3010703@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 12 Mar 2014 11:18:51 +0100
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <531F1E30.4040203@pengutronix.de>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <531DD2C4.5060109@pengutronix.de>
+ <f1e2f08f-05fc-40d3-8437-4c6817d631cb@AM1EHSMHS010.ehs.local>
+ <531F0636.4050608@pengutronix.de>
+ <a99feda0-7463-4781-bb73-90b99e65b014@CO9EHSMHS028.ehs.local>
+ <531F1E30.4040203@pengutronix.de>
+Message-ID: <5320348B.7030401@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/03/2014 11:21, Boris BREZILLON a ?crit :
-> Le 12/03/2014 11:13, Nicolas Ferre a ?crit :
->> On 12/03/2014 10:43, Alexandre Belloni :
->>> This series adds DT support for the at91sam9rl SoC, then the 
->>> at91sam9rl-ek
->>> evaluation board.
->>>
->>> While the at91sam9rl dtsi should be almost complete (still missing 
->>> LCD and
->>> touchscreen bits). The at91sam9rlek DT now support the following tested
->>> features:
->>>   - MMC
->>>   - dbgu
->>>   - usart1
->>>   - watchdog
->>>   - nand
->>>   - leds
->>>   - buttons
->>>   - common clock framework
->>>
->>> Next:
->>>   - spi
->>>   - dataflash
->>>   - i2c
->>>   - lcd
->>>   - touchscreen
->>>   - usb gadget
->>>   - audio
->>>
->>> Changes since v4:
->>>   - correct a typo in the pwm clock name
->>>   - add an entry for the pwm clock in the board file lookup table
->>>   - reorder pinctrl nodes alphabetically
->>>
->>> Changes since v3:
->>>   - reordered nand
->>>   - removed ADC and USB gadget definition as they were not working. 
->>> They will
->>>     come with another set of patches adding proper support.
->>>
->>> Alexandre Belloni (8):
->>>    ARM: at91: prepare at91sam9rl DT transition
->>>    ARM: at91: Add at91sam9rl DT SoC support
->>>    ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
->>>    ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
->>>    ARM: at91: prepare common clk transition for sam9rl SoCs
->>>    ARM: at91/dt: define at91sam9rl clocks
->>>    ARM: at91/dt: define main clk frequency of at91sam9rlek
->>>    ARM: at91: switch sam9rl to common clock framework
->>>
->>> Boris BREZILLON (1):
->>>    ARM: at91: prepare sam9 dt boards transition to common clk
->> The series seems ready for inclusion. I stack the whole series on our
->> at91-3.15-cleanup branch with my:
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> You can add my
->
-> Acked-by: Boris BREZILLON <b.brezillon.dev@gmail>
-Oops:
+Hi guys,
 
-Acked-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->
-> Thanks.
->
-> Best Regards,
->
-> Boris
->>
->> Thanks a lot.
->>
->>
->>>   arch/arm/boot/dts/Makefile         | 2 +
->>>   arch/arm/boot/dts/at91sam9rl.dtsi  | 802 
->>> +++++++++++++++++++++++++++++++++++++
->>>   arch/arm/boot/dts/at91sam9rlek.dts | 157 ++++++++
->>>   arch/arm/configs/at91_dt_defconfig |   1 +
->>>   arch/arm/mach-at91/Kconfig         |   1 -
->>>   arch/arm/mach-at91/at91sam9rl.c    |  23 +-
->>>   arch/arm/mach-at91/board-dt-sam9.c |  11 +-
->>>   7 files changed, 994 insertions(+), 3 deletions(-)
->>>   create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
->>>   create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+
+On 03/11/2014 03:31 PM, Marc Kleine-Budde wrote:
+> On 03/11/2014 03:08 PM, Appana Durga Kedareswara Rao wrote:
+> 
+>>>>>> +   struct napi_struct napi;
+>>>>>> +   u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
+>>>>>> +   void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
+>>>>>> +                   u32 val);
+>>>>>> +   struct net_device *dev;
+>>>>>> +   void __iomem *reg_base;
+>>>>>> +   unsigned long irq_flags;
+>>>>>> +   struct clk *aperclk;
+>>>>>> +   struct clk *devclk;
+>>>>>
+>>>>> Please rename the clock variables to match the names in the DT.
+>>>>>
+>>>> The clock names are different for axi CAN and CANPS case.
+>>>> So will make them as busclk and devclk Are you ok with this?
 >>>
->>
->
+>>> Why not "ref_clk" and "aper_clk" as used in the DT?
+>>>
+>> One of the comments I got from the Soren(sorenb at xilinx.com)
+>> Is the  clock-names must match the data sheet.
+>> If I Modify the clock names then it is different names for AXI CAN
+>> and CANPS case.
+> 
+> Sorry, my faul, I thought the names are already these from the
+> datasheet. As S?ren pointed out please use 's_axi_aclk' and
+> 'can_clk' for the DT and for the the variable names in the private
+> struct, too.
+> 
+> The 'official' name of the ip core seems to be axi_can, should we rename
+> the driver? I suspect, that Michal wants to keep xilinx in the name for
+> marketing reasons :P
+
+I hope that I am not moving to marketing position.  :-)
+
+opb_can, plb_can, axi_can, amba_can are all valid options for this IP.
+
+Maybe in future Xilinx will decide to use different bus and then will just move
+all current soft IPs to new bus and drivers will be compatible.
+This is exactly what happened when Xilinx moved from OPB to PLB and then
+from PLB to AXI.
+That's why I think in general having bus name in name doesn't fit for our case.
+
+The same is for clock name which has bus name in it.
+For PLB it was called SPLB_Clk and I don't have OPB version but
+at least standalone driver points to OPB version where I believe
+SPLB_Clk name was not used.
+
+That's why if you want to reflect that clock is coming from bus
+you should use any generic name. At least for these soft IPs
+and this one is special because it is one which also went to silicon.
+Next example is XADC.
+
+That's why I just don't think we can find out better name than
+xilinx_can.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/87c9427e/attachment-0001.sig>
