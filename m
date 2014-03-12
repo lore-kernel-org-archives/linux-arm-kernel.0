@@ -1,25 +1,31 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Mar 2014 16:36:33 +0000
-Subject: [PATCH v5 1/5] mfd: add bcm590xx pmu DT binding
-In-Reply-To: <1394633237-16837-2-git-send-email-mporter@linaro.org>
+Date: Wed, 12 Mar 2014 16:38:47 +0000
+Subject: [PATCH v5 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <1394633237-16837-3-git-send-email-mporter@linaro.org>
 References: <1394633237-16837-1-git-send-email-mporter@linaro.org>
- <1394633237-16837-2-git-send-email-mporter@linaro.org>
-Message-ID: <20140312163633.GC22450@lee--X1>
+ <1394633237-16837-3-git-send-email-mporter@linaro.org>
+Message-ID: <20140312163847.GD22450@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add a DT binding for the BCM590xx PMUs. The binding inherits from
-> the generic regulator bindings.
+> Add a driver for the BCM590xx PMU multi-function devices. The driver
+> initially supports regmap initialization and instantiation of the
+> voltage regulator device function of the PMU.
 > 
 > Signed-off-by: Matt Porter <mporter@linaro.org>
 > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 > ---
->  Documentation/devicetree/bindings/mfd/bcm590xx.txt | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/bcm590xx.txt
+>  drivers/mfd/Kconfig          |  8 ++++
+>  drivers/mfd/Makefile         |  1 +
+>  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
+>  4 files changed, 133 insertions(+)
+>  create mode 100644 drivers/mfd/bcm590xx.c
+>  create mode 100644 include/linux/mfd/bcm590xx.h
 
-Applied with Mark's Ack.
+Please don't sent patches that have already been accepted, as can get
+pretty confusing.
 
 -- 
 Lee Jones
