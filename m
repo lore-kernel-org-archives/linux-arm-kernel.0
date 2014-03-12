@@ -1,40 +1,92 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 12 Mar 2014 14:36:31 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2M11bIDMvOV0gdXNiOiBjaGlwaWRlYTogVXNlIHN0YW5k?=
- =?UTF-8?B?YXJkIHVzYi1waHkgcHJvcGVydHku?=
-In-Reply-To: <20140312111925.1d3f0c20@ipc1.ka-ro>
-References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
- <1394618518-13803-3-git-send-email-denis@eukrea.com>
- <20140312111925.1d3f0c20@ipc1.ka-ro>
-Message-ID: <1394620591.168495980@f118.i.mail.ru>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 12 Mar 2014 11:39:55 +0100
+Subject: [PATCH 5/5] ARM: shmobile: r8a7790: add IIC(B) cores to dtsi
+In-Reply-To: <1394573078-20767-6-git-send-email-wsa@the-dreams.de>
+References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
+ <1394573078-20767-6-git-send-email-wsa@the-dreams.de>
+Message-ID: <1722114.RHS5FXLvLd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 12 ????? 2014, 11:19 +01:00 ?? Lothar Wa?mann <LW@KARO-electronics.de>:
-> Hi,
+Hi Wolfram,
+
+Thank you for the patch.
+
+On Tuesday 11 March 2014 22:24:38 Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
 > 
-> Denis Carikli wrote:
-> > This converts the Chipidea usbmisc driver to
-> > use the standard usb-phy property.
-> > 
-> [...]
-> > diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > index c00f772..9a74100 100644
-> > --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> > +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > @@ -130,7 +130,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
-> >  		return ret;
-> >  	}
-> >  
-> > -	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
-> > +	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-> >  	if (IS_ERR(data->phy)) {
-> >  		ret = PTR_ERR(data->phy);
-> >  		goto err_clk;
-> >
-> How about accepting the old property too and print a warning, that it is
-> deprecated, rather than breaking all existing DT blobs?
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 9e15fb9858e7..5b357480d8bf 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -24,6 +24,10 @@
+>  		i2c1 = &i2c1;
+>  		i2c2 = &i2c2;
+>  		i2c3 = &i2c3;
+> +		i2c4 = &i2c4;
+> +		i2c5 = &i2c5;
+> +		i2c6 = &i2c6;
+> +		i2c7 = &i2c7;
+>  		spi0 = &qspi;
+>  		spi1 = &msiof0;
+>  		spi2 = &msiof1;
+> @@ -236,6 +240,46 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	i2c4: i2c at e6500000 {
 
-And this change should be reflected in the bindings documentation.
+As for the other patches, iic0-iic3 ?
 
----
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
+> +		reg = <0 0xe6500000 0 0x425>;
+> +		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7790_CLK_IIC0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2c5: i2c at e6510000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
+> +		reg = <0 0xe6510000 0 0x425>;
+> +		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7790_CLK_IIC1>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2c6: i2c at e6520000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
+> +		reg = <0 0xe6520000 0 0x425>;
+> +		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7790_CLK_IIC2>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2c7: i2c at e60b0000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
+> +		reg = <0 0xe60b0000 0 0x425>;
+> +		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp9_clks R8A7790_CLK_IICDVFS>;
+> +		status = "disabled";
+> +	};
+> +
+>  	mmcif0: mmcif at ee200000 {
+>  		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
+>  		reg = <0 0xee200000 0 0x80>;
+
+-- 
+Regards,
+
+Laurent Pinchart
