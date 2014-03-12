@@ -1,105 +1,70 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Mar 2014 15:19:15 +0900
-Subject: [PATCHv2 4/5] ARM: dts: exynos: Move common dt data for interrupt
- combiner controller
-In-Reply-To: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
-References: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1394605156-7768-5-git-send-email-cw00.choi@samsung.com>
+From: gioh.kim@lge.com (Gioh Kim)
+Date: Wed, 12 Mar 2014 15:38:39 +0900
+Subject: ARM: mm: Could I change module space size or place modules in
+ vmalloc area?
+In-Reply-To: <201401031423.55336.arnd@arndb.de>
+References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
+ <201401031310.09930.arnd@arndb.de>
+ <20140103122206.GK7383@n2100.arm.linux.org.uk>
+ <201401031423.55336.arnd@arndb.de>
+Message-ID: <000501cf3dbd$b49ac970$1dd05c50$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch move common dt data of interrupt combiner controller to
-exynos4x12.dtsi. Each Exynos4x12 SoC has different number of interrput combiner
-as following:
-- Exynos4212 : interrput combiner 18(0 ~ 17)
-- Exynos4412 : interrput combiner 20(0 ~ 19)
+I am sorry to read your mail so late.
+My module had been a proprietary driver so that I requested to strip it and
+got small size driver.
 
-The exynos combiner driver initialize interrupt according to specific number
-of interrput combiner.
-- samsung,combiner-nr : The number of interrput combiners supported.
+Thank you for attention.
 
-Also,
-This patch arrange again the dt data according to register address
-in exynos4212/exynos4412.dtsi.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/boot/dts/exynos4212.dtsi | 13 ++++---------
- arch/arm/boot/dts/exynos4412.dtsi | 14 ++++----------
- arch/arm/boot/dts/exynos4x12.dtsi |  8 ++++++++
- 3 files changed, 16 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 94a43f9..ceefc71 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -22,16 +22,11 @@
- / {
- 	compatible = "samsung,exynos4212";
- 
--	gic: interrupt-controller at 10490000 {
--		cpu-offset = <0x8000>;
-+	combiner: interrupt-controller at 10440000 {
-+		samsung,combiner-nr = <18>;
- 	};
- 
--	interrupt-controller at 10440000 {
--		samsung,combiner-nr = <18>;
--		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
--			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
--			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
--			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
--			     <0 107 0>, <0 108 0>;
-+	gic: interrupt-controller at 10490000 {
-+		cpu-offset = <0x8000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 87b339c..a40b6e2 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -22,17 +22,11 @@
- / {
- 	compatible = "samsung,exynos4412";
- 
--	gic: interrupt-controller at 10490000 {
--		cpu-offset = <0x4000>;
--	};
--
--	interrupt-controller at 10440000 {
-+	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <20>;
--		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
--			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
--			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
--			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
--			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
- 	};
- 
-+	gic: interrupt-controller at 10490000 {
-+		cpu-offset = <0x4000>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index a1e76ec..c4a9306 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -68,6 +68,14 @@
- 		};
- 	};
- 
-+	combiner: interrupt-controller at 10440000 {
-+		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-+			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-+			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-+			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-+			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
-+	};
-+
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,exynos4x12-pinctrl";
- 		reg = <0x11400000 0x1000>;
--- 
-1.8.0
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, January 03, 2014 10:24 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Russell King - ARM Linux; HyoJun Im; linux-mm at kvack.org; Gioh Kim
+> Subject: Re: ARM: mm: Could I change module space size or place modules in
+> vmalloc area?
+> 
+> On Friday 03 January 2014, Russell King - ARM Linux wrote:
+> > On Fri, Jan 03, 2014 at 01:10:09PM +0100, Arnd Bergmann wrote:
+> > > Aside from the good comments that Russell made, I would remark that
+> > > the fact that you need multiple megabytes worth of modules indicates
+> > > that you are doing something wrong. Can you point to a git tree
+> > > containing those modules?
+> >
+> > From the comments which have been made, one point that seems to have
+> > been identified is that if this module is first stripped and then
+> > loaded, it can load, but if it's unstripped, it's too big.  This
+> > sounds suboptimal to me - the debug info shouldn't be loaded into the
+> kernel.
+> 
+> Reading the layout_and_allocate() function, that is probably the intention
+> already, and if something goes wrong there on ARM, it could be fixed up in
+> an arch specific module_frob_arch_sections() function.
+> 
+> > However, I guess there's bad interactions with module signing if you
+> > don't do this and the module was signed with the debug info present,
+> > so I don't think there's a good solution for this.
+> 
+> My point was another anyway: I can't think of any good reason why you
+> would end up with this many modules on any sane system. The only cases
+> I've seen so far are
+> 
+> - modules written in C++, with libstdc++ linked into the module
+> - a closed-source platform port hidden in a loadable module that
+>   contains all the device drivers and subsystems while ignoring the
+>   infrastructure we have in the kernel, and the possible legal
+>   implications.
+> - a bug in the module using large arrays that should just be
+>   dynamically allocated.
+> - device firmware statically linked into the module rather than
+>   loaded using request_firmware.
+> 
+> In each of these cases, the real answer is to fix the code they are trying
+> to load to do things in a more common way, especially if the intention is
+> to eventually merge the code upstream. It is of course possible that they
+> are indeed trying something valid, that's why I asked to see the source
+> code.
+> 
+> 	Arnd
