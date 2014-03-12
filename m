@@ -1,34 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Mar 2014 17:15:34 +0000
-Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
-In-Reply-To: <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
- <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140312171534.GQ17083@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 12 Mar 2014 18:17:06 +0100
+Subject: [PATCH v2 3/4] irqchip: sun4i: Fix a comment about mask register
+ initialization
+In-Reply-To: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
+References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1394644627-12315-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
-> An implementation of get_user_pages_fast for ARM. It is based loosely
-> on the PowerPC implementation. We disable interrupts in the walker to
-> prevent the call_rcu_sched pagetable freeing code from running under
-> us.
-> 
-> We also explicitly fire an IPI in the Transparent HugePage splitting
-> case to prevent splits from interfering with the fast_gup walker.
-> As THP splits are relatively rare, this should not have a noticable
-> overhead.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
->  arch/arm/include/asm/pgtable-3level.h |   6 +
->  arch/arm/mm/Makefile                  |   1 +
->  arch/arm/mm/gup.c                     | 299 ++++++++++++++++++++++++++++++++++
->  3 files changed, 306 insertions(+)
->  create mode 100644 arch/arm/mm/gup.c
+The comment was claiming that we were masking all irqs, while the code actually
+*un*masks all of them.
 
-Is there anything specific to ARM in this gup.c file? Could we make it
-more generic like mm/gup.c?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/irqchip/irq-sun4i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index 5c25048..8a2fbee 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -109,7 +109,7 @@ static int __init sun4i_of_init(struct device_node *node,
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
+ 
+-	/* Mask all the interrupts */
++	/* Unmask all the interrupts, ENABLE_REG(x) is used for masking */
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
 -- 
-Catalin
+1.9.0
