@@ -1,32 +1,67 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 12 Mar 2014 16:42:52 +0000
-Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
-In-Reply-To: <20140312163026.GI27965@twins.programming.kicks-ass.net>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
- <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
- <20140312141800.GD27965@twins.programming.kicks-ass.net>
- <CAPvkgC1sphjikAaUXSEyRMiQ+wDNwgTw-mhL++DzBLGBqMdtTg@mail.gmail.com>
- <20140312163026.GI27965@twins.programming.kicks-ass.net>
-Message-ID: <CAPvkgC2avetCUEoXX58XiUN05hv7LteO6SV-Enu3Z2pMjs+xHw@mail.gmail.com>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Wed, 12 Mar 2014 09:44:20 -0700
+Subject: [PATCH v4 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <000001cf3dcd$751a4680$5f4ed380$%han@samsung.com>
+References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
+ <1394085963-27553-3-git-send-email-tinamdar@apm.com>
+ <000001cf3dcd$751a4680$5f4ed380$%han@samsung.com>
+Message-ID: <CACoXjckTMbt2GgLFgh39CRNGydZ4u4-L2J1PQfFi8fR7A=LUGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2014 16:30, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Mar 12, 2014 at 04:20:15PM +0000, Steve Capper wrote:
->> On 12 March 2014 14:18, Peter Zijlstra <peterz@infradead.org> wrote:
->> > Since you just went through the trouble of enabling RCU pagetable
->> > freeing, you might also replace these local_irq_save/restore with
->> > rcu_read_{,un}lock().
->>
->> Hi Peter,
->> This critical section also needs to block the THP splitting code. At
->> the moment an IPI is broadcast in pmdp_splitting_flush. I'm not sure
->> how to adapt that to block on an rcu_read_lock, I'll have a think.
->
-> Ah, I've not looked at THP much at all.
->
-> Would it be sufficient to make sure to fail the pmd get_page()
-> equivalent early enough?
+Hello Jingoo Han,
 
-I don't think that will be enough, as we haven't locked anything. I'll
-refine the IPI as per your suggestion.
+On Wed, Mar 12, 2014 at 1:31 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Thursday, March 06, 2014 3:06 PM, Tanmay Inamdar wrote:
+>>
+>> This patch adds the device tree nodes for APM X-Gene PCIe controller and
+>> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
+>> nodes are added.
+>>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>>  arch/arm64/boot/dts/apm-mustang.dts |    8 ++
+>>  arch/arm64/boot/dts/apm-storm.dtsi  |  155 +++++++++++++++++++++++++++++++++++
+>>  2 files changed, 163 insertions(+)
+>
+> [.....]
+>
+>> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+>
+> [.....]
+>
+>> +
+>> +             pcie0: pcie at 1f2b0000 {
+>> +                     status = "disabled";
+>> +                     device_type = "pci";
+>> +                     compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+>> +                     #interrupt-cells = <1>;
+>> +                     #size-cells = <2>;
+>> +                     #address-cells = <3>;
+>> +                     reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+>> +                             0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+>> +                     reg-names = "csr", "cfg";
+>> +                     ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+>> +                               0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
+>                                                                           ^^^
+>
+> I have a question about the fourth number '0xe0' of 'ranges' property.
+> Would you let me know what the '0xe0' means?
+>
+
+In X-Gene address map, the physical address range starting from
+0xe0_00000000 is reserved for PCIe Port 0 outbound memory mappings.
+
+> Best regards,
+> Jingoo Han
+>
+>> +                     dma-ranges = <0x42000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000>;
+>> +                     interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+>> +                     interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1
+>> +                                      0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x1
+>> +                                      0x0 0x0 0x0 0x3 &gic 0x0 0xc4 0x1
+>> +                                      0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
+>> +                     clocks = <&pcie0clk 0>;
+>> +             };
+>
