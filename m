@@ -1,32 +1,29 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 12 Mar 2014 12:41:41 -0300
-Subject: [PATCH 1/1] clk: mvebu: Fix ratio register offset on A375 SoC
-In-Reply-To: <1394638901-13368-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1394638901-13368-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1394638901-13368-2-git-send-email-ezequiel.garcia@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Mar 2014 09:44:04 -0600
+Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
+In-Reply-To: <20140312110315.GG21483@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
+ <531FE40C.1060709@wwwdotorg.org>
+ <20140312110315.GG21483@n2100.arm.linux.org.uk>
+Message-ID: <532080C4.2000801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the ratio register offset which is 0x4,
-as per the Armada 375 SoC specification.
+On 03/12/2014 05:03 AM, Russell King - ARM Linux wrote:
+> On Tue, Mar 11, 2014 at 10:35:24PM -0600, Stephen Warren wrote:
+>> Hmm. I thought that ARMv6 didn't have efficient unaligned accesses, but
+>> I suppose it must; ARM selects HAVE_EFFICIENT_UNALIGNED_ACCESS for
+>> v6/v6k/v7. BUILTIN_BSWAP seems innocuous. Can you verify which of those
+>> two options actually causes problems for you?
+> 
+> What do you think is different between v6 and v7 for unaligned accesses?
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/clk/mvebu/clk-corediv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
-index 4da6076..4af33ba 100644
---- a/drivers/clk/mvebu/clk-corediv.c
-+++ b/drivers/clk/mvebu/clk-corediv.c
-@@ -213,7 +213,7 @@ static const struct clk_corediv_soc_desc armada375_corediv_soc = {
- 		.set_rate = clk_corediv_set_rate,
- 	},
- 	.ratio_reload = BIT(8),
--	.ratio_offset = 0x8,
-+	.ratio_offset = 0x4,
- };
- 
- static void __init
--- 
-1.9.0
+I don't know the details of unaligned accesses; I'm just remembering
+(probably incorrectly and/or misinterpreting) some discussion in U-Boot
+about ARMv7 being able to do unaligned accesses OK, yet earlier
+generations not being able to (although I don't recall which), and hence
+the toolchain options are set up to disallow them, and the ARMv7(?)
+config bit that enables them is left disabled, so such accesses cause an
+exception, so it's easy to catch the problems that must happen on older
+HW even when running on newer HW, even though such access could be
+allows on ARMv7.
