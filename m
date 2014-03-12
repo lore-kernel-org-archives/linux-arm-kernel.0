@@ -1,43 +1,46 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 12 Mar 2014 13:33:00 +0900
-Subject: [PATCH v2 3/4] ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and
- ARCH_S3C64XX
+Date: Wed, 12 Mar 2014 13:32:59 +0900
+Subject: [PATCH v2 2/4] drivers: clk: use CONFIG_COMMON_CLK_SAMSUNG for Samsung
+ clock support
 In-Reply-To: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1394598781-3848-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1394598781-3848-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects COMMON_CLK_SAMSUNG for EXYNOS and S3C64XX SoC
-and removes COMMON_CLK selection as COMMON_CLK_SAMSUNG selects it's dependency.
+This patch includes Samsung clock Kconfig file, and replaces PLAT_SAMSUNG
+with COMMON_CLK_SAMSUNG for Samsung common clock support.
+Any Samsung SoC want to use Samsung common clock infrastructure can simply
+select COMMON_CLK_SAMSUNG.
 
-CC: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/Kconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/Kconfig  |    2 ++
+ drivers/clk/Makefile |    2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e254198..0c15aa7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -755,7 +755,7 @@ config ARCH_S3C64XX
- 	select ARM_VIC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
--	select COMMON_CLK
-+	select COMMON_CLK_SAMSUNG
- 	select CPU_V6K
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_SAMSUNG
-@@ -834,7 +834,7 @@ config ARCH_EXYNOS
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SPARSEMEM_ENABLE
- 	select ARM_GIC
--	select COMMON_CLK
-+	select COMMON_CLK_SAMSUNG
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_S3C2410_I2C if I2C
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 7641965..f2b6179 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -112,3 +112,5 @@ source "drivers/clk/qcom/Kconfig"
+ endmenu
+ 
+ source "drivers/clk/mvebu/Kconfig"
++
++source "drivers/clk/samsung/Kconfig"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index a367a98..f1da6ee 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -38,7 +38,7 @@ obj-$(CONFIG_PLAT_ORION)		+= mvebu/
+ obj-$(CONFIG_ARCH_MXS)			+= mxs/
+ obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
+ obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
+-obj-$(CONFIG_PLAT_SAMSUNG)		+= samsung/
++obj-$(CONFIG_COMMON_CLK_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= shmobile/
+ obj-$(CONFIG_ARCH_SIRF)			+= sirf/
+ obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
 -- 
 1.7.9.5
