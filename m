@@ -1,61 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 12 Mar 2014 16:28:30 +0100
-Subject: [PATCH] ARM: shmobile: compile drivers/sh for
- CONFIG_ARCH_SHMOBILE_MULTI
-In-Reply-To: <1783624.XEvhdtDmJe@avalon>
-References: <1389707776-23306-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdU4v9=BxTKk-=z4GE55KCuxuPry93OtGrTOzJ5ke8WT=g@mail.gmail.com>
- <1783624.XEvhdtDmJe@avalon>
-Message-ID: <2988860.LSXScrXPRs@avalon>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 12 Mar 2014 16:26:26 +0100
+Subject: [PATCH v4 0/6] Add STiH407 SoC and reference board support
+In-Reply-To: <CACRpkdboBkzcJC35-BNvVYmS_t9Cd204AVz4rZasKtNJp0yE4g@mail.gmail.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <CACRpkdboBkzcJC35-BNvVYmS_t9Cd204AVz4rZasKtNJp0yE4g@mail.gmail.com>
+Message-ID: <53207CA2.4090309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Linus,
 
-On Wednesday 12 March 2014 15:18:46 Laurent Pinchart wrote:
-> On Tuesday 11 March 2014 20:15:04 Geert Uytterhoeven wrote:
-> > On Mon, Jan 20, 2014 at 11:52 PM, Laurent Pinchart wrote:
-> > > On Monday 20 January 2014 15:56:43 Mark Brown wrote:
-> > >> On Mon, Jan 20, 2014 at 04:48:10PM +0100, Laurent Pinchart wrote:
-> > >> > The problem isn't as simple as it seems, and more advanced
-> > >> > implementations that would allow listing clocks that should be
-> > >> > managed automatically (or the other way around) would also add
-> > >> > another level of complexity. The required information is platform-
-> > >> > dependent, but we currently don't express it as such in DT.
-> > >> 
-> > >> Well, the set of clocks an IP requires will tend to be the same - it's
-> > >> normally just that integrators may have done things like tie them
-> > >> together or decide to spread confusion by renaming them.
-> > > 
-> > > That's the problem :-) How should the runtime PM core be given the list
-> > > of clocks it needs to manage ? That information needs to come from
-> > > somewhere.
-> > 
-> > Stirring the pot again...
-> > 
-> > Which clocks a device needs is expressed in DT with CCF.
-> > In the simple case, the runtime PM core can just control them based on
-> > device use.
-> > In the complex case, the driver can regain control using its own pm
-> > callbacks, right?
-> 
-> Sure, the driver can of course control the clocks manually in its PM
-> callbacks if it needs to. The point, however, is to control the clocks from
-> core code whenever possible. We thus need to define exact semantics to make
-> sure each side knows what tasks to perform, and what to expect from the
-> other side. For instance, in the DT case, the runtime PM core can easily
-> get the list of the clocks used by the device from its DT node, but how can
-> it know which clock(s) it should manage automatically and which clock(s) it
-> should leave for the driver to control ?
-> 
-> > Probably I'm still missing something, as I haven't had enough exposure to
-> > runtime PM and CCF ;-)
+On 03/12/2014 03:20 PM, Linus Walleij wrote:
+> On Wed, Mar 12, 2014 at 9:50 AM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
+>
+>> This series adds basic support to the STMicroelectronics STiH407 SoC and its
+>> B2120 reference board. The STiH407 is a dual-core ARM Cortex-A9 CPU aimed at
+>> STB market.
+>>
+>> Changes since v3:
+>
+> I've applied the pinctrl changes to the pinctrl tree, please push all the
+> DTS[i] changes through ARM SoC.
+As mentioned in the cover-letter, the DTS changes are based on arm_soc's 
+for-next branch.
 
-If you haven't seen it already, https://lkml.org/lkml/2014/1/31/290 
-("[RFC/PATCH] base: platform: add generic clock handling for platform-bus") 
-might be related.
+Do you mean I should send a pull request for these three patches?
 
--- 
-Regards,
 
-Laurent Pinchart
+>
+> There is no need to keep DTS and subsystem changes in sync as
+> the DTS'es are supposed to be maintained in separation in the
+> future anyway.
+>
+
+Understood.
+
+Thanks,
+Maxime
+> Yours,
+> Linus Walleij
+>
