@@ -1,118 +1,44 @@
-From: brezillonboris@gmail.com (Boris BREZILLON)
-Date: Wed, 12 Mar 2014 11:30:55 +0100
-Subject: [PATCH] net: macb: set interface name based on DT aliases
-In-Reply-To: <532013C4.1000107@atmel.com>
-References: <532013C4.1000107@atmel.com>
-Message-ID: <1394620255-6357-1-git-send-email-b.brezillon.dev@gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 12 Mar 2014 12:33:04 +0200
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <532037E0.1080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use aliases to set the interface name (ethX) instead of automatic
-assignement.
+On 12/03/14 12:26, Tomi Valkeinen wrote:
+> Hi,
+> 
+> This patch adds hwmod data for omap5 display subsystem. I have tested this on
+> omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet, as the
+> mainline is missing omap5 HDMI driver.
+> 
+> I do see this when booting:
+> 
+>   omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+>   omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
+>   omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
+>   omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+>   omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+> 
+> But at least DSI works just fine.
 
-Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
----
+Oh, I forgot to say that I tested this on top of the DSS DT branch, and
+unpublished omap5 and omap5-uevm display patches. So if applied to the
+current mainline, the hwmods are not used at all (except the reset at
+boot time, I think).
 
-Hello Nicolas, Jean-Christophe,
+But if this gets merged for 3.15, it'll make adding omap5 DSS support
+easier for 3.16 as the HWMOD data is already there.
 
-This is an example on how we could set the ethernet interface id based on DT
-aliases.
-As you can see this patch is not properly separated.
-
-I'm still not happy with this approach for several reasons:
-1) If another ethernet iface has already been registered with the same id the
-   net dev registration will fail.
-2) We bypass the ethernet macros/functions and directly use the net device
-   functions which IMHO is not future proof.
-
-Best Regards,
-
-Boris
+ Tomi
 
 
-
- arch/arm/boot/dts/sama5d36.dtsi     |    2 +-
- arch/arm/boot/dts/sama5d3_emac.dtsi |    4 ++++
- arch/arm/boot/dts/sama5d3_gmac.dtsi |    4 ++++
- drivers/net/ethernet/cadence/macb.c |   15 +++++++++++++--
- 4 files changed, 22 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
-index 6c31c26..db58cad 100644
---- a/arch/arm/boot/dts/sama5d36.dtsi
-+++ b/arch/arm/boot/dts/sama5d36.dtsi
-@@ -8,8 +8,8 @@
-  */
- #include "sama5d3.dtsi"
- #include "sama5d3_can.dtsi"
--#include "sama5d3_emac.dtsi"
- #include "sama5d3_gmac.dtsi"
-+#include "sama5d3_emac.dtsi"
- #include "sama5d3_lcd.dtsi"
- #include "sama5d3_mci2.dtsi"
- #include "sama5d3_tcb1.dtsi"
-diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
-index fe2af92..f2c5da0 100644
---- a/arch/arm/boot/dts/sama5d3_emac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
-@@ -11,6 +11,10 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	aliases {
-+		eth1 = &macb1;
-+	};
-+
- 	ahb {
- 		apb {
- 			pinctrl at fffff200 {
-diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
-index a6cb050..05164de 100644
---- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
-@@ -11,6 +11,10 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	aliases {
-+		eth0 = &macb0;
-+	};
-+
- 	ahb {
- 		apb {
- 			pinctrl at fffff200 {
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 3190d38..b6f1f7c 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1795,7 +1795,7 @@ static int __init macb_probe(struct platform_device *pdev)
- {
- 	struct macb_platform_data *pdata;
- 	struct resource *regs;
--	struct net_device *dev;
-+	struct net_device *dev = NULL;
- 	struct macb *bp;
- 	struct phy_device *phydev;
- 	u32 config;
-@@ -1819,7 +1819,18 @@ static int __init macb_probe(struct platform_device *pdev)
- 	}
- 
- 	err = -ENOMEM;
--	dev = alloc_etherdev(sizeof(*bp));
-+	if (pdev->dev.of_node) {
-+		int id = of_alias_get_id(pdev->dev.of_node, "eth");
-+		if (id >= 0) {
-+			char name[IFNAMSIZ];
-+			snprintf(name, sizeof(name), "eth%d", id);
-+			dev = alloc_netdev(sizeof(*bp), name, ether_setup);
-+		}
-+	}
-+
-+	if (!dev)
-+		dev = alloc_etherdev(sizeof(*bp));
-+
- 	if (!dev)
- 		goto err_out;
- 
--- 
-1.7.9.5
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/73433334/attachment.sig>
