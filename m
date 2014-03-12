@@ -1,29 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Mar 2014 17:19:56 +0000
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries
-In-Reply-To: <531F16C6.5030903@arm.com>
-References: <1394543851-11732-1-git-send-email-broonie@kernel.org>
- <531F16C6.5030903@arm.com>
-Message-ID: <20140312171955.GR17083@arm.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 12 Mar 2014 17:21:03 +0000
+Subject: [PATCH 1/3] iio: adc: at91_adc: Repair broken platform_data
+ support
+In-Reply-To: <20140312105746.GK13905@piout.net>
+References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394038675-15809-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <5318C950.7060900@kernel.org> <20140312105746.GK13905@piout.net>
+Message-ID: <1a787464-2945-4106-901b-0152627d09cd@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 01:59:34PM +0000, Sudeep Holla wrote:
-> On 11/03/14 13:17, Mark Brown wrote:
-> > From: Mark Brown <broonie@linaro.org>
-> >
-> > Probably due to rebasing over the lengthy time it took to get the patch
-> > merged commit addea9ef055b (cpufreq: enable ARM drivers on arm64) added
-> > a duplicate Power management options section.  Add CPUfreq to the CPU
-> > power management section and remove a duplicate include of the main
-> > power section.
-> 
-> This looks fine to me, but since commit addea9ef055b is only in Rafael's
-> next tree, Catalin can't take this, so it makes sense to go through Rafael's
-> tree, right ?
 
-I actually took this patch and noticed that Rafael took it as well. The
-above commit I think is only valid in the arm64 tree for -next.
+
+On March 12, 2014 10:57:46 AM GMT+00:00, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+>Hi Jonathan,
+>
+>On 06/03/2014 at 19:15:28 +0000, Jonathan Cameron wrote :
+>> It's late in the cycle so I'll send this on to Greg KH with a note
+>> to say either send it to Linus if he is happy doing so - or send
+>> it early in 3.15, then it'll get picked up for stable.
+>> 
+>> I'll give it a day or so to see if I the at91 maintainers are happy
+>> with the other two parts as it is probably cleaner if all 3 go
+>together.
+>> 
+>> Applied to the fixes-togreg branch of iio.git
+>> 
+>
+>I don't recall seeing you sending that to Greg. Could you do that,
+>along
+>with the two other patches that got acked by Nicolas ?
+Sorry spot of man flu, messy weekend and manic day job have made for an interesting
+ week.  Given regression has already snuck out in a release and Greg doesn't have other
+ fixes queued I think we are talking soon after merge window and rc1.  I'll check with Greg though...
+>
+>Anyway, if it is too late, we'll push for stable.
+>
+>Thanks !
 
 -- 
-Catalin
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
