@@ -1,134 +1,72 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 12 Mar 2014 14:08:22 +0800
-Subject: [PATCH v2][ 3/8] usb: chipidea: usbmisc: Add USB Host support
- for i.MX25/i.MX35 CPUs
-In-Reply-To: <1394535304-10240-3-git-send-email-denis@eukrea.com>
-References: <1394535304-10240-1-git-send-email-denis@eukrea.com>
- <1394535304-10240-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140312060821.GC16568@shlinux1.ap.freescale.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 12 Mar 2014 16:08:10 +0900
+Subject: [PATCH] clk: exynos4: Add clock ID for ppmuleft/right
+Message-ID: <1394608090-25362-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 11:54:59AM +0100, Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
+There is no gate for the PPMU Left/Right to the LEFT/RIGHTBUS block.
+So, this patch add ppmuleft/right clock which is used to calculate memory bus
+utilization by using PPMU(Performance Profiling Monitoring Unit).
 
-Add something at commit log please.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c   |  2 ++
+ include/dt-bindings/clock/exynos4.h | 26 ++++++++++++++------------
+ 2 files changed, 16 insertions(+), 12 deletions(-)
 
-> Changelog v1->v2:
-> - converted two remaining defines to BIT()
-> - Removed a variable declaration that was not used in usbmisc_imx25_init
-> ---
->  drivers/usb/chipidea/usbmisc_imx.c |   58 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
-> 
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index cd061ab..3523c09 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -21,6 +21,26 @@
->  #define MX25_USB_PHY_CTRL_OFFSET	0x08
->  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
->  
-> +#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
-> +#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
-> +#define MXC_EHCI_INTERFACE_MASK		(0xf)
-> +
-
-Which SoCs will use above Macros?
-If only imx25 and imx35, using prefix MX25 please.
-Otherwise, adding prefix IMX_ for above Macros and
-the comment for which SoC needs them.
-
-> +#define MX25_OTG_SIC_SHIFT		29
-> +#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
-> +#define MX25_OTG_PM_BIT			BIT(24)
-> +#define MX25_OTG_PP_BIT			BIT(11)
-> +#define MX25_OTG_OCPOL_BIT		BIT(3)
-> +
-> +#define MX25_H1_SIC_SHIFT		21
-> +#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
-> +#define MX25_H1_PP_BIT			BIT(18)
-> +#define MX25_H1_PM_BIT			BIT(16)
-> +#define MX25_H1_IPPUE_UP_BIT		BIT(7)
-> +#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
-> +#define MX25_H1_TLL_BIT			BIT(5)
-> +#define MX25_H1_USBTE_BIT		BIT(4)
-> +#define MX25_H1_OCPOL_BIT		BIT(2)
-> +
->  #define MX27_H1_PM_BIT			BIT(8)
->  #define MX27_H2_PM_BIT			BIT(16)
->  #define MX27_OTG_PM_BIT			BIT(24)
-> @@ -50,6 +70,39 @@ struct imx_usbmisc {
->  
->  static struct imx_usbmisc *usbmisc;
->  
-> +static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
-> +{
-> +	unsigned long flags;
-> +	u32 val = 0;
-> +
-> +	if (data->index > 1)
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&usbmisc->lock, flags);
-> +	switch (data->index) {
-> +	case 0:
-> +		val = readl(usbmisc->base);
-> +		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
-> +		val |= (MXC_EHCI_INTERFACE_DIFF_UNI & MXC_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-> +		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
-> +		writel(val, usbmisc->base);
-> +		break;
-> +	case 1:
-> +		val = readl(usbmisc->base);
-> +		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
-> +		val |= (MXC_EHCI_INTERFACE_SINGLE_UNI & MXC_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
-> +		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
-> +			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
-> +
-> +		writel(val, usbmisc->base);
-> +
-> +		break;
-> +	}
-> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
->  static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
->  {
->  	void __iomem *reg;
-> @@ -159,6 +212,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
->  }
->  
->  static const struct usbmisc_ops imx25_usbmisc_ops = {
-> +	.init = usbmisc_imx25_init,
->  	.post = usbmisc_imx25_post,
->  };
->  
-> @@ -200,6 +254,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
->  		.data = &imx25_usbmisc_ops,
->  	},
->  	{
-> +		.compatible = "fsl,imx35-usbmisc",
-> +		.data = &imx25_usbmisc_ops,
-> +	},
-> +	{
->  		.compatible = "fsl,imx27-usbmisc",
->  		.data = &imx27_usbmisc_ops,
->  	},
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 010f071..3819485 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -717,6 +717,8 @@ static struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
+ 			0, 0),
+ 	GATE(CLK_AC97, "ac97", "aclk100", GATE_IP_PERIL, 27,
+ 			0, 0),
++	GATE(CLK_PPMULEFT, "ppmuleft", "aclk200", GATE_IP_LEFTBUS, 1, 0, 0),
++	GATE(CLK_PPMURIGHT, "ppmuright", "aclk200", GATE_IP_RIGHTBUS, 1, 0, 0),
+ };
+ 
+ /* list of gate clocks supported in exynos4210 soc */
+diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
+index 75aff33..cd7fecf 100644
+--- a/include/dt-bindings/clock/exynos4.h
++++ b/include/dt-bindings/clock/exynos4.h
+@@ -215,20 +215,22 @@
+ #define CLK_SPI1_ISP_SCLK	381 /* Exynos4x12 only */
+ #define CLK_UART_ISP_SCLK	382 /* Exynos4x12 only */
+ #define CLK_TMU_APBIF		383
++#define CLK_PPMULEFT		384
++#define CLK_PPMURIGHT		385
+ 
+ /* mux clocks */
+-#define CLK_MOUT_FIMC0		384
+-#define CLK_MOUT_FIMC1		385
+-#define CLK_MOUT_FIMC2		386
+-#define CLK_MOUT_FIMC3		387
+-#define CLK_MOUT_CAM0		388
+-#define CLK_MOUT_CAM1		389
+-#define CLK_MOUT_CSIS0		390
+-#define CLK_MOUT_CSIS1		391
+-#define CLK_MOUT_G3D0		392
+-#define CLK_MOUT_G3D1		393
+-#define CLK_MOUT_G3D		394
+-#define CLK_ACLK400_MCUISP	395 /* Exynos4x12 only */
++#define CLK_MOUT_FIMC0		386
++#define CLK_MOUT_FIMC1		387
++#define CLK_MOUT_FIMC2		388
++#define CLK_MOUT_FIMC3		389
++#define CLK_MOUT_CAM0		390
++#define CLK_MOUT_CAM1		391
++#define CLK_MOUT_CSIS0		392
++#define CLK_MOUT_CSIS1		393
++#define CLK_MOUT_G3D0		394
++#define CLK_MOUT_G3D1		395
++#define CLK_MOUT_G3D		396
++#define CLK_ACLK400_MCUISP	397 /* Exynos4x12 only */
+ 
+ /* div clocks */
+ #define CLK_DIV_ISP0		450 /* Exynos4x12 only */
 -- 
-
-Best Regards,
-Peter Chen
+1.8.0
