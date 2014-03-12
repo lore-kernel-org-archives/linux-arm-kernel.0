@@ -1,56 +1,38 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Wed, 12 Mar 2014 15:20:19 -0400 (EDT)
-Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
-In-Reply-To: <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
-References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
- <531FE40C.1060709@wwwdotorg.org>
- <20140312113346.GA9347@mudshark.cambridge.arm.com>
- <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
-Message-ID: <alpine.DEB.2.10.1403121512370.2805@vincent-weaver-1.um.maine.edu>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 12 Mar 2014 20:18:51 +0100
+Subject: [PATCH 1/2 v4] i2c: exynos5: add support for HSI2C on Exynos5260
+ SoC
+In-Reply-To: <1391748171-12451-1-git-send-email-ch.naveen@samsung.com>
+References: <1385100726-32165-1-git-send-email-ch.naveen@samsung.com>
+ <1391748171-12451-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20140312191851.GB28891@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Mar 2014, Vince Weaver wrote:
-
-> On Wed, 12 Mar 2014, Will Deacon wrote:
-> > 
-> > I just took the tree you mentioned above, merged together 3.14-rc6,
-> > for-3.15/soc and for-3.15/dt. Using the defconfig (+ appended dtb options)
-> > and cross-compiling with a dated linaro toolchain, it booted fine on my rpi:
-> > 
-> >   Uncompressing Linux... done, booting the kernel.
-> >   [    0.000000] Booting Linux on physical CPU 0x0
-> >   [    0.000000] Initializing cgroup subsys cpuset
-> >   [    0.000000] Initializing cgroup subsys cpu
-> >   [    0.000000] Initializing cgroup subsys cpuacct
-> >   [    0.000000] Linux version 3.14.0-rc6+ (will at tiny-lites) (gcc version 4.8.2 20130603 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.06 - Linaro GCC 2013.06) ) #8 Wed Mar 12 10:51:44 GMT 2014
-> >   [    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387d
-> >   [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-> >   [    0.000000] Machine model: Raspberry Pi Model B
-> >   [    0.000000] bootconsole [earlycon0] enabled
-> >   [    0.000000] Memory policy: Data cache writeback
-> >   [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 97536
-> >   [...]
-> > 
-> > Which compiler are you using?
+On Fri, Feb 07, 2014 at 10:12:51AM +0530, Naveen Krishna Chatradhi wrote:
+> This patch adds a new compatible and uses variant struct to support
+> HSI2C module on Exynos5260. Updates the Documentation dt bindings.
+> Also resets the module as an init sequence (Needed by Exynos5260).
 > 
-> it's the gcc 4.6.3 that comes with the version of raspian on the rasp-pi 
-> (I'm compiling natively).  Let me try again and double check there weren't 
-> any other changes.
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 
-I re-built from scratch using the bcm2835_defconfig and again it hangs at 
-boot, actually it looks like it hangs just after
+This patch has clearly not been tested :( Build failure!
 
-	Uncompressing Linux...
+> +struct exynos_hsi2c_variant {
+> +	unsigned int		    fifo_depth;
+> +};
 
-on the serial console.
+Why so many tabs? In general, I'd prefer one space.
 
-The only difference in .config between a working config and the hanging 
-one are
-	CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-	CONFIG_ARCH_USE_BUILTIN_BSWAP
+> -	exynos5_i2c_init(i2c);
+> +	exynos5_i2c_reset(i2c);
 
-Unfortunately my machine is remote and I won't be able to get in and 
-reboot it and do more testing until probably Friday.
+Is this a related change?
 
-Vince
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/ffc804ff/attachment.sig>
