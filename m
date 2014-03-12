@@ -1,70 +1,36 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 12 Mar 2014 19:48:54 +0100
-Subject: [PATCH v3 4/9] of: mtd: add documentation for the ONFI NAND timing
- mode property
-In-Reply-To: <F8865D0A-59A7-41A7-AA7F-9B91DF5C8258@gmail.com>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
- <F8865D0A-59A7-41A7-AA7F-9B91DF5C8258@gmail.com>
-Message-ID: <5320AC16.8030901@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Mar 2014 19:59:52 +0100
+Subject: [PATCH v2 1/3] ata: ahci_st: Provide DT bindings for ST's SATA
+ implementation
+In-Reply-To: <20140312171452.GE22450@lee--X1>
+References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+ <7613177.7hd4IoKUr4@wuerfel> <20140312171452.GE22450@lee--X1>
+Message-ID: <5284929.ZWl2X8pt1x@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/03/2014 19:27, Warner Losh a ?crit :
-> On Mar 12, 2014, at 12:07 PM, Boris BREZILLON <b.brezillon.dev@gmail.com> wrote:
->
->> Add documentation for the ONFI NAND timing mode property.
-> I don?t see a Toggle/JEDEC mode timing property. Will that be defined for Toshiba, Samsung
-> and San Disk flash? Or will this be limited to Micron, Intel and Hynix (the only ones
-> supporting ONFI)?
+On Wednesday 12 March 2014 17:14:52 Lee Jones wrote:
+> > > > > +This binding describes a SATA device.
+> > > > > +
+> > > > > +Required properties:
+> > > > > + - compatible         : Must be "st,ahci"
+> > > > 
+> > > > Is there not a more specific name? This is awfully generic.
+> > > 
+> > > There isn't one. ST only have one AHCI driver. The driver is named as
+> > > generically.
+> > 
+> > If it is this generic, can't you use the completely generic
+> > ahci-platform driver and add a "generic-ahci" compatible string
+> > to that?
+> 
+> It pretty much does. The only 'special' functionality we handle in
+> the driver are resets and configuring the OOB. However, both are
+> required.
 
-There is currently no Toggle/JEDEC timing mode support, and I don't know 
-what these
-timing modes describe.
-But I guess they can be converted to standard timings described in 
-nand_sdr_timings
-struct (or in your case in the future nand_ddr_timings struct).
+The reset handling should be easy to add to the generic driver
+usign as an optional property if I'm not mistaken.
 
-Could you check that the timings described by these modes use the same 
-naming convention
-as those defined in the ONFI specification 
-(www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
-  chapter 4.15.4) ?
+What is OOB?
 
-If this is the case, we can define a new DT property and new converters.
-
-Best Regards,
-
-Boris
-
-> Warner
->
->
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
->> Documentation/devicetree/bindings/mtd/nand.txt |    8 ++++++++
->> 1 file changed, 8 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
->> index b53f92e..2046027 100644
->> --- a/Documentation/devicetree/bindings/mtd/nand.txt
->> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
->> @@ -19,3 +19,11 @@ errors per {size} bytes".
->> The interpretation of these parameters is implementation-defined, so not all
->> implementations must support all possible combinations. However, implementations
->> are encouraged to further specify the value(s) they support.
->> +
->> +- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
->> +  the NAND chip. Each supported mode is represented as a bit position (i.e. :
->> +  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
->> +  This is only used when the chip does not support the ONFI standard.
->> +  The last bit set represent the closest mode fulfilling the NAND chip timings.
->> +  For a full description of the different timing modes see this document:
->> +  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
->> -- 
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
