@@ -1,59 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 12 Mar 2014 12:16:39 -0300
-Subject: [PATCH 1/6] clk: mvebu: Support Armada 380 SoC on the core divider
- clock
+Date: Wed, 12 Mar 2014 12:16:40 -0300
+Subject: [PATCH 2/6] ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
 In-Reply-To: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1394637404-7651-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1394637404-7651-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for the Core Divider clocks of the Armada
-380 SoCs. Similarly to Armada 370 and XP, the Core Divider clocks of
-the 380 have gate capabilities. The only difference is the register layout.
+Armada 38x SoCs have a 2 GHz fixed main PLL that is used to feed
+other clocks. This commit adds a DT representation of this clock
+through a fixed-clock compatible node.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clk/mvebu/clk-corediv.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
-index 4da6076..911dbb6 100644
---- a/drivers/clk/mvebu/clk-corediv.c
-+++ b/drivers/clk/mvebu/clk-corediv.c
-@@ -204,6 +204,22 @@ static const struct clk_corediv_soc_desc armada370_corediv_soc = {
- 	.ratio_offset = 0x8,
- };
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 812ce28..38fc3a0 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -341,6 +341,13 @@
+ 	};
  
-+static const struct clk_corediv_soc_desc armada380_corediv_soc = {
-+	.descs = mvebu_corediv_desc,
-+	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
-+	.ops = {
-+		.enable = clk_corediv_enable,
-+		.disable = clk_corediv_disable,
-+		.is_enabled = clk_corediv_is_enabled,
-+		.recalc_rate = clk_corediv_recalc_rate,
-+		.round_rate = clk_corediv_round_rate,
-+		.set_rate = clk_corediv_set_rate,
-+	},
-+	.ratio_reload = BIT(8),
-+	.enable_bit_offset = 16,
-+	.ratio_offset = 0x4,
-+};
+ 	clocks {
++		/* 2 GHz fixed main PLL */
++		mainpll: mainpll {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <2000000000>;
++		};
 +
- static const struct clk_corediv_soc_desc armada375_corediv_soc = {
- 	.descs = mvebu_corediv_desc,
- 	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
-@@ -290,3 +306,10 @@ static void __init armada375_corediv_clk_init(struct device_node *node)
- }
- CLK_OF_DECLARE(armada375_corediv_clk, "marvell,armada-375-corediv-clock",
- 	       armada375_corediv_clk_init);
-+
-+static void __init armada380_corediv_clk_init(struct device_node *node)
-+{
-+	return mvebu_corediv_clk_init(node, &armada380_corediv_soc);
-+}
-+CLK_OF_DECLARE(armada380_corediv_clk, "marvell,armada-380-corediv-clock",
-+	       armada380_corediv_clk_init);
+ 		/* 25 MHz reference crystal */
+ 		refclk: oscillator {
+ 			compatible = "fixed-clock";
 -- 
 1.9.0
