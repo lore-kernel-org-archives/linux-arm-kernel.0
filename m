@@ -1,98 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Mar 2014 16:55:11 +0000
-Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
-In-Reply-To: <20140312163200.GJ27965@twins.programming.kicks-ass.net>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
- <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
- <20140312163200.GJ27965@twins.programming.kicks-ass.net>
-Message-ID: <20140312165510.GA9950@mudshark.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 12 Mar 2014 11:53:58 -0500
+Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
+In-Reply-To: <53208CDD.7030106@ti.com>
+References: <1394639330-1288-1-git-send-email-balbi@ti.com>
+ <53208CDD.7030106@ti.com>
+Message-ID: <20140312165358.GE919@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 04:32:00PM +0000, Peter Zijlstra wrote:
-> On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
-> > +void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
-> > +			  pmd_t *pmdp)
-> > +{
-> > +	pmd_t pmd = pmd_mksplitting(*pmdp);
-> > +	VM_BUG_ON(address & ~PMD_MASK);
-> > +	set_pmd_at(vma->vm_mm, address, pmdp, pmd);
-> > +
-> > +	/* dummy IPI to serialise against fast_gup */
-> > +	smp_call_function(thp_splitting_flush_sync, NULL, 1);
-> > +}
+On Thu, Mar 13, 2014 at 12:35:41AM +0800, Santosh Shilimkar wrote:
+> On Wednesday 12 March 2014 11:48 PM, Felipe Balbi wrote:
+> > Currently, even when building keystone only
+> > kernel builds, DTB won't get build because
+> > we lack a Makefile rule to get it compiled.
+> > 
+> > This patch adds that rule so mainline kernel
+> > users have a chance to use up-to-date DTB on
+> > keystone 2 platforms.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >
+> We have been building dtbs with explicit command
+> instead of dtbs since it was just one dtb so far
+> supported. Was planning to add the rule once more
+> boards get added. Now with Lamarr and Edision in
+> for next merge window, will do that post 3.15-rc1.
 > 
-> do you really need to IPI the entire machine? Wouldn't the mm's TLB
-> invalidate mask be sufficient?
+> > note that I just tried this on top of linux-next
+> > (commit 69d5cdda16b3c9767b82d80b07edb9bb056448e3)
+> > and, even though dtb builds fine, I still couldn't
+> > get keystone_defconfig uImage to boot fine.
+> > 
+> > It's probably my LOADADDR which is wrong.
+> > 
+> > Santosh, what's the LOADADDR I should be using
+> > for keystone boots ?
+> >
+> LOADADDR is same 0x80008000. You might have missed
 
-Are you thinking of using mm_cpumask(vma->vm_mm)? That's rarely cleared on
-ARM, so it tends to identify everywhere the task has ever run, regardless of
-TLB state. The reason is that the mask is also used for cache flushing
-(which is further overloaded for VIVT and VIPT w/ software maintenance
-broadcast).
+tried that, didn't help.
 
-I had a patch improving this a bit (below) but I didn't manage to see any
-significant improvements so I didn't pursue it further. What we probably want
-to try is nuking the mask on a h/w broadcast TLBI operation with ARMv7, but
-it will mean adding horrible checks to tlbflush.h
+> to configure the environment u-boot variable to
+> disable higher address space switch.
+> 'setenv mem_lpae 0'. Also ensure to update
 
-Will
+hmm, that might do it. Will try after upgrading u-boot to latest
+release.
 
---->8
-
-commit fd24d6170839b200cc2916c83847ca46e889f1ca
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Thu Jul 25 16:38:34 2013 +0100
-
-    ARM: mm: use mm_cpumask to keep track of dirty TLBs on v7
-    
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index def9e570199f..f2a1cb7edfca 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -202,6 +202,7 @@
- #ifndef __ASSEMBLY__
- 
- #include <linux/sched.h>
-+#include <asm/smp_plat.h>
- 
- struct cpu_tlb_fns {
- 	void (*flush_user_range)(unsigned long, unsigned long, struct vm_area_struct *);
-@@ -401,6 +402,17 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+	if (!cache_ops_need_broadcast()) {
-+		int cpu = get_cpu();
-+		if (cpumask_equal(mm_cpumask(mm), cpumask_of(cpu))) {
-+			cpumask_clear_cpu(cpu, mm_cpumask(mm));
-+			local_flush_tlb_mm(mm);
-+			put_cpu();
-+			return;
-+		}
-+		put_cpu();
-+	}
-+
- 	if (tlb_flag(TLB_WB))
- 		dsb(ishst);
- 
-@@ -459,6 +471,17 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+	if (!cache_ops_need_broadcast()) {
-+		int cpu = get_cpu();
-+		if (cpumask_equal(mm_cpumask(vma->vm_mm), cpumask_of(cpu))) {
-+			cpumask_clear_cpu(cpu, mm_cpumask(vma->vm_mm));
-+			local_flush_tlb_page(vma, uaddr);
-+			put_cpu();
-+			return;
-+		}
-+		put_cpu();
-+	}
-+
- 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
- 
- 	if (tlb_flag(TLB_WB))
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/1469d685/attachment.sig>
