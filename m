@@ -1,154 +1,238 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Mar 2014 15:19:48 +0200
-Subject: [PATCH 4/7] of: configure the platform device dma_mask and
- dma_pfn_offset
-In-Reply-To: <CAL_Jsq+KPpqmF3eU49AeWO2Q0d4uBon_67+zUz6dXKtfsjA3Nw@mail.gmail.com>
-References: <1394097598-17622-1-git-send-email-santosh.shilimkar@ti.com>	<201403071702.41716.arnd@arndb.de>	<CAL_JsqLu_16p-8FLjBYt7xQA2eAyiprPML2q5R3fnivZPrvPug@mail.gmail.com>	<201403090739.18351.arnd@arndb.de>
- <CAL_Jsq+KPpqmF3eU49AeWO2Q0d4uBon_67+zUz6dXKtfsjA3Nw@mail.gmail.com>
-Message-ID: <53205EF4.3070308@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Mar 2014 13:22:10 +0100
+Subject: [PATCH 1/2] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+ (BG2Q) device tree
+In-Reply-To: <1394622364-6848-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394622364-6848-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140312122210.GA3040@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Arnd,
-
-On 03/12/2014 02:15 AM, Rob Herring wrote:
-> On Sun, Mar 9, 2014 at 12:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Saturday 08 March 2014, Rob Herring wrote:
->>> On Fri, Mar 7, 2014 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->>>> a) Follow what we do for PCI devices: assume that we can do DMA_MASK(32)
->>>> on any device, and have drivers call dma_set_mask(DMA_MASK(64)) on devices
->>>> that would like to do more than that, or call e.g. dma_set_mask(DMA_MASK(28))
->>>> for devices that can do less than 32 bit, as given in the argument. This
->>>> approach would be most consistent with the way PCI works, but it doesn't
->>>> really work well for the case where the mask is less than 32-bit and the
->>>> device driver doesn't know that.
->>>>
->>>> b) Never have to call dma_set_mask() for platform devices and assume that the
->>>> platform code sets it up correctly. This would probably be the simpler
->>>> solution, and I can't think of any downsides at the moment.
->>>
->>> I don't think we want this. In the case of setting up 64-bit masters,
->>> it is typically the device that knows if it can do 64-bit DMA either
->>> thru a capabilities register or compatible value. That device specific
->>> knowledge should really stay within the device's driver.
->>
->> So you think we should still set a 64-bit mask in the "ranges" property
->> for devices that can only do 32-bit and let the driver figure it out?
+On 12/03/2014 at 12:06:03 +0100, Antoine T?nart wrote :
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  Documentation/arm/Marvell/README                   |   5 +
+>  .../devicetree/bindings/arm/marvell,berlin.txt     |   1 +
+>  arch/arm/boot/dts/berlin2q.dtsi                    | 167 +++++++++++++++++++++
+>  3 files changed, 173 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
 > 
-> No, I think option a makes more sense. BTW, don't you mean dma-ranges?
-> A device has it's own mask which is typically going to be 32 or
-> 64-bit. The core code may not know what the device supports, so the
-> device has to set it's own mask. I don't see a way around that. DT is
-> not a good option because it is discoverable in some cases.
+> diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+> index 5a930c1528ad..69ad05ea8ed8 100644
+> --- a/Documentation/arm/Marvell/README
+> +++ b/Documentation/arm/Marvell/README
+> @@ -224,6 +224,11 @@ Berlin family (Digital Entertainment)
+>  		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+>  		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500/
+>  		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
+> +	88DE3114, Armada 1500 Pro
+> +		Desgin name:	BG2-Q
+> +		Core:		Quad Core ARM CA9, PL310 L2CC
+> +		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500-pro/
+> +		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500-pro/assets/Marvell_ARMADA_1500_PRO-01_product_brief.pdf
+>  	88DE????
+>  		Design name:	BG3
+>  		Core:		ARM Cortex-A15, CA15 integrated L2CC
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> index 737afa5f8148..25472b74218f 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> @@ -11,6 +11,7 @@ In addition, the above compatible shall be extended with the specific
+>  SoC and board used. Currently known SoC compatibles are:
+>      "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
+>      "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
+> +    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q)
+>      "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
+>      "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
+>  
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> new file mode 100644
+> index 000000000000..f58c9c64c60e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -0,0 +1,167 @@
+> +/*
+> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
+> +	compatible = "marvell,berlin2q", "marvell,berlin";
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <3>;
+> +		};
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		smclk: sysmgr-clock {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <25000000>;
+> +		};
+> +
+
+The 25MHz crystal is on the board, please move it to the board dts.
+
+> +		sysclk: system-clock {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <400000000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		ranges = <0 0xf7000000 0x1000000>;
+> +		interrupt-parent = <&gic>;
+> +
+> +		l2: l2-cache-controller at ac0000 {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0xac0000 0x1000>;
+> +			cache-level = <2>;
+> +		};
+> +
+> +		gic: interrupt-controller at ad1000 {
+> +			compatible = "arm,cortex-a9-gic";
+> +			reg = <0xad1000 0x1000>, <0xad0100 0x100>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +		};
+> +
+> +		local-timer at ad0600 {
+> +			compatible = "arm,cortex-a9-twd-timer";
+> +			reg = <0xad0600 0x20>;
+> +			clocks = <&sysclk>;
+> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "okay";
+> +		};
+> +
+> +		apb at e80000 {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			ranges = <0 0xe80000 0x10000>;
+> +			interrupt-parent = <&aic>;
+> +
+> +			timer0: timer at 2c00 {
+> +				compatible = "snps,dw-apb-timer";
+> +				reg = <0x2c00 0x14>;
+> +				interrupts = <8>;
+> +				clock-freq = <100000000>;
+> +				status = "okay";
+> +			};
+> +
+> +			timer1: timer at 2c14 {
+> +				compatible = "snps,dw-apb-timer";
+> +				reg = <0x2c14 0x14>;
+> +				clock-freq = <100000000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			aic: interrupt-controller at 3800 {
+> +				compatible = "snps,dw-apb-ictl";
+> +				reg = <0x3800 0x30>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +				interrupt-parent = <&gic>;
+> +				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
+> +
+> +		apb at fc0000 {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			ranges = <0 0xfc0000 0x10000>;
+> +			interrupt-parent = <&sic>;
+> +
+> +			uart0: uart at 9000 {
+> +				compatible = "snps,dw-apb-uart";
+> +				reg = <0x9000 0x100>;
+> +				interrupt-parent = <&sic>;
+> +				interrupts = <8>;
+> +				clock-frequency = <25000000>;
+> +				reg-shift = <2>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart1: uart at a000 {
+> +				compatible = "snps,dw-apb-uart";
+> +				reg = <0xa000 0x100>;
+> +				interrupt-parent = <&sic>;
+> +				interrupts = <9>;
+> +				clock-frequency = <25000000>;
+> +				reg-shift = <2>;
+> +				status = "disabled";
+> +			};
+> +
+> +			sic: interrupt-controller at e000 {
+> +				compatible = "snps,dw-apb-ictl";
+> +				reg = <0xe000 0x30>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +				interrupt-parent = <&gic>;
+> +				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.3.2
 > 
-> Isn't the question here how do we handle restrictions added by the
-> bus? It seems while this series adds support for handling dma-ranges
-> to set the default case, it also needs to handle when the driver sets
-> the mask. Is this not simply a matter of having dma_set_mask also
-> parse dma-ranges (or reuse a saved bus mask)?
 > 
->> I think this approach is much less useful for platform devices than it is
->> for PCI devices, where we don't explicitly describe the "ranges" for each
->> device. Are you thinking of off-chip or on-chip DMA masters here? If
->> on-chip, I don't think it's likely that we would end up with different
->> versions of the chip that have the same device on there but not the
->> same DMA capabilities.
-> 
-> Sounds like a challenge to h/w designers. :)
-> 
-> I'm mainly thinking about the midway case where all masters are 32-bit
-> except AHCI which is 64-bit. The core libahci sets the mask based on
-> the capabilities register regardless of PCI or platform bus. Requiring
-> this to be setup by the platform or in the DT seems like a step
-> backwards. A slightly more complicated case would be something like
-> midway, but with RAM starting at say 2GB and DMA masters have the same
-> view as the cpu (i.e. no offset). Then the platform does need to set
-> the mask to (2^31 -1).
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-mask has to be (2^32 -1).
-
-I'd like to add my 5 cents here :)
-First of all this solution is pretended to be generic, so by default it
-can't handle all possible cases (corner cases) - only widely used. 
-Arch or driver can always fix up it through bus notifier or driver's probe.
-
-Second, it works only for DT-boot case when devices instantiated from DT in generic way.
-So, if any bus creates devices in its own way - proper DMA configuration of such
-devices will be private problem of this bus.
-
-I've tried to formulate possible use cases which can be and can't be covered
-by this approach:
-[1] 32 bit SoC:
-- no DMA range limitation: DMA range has to be absent or be equal to RAM
-  (default DMA configuration will be applied)
-
-- DMA range present and It's defined inside RAM (no address translation needed):
-  DMA range can be present and depending on its size
-  dma_mask will be equal or less than DMA_MASK(32).
-  (default DMA configuration will be applied - if DMA range isn't present)
-
-- DMA range present and It's defined outside of RAM (address translation needed):
-  DMA range has to be present and depending on its size
-  dma_mask will be equal or less than DMA_MASK(32); and dma_pfn_offset will be calculated.
-
-Compatibility issues:
-  - Old DT without DMA properties defined and DMA range is defined outside of RAM:
-  arch or drivers code has to provide proper address translation routines.
-
-[2] 64 bit SOC (only 64 bit masters):
-- no DMA range limitation: DMA range has to be present and equal to RAM
-
-- DMA range present and It's defined inside RAM (no address translation needed):
-  DMA range has to be present and depending on its size
-  dma_mask will be equal or less than DMA_MASK(64).
-
-- DMA range present and It's defined outside of RAM (address translation needed):
-  DMA range has to be present and depending on its size
-  dma_mask will be equal or less than DMA_MASK(64); and dma_pfn_offset will be calculated.
-
-Compatibility issues:
-  - Old DT without DMA properties defined: Drivers may still need to call dma_set_mask(DMA_MASK(64)
-  - Old DT without DMA properties defined and DMA range is defined outside of RAM:
-  arch or drivers code still has to provide proper address translation routines.
-
-[3] 64 bit SOC (only 32 bit masters):
-
-- DMA range is present and It's defined inside RAM (no address translation needed):
-  DMA range can be absent - default DMA configuration will be applied.
-
-- DMA range present and It's defined outside of RAM (address translation needed):
-  DMA range has to be present and depending on its size
-  dma_mask will be equal or less than DMA_MASK(32); and dma_pfn_offset will be calculated.
-
-Compatibility issues:
-  - Old DT without DMA properties defined and DMA range is defined outside of RAM:
-  arch or drivers code has to provide proper address translation routines.
-
-
-[4] 64 bit SOC (32 bit and 64 masters):
-- This is combination of above 2,3 cases.
-  The current approach will allow to handle it by defining two buses in DT
-  "simple-bus32" and "simple-bus64", and each one should have its own DMA properties
-  defined in DT.
-
-- The worst case will be if some device is able to change its DMA configuration
-  dynamically by reading its DMA configuration from HW. The main difficulties will
-  be to handle DMA addresses translation properly in this case. But, in my opinion,
-  such behavior will be needed in very rare case as DT has to describe specific SoC
-  and such device has to belong to only one bus as per SoC specification.
-
-Compatibility issues:
-  - Old DT without DMA properties defined and 32 bits DMA range is defined outside of RAM:
-  arch or drivers code has to provide proper address translation routines.
-
-As per above, this approach will allow to handle most of cases and configure DMA properly
-with one exception - device is able to change its DMA configuration dynamically.
-
-Also, for compatibility reasons, arches and drivers may need to continue maintain their own
-DMA addresses translation routines to support the case
-"Old DT without DMA properties defined and DMA range is defined outside of RAM".
-
-Regards,
-- grygorii
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
