@@ -1,199 +1,65 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 12 Mar 2014 09:50:06 +0100
-Subject: [PATCH v4 2/6] pinctrl: st: Enhance the controller to manage
- unavailable registers
-In-Reply-To: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1394614210-15698-3-git-send-email-maxime.coquelin@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Mar 2014 08:54:01 +0000
+Subject: [PATCHv4 2/2] arm: Get rid of meminfo
+In-Reply-To: <1392761733-32628-3-git-send-email-lauraa@codeaurora.org>
+References: <1392761733-32628-1-git-send-email-lauraa@codeaurora.org>
+ <1392761733-32628-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140312085401.GB21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+On Tue, Feb 18, 2014 at 02:15:33PM -0800, Laura Abbott wrote:
+> memblock is now fully integrated into the kernel and is the prefered
+> method for tracking memory. Rather than reinvent the wheel with
+> meminfo, migrate to using memblock directly instead of meminfo as
+> an intermediate.
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-This patch adds a new logic inside the st pinctrl to manage
-an unsupported scenario: some sysconfig are not available!
+Laura,
 
-This is the case of STiH407 where, although documented, the
-following registers from SYSCFG_FLASH have been removed from the SoC.
+This patch causes a bunch of platforms to no longer boot - imx6solo with
+1GB of RAM boots, imx6q with 2GB of RAM doesn't.  Versatile Express doesn't.
 
-SYSTEM_CONFIG3040
-   Output Enable pad control for all PIO Alternate Functions
-and
-SYSTEM_ CONFIG3050
-   Pull Up pad control for all PIO Alternate Functions
+The early printk messages don't reveal anything too interesting:
 
-Without managing this condition an imprecise external abort
-will be detect.
+Booting Linux on physical CPU 0x0
+Linux version 3.14.0-rc6+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.6.4 (GCC) ) #630 SMP Wed Mar 12 01:13:36 GMT 2014
+CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+Machine model: SolidRun Cubox-i Dual/Quad
+cma: CMA: reserved 64 MiB at 8c000000
+Memory policy: Data cache writealloc
+<hang>
 
-To do this the patch also reviews the st_parse_syscfgs
-and other routines to manipulate the registers only if
-actually available.
-In any case, for example the st_parse_syscfgs detected
-an error condition but no action was made in the
-st_pctl_probe_dt.
+vs.
 
-Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- drivers/pinctrl/pinctrl-st.c | 104 +++++++++++++++++++++++++------------------
- 1 file changed, 61 insertions(+), 43 deletions(-)
+Booting Linux on physical CPU 0x0
+Linux version 3.14.0-rc6+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.6.4 (GCC) ) #631 SMP Wed Mar 12 01:15:37 GMT 2014
+CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+Machine model: SolidRun Cubox-i Dual/Quad
+cma: CMA: reserved 64 MiB at 3b800000
+Memory policy: Data cache writealloc
+On node 0 totalpages: 524288
+free_area_init_node: node 0, pgdat c09d0240, node_mem_map ea7d8000
+  Normal zone: 1520 pages used for memmap
+  Normal zone: 0 pages reserved
+  Normal zone: 194560 pages, LIFO batch:31
+  HighMem zone: 2576 pages used for memmap
+  HighMem zone: 329728 pages, LIFO batch:31
+...
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 9fb66aa..7073eaf 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -410,25 +410,29 @@ static void st_pinconf_set_config(struct st_pio_control *pc,
- 	unsigned int oe_value, pu_value, od_value;
- 	unsigned long mask = BIT(pin);
- 
--	regmap_field_read(output_enable, &oe_value);
--	regmap_field_read(pull_up, &pu_value);
--	regmap_field_read(open_drain, &od_value);
--
--	/* Clear old values */
--	oe_value &= ~mask;
--	pu_value &= ~mask;
--	od_value &= ~mask;
--
--	if (config & ST_PINCONF_OE)
--		oe_value |= mask;
--	if (config & ST_PINCONF_PU)
--		pu_value |= mask;
--	if (config & ST_PINCONF_OD)
--		od_value |= mask;
--
--	regmap_field_write(output_enable, oe_value);
--	regmap_field_write(pull_up, pu_value);
--	regmap_field_write(open_drain, od_value);
-+	if (output_enable) {
-+		regmap_field_read(output_enable, &oe_value);
-+		oe_value &= ~mask;
-+		if (config & ST_PINCONF_OE)
-+			oe_value |= mask;
-+		regmap_field_write(output_enable, oe_value);
-+	}
-+
-+	if (pull_up) {
-+		regmap_field_read(pull_up, &pu_value);
-+		pu_value &= ~mask;
-+		if (config & ST_PINCONF_PU)
-+			pu_value |= mask;
-+		regmap_field_write(pull_up, pu_value);
-+	}
-+
-+	if (open_drain) {
-+		regmap_field_read(open_drain, &od_value);
-+		od_value &= ~mask;
-+		if (config & ST_PINCONF_OD)
-+			od_value |= mask;
-+		regmap_field_write(open_drain, od_value);
-+	}
- }
- 
- static void st_pctl_set_function(struct st_pio_control *pc,
-@@ -439,6 +443,9 @@ static void st_pctl_set_function(struct st_pio_control *pc,
- 	int pin = st_gpio_pin(pin_id);
- 	int offset = pin * 4;
- 
-+	if (!alt)
-+		return;
-+
- 	regmap_field_read(alt, &val);
- 	val &= ~(0xf << offset);
- 	val |= function << offset;
-@@ -576,17 +583,23 @@ static void st_pinconf_get_direction(struct st_pio_control *pc,
- {
- 	unsigned int oe_value, pu_value, od_value;
- 
--	regmap_field_read(pc->oe, &oe_value);
--	regmap_field_read(pc->pu, &pu_value);
--	regmap_field_read(pc->od, &od_value);
-+	if (pc->oe) {
-+		regmap_field_read(pc->oe, &oe_value);
-+		if (oe_value & BIT(pin))
-+			ST_PINCONF_PACK_OE(*config);
-+	}
- 
--	if (oe_value & BIT(pin))
--		ST_PINCONF_PACK_OE(*config);
--	if (pu_value & BIT(pin))
--		ST_PINCONF_PACK_PU(*config);
--	if (od_value & BIT(pin))
--		ST_PINCONF_PACK_OD(*config);
-+	if (pc->pu) {
-+		regmap_field_read(pc->pu, &pu_value);
-+		if (pu_value & BIT(pin))
-+			ST_PINCONF_PACK_PU(*config);
-+	}
- 
-+	if (pc->od) {
-+		regmap_field_read(pc->od, &od_value);
-+		if (od_value & BIT(pin))
-+			ST_PINCONF_PACK_OD(*config);
-+	}
- }
- 
- static int st_pinconf_get_retime_packed(struct st_pinctrl *info,
-@@ -1105,8 +1118,21 @@ static int st_pctl_dt_setup_retime(struct st_pinctrl *info,
- 	return -EINVAL;
- }
- 
--static int st_parse_syscfgs(struct st_pinctrl *info,
--		int bank, struct device_node *np)
-+
-+static struct regmap_field *st_pc_get_value(struct device *dev,
-+					    struct regmap *regmap, int bank,
-+					    int data, int lsb, int msb)
-+{
-+	struct reg_field reg = REG_FIELD((data + bank) * 4, lsb, msb);
-+
-+	if (data < 0)
-+		return NULL;
-+
-+	return devm_regmap_field_alloc(dev, regmap, reg);
-+}
-+
-+static void st_parse_syscfgs(struct st_pinctrl *info, int bank,
-+			     struct device_node *np)
- {
- 	const struct st_pctl_data *data = info->data;
- 	/**
-@@ -1116,29 +1142,21 @@ static int st_parse_syscfgs(struct st_pinctrl *info,
- 	 */
- 	int lsb = (bank%4) * ST_GPIO_PINS_PER_BANK;
- 	int msb = lsb + ST_GPIO_PINS_PER_BANK - 1;
--	struct reg_field alt_reg = REG_FIELD((data->alt + bank) * 4, 0, 31);
--	struct reg_field oe_reg = REG_FIELD((data->oe + bank/4) * 4, lsb, msb);
--	struct reg_field pu_reg = REG_FIELD((data->pu + bank/4) * 4, lsb, msb);
--	struct reg_field od_reg = REG_FIELD((data->od + bank/4) * 4, lsb, msb);
- 	struct st_pio_control *pc = &info->banks[bank].pc;
- 	struct device *dev = info->dev;
- 	struct regmap *regmap  = info->regmap;
- 
--	pc->alt = devm_regmap_field_alloc(dev, regmap, alt_reg);
--	pc->oe = devm_regmap_field_alloc(dev, regmap, oe_reg);
--	pc->pu = devm_regmap_field_alloc(dev, regmap, pu_reg);
--	pc->od = devm_regmap_field_alloc(dev, regmap, od_reg);
--
--	if (IS_ERR(pc->alt) || IS_ERR(pc->oe) ||
--			IS_ERR(pc->pu) || IS_ERR(pc->od))
--		return -EINVAL;
-+	pc->alt = st_pc_get_value(dev, regmap, bank, data->alt, 0, 31);
-+	pc->oe = st_pc_get_value(dev, regmap, bank/4, data->oe, lsb, msb);
-+	pc->pu = st_pc_get_value(dev, regmap, bank/4, data->pu, lsb, msb);
-+	pc->od = st_pc_get_value(dev, regmap, bank/4, data->od, lsb, msb);
- 
- 	/* retime avaiable for all pins by default */
- 	pc->rt_pin_mask = 0xff;
- 	of_property_read_u32(np, "st,retime-pin-mask", &pc->rt_pin_mask);
- 	st_pctl_dt_setup_retime(info, bank, pc);
- 
--	return 0;
-+	return;
- }
- 
- /*
+The only obvious difference is the address of that CMA reservation,
+CMA shouldn't make a difference here - but I suspect that other
+allocations which need to be in lowmem probably aren't.
+
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
