@@ -1,54 +1,50 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 12 Mar 2014 13:06:48 +0200
-Subject: [PATCH] video: atmel_lcdfb: ensure the hardware is initialized
- with the correct mode
-In-Reply-To: <1394209254-23797-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1394209254-23797-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53203FC8.7010604@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 12 Mar 2014 08:08:38 -0300
+Subject: [PATCH v3][ 5/9] ARM: dts: imx25.dtsi: Fix USB support.
+In-Reply-To: <1394618518-13803-5-git-send-email-denis@eukrea.com>
+References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
+ <1394618518-13803-5-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5A5BOgoJwtrxYEVJ9pzyS-6hobzf02i6Wf3Xu2BG29bAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/14 18:20, Antoine T?nart wrote:
-> If no driver takeover the atmel_lcdfb, the lcd won't be in a working state
-> since atmel_lcdfb_set_par() will never be called. Enabling a driver which does,
-> like fbcon, will call the function and put atmel_lcdfb in a working state.
-> 
-> Fixes: b985172b328a (video: atmel_lcdfb: add device tree suport)
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/video/atmel_lcdfb.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index cd96162..b74e5f5d 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -1298,6 +1298,12 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
->  		goto unregister_irqs;
->  	}
->  
-> +	ret = atmel_lcdfb_set_par(info);
-> +	if (ret < 0) {
-> +		dev_err(dev, "set par failed: %d\n", ret);
-> +		goto unregister_irqs;
-> +	}
+Hi Denis,
+
+On Wed, Mar 12, 2014 at 7:01 AM, Denis Carikli <denis@eukrea.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> This patch was adapted from the thread named
+> "USB Host support for mx25" on linux-usb at vger.kernel.org
+>
+
+As you add me in the From field, you also need to add:
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com> above your
+Signed-off-by line.
+
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > +
->  	dev_set_drvdata(dev, info);
->  
->  	/*
-> 
+> +       usbphy {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               compatible = "simple-bus";
 
-Thanks, queued for 3.15.
+I made this comment earlier: why do we place usbphy0/1 under simple-bus?
 
- Tomi
+This is not documented in the the bindings.
 
+> +
+> +               usbphy0: usbphy at 0 {
+> +                       reg = <0>;
+> +                       compatible = "usb-nop-xceiv";
+> +               };
+> +
+> +               usbphy1: usbphy at 1 {
+> +                       reg = <1>;
+> +                       compatible = "usb-nop-xceiv";
+> +               };
+> +       };
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/07cbba94/attachment-0001.sig>
+Regards,
+
+Fabio Estevam
