@@ -1,65 +1,82 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Wed, 12 Mar 2014 07:41:54 -0400 (EDT)
-Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
-In-Reply-To: <20140312113346.GA9347@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
- <531FE40C.1060709@wwwdotorg.org>
- <20140312113346.GA9347@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Mar 2014 11:42:57 +0000
+Subject: [PATCH v2 1/3] ata: ahci_st: Provide DT bindings for ST's SATA
+ implementation
+In-Reply-To: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140312114257.GA17461@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Mar 2014, Will Deacon wrote:
+On Tue, Feb 25, 2014 at 11:41:19AM +0000, Lee Jones wrote:
+> Cc: devicetree at vger.kernel.org
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
+> new file mode 100644
+> index 0000000..1b69fa9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
+> @@ -0,0 +1,31 @@
+> +STMicroelectronics STi SATA controller
 
-> Hi guys,
-> 
-> On Wed, Mar 12, 2014 at 04:35:24AM +0000, Stephen Warren wrote:
-> > On 03/10/2014 03:21 PM, Vince Weaver wrote:
-> > > I buit the current
-> > > 	git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
-> > > kernel on a Raspberry Pi.
-> > > 
-> > > I used 
-> > > 	make bcm2835_defconfig
-> > > 	make zImage
-> > > but the results zImage hung at boot.
-> > > 
-> > > It turned out that for some reason 
-> > > 	CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y
-> > > and
-> > > 	CONFIG_ARCH_USE_BUILTIN_BSWAP=y
-> > 
-> > Hmm. I thought that ARMv6 didn't have efficient unaligned accesses, but
-> > I suppose it must; ARM selects HAVE_EFFICIENT_UNALIGNED_ACCESS for
-> > v6/v6k/v7. BUILTIN_BSWAP seems innocuous. Can you verify which of those
-> > two options actually causes problems for you?
-> 
-> So just to confirm: enabling those options in the kernel you are compiling
-> results in an image that you can't boot? We're not talking about the host
-> kernel here.
-> 
-> I just took the tree you mentioned above, merged together 3.14-rc6,
-> for-3.15/soc and for-3.15/dt. Using the defconfig (+ appended dtb options)
-> and cross-compiling with a dated linaro toolchain, it booted fine on my rpi:
-> 
->   Uncompressing Linux... done, booting the kernel.
->   [    0.000000] Booting Linux on physical CPU 0x0
->   [    0.000000] Initializing cgroup subsys cpuset
->   [    0.000000] Initializing cgroup subsys cpu
->   [    0.000000] Initializing cgroup subsys cpuacct
->   [    0.000000] Linux version 3.14.0-rc6+ (will at tiny-lites) (gcc version 4.8.2 20130603 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.06 - Linaro GCC 2013.06) ) #8 Wed Mar 12 10:51:44 GMT 2014
->   [    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387d
->   [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
->   [    0.000000] Machine model: Raspberry Pi Model B
->   [    0.000000] bootconsole [earlycon0] enabled
->   [    0.000000] Memory policy: Data cache writeback
->   [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 97536
->   [...]
-> 
-> Which compiler are you using?
+Is that a family name or a particular device?
 
-it's the gcc 4.6.3 that comes with the version of raspian on the rasp-pi 
-(I'm compiling natively).  Let me try again and double check there weren't 
-any other changes.
+> +
+> +This binding describes a SATA device.
+> +
+> +Required properties:
+> + - compatible	   : Must be "st,ahci"
 
-Vince
+Is there not a more specific name? This is awfully generic.
+
+> + - reg		   : Physical base addresses and length of register sets
+> + - interrupts	   : Interrupt associated with the SATA device
+> + - interrupt-names :   Associated name must be; "hostc"
+> + - resets	   : The power-down and soft-reset lines of SATA IP
+> + - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
+
+Get rid of the semicolon, it makes this harder to read. Same for the
+other -names proeprties.
+
+> + - clocks	   : The phandle for the clock
+> + - clock-names	   :   Associated name must be; "ahci_clk"
+> + - phys		   : The phandle for the PHY device
+> + - phy-names	   :   Associated name must be; "ahci_phy"
+
+This looks sane, but I'd like to see a more specific description and
+compatible string.
+
+Cheers,
+Mark.
+
+> +
+> +Example:
+> +
+> +	sata0: sata at fe380000 {
+> +		compatible      = "st,ahci";
+> +		reg             = <0xfe380000 0x1000>;
+> +		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
+> +		interrupt-names = "hostc";
+> +		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
+> +		phy-names       = "ahci_phy";
+> +		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
+> +				  <&softreset STIH416_SATA0_SOFTRESET>;
+> +		reset-names     = "pwr-dwn", "sw-rst";
+> +		clocks	        = <&CLK_S_ICN_REG_0>;
+> +		clock-names     = "ahci_clk";
+> +	};
+> -- 
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
