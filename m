@@ -1,29 +1,70 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 12 Mar 2014 20:08:14 +0800
-Subject: [PATCH 1/3 V2] crypto: Fix the pointer voodoo in unaligned ahash
-In-Reply-To: <1393806108-6374-1-git-send-email-marex@denx.de>
-References: <1389720829-5963-1-git-send-email-marex@denx.de>
- <1393806108-6374-1-git-send-email-marex@denx.de>
-Message-ID: <20140312120814.GA25881@gondor.apana.org.au>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 12 Mar 2014 13:11:01 +0100
+Subject: [PATCH v2] Documentation: clk: Add locking documentation
+In-Reply-To: <1393591256-6932-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1393591256-6932-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1427024.Y6pT20dv1F@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 03, 2014 at 01:21:46AM +0100, Marek Vasut wrote:
-> Add documentation for the pointer voodoo that is happening in crypto/ahash.c
-> in ahash_op_unaligned(). This code is quite confusing, so add a beefy chunk
-> of documentation.
+Hello,
+
+On Friday 28 February 2014 13:40:56 Laurent Pinchart wrote:
+> Briefly documentation the common clock framework locking scheme from a
+> clock driver point of view.
 > 
-> Moreover, make sure the mangled request is completely restored after finishing
-> this unaligned operation. This means restoring all of .result, .priv, .base.data
-> and .base.complete .
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-There is no point in saving priv because it is only meant to be
-used by the crypto API.
+Ping ? Is this version better (and acceptable) ?
 
-Otherwise the patch looks OK to me.
+> ---
+>  Documentation/clk.txt | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+> index 699ef2a..c9c399a 100644
+> --- a/Documentation/clk.txt
+> +++ b/Documentation/clk.txt
+> @@ -255,3 +255,37 @@ are sorted out.
+> 
+>  To bypass this disabling, include "clk_ignore_unused" in the bootargs to
+> the kernel.
+> +
+> +	Part 7 - Locking
+> +
+> +The common clock framework uses two global locks, the prepare lock and the
+> +enable lock.
+> +
+> +The enable lock is a spinlock and is held across calls to the .enable,
+> +.disable and .is_enabled operations. Those operations are thus not allowed
+> to +sleep, and calls to the clk_enable(), clk_disable() and
+> clk_is_enabled() API +functions are allowed in atomic context.
+> +
+> +The prepare lock is a mutex and is held across calls to all other
+> operations. +All those operations are allowed to sleep, and calls to the
+> corresponding API +functions are not allowed in atomic context.
+> +
+> +This effectively divides operations in two groups from a locking
+> perspective. +
+> +Drivers don't need to manually protect resources shared between the
+> operations +of one group, regardless of whether those resources are shared
+> by multiple +clocks or not. However, access to resources that are shared
+> between operations +of the two groups needs to be protected by the drivers.
+> An example of such a +resource would be a register that controls both the
+> clock rate and the clock +enable/disable state.
+> +
+> +The clock framework is reentrant, in that a driver is allowed to call clock
+> +framework functions from within its implementation of clock operations.
+> This +can for instance cause a .set_rate operation of one clock being
+> called from +within the .set_rate operation of another clock. This case
+> must be considered +in the driver implementations, but the code flow is
+> usually controlled by the +driver in that case.
+> +
+> +Note that locking must also be considered when code outside of the common
+> +clock framework needs to access resources used by the clock operations.
+> This +is considered out of scope of this document.
 
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Regards,
+
+Laurent Pinchart
