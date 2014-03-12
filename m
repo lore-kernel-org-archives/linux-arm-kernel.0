@@ -1,24 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Mar 2014 10:19:56 -0700
-Subject: [PATCH v4 5/9] ARM: dts: omap3-overo: Add HSUSB PHY
-In-Reply-To: <531EDAAC.8030509@ti.com>
-References: <1394220139-1760-1-git-send-email-florian.vaussard@epfl.ch>
- <1394220139-1760-6-git-send-email-florian.vaussard@epfl.ch>
- <531D9452.6040501@ti.com> <531DD6A8.7010406@epfl.ch>
- <531EDAAC.8030509@ti.com>
-Message-ID: <20140312171955.GB30897@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Mar 2014 17:19:56 +0000
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries
+In-Reply-To: <531F16C6.5030903@arm.com>
+References: <1394543851-11732-1-git-send-email-broonie@kernel.org>
+ <531F16C6.5030903@arm.com>
+Message-ID: <20140312171955.GR17083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [140311 02:46]:
+On Tue, Mar 11, 2014 at 01:59:34PM +0000, Sudeep Holla wrote:
+> On 11/03/14 13:17, Mark Brown wrote:
+> > From: Mark Brown <broonie@linaro.org>
+> >
+> > Probably due to rebasing over the lengthy time it took to get the patch
+> > merged commit addea9ef055b (cpufreq: enable ARM drivers on arm64) added
+> > a duplicate Power management options section.  Add CPUfreq to the CPU
+> > power management section and remove a duplicate include of the main
+> > power section.
 > 
-> Any sane design would maintain register offsets but it doesn't seem so with
-> omap34xx vs omap36xx. So my assumption was wrong.
-> 
-> I'll ack this patch.
+> This looks fine to me, but since commit addea9ef055b is only in Rafael's
+> next tree, Catalin can't take this, so it makes sense to go through Rafael's
+> tree, right ?
 
-OK thanks, I'll apply the whole series with your ack to omap-for-v3.15/dt-overo.
+I actually took this patch and noticed that Rafael took it as well. The
+above commit I think is only valid in the arm64 tree for -next.
 
-Regards,
-
-Tony
+-- 
+Catalin
