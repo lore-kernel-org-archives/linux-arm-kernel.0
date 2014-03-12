@@ -1,51 +1,74 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Wed, 12 Mar 2014 12:27:40 -0600
-Subject: [PATCH v3 4/9] of: mtd: add documentation for the ONFI NAND
- timing mode property
-In-Reply-To: <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <F8865D0A-59A7-41A7-AA7F-9B91DF5C8258@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 12 Mar 2014 19:40:39 +0100
+Subject: [PATCH] ARM: shmobile: r8a7791: Fix SCIFA3-5 clocks
+Message-ID: <1394649639-23358-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-On Mar 12, 2014, at 12:07 PM, Boris BREZILLON <b.brezillon.dev@gmail.com> wrote:
+The MSTP clocks for SCIFA3-5 are MSTP1106-1108, not MSTP1105-1107
 
-> Add documentation for the ONFI NAND timing mode property.
+Also reinsert them at the correct position to preserve sort order.
 
-I don?t see a Toggle/JEDEC mode timing property. Will that be defined for Toshiba, Samsung
-and San Disk flash? Or will this be limited to Micron, Intel and Hynix (the only ones
-supporting ONFI)?
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+The clock index macros for DT sources are already OK.
+---
+ arch/arm/mach-shmobile/clock-r8a7791.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-Warner
-
-
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> ---
-> Documentation/devicetree/bindings/mtd/nand.txt |    8 ++++++++
-> 1 file changed, 8 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-> index b53f92e..2046027 100644
-> --- a/Documentation/devicetree/bindings/mtd/nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
-> @@ -19,3 +19,11 @@ errors per {size} bytes".
-> The interpretation of these parameters is implementation-defined, so not all
-> implementations must support all possible combinations. However, implementations
-> are encouraged to further specify the value(s) they support.
-> +
-> +- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
-> +  the NAND chip. Each supported mode is represented as a bit position (i.e. :
-> +  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
-> +  This is only used when the chip does not support the ONFI standard.
-> +  The last bit set represent the closest mode fulfilling the NAND chip timings.
-> +  For a full description of the different timing modes see this document:
-> +  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index 605fc778e3e2..701383fe3267 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -170,6 +170,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ 
+ /* MSTP */
+ enum {
++	MSTP1108, MSTP1107, MSTP1106,
+ 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
+ 	MSTP917,
+ 	MSTP815, MSTP814,
+@@ -180,12 +181,15 @@ enum {
+ 	MSTP522,
+ 	MSTP314, MSTP312, MSTP311,
+ 	MSTP216, MSTP207, MSTP206,
+-	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
++	MSTP204, MSTP203, MSTP202,
+ 	MSTP124,
+ 	MSTP_NR
+ };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP1108] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 8, MSTPSR11, 0), /* SCIFA5 */
++	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA4 */
++	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA3 */
+ 	[MSTP931] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
+ 	[MSTP930] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
+ 	[MSTP929] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
+@@ -218,9 +222,6 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
+ 	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
+ 	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
+-	[MSTP1105] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 5, MSTPSR11, 0), /* SCIFA3 */
+-	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA4 */
+-	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA5 */
+ 	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
+ };
+ 
+@@ -259,9 +260,9 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
+ 	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
+ 	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
+-	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
+-	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+-	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
++	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1106]), /* SCIFA3 */
++	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1107]), /* SCIFA4 */
++	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1108]), /* SCIFA5 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
+-- 
+1.7.9.5
