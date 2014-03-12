@@ -1,70 +1,76 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Mar 2014 12:31:55 +0900
-Subject: [PATCH 1/5] ARM: dts: exynos4x12: Add ADC's dt data to read raw
- data
-In-Reply-To: <531EFF7F.9010405@samsung.com>
-References: <1394524494-30641-1-git-send-email-cw00.choi@samsung.com>
- <1394524494-30641-2-git-send-email-cw00.choi@samsung.com>
- <531EFF7F.9010405@samsung.com>
-Message-ID: <531FD52B.8040007@samsung.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 11 Mar 2014 20:37:35 -0700
+Subject: [PATCH 1/2] of/irq: Fix irq-mapping in of_irq_parse_raw()
+In-Reply-To: <20140311201533.GF31835@obsidianresearch.com>
+References: <1393944864-28113-1-git-send-email-tharvey@gateworks.com>
+ <20140311201533.GF31835@obsidianresearch.com>
+Message-ID: <CAJ+vNU1-evvZuLEeKvdRnbt_kXm3-zsNEk9ACQ21UhYxJtWwFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, Mar 11, 2014 at 1:15 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Tue, Mar 04, 2014 at 06:54:24AM -0800, Tim Harvey wrote:
+>> When an interrupt-map contains multiple entries an imap pointer arithmetic
+>> bug can cause only the first entry to be properly evaluated and causes
+>> the out_irq parameters to be incorrect depending on the #interrupt-cells
+>> and #address-cells of the parent interrupt controller.
+>
+> Tim,
+>
+> I took a bit closer look at this for you, and I suspect the root fix
+> is this:
+>
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -55,7 +55,6 @@ Example:
+>         intc: interrupt-controller at fff11000 {
+>                 compatible = "arm,cortex-a9-gic";
+>                 #interrupt-cells = <3>;
+> -               #address-cells = <1>;
+>                 interrupt-controller;
+>                 reg = <0xfff11000 0x1000>,
+>                       <0xfff10100 0x100>;
+> (plus the corresponding purge from the .dt files)
+>
+> It looks like the implementation does follow the OF specification:
+>
+>  Each mapping entry consists of a 3-tuple of (child-interrupt,
+>  interrupt-parent, parent-interrupt). The number of cells for the
+>  child-interrupt specifier is determined by the "#address-cells" and
+>  "#interrupt-cells"property of this node. The number of cells for the
+>  parent-interrupt value is determined by the "#address-cells"and
+>  "#interrupt-cells"property values of this node's
+>  interrupt-parent.
 
-On 03/11/2014 09:20 PM, Tomasz Figa wrote:
-> Hi Chanwoo,
-> 
-> On 11.03.2014 08:54, Chanwoo Choi wrote:
->> This patch add ADC(Analog to Digital Converter)'s dt data to get raw data
->> with IIO subsystem. Usually, ADC is used to check temperature, jack type, and
->> so on.
->>
-> 
-> 8< ---
-> 
->> Register map
->> - <0x126C0000 0x100> : ADC register's base address
->> - <0x10020718 0x4> : ADC_PHY_CONTROL, TS-ADC control register address
->>
->> Clock
->> - <&clock 326> : ADC clock (clock name :'tsadc')
->>
->> Interrupt
->> - INTG10[3] : ADC for General ADC
-> 
-> --- >8
-> 
-> I don't think there is a need to include such data in commit message. A commit message should say what is done and why it's done (and sometimes how it's done, in case of some complex code being added) and I guess that's all.
+Ok - I see I misunderstood the spec with regards to what the
+address-cells related to.
 
-OK, I'll remove it on patch description.
+>
+> So by specifying interrupt-cells = 3, address-cells = 1, the GIC is
+> requiring 4 DWs for its interrupt specifier.
 
-> 
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4x12.dtsi | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
->> index 5c412aa..5a3e551 100644
->> --- a/arch/arm/boot/dts/exynos4x12.dtsi
->> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
->> @@ -80,6 +80,18 @@
->>           };
->>       };
->>
->> +    adc: adc at 126C0000 {
->> +        compatible = "samsung,exynos-adc-v1";
->> +        reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->> +        interrupt-parent = <&combiner>;
->> +        interrupts = <10 3>;
->> +        clocks = <&clock 326>;
-> 
-> Please use clock macros instead of numbers, as introduced by Andrzej Hajda's patches merged to Kgene's tree.
-> 
-OK, I'll modify it.
+Agreed, and the interrupt mapping for the imx6 pcie host controller:
 
-Thanks,
-Chanwoo Choi
+interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+
+has only 3 cells for the parent interrupt, and only 3 are needed so I
+suppose there is no 'address' necessary.
+
+>
+> I see no reason why it doesn't have an address-cells = 0 like other
+> interrupt controllers..
+
+I agree, and I see that as well for other cortex-a9 gic interrupt controllers.
+
+>
+> Setting #address-cells to 0 in the GIC node should be functionally
+> equivalent to your patch below, since newaddrsize will == 0.
+
+yes, it does.  I'll verify and post a followup patch tomorrow for the
+invalid dtsi's.  Thanks for digging into this!
+
+Tim
