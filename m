@@ -1,54 +1,229 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 12 Mar 2014 13:40:23 +0000
-Subject: [RFC PATCH V3 6/6] arm64: mm: Activate get_user_pages_fast for arm64
+Date: Wed, 12 Mar 2014 13:40:21 +0000
+Subject: [RFC PATCH V3 4/6] arm64: Convert asm/tlb.h to generic mmu_gather
 In-Reply-To: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
 References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1394631623-17883-7-git-send-email-steve.capper@linaro.org>
+Message-ID: <1394631623-17883-5-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The get_user_pages fast implementation in arch/arm is valid for arm64
-too. This patch references get_user_pages_fast from arch/arm, rather
-than duplicate the code.
+From: Catalin Marinas <catalin.marinas@arm.com>
 
+Over the past couple of years, the generic mmu_gather gained range
+tracking - 597e1c3580b7 (mm/mmu_gather: enable tlb flush range in generic
+mmu_gather), 2b047252d087 (Fix TLB gather virtual address range
+invalidation corner cases) - and tlb_fast_mode() has been removed -
+29eb77825cc7 (arch, mm: Remove tlb_fast_mode()).
+
+The new mmu_gather structure is now suitable for arm64 and this patch
+converts the arch asm/tlb.h to the generic code. One functional
+difference is the shift_arg_pages() case where previously the code was
+flushing the full mm (no tlb_start_vma call) but now it flushes the
+range given to tlb_gather_mmu() (possibly slightly more efficient
+previously).
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm64/include/asm/pgtable.h | 6 ++++++
- arch/arm64/mm/Makefile           | 4 +++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/tlb.h | 136 +++++++------------------------------------
+ 1 file changed, 20 insertions(+), 116 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index aa3917c..d5ae326 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -242,9 +242,15 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- #define __HAVE_ARCH_PMD_WRITE
- #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 717031a..72cadf5 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -19,115 +19,44 @@
+ #ifndef __ASM_TLB_H
+ #define __ASM_TLB_H
  
-+#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-+
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
- #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-+#define __HAVE_ARCH_PMDP_SPLITTING_FLUSH
-+struct vm_area_struct;
-+void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
-+			  pmd_t *pmdp);
+-#include <linux/pagemap.h>
+-#include <linux/swap.h>
+ 
+-#include <asm/pgalloc.h>
+-#include <asm/tlbflush.h>
+-
+-#define MMU_GATHER_BUNDLE	8
+-
+-/*
+- * TLB handling.  This allows us to remove pages from the page
+- * tables, and efficiently handle the TLB issues.
+- */
+-struct mmu_gather {
+-	struct mm_struct	*mm;
+-	unsigned int		fullmm;
+-	struct vm_area_struct	*vma;
+-	unsigned long		start, end;
+-	unsigned long		range_start;
+-	unsigned long		range_end;
+-	unsigned int		nr;
+-	unsigned int		max;
+-	struct page		**pages;
+-	struct page		*local[MMU_GATHER_BUNDLE];
+-};
++#include <asm-generic/tlb.h>
+ 
+ /*
+- * This is unnecessarily complex.  There's three ways the TLB shootdown
+- * code is used:
++ * There's three ways the TLB shootdown code is used:
+  *  1. Unmapping a range of vmas.  See zap_page_range(), unmap_region().
+  *     tlb->fullmm = 0, and tlb_start_vma/tlb_end_vma will be called.
+- *     tlb->vma will be non-NULL.
+  *  2. Unmapping all vmas.  See exit_mmap().
+  *     tlb->fullmm = 1, and tlb_start_vma/tlb_end_vma will be called.
+- *     tlb->vma will be non-NULL.  Additionally, page tables will be freed.
++ *     Page tables will be freed.
+  *  3. Unmapping argument pages.  See shift_arg_pages().
+  *     tlb->fullmm = 0, but tlb_start_vma/tlb_end_vma will not be called.
+- *     tlb->vma will be NULL.
+  */
+ static inline void tlb_flush(struct mmu_gather *tlb)
+ {
+-	if (tlb->fullmm || !tlb->vma)
++	if (tlb->fullmm) {
+ 		flush_tlb_mm(tlb->mm);
+-	else if (tlb->range_end > 0) {
+-		flush_tlb_range(tlb->vma, tlb->range_start, tlb->range_end);
+-		tlb->range_start = TASK_SIZE;
+-		tlb->range_end = 0;
++	} else if (tlb->end > 0) {
++		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
++		flush_tlb_range(&vma, tlb->start, tlb->end);
++		tlb->start = TASK_SIZE;
++		tlb->end = 0;
+ 	}
+ }
+ 
+ static inline void tlb_add_flush(struct mmu_gather *tlb, unsigned long addr)
+ {
+ 	if (!tlb->fullmm) {
+-		if (addr < tlb->range_start)
+-			tlb->range_start = addr;
+-		if (addr + PAGE_SIZE > tlb->range_end)
+-			tlb->range_end = addr + PAGE_SIZE;
+-	}
+-}
+-
+-static inline void __tlb_alloc_page(struct mmu_gather *tlb)
+-{
+-	unsigned long addr = __get_free_pages(GFP_NOWAIT | __GFP_NOWARN, 0);
+-
+-	if (addr) {
+-		tlb->pages = (void *)addr;
+-		tlb->max = PAGE_SIZE / sizeof(struct page *);
++		tlb->start = min(tlb->start, addr);
++		tlb->end = max(tlb->end, addr + PAGE_SIZE);
+ 	}
+ }
+ 
+-static inline void tlb_flush_mmu(struct mmu_gather *tlb)
+-{
+-	tlb_flush(tlb);
+-	free_pages_and_swap_cache(tlb->pages, tlb->nr);
+-	tlb->nr = 0;
+-	if (tlb->pages == tlb->local)
+-		__tlb_alloc_page(tlb);
+-}
+-
+-static inline void
+-tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start, unsigned long end)
+-{
+-	tlb->mm = mm;
+-	tlb->fullmm = !(start | (end+1));
+-	tlb->start = start;
+-	tlb->end = end;
+-	tlb->vma = NULL;
+-	tlb->max = ARRAY_SIZE(tlb->local);
+-	tlb->pages = tlb->local;
+-	tlb->nr = 0;
+-	__tlb_alloc_page(tlb);
+-}
+-
+-static inline void
+-tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
+-{
+-	tlb_flush_mmu(tlb);
+-
+-	/* keep the page table cache within bounds */
+-	check_pgt_cache();
+-
+-	if (tlb->pages != tlb->local)
+-		free_pages((unsigned long)tlb->pages, 0);
+-}
+-
+ /*
+  * Memorize the range for the TLB flush.
+  */
+-static inline void
+-tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep, unsigned long addr)
++static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
++					  unsigned long addr)
+ {
+ 	tlb_add_flush(tlb, addr);
+ }
+@@ -137,38 +66,24 @@ tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep, unsigned long addr)
+  * case where we're doing a full MM flush.  When we're doing a munmap,
+  * the vmas are adjusted to only cover the region to be torn down.
+  */
+-static inline void
+-tlb_start_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
++static inline void tlb_start_vma(struct mmu_gather *tlb,
++				 struct vm_area_struct *vma)
+ {
+ 	if (!tlb->fullmm) {
+-		tlb->vma = vma;
+-		tlb->range_start = TASK_SIZE;
+-		tlb->range_end = 0;
++		tlb->start = TASK_SIZE;
++		tlb->end = 0;
+ 	}
+ }
+ 
+-static inline void
+-tlb_end_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
++static inline void tlb_end_vma(struct mmu_gather *tlb,
++			       struct vm_area_struct *vma)
+ {
+ 	if (!tlb->fullmm)
+ 		tlb_flush(tlb);
+ }
+ 
+-static inline int __tlb_remove_page(struct mmu_gather *tlb, struct page *page)
+-{
+-	tlb->pages[tlb->nr++] = page;
+-	VM_BUG_ON(tlb->nr > tlb->max);
+-	return tlb->max - tlb->nr;
+-}
+-
+-static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
+-{
+-	if (!__tlb_remove_page(tlb, page))
+-		tlb_flush_mmu(tlb);
+-}
+-
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+-	unsigned long addr)
++				  unsigned long addr)
+ {
+ 	pgtable_page_dtor(pte);
+ 	tlb_add_flush(tlb, addr);
+@@ -184,16 +99,5 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ }
  #endif
  
- #define PMD_BIT_FUNC(fn,op) \
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-index b51d364..212f229 100644
---- a/arch/arm64/mm/Makefile
-+++ b/arch/arm64/mm/Makefile
-@@ -1,5 +1,7 @@
-+ARM=../../../arch/arm/mm
-+
- obj-y				:= dma-mapping.o extable.o fault.o init.o \
- 				   cache.o copypage.o flush.o \
- 				   ioremap.o mmap.o pgd.o mmu.o \
--				   context.o tlb.o proc.o
-+				   context.o tlb.o proc.o $(ARM)/gup.o
- obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+-#define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
+-#define pmd_free_tlb(tlb, pmdp, addr)	__pmd_free_tlb(tlb, pmdp, addr)
+-#define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
+-
+-#define tlb_migrate_finish(mm)		do { } while (0)
+-
+-static inline void
+-tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp, unsigned long addr)
+-{
+-	tlb_add_flush(tlb, addr);
+-}
+ 
+ #endif
 -- 
 1.8.1.4
