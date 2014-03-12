@@ -1,74 +1,53 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 12 Mar 2014 11:49:12 +0100
-Subject: [PATCH] arm: omap: cm-t3530: Add MMC2/SDIO/WLAN support
-Message-ID: <1394621352-32438-1-git-send-email-sr@denx.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Mar 2014 11:49:21 +0100
+Subject: [PATCH] Doc: USB: gadget: atmel_usba correct atmel,vbus-gpio
+ meaning
+In-Reply-To: <53109F03.6060506@atmel.com>
+References: <1393515910-15837-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <53109F03.6060506@atmel.com>
+Message-ID: <53203BB1.6090105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the MMC2/SDIO WiFi Libertas (Marvell) module available
-on the CM-T3530 SOM.
+On 28/02/2014 15:36, Nicolas Ferre :
+> On 27/02/2014 16:45, Alexandre Belloni :
+>> atmel,at91sam9rl-udc is a USB gadget, it has now means to control vbus.
+> 
+> s/now/no/
+> 
+>> atmel,vbus-gpio is in fact used to detect the presence of vbus.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Tony Lindgren <tony@atomide.com>
----
-This patch is based on current mainline (v3.14-rc6) plus this compulab patch
-series from Dmitry:
+Stacked in at91-3.15-dt.
 
-[PATCH 00/11] ARM: dts: sbc-t3x: add support for more boards
-http://www.spinics.net/lists/arm-kernel/msg300078.html
+Thanks.
 
-Thanks,
-Stefan
+>> ---
+>>  Documentation/devicetree/bindings/usb/atmel-usb.txt | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+>> index 55f51af08bc7..bc2222ca3f2a 100644
+>> --- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
+>> +++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+>> @@ -57,8 +57,8 @@ Required properties:
+>>   - ep childnode: To specify the number of endpoints and their properties.
+>>  
+>>  Optional properties:
+>> - - atmel,vbus-gpio: If present, specifies a gpio that needs to be
+>> -   activated for the bus to be powered.
+>> + - atmel,vbus-gpio: If present, specifies a gpio that allows to detect whether
+>> +   vbus is present (USB is connected).
+>>  
+>>  Required child node properties:
+>>   - name: Name of the endpoint.
+>>
+> 
+> 
 
- arch/arm/boot/dts/omap3-cm-t3530.dts | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
-index 9faf1cd..d145849 100644
---- a/arch/arm/boot/dts/omap3-cm-t3530.dts
-+++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
-@@ -9,4 +9,40 @@
- / {
- 	model = "CompuLab CM-T3530";
- 	compatible = "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
-+
-+	/* Regulator to trigger the reset signal of the Wifi module */
-+	mmc2_sdio_reset: regulator-mmc2-sdio-reset {
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-mmc2-sdio-reset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 2 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2164, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat4.sdmmc2_dir_dat0 */
-+			OMAP3_CORE1_IOPAD(0x2166, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat5.sdmmc2_dir_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2168, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat6.sdmmc2_dir_cmd */
-+			OMAP3_CORE1_IOPAD(0x216a, PIN_INPUT | MUX_MODE1)		/* sdmmc2_dat7.sdmmc2_clkin */
-+		>;
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&mmc2_sdio_reset>;
-+	non-removable;
-+	bus-width = <4>;
-+	cap-power-off-card;
- };
 -- 
-1.8.5.5
+Nicolas Ferre
