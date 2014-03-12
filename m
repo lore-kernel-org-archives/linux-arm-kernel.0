@@ -1,58 +1,69 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Mar 2014 20:43:55 +0900
-Subject: [PATCHv2 0/5] ARM: dts: exynos: Add missing dt data to bring
- kernel of Exynos4x12
-In-Reply-To: <53204328.7070607@samsung.com>
-References: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
- <53204328.7070607@samsung.com>
-Message-ID: <5320487B.1090908@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 12 Mar 2014 12:43:43 +0100
+Subject: [PATCH v9][ 3/8] staging: imx-drm: Correct BGR666 and the
+ board's dts that use them.
+In-Reply-To: <1394121702-13257-3-git-send-email-denis@eukrea.com>
+References: <1394121702-13257-1-git-send-email-denis@eukrea.com>
+ <1394121702-13257-3-git-send-email-denis@eukrea.com>
+Message-ID: <20140312124343.448f8287@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi,
 
-On 03/12/2014 08:21 PM, Tomasz Figa wrote:
-> Hi Chanwoo,
+Denis Carikli wrote:
+> The current BGR666 is not consistent with the other color mapings like BGR24.
+> BGR666 should be in the same byte order than BGR24.
 > 
-> On 12.03.2014 07:19, Chanwoo Choi wrote:
->> This patch add missing dt data of Exynos4x12 to bring up kernel feature and
->> code clean. This patchset is based on 'v3.15-next/dt-clk-exynos' branch.
->> - git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>
->> exynos4x12/exynos4412/exynos4212.dtsi
->> - Add ADC (Analog and Digital Converter) to get raw data
->> - Add PMU (Performance Monitoring Unit) for perf event
->> - Add gps_alive power domain to remove power leakage when gps-alive isn't used
->> - Remove duplicate dt data of interrput combiner controller
->>
->> exynos4412-trats.dts
->> - Add ADC dt data with ntc thermistor child to read temperature
->>
->> Changes from v1:
->> - Use clock macro name for Exynos4 instead of constant for ADC
->> - Remove unnecessary description about patch content
->> - Move gps-alive power domain's dt data from exynos4x12.dts to exynos4.dts
->> - Move thermistor dt node outside of ADC dt node and modify node name of thermistor
->>
->> Chanwoo Choi (5):
->>    ARM: dts: exynos4x12: Add ADC's dt data to read raw data
->>    ARM: dts: exynos4x12: Add PMU dt data to support PMU(Perforamnce Monitoring Unit)
->>    ARM: dts: exynos4x12: Add GPS_ALIVE power domain
->>    ARM: dts: exynos: Move common dt data for interrupt combiner controller
->>    ARM: dts: exynos4412-trats2: Add ADC/themistor dt data to get temperature of SoC/battery
->>
->>   arch/arm/boot/dts/exynos4.dtsi          |  5 +++++
->>   arch/arm/boot/dts/exynos4212.dtsi       | 13 ++++---------
->>   arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
->>   arch/arm/boot/dts/exynos4412.dtsi       | 14 ++++----------
->>   arch/arm/boot/dts/exynos4x12.dtsi       | 26 ++++++++++++++++++++++++++
->>   5 files changed, 60 insertions(+), 19 deletions(-)
->>
-> 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
+[...]
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+> index 6f9abe8..154d293 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+> @@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+>  
+>  	/* bgr666 */
+>  	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+> -	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
+> +	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
+>  	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+> -	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
+> +	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+>  
+>  	/* bgr24 */
+>  	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
+>
+You obviously missed this one which is also affected by your change:
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index daa54df..e5a600b 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -185,11 +185,11 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 	switch (imx_ldb_ch->chno) {
+ 	case 0:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	case 1:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	default:
+ 		dev_err(ldb->dev, "unable to config di%d panel format\n",
 
-Thanks for your review.
+Without this patch Red/Blue on an 18bit LVDS display will be swapped.
 
-Best Regards,
-Chanwoo Choi
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
