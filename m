@@ -1,81 +1,67 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 12 Mar 2014 13:03:46 +0100
-Subject: [GIT PULL v2] Xilinx Zynq changes for v3.15
-In-Reply-To: <20140311213331.GA6429@quad.lixom.net>
-References: <53061EBA.1080002@monstr.eu> <531D746A.4020903@monstr.eu>
- <20140311213331.GA6429@quad.lixom.net>
-Message-ID: <53204D22.2000703@monstr.eu>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 12 Mar 2014 20:04:28 +0800
+Subject: [PATCH 2/2] ARM: dts: berlin2q: add the Marvell BG2-Q DMP
+ device tree
+In-Reply-To: <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140312200428.23178d69@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2014 10:33 PM, Olof Johansson wrote:
-> On Mon, Mar 10, 2014 at 09:14:34AM +0100, Michal Simek wrote:
->> Hi,
->>
->> please pull these changes to your arm-soc tree. This branch is based
->> on zynq/dt branch from the second pull request.
->> I have kept OCM patch in this branch because it depends on slcr changes
->> done here. If you want to send another pull request just for this OCM
->> patch based on this branch, please let me know.
->>
->> Changes in v2: Fix incorrect git repo url
-> 
-> Thanks!
-> 
->> The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
->>
->>   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
->>
->> are available in the git repository at:
->>
->>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.15
->>
->> for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
->>
->>   ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
->>
->> ----------------------------------------------------------------
->> arm: Xilinx Zynq cleanup patches for v3.15
->>
->> - Redesign SLCR initialization to enable
->>   driver developing which targets SLCR space
->> - Add OCM driver
->> - Add SOC_BUS support
->>
->> ----------------------------------------------------------------
->> Michal Simek (8):
->>       ARM: zynq: Split slcr in two parts
->>       ARM: zynq: Map I/O memory on clkc init
->>       ARM: zynq: Add and use zynq_slcr_read/write() helper functions
->>       ARM: zynq: Introduce zynq_slcr_unlock()
->>       ARM: zynq: Add OCM driver
-> 
-> Looking at the patches in the branch, this is the one I have most concern with.
-> I think it will require more work to get it in shape to get merged, as per
-> those comments.
-> 
-> I think it's worth to merge the other stuff though, so can you rebuild the
-> branch without the OCM driver so we can get the rest in for 3.15 even if the
-> OCM piece ends up taking longer?
+Hi Antoine,
 
-No problem to do it. I will just wait one more day till we finish that discussions.
-Or is there any time pressure?
+On Wed, 12 Mar 2014 04:06:04 -0700
+Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile         |  3 ++-
+>  arch/arm/boot/dts/berlin2q-dmp.dts | 32 ++++++++++++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/berlin2q-dmp.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 032030361bef..1a2adadfb962 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>  dtb-$(CONFIG_ARCH_BERLIN) += \
+>  	berlin2-sony-nsz-gs7.dtb	\
+> -	berlin2cd-google-chromecast.dtb
+> +	berlin2cd-google-chromecast.dtb	\
+> +	berlin2q-dmp.dtb
+>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+>  	da850-evm.dtb
+>  dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+> diff --git a/arch/arm/boot/dts/berlin2q-dmp.dts
+> b/arch/arm/boot/dts/berlin2q-dmp.dts new file mode 100644
+> index 000000000000..6a98860e0251
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/berlin2q-dmp.dts
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +#include "berlin2q.dtsi"
+> +
+> +/ {
+> +	model = "Marvell BG2-Q DMP";
+> +	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q",
+> "marvell,berlin"; +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x40000000>;
+
+The memory size of BG2Q DMP is 2GB. And IIRC, all BG2Q boards have 2GB memory.
+So would it be better to put memory dt node in berlin2q.dtsi?
 
 Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/414bf75e/attachment-0001.sig>
+Jisheng
