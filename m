@@ -1,47 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Mar 2014 15:16:32 +0100
-Subject: [PATCH v4 2/6] pinctrl: st: Enhance the controller to manage
- unavailable registers
-In-Reply-To: <1394614210-15698-3-git-send-email-maxime.coquelin@st.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
- <1394614210-15698-3-git-send-email-maxime.coquelin@st.com>
-Message-ID: <CACRpkdY4FJ04=jnU_7GVM_W80Lx=t2nggx9=2=cfdHAJdN2kNw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 12 Mar 2014 15:18:46 +0100
+Subject: [PATCH] ARM: shmobile: compile drivers/sh for
+ CONFIG_ARCH_SHMOBILE_MULTI
+In-Reply-To: <CAMuHMdU4v9=BxTKk-=z4GE55KCuxuPry93OtGrTOzJ5ke8WT=g@mail.gmail.com>
+References: <1389707776-23306-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1566590.zu3Q3sqakp@avalon>
+ <CAMuHMdU4v9=BxTKk-=z4GE55KCuxuPry93OtGrTOzJ5ke8WT=g@mail.gmail.com>
+Message-ID: <1783624.XEvhdtDmJe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 9:50 AM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
+Hi Geert,
 
-> From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->
-> This patch adds a new logic inside the st pinctrl to manage
-> an unsupported scenario: some sysconfig are not available!
->
-> This is the case of STiH407 where, although documented, the
-> following registers from SYSCFG_FLASH have been removed from the SoC.
->
-> SYSTEM_CONFIG3040
->    Output Enable pad control for all PIO Alternate Functions
-> and
-> SYSTEM_ CONFIG3050
->    Pull Up pad control for all PIO Alternate Functions
->
-> Without managing this condition an imprecise external abort
-> will be detect.
->
-> To do this the patch also reviews the st_parse_syscfgs
-> and other routines to manipulate the registers only if
-> actually available.
-> In any case, for example the st_parse_syscfgs detected
-> an error condition but no action was made in the
-> st_pctl_probe_dt.
->
-> Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+On Tuesday 11 March 2014 20:15:04 Geert Uytterhoeven wrote:
+> On Mon, Jan 20, 2014 at 11:52 PM, Laurent Pinchart wrote:
+> > On Monday 20 January 2014 15:56:43 Mark Brown wrote:
+> >> On Mon, Jan 20, 2014 at 04:48:10PM +0100, Laurent Pinchart wrote:
+> >> > The problem isn't as simple as it seems, and more advanced
+> >> > implementations that would allow listing clocks that should be managed
+> >> > automatically (or the other way around) would also add another level of
+> >> > complexity. The required information is platform-dependent, but we
+> >> > currently don't express it as such in DT.
+> >> 
+> >> Well, the set of clocks an IP requires will tend to be the same - it's
+> >> normally just that integrators may have done things like tie them
+> >> together or decide to spread confusion by renaming them.
+> > 
+> > That's the problem :-) How should the runtime PM core be given the list of
+> > clocks it needs to manage ? That information needs to come from somewhere.
+> 
+> Stirring the pot again...
+> 
+> Which clocks a device needs is expressed in DT with CCF.
+> In the simple case, the runtime PM core can just control them based on
+> device use.
+> In the complex case, the driver can regain control using its own pm
+> callbacks, right?
 
-This v4 version applied to the pinctrl devel branch with
-Lee's ACK.
+Sure, the driver can of course control the clocks manually in its PM callbacks 
+if it needs to. The point, however, is to control the clocks from core code 
+whenever possible. We thus need to define exact semantics to make sure each 
+side knows what tasks to perform, and what to expect from the other side. For 
+instance, in the DT case, the runtime PM core can easily get the list of the 
+clocks used by the device from its DT node, but how can it know which clock(s) 
+it should manage automatically and which clock(s) it should leave for the 
+driver to control ?
 
-Yours,
-Linus Walleij
+> Probably I'm still missing something, as I haven't had enough exposure to
+> runtime PM and CCF ;-)
+
+-- 
+Regards,
+
+Laurent Pinchart
