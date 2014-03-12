@@ -1,47 +1,28 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 13 Mar 2014 00:35:41 +0800
-Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
-In-Reply-To: <1394639330-1288-1-git-send-email-balbi@ti.com>
-References: <1394639330-1288-1-git-send-email-balbi@ti.com>
-Message-ID: <53208CDD.7030106@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Mar 2014 16:36:33 +0000
+Subject: [PATCH v5 1/5] mfd: add bcm590xx pmu DT binding
+In-Reply-To: <1394633237-16837-2-git-send-email-mporter@linaro.org>
+References: <1394633237-16837-1-git-send-email-mporter@linaro.org>
+ <1394633237-16837-2-git-send-email-mporter@linaro.org>
+Message-ID: <20140312163633.GC22450@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 March 2014 11:48 PM, Felipe Balbi wrote:
-> Currently, even when building keystone only
-> kernel builds, DTB won't get build because
-> we lack a Makefile rule to get it compiled.
+> Add a DT binding for the BCM590xx PMUs. The binding inherits from
+> the generic regulator bindings.
 > 
-> This patch adds that rule so mainline kernel
-> users have a chance to use up-to-date DTB on
-> keystone 2 platforms.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 > ---
->
-We have been building dtbs with explicit command
-instead of dtbs since it was just one dtb so far
-supported. Was planning to add the rule once more
-boards get added. Now with Lamarr and Edision in
-for next merge window, will do that post 3.15-rc1.
+>  Documentation/devicetree/bindings/mfd/bcm590xx.txt | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/bcm590xx.txt
 
-> note that I just tried this on top of linux-next
-> (commit 69d5cdda16b3c9767b82d80b07edb9bb056448e3)
-> and, even though dtb builds fine, I still couldn't
-> get keystone_defconfig uImage to boot fine.
-> 
-> It's probably my LOADADDR which is wrong.
-> 
-> Santosh, what's the LOADADDR I should be using
-> for keystone boots ?
->
-LOADADDR is same 0x80008000. You might have missed
-to configure the environment u-boot variable to
-disable higher address space switch.
-'setenv mem_lpae 0'. Also ensure to update
-the boot loaders since the default ones comes with
-EVM are long back outdated.
+Applied with Mark's Ack.
 
-Regards,
-Santosh
- 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
