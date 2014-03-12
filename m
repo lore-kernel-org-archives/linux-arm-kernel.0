@@ -1,80 +1,73 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 12 Mar 2014 19:07:38 +0100
-Subject: [PATCH v3 3/9] of: mtd: add NAND timing mode retrieval support
+Date: Wed, 12 Mar 2014 19:07:41 +0100
+Subject: [PATCH v3 6/9] mtd: nand: add sunxi NFC dt bindings doc
 In-Reply-To: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1394647664-8258-4-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1394647664-8258-7-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to retrieve NAND timing mode (ONFI timing mode) from a given
-DT node.
+Add the sunxi NAND Flash Controller dt bindings documentation.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- drivers/of/of_mtd.c    |   19 +++++++++++++++++++
- include/linux/of_mtd.h |    8 ++++++++
- 2 files changed, 27 insertions(+)
+ .../devicetree/bindings/mtd/sunxi-nand.txt         |   48 ++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
 
-diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
-index b7361ed..8bdaa0b 100644
---- a/drivers/of/of_mtd.c
-+++ b/drivers/of/of_mtd.c
-@@ -117,3 +117,22 @@ bool of_get_nand_on_flash_bbt(struct device_node *np)
- 	return of_property_read_bool(np, "nand-on-flash-bbt");
- }
- EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
+diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+new file mode 100644
+index 0000000..4bf5b07
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+@@ -0,0 +1,48 @@
++Allwinner NAND Flash Controller (NFC)
 +
-+/**
-+ * of_get_nand_timings - Get nand timings for the given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * return 0 on success errno other wise
-+ */
-+int of_get_nand_onfi_timing_mode(struct device_node *np)
-+{
-+	int err;
-+	u32 mode;
++Required properties:
++- compatible : "allwinner,sun4i-nand".
++- reg : shall contain registers location and length for data and reg.
++- interrupts : shall define the nand controller interrupt.
++- #address-cells: shall be set to 1. Encode the nand CS.
++- #size-cells : shall be set to 0.
++- clocks : shall reference nand controller clocks.
++- clock-names : nand controller internal clock names. Shall contain :
++    * "ahb_clk" : AHB gating clock
++    * "sclk" : nand controller clock
 +
-+	err = of_property_read_u32(np, "onfi,nand-timing-mode", &mode);
-+	if (err)
-+		return err;
++Optional children nodes:
++Children nodes represent the available nand chips.
 +
-+	return mode;
-+}
-+EXPORT_SYMBOL_GPL(of_get_nand_onfi_timing_mode);
-diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
-index e266caa..c8310ae 100644
---- a/include/linux/of_mtd.h
-+++ b/include/linux/of_mtd.h
-@@ -9,6 +9,8 @@
- #ifndef __LINUX_OF_MTD_H
- #define __LINUX_OF_MTD_H
- 
-+#include <linux/mtd/nand.h>
++Optional properties:
++- onfi,nand-timing-mode : mandatory if the chip does not support the ONFI
++  standard.
++- allwinner,rb : shall contain the native Ready/Busy ids.
++ or
++- rb-gpios : shall contain the gpios used as R/B pins.
++- nand-ecc-mode : one of the supported ECC modes ("hw", "hw_syndrome", "soft",
++  "soft_bch" or "none")
 +
- #ifdef CONFIG_OF_MTD
- 
- #include <linux/of.h>
-@@ -17,6 +19,7 @@ int of_get_nand_ecc_step_size(struct device_node *np);
- int of_get_nand_ecc_strength(struct device_node *np);
- int of_get_nand_bus_width(struct device_node *np);
- bool of_get_nand_on_flash_bbt(struct device_node *np);
-+int of_get_nand_onfi_timing_mode(struct device_node *np);
- 
- #else /* CONFIG_OF_MTD */
- 
-@@ -45,6 +48,11 @@ static inline bool of_get_nand_on_flash_bbt(struct device_node *np)
- 	return false;
- }
- 
-+static inline int of_get_nand_onfi_timing_mode(struct device_node *np)
-+{
-+	return -ENOSYS;
-+}
++see Documentation/devicetree/mtd/nand.txt for generic bindings.
 +
- #endif /* CONFIG_OF_MTD */
- 
- #endif /* __LINUX_OF_MTD_H */
++
++Examples:
++nfc: nand at 01c03000 {
++	compatible = "allwinner,sun4i-nand";
++	reg = <0x01c03000 0x1000>;
++	interrupts = <0 37 1>;
++	clocks = <&ahb_gates 13>, <&nand_clk>;
++	clock-names = "ahb_clk", "sclk";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
++	status = "okay";
++
++	nand at 0 {
++		reg = <0>;
++		allwinner,rb = <0>;
++		nand-ecc-mode = "soft_bch";
++		onfi,nand-timing-mode = <4>;
++	};
++};
 -- 
 1.7.9.5
