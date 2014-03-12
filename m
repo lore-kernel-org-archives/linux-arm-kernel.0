@@ -1,95 +1,37 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Mar 2014 12:14:03 +0200
-Subject: Common clock: function clock and bus clock
-In-Reply-To: <CADApbegGTm=REJbukdyEY9ZVK9hXax+Hodp7MFx3SUb=CV1TbA@mail.gmail.com>
-References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
- <CAN1soZzFfSp2Hj=JBxj+N9iLrjkm3poOa7piJDJT5BY-ycsWHQ@mail.gmail.com>
- <CADApbegGTm=REJbukdyEY9ZVK9hXax+Hodp7MFx3SUb=CV1TbA@mail.gmail.com>
-Message-ID: <5320336B.3020107@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Mar 2014 09:23:55 +0000
+Subject: [PATCH v3 2/5] mfd: add bcm590xx pmu driver
+In-Reply-To: <20140312005748.GQ25092@beef>
+References: <1394552775-31264-1-git-send-email-mporter@linaro.org>
+ <1394552775-31264-3-git-send-email-mporter@linaro.org>
+ <20140311160837.GP21216@lee--X1> <20140311221938.GO25092@beef>
+ <20140311224517.GA5672@lee--X1> <20140311232545.GP25092@beef>
+ <20140312004030.GH28112@sirena.org.uk>
+ <20140312005748.GQ25092@beef>
+Message-ID: <20140312092355.GB5672@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2014 04:30 AM, Chao Xie wrote:
-> On Tue, Mar 11, 2014 at 10:48 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Tue, Mar 11, 2014 at 10:06 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
->>> hi
->>>
->>> I can not find any examples for handling function clock and bus clock
->>> in drivers/clk/.
->>>
->>> For a device, it will have a function clock and bus clock. function
->>> clock will control the fucntionality of this device, while bus clock
->>> will control the communication part to the bus.
->>>
->>> For some SOCes, they do not export bus clock, so from the hardware it
->>> seems that function clock is combined with bus clock, while for some
->>> SOCes, they are not.
->>>
->>> For most of the device driver, they will enable/disable function clock
->>> and bus clock both. While for some devices, they may share bus clock,
->>> and have different function clocks.
->>>
->>> In fact, i want to define the APIs as below:
->>>
->>> struct clk* soc_register_bus_clock(struct device *dev, char **parent_name, ...);
->>> This function will  create and register bus clock
->>>
->>> struct clk* soc_register_fucntion_clock(struct device *dev, char
->>> **parent_name, ...);
->>> This function will create and register function clock
->>>
->>> struct clk* soc_register_clk(struct device *dev, char **parent_name);
->>> This function will create and register a device clock. Then this clock
->>> is enable, it will enable bus clock and function clock both, and it is
->>> similar for disabling.
->>>
->>> struct clk* soc_register_composite_clk(struct device *dev, char
->>> *bus_clk_name, char *function_clk_name);
->>> This function will create and register a composite device clock. When
->>> enable this clock, it will invoke clk_enable(bus_clk) and
->>> clk_enable(function_clk) both. It is similar for disabling.
->>>
->>> So for the device which has its own control register and bits for
->>> function clock and bus clock. We can call  soc_register_clk.
->>> For the device share bus clock with other devices, we create the clock
->>> for the device by calling  soc_register_composite_clk.
->>>
->>> 1. Now clk_enable can be preempted by same caller.
->>> 2. For above devices, the bus clock only have enable/disable ops.
->>>
->>> Based on above conditions, I think soc_register_composite_clk is fine.
->>>
->>> Does anyone have same problems? Will above proposal break common clock rules.
->>
->> I think it's too complex.
->>
->> If the bus clock and function clock is only used for gating, maybe you
->> can set the bus clock as parent of function clock.
->>
-> You can not do it. Because the function clock may have mux and div, it
-> can not depends on bus clock's rate.
->
->> If both of them are complex, why not define two clocks in your device driver?
->>
-> It is the problem. In fact for different SOCes, we can not know which
-> device will have such limitation.
-> Even for same device, for SOC-a, it has the limitation, for SOC-b, it does not.
-> So the choice is make all the device drivers to grap two clocks. There
-> are too many of them, and for
-> the devices does not have such limitation, it is redundant.
-> So the point is we donot want to change the device driver, and we want
-> to make the device driver interfaces
-> maintain unchanged. .
+> > > > Are there any inter-patch dependencies in the set? If so, we should
+> > > > know about them so we can coordinate a sensible solution.
+> > 
+> > > Yes, the regulator driver (3/5) that Mark applied is dependent on this
+> > > patch...the regulator driver includes include/linux/mfd/bcm590xx.h.
+> > 
+> > There's no actual dependency though - the regulator driver can only be
+> > built if the MFD is enabled in Kconfig since it depends on it so until
+> > the MFD is present in the tree it won't get built.
+> 
+> Oh, right. Lee, no dependencies then.
 
-Clk pm domain - Is it what you want?
-drivers/base/power/clock_ops.c
+Perfect, I'll just apply the MFD patch.
 
-Usage example:
-arch/arm/mach-davinci/pm_domain.c
-arch/arm/mach-keystone/pm_domain.c
+We still need the DT guys to look over your document, so nothing will
+be certain until a) we receive their Ack or b) enough time passes, so
+we will review it between ourselves.
 
-Then you can simply use Runtime PM API to control clocks.
-
-Regrads,
--grygorii
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
