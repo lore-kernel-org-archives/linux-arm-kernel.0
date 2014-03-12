@@ -1,222 +1,116 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 12 Mar 2014 17:31:04 +0100
-Subject: [PATCH v10][ 07/10] imx-drm: Prepare imx-drm for extra
- display-timings retrival.
+Date: Wed, 12 Mar 2014 17:31:05 +0100
+Subject: [PATCH v10][ 08/10] imx-drm: imx-drm-core: provide a common display
+ timings retrival function.
 In-Reply-To: <1394641867-15629-1-git-send-email-denis@eukrea.com>
 References: <1394641867-15629-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394641867-15629-7-git-send-email-denis@eukrea.com>
+Message-ID: <1394641867-15629-8-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hardware behaviour was kept.
+imx_drm_of_get_extra_timing_flags will be used to
+retrive the native-mode and de-active display-timings
+node properties in the device tree.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v9->v10:
 - New patch that was splitted out of
   "staging: imx-drm: Use de-active and pixelclk-active
- display-timings."
-- The IMXDRM_MODE_FLAG_ are now using the BIT macros.
-- The SET_CLK_POL and SET_DE_POL masks were removed.
-  The code was updated accordingly.
+- When a IMXDRM_MODE_FLAG_ flag is set, its opposite
+  flag is also unset.
 ---
- drivers/staging/imx-drm/imx-drm-core.c      |   10 ++++++++++
- drivers/staging/imx-drm/imx-drm.h           |    6 ++++++
- drivers/staging/imx-drm/imx-hdmi.c          |    3 +++
- drivers/staging/imx-drm/imx-ldb.c           |    3 +++
- drivers/staging/imx-drm/imx-tve.c           |    3 +++
- drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    6 ++++--
- drivers/staging/imx-drm/ipu-v3/ipu-di.c     |    7 ++++++-
- drivers/staging/imx-drm/ipuv3-crtc.c        |   12 ++++++++++--
- drivers/staging/imx-drm/parallel-display.c  |    2 ++
- 9 files changed, 47 insertions(+), 5 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c |   57 ++++++++++++++++++++++++++++++++
+ drivers/staging/imx-drm/imx-drm.h      |    2 ++
+ 2 files changed, 59 insertions(+)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 4144a75..6a71cd9 100644
+index 6a71cd9..d877b77 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -492,6 +492,16 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+@@ -24,6 +24,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
++#include <video/of_display_timing.h>
+ 
+ #include "imx-drm.h"
+ 
+@@ -492,6 +493,62 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
  }
  EXPORT_SYMBOL_GPL(imx_drm_encoder_parse_of);
  
-+void imx_drm_set_default_timing_flags(struct drm_display_mode *mode)
++int imx_drm_of_get_extra_timing_flags(struct drm_connector *connector,
++				 struct drm_display_mode *mode,
++				 struct device_node *display_np)
 +{
-+	mode->private_flags &= ~IMXDRM_MODE_FLAG_DE_LOW;
-+	mode->private_flags &= ~IMXDRM_MODE_FLAG_PIXDATA_POSEDGE;
++	struct drm_display_mode *new_mode = drm_mode_create(connector->dev);
++	struct device_node *timings_np;
++	struct device_node *mode_np;
++	u32 val;
 +
-+	mode->private_flags |= IMXDRM_MODE_FLAG_DE_HIGH;
-+	mode->private_flags |= IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE;
++	if (!new_mode)
++		return -EINVAL;
++
++	of_get_drm_display_mode(display_np, mode, OF_USE_NATIVE_MODE);
++
++	timings_np = of_get_child_by_name(display_np, "display-timings");
++	if (timings_np) {
++		/* get the display mode node */
++		mode_np = of_parse_phandle(timings_np,
++					   "native-mode", 0);
++		if (!mode_np)
++			mode_np = of_get_next_child(timings_np, NULL);
++
++		if (!of_property_read_u32(mode_np, "de-active", &val)) {
++			if (val) {
++				mode->private_flags |=
++					IMXDRM_MODE_FLAG_DE_HIGH;
++				mode->private_flags &=
++					~IMXDRM_MODE_FLAG_DE_LOW;
++			} else {
++				mode->private_flags &=
++					~IMXDRM_MODE_FLAG_DE_HIGH;
++				mode->private_flags |=
++					IMXDRM_MODE_FLAG_DE_LOW;
++			}
++		}
++
++		if (!of_property_read_u32(mode_np, "pixelclk-active",
++					  &val)) {
++			if (val) {
++				mode->private_flags |=
++					IMXDRM_MODE_FLAG_PIXDATA_POSEDGE;
++				mode->private_flags &=
++					~IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE;
++			} else {
++				mode->private_flags &=
++					~IMXDRM_MODE_FLAG_PIXDATA_POSEDGE;
++				mode->private_flags |=
++					IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE;
++			}
++		}
++	}
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(imx_drm_set_default_timing_flags);
++EXPORT_SYMBOL_GPL(imx_drm_of_get_extra_timing_flags);
 +
- /*
-  * @node: device tree node containing encoder input ports
-  * @encoder: drm_encoder
+ void imx_drm_set_default_timing_flags(struct drm_display_mode *mode)
+ {
+ 	mode->private_flags &= ~IMXDRM_MODE_FLAG_DE_LOW;
 diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index a322bac..ae07d9d 100644
+index ae07d9d..ae01f4d 100644
 --- a/drivers/staging/imx-drm/imx-drm.h
 +++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -1,6 +1,11 @@
- #ifndef _IMX_DRM_H_
- #define _IMX_DRM_H_
- 
-+#define IMXDRM_MODE_FLAG_DE_HIGH		BIT(0)
-+#define IMXDRM_MODE_FLAG_DE_LOW			BIT(1)
-+#define IMXDRM_MODE_FLAG_PIXDATA_POSEDGE	BIT(2)
-+#define IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE	BIT(3)
-+
- struct device_node;
- struct drm_crtc;
- struct drm_connector;
-@@ -49,6 +54,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
+@@ -54,6 +54,8 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
  		struct drm_encoder *encoder);
  int imx_drm_encoder_parse_of(struct drm_device *drm,
  	struct drm_encoder *encoder, struct device_node *np);
-+void imx_drm_set_default_timing_flags(struct drm_display_mode *mode);
++int imx_drm_of_get_extra_timing_flags(struct drm_connector *connector,
++	struct drm_display_mode *mode, struct device_node *display_np);
+ void imx_drm_set_default_timing_flags(struct drm_display_mode *mode);
  
  int imx_drm_connector_mode_valid(struct drm_connector *connector,
- 	struct drm_display_mode *mode);
-diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 4540a9aa..0b215cc 100644
---- a/drivers/staging/imx-drm/imx-hdmi.c
-+++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -1431,6 +1431,9 @@ static bool imx_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
- 			const struct drm_display_mode *mode,
- 			struct drm_display_mode *adjusted_mode)
- {
-+	drm_mode_copy(adjusted_mode, mode);
-+	imx_drm_set_default_timing_flags(ajusted_mode);
-+
- 	return true;
- }
- 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index e6d7bc7..9845a6b 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -108,6 +108,9 @@ static int imx_ldb_connector_get_modes(struct drm_connector *connector)
- 		mode = drm_mode_create(connector->dev);
- 		if (!mode)
- 			return -EINVAL;
-+
-+		imx_drm_set_default_timing_flags(&imx_ldb_ch->mode);
-+
- 		drm_mode_copy(mode, &imx_ldb_ch->mode);
- 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
- 		drm_mode_probed_add(connector, mode);
-diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
-index 575533f..605013c 100644
---- a/drivers/staging/imx-drm/imx-tve.c
-+++ b/drivers/staging/imx-drm/imx-tve.c
-@@ -294,6 +294,9 @@ static bool imx_tve_encoder_mode_fixup(struct drm_encoder *encoder,
- 				       const struct drm_display_mode *mode,
- 				       struct drm_display_mode *adjusted_mode)
- {
-+	drm_mode_copy(adjusted_mode, mode);
-+	imx_drm_set_default_timing_flags(adjusted_mode);
-+
- 	return true;
- }
- 
-diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-index b95cba1..3abeea3 100644
---- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-+++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-@@ -29,9 +29,11 @@ enum ipuv3_type {
- 
- #define CLK_POL_ACTIVE_LOW	0
- #define CLK_POL_ACTIVE_HIGH	1
-+#define CLK_POL_PRESERVE	2
- 
- #define ENABLE_POL_NEGEDGE	0
- #define ENABLE_POL_POSEDGE	1
-+#define ENABLE_POL_PRESERVE	2
- 
- /*
-  * Bitfield of Display Interface signal polarities.
-@@ -43,10 +45,10 @@ struct ipu_di_signal_cfg {
- 	unsigned clksel_en:1;
- 	unsigned clkidle_en:1;
- 	unsigned data_pol:1;	/* true = inverted */
--	unsigned clk_pol:1;
--	unsigned enable_pol:1;
- 	unsigned Hsync_pol:1;	/* true = active high */
- 	unsigned Vsync_pol:1;
-+	u8 clk_pol;
-+	u8 enable_pol;
- 
- 	u16 width;
- 	u16 height;
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-index 53646aa..791080b 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-@@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
- 
- 	if (sig->clk_pol == CLK_POL_ACTIVE_HIGH)
- 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
-+	else if (sig->clk_pol == CLK_POL_ACTIVE_LOW)
-+		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
- 
- 	ipu_di_write(di, di_gen, DI_GENERAL);
- 
-@@ -604,10 +606,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
- 		     DI_SYNC_AS_GEN);
- 
- 	reg = ipu_di_read(di, DI_POL);
--	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
-+	reg &= ~(DI_POL_DRDY_DATA_POLARITY);
- 
- 	if (sig->enable_pol == ENABLE_POL_POSEDGE)
- 		reg |= DI_POL_DRDY_POLARITY_15;
-+	else if (sig->enable_pol == ENABLE_POL_NEGEDGE)
-+		reg &= ~DI_POL_DRDY_POLARITY_15;
-+
- 	if (sig->data_pol)
- 		reg |= DI_POL_DRDY_DATA_POLARITY;
- 
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 8cfeb47..c935f38 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -157,8 +157,16 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
- 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
- 		sig_cfg.Vsync_pol = 1;
- 
--	sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
--	sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
-+	if (mode->private_flags & IMXDRM_MODE_FLAG_DE_HIGH)
-+		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
-+	else if (mode->private_flags & IMXDRM_MODE_FLAG_DE_LOW)
-+		sig_cfg.enable_pol = ENABLE_POL_NEGEDGE;
-+
-+	if (mode->private_flags & IMXDRM_MODE_FLAG_PIXDATA_POSEDGE)
-+		sig_cfg.clk_pol = CLK_POL_ACTIVE_HIGH;
-+	else if (mode->private_flags & IMXDRM_MODE_FLAG_PIXDATA_NEGEDGE)
-+		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
-+
- 	sig_cfg.width = mode->hdisplay;
- 	sig_cfg.height = mode->vdisplay;
- 	sig_cfg.pixel_fmt = out_pixel_fmt;
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 01b7ce5..871a737 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -73,6 +73,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
- 		if (!mode)
- 			return -EINVAL;
- 		drm_mode_copy(mode, &imxpd->mode);
-+		imx_drm_set_default_timing_flags(mode);
- 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
- 		drm_mode_probed_add(connector, mode);
- 		num_modes++;
-@@ -84,6 +85,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
- 			return -EINVAL;
- 		of_get_drm_display_mode(np, &imxpd->mode, OF_USE_NATIVE_MODE);
- 		drm_mode_copy(mode, &imxpd->mode);
-+		imx_drm_set_default_timing_flags(mode);
- 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
- 		drm_mode_probed_add(connector, mode);
- 		num_modes++;
 -- 
 1.7.9.5
