@@ -1,75 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Mar 2014 10:28:55 -0700
-Subject: [PATCH v3 5/5] drivers: bus: omap_l3: Change pr_crit() to
- dev_err() when IRQ request fails
-In-Reply-To: <5316CE17.6010201@ti.com>
-References: <1393937293-6036-1-git-send-email-peter.ujfalusi@ti.com>
- <1393937293-6036-6-git-send-email-peter.ujfalusi@ti.com>
- <5315E522.9090606@ti.com> <5316CE17.6010201@ti.com>
-Message-ID: <20140312172854.GD30897@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Mar 2014 18:29:26 +0100
+Subject: [PATCH v2 1/2] at91: gpio: use gpiolib API to mark a GPIO used
+ as an IRQ
+In-Reply-To: <5320714C.3050306@atmel.com>
+References: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>	<1390473478-5591-2-git-send-email-jjhiblot@traphandler.com>
+ <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
+ <52EB657A.4040601@atmel.com> <5320714C.3050306@atmel.com>
+Message-ID: <53209976.80008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [140304 23:14]:
-> On 03/04/2014 04:37 PM, Santosh Shilimkar wrote:
-> > On Tuesday 04 March 2014 08:48 PM, Peter Ujfalusi wrote:
-> >> Use dev_err() which will going to print the driver's name as well and the
-> >> KERN_ERR level is sufficient in this case (we also print via dev_err when
-> >> there is an error with the mem resources)
-> >>
-> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> ---
-> >>  drivers/bus/omap_l3_noc.c | 7 +++----
-> >>  1 file changed, 3 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> >> index 0eff48585ae3..972691a668a3 100644
-> >> --- a/drivers/bus/omap_l3_noc.c
-> >> +++ b/drivers/bus/omap_l3_noc.c
-> >> @@ -158,8 +158,8 @@ static int omap4_l3_probe(struct platform_device *pdev)
-> >>  	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
-> >>  			       IRQF_DISABLED, "l3-dbg-irq", l3);
-> >>  	if (ret) {
-> >> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> >> -						l3->debug_irq);
-> >> +		dev_err(&pdev->dev, "request_irq failed for %d\n",
-> >> +			l3->debug_irq);
-> >>  		return ret;
-> >>  	}
-> >>  
-> >> @@ -167,8 +167,7 @@ static int omap4_l3_probe(struct platform_device *pdev)
-> >>  	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
-> >>  			       IRQF_DISABLED, "l3-app-irq", l3);
-> >>  	if (ret)
-> >> -		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> >> -						l3->app_irq);
-> >> +		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
-> >>  
-> >>  	return ret;
-> >>  }
-> >>
-> > So this one change in the log level. If I look at now, may be dev_err
-> > is fine but the change is not same.
+On 12/03/2014 15:38, Nicolas Ferre :
+> On 31/01/2014 09:57, Nicolas Ferre :
+>> On 31/01/2014 08:55, Linus Walleij :
+>>> On Thu, Jan 23, 2014 at 11:37 AM, Jean-Jacques Hiblot
+>>> <jjhiblot@traphandler.com> wrote:
+>>>
+>>>> When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
+>>>> the gpiolib so we can keep track of the usage centrally.
+>>>>
+>>>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>>>
+>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> Nicolas, are you queueing this patch?
+>>
+>> Yes, I will.
 > 
-> Not sure what you mean by 'the change is not same'?
-> I just picked the old series and rebased it on linux-next, the patch is the
-> same as it was back in May 2013:
-> https://lkml.org/lkml/2013/5/2/205
-> 
-> And yes, I have shortened the texts in the print, but the meaning of the
-> prints have not changed.
+> stacked on at91-3.15-cleanup branch.
 
-Santosh, got any more comments on this series?
+... And immediately removed thanks to Boris' advice: it seems that you
+will move to a gpio_irq_request/release_resources() model.
 
-Regards,
+So, we might wait for the solution to settle in 3.15-rc before building
+on top of it.
 
-Tony
- 
-> > Apart from above comment, rest of the series looks fine to me.
-> > Feel free to add my ack...
+Thanks, bye,
+
+>>> I guess this custom GPIO implementation is going away with
+>>> the transition to pinctrl else I'd requested that it be moved to
+>>> drivers/gpio...
+>>
+>> Absolutely. But I suspect it will still be around for some time...
+>>
+>> Thanks for your review. Bye,
+>>
 > 
-> Thanks.
 > 
-> -- 
-> P?ter
+
+
+-- 
+Nicolas Ferre
