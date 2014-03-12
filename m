@@ -1,43 +1,44 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Mar 2014 15:19:11 +0900
-Subject: [PATCHv2 0/5] ARM: dts: exynos: Add missing dt data to bring kernel of
- Exynos4x12
-Message-ID: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
+Date: Wed, 12 Mar 2014 15:19:12 +0900
+Subject: [PATCHv2 1/5] ARM: dts: exynos4x12: Add ADC's dt data to read raw data
+In-Reply-To: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
+References: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1394605156-7768-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add missing dt data of Exynos4x12 to bring up kernel feature and
-code clean. This patchset is based on 'v3.15-next/dt-clk-exynos' branch.
-- git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+This patch add ADC(Analog to Digital Converter)'s dt data to get raw data
+with IIO subsystem. Usually, ADC is used to check temperature, jack type
+and so on.
 
-exynos4x12/exynos4412/exynos4212.dtsi
-- Add ADC (Analog and Digital Converter) to get raw data
-- Add PMU (Performance Monitoring Unit) for perf event
-- Add gps_alive power domain to remove power leakage when gps-alive isn't used
-- Remove duplicate dt data of interrput combiner controller
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4x12.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-exynos4412-trats.dts
-- Add ADC dt data with ntc thermistor child to read temperature
-
-Changes from v1:
-- Use clock macro name for Exynos4 instead of constant for ADC
-- Remove unnecessary description about patch content
-- Move gps-alive power domain's dt data from exynos4x12.dts to exynos4.dts
-- Move thermistor dt node outside of ADC dt node and modify node name of thermistor
-
-Chanwoo Choi (5):
-  ARM: dts: exynos4x12: Add ADC's dt data to read raw data
-  ARM: dts: exynos4x12: Add PMU dt data to support PMU(Perforamnce Monitoring Unit)
-  ARM: dts: exynos4x12: Add GPS_ALIVE power domain
-  ARM: dts: exynos: Move common dt data for interrupt combiner controller
-  ARM: dts: exynos4412-trats2: Add ADC/themistor dt data to get temperature of SoC/battery
-
- arch/arm/boot/dts/exynos4.dtsi          |  5 +++++
- arch/arm/boot/dts/exynos4212.dtsi       | 13 ++++---------
- arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi       | 14 ++++----------
- arch/arm/boot/dts/exynos4x12.dtsi       | 26 ++++++++++++++++++++++++++
- 5 files changed, 60 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index e0eb6bb..eec1e30 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -80,6 +80,18 @@
+ 		};
+ 	};
+ 
++	adc: adc at 126C0000 {
++		compatible = "samsung,exynos-adc-v1";
++		reg = <0x126C0000 0x100>, <0x10020718 0x4>;
++		interrupt-parent = <&combiner>;
++		interrupts = <10 3>;
++		clocks = <&clock CLK_TSADC>;
++		clock-names = "adc";
++		#io-channel-cells = <1>;
++		io-channel-ranges;
++		status = "disabled";
++	};
++
+ 	pinctrl_2: pinctrl at 03860000 {
+ 		compatible = "samsung,exynos4x12-pinctrl";
+ 		reg = <0x03860000 0x1000>;
 -- 
 1.8.0
