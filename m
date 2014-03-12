@@ -1,81 +1,136 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Mar 2014 17:26:42 +0000
-Subject: [PATCH] ARM64: Kernel managed pages are only flushed
-In-Reply-To: <20140312160340.GI17083@arm.com>
-References: <1394018446-16738-1-git-send-email-Bharat.Bhushan@freescale.com>
- <20140306065339.GA2975@localhost>
- <b9ecee11764146c98dd41b811ebc05ae@BN1PR03MB266.namprd03.prod.outlook.com>
- <20140312145653.GA9691@mudshark.cambridge.arm.com>
- <20140312160340.GI17083@arm.com>
-Message-ID: <20140312172642.GU17083@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 12 Mar 2014 14:27:25 -0300
+Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
+In-Reply-To: <1390410577-22073-4-git-send-email-denis@eukrea.com>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
+ <1390410577-22073-4-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 04:03:40PM +0000, Catalin Marinas wrote:
-> On Wed, Mar 12, 2014 at 02:56:53PM +0000, Will Deacon wrote:
-> > On Wed, Mar 12, 2014 at 02:41:31PM +0000, Bharat.Bhushan at freescale.com wrote:
-> > > Did you get the chance to look into this? What is your take for this patch
-> > > or you want to suggest some other solution?
-> > 
-> > See my reply to Laura here:
-> > 
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238510.html
-> > 
-> > We *really* don't want executable device mappings.
-> 
-> /dev/mem mapping use pgprot_noncached() but I think we could generalise
-> any of the writecombine and dmacoherent mappings to XN like in the patch
-> below:
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index b524dcd17243..2d3cede62709 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -286,11 +286,11 @@ static inline int has_transparent_hugepage(void)
->   * Mark the prot value as uncacheable and unbufferable.
->   */
->  #define pgprot_noncached(prot) \
-> -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE))
-> +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
->  #define pgprot_writecombine(prot) \
-> -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
-> +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC) | PTE_PXN | PTE_UXN)
->  #define pgprot_dmacoherent(prot) \
-> -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
-> +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC) | PTE_PXN | PTE_UXN)
->  #define __HAVE_PHYS_MEM_ACCESS_PROT
->  struct file;
->  extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+Hi Denis,
 
-And one more patch as suggested by Steve Capper. Both would be needed.
+On Wed, Jan 22, 2014 at 3:09 PM, Denis Carikli <denis@eukrea.com> wrote:
+> The CMO-QVGA(With backlight), DVI-VGA and DVI-SVGA displays
+> were added.
 
--------------8<----------------------
+I am trying the same on a mx25pdk and these are my changes:
 
->From 31d84855d71778e4a0f615f61ab836be3a70a58b Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Wed, 12 Mar 2014 16:28:09 +0000
-Subject: [PATCH] arm64: Do not synchronise I and D caches for special ptes
+arch/arm/boot/dts/imx25-pdk.dts | 60 +++++++++++++++++++++++++++++++++++++++++
+ drivers/video/fbdev/imxfb.c     |  2 +-
+ 2 files changed, 61 insertions(+), 1 deletion(-)
 
-Special pte mappings are not intended to be executable and do not even
-have an associated struct page. This patch ensures that we do not call
-__sync_icache_dcache() on such ptes.
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index cccd8fe..700ae1c 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -21,6 +21,26 @@
+         reg = <0x80000000 0x4000000>;
+     };
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Steve Capper <Steve.Capper@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
++    display: display {
++        model = "CLAA057VC01CW";
++        native-mode = <&timing0>;
++        bits-per-pixel = <16>;
++        fsl,pcr = <0xfa208b80>;
++        display-timings {
++            timing0: 640x480 {
++                hactive = <640>;
++                vactive = <480>;
++                hback-porch = <114>;
++                hfront-porch = <45>;
++                hsync-len = <1>;
++                vback-porch = <11>;
++                vfront-porch = <33>;
++                vsync-len = <1>;
++                clock-frequency = <25000000>;
++            };
++        };
++    };
++
+     regulators {
+         compatible = "simple-bus";
+         #address-cells = <1>;
+@@ -98,6 +118,16 @@
+     status = "okay";
+ };
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 2d3cede62709..72c9ac38cdd9 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -199,7 +199,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 			      pte_t *ptep, pte_t pte)
- {
- 	if (pte_valid_user(pte)) {
--		if (pte_exec(pte))
-+		if (!pte_special(pte) && pte_exec(pte))
- 			__sync_icache_dcache(pte, addr);
- 		if (pte_dirty(pte) && pte_write(pte))
- 			pte_val(pte) &= ~PTE_RDONLY;
++&lcdc {
++    display = <&display>;
++    fsl,lpccr = <0x00a903ff>;
++    fsl,lscr1 = <0x00120300>;
++    fsl,dmacr = <0x00020010>;
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_lcd>;
++    status = "okay";
++};
++
+ &fec {
+     phy-mode = "rmii";
+     pinctrl-names = "default";
+@@ -170,6 +200,36 @@
+             >;
+         };
+
++        pinctrl_lcd: lcdgrp {
++            fsl,pins = <
++                MX25_PAD_LD0__LD0        0x80000000
++                MX25_PAD_LD1__LD1        0x80000000
++                MX25_PAD_LD2__LD2        0x80000000
++                MX25_PAD_LD3__LD3        0x80000000
++                MX25_PAD_LD4__LD4        0x80000000
++                MX25_PAD_LD5__LD5        0x80000000
++                MX25_PAD_LD6__LD6        0x80000000
++                MX25_PAD_LD7__LD7        0x80000000
++                MX25_PAD_LD8__LD8        0x80000000
++                MX25_PAD_LD9__LD9        0x80000000
++                MX25_PAD_LD10__LD10        0x80000000
++                MX25_PAD_LD11__LD11        0x80000000
++                MX25_PAD_LD12__LD12        0x80000000
++                MX25_PAD_LD13__LD13        0x80000000
++                MX25_PAD_LD14__LD14        0x80000000
++                MX25_PAD_LD15__LD15        0x80000000
++                MX25_PAD_GPIO_E__LD16        0x80000000
++                MX25_PAD_GPIO_F__LD17        0x80000000
++                MX25_PAD_HSYNC__HSYNC        0x80000000
++                MX25_PAD_VSYNC__VSYNC        0x80000000
++                MX25_PAD_LSCLK__LSCLK        0x80000000
++                MX25_PAD_OE_ACD__OE_ACD        0x80000000
++                MX25_PAD_CONTRAST__CONTRAST    0x80000000
++            >;
++        };
++
++
++
+         pinctrl_i2c1: i2c1grp {
+             fsl,pins = <
+                 MX25_PAD_I2C1_CLK__I2C1_CLK        0x80000000
+diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+index 086e024..45cc30b 100644
+--- a/drivers/video/fbdev/imxfb.c
++++ b/drivers/video/fbdev/imxfb.c
+@@ -671,8 +671,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
+
+         fbi->lscr1 = IMXFB_LSCR1_DEFAULT;
+         of_property_read_u32(np, "fsl,lscr1", &fbi->lscr1);
+-
+         of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
++        of_property_read_u32(np, "fsl,lpccr", &fbi->pwmr);
+     }
+
+     return 0;
+
+This last hunk if from an earlier patch from you. (I suggest you to
+resend it since the location of imxfb.c has changed in linux-next).
+
+Is there any other imxfb patch I am missing?
+
+I turned on the backlight supply via bootloader (kernel still does not
+support MC34704 PMIC yet), but the LCD screen is white and I cannot
+see the Linux logo. The /dev/fb0 does exist though.
+
+Any ideas?
+
+Regards,
+
+Fabio Estevam
