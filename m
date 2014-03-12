@@ -1,34 +1,33 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Mar 2014 18:17:06 +0100
-Subject: [PATCH v2 3/4] irqchip: sun4i: Fix a comment about mask register
- initialization
-In-Reply-To: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
-References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1394644627-12315-4-git-send-email-hdegoede@redhat.com>
+Date: Wed, 12 Mar 2014 18:17:03 +0100
+Subject: [PATCH v2 0/4] irq: sun4i IRQ 0 / ENMI fixes
+Message-ID: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comment was claiming that we were masking all irqs, while the code actually
-*un*masks all of them.
+Hi All,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/irqchip/irq-sun4i.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here is v2 of my sun4i IRQ 0 / ENMI fixes fixes, changelog below:
 
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index 5c25048..8a2fbee 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -109,7 +109,7 @@ static int __init sun4i_of_init(struct device_node *node,
- 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
- 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
- 
--	/* Mask all the interrupts */
-+	/* Unmask all the interrupts, ENABLE_REG(x) is used for masking */
- 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
- 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
- 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
--- 
-1.9.0
+v2:
+
+PATCH 1/4 irq: Add handle_fasteoi_late_irq irq handler
+New patch by Thomas Gleixner, adding a new irq handler with the "call eoi
+after the irq-handler has run its course" behavior we need to avoid double
+irqs on the ENMI.
+
+PATCH 2/4 irqchip: sun4i: Fix irq 0 not working
+Modified to avoid spurious calls to the irq 0 handler, as suggested by Maxime.
+
+PATCH 3/4 irqchip: sun4i: Fix a comment about mask register
+Added Maxime's Acked-by
+
+PATCH 4/4 irqchip: sun4i: Use handle_fasteoi_late_irq for the
+New patch switching the handler for irq 0 over to the new
+handle_fasteoi_late_irq handler, thereby fixing the double interrupts issue
+
+Thanks for all the help to all involved.
+
+Regards,
+
+Hans
