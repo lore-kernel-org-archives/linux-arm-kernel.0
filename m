@@ -1,227 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Mar 2014 17:40:44 +0900
-Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
-In-Reply-To: <20493371.uo7oml5YRN@avalon>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
- <20493371.uo7oml5YRN@avalon>
-Message-ID: <20140312084043.GC25813@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 12 Mar 2014 17:41:33 +0900
+Subject: [PATCH v6 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <1394020150-1875-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1394020150-1875-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394020150-1875-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <000101cf3dce$df2c1840$9d8448c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:15:14PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Wednesday, March 05, 2014 8:49 PM, Liviu Dudau wrote:
 > 
-> Thank you for the patch.
+> Use the generic host bridge functions to provide support for
+> PCI Express on arm64. There is no support for ISA memory.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  arch/arm64/Kconfig            |  19 +++-
+>  arch/arm64/include/asm/Kbuild |   1 +
+>  arch/arm64/include/asm/io.h   |   3 +-
+>  arch/arm64/include/asm/pci.h  |  49 +++++++++
+>  arch/arm64/kernel/Makefile    |   1 +
+>  arch/arm64/kernel/pci.c       | 173 ++++++++++++++++++++++++++++++++
+>  6 files changed, 244 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pci.h
+>  create mode 100644 arch/arm64/kernel/pci.c
 
-Thanks, I will address these problems.
+[.....]
 
-> 
-> On Wednesday 26 February 2014 16:33:20 Simon Horman wrote:
-> > Declare all core and MSTP clocks currently used by r8a7779-based boards.
-> > 
-> > Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
-> > 
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > v3
-> > * As suggested by Laurent Pinchart
-> >   - Add and use extal_clk
-> >   - Fix bogus status register use for MSTP clocks
-> >   - Fix bogus mstp3_cls to use its own entries rather than
-> >     that of mstp1_clks
-> > 
-> > * Update to use "main" in cpg_clocks as per updated
-> >   binding in previous patch
-> > * Update for new, consolidated and renamed index macros
-> >   - R8A7779_CLK_ETHER
-> >   - R8A7779_CLK_HSCIF
-> >   - R8A7779_CLK_HSPI
-> >   - R8A7779_CLK_MMC0,1
-> >   - R8A7779_CLK_PCIE
-> >   - R8A7779_CLK_USB01,2
-> > ---
-> >  arch/arm/boot/dts/r8a7779.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 129 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> > index d0561d4..240a03e 100644
-> > --- a/arch/arm/boot/dts/r8a7779.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> > @@ -11,6 +11,7 @@
-> > 
-> >  /include/ "skeleton.dtsi"
-> > 
-> > +#include <dt-bindings/clock/r8a7779-clock.h>
-> >  #include <dt-bindings/interrupt-controller/irq.h>
-> > 
-> >  / {
-> > @@ -278,4 +279,132 @@
-> >  		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-> >  		status = "disabled";
-> >  	};
-> > +
-> > +	clocks {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		ranges;
-> > +
-> > +		/* External root clock */
-> > +		extal_clk: extal_clk {
-> > +			compatible = "fixed-clock";
-> > +			#clock-cells = <0>;
-> > +			/* This value must be overriden by the board. */
-> > +			clock-frequency = <0>;
-> > +			clock-output-names = "extal";
-> > +		};
-> > +
-> > +		/* Special CPG clocks */
-> > +		cpg_clocks: cpg_clocks at 0xe6150000 {
-> > +			compatible = "renesas,r8a7779-cpg-clocks";
-> > +			reg = <0 0xe6150000 0 0x1000>;
-> > +			clocks = <&extal_clk>;
-> > +			#clock-cells = <1>;
-> > +			clock-output-names = "plla", "z", "zs", "s",
-> > +					     "s1", "p", "out";
-> > +		};
-> > +
-> > +		/* Fixed factor clocks */
-> > +		i_clk: i_clk {
-> > +			compatible = "fixed-factor-clock";
-> > +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
-> > +			#clock-cells = <0>;
-> > +			clock-div = <2>;
-> > +			clock-mult = <1>;
-> > +			clock-output-names = "i";
-> > +		};
-> > +		s3_clk: s3_clk {
-> > +			compatible = "fixed-factor-clock";
-> > +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
-> > +			#clock-cells = <0>;
-> > +			clock-div = <8>;
-> > +			clock-mult = <1>;
-> > +			clock-output-names = "s3";
-> > +		};
-> > +		s4_clk: s4_clk {
-> > +			compatible = "fixed-factor-clock";
-> > +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
-> > +			#clock-cells = <0>;
-> > +			clock-div = <16>;
-> > +			clock-mult = <1>;
-> > +			clock-output-names = "s4";
-> > +		};
-> > +		g_clk: g_clk {
-> > +			compatible = "fixed-factor-clock";
-> > +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
-> > +			#clock-cells = <0>;
-> > +			clock-div = <24>;
-> > +			clock-mult = <1>;
-> > +			clock-output-names = "g";
-> > +		};
-> > +
-> > +		/* Gate clocks */
-> > +		mstp0_clks: mstp0_clks {
-> > +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
-> clocks";
-> > +			reg = <0 0xffc80030 0 4>;
-> > +			clocks = <&cpg_clocks R8A7779_CLK_P>,
-> > <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>;
-> 
-> Aren't the HSPI and HSCIF parent clocks clks ? Aren't the SCIF parent clocks 
-> clks1 ?
-> 
-> > +			#clock-cells = <1>;
-> > +			renesas,clock-indices = <
-> > +				R8A7779_CLK_HSPI R8A7779_CLK_TMU0 R8A7779_CLK_TMU0
-> > +				R8A7779_CLK_TMU0 R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
-> > +				R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1
-> > +				R8A7779_CLK_SCIF0 R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
-> > +				R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
-> > +			>;
-> > +			clock-output-names =
-> > +				"hspi", "tmu00", "tmu01",
-> > +				"tmu02", "scif5", "scif4",
-> 
-> The clock names should be tmu0, tmu1 and tmu2, not tmu00, tmu01 and tmu02.
-> 
-> > +				"scif3", "scif2", "scif1",
-> > +				"scif0", "i2c3", "i2c2",
-> > +				"i2c1", "i2c0";
-> > +		};
-> > +		mstp1_clks: mstp1_clks {
-> > +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
-> clocks";
-> > +			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
-> > +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
-> R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
-> 
-> Please verify the clock parents here as well.
-> 
-> > +			#clock-cells = <1>;
-> > +			renesas,clock-indices = <
-> > +				R8A7779_CLK_USB01 R8A7779_CLK_USB01
-> > +				R8A7779_CLK_USB2 R8A7779_CLK_USB2
-> > +				R8A7779_CLK_DU R8A7779_CLK_VIN2
-> > +				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
-> > +				R8A7779_CLK_ETHER R8A7779_CLK_SATA
-> > +				R8A7779_CLK_PCIE R8A7779_CLK_VIN3
-> > +			>;
-> > +			clock-output-names =
-> > +				"ehci0", "ohci0",
-> > +				"ehci1", "ohci1",
-> > +				"du", "vin2",
-> > +				"vin1", "vin0",
-> > +				"ether", "sata",
-> > +				"pcie", "vin3";
-> > +		};
-> > +		mstp3_clks: mstp3_clks {
-> > +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
-> clocks";
-> > +			reg = <0 0xffc8003c 0 4>;
-> > +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
-> R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
-> 
-> Aren't the MMC and SDHI parent clocks clks4 ?
-> 
-> > +			#clock-cells = <1>;
-> > +			renesas,clock-indices = <
-> > +				R8A7779_CLK_SDHI3 R8A7779_CLK_SDHI2
-> > +				R8A7779_CLK_SDHI1 R8A7779_CLK_SDHI0
-> > +				R8A7779_CLK_MMC1 R8A7779_CLK_MMC0
-> > +			>;
-> > +			clock-output-names =
-> > +				"sdhi3", "sdhi2",
-> > +				"sdhi1", "sdhi0",
-> > +				"mmc1", "mmc0";
-> > +		};
-> > +	};
-> >  };
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pci.h
+
+[.....]
+
+> +
+> +static inline int pci_domain_nr(struct pci_bus *bus)
+> +{
+> +	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> +
+> +	if (bridge)
+> +		return bridge->domain_nr;
+> +
+> +	return 0;
+> +}
+
+Hi Liviu Dudau,
+
+When CONFIG_PCI=n, the following build errors happen. :-(
+Would you confirm this?
+
+In file included from include/linux/pci.h:1393:0,
+                 from drivers/scsi/scsi_lib.c:19:
+arch/arm64/include/asm/pci.h:31:19: error: redefinition of 'pci_domain_nr'
+ static inline int pci_domain_nr(struct pci_bus *bus)
+                   ^
+In file included from drivers/scsi/scsi_lib.c:19:0:
+include/linux/pci.h:1383:19: note: previous definition of 'pci_domain_nr' was here
+ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+                   ^
+             .....
+
+Best regards,
+Jingoo Han
