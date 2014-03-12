@@ -1,43 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Mar 2014 22:01:27 +0800
-Subject: [GIT PULL 1/2] ARM: Keystone DTS updates for 3.15
-In-Reply-To: <20140311200116.GD31877@quad.lixom.net>
-References: <1394005703-6624-1-git-send-email-santosh.shilimkar@ti.com>
- <20140311200116.GD31877@quad.lixom.net>
-Message-ID: <532068B7.2060805@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Mar 2014 15:02:02 +0100
+Subject: [PATCH 3/3] pinctrl: mvebu: silence WARN to dev_warn
+In-Reply-To: <20140307134616.GR1872@titan.lakedaemon.net>
+References: <1393977790-29110-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393977790-29110-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140306201803.GL1872@titan.lakedaemon.net>
+ <CACRpkda0JCLZUv_KPmwucDh3ko2YbtG2ukMMscSodAbBpiY+zw@mail.gmail.com>
+ <20140307035056.GQ1872@titan.lakedaemon.net>
+ <CACRpkdbEQSj7jLWT2BFR22m7phwmyKCByhQuFFgHvHoKvQFD5g@mail.gmail.com>
+ <20140307134616.GR1872@titan.lakedaemon.net>
+Message-ID: <CACRpkdbcbMNim9LRkr75Mk5yHfwbA1OAexByHG50qDUPwts4uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 March 2014 04:01 AM, Olof Johansson wrote:
-> On Wed, Mar 05, 2014 at 03:48:22PM +0800, Santosh Shilimkar wrote:
->> Hi Arm-soc folks,
->>
->> Please pull below keystone DTS updates for 3.15. It merges cleanly with
->> arm-soc 'for-next' and 'next/dt' heads.
->>
->> Please note that you get a trivial merge conflict while merging to the
->> latest Linus tip, because of bug fix commit 565bbdcd3b{ARM: keystone:
->> dts: fix clkvcp3 control register address} which got merged post
->> 3.14-rc5. If it needs to be avoided then I need to rebase the PULL
->> request on top of 3.14-rc6 when it gets tagged. Do let me know if
->> thats needed.
->>
->> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
->>
->>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
->>
->> for you to fetch changes up to 82c04f71ecacf225cdd0ea96ec91f28ca9db70a1:
->>
->>   ARM: dts: keystone: add AEMIF/NAND device entry (2014-02-28 21:05:24 -0500)
-> 
-> Merged. See comments on the per-board table in keystone.c, but that can be
-> rolled back and changed on top of this.
-> 
-Thanks. I will follow it up with the comment.
+On Fri, Mar 7, 2014 at 2:46 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Fri, Mar 07, 2014 at 11:56:11AM +0800, Linus Walleij wrote:
 
-Regards,
-Santosh
+>> For a single patch?
+>
+> Well, just the doc change and WARN change.  I've already taken the dts
+> change into mvebu/dt (for arm-soc).
+
+I've applied this patch [3/3] to the pinctrl tree.
+
+> There should be no need for these two to be in mvebu's for-next, so if
+> it's easier for you to pick them, please do so.
+>
+> I'll drop them from mvebu/pinctrl and update mvebu's for-next right now.
+
+No, I mean, please apply patch 1/3 and 2/3 to the mvebu tree.
+There is no need to sync DTS and pinctrl driver changes. This
+patch to the pinctrl driver I want to carry however.
+
+Yours,
+Linus Walleij
