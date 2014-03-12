@@ -1,28 +1,70 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 12 Mar 2014 12:06:02 +0100
-Subject: [PATCH 0/2] ARM: add initial support for the Marvell BG2-Q DMP
-Message-ID: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed, 12 Mar 2014 12:06:04 +0100
+Subject: [PATCH 2/2] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device tree
+In-Reply-To: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds the initial support for the Marvell BG2-Q DMP (part of the
-Berlin family). SoC has nodes for cpu, l2 cache controller, interrupt
-controllers, local timer, apb timers and uarts for now.
-
-Homepage: http://www.marvell.com/digital-entertainment/armada-1500-pro/
-
-Antoine T?nart (2):
-  ARM: dts: berlin2q: add the Marvell Armada 1500 pro (BG2Q) device tree
-  ARM: dts: berlin2q: add the Marvell BG2-Q DMP device tree
-
- Documentation/arm/Marvell/README                   |   5 +
- .../devicetree/bindings/arm/marvell,berlin.txt     |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/berlin2q-dmp.dts                 |  32 ++++
- arch/arm/boot/dts/berlin2q.dtsi                    | 167 +++++++++++++++++++++
- 5 files changed, 207 insertions(+), 1 deletion(-)
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile         |  3 ++-
+ arch/arm/boot/dts/berlin2q-dmp.dts | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/berlin2q-dmp.dts
- create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 032030361bef..1a2adadfb962 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2-sony-nsz-gs7.dtb	\
+-	berlin2cd-google-chromecast.dtb
++	berlin2cd-google-chromecast.dtb	\
++	berlin2q-dmp.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+diff --git a/arch/arm/boot/dts/berlin2q-dmp.dts b/arch/arm/boot/dts/berlin2q-dmp.dts
+new file mode 100644
+index 000000000000..6a98860e0251
+--- /dev/null
++++ b/arch/arm/boot/dts/berlin2q-dmp.dts
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "berlin2q.dtsi"
++
++/ {
++	model = "Marvell BG2-Q DMP";
++	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x40000000>;
++	};
++
++	choosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	soc {
++		apb at fc0000 {
++			uart0: uart at 9000 {
++				status = "okay";
++			};
++		};
++	};
++};
 -- 
 1.8.3.2
