@@ -1,29 +1,46 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 12 Mar 2014 11:19:48 +0100
-Subject: [PATCH v6 0/3] perf: AARCH64 arch support
-In-Reply-To: <20140212100939.GB13441@mudshark.cambridge.arm.com>
-References: <1391451509-31265-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1mBWnO7mivQtGY1qLfd=KwV4ehyZoq0tV7buMiWKrTqrQ@mail.gmail.com>
- <20140212100939.GB13441@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1mqiCRAscUN0t-GwpdX9B_kEii+fq8cH0kVbo+0=6YgVA@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 12 Mar 2014 11:19:25 +0100
+Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
+In-Reply-To: <1394618518-13803-3-git-send-email-denis@eukrea.com>
+References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
+ <1394618518-13803-3-git-send-email-denis@eukrea.com>
+Message-ID: <20140312111925.1d3f0c20@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-Gentle ping on this series? Which tree is it supposed to land in?
-
-I have a new series about libdw integration and unwinding built-in
-test for AARCH64, which is based on this one. How to handle it?
-
-Regards,
-Jean
-
-On 12 February 2014 11:09, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Feb 12, 2014 at 08:47:17AM +0000, Jean Pihet wrote:
->> Ping on the series. Is this OK for inclusion?
+Denis Carikli wrote:
+> This converts the Chipidea usbmisc driver to
+> use the standard usb-phy property.
+> 
+[...]
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+> index c00f772..9a74100 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -130,7 +130,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
+> +	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+>  	if (IS_ERR(data->phy)) {
+>  		ret = PTR_ERR(data->phy);
+>  		goto err_clk;
 >
-> I already acked it all, but you'll need to wait until the next merge window
-> since this isn't a fix.
->
-> Will
+How about accepting the old property too and print a warning, that it is
+deprecated, rather than breaking all existing DT blobs?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
