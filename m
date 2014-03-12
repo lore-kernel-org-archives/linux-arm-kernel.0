@@ -1,39 +1,27 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 12 Mar 2014 16:43:20 -0500
-Subject: [PATCH] ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
-Message-ID: <1394660600-3771-1-git-send-email-nm@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 12 Mar 2014 17:45:24 -0400
+Subject: [PATCH v2 3/4] rename ARCH_BCM to ARCH_BCM_MOBILE (mmc)
+In-Reply-To: <1379956836-5866-4-git-send-email-bcm@fixthebug.org>
+References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
+ <1379956836-5866-4-git-send-email-bcm@fixthebug.org>
+Message-ID: <20140312214524.GS25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like IS_PM34XX_ERRATUM, IS_PM44XX_ERRATUM is valid only if
-CONFIG_PM is enabled, else, disabling CONFIG_PM results in build
-failure complaining about the following:
-arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
-:(.text+0x8a70): undefined reference to `pm44xx_errata'
+On Mon, Sep 23, 2013 at 10:20:35AM -0700, Christian Daudt wrote:
+> Currently ARCH_BCM has been used for Broadcom
+> Mobile V7 based SoCs. In order to allow other Broadcom
+> SoCs to also use mach-bcm directory and files, this patch
+> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
+> uses ARCH_BCM to define any Broadcom chip residing
+> in mach-bcm directory.
+> 
+> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-Fixes: c962184 (ARM: OMAP4: PM: add errata support)
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+Hi Chris,
 
-Patch based on: v3.14-rc6
-Reported originally with a randconfig defconfig: http://slexy.org/view/s21U7eF4k1
+Could you please take this patch for 3.15? It was missed for 3.14.
 
- arch/arm/mach-omap2/pm.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 7bdd22a..d4d0fce 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -103,7 +103,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
- 
- #define PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD	(1 << 0)
- 
--#if defined(CONFIG_ARCH_OMAP4)
-+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
- extern u16 pm44xx_errata;
- #define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
- #else
--- 
-1.7.9.5
+Thanks,
+Matt
