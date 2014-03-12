@@ -1,44 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Mar 2014 12:39:42 +0000
-Subject: [PATCH 5/5] ahci: st: Invoke AHCI Platform Suspend/Resume
+Date: Wed, 12 Mar 2014 12:39:38 +0000
+Subject: [PATCH 1/5] ahci: st: Standardise naming conventions
 In-Reply-To: <1394627982-23726-1-git-send-email-lee.jones@linaro.org>
 References: <1394627982-23726-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1394627982-23726-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1394627982-23726-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is where we disable IRQs on suspend and update the internal
-power state during suspend/resume.
+Other devices have adopted similar naming conventions which have been
+accepted as the standard. This patch brings any mention of the the ST
+AHCI driver into line with them.
 
 Suggested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/ata/ahci_st.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/ata/Kconfig   | 6 +++---
+ drivers/ata/ahci_st.c | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index ee7a3dc..ffc5d9d 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -97,12 +97,12 @@ config SATA_AHCI_PLATFORM
+ 
+ 	  If unsure, say N.
+ 
+-config SATA_AHCI_ST
+-	tristate "ST SATA support"
++config AHCI_ST
++	tristate "ST AHCI SATA support"
+ 	depends on SATA_AHCI_PLATFORM
+ 	select GENERIC_PHY
+ 	help
+-	  This option enables support for ST SATA controller.
++	  This option enables support for ST AHCI SATA controller.
+ 
+ 	  If unsure, say N.
+ 
 diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
-index 3edec5d..17191b9 100644
+index 2f95133..f5af660 100644
 --- a/drivers/ata/ahci_st.c
 +++ b/drivers/ata/ahci_st.c
-@@ -186,6 +186,10 @@ static int st_ahci_suspend(struct device *dev)
- 	struct ahci_host_priv *hpriv = drv_data->hpriv;
- 	int err;
+@@ -235,5 +235,5 @@ module_platform_driver(st_ahci_driver);
  
-+	ret = ahci_platform_suspend_host(dev);
-+	if (ret)
-+		return ret;
-+
- 	if (drv_data->pwr) {
- 		err = reset_control_assert(drv_data->pwr);
- 		if (err) {
-@@ -215,7 +219,7 @@ static int st_ahci_resume(struct device *dev)
- 		return err;
- 	}
- 
--	return 0;
-+	return ahci_platform_resume_host(dev);
- }
- #endif
- 
+ MODULE_AUTHOR("Alexandre Torgue <alexandre.torgue@st.com>");
+ MODULE_AUTHOR("Francesco Virlinzi <francesco.virlinzi@st.com>");
+-MODULE_DESCRIPTION("STMicroelectronics Sata Ahci driver");
++MODULE_DESCRIPTION("STMicroelectronics SATA AHCI Driver");
+ MODULE_LICENSE("GPL v2");
 -- 
 1.8.3.2
