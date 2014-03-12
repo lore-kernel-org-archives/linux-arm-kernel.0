@@ -1,50 +1,47 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 12 Mar 2014 12:03:00 -0700
-Subject: [PATCH v3 6/9] tty: xuartps: Don't write IRQ disable register to
- enable interrupts
+Date: Wed, 12 Mar 2014 12:03:02 -0700
+Subject: [PATCH v3 8/9] tty: cadence: Document DT binding
 In-Reply-To: <1394650983-24780-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1394650983-24780-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1394650983-24780-7-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1394650983-24780-9-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A comment states, that, according to the data sheet, to enable
-interrupts the disable register should be written, but the enable
-register could be left untouched. And it suspsects a HW bug requiring
-to write both.
-Reviewing the data sheet, these statements seem wrong. Just as one would
-expect. Writing to the enable/disable register enables/disables
-interrupts.
-Hence the misleading comment and needless write to the disable register
-are removed from the enable sequence.
+Add binding documentation for the Cadence UART.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
-I added a few lines to comment the change and altered the summary line.
-In case this causes issues it should show up a little easier as a
-candidate to revert.
+ .../devicetree/bindings/serial/cdns,uart.txt         | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
 
-	S?ren
----
- drivers/tty/serial/xilinx_uartps.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index b182ab8cfd07..f9a2c2fc03c4 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1085,11 +1085,7 @@ static void xuartps_console_write(struct console *co, const char *s,
- 
- 	xuartps_writel(ctrl, XUARTPS_CR_OFFSET);
- 
--	/* restore interrupt state, it seems like there may be a h/w bug
--	 * in that the interrupt enable register should not need to be
--	 * written based on the data sheet
--	 */
--	xuartps_writel(~imr, XUARTPS_IDR_OFFSET);
-+	/* restore interrupt state */
- 	xuartps_writel(imr, XUARTPS_IER_OFFSET);
- 
- 	if (locked)
+diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+new file mode 100644
+index 000000000000..a3eb154c32ca
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+@@ -0,0 +1,20 @@
++Binding for Cadence UART Controller
++
++Required properties:
++- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
++- reg: Should contain UART controller registers location and length.
++- interrupts: Should contain UART controller interrupts.
++- clocks: Must contain phandles to the UART clocks
++  See ../clocks/clock-bindings.txt for details.
++- clock-names: Tuple to identify input clocks, must contain "uart_clk" and "pclk"
++  See ../clocks/clock-bindings.txt for details.
++
++
++Example:
++	uart at e0000000 {
++		compatible = "cdns,uart-r1p8";
++		clocks = <&clkc 23>, <&clkc 40>;
++		clock-names = "uart_clk", "pclk";
++		reg = <0xE0000000 0x1000>;
++		interrupts = <0 27 4>;
++	};
 -- 
 1.9.0.1.g4196000
