@@ -1,155 +1,68 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 12 Mar 2014 13:00:51 +0100
-Subject: [PATCH] ARM: zynq: Add OCM driver
-In-Reply-To: <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
-References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
- <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
-Message-ID: <53204C73.5070807@monstr.eu>
+Date: Wed, 12 Mar 2014 13:03:46 +0100
+Subject: [GIT PULL v2] Xilinx Zynq changes for v3.15
+In-Reply-To: <20140311213331.GA6429@quad.lixom.net>
+References: <53061EBA.1080002@monstr.eu> <531D746A.4020903@monstr.eu>
+ <20140311213331.GA6429@quad.lixom.net>
+Message-ID: <53204D22.2000703@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
->> diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
->> new file mode 100644
->> index 0000000..64cb5e8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
->> @@ -0,0 +1,17 @@
->> +Device tree bindings for Zynq's OCM
->> +
->> +The OCM is divided to 4 64kB segments which can be separately configured
->> +to low or high location. Location is controlled via SLCR.
->> +
->> +Required properties:
->> + compatible: Compatibility string. Must be "xlnx,zynq-ocm-1.0".
->> + reg: Specify the base and size of the OCM registers in the memory map.
->> +      E.g.: reg = <0xf800c000 0x1000>;
->> +
->> +Example:
->> +ocmc: ocmc at f800c000 {
->> +       compatible =  "xlnx,zynq-ocm-1.0";
->> +       interrupt-parent = <&intc>;
->> +       interrupts = <0 3 4>;
->> +       reg = <0xf800c000 0x1000>;
->> +} ;
->> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->> index 1d942e2..4929be5 100644
->> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->> @@ -66,6 +66,13 @@
->>                         cache-level = <2>;
->>                 };
+On 03/11/2014 10:33 PM, Olof Johansson wrote:
+> On Mon, Mar 10, 2014 at 09:14:34AM +0100, Michal Simek wrote:
+>> Hi,
 >>
->> +               ocmc: ocmc at f800c000 {
->> +                       compatible = "xlnx,zynq-ocm-1.0";
->> +                       interrupt-parent = <&intc>;
->> +                       interrupts = <0 3 4>;
->> +                       reg = <0xf800c000 0x1000>;
->> +               } ;
->> +
->>                 uart0: uart at e0000000 {
->>                         compatible = "xlnx,xuartps";
->>                         status = "disabled";
->> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
->> index 323e505..f3e6ce4 100644
->> --- a/arch/arm/mach-zynq/Kconfig
->> +++ b/arch/arm/mach-zynq/Kconfig
->> @@ -15,5 +15,6 @@ config ARCH_ZYNQ
->>         select CADENCE_TTC_TIMER
->>         select ARM_GLOBAL_TIMER
->>         select MFD_SYSCON
->> +       select GENERIC_ALLOCATOR
->>         help
->>           Support for Xilinx Zynq ARM Cortex A9 Platform
->> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
->> index 1b25d92..626f64b 100644
->> --- a/arch/arm/mach-zynq/Makefile
->> +++ b/arch/arm/mach-zynq/Makefile
->> @@ -3,7 +3,7 @@
->>  #
+>> please pull these changes to your arm-soc tree. This branch is based
+>> on zynq/dt branch from the second pull request.
+>> I have kept OCM patch in this branch because it depends on slcr changes
+>> done here. If you want to send another pull request just for this OCM
+>> patch based on this branch, please let me know.
 >>
->>  # Common support
->> -obj-y                          := common.o slcr.o
->> +obj-y                          := common.o slcr.o zynq_ocm.o
->>  CFLAGS_REMOVE_hotplug.o                =-march=armv6k
->>  CFLAGS_hotplug.o               =-Wa,-march=armv7-a -mcpu=cortex-a9
->>  obj-$(CONFIG_HOTPLUG_CPU)      += hotplug.o
->> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
->> index b097844..953f6a1 100644
->> --- a/arch/arm/mach-zynq/common.h
->> +++ b/arch/arm/mach-zynq/common.h
->> @@ -24,6 +24,7 @@ extern int zynq_early_slcr_init(void);
->>  extern void zynq_slcr_system_reset(void);
->>  extern void zynq_slcr_cpu_stop(int cpu);
->>  extern void zynq_slcr_cpu_start(int cpu);
->> +extern u32 zynq_slcr_get_ocm_config(void);
->>
->>  #ifdef CONFIG_SMP
->>  extern void secondary_startup(void);
->> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
->> index c1f1499..9a37ab3 100644
->> --- a/arch/arm/mach-zynq/slcr.c
->> +++ b/arch/arm/mach-zynq/slcr.c
->> @@ -26,6 +26,7 @@
->>  #define SLCR_PS_RST_CTRL_OFFSET                0x200 /* PS Software Reset Control */
->>  #define SLCR_A9_CPU_RST_CTRL_OFFSET    0x244 /* CPU Software Reset Control */
->>  #define SLCR_REBOOT_STATUS_OFFSET      0x258 /* PS Reboot Status */
->> +#define SLCR_OCM_CFG_OFFSET            0x910 /* OCM Address Mapping */
->>
->>  #define SLCR_UNLOCK_MAGIC              0xDF0D
->>  #define SLCR_A9_CPU_CLKSTOP            0x10
->> @@ -107,6 +108,20 @@ void zynq_slcr_system_reset(void)
->>  }
->>
->>  /**
->> + * zynq_slcr_get_ocm_config - Get SLCR OCM config
->> + *
->> + * return:     OCM config bits
->> + */
->> +u32 zynq_slcr_get_ocm_config(void)
->> +{
->> +       u32 val;
->> +
->> +       zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
->> +
->> +       return val;
->> +}
->> +
->> +/**
->>   * zynq_slcr_cpu_start - Start cpu
->>   * @cpu:       cpu number
->>   */
->> diff --git a/arch/arm/mach-zynq/zynq_ocm.c b/arch/arm/mach-zynq/zynq_ocm.c
->> new file mode 100644
->> index 0000000..034a65b
->> --- /dev/null
->> +++ b/arch/arm/mach-zynq/zynq_ocm.c
->> @@ -0,0 +1,243 @@
->> +/*
->> + * Copyright (C) 2013 Xilinx
->> + *
->> + * Based on "Generic on-chip SRAM allocation driver"
+>> Changes in v2: Fix incorrect git repo url
 > 
-> We're not adding new drivers under arch/arm, so if you need this
-> driver then you should either merge it under drivers/ somewhere, or
-> look at extending the generic driver in a way that you can reuse it.
+> Thanks!
+> 
+>> The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
+>>
+>>   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.15
+>>
+>> for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
+>>
+>>   ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
+>>
+>> ----------------------------------------------------------------
+>> arm: Xilinx Zynq cleanup patches for v3.15
+>>
+>> - Redesign SLCR initialization to enable
+>>   driver developing which targets SLCR space
+>> - Add OCM driver
+>> - Add SOC_BUS support
+>>
+>> ----------------------------------------------------------------
+>> Michal Simek (8):
+>>       ARM: zynq: Split slcr in two parts
+>>       ARM: zynq: Map I/O memory on clkc init
+>>       ARM: zynq: Add and use zynq_slcr_read/write() helper functions
+>>       ARM: zynq: Introduce zynq_slcr_unlock()
+>>       ARM: zynq: Add OCM driver
+> 
+> Looking at the patches in the branch, this is the one I have most concern with.
+> I think it will require more work to get it in shape to get merged, as per
+> those comments.
+> 
+> I think it's worth to merge the other stuff though, so can you rebuild the
+> branch without the OCM driver so we can get the rest in for 3.15 even if the
+> OCM piece ends up taking longer?
 
-Driver is reusing ideas from this generic driver but
-incorporation our changes to will be problematic.
-
-It is a shame that you didn't review the rest of code below.
-The reason why I have added this driver to arch/arm/mach-zynq
-was that there is code connection to zynq SMP bootup trampoline
-which has to be added at 0x0 when OCM is placed at 0x0.
-And this memory can't be used for generic purpose.
-If you see any nice way how to it please let me know.
-
-Calling SLCR function is solvable via regmap mapping.
+No problem to do it. I will just wait one more day till we finish that discussions.
+Or is there any time pressure?
 
 Thanks,
 Michal
-
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -165,4 +78,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/503dcadf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140312/414bf75e/attachment-0001.sig>
