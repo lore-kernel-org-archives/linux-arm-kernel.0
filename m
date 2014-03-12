@@ -1,34 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Mar 2014 16:38:47 +0000
-Subject: [PATCH v5 2/5] mfd: add bcm590xx pmu driver
-In-Reply-To: <1394633237-16837-3-git-send-email-mporter@linaro.org>
-References: <1394633237-16837-1-git-send-email-mporter@linaro.org>
- <1394633237-16837-3-git-send-email-mporter@linaro.org>
-Message-ID: <20140312163847.GD22450@lee--X1>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 12 Mar 2014 17:40:32 +0100
+Subject: [PATCH v9][ 7/8] ARM: dts: mbimx51sd: Add display support.
+In-Reply-To: <1394123206.3622.51.camel@paszta.hi.pengutronix.de>
+References: <1394121702-13257-3-git-send-email-denis@eukrea.com>	
+ <1394121869-13387-1-git-send-email-denis@eukrea.com>	
+ <1394121869-13387-4-git-send-email-denis@eukrea.com>
+ <1394123206.3622.51.camel@paszta.hi.pengutronix.de>
+Message-ID: <53208E00.5070404@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add a driver for the BCM590xx PMU multi-function devices. The driver
-> initially supports regmap initialization and instantiation of the
-> voltage regulator device function of the PMU.
-> 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> ---
->  drivers/mfd/Kconfig          |  8 ++++
->  drivers/mfd/Makefile         |  1 +
->  drivers/mfd/bcm590xx.c       | 93 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/bcm590xx.h | 31 +++++++++++++++
->  4 files changed, 133 insertions(+)
->  create mode 100644 drivers/mfd/bcm590xx.c
->  create mode 100644 include/linux/mfd/bcm590xx.h
+On 03/06/2014 05:26 PM, Philipp Zabel wrote:
+> Hi Denis,
+Hi,
 
-Please don't sent patches that have already been accepted, as can get
-pretty confusing.
+> Does this board really have a DVI connector and no I2C bus routed to the
+> DDC pins?
+Yes, I2C is not routed to the DVI connector.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Denis.
