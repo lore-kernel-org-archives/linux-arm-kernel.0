@@ -1,62 +1,40 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 12 Mar 2014 12:01:42 -0700
-Subject: [PATCH v16 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <2172234.huOH9CEWA3@amdc1032>
-References: <1394575895-7039-1-git-send-email-lho@apm.com>
- <1394575895-7039-3-git-send-email-lho@apm.com>
- <1394575895-7039-4-git-send-email-lho@apm.com>
- <2172234.huOH9CEWA3@amdc1032>
-Message-ID: <CAPw-ZTmvG1dMckif4xKrv-rg=8jAode0RWgFBjoi_5OXrB2RHQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 12 Mar 2014 12:02:54 -0700
+Subject: [PATCH v3 0/9] tty: xuartps: Rebranding + DT documentation
+Message-ID: <1394650983-24780-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Here is a fixed and extended v3. I picked up Michal's patches and
+incorporated them into the series. Those are the first two patches.
+The 'rebranding' patch is correspondingly extended to convert the new
+code as well.
 
->> +MODULE_DEVICE_TABLE(of, xgene_ahci_of_match);
->> +
->> +static struct platform_driver xgene_ahci_driver = {
->> +     .probe = xgene_ahci_probe,
->> +     .remove = ata_platform_remove_one,
->
-> It is good to use ata_platform_remove_one() here but some code still needs
-> to callback ahci_platform_disable_resources() before the driver is removed
-> completely.  The way other drivers do it is to define custom ->host_stop
-> method and add it to port ops (xgene_ahci_ops in this case).  For X-Gene
-> AHCI driver ->host_stop function can be quite simple and look like this:
->
-> static void xgene_ahci_host_stop(struct ata_host *host)
-> {
->         struct ahci_host_priv *hpriv = host->private_data;
->
->         ahci_platform_disable_resources(hpriv);
-> }
+The erroneously changed compatibility string has been reverted back to
+what it should be.
 
-Will do.
+	S?ren
 
->
->> +     .driver = {
->> +             .name = "xgene-ahci",
->> +             .owner = THIS_MODULE,
->> +             .of_match_table = xgene_ahci_of_match,
->> +     },
->
-> Power Management support is missing for this driver.  If your platform
-> doesn't support Suspend to RAM yet it would be good to add a comment
-> about this explaining the lack of PM.  Otherwise it should be fixed (you
-> can take a look at ahci_imx.c and ahci_sunxi.c for examples).
+Michal Simek (2):
+  tty: xuartps: Fix kernel-doc errors in the driver
+  tty: xuartps: Initialize ports according to aliases
 
-In order to support PM, I will need an other errata fix in libachi.c.
-For now PM, will NOT be support.
+Soren Brinkmann (7):
+  tty: xuartps: Clean up
+  tty: xuartps: Print warning in clock notifier
+  tty: xuartps: Refactor read-modify-writes
+  tty: xuartps: Don't write IRQ disable register to enable interrupts
+  tty: xuartps: Rebrand driver as Cadence UART
+  tty: cadence: Document DT binding
+  ARM: zynq: DT: Migrate UART to Cadence binding
 
->
-> Otherwise the driver looks good to me and (FWIW) you can add:
->
->         Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->
-> Once the aforementioned issues are fixed.
+ .../devicetree/bindings/serial/cdns,uart.txt       |   20 +
+ arch/arm/boot/dts/zynq-7000.dtsi                   |    8 +-
+ drivers/tty/serial/Kconfig                         |    9 +-
+ drivers/tty/serial/xilinx_uartps.c                 | 1129 ++++++++++----------
+ include/uapi/linux/serial_core.h                   |    2 +-
+ 5 files changed, 570 insertions(+), 598 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
 
-I will post another version. If you ack'ed that version, Tejun can add
-you to the Reviewed-by list.
-
--Loc
+-- 
+1.9.0.1.g4196000
