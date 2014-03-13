@@ -1,43 +1,54 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 13 Mar 2014 10:41:45 -0700
-Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping when
- possible
-In-Reply-To: <201403061633.31260.marex@denx.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
- <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
- <000201cf38e6$5b02d6e0$110884a0$%han@samsung.com>
- <201403061633.31260.marex@denx.de>
-Message-ID: <CAJ+vNU2XrAL+BTTB8i4hQhkZ_NfcS0VrWuHUjeFfU9hhGjNXbg@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 13 Mar 2014 10:43:09 -0700
+Subject: [RFC] cpufreq-cpu0: allow OPP table supplied by platform
+In-Reply-To: <20140313194424.122ec572@xhacker>
+References: <20140313184859.7d6f6512@xhacker>
+ <CAKohpokLv0m+Cky7nCUOgP-djTMrA6jyka_EZ07+_exCAexXXg@mail.gmail.com>
+ <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
+ <20140313194424.122ec572@xhacker>
+Message-ID: <232645eb-183a-4a7c-997b-db3ab149d72b@TX2EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 6, 2014 at 7:33 AM, Marek Vasut <marex@denx.de> wrote:
-> On Thursday, March 06, 2014 at 03:47:03 AM, Jingoo Han wrote:
->> On Wednesday, March 05, 2014 10:26 PM, Lucas Stach wrote:
->> > This is the recommended method of doing the IRQ
->> > mapping. For old devicetrees we fall back to the
->> > previous practice.
->> >
->> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->> > Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> (+cc Mohit KUMAR, Richard Zhu, Pratyush Anand, Marek Vasut,
->>        Kishon Vijay Abraham I)
->>
->> Acked-by: Jingoo Han <jg1.han@samsung.com>
->>
->> It works properly on Exynos platform.
->> Thank you.
->
-> Looks reasonable,
->
-> Reviewed-by: Marek Vasut <marex@denx.de>
->
+On Thu, 2014-03-13 at 07:44PM +0800, Jisheng Zhang wrote:
+> Fixing lakml :)
+> 
+> sorry
+> 
+> On Thu, 13 Mar 2014 03:56:46 -0700
+> Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> 
+> > Fixing Rafael's id.
+> > 
+> > On 13 March 2014 16:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > > On 13 March 2014 16:18, Jisheng Zhang <jszhang@marvell.com> wrote:
+> > >> Hi all,
+> > >>
+> > >> cpufreq-cpu0 is suitable for Marvell Berlin SoC. But there's one issue
+> > >> to address. The opp is different between chips even on the same step
+> > >> SoC, BG2Q for example. we can calculate the OPP table from the value of
+> > >> one OTP register. We have two solutions:
+> > >>
+> > >> 1. bootloader reads OTP register and calculate the OPP table then change
+> > >> dtb danamically
+> > >>
+> > >> 2. supply one driver in mach-berlin to initialize the OPP table; and
+> > >> modify cpufreq-cpu0 to allow platform supply OPP table, fall back to
+> > >> of_init_opp_table() if there's no OPP table.
+> > >>
+> > >> Which solution is better?
+> > >
+> > > I think we can go ahead with second option here. We can just check if opp
+> > > tables are already initialized or not. In case they are, don't probe from
+> > > dt..
+> > >
+> > > But lets see with others have to say here..
 
-I've tested this on the Gateworks Ventana products with P2P bridges
-and with the patch I just submitted here:
-http://thread.gmane.org/gmane.linux.kernel.pci/30017
+This might become useful for Zynq as well. We essentially allow to boot
+with all kind of different frequencies and depending on how the PLL, and clock
+registers get setup by the bootloader, certain frequencies may or may
+not become possible. Having a way to dynamically build an OPP table
+would probably be a nicer way than having to tell everybody to adjust
+the DT according to how the bootloader sets up the clocks.
 
-Tested-by: Tim Harvey <tharvey@gateworks.com>
-
-Tim
+	S?ren
