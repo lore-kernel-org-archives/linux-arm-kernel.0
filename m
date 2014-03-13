@@ -1,63 +1,60 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Mar 2014 19:03:54 +0100
-Subject: [PATCH v3 4/4] irqchip: sun4i: Don't ack IRQs != 0,
- fix acking of IRQ 0
-In-Reply-To: <1394733834-26839-1-git-send-email-hdegoede@redhat.com>
-References: <1394733834-26839-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1394733834-26839-5-git-send-email-hdegoede@redhat.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 13 Mar 2014 14:07:50 -0400
+Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
+In-Reply-To: <20140313155415.GB25472@mudshark.cambridge.arm.com>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>
+ <20140313155415.GB25472@mudshark.cambridge.arm.com>
+Message-ID: <1394734070.26600.6.camel@pippen.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All IRQs except for IRQ 0 seem to not need acking, so drop acking for them.
+On Thu, 2014-03-13 at 15:54 +0000, Will Deacon wrote:
+> On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
+> > CALLER_ADDRx returns caller's address at specified level in call stacks.
+> > They are used for several tracers like irqsoff and preemptoff.
+> > Strange to say, however, they are refered even without FTRACE.
+> > 
+> > Please note that this implementation assumes that we have frame pointers.
+> > (which means kernel should be compiled with -fno-omit-frame-pointer.)
+> 
+> How do you ensure that -fno-omit-frame-pointer is passed?
 
-The ENMI needs to have the ack done *after* clearing the interrupt source,
-otherwise we will get a spurious interrupt for each real interrupt.
+Perhaps -pg does the same thing?
 
-So use the new IRQCHIP_EOI_THREADED flag for this in combination with
-handle_fasteoi_irq. This uses a separate irq_chip struct for IRQ 0,
-since we only want this behavior for IRQ 0.
+> > +#define HAVE_ARCH_CALLER_ADDR
+> > +
+> > +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> > +#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> > +#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> > +#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> > +#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> > +#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> > +#define CALLER_ADDR6 ((unsigned long)return_address(6))
+> 
+> Could we change the core definitions of these macros (in linux/ftrace.h) to
+> use return_address, then provide an overridable version of return_address
+> that defaults to __builtin_return_address, instead of copy-pasting this
+> sequence?
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/irqchip/irq-sun4i.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+We could add a new macro:
 
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index 8a2fbee..a0ed1ea 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -76,16 +76,29 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
- 
- static struct irq_chip sun4i_irq_chip = {
- 	.name		= "sun4i_irq",
--	.irq_ack	= sun4i_irq_ack,
- 	.irq_mask	= sun4i_irq_mask,
- 	.irq_unmask	= sun4i_irq_unmask,
- };
- 
-+/* IRQ 0 / the ENMI needs a late eoi call */
-+static struct irq_chip sun4i_irq_chip_enmi = {
-+	.name		= "sun4i_irq",
-+	.irq_eoi	= sun4i_irq_ack,
-+	.irq_mask	= sun4i_irq_mask,
-+	.irq_unmask	= sun4i_irq_unmask,
-+	.flags		= IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED,
-+};
-+
- static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
- 			 irq_hw_number_t hw)
- {
--	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
--				 handle_level_irq);
-+	if (hw == 0)
-+		irq_set_chip_and_handler(virq, &sun4i_irq_chip_enmi,
-+					 handle_fasteoi_irq);
-+	else
-+		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-+					 handle_level_irq);
-+
- 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
- 
- 	return 0;
--- 
-1.9.0
+/* All archs should have this, but we define it for consistency */
+#ifndef ftrace_return_address0
+# define ftrace_return_address0  __builtin_return_address(0)
+#endif
+/* Archs may use other ways for ADDR1 and beyond */
+#ifndef ftrace_return_address
+# define ftrace_return_address(n) __builtin_return_address(n)
+#endif
+
+And then have:
+
+#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
+#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
+[...]
+
+And then you would only need to redefine ftrace_return_address.
+
+-- Steve
