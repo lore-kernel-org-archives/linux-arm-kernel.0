@@ -1,164 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Mar 2014 12:37:23 +0100
-Subject: [PATCH v3 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
-In-Reply-To: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1394710643-3411-3-git-send-email-maxime.ripard@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 13 Mar 2014 11:43:22 +0000
+Subject: [PATCH v5 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <CACRpkdYBuxYko5JD5ZCfoQq+PeXtkKP9eprk9HM=ghW2YMoMuA@mail.gmail.com>
+References: <1394036606-17784-1-git-send-email-pawel.moll@arm.com>
+ <53184C2E.3000807@ti.com>
+ <CACRpkdYBuxYko5JD5ZCfoQq+PeXtkKP9eprk9HM=ghW2YMoMuA@mail.gmail.com>
+Message-ID: <1394711002.32336.5.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch the device tree to the new compatibles introduced in the i2c drivers
-to have a common pattern accross all Allwinner SoCs.
+On Thu, 2014-03-13 at 09:30 +0000, Linus Walleij wrote:
+> On Thu, Mar 6, 2014 at 11:21 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> > On 05/03/14 18:23, Pawel Moll wrote:
+> >> This patch adds basic DT bindings for the PL11x CLCD cells
+> >> and make their fbdev driver use them.
+> >
+> > Is this an old HW, and presumably there won't be new users for it?
+> 
+> AFAICT ARM really like to re-synthesize this piece of HW in every
+> new reference design they make. 
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi  |  6 +++---
- arch/arm/boot/dts/sun5i-a10s.dtsi |  6 +++---
- arch/arm/boot/dts/sun5i-a13.dtsi  |  6 +++---
- arch/arm/boot/dts/sun7i-a20.dtsi  | 10 +++++-----
- 4 files changed, 14 insertions(+), 14 deletions(-)
+Not for long now, hopefully...
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 27dc6ee8d0d6..6d3e39b8bb29 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -641,7 +641,7 @@
- 		};
- 
- 		i2c0: i2c at 01c2ac00 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <7>;
- 			clocks = <&apb1_gates 0>;
-@@ -650,7 +650,7 @@
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <8>;
- 			clocks = <&apb1_gates 1>;
-@@ -659,7 +659,7 @@
- 		};
- 
- 		i2c2: i2c at 01c2b400 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b400 0x400>;
- 			interrupts = <9>;
- 			clocks = <&apb1_gates 2>;
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index f34e0d85c9be..4977f47aeab3 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -519,7 +519,7 @@
- 		i2c0: i2c at 01c2ac00 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <7>;
- 			clocks = <&apb1_gates 0>;
-@@ -530,7 +530,7 @@
- 		i2c1: i2c at 01c2b000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <8>;
- 			clocks = <&apb1_gates 1>;
-@@ -541,7 +541,7 @@
- 		i2c2: i2c at 01c2b400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b400 0x400>;
- 			interrupts = <9>;
- 			clocks = <&apb1_gates 2>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 0e9c239af689..7e0ef8374bbf 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -461,7 +461,7 @@
- 		};
- 
- 		i2c0: i2c at 01c2ac00 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <7>;
- 			clocks = <&apb1_gates 0>;
-@@ -470,7 +470,7 @@
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <8>;
- 			clocks = <&apb1_gates 1>;
-@@ -479,7 +479,7 @@
- 		};
- 
- 		i2c2: i2c at 01c2b400 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b400 0x400>;
- 			interrupts = <9>;
- 			clocks = <&apb1_gates 2>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4cc2f5f2ecad..c1fd510fd2c4 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -762,7 +762,7 @@
- 		};
- 
- 		i2c0: i2c at 01c2ac00 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <0 7 4>;
- 			clocks = <&apb1_gates 0>;
-@@ -771,7 +771,7 @@
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <0 8 4>;
- 			clocks = <&apb1_gates 1>;
-@@ -780,7 +780,7 @@
- 		};
- 
- 		i2c2: i2c at 01c2b400 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b400 0x400>;
- 			interrupts = <0 9 4>;
- 			clocks = <&apb1_gates 2>;
-@@ -789,7 +789,7 @@
- 		};
- 
- 		i2c3: i2c at 01c2b800 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2b800 0x400>;
- 			interrupts = <0 88 4>;
- 			clocks = <&apb1_gates 3>;
-@@ -798,7 +798,7 @@
- 		};
- 
- 		i2c4: i2c at 01c2bc00 {
--			compatible = "allwinner,sun4i-i2c";
-+			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2bc00 0x400>;
- 			interrupts = <0 89 4>;
- 			clocks = <&apb1_gates 15>;
--- 
-1.9.0
+> > If
+> > yes, this is probably fine. If not, you might want to look at the video
+> > ports and endpoints, which is used by at least three not-yet-merged series:
+> >
+> > [PATCHv3 00/41] OMAPDSS: DT support v3
+> > [PATCH v5 00/11] imx-drm dt bindings
+> > [RFC PATCH v2 00/21] Add DSI display support for Exynos based boards
+> >
+> > Using bindings like that would be more future proof, even if the current
+> > driver doesn't use them.
+> 
+> I take it that it shouldn't matter if the driver is for framebuffer or
+> DRM (as was implied by some answer here) the hardware
+> description should be the same no matter what, so the more
+> furture-proof the better.
+
+Again, no argument here - the clcd-specific properties will be of use
+whatever happens in the future (the "immediate" display timing subnode
+is optional and is cloned from other existing bindings, so no new
+problem is introduced here). I'm just shying away from the discussions
+on generic display (or CDF or video or whatever) bindings. Call me
+coward if you wish (maybe just tired to death with this subject ;-)
+
+Pawel
