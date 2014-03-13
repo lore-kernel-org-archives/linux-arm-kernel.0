@@ -1,84 +1,81 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Thu, 13 Mar 2014 02:21:45 +0000
-Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
- phy_ethtool_get_wol
-In-Reply-To: <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1394677305.20857.29.camel@deadeye.wl.decadent.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Mar 2014 11:22:47 +0900
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <3299454.uLzSWehPDg@avalon>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <2601556.jT3Q3TPugr@avalon> <20140312075520.GB25813@verge.net.au>
+ <3299454.uLzSWehPDg@avalon>
+Message-ID: <20140313022246.GA8802@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-12 at 00:02 +0100, Sebastian Hesselbarth wrote:
-> phy_ethtool_get_wol is a helper to get current WOL settings from
-> a phy device. When using this helper on a PHY without .get_wol
-> callback, struct ethtool_wolinfo is never set-up correctly and
-> may contain misleading information about WOL status.
+On Wed, Mar 12, 2014 at 11:12:02AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> To fix this, always zero relevant fields of struct ethtool_wolinfo
-> regardless of .get_wol callback availability.
-
-Sorry, I still disagree with this.
-
-You're trying to make phy_ethtool_get_wol() do two subtly different
-things:
-- Provide an implementation of ethtool_ops::get_wol, leaving the net
-  driver only to look up phy_device
-- Provide a standalone function for executing ETHTOOL_GWOL on a
-  phy_device
-
-You may notice that phy_suspend() already sets wol.cmd = ETHTOOL_GWOL.
-So it seems to me like it's taking responsibility for initialising the
-structure like ethtool_get_wol() does.  The bug is then that
-phy_suspend() doesn't clear the rest of the structure.  That is not the
-responsibility of phy_ethtool_get_wol().
-
-Ben.
-
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Changelog:
-> v1->v2:
-> - clear whole struct ethtool_wolinfo
-> - check for non-NULL phy_device
-> v2->v3:
-> - only clear ->supported and ->wolopts (Suggested by Ben Hutchings)
+> On Wednesday 12 March 2014 16:55:23 Simon Horman wrote:
+> > On Wed, Feb 26, 2014 at 02:02:37PM +0100, Laurent Pinchart wrote:
+>  > On Wednesday 26 February 2014 13:53:17 Laurent Pinchart wrote:
+> > > > On Wednesday 26 February 2014 16:33:17 Simon Horman wrote:
+> > > > > The R8A7779 SoC has several clocks that are too custom to be supported
+> > > > > in a generic driver. Those clocks can be divided in two categories:
+> > > > > 
+> > > > > - Fixed rate clocks with multiplier and divisor set according to boot
+> > > > >   mode configuration
+> > > > > 
+> > > > > - Custom divider clocks with SoC-specific divider values
+> > > > > 
+> > > > > This driver supports both.
+> > > > 
+> > > > Looking at the R8A7779 datasheet it looks like we only have fixed rate
+> > > > clocks, without any configurable divider clock. Did I miss something ?
+> > 
+> > Sorry, its a cut-and past error on my part.
+> > I will revise the changelog.
+> > 
+> > > > > Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
+> > > > > 
+> > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > > 
+> > > > > ---
+> > > > > v3
+> > > > > * As suggested by Laurent Pinchart
+> > > > > 
+> > > > >   - Added external clock input
+> > > > >   - Use PLLA ratio set bu MD11 and MD12
+> > > > >   - Add _div suffixes of fields of struct cpt_clk_config
+> > > > >   - Register PLLA as a fixed factor clock
+> > > > >   - Use sizeof() instead of sizeof
+> > > > >   - Use num_clks instead of CPG_NUM_CLOCKS in
+> > > > >   r8a7779_cpg_clocks_init()
+> > > > >   
+> > > > >   - I kept this as r8a7779 binding rather than moving to a R-Car Gen1
+> > > > >     binding which could be shared with other SoCs as I do not believe
+> > > > >     that the SoCs is are sufficiently similar.
+> > > > 
+> > > > I had a look at the M1 datasheet and I still find its CPG very similar
+> > > > with the H1 CPG. The PLLA multiplier and divider are different, but if
+> > > > you look closely, they're both exactly twice the value compared to H1,
+> > > > so there's no difference in practice.
+> > > > 
+> > > > What differences do you see that would make it impractical to share a
+> > > > single driver for both ?
+> > 
+> > Thanks for pointing that out. Looking over the M1 datasheet again I agree
+> > with you that there does seem to be rather a lot of similarities with the
+> > H1. And I agree that it is likely that the driver could be shared.
+> > 
+> > However, I'd like to leave that as future work at this time.
+> > 
+> > The reason for this is that on the one hand I believe such work sould be
+> > done in conjunctin with integrating the driver on the bockw board.
+> > And that seems to be non-trivial to me.
 > 
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ben Hutchings <ben@decadent.org.uk>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/phy.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
-> index 19c9eca0ef26..94234a91a50f 100644
-> --- a/drivers/net/phy/phy.c
-> +++ b/drivers/net/phy/phy.c
-> @@ -1092,7 +1092,9 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
->  
->  void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
->  {
-> -	if (phydev->drv->get_wol)
-> +	wol->supported = wol->wolopts = 0;
-> +
-> +	if (phydev && phydev->drv->get_wol)
->  		phydev->drv->get_wol(phydev, wol);
->  }
->  EXPORT_SYMBOL(phy_ethtool_get_wol);
+> We can always rename the driver later, that's not a big issue, but we can't 
+> change compatibility strings. I would thus like to see "renesas,rcar-gen1-cpg-
+> clocks" listed in the DT bindings.
 
--- 
-Ben Hutchings
-Experience is directly proportional to the value of equipment destroyed.
-                                                         - Carolyn Scheppner
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/2bfd7788/attachment.sig>
+I know that we have done such things in the past but these days I feel that
+it is a bit contentious as it is a binding for a software abstraction
+rather than the hardware. And as far as I know bindings are supposed to
+describe the hardware.
