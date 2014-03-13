@@ -1,40 +1,51 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 13 Mar 2014 16:38:58 -0300
-Subject: [PATCH v2 2/6] ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
-In-Reply-To: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1394739542-30017-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Mar 2014 20:50:00 +0100
+Subject: [PATCH 1/3] irqchip: sun4i: Don't mask + unmask for the non oneshot
+ case
+In-Reply-To: <1394740202-1952-1-git-send-email-hdegoede@redhat.com>
+References: <1394740202-1952-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1394740202-1952-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Since sun4i and sun5i are single core SOCs there is no need to mask non
+oneshot IRQs, to achieve this we use handle_fasteoi_irq with a dummy eoi.
 
-Armada 38x SoCs have a 2 GHz fixed main PLL that is used to feed
-other clocks. This commit adds a DT representation of this clock
-through a fixed-clock compatible node.
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/irqchip/irq-sun4i.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 812ce28..38fc3a0 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -341,6 +341,13 @@
- 	};
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index a0ed1ea..0a71990 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -74,8 +74,17 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+ 	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
+ }
  
- 	clocks {
-+		/* 2 GHz fixed main PLL */
-+		mainpll: mainpll {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <2000000000>;
-+		};
++/*
++ * Since sun4i and sun5i are single core SOCs there is no need to mask non
++ * oneshot IRQs, to achieve this we use handle_fasteoi_irq with a dummy eoi.
++ */
++static void sun4i_irq_dummy_eoi(struct irq_data *irqd)
++{
++}
 +
- 		/* 25 MHz reference crystal */
- 		refclk: oscillator {
- 			compatible = "fixed-clock";
+ static struct irq_chip sun4i_irq_chip = {
+ 	.name		= "sun4i_irq",
++	.irq_eoi	= sun4i_irq_dummy_eoi,
+ 	.irq_mask	= sun4i_irq_mask,
+ 	.irq_unmask	= sun4i_irq_unmask,
+ };
+@@ -97,7 +106,7 @@ static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
+ 					 handle_fasteoi_irq);
+ 	else
+ 		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
+-					 handle_level_irq);
++					 handle_fasteoi_irq);
+ 
+ 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+ 
 -- 
 1.9.0
