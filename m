@@ -1,106 +1,80 @@
-From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
-Date: Thu, 13 Mar 2014 11:00:27 +0000
-Subject: [PATCH] ARM64: Kernel managed pages are only flushed
-In-Reply-To: <20140312172642.GU17083@arm.com>
-References: <1394018446-16738-1-git-send-email-Bharat.Bhushan@freescale.com>
- <20140306065339.GA2975@localhost>
- <b9ecee11764146c98dd41b811ebc05ae@BN1PR03MB266.namprd03.prod.outlook.com>
- <20140312145653.GA9691@mudshark.cambridge.arm.com>
- <20140312160340.GI17083@arm.com> <20140312172642.GU17083@arm.com>
-Message-ID: <dc834a6b0a1548ac8c4d27fa34261fd0@BN1PR03MB266.namprd03.prod.outlook.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 13 Mar 2014 19:02:06 +0800
+Subject: [PATCH 1/2] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+ (BG2Q) device tree
+In-Reply-To: <20140313104303.GB4418@piout.net>
+References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394622364-6848-2-git-send-email-antoine.tenart@free-electrons.com>
+ <532182EB.7090002@gmail.com> <20140313104303.GB4418@piout.net>
+Message-ID: <20140313190206.762108a2@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, 13 Mar 2014 03:43:03 -0700
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Wednesday, March 12, 2014 10:57 PM
-> To: Will Deacon
-> Cc: Bhushan Bharat-R65777; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM64: Kernel managed pages are only flushed
-> 
-> On Wed, Mar 12, 2014 at 04:03:40PM +0000, Catalin Marinas wrote:
-> > On Wed, Mar 12, 2014 at 02:56:53PM +0000, Will Deacon wrote:
-> > > On Wed, Mar 12, 2014 at 02:41:31PM +0000, Bharat.Bhushan at freescale.com
-> wrote:
-> > > > Did you get the chance to look into this? What is your take for
-> > > > this patch or you want to suggest some other solution?
-> > >
-> > > See my reply to Laura here:
-> > >
-> > >
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238
-> > > 510.html
-> > >
-> > > We *really* don't want executable device mappings.
-> >
-> > /dev/mem mapping use pgprot_noncached() but I think we could
-> > generalise any of the writecombine and dmacoherent mappings to XN like
-> > in the patch
-> > below:
-> >
-> > diff --git a/arch/arm64/include/asm/pgtable.h
-> > b/arch/arm64/include/asm/pgtable.h
-> > index b524dcd17243..2d3cede62709 100644
-> > --- a/arch/arm64/include/asm/pgtable.h
-> > +++ b/arch/arm64/include/asm/pgtable.h
-> > @@ -286,11 +286,11 @@ static inline int has_transparent_hugepage(void)
-> >   * Mark the prot value as uncacheable and unbufferable.
-> >   */
-> >  #define pgprot_noncached(prot) \
-> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE))
-> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK,
-> > +PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
-> >  #define pgprot_writecombine(prot) \
-> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
-> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC)
-> > +| PTE_PXN | PTE_UXN)
-> >  #define pgprot_dmacoherent(prot) \
-> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
-> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC)
-> > +| PTE_PXN | PTE_UXN)
-> >  #define __HAVE_PHYS_MEM_ACCESS_PROT
-> >  struct file;
-> >  extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long
-> > pfn,
-> 
-> And one more patch as suggested by Steve Capper. Both would be needed.
-> 
-> -------------8<----------------------
-> 
-> From 31d84855d71778e4a0f615f61ab836be3a70a58b Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Wed, 12 Mar 2014 16:28:09 +0000
-> Subject: [PATCH] arm64: Do not synchronise I and D caches for special ptes
-> 
-> Special pte mappings are not intended to be executable and do not even have an
-> associated struct page. This patch ensures that we do not call
-> __sync_icache_dcache() on such ptes.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Steve Capper <Steve.Capper@arm.com>
-> ---
->  arch/arm64/include/asm/pgtable.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 2d3cede62709..72c9ac38cdd9 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -199,7 +199,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned
-> long addr,
->  			      pte_t *ptep, pte_t pte)
->  {
->  	if (pte_valid_user(pte)) {
-> -		if (pte_exec(pte))
-> +		if (!pte_special(pte) && pte_exec(pte))
->  			__sync_icache_dcache(pte, addr);
->  		if (pte_dirty(pte) && pte_write(pte))
->  			pte_val(pte) &= ~PTE_RDONLY;
-> 
+> On 13/03/2014 at 10:05:31 +0000, Sebastian Hesselbarth wrote :
+> > On 03/12/2014 11:06 AM, Antoine T?nart wrote:
+> > >+			compatible = "arm,cortex-a9-twd-timer";
+> > >+			reg = <0xad0600 0x20>;
+> > >+			clocks = <&sysclk>;
+> > 
+> > Playing with Chromecast, I remember local-timer running at sysclk/3 or
 
-Tested-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+twdclk is running at cpuclk/3. 
 
-Thanks
--Bharat
+On chromecast, freq of cpuclk is the same as sysclk. But parent of twdclk
+is cpuclk.
+
+> > something. I know berlin2/berlin2cd is wrong here. Can you check that
+> > for berlin2q local-timer also runs at sysclk/n?
+> > 
+> 
+> Actually, what we have is sysclk = cpuclk/3 so I guess it depends on
+> what you call sysclk.
+> 
+> > >+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> > >+			status = "okay";
+> > >+		};
+> > >+
+> > >+		apb at e80000 {
+> > >+			compatible = "simple-bus";
+> > >+			#address-cells = <1>;
+> > >+			#size-cells = <1>;
+> > >+
+> > >+			ranges = <0 0xe80000 0x10000>;
+> > >+			interrupt-parent = <&aic>;
+> > >+
+> > >+			timer0: timer at 2c00 {
+> > >+				compatible = "snps,dw-apb-timer";
+> > >+				reg = <0x2c00 0x14>;
+> > >+				interrupts = <8>;
+> > >+				clock-freq = <100000000>;
+> > >+				status = "okay";
+> > >+			};
+> > >+
+> > >+			timer1: timer at 2c14 {
+> > >+				compatible = "snps,dw-apb-timer";
+> > >+				reg = <0x2c14 0x14>;
+> > >+				clock-freq = <100000000>;
+> > >+				status = "disabled";
+> > >+			};
+> > 
+> > berlin2/berlin2cd have a vast amount of 8 apb timers. Any timers missing
+> > here or did Marvell remove them?
+
+We still have 8 apb timers
+
+> > 
+> > 
+> > Also for uart, can you please double-check if there is no uart2?
+> > 
+> 
+> We don't have those informations, maybe Jisheng can help ?
+
+uart2 is removed
+
+Thanks,
+Jisheng 
