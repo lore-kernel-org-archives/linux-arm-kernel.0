@@ -1,42 +1,68 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 13 Mar 2014 22:46:56 +0000
-Subject: [PATCH v2 03/15] efi: create memory map iteration helper
-In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
-References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1394750828-16351-4-git-send-email-leif.lindholm@linaro.org>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 13 Mar 2014 15:25:50 -0700
+Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
+In-Reply-To: <20140313182554.GA15990@obsidianresearch.com>
+References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+ <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+ <5321EE81.1030207@wwwdotorg.org>
+ <20140313182554.GA15990@obsidianresearch.com>
+Message-ID: <CAJ+vNU2YYbsH8iOWJ_B-vcHdfWYW1oFsWY_=YEd-ojJASOZgtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+On Thu, Mar 13, 2014 at 11:25 AM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Thu, Mar 13, 2014 at 11:44:33AM -0600, Stephen Warren wrote:
+>> On 03/13/2014 11:40 AM, Tim Harvey wrote:
+>> > When using interrupt-maps, the size of a map entry is #address-cells +
+>> >  #interrupt-cells for the parent interrupt controller.  For the ARM GIC
+>> > address-cells should be 0 as this is not used.
+>> >
+>> > This patch fixes the example by correctly specifying #address-cells = 0.
+>>
+>> If the #address-cells property is required (well, or even optional...)
+>> in the node, shouldn't it be included in the list of required/optional
+>> properties above, and not solely included in the example?
+>
+> AFAIK, #address-cells = 0 is the same as not including a
+> #address-cells at all.
+>
+> Omitting entirely is what other interrupt-controller bindings are
+> doing, so I'd just drop mention of #address-cells completely.
+>
+> Jason
 
-There are a lot of places in the kernel which iterate through an
-EFI memory map. Most of these places use essentially the same
-for-loop code. This patch adds a for_each_efi_memory_desc()
-helper to clean up all of the existing duplicate code and avoid
-more in the future.
+Jason / Stephen,
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- include/linux/efi.h |    6 ++++++
- 1 file changed, 6 insertions(+)
+Yes, it does indeed default to 0 if not specified.  For arm-gic it
+would appear #address-cells must be 0, so should we remove all places
+its set explicitly to 0 in dts as wel as the example in
+Documentation/devicetree/bindings?
 
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 64d532c..a3276da 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -622,6 +622,12 @@ extern int efi_set_rtc_mmss(const struct timespec *now);
- extern void efi_reserve_boot_services(void);
- extern struct efi_memory_map memmap;
- 
-+/* Iterate through an efi_memory_map */
-+#define for_each_efi_memory_desc(m, md)					   \
-+	for ((md) = (m)->map;						   \
-+	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
-+	     (md) = (void *)(md) + (m)->desc_size)
-+
- /**
-  * efi_range_is_wc - check the WC bit on an address range
-  * @start: starting kvirt address
--- 
-1.7.10.4
+Looking through arch/arm/boot/dts I'm seeing other dts configs using
+'arm,cortex-a9-gic' which I'm guessing are equally as wrong as the
+imx6 situation:
+ - arch/arm/boot/dts/highbank.dts
+ - arch/arm/boot/dts/sh73a0.dtsi
+
+I'm also seeing a number of places where its set explicitly to 0:
+ - Documentation/devicetree/bindings/arm/gic.txt
+ - Documentation/devicetree/bindings/arm/vexpress.txt
+ - arch/arm/boot/dts/bcm11351.dtsi
+ - arch/arm/boot/dts/hi3620.dtsi
+ - arch/arm/boot/dts/imx6qdl.dtsi
+ - arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+
+If I extend this search to the other compatible gic interrupt
+controllers implemented in drivers/irqchip/irq-gic.c
+(arm,cortex-a15-gic, qcom,msm-8660-qgic, qcom,msm-qgic2) I find even
+more examples where #address-cells is set explicitly to 0 or to 1 (and
+I would believe a value of 1 is invalid, just as it is in my case).
+
+I'm happy to broaden my patch, but I certainly want to make sure I'm
+doing the right thing with it, as I don't have the ability to test all
+the other devicetree configs and am by no means a devicetree expert.
+
+Recommendations?
+
+Tim
