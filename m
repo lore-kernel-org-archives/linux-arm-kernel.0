@@ -1,49 +1,140 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Mar 2014 17:27:21 +0100 (CET)
-Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
- the ENMI (irq 0)
-In-Reply-To: <5321CB12.3090704@redhat.com>
-References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
- <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
- <alpine.DEB.2.02.1403131542060.18573@ionos.tec.linutronix.de>
- <5321CB12.3090704@redhat.com>
-Message-ID: <alpine.DEB.2.02.1403131725230.18573@ionos.tec.linutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 16:25:48 +0000
+Subject: [PATCH v6 7/7] arm64: ftrace: Add system call tracepoint
+In-Reply-To: <1394705630-12384-8-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-8-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313162548.GD25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Mar 2014, Hans de Goede wrote:
-> On 03/13/2014 03:46 PM, Thomas Gleixner wrote:
-> >>  static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
-> >>  			 irq_hw_number_t hw)
-> >>  {
-> >> -	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> >> -				 handle_level_irq);
-> >> +	if (hw == 0) /* IRQ 0, the ENMI needs special handling */
-> >> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> >> +					 handle_fasteoi_late_irq);
-> >> +	else
-> >> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> >> +					 handle_level_irq);
-> > 
-> > I wonder what happens when you use the fasteoi handler for all of
-> > them.
+On Thu, Mar 13, 2014 at 10:13:50AM +0000, AKASHI Takahiro wrote:
+> This patch allows system call entry or exit to be traced as ftrace events,
+> ie. sys_enter_*/sys_exit_*, if CONFIG_FTRACE_SYSCALLS is enabled.
+> Those events appear and can be controlled under
+>     ${sysfs}/tracing/events/syscalls/
 > 
-> As mentioned in my previous mail doing an ack (or an eio) seems to
-> be unnecessary for all but IRQ 0.
+> Please note that we can't trace compat system calls here because
+> AArch32 mode does not share the same syscall table with AArch64.
+> Just define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS in order to avoid unexpected
+> results (bogus syscalls reported or even hang-up).
 > 
-> I do wonder if handle_level_irq is the right handle*irq function
-> to use in this case, since this is strictly used in the non smp
-> case I think that the mask / unmask done by handle_level_irq is
-> not necessary for non threaded handlers. So what would be the
-> correct handle*irq function to use in this case ?
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/Kconfig               |    1 +
+>  arch/arm64/include/asm/ftrace.h  |   20 ++++++++++++++++
+>  arch/arm64/include/asm/syscall.h |    1 +
+>  arch/arm64/include/asm/unistd.h  |    2 ++
+>  arch/arm64/kernel/ptrace.c       |   48 ++++++++++++++++++++++----------------
+>  5 files changed, 52 insertions(+), 20 deletions(-)
 > 
-> Note the irqs are level irqs. IOW they may stay asserted while
-> the handler runs because of the handler and a new irq raising.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 6954959..b1dcdb4 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -43,6 +43,7 @@ config ARM64
+>  	select HAVE_MEMBLOCK
+>  	select HAVE_PATA_PLATFORM
+>  	select HAVE_PERF_EVENTS
+> +	select HAVE_SYSCALL_TRACEPOINTS
+>  	select IRQ_DOMAIN
+>  	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index c44c4b1..4ef06f1 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -44,6 +44,26 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>  #define CALLER_ADDR4 ((unsigned long)return_address(4))
+>  #define CALLER_ADDR5 ((unsigned long)return_address(5))
+>  #define CALLER_ADDR6 ((unsigned long)return_address(6))
+> +
+> +#include <asm/compat.h>
+> +
+> +/*
+> + * Because AArch32 mode does not share the same syscall table with AArch64,
+> + * tracing compat syscalls may result in reporting bogus syscalls or even
+> + * hang-up, so just do not trace them.
+> + * See kernel/trace/trace_syscalls.c
+> + *
+> + * x86 code says:
+> + * If the user realy wants these, then they should use the
+> + * raw syscall tracepoints with filtering.
 
-Right. You could be creative and use fasteoi plus an empty eoi
-callback in the chip for irq 1-N. That way you only mask and unmask in
-the threaded case.
+Fair enough.
 
-Thanks,
+> + */
+> +#define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS 1
 
-	tglx
+You don't need the '1' here.
+
+> +static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
+> +{
+> +        if (is_compat_task())
+> +                return true;
+> +        return false;
+> +}
+
+return is_compat_task();
+
+>  #endif /* ifndef __ASSEMBLY__ */
+>  
+>  #endif /* __ASM_FTRACE_H */
+> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+> index 70ba9d4..383771e 100644
+> --- a/arch/arm64/include/asm/syscall.h
+> +++ b/arch/arm64/include/asm/syscall.h
+> @@ -18,6 +18,7 @@
+>  
+>  #include <linux/err.h>
+>  
+> +extern const void *sys_call_table[];
+>  
+>  static inline int syscall_get_nr(struct task_struct *task,
+>  				 struct pt_regs *regs)
+> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+> index 82ce217..c335479 100644
+> --- a/arch/arm64/include/asm/unistd.h
+> +++ b/arch/arm64/include/asm/unistd.h
+> @@ -28,3 +28,5 @@
+>  #endif
+>  #define __ARCH_WANT_SYS_CLONE
+>  #include <uapi/asm/unistd.h>
+> +
+> +#define NR_syscalls (__NR_syscalls)
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 9993a8f..9c52b3e 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -41,6 +41,9 @@
+>  #include <asm/traps.h>
+>  #include <asm/system_misc.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include <trace/events/syscalls.h>
+> +
+>  /*
+>   * TODO: does not yet catch signals sent when the child dies.
+>   * in exit.c or in signal.c.
+> @@ -1062,29 +1065,31 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+>  	unsigned long saved_reg;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> -		return regs->syscallno;
+> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+> +		/*
+> +		 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
+> +		 * used to denote syscall entry/exit:
+> +		 *   0 -> entry
+> +		 */
+> +		if (is_compat_task()) {
+
+if (arch_trace_is_compat_syscall())
+
+With those changes:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
