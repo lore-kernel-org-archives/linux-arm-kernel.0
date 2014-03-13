@@ -1,63 +1,45 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 13 Mar 2014 13:46:50 -0700
-Subject: [PATCH v5 09/11] arm: add support for reserved memory defined by
- device tree
-In-Reply-To: <1392985527-6260-10-git-send-email-m.szyprowski@samsung.com>
-References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
- <1392985527-6260-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAGa+x856+YyJ-vyfGoFAKmsqwKD+=Wh0-TT_mAaPStOXjd8eSQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Mar 2014 13:48:52 -0700
+Subject: [RFC 4/5] clocksource: omap-timer: Introduce clocksource driver
+ for OMAP SoCs
+In-Reply-To: <1394742919-32163-5-git-send-email-joelf@ti.com>
+References: <1394742919-32163-1-git-send-email-joelf@ti.com>
+ <1394742919-32163-5-git-send-email-joelf@ti.com>
+Message-ID: <20140313204851.GB23432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 4:25 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Enable reserved memory initialization from device tree.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+* Joel Fernandes <joelf@TI.com> [140313 13:43]:
+> We introduce functions to initialize clocksource and clockevent, use
+> CLOCKSOURCE_OF_DECLARE to declare the clocksource, and handle the clocksource
+> selection on a per-SoC basis (Currently only AM335x is supported). Powering up
+> of the timer will be done with the help of the mach-omap layer function that's
+> introduced earlier in the series.
+> 
+> We make a local copy of dmtimer API for use by clocksource, the original
+> dmtimer API in plat-omap is kept as-is till the migration of all SoCs is
+> completed after which it can't be deleted.
+> 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  drivers/clocksource/Makefile     |    1 +
+>  drivers/clocksource/omap-timer.c | 1157 ++++++++++++++++++++++++++++++++++++++
+>  drivers/clocksource/omap-timer.h |  422 ++++++++++++++
+>  3 files changed, 1580 insertions(+)
+>  create mode 100644 drivers/clocksource/omap-timer.c
+>  create mode 100644 drivers/clocksource/omap-timer.h
 
-This patch has hit -next and several legacy (non-DT) boot failures
-were detected and bisected down to this patch.  A quick scan looks
-like there needs to be some sanity checking whether a DT is even
-present.
+Hmm this leaves duplicate arch/arm/plat-omap/dmtimer.c code, please
+sort out that issue too by allowing omap1 and omap3 still to use
+the legacy timer init functions but with timer code under
+drivers/clocksource/omap-timer.c.
 
-Kevin
+And not the that drivers/clocksource/omap-timer.h won't be needed at
+all, those defines can stay private to the drivers/clocksource/omap-timer.c.
 
-[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002791.html
+So this patch really should just be moving of the code to the new
+location.
 
->  arch/arm/Kconfig   |    1 +
->  arch/arm/mm/init.c |    2 ++
->  2 files changed, 3 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e25419817791..d0262bea8020 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1918,6 +1918,7 @@ config USE_OF
->         select IRQ_DOMAIN
->         select OF
->         select OF_EARLY_FLATTREE
-> +       select OF_RESERVED_MEM
->         help
->           Include support for flattened device tree machine descriptions.
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 804d61566a53..2a77ba8796ae 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -323,6 +323,8 @@ void __init arm_memblock_init(struct meminfo *mi,
->         if (mdesc->reserve)
->                 mdesc->reserve();
->
-> +       early_init_fdt_scan_reserved_mem();
-> +
->         /*
->          * reserve memory for DMA contigouos allocations,
->          * must come from DMA area inside low memory
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Regards,
+
+Tony
