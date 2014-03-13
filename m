@@ -1,56 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Mar 2014 11:18:30 +0200
-Subject: [PATCH 08/18] dma: edma: Implement device_slave_caps callback
-In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1394702320-21743-9-git-send-email-peter.ujfalusi@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 13 Mar 2014 10:18:45 +0100
+Subject: [PATCH v4][ 7/8] ARM: dts: mbimxsd35 baseboard: Add USB support.
+In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+Message-ID: <1394702326-25558-7-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the callback implemented omap-dma can provide information to client
-drivers regarding to supported address widths, directions, residue
-granularity, etc.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- drivers/dma/edma.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Changelog v1->v2:
+- With the clock fix patches, the usb gadget also work.
+  So I've set the otg port to otg instead of host.
+- Before I forgott to set dr_mode to host in the usbhost port.
+  That is now fixed.
+---
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 604c7c94c731..1877319379fc 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -851,6 +851,23 @@ static void __init edma_chan_init(struct edma_cc *ecc,
- 	}
- }
- 
-+#define EDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
-+				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
-+				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+index 71197b9..f04ae91 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -150,3 +150,16 @@
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
 +
-+static int edma_dma_device_slave_caps(struct dma_chan *dchan,
-+				      struct dma_slave_caps *caps)
-+{
-+	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	caps->dstn_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	caps->cmd_pause = true;
-+	caps->cmd_terminate = true;
-+	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++&usbhost1 {
++	phy_type = "serial";
++	dr_mode = "host";
++	status = "okay";
++};
 +
-+	return 0;
-+}
-+
- static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 			  struct device *dev)
- {
-@@ -861,6 +878,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	dma->device_issue_pending = edma_issue_pending;
- 	dma->device_tx_status = edma_tx_status;
- 	dma->device_control = edma_control;
-+	dma->device_slave_caps = edma_dma_device_slave_caps;
- 	dma->dev = dev;
- 
- 	INIT_LIST_HEAD(&dma->channels);
++&usbotg {
++	phy_type = "utmi";
++	dr_mode = "otg";
++	external-vbus-divider;
++	status = "okay";
++};
 -- 
-1.9.0
+1.7.9.5
