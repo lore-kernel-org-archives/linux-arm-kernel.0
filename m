@@ -1,47 +1,33 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 13 Mar 2014 09:25:43 +0100
-Subject: [PATCH 1/3] ARM: dts: overo: Add support for DVI output
-In-Reply-To: <53200894.5020602@ti.com>
-References: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
- <1394541257-25605-2-git-send-email-florian.vaussard@epfl.ch>
- <53200894.5020602@ti.com>
-Message-ID: <53216B87.9070007@epfl.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Mar 2014 09:28:23 +0100
+Subject: [PATCH 0/2] ARM: shmobile: koelsch, lager: Annotate clk_names
+ with __initconst
+In-Reply-To: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
+References: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 13, 2014 at 7:29 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add __initconst annotations to recently added clk_names.
+>
+> Depends on
+> "[PATCH v2 00/03] ARM: shmobile: Break out and extend clock workaround V2"
+>
+> Simon Horman (2):
+>   ARM: shmobile: koelsch: Annotate clk_names with __initconst
+>   ARM: shmobile: lager: Annotate clk_names with __initconst
 
-On 03/12/2014 08:11 AM, Tomi Valkeinen wrote:
-> On 11/03/14 14:34, Florian Vaussard wrote:
->> Summit and Tobi expansion boards have a HDMI connector with a TFP410
->> encoder. Add a common include file for this configuration, and then
->> use it for Summit and Tobi.
->>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> ---
->>  arch/arm/boot/dts/omap3-overo-common-dvi.dtsi    | 109 +++++++++++++++++++++++
->>  arch/arm/boot/dts/omap3-overo-summit-common.dtsi |   1 +
->>  arch/arm/boot/dts/omap3-overo-tobi-common.dtsi   |   1 +
->>  3 files changed, 111 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
-> 
-> <snip>
-> 
->> +&dss {
->> +	status = "ok";
->> +
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&dss_dpi_pins
->> +		     &i2c3_pins>;
-> 
-> The i2c3 pins don't belong here, they are not related to dss. The
-> dvi-connector uses i2c3, but I don't think they belong there either, as
-> the i2c3 bus can be used by multiple devices. So I guess they should be
-> set in &i2c3 node.
-> 
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-You are right. And as I am already using i2c3 for other things, this
-duplicates the pinctrl. I will drop it.
+Gr{oetje,eeting}s,
 
-Regards,
-Florian
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
