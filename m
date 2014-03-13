@@ -1,44 +1,57 @@
-From: elder@ieee.org (Alex Elder)
-Date: Thu, 13 Mar 2014 16:05:49 -0500
-Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
-In-Reply-To: <CAJiQ=7BrCqo3VijjEvt2JLifM0MNGYmAA+VG_YQbSHfyBqsbtg@mail.gmail.com>
-References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
- <53193FEE.4060002@ieee.org>
- <CAJiQ=7BrCqo3VijjEvt2JLifM0MNGYmAA+VG_YQbSHfyBqsbtg@mail.gmail.com>
-Message-ID: <53221DAD.4010708@ieee.org>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 13 Mar 2014 16:08:01 -0500
+Subject: [PATCH] clk: socfpga: Fix section mismatch warning
+Message-ID: <1394744881-15254-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2014 10:44 PM, Kevin Cernekee wrote:
-> On Thu, Mar 6, 2014 at 7:41 PM, Alex Elder <elder@ieee.org> wrote:
->>> This patchset adds very minimal support for the BCM63138 SoC which is
->>> a xDSL SoC using a dual Cortex A9 CPU complex.
->>
->>
->> Why do you use "63xx" for the generic name, when the specific
->> part you are defining here is 63138?  I would have expected
->> "63xxx".
-> 
-> The product line has a mix of 4-digit and 5-digit part numbers.  The
-> drivers for onchip peripherals all used "bcm63xx":
+From: Dinh Nguyen <dinguyen@altera.com>
 
-That's too bad.  I would suggest that one or the other be used
-consistently, apparently "63xx" (not 63xxx) would be it.
+WARNING: drivers/clk/socfpga/built-in.o(.data+0xc0): Section mismatch in
+reference from the variable socfpga_child_clocks to the function
+.init.text:socfpga_pll_init()
+The variable socfpga_child_clocks references
+the function __init socfpga_pll_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
-					-Alex
+WARNING: drivers/clk/socfpga/built-in.o(.data+0x184): Section mismatch in
+reference from the variable socfpga_child_clocks to the function
+.init.text:socfpga_periph_init()
+The variable socfpga_child_clocks references
+the function __init socfpga_periph_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
-> $ find drivers/ | grep 63xx
-> drivers/tty/serial/bcm63xx_uart.c
-> drivers/pcmcia/bcm63xx_pcmcia.h
-> drivers/pcmcia/bcm63xx_pcmcia.c
-> drivers/usb/gadget/bcm63xx_udc.c
-> drivers/watchdog/max63xx_wdt.c
-> drivers/watchdog/bcm63xx_wdt.c
-> drivers/char/hw_random/bcm63xx-rng.c
-> drivers/mtd/bcm63xxpart.c
-> drivers/net/phy/bcm63xx.c
-> drivers/net/ethernet/broadcom/bcm63xx_enet.h
-> drivers/net/ethernet/broadcom/bcm63xx_enet.c
-> drivers/spi/spi-bcm63xx.c
-> drivers/spi/spi-bcm63xx-hsspi.c
-> 
+WARNING: drivers/clk/socfpga/built-in.o(.data+0x248): Section mismatch in
+reference from the variable socfpga_child_clocks to the function
+.init.text:socfpga_gate_init()
+The variable socfpga_child_clocks references
+the function __init socfpga_gate_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+
+Reported-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ drivers/clk/socfpga/clk.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 6217d5d..35a960a 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -28,7 +28,7 @@
+ 
+ void __iomem *clk_mgr_base_addr;
+ 
+-static struct of_device_id socfpga_child_clocks[] = {
++static const struct of_device_id socfpga_child_clocks[] __initconst = {
+ 	{ .compatible = "altr,socfpga-pll-clock", socfpga_pll_init, },
+ 	{ .compatible = "altr,socfpga-perip-clk", socfpga_periph_init, },
+ 	{ .compatible = "altr,socfpga-gate-clk", socfpga_gate_init, },
+-- 
+1.7.9.5
