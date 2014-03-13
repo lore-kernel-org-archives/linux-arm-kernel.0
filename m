@@ -1,107 +1,147 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Mar 2014 18:15:48 +0000
-Subject: [PATCH 1/5] arm: Move asm macro get_thread_info to asm/assembler.h
+Date: Thu, 13 Mar 2014 18:15:49 +0000
+Subject: [PATCH 2/5] arm: Add {inc,dec}_preempt_count asm macros
 In-Reply-To: <1394734552-4704-1-git-send-email-catalin.marinas@arm.com>
 References: <1394734552-4704-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1394734552-4704-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1394734552-4704-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm/assembler.h is a better place for this macro since it is used by
-asm files outside arch/arm/kernel/
+The patch adds asm macros for inc_preempt_count and dec_preempt_count_ti
+(which also gets the current thread_info) instead of open-coding them in
+arch/arm/vfp/*.S files.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/assembler.h | 10 ++++++++++
- arch/arm/kernel/entry-header.S   | 11 -----------
- arch/arm/vfp/entry.S             |  5 ++++-
- arch/arm/vfp/vfphw.S             |  5 ++++-
- 4 files changed, 18 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/assembler.h | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/vfp/entry.S             | 20 +++-----------------
+ arch/arm/vfp/vfphw.S             | 14 ++------------
+ 3 files changed, 37 insertions(+), 29 deletions(-)
 
 diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 5c2285160575..7380a3ecffa2 100644
+index 7380a3ecffa2..a087318bbaff 100644
 --- a/arch/arm/include/asm/assembler.h
 +++ b/arch/arm/include/asm/assembler.h
-@@ -174,6 +174,16 @@
- 	restore_irqs_notrace \oldcpsr
+@@ -23,6 +23,7 @@
+ #include <asm/ptrace.h>
+ #include <asm/domain.h>
+ #include <asm/opcodes-virt.h>
++#include <asm/asm-offsets.h>
+ 
+ #define IOMEM(x)	(x)
+ 
+@@ -184,6 +185,37 @@
+ 	mov	\rd, \rd, lsl #13
  	.endm
  
 +/*
-+ * Get current thread_info.
++ * Increment/decrement the preempt count.
 + */
-+	.macro	get_thread_info, rd
-+ ARM(	mov	\rd, sp, lsr #13	)
-+ THUMB(	mov	\rd, sp			)
-+ THUMB(	lsr	\rd, \rd, #13		)
-+	mov	\rd, \rd, lsl #13
++#ifdef CONFIG_PREEMPT_COUNT
++	.macro	inc_preempt_count, ti, tmp
++	ldr	\tmp, [\ti, #TI_PREEMPT]	@ get preempt count
++	add	\tmp, \tmp, #1			@ increment it
++	str	\tmp, [\ti, #TI_PREEMPT]
 +	.endm
++
++	.macro	dec_preempt_count, ti, tmp
++	ldr	\tmp, [\ti, #TI_PREEMPT]	@ get preempt count
++	sub	\tmp, \tmp, #1			@ decrement it
++	str	\tmp, [\ti, #TI_PREEMPT]
++	.endm
++
++	.macro	dec_preempt_count_ti, ti, tmp
++	get_thread_info \ti
++	dec_preempt_count \ti, \tmp
++	.endm
++#else
++	.macro	inc_preempt_count, ti, tmp
++	.endm
++
++	.macro	dec_preempt_count, ti, tmp
++	.endm
++
++	.macro	dec_preempt_count_ti, ti, tmp
++	.endm
++#endif
 +
  #define USER(x...)				\
  9999:	x;					\
  	.pushsection __ex_table,"a";		\
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 39f89fbd5111..1420725142ca 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -236,11 +236,6 @@
- 	movs	pc, lr				@ return & move spsr_svc into cpsr
- 	.endm
- 
--	.macro	get_thread_info, rd
--	mov	\rd, sp, lsr #13
--	mov	\rd, \rd, lsl #13
--	.endm
--
- 	@
- 	@ 32-bit wide "mov pc, reg"
- 	@
-@@ -306,12 +301,6 @@
- 	.endm
- #endif	/* ifdef CONFIG_CPU_V7M / else */
- 
--	.macro	get_thread_info, rd
--	mov	\rd, sp
--	lsr	\rd, \rd, #13
--	mov	\rd, \rd, lsl #13
--	.endm
--
- 	@
- 	@ 32-bit wide "mov pc, reg"
- 	@
 diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 46e17492fd1f..9cc290ae4e3b 100644
+index 9cc290ae4e3b..f0759e70fb86 100644
 --- a/arch/arm/vfp/entry.S
 +++ b/arch/arm/vfp/entry.S
-@@ -8,9 +8,12 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/init.h>
-+#include <linux/linkage.h>
- #include <asm/thread_info.h>
- #include <asm/vfpmacros.h>
--#include "../kernel/entry-header.S"
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
- 
- @ VFP entry point.
+@@ -25,11 +25,7 @@
+ @  IRQs disabled.
  @
+ ENTRY(do_vfp)
+-#ifdef CONFIG_PREEMPT_COUNT
+-	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+-	add	r11, r4, #1		@ increment it
+-	str	r11, [r10, #TI_PREEMPT]
+-#endif
++	inc_preempt_count r10, r4
+ 	enable_irq
+  	ldr	r4, .LCvfp
+ 	ldr	r11, [r10, #TI_CPU]	@ CPU number
+@@ -38,12 +34,7 @@ ENTRY(do_vfp)
+ ENDPROC(do_vfp)
+ 
+ ENTRY(vfp_null_entry)
+-#ifdef CONFIG_PREEMPT_COUNT
+-	get_thread_info	r10
+-	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+-	sub	r11, r4, #1		@ decrement it
+-	str	r11, [r10, #TI_PREEMPT]
+-#endif
++	dec_preempt_count_ti r10, r4
+ 	mov	pc, lr
+ ENDPROC(vfp_null_entry)
+ 
+@@ -56,12 +47,7 @@ ENDPROC(vfp_null_entry)
+ 
+ 	__INIT
+ ENTRY(vfp_testing_entry)
+-#ifdef CONFIG_PREEMPT_COUNT
+-	get_thread_info	r10
+-	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+-	sub	r11, r4, #1		@ decrement it
+-	str	r11, [r10, #TI_PREEMPT]
+-#endif
++	dec_preempt_count_ti r10, r4
+ 	ldr	r0, VFP_arch_address
+ 	str	r0, [r0]		@ set to non-zero value
+ 	mov	pc, r9			@ we have handled the fault
 diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 3e5d3115a2a6..98f6246c9002 100644
+index 98f6246c9002..be807625ed8c 100644
 --- a/arch/arm/vfp/vfphw.S
 +++ b/arch/arm/vfp/vfphw.S
-@@ -14,10 +14,13 @@
-  * r10 points at the start of the private FP workspace in the thread structure
-  * sp points to a struct pt_regs (as defined in include/asm/proc/ptrace.h)
-  */
-+#include <linux/init.h>
-+#include <linux/linkage.h>
- #include <asm/thread_info.h>
- #include <asm/vfpmacros.h>
- #include <linux/kern_levels.h>
--#include "../kernel/entry-header.S"
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
+@@ -182,12 +182,7 @@ vfp_hw_state_valid:
+ 					@ else it's one 32-bit instruction, so
+ 					@ always subtract 4 from the following
+ 					@ instruction address.
+-#ifdef CONFIG_PREEMPT_COUNT
+-	get_thread_info	r10
+-	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+-	sub	r11, r4, #1		@ decrement it
+-	str	r11, [r10, #TI_PREEMPT]
+-#endif
++	dec_preempt_count_ti r10, r4
+ 	mov	pc, r9			@ we think we have handled things
  
- 	.macro	DBGSTR, str
- #ifdef DEBUG
+ 
+@@ -206,12 +201,7 @@ look_for_VFP_exceptions:
+ 	@ not recognised by VFP
+ 
+ 	DBGSTR	"not VFP"
+-#ifdef CONFIG_PREEMPT_COUNT
+-	get_thread_info	r10
+-	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
+-	sub	r11, r4, #1		@ decrement it
+-	str	r11, [r10, #TI_PREEMPT]
+-#endif
++	dec_preempt_count_ti r10, r4
+ 	mov	pc, lr
+ 
+ process_exception:
