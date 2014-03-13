@@ -1,42 +1,40 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Mar 2014 12:12:50 +0100 (CET)
-Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
- the ENMI (irq 0)
-In-Reply-To: <20140313093457.GF2815@lukather>
-References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
- <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
- <20140313093457.GF2815@lukather>
-Message-ID: <alpine.DEB.2.02.1403131212090.18573@ionos.tec.linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Mar 2014 12:15:58 +0100
+Subject: [PATCH v2 0/3] watchdog: sunxi: Change compatible patterns
+In-Reply-To: <20140312180751.GC1484@spo001.leaseweb.com>
+References: <1391808566-31008-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140303104042.GU607@lukather>
+ <20140311205405.GA10228@spo001.leaseweb.com>
+ <20140312091649.GU2815@lukather>
+ <20140312180751.GC1484@spo001.leaseweb.com>
+Message-ID: <20140313111558.GH2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Mar 2014, Maxime Ripard wrote:
 
-> On Wed, Mar 12, 2014 at 06:17:07PM +0100, Hans de Goede wrote:
-> > The ENMI needs to have the ack done *after* clearing the interrupt source,
-> > otherwise we will get a spurious interrupt for each real interrupt. Switch
-> > to the new handle_fasteoi_late_irq handler which gives us the desired behavior.
+On Wed, Mar 12, 2014 at 07:07:51PM +0100, Wim Van Sebroeck wrote:
+> > > I'm OK with the patches, but what is the preferred way to get them upstream?
+> > > via watchdog tree or via arch/soc tree?
 > > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> > ---
-> >  drivers/irqchip/irq-sun4i.c | 11 +++++++++--
-> >  1 file changed, 9 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> > index 8a2fbee..4b1c874 100644
-> > --- a/drivers/irqchip/irq-sun4i.c
-> > +++ b/drivers/irqchip/irq-sun4i.c
-> > @@ -77,15 +77,22 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
-> >  static struct irq_chip sun4i_irq_chip = {
-> >  	.name		= "sun4i_irq",
-> >  	.irq_ack	= sun4i_irq_ack,
-> > +	.irq_eoi	= sun4i_irq_ack, /* For the ENMI */
+> > Since it touches the machine restart code, I'd prefer to merge it
+> > myself if it's ok?
 > 
-> Hmmm, I wonder if that actually does something.
-> 
-> There's been a patch floating around that I was sure was merged, but
-> apparently wasn't that remove sun4i_irq_ack, because the register we
-> were writing to are in read only, and it wasn't doing anything.
+> No Problem. You have my Acked-by.
 
-Well, it looks like it does something otherwise Hans would not see any
-improvement of the situation.
+Actually, I only have to keep together patches 2 and 3. Could you
+merge the first one? I'll handle the two others.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/ca831906/attachment.sig>
