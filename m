@@ -1,195 +1,162 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 13 Mar 2014 15:06:45 +0100
-Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
-In-Reply-To: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 13 Mar 2014 14:07:43 +0000
+Subject: [RFC 0/6] rework sched_domain topology description
+In-Reply-To: <CAKfTPtC3Y7s=n205MND24tLrsT+-3+JhWHebxcBkwAuaMngDhA@mail.gmail.com>
+References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
+ <5317B092.7070805@arm.com>
+ <CAKfTPtDGbT717Y5F1GoBgr4pnvApG5Gphu2Me_bAFrM0+qsfAg@mail.gmail.com>
+ <53186A8A.9060406@arm.com>
+ <CAKfTPtCspVk+X3O23ikTt3MZUHVrrp21PyhmrcLF-GwW3OjOqA@mail.gmail.com>
+ <531B0FDA.2040302@arm.com>
+ <20140311131719.GY9987@twins.programming.kicks-ass.net>
+ <532060E7.7010203@arm.com>
+ <CAKfTPtC3Y7s=n205MND24tLrsT+-3+JhWHebxcBkwAuaMngDhA@mail.gmail.com>
+Message-ID: <5321BBAF.8050108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
-The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
-timer, apb timers and uarts for now.
+On 12/03/14 13:47, Vincent Guittot wrote:
+> On 12 March 2014 14:28, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>> On 11/03/14 13:17, Peter Zijlstra wrote:
+>>> On Sat, Mar 08, 2014 at 12:40:58PM +0000, Dietmar Eggemann wrote:
+>>>>>
+>>>>> I don't have a strong opinion about using or not a cpu argument for
+>>>>> setting the flags of a level (it was part of the initial proposal
+>>>>> before we start to completely rework the build of sched_domain)
+>>>>> Nevertheless, I see one potential concern that you can have completely
+>>>>> different flags configuration of the same sd level of 2 cpus.
+>>>>
+>>>> Could you elaborate a little bit further regarding the last sentence? Do you
+>>>> think that those completely different flags configuration would make it
+>>>> impossible, that the load-balance code could work at all at this sd?
+>>>
+>>> So a problem with such an interfaces is that is makes it far too easy to
+>>> generate completely broken domains.
+>>
+>> I see the point. What I'm still struggling with is to understand why
+>> this interface is worse then the one where we set-up additional,
+>> adjacent sd levels with new cpu_foo_mask functions plus different static
+>> sd-flags configurations and rely on the sd degenerate functionality in
+>> the core scheduler to fold these levels together to achieve different
+>> per cpu sd flags configurations.
+> 
+> The main difference is that all CPUs has got the same levels at the
+> initial state and then the degenerate sequence can decide that it's
+> worth removing a level and if it will not create unsuable domains.
+>
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 167 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 167 insertions(+)
- create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
+Agreed. But what I'm trying to say is that using the approach of
+multiple adjacent sd levels with different cpu_mask(int cpu) functions
+and static sd topology flags will not prevent us from coding the
+enforcement of sane sd topology flags set-ups somewhere inside the core
+scheduler.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-new file mode 100644
-index 000000000000..1cb76031dfe6
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -0,0 +1,167 @@
-+/*
-+ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
-+	compatible = "marvell,berlin2q", "marvell,berlin";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <3>;
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		smclk: sysmgr-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		sysclk: system-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <400000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		ranges = <0 0xf7000000 0x1000000>;
-+		interrupt-parent = <&gic>;
-+
-+		l2: l2-cache-controller at ac0000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0xac0000 0x1000>;
-+			cache-level = <2>;
-+		};
-+
-+		local-timer at ad0600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xad0600 0x20>;
-+			clocks = <&sysclk>;
-+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "okay";
-+		};
-+
-+		gic: interrupt-controller at ad1000 {
-+			compatible = "arm,cortex-a9-gic";
-+			reg = <0xad1000 0x1000>, <0xad0100 0x100>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		apb at e80000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xe80000 0x10000>;
-+			interrupt-parent = <&aic>;
-+
-+			timer0: timer at 2c00 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c00 0x14>;
-+				interrupts = <8>;
-+				clock-freq = <100000000>;
-+				status = "okay";
-+			};
-+
-+			timer1: timer at 2c14 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c14 0x14>;
-+				clock-freq = <100000000>;
-+				status = "disabled";
-+			};
-+
-+			aic: interrupt-controller at 3800 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0x3800 0x30>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		apb at fc0000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xfc0000 0x10000>;
-+			interrupt-parent = <&sic>;
-+
-+			uart0: uart at 9000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0x9000 0x100>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <8>;
-+				clock-frequency = <25000000>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			uart1: uart at a000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xa000 0x100>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <9>;
-+				clock-frequency = <25000000>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			sic: interrupt-controller at e000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0xe000 0x30>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
--- 
-1.8.3.2
+It is possible to easily introduce erroneous set-ups from the standpoint
+of sd topology flags with this approach too.
+
+For the sake of an example on ARM TC2 platform, I changed
+cpu_corepower_mask(int cpu) [arch/arm/kernel/topology.c] to simulate
+that in socket 1 (3 Cortex-A7) cores can powergate individually whereas
+in socket 0 (2 Cortex A15) they can't:
+
+ const struct cpumask *cpu_corepower_mask(int cpu)
+ {
+-       return &cpu_topology[cpu].thread_sibling;
++       return cpu_topology[cpu].socket_id ?
+&cpu_topology[cpu].thread_sibling :
++                       &cpu_topology[cpu].core_sibling;
+ }
+
+
+With this I get the following cpu mask configuration:
+
+dmesg snippet (w/ additional debug in cpu_coregroup_mask(),
+cpu_corepower_mask()):
+
+...
+CPU0: cpu_corepower_mask=0-1
+CPU0: cpu_coregroup_mask=0-1
+CPU1: cpu_corepower_mask=0-1
+CPU1: cpu_coregroup_mask=0-1
+CPU2: cpu_corepower_mask=2
+CPU2: cpu_coregroup_mask=2-4
+CPU3: cpu_corepower_mask=3
+CPU3: cpu_coregroup_mask=2-4
+CPU4: cpu_corepower_mask=4
+CPU4: cpu_coregroup_mask=2-4
+...
+
+And I deliberately introduced the following error into the
+arm_topology[] table:
+
+ static struct sched_domain_topology_level arm_topology[] = {
+ #ifdef CONFIG_SCHED_MC
+-       { cpu_corepower_mask, SD_SHARE_PKG_RESOURCES |
+SD_SHARE_POWERDOMAIN, SD_INIT_NAME(GMC) },
++       { cpu_corepower_mask, SD_SHARE_POWERDOMAIN, SD_INIT_NAME(GMC) },
+        { cpu_coregroup_mask, SD_SHARE_PKG_RESOURCES, SD_INIT_NAME(MC) },
+
+With this set-up, I get GMC & DIE level for CPU0,1 and MC & DIE level
+for CPU2,3,4, i.e. the SD_SHARE_PKG_RESOURCES flag is only set for
+CPU2,3,4 and MC level.
+
+dmesg snippet (w/ adapted sched_domain_debug_one(), only CPU0 and CPU2
+shown here):
+
+...
+CPU0 attaching sched-domain:
+domain 0: span 0-1 level GMC
+SD_LOAD_BALANCE SD_BALANCE_NEWIDLE SD_BALANCE_EXEC SD_BALANCE_FORK
+SD_WAKE_AFFINE SD_SHARE_POWERDOMAIN SD_PREFER_SIBLING
+groups: 0 1
+...
+domain 1: span 0-4 level DIE
+SD_LOAD_BALANCE SD_BALANCE_NEWIDLE SD_BALANCE_EXEC SD_BALANCE_FORK
+SD_WAKE_AFFINE SD_PREFER_SIBLING
+groups: 0-1 (cpu_power = 2048) 2-4 (cpu_power = 3072)
+...
+CPU2 attaching sched-domain:
+domain 0: span 2-4 level MC
+SD_LOAD_BALANCE SD_BALANCE_NEWIDLE SD_BALANCE_EXEC SD_BALANCE_FORK
+SD_WAKE_AFFINE SD_SHARE_PKG_RESOURCES
+groups: 2 3 4
+...
+domain 1: span 0-4 level DIE
+SD_LOAD_BALANCE SD_BALANCE_NEWIDLE SD_BALANCE_EXEC SD_BALANCE_FORK
+SD_WAKE_AFFINE SD_PREFER_SIBLING
+groups: 2-4 (cpu_power = 3072) 0-1 (cpu_power = 2048)
+...
+
+What I wanted to say is IMHO, it doesn't matter which approach we take
+(multiple adjacent sd levels or per-cpu topo sd flag function), we have
+to enforce sane sd topology flags set-up inside the core scheduler anyway.
+
+-- Dietmar
+
+>>
+>> IMHO, exposing struct sched_domain_topology_level bar_topology[] to the
+>> arch is the reason why the core scheduler has to check if the arch
+>> provides a sane sd setup in both cases.
+>>
+>>>
+>>> You can, for two cpus in the same domain provide, different flags; such
+>>> a configuration doesn't make any sense at all.
+>>>
+>>> Now I see why people would like to have this; but unless we can make it
+>>> robust I'd be very hesitant to go this route.
+>>>
+>>
+>> By making it robust, I guess you mean that the core scheduler has to
+>> check that the provided set-ups are sane, something like the following
+>> code snippet in sd_init()
+>>
+>> if (WARN_ONCE(tl->sd_flags & ~TOPOLOGY_SD_FLAGS,
+>>                 "wrong sd_flags in topology description\n"))
+>>         tl->sd_flags &= ~TOPOLOGY_SD_FLAGS;
+>>
+>> but for per cpu set-up's.
+>> Obviously, this check has to be in sync with the usage of these flags in
+>> the core scheduler algorithms. This comprises probably that a subset of
+>> these topology sd flags has to be set for all cpus in a sd level whereas
+>> other can be set only for some cpus.
+[...]
