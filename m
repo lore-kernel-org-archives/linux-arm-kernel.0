@@ -1,44 +1,83 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 13 Mar 2014 14:38:37 +0100
-Subject: [alsa-devel] [PATCH 14/18] ASoC: davinci: Add edma dmaengine
- platform driver
-In-Reply-To: <5321AC84.7080004@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
- <1394702320-21743-15-git-send-email-peter.ujfalusi@ti.com>
- <53218835.3080909@metafoo.de> <5321AC84.7080004@ti.com>
-Message-ID: <5321B4DD.5040306@metafoo.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 15:37:56 +0200
+Subject: [PATCH 10/18] dma: edma: Reduce debug print verbosity for non
+ verbose debugging
+In-Reply-To: <1394715211.28803.239.camel@smile.fi.intel.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>	
+ <1394702320-21743-11-git-send-email-peter.ujfalusi@ti.com>
+ <1394715211.28803.239.camel@smile.fi.intel.com>
+Message-ID: <5321B4B4.30602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 02:03 PM, Peter Ujfalusi wrote:
-> On 03/13/2014 12:28 PM, Lars-Peter Clausen wrote:
->>> +int edma_pcm_platform_register(struct device *dev)
->>> +{
->>> +    if (dev->of_node)
->>> +        return snd_dmaengine_pcm_register(dev,
->>> +                    &edma_dmaengine_pcm_config,
->>> +                    SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+On 03/13/2014 02:53 PM, Shevchenko, Andriy wrote:
+> On Thu, 2014-03-13 at 11:18 +0200, Peter Ujfalusi wrote:
+>> Do not print the paRAM information when verbose debugging is not asked and
+>> also reduce the number of lines printed in edma_prep_dma_cyclic()
 >>
->> Since the edma dmaengine driver implements the slave cap API there is no need
->> to manually specify SND_DMAENGINE_PCM_FLAG_NO_RESIDUE manually. But since the
->> edma driver sets the granularity to DMA_RESIDUE_GRANULARITY_DESCRIPTOR in this
->> case the generic dmaengine will not set SND_DMAENGINE_PCM_FLAG_NO_RESIDUE
->> automatically since it assumes that the dmaengine driver is capable of
->> properly reporting the DMA position.
->
-> Hrm, I see. For eDMA I think we can support DMA_RESIDUE_GRANULARITY_SEGMENT
-> granularity. Since according to the documentation the _SEGMENT means that the
-> DMA position will be updated per periods, which is basically the same thing
-> what we are doing at the moment when the granularity is
-> DMA_RESIDUE_GRANULARITY_DESCRIPTOR.
->  From ALSA point of view at least they are the same: neither of them can report
-> exact position, the DMA pointer jumps from period to period.
->
-> IMHO in the generic dmaengine PCM we should set the SNDRV_PCM_INFO_BATCH for
-> both cases.
->
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  drivers/dma/edma.c | 11 +++++------
+>>  1 file changed, 5 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>> index e4f4a0cef58c..e2aa42b8342f 100644
+>> --- a/drivers/dma/edma.c
+>> +++ b/drivers/dma/edma.c
+>> @@ -141,7 +141,7 @@ static void edma_execute(struct edma_chan *echan)
+>>  	for (i = 0; i < nslots; i++) {
+>>  		j = i + edesc->processed;
+>>  		edma_write_slot(echan->slot[i], &edesc->pset[j]);
+>> -		dev_dbg(echan->vchan.chan.device->dev,
+>> +		dev_vdbg(echan->vchan.chan.device->dev,
+>>  			"\n pset[%d]:\n"
+>>  			"  chnum\t%d\n"
+>>  			"  slot\t%d\n"
+> 
+> I believe you may move this code to separate function and reuse it
+> later.
 
-Ups, sorry mixed up DMA_RESIDUE_GRANULARITY_SEGMENT and 
-DMA_RESIDUE_GRANULARITY_DESCRIPTOR. You can just remove the 
-SND_DMAENGINE_PCM_FLAG_NO_RESIDUE when registering the dmaengine PCM driver 
-and everything will still work as expected.
+As the per patch description, I only changed the debug level in this patch.
+
+> Moreover %d is not good specifier for unsigned types, maybe %u?
+
+You are right for unsigned type %u is the correct. This is why we have %d
+since j, echan->ch_num and echan->slot[i] are integer.
+
+> 
+>> @@ -554,9 +554,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+>>  	edesc->cyclic = 1;
+>>  	edesc->pset_nr = nslots;
+>>  
+>> -	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
+>> -	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
+>> -	dev_dbg(dev, "%s: buf_len=%d\n", __func__, buf_len);
+>> +	dev_dbg(dev, "%s: channel=%d nslots=%d period_len=%d buf_len=%d\n",
+>> +		__func__, echan->ch_num, nslots, period_len, buf_len);
+> 
+> Consider to use proper specifiers for size_t types, namely %zd.
+
+I just collapsed the three line of dev_dbg into one and have not really
+checked the formats.
+For size_t the correct format should be %zu.
+I'll fix this up for the next version.
+
+>>  
+>>  	for (i = 0; i < nslots; i++) {
+>>  		/* Allocate a PaRAM slot, if needed */
+>> @@ -590,8 +589,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+>>  		else
+>>  			src_addr += period_len;
+>>  
+>> -		dev_dbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
+>> -		dev_dbg(dev,
+>> +		dev_vdbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
+>> +		dev_vdbg(dev,
+> 
+> See the first comment.
+
+As the per patch description, I only changed the debug level in this patch.
+This can be done as a separate patch later IMO as part of a bigger debug cleanup.
+
+-- 
+P?ter
