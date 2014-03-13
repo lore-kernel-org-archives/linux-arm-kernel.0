@@ -1,173 +1,164 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 13 Mar 2014 22:46:58 +0000
-Subject: [PATCH v2 05/15] efi: add helper function to get UEFI params from FDT
+Date: Thu, 13 Mar 2014 22:46:55 +0000
+Subject: [PATCH v2 02/15] efi: x86: Improve cmdline conversion
 In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
 References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1394750828-16351-6-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1394750828-16351-3-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+From: "H. Peter Anvin" <hpa@zytor.com>
 
-ARM and ARM64 architectures use the device tree to pass UEFI parameters
-from stub to kernel. These parameters are things known to the stub but
-not discoverable by the kernel after the stub calls ExitBootSerives().
-There is a helper function in:
+Improve the conversion of the UTF-16 EFI command line
+to UTF-8 for passing to the kernel.
 
-   drivers/firmware/efi/fdt.c
-
-which the stub uses to add the UEFI parameters to the device tree.
-This patch adds a complimentary helper function which UEFI runtime
-support may use to retrieve the parameters from the device tree.
-If an architecture wants to use this helper, it should select
-CONFIG_UEFI_PARAMS_FROM_FDT.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
+Signed-off-by: H. Peter Anvin <hpa@zytor.com>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 ---
- drivers/firmware/efi/Kconfig |    7 ++++
- drivers/firmware/efi/efi.c   |   79 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/efi.h          |    9 +++++
- 3 files changed, 95 insertions(+)
+ arch/x86/boot/compressed/eboot.c       |    3 +-
+ drivers/firmware/efi/efi-stub-helper.c |   91 ++++++++++++++++++++++++--------
+ 2 files changed, 70 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-index 1e75f48..d3fe28d 100644
---- a/drivers/firmware/efi/Kconfig
-+++ b/drivers/firmware/efi/Kconfig
-@@ -47,6 +47,13 @@ config EFI_RUNTIME_MAP
+diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
+index a7677ba..feca05f 100644
+--- a/arch/x86/boot/compressed/eboot.c
++++ b/arch/x86/boot/compressed/eboot.c
+@@ -488,8 +488,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
+ 	hdr->type_of_loader = 0x21;
  
- 	  See also Documentation/ABI/testing/sysfs-firmware-efi-runtime-map.
- 
-+config UEFI_PARAMS_FROM_FDT
-+	bool
-+	help
-+	  Select this config option from the architecture Kconfig if
-+	  the EFI runtime support gets system table address, memory
-+          map address, and other parameters from the device tree.
-+
- endmenu
- 
- config UEFI_CPER
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index b25b36b..7f6e977 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -20,6 +20,8 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/efi.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/io.h>
- 
- struct efi __read_mostly efi = {
-@@ -318,3 +320,80 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
- 
- 	return 0;
+ 	/* Convert unicode cmdline to ascii */
+-	cmdline_ptr = efi_convert_cmdline_to_ascii(sys_table, image,
+-						   &options_size);
++	cmdline_ptr = efi_convert_cmdline(sys_table, image, &options_size);
+ 	if (!cmdline_ptr)
+ 		goto fail;
+ 	hdr->cmd_line_ptr = (unsigned long)cmdline_ptr;
+diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+index 6811af7..661f425 100644
+--- a/drivers/firmware/efi/efi-stub-helper.c
++++ b/drivers/firmware/efi/efi-stub-helper.c
+@@ -575,52 +575,99 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
  }
-+
-+#ifdef CONFIG_UEFI_PARAMS_FROM_FDT
-+
-+#define UEFI_PARAM(name, prop, field)			   \
-+	{						   \
-+		{ name },				   \
-+		{ prop },				   \
-+		offsetof(struct efi_fdt_params, field),    \
-+		FIELD_SIZEOF(struct efi_fdt_params, field) \
-+	}
-+
-+static __initdata struct {
-+	const char name[32];
-+	const char propname[32];
-+	int offset;
-+	int size;
-+} dt_params[] = {
-+	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
-+};
-+
-+struct param_info {
-+	int verbose;
-+	void *params;
-+};
-+
-+static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-+				       int depth, void *data)
+ 
+ /*
+- * Convert the unicode UEFI command line to ASCII to pass to kernel.
++ * Get the number of UTF-8 bytes corresponding to an UTF-16 character.
++ * This overestimates for surrogates, but that is okay.
++ */
++static int efi_utf8_bytes(u16 c)
 +{
-+	struct param_info *info = data;
-+	void *prop, *dest;
-+	unsigned long len;
-+	u64 val;
-+	int i;
++	return 1 + (c >= 0x80) + (c >= 0x800);
++}
 +
-+	if (depth != 1 ||
-+	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
-+		return 0;
++/*
++ * Convert an UTF-16 string, not necessarily null terminated, to UTF-8.
++ */
++static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
++{
++	unsigned int c;
 +
-+	pr_info("Getting parameters from FDT:\n");
-+
-+	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
-+		if (!prop) {
-+			pr_err("Can't find %s in device tree!\n",
-+			       dt_params[i].name);
-+			return 0;
++	while (n--) {
++		c = *src++;
++		if (n && c >= 0xd800 && c <= 0xdbff &&
++		    *src >= 0xdc00 && *src <= 0xdfff) {
++			c = 0x10000 + ((c & 0x3ff) << 10) + (*src & 0x3ff);
++			src++;
++			n--;
 +		}
-+		dest = info->params + dt_params[i].offset;
-+
-+		val = of_read_number(prop, len / sizeof(u32));
-+
-+		if (dt_params[i].size == sizeof(u32))
-+			*(u32 *)dest = val;
-+		else
-+			*(u64 *)dest = val;
-+
-+		if (info->verbose)
-+			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
-+				dt_params[i].size * 2, val);
++		if (c >= 0xd800 && c <= 0xdfff)
++			c = 0xfffd; /* Unmatched surrogate */
++		if (c < 0x80) {
++			*dst++ = c;
++			continue;
++		}
++		if (c < 0x800) {
++			*dst++ = 0xc0 + (c >> 6);
++			goto t1;
++		}
++		if (c < 0x10000) {
++			*dst++ = 0xe0 + (c >> 12);
++			goto t2;
++		}
++		*dst++ = 0xf0 + (c >> 18);
++		*dst++ = 0x80 + ((c >> 12) & 0x3f);
++t2:
++		*dst++ = 0x80 + ((c >> 6) & 0x3f);
++t1:
++		*dst++ = 0x80 + (c & 0x3f);
 +	}
-+	return 1;
++
++	return dst;
 +}
 +
-+int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
-+{
-+	struct param_info info;
-+
-+	info.verbose = verbose;
-+	info.params = params;
-+
-+	return of_scan_flat_dt(fdt_find_uefi_params, &info);
-+}
-+#endif /* CONFIG_UEFI_PARAMS_FROM_FDT */
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index a3276da..d450673 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -483,6 +483,14 @@ struct efi_memory_map {
- 	unsigned long desc_size;
- };
++/*
++ * Do proper conversion from UTF-16 to UTF-8
+  * Size of memory allocated return in *cmd_line_len.
+  * Returns NULL on error.
+  */
+-static char *efi_convert_cmdline_to_ascii(efi_system_table_t *sys_table_arg,
+-				      efi_loaded_image_t *image,
+-				      int *cmd_line_len)
++static char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
++				 efi_loaded_image_t *image,
++				 int *cmd_line_len)
+ {
+-	u16 *s2;
++	const u16 *s2;
+ 	u8 *s1 = NULL;
+ 	unsigned long cmdline_addr = 0;
+-	int load_options_size = image->load_options_size / 2; /* ASCII */
+-	void *options = image->load_options;
+-	int options_size = 0;
++	int load_options_chars = image->load_options_size / 2; /* UTF-16 */
++	const u16 *options = image->load_options;
++	int options_bytes = 0;	/* UTF-8 bytes */
++	int options_chars = 0;	/* UTF-16 chars */
+ 	efi_status_t status;
+-	int i;
+ 	u16 zero = 0;
  
-+struct efi_fdt_params {
-+	u64 system_table;
-+	u64 mmap;
-+	u32 mmap_size;
-+	u32 desc_size;
-+	u32 desc_ver;
-+};
-+
- typedef struct {
- 	u32 revision;
- 	void *parent_handle;
-@@ -620,6 +628,7 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
- extern void efi_get_time(struct timespec *now);
- extern int efi_set_rtc_mmss(const struct timespec *now);
- extern void efi_reserve_boot_services(void);
-+extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
- extern struct efi_memory_map memmap;
+ 	if (options) {
+ 		s2 = options;
+-		while (*s2 && *s2 != '\n' && options_size < load_options_size) {
+-			s2++;
+-			options_size++;
++		while (options_chars < load_options_chars
++		       && *s2 && *s2 != '\n') {
++			options_bytes += efi_utf8_bytes(*s2++);
++			options_chars++;
+ 		}
+ 	}
  
- /* Iterate through an efi_memory_map */
+-	if (options_size == 0) {
+-		/* No command line options, so return empty string*/
+-		options_size = 1;
++	if (!options_chars) {
++		/* No command line options, so return empty string */
+ 		options = &zero;
+ 	}
+ 
+-	options_size++;  /* NUL termination */
++	options_bytes++;  /* NUL termination */
+ 
+-	status = efi_low_alloc(sys_table_arg, options_size, 0, &cmdline_addr);
++	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
+ 	if (status != EFI_SUCCESS)
+ 		return NULL;
+ 
+ 	s1 = (u8 *)cmdline_addr;
+-	s2 = (u16 *)options;
+-
+-	for (i = 0; i < options_size - 1; i++)
+-		*s1++ = *s2++;
++	s2 = (const u16 *)options;
+ 
++	s1 = efi_utf16_to_utf8(s1, s2, options_chars);
+ 	*s1 = '\0';
+ 
+-	*cmd_line_len = options_size;
++	*cmd_line_len = options_bytes;
+ 	return (char *)cmdline_addr;
+ }
 -- 
 1.7.10.4
