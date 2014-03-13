@@ -1,124 +1,125 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 10:23:06 +0900
-Subject: [PATCH v2 01/03] ARM: shmobile: Introduce
- shmobile_clk_workaround()
-In-Reply-To: <20140312233617.17009.94940.sendpatchset@w520>
+Date: Thu, 13 Mar 2014 10:23:48 +0900
+Subject: [PATCH 02/03] ARM: shmobile: Use shmobile_clk_workaround() on
+ Lager
+In-Reply-To: <20140312235938.GF25813@verge.net.au>
 References: <20140312233608.17009.65690.sendpatchset@w520>
- <20140312233617.17009.94940.sendpatchset@w520>
-Message-ID: <20140313012303.GI25813@verge.net.au>
+ <20140312233626.17009.24749.sendpatchset@w520>
+ <20140312235938.GF25813@verge.net.au>
+Message-ID: <20140313012344.GJ25813@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 08:36:17AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Thu, Mar 13, 2014 at 08:59:45AM +0900, Simon Horman wrote:
+> On Thu, Mar 13, 2014 at 08:36:26AM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Convert the Lager DT reference code to use the newly introduced
+> > function shmobile_clk_workaround().
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> > 
+> >  arch/arm/mach-shmobile/board-lager-reference.c |   65 +++++++++---------------
+> >  1 file changed, 25 insertions(+), 40 deletions(-)
+> > 
+> > --- 0001/arch/arm/mach-shmobile/board-lager-reference.c
+> > +++ work/arch/arm/mach-shmobile/board-lager-reference.c	2014-02-24 16:17:32.000000000 +0900
+> > @@ -18,12 +18,11 @@
+> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+> >   */
+> >  
+> > -#include <linux/clk.h>
+> > -#include <linux/clkdev.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/init.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/platform_data/rcar-du.h>
+> > +#include <mach/clock.h>
+> >  #include <mach/common.h>
+> >  #include <mach/irqs.h>
+> >  #include <mach/rcar-gen2.h>
+> > @@ -86,46 +85,32 @@ static void __init lager_add_du_device(v
+> >  	platform_device_register_full(&info);
+> >  }
+> >  
+> > +/*
+> > + * This is a really crude hack to provide clkdev support to platform
+> > + * devices until they get moved to DT.
+> > + */
+> > +static const struct clk_name clk_names[] = {
 > 
-> Introduce a new clock workaround function used by DT reference
-> code on the mach-shmobile subarchitecture. The new function
-> shmobile_clk_workaround() is used to configure clkdev to
-> allow DT and platform devices to coexist. It is possible for
-> the DT reference board code to also request enabling of the clock
-> in case the driver does not implement clock control.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Should this be annotated as __initconst?
+> Likewise for the Koelsch variant of this patch.
 
-Thanks, I have queued this up with Wolfram's Reviewed-by
-and Tested-by which he supplied for v1.
+Btw, I'm happy to handle this as an incremental patch if you like.
 
-I have also removed the trailing empty line that this
-patch adds to clock.c.
-
-> ---
 > 
->  Changes since V1:
->  - Reworked patch dependency, updated include file path
-> 
->  arch/arm/mach-shmobile/Makefile             |    2 -
->  arch/arm/mach-shmobile/clock.c              |   29 +++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/clock.h |   16 ++++++++++++++
->  3 files changed, 46 insertions(+), 1 deletion(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/Makefile
-> +++ work/arch/arm/mach-shmobile/Makefile	2014-03-13 08:29:12.000000000 +0900
-> @@ -21,8 +21,8 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
->  obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
->  
->  # Clock objects
-> -ifndef CONFIG_COMMON_CLK
->  obj-y				+= clock.o
-> +ifndef CONFIG_COMMON_CLK
->  obj-$(CONFIG_ARCH_SH7372)	+= clock-sh7372.o
->  obj-$(CONFIG_ARCH_SH73A0)	+= clock-sh73a0.o
->  obj-$(CONFIG_ARCH_R8A73A4)	+= clock-r8a73a4.o
-> --- 0001/arch/arm/mach-shmobile/clock.c
-> +++ work/arch/arm/mach-shmobile/clock.c	2014-03-13 08:29:35.000000000 +0900
-> @@ -21,6 +21,32 @@
->   */
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> +
-> +#ifdef CONFIG_COMMON_CLK
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <mach/clock.h>
-> +
-> +void __init shmobile_clk_workaround(const struct clk_name *clks,
-> +				    int nr_clks, bool enable)
-> +{
-> +	const struct clk_name *clkn;
-> +	struct clk *clk;
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < nr_clks; ++i) {
-> +		clkn = clks + i;
-> +		clk = clk_get(NULL, clkn->clk);
-> +		if (!IS_ERR(clk)) {
-> +			clk_register_clkdev(clk, clkn->con_id, clkn->dev_id);
-> +			if (enable)
-> +				clk_prepare_enable(clk);
-> +			clk_put(clk);
-> +		}
-> +	}
-> +}
-> +
-> +#else /* CONFIG_COMMON_CLK */
->  #include <linux/sh_clk.h>
->  #include <linux/export.h>
->  #include <mach/clock.h>
-> @@ -58,3 +84,6 @@ void __clk_put(struct clk *clk)
->  {
->  }
->  EXPORT_SYMBOL(__clk_put);
-> +
-> +#endif /* CONFIG_COMMON_CLK */
-> +
-> --- 0001/arch/arm/mach-shmobile/include/mach/clock.h
-> +++ work/arch/arm/mach-shmobile/include/mach/clock.h	2014-03-13 08:29:12.000000000 +0900
-> @@ -1,6 +1,21 @@
->  #ifndef CLOCK_H
->  #define CLOCK_H
->  
-> +#ifdef CONFIG_COMMON_CLK
-> +/* temporary clock configuration helper for platform devices */
-> +
-> +struct clk_name {
-> +	const char *clk;
-> +	const char *con_id;
-> +	const char *dev_id;
-> +};
-> +
-> +void shmobile_clk_workaround(const struct clk_name *clks, int nr_clks,
-> +			     bool enable);
-> +
-> +#else /* CONFIG_COMMON_CLK */
-> +/* legacy clock implementation */
-> +
->  unsigned long shmobile_fixed_ratio_clk_recalc(struct clk *clk);
->  extern struct sh_clk_ops shmobile_fixed_ratio_clk_ops;
->  
-> @@ -36,4 +51,5 @@ do {			\
->  	(p)->div = d;	\
->  } while (0)
->  
-> +#endif /* CONFIG_COMMON_CLK */
->  #endif
+> > +	{ "cmt0", NULL, "sh_cmt.0" },
+> > +	{ "scifa0", NULL, "sh-sci.0" },
+> > +	{ "scifa1", NULL, "sh-sci.1" },
+> > +	{ "scifb0", NULL, "sh-sci.2" },
+> > +	{ "scifb1", NULL, "sh-sci.3" },
+> > +	{ "scifb2", NULL, "sh-sci.4" },
+> > +	{ "scifa2", NULL, "sh-sci.5" },
+> > +	{ "scif0", NULL, "sh-sci.6" },
+> > +	{ "scif1", NULL, "sh-sci.7" },
+> > +	{ "hscif0", NULL, "sh-sci.8" },
+> > +	{ "hscif1", NULL, "sh-sci.9" },
+> > +	{ "du0", "du.0", "rcar-du-r8a7790" },
+> > +	{ "du1", "du.1", "rcar-du-r8a7790" },
+> > +	{ "du2", "du.2", "rcar-du-r8a7790" },
+> > +	{ "lvds0", "lvds.0", "rcar-du-r8a7790" },
+> > +	{ "lvds1", "lvds.1", "rcar-du-r8a7790" },
+> > +};
+> > +
+> >  static void __init lager_add_standard_devices(void)
+> >  {
+> > -	/*
+> > -	 * This is a really crude hack to provide clkdev support to platform
+> > -	 * devices until they get moved to DT.
+> > -	 */
+> > -	static const struct clk_name {
+> > -		const char *clk;
+> > -		const char *con_id;
+> > -		const char *dev_id;
+> > -	} clk_names[] = {
+> > -		{ "cmt0", NULL, "sh_cmt.0" },
+> > -		{ "scifa0", NULL, "sh-sci.0" },
+> > -		{ "scifa1", NULL, "sh-sci.1" },
+> > -		{ "scifb0", NULL, "sh-sci.2" },
+> > -		{ "scifb1", NULL, "sh-sci.3" },
+> > -		{ "scifb2", NULL, "sh-sci.4" },
+> > -		{ "scifa2", NULL, "sh-sci.5" },
+> > -		{ "scif0", NULL, "sh-sci.6" },
+> > -		{ "scif1", NULL, "sh-sci.7" },
+> > -		{ "hscif0", NULL, "sh-sci.8" },
+> > -		{ "hscif1", NULL, "sh-sci.9" },
+> > -		{ "du0", "du.0", "rcar-du-r8a7790" },
+> > -		{ "du1", "du.1", "rcar-du-r8a7790" },
+> > -		{ "du2", "du.2", "rcar-du-r8a7790" },
+> > -		{ "lvds0", "lvds.0", "rcar-du-r8a7790" },
+> > -		{ "lvds1", "lvds.1", "rcar-du-r8a7790" },
+> > -	};
+> > -	struct clk *clk;
+> > -	unsigned int i;
+> > -
+> > -	for (i = 0; i < ARRAY_SIZE(clk_names); ++i) {
+> > -		clk = clk_get(NULL, clk_names[i].clk);
+> > -		if (!IS_ERR(clk)) {
+> > -			clk_register_clkdev(clk, clk_names[i].con_id,
+> > -					    clk_names[i].dev_id);
+> > -			clk_put(clk);
+> > -		}
+> > -	}
+> > -
+> > +	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
+> >  	r8a7790_add_dt_devices();
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> >  
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
