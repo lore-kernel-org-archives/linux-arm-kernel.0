@@ -1,23 +1,22 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 15:29:57 +0900
-Subject: [PATCH 1/2] ARM: shmobile: koelsch: Annotate clk_names with
- __initconst
+Date: Thu, 13 Mar 2014 15:29:58 +0900
+Subject: [PATCH 2/2] ARM: shmobile: lager: Annotate clk_names with __initconst
 In-Reply-To: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
 References: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1394692198-30715-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1394692198-30715-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c | 2 +-
+ arch/arm/mach-shmobile/board-lager-reference.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index a760f7f..1e6a436 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -85,7 +85,7 @@ static void __init koelsch_add_du_device(void)
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index c76248b..7ff395e 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -89,7 +89,7 @@ static void __init lager_add_du_device(void)
   * This is a really crude hack to provide clkdev support to platform
   * devices until they get moved to DT.
   */
