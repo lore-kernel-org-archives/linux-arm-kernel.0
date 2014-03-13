@@ -1,217 +1,74 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 13 Mar 2014 13:27:58 -0700
-Subject: [PATCH v11] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1390907351-28426-1-git-send-email-jonas.jensen@gmail.com>
-References: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
- <1390907351-28426-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20140313202758.12081.26697@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Mar 2014 13:30:09 -0700
+Subject: [RESEND PATCH 1/1] arm: dts: am33xx: correcting dt node unit
+ address for usb
+In-Reply-To: <20140306152637.GB25648@saruman.home>
+References: <1394109094-19205-1-git-send-email-mugunthanvnm@ti.com>
+ <20140306152637.GB25648@saruman.home>
+Message-ID: <20140313203009.GE5981@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jonas Jensen (2014-01-28 03:09:11)
-> MOXA ART SoCs allow to determine PLL output and APB frequencies
-> by reading registers holding multiplier and divisor information.
+* Felipe Balbi <balbi@ti.com> [140306 07:33]:
+> On Thu, Mar 06, 2014 at 06:01:34PM +0530, Mugunthan V N wrote:
+> > DT node's unit address should be its own register offset address to make it a
+> > unique across the system. This patch corrects the incorrect USB entries with
+> > correct register offset for unit address.
+> > 
+> > Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 > 
-> Add a clock driver for this SoC.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-Taken into clk-next.
+Applying into omap-for-v3.15/fixes with cc stable v3.12+. If somebody
+wants it in earlier kernels it needs to be updated and posted
+to the lists.
 
 Regards,
-Mike
 
-> ---
+Tony
+
+> > This patch was posted long back (Aug. 30, 2013), below is the archive of the
+> > orginal patch.
+> > https://patchwork.kernel.org/patch/2852163/
+> > 
+> > ---
+> >  arch/arm/boot/dts/am33xx.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index 7073429..9770e35 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -453,7 +453,7 @@
+> >  			ti,hwmods = "usb_otg_hs";
+> >  			status = "disabled";
+> >  
+> > -			usb_ctrl_mod: control at 44e10000 {
+> > +			usb_ctrl_mod: control at 44e10620 {
+> >  				compatible = "ti,am335x-usb-ctrl-module";
+> >  				reg = <0x44e10620 0x10
+> >  					0x44e10648 0x4>;
+> > @@ -556,7 +556,7 @@
+> >  					"tx14", "tx15";
+> >  			};
+> >  
+> > -			cppi41dma: dma-controller at 07402000 {
+> > +			cppi41dma: dma-controller at 47402000 {
+> >  				compatible = "ti,am3359-cppi41";
+> >  				reg =  <0x47400000 0x1000
+> >  					0x47402000 0x1000
+> > -- 
+> > 1.9.0
+> > 
 > 
-> Notes:
->     Thanks for the replies,
->     
->     Changes since v10:
->     
->     1. add clock-specifier to DT binding description
->     2. remove local variable "rate"
->     3. add local variable "parent_name"
->     4. use clk_register_fixed_factor() instead of clk_register_fixed_rate()
->     5. remove flag CLK_IS_ROOT
->     
->     Applies to next-20140128
-> 
->  .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
->  drivers/clk/Makefile                               |  1 +
->  drivers/clk/clk-moxart.c                           | 97 ++++++++++++++++++++++
->  3 files changed, 146 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
->  create mode 100644 drivers/clk/clk-moxart.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-> new file mode 100644
-> index 0000000..fedea84
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-> @@ -0,0 +1,48 @@
-> +Device Tree Clock bindings for arch-moxart
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +MOXA ART SoCs allow to determine PLL output and APB frequencies
-> +by reading registers holding multiplier and divisor information.
-> +
-> +
-> +PLL:
-> +
-> +Required properties:
-> +- compatible : Must be "moxa,moxart-pll-clock"
-> +- #clock-cells : Should be 0
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle + clock-specifier for the parent clock
-> +
-> +Optional properties:
-> +- clock-output-names : Should contain clock name
-> +
-> +
-> +APB:
-> +
-> +Required properties:
-> +- compatible : Must be "moxa,moxart-apb-clock"
-> +- #clock-cells : Should be 0
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle + clock-specifier for the parent clock
-> +
-> +Optional properties:
-> +- clock-output-names : Should contain clock name
-> +
-> +
-> +For example:
-> +
-> +       clk_pll: clk_pll at 98100000 {
-> +               compatible = "moxa,moxart-pll-clock";
-> +               #clock-cells = <0>;
-> +               reg = <0x98100000 0x34>;
-> +       };
-> +
-> +       clk_apb: clk_apb at 98100000 {
-> +               compatible = "moxa,moxart-apb-clock";
-> +               #clock-cells = <0>;
-> +               reg = <0x98100000 0x34>;
-> +               clocks = <&clk_pll>;
-> +       };
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 0faf730..7940d0c 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)      += clk-composite.o
->  # SoCs specific
->  obj-$(CONFIG_ARCH_BCM2835)     += clk-bcm2835.o
->  obj-$(CONFIG_ARCH_EFM32)       += clk-efm32gg.o
-> +obj-$(CONFIG_ARCH_MOXART)      += clk-moxart.o
->  obj-$(CONFIG_ARCH_NOMADIK)     += clk-nomadik.o
->  obj-$(CONFIG_ARCH_HIGHBANK)    += clk-highbank.o
->  obj-$(CONFIG_ARCH_HI3xxx)      += hisilicon/
-> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-> new file mode 100644
-> index 0000000..30a3b69
-> --- /dev/null
-> +++ b/drivers/clk/clk-moxart.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + * MOXA ART SoCs clock driver.
-> + *
-> + * Copyright (C) 2013 Jonas Jensen
-> + *
-> + * Jonas Jensen <jonas.jensen@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clkdev.h>
-> +
-> +void __init moxart_of_pll_clk_init(struct device_node *node)
-> +{
-> +       static void __iomem *base;
-> +       struct clk *clk, *ref_clk;
-> +       unsigned int mul;
-> +       const char *name = node->name;
-> +       const char *parent_name;
-> +
-> +       of_property_read_string(node, "clock-output-names", &name);
-> +       parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +       base = of_iomap(node, 0);
-> +       if (!base) {
-> +               pr_err("%s: of_iomap failed\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       mul = readl(base + 0x30) >> 3 & 0x3f;
-> +       iounmap(base);
-> +
-> +       ref_clk = of_clk_get(node, 0);
-> +       if (IS_ERR(ref_clk)) {
-> +               pr_err("%s: of_clk_get failed\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       clk = clk_register_fixed_factor(NULL, name, parent_name, 0, mul, 1);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("%s: failed to register clock\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       clk_register_clkdev(clk, NULL, name);
-> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
-> +              moxart_of_pll_clk_init);
-> +
-> +void __init moxart_of_apb_clk_init(struct device_node *node)
-> +{
-> +       static void __iomem *base;
-> +       struct clk *clk, *pll_clk;
-> +       unsigned int div, val;
-> +       unsigned int div_idx[] = { 2, 3, 4, 6, 8};
-> +       const char *name = node->name;
-> +       const char *parent_name;
-> +
-> +       of_property_read_string(node, "clock-output-names", &name);
-> +       parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +       base = of_iomap(node, 0);
-> +       if (!base) {
-> +               pr_err("%s: of_iomap failed\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       val = readl(base + 0xc) >> 4 & 0x7;
-> +       iounmap(base);
-> +
-> +       if (val > 4)
-> +               val = 0;
-> +       div = div_idx[val] * 2;
-> +
-> +       pll_clk = of_clk_get(node, 0);
-> +       if (IS_ERR(pll_clk)) {
-> +               pr_err("%s: of_clk_get failed\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       clk = clk_register_fixed_factor(NULL, name, parent_name, 0, 1, div);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("%s: failed to register clock\n", node->full_name);
-> +               return;
-> +       }
-> +
-> +       clk_register_clkdev(clk, NULL, name);
-> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
-> +              moxart_of_apb_clk_init);
 > -- 
-> 1.8.2.1
-> 
+> balbi
+
+
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
