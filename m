@@ -1,86 +1,33 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Mar 2014 10:08:36 +0000
-Subject: [PATCH 2/2] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device
- tree
-In-Reply-To: <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
- <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <532183A4.5020600@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 10:12:02 +0000
+Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
+In-Reply-To: <20140312174520.GB17308@arm.com>
+References: <1392311193-21214-1-git-send-email-jean.pihet@linaro.org>
+ <CAFrcx1=ZBWt1mak_6+=KbCFZEsaD3T_xZ8up4WBLSr6_JTkP1A@mail.gmail.com>
+ <20140312174520.GB17308@arm.com>
+Message-ID: <20140313101202.GB11365@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2014 11:06 AM, Antoine T?nart wrote:
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/boot/dts/Makefile         |  3 ++-
->   arch/arm/boot/dts/berlin2q-dmp.dts | 32 ++++++++++++++++++++++++++++++++
->   2 files changed, 34 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/berlin2q-dmp.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 032030361bef..1a2adadfb962 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
->   dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
->   dtb-$(CONFIG_ARCH_BERLIN) += \
->   	berlin2-sony-nsz-gs7.dtb	\
-> -	berlin2cd-google-chromecast.dtb
-> +	berlin2cd-google-chromecast.dtb	\
-> +	berlin2q-dmp.dtb
+On Wed, Mar 12, 2014 at 05:45:20PM +0000, Catalin Marinas wrote:
+> On Wed, Mar 12, 2014 at 01:42:51PM +0100, Jean Pihet wrote:
+> > Hi,
+> > 
+> > On 13 February 2014 18:06, Jean Pihet <jean.pihet@linaro.org> wrote:
+> > > This patch hooks in the perf_regs and libunwind code for ARM64.
+> > > The tools/perf/arch/arm64 is created; it contains the arch specific
+> > > code for DWARF unwinding.
+> > >
+> > > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Ping on this patch. Can this one go into the perf tree?
+> 
+> I'm happy to take it as well if there are no objections from the perf
+> maintainers.
 
-If it is "the" Marvell reference board, the file should be named
-berlin2q-marvell-dmp.dtb.
+I object :) Last time I took a patch for perf tools (via the arm tree) it
+ended in a conflict from hell and we vowed not to take tools patches via
+arch trees again.
 
->   dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
->   	da850-evm.dtb
->   dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-> diff --git a/arch/arm/boot/dts/berlin2q-dmp.dts b/arch/arm/boot/dts/berlin2q-dmp.dts
-> new file mode 100644
-> index 000000000000..6a98860e0251
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/berlin2q-dmp.dts
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +#include "berlin2q.dtsi"
-> +
-> +/ {
-> +	model = "Marvell BG2-Q DMP";
-> +	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000>;
-
-Please double-check Jisheng's comment about memory size.
-
-> +	};
-> +
-> +	choosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	soc {
-> +		apb at fc0000 {
-> +			uart0: uart at 9000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-
-And Arnd's comment about using &uart0 instead.
-
-Beside the comments made, this all looks fine.
-
-Sebastian
-
-> +};
->
+Will
