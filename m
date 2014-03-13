@@ -1,162 +1,187 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Mar 2014 13:32:43 +0100
-Subject: [PATCH] ARM: mach-ux500|nomadik|u300: Align to common DT bindings for
- mmci
-Message-ID: <1394713963-18300-1-git-send-email-ulf.hansson@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 13 Mar 2014 13:36:28 +0100
+Subject: [PATCH v5 4/5] clk/exynos5260: add macros and documentation for
+ exynos5260
+In-Reply-To: <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
+References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
+ <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <5321A64C.3070902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the first step in preparing the mmci driver for converting to the
-mmc_of_parse API, let's align to the common names of DT bindings for
-the mmc/sd highspeed modes.
+Hi Rahul,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- Documentation/devicetree/bindings/mmc/mmci.txt |    4 ----
- arch/arm/boot/dts/ste-ccu9540.dts              |    6 +++---
- arch/arm/boot/dts/ste-href.dtsi                |    8 ++++----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 ++--
- arch/arm/boot/dts/ste-snowball.dts             |    4 ++--
- arch/arm/boot/dts/ste-u300.dts                 |    4 ++--
- drivers/mmc/host/mmci.c                        |    4 ++--
- 7 files changed, 15 insertions(+), 19 deletions(-)
+On 12.03.2014 15:56, Rahul Sharma wrote:
+> Add macros which are used as Clock IDs in DT and clock file.
+> It also adds the documentation for the exynos5260 clocks.
+>
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>   .../devicetree/bindings/clock/exynos5260-clock.txt |   55 +++++
+>   include/dt-bindings/clock/exynos5260-clk.h         |  233 ++++++++++++++++++++
+>   2 files changed, 288 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+>   create mode 100644 include/dt-bindings/clock/exynos5260-clk.h
+>
+> diff --git a/Documentation/devicetree/bindings/clock/exynos5260-clock.txt b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+> new file mode 100644
+> index 0000000..4128892
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+> @@ -0,0 +1,55 @@
+> +* Samsung Exynos5260 Clock Controller
+> +
+> +The Exynos5260 clock controller encapsulate all CMUs which are
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-index 2b584ca..0c463e0 100644
---- a/Documentation/devicetree/bindings/mmc/mmci.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -9,7 +9,3 @@ by mmc.txt and the properties used by the mmci driver.
- Required properties:
- - compatible             : contains "arm,pl18x", "arm,primecell".
- - arm,primecell-periphid : contains the PrimeCell Peripheral ID.
--
--Optional properties:
--- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
--- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
-diff --git a/arch/arm/boot/dts/ste-ccu9540.dts b/arch/arm/boot/dts/ste-ccu9540.dts
-index 2295087..651c56d 100644
---- a/arch/arm/boot/dts/ste-ccu9540.dts
-+++ b/arch/arm/boot/dts/ste-ccu9540.dts
-@@ -38,8 +38,8 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-sd-highspeed;
--			mmc-cap-mmc-highspeed;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 
- 			cd-gpios  = <&gpio7 6 0x4>; // 230
-@@ -63,7 +63,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 6cb9b68..a5db487 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -116,8 +116,8 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-sd-highspeed;
--			mmc-cap-mmc-highspeed;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 			vqmmc-supply = <&vmmci>;
- 			pinctrl-names = "default", "sleep";
-@@ -144,7 +144,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi2_default_mode>;
- 			pinctrl-1 = <&sdi2_sleep_mode>;
-@@ -157,7 +157,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi4_default_mode>;
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 5acc044..d316c95 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -840,8 +840,8 @@
- 			interrupts = <22>;
- 			max-frequency = <48000000>;
- 			bus-width = <4>;
--			mmc-cap-mmc-highspeed;
--			mmc-cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 			cd-gpios = <&gpio3 15 0x1>;
- 			cd-inverted;
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 97d5d21..4add51f 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -155,7 +155,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 			vqmmc-supply = <&vmmci>;
- 			pinctrl-names = "default", "sleep";
-@@ -194,7 +194,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi4_default_mode>;
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index a9da480..0a839da 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -442,8 +442,8 @@
- 			clock-names = "apb_pclk", "mclk";
- 			max-frequency = <24000000>;
- 			bus-width = <4>; // SD-card slot
--			mmc-cap-mmc-highspeed;
--			mmc-cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 			cd-gpios = <&gpio 12 0x4>;
- 			cd-inverted;
- 			vmmc-supply = <&ab3100_ldo_g_reg>;
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b931226..c321bb6 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1395,9 +1395,9 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
- 	if (!pdata->f_max)
- 		pr_warn("%s has no 'max-frequency' property\n", np->full_name);
- 
--	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
-+	if (of_get_property(np, "cap-mmc-highspeed", NULL))
- 		pdata->capabilities |= MMC_CAP_MMC_HIGHSPEED;
--	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
-+	if (of_get_property(np, "cap-sd-highspeed", NULL))
- 		pdata->capabilities |= MMC_CAP_SD_HIGHSPEED;
- 
- 	of_property_read_u32(np, "bus-width", &bus_width);
--- 
-1.7.9.5
+s/encapsulate/encapsulates/
+
+Anyway, I don't think there is any global clock controller entity that 
+should be described here. The binding is related to several separate 
+entities found on Exynos5260, i.e. particular CMUs.
+
+> +instantiaited independently from the device-tree. As a whole, these
+
+s/instantiaited/instantiated/
+s/the device-tree/device tree/
+
+> +CMUs generates and supplies clocks to various controllers within
+
+s/generates/generate/
+s/supplies/supply/
+
+> +the Exynos5260 SoC.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +	"exynos5260-clock-top"
+> +	"exynos5260-clock-peri"
+> +	"exynos5260-clock-egl"
+> +	"exynos5260-clock-kfc"
+> +	"exynos5260-clock-g2d"
+> +	"exynos5260-clock-mif"
+> +	"exynos5260-clock-mfc"
+> +	"exynos5260-clock-g3d"
+> +	"exynos5260-clock-fsys"
+> +	"exynos5260-clock-aud"
+> +	"exynos5260-clock-isp"
+> +	"exynos5260-clock-gscl"
+> +	"exynos5260-clock-disp"
+
+Compatible strings should be prefixed with Samsung's vendor prefix, i.e. 
+"samsung,".
+
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+
+As implemented in patch [1] the clock core will be able to sort out 
+dependencies between particular clock providers based on clock consumer 
+bindings. This means that it would be a good idea to add clock 
+properties to this binding and strictly specify which clocks outside 
+particular CMU block are fed into the block.
+
+So for example, if CMU TOP uses fin_pll clock, its node would need to 
+have "clock-names" property with "fin_pll" entry and "clocks" property 
+with respective entry pointing to the fixed rate clock node.
+
+In general, all external, IO and PHY clocks fed into CMU blocks should 
+be listed this way to have dependencies between clocks properly defined 
+in the system.
+
+[1] http://thread.gmane.org/gmane.linux.kernel/1654635
+
+> +
+> +The following is the list of clocks generated by each controller.
+
+There is no list below. IMHO this sentence should be removed.
+
+> Each
+> +clock is assigned with a MACRO constant. These constants are defined in
+> +"dt-bindings/clk/exynos5260-clk.h". DT client nodes use this MACRO to
+> +specify the clock, which they want to consume.
+
+IMHO the whole paragraph above can be rewritten taking 
+samsung,s3c64xx-clock.txt as an example:
+
+Each clock is assigned an identifier and client nodes can use this 
+identifier to specify the clock which they consume. All available clocks 
+are defined as preprocessor macros in dt-bindings/clock/exynos5260-clk.h 
+header and can be used in device tree sources.
+
+In addition to the above, a list of external clocks that need or may be 
+present should be added. Again, see samsung,s3c64xx-clock.txt for an 
+example.
+
+> +
+> +Example 1: An example of a clock controller node is listed below.
+> +
+> +	cmu_disp: clock-controller at 0x14550000 {
+> +		compatible = "exynos5260-clock-disp";
+
+Incorrect compatible string.
+
+> +		reg = <0x14550000 0x10000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +Example 2: UART controller node that consumes the clock generated by the
+> +		peri clock controller. Refer to the standard clock bindings for
+> +		information about 'clocks' and 'clock-names' property.
+> +
+> +	serial at 12C00000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C00000 0x100>;
+> +		interrupts = <0 146 0>;
+> +		clocks = <&clock_peri PERI_PCLK_UART0>, <&clock_peri PERI_SCLK_UART0>;
+> +		clock-names = "uart", "clk_uart_baud0";
+> +		status = "disabled";
+> +	};
+> +
+> diff --git a/include/dt-bindings/clock/exynos5260-clk.h b/include/dt-bindings/clock/exynos5260-clk.h
+> new file mode 100644
+> index 0000000..d6f4391
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/exynos5260-clk.h
+> @@ -0,0 +1,233 @@
+> +/*
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Provides Constants for Exynos5260 clocks.
+> +*/
+> +
+> +#ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
+> +#define _DT_BINDINGS_CLK_EXYNOS5260_H
+> +
+> +/*
+> + * Clock names:	XXXXX_YYYYYY_ZZZZ
+> + *		|---| |----| |--|
+> + *		 cmu   type   IP
+> + */
+> +
+> +/* List Of Clocks For CMU_TOP */
+> +#define FIN_PLL			1
+> +#define TOP_FOUT_DISP_PLL	2
+> +#define TOP_FOUT_AUD_PLL	3
+> +#define TOP_SCLK_MMC0		4
+
+[snip]
+
+> +#define DISP_CLK_DSIM1		9
+> +#define DISP_CLK_DPPHY		10
+> +#define DISP_CLK_DP		11
+> +#define DISP_SCLK_PIXEL		12
+> +#define DISP_MOUT_HDMI_PHY_PIXEL_USER		13
+> +#define DISP_MOUT_HDMI_PHY_PIXEL	14
+
+nit: Incorrect alignment. Please indent further all the numbers to match 
+the longest indentation level.
+
+Best regards,
+Tomasz
