@@ -1,105 +1,52 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 18:17:24 +0100
-Subject: =?UTF-8?q?=5BPATCH=20v11=5D=5B=2003/12=5D=20imx-drm=3A=20Correct=20BGR666=20and=20the=20board=27s=20dts=20that=20use=20them=2E?=
+Date: Thu, 13 Mar 2014 18:17:25 +0100
+Subject: [PATCH v11][ 04/12] imx-drm: Match ipu_di_signal_cfg's clk_pol with
+ its description.
 In-Reply-To: <1394731053-6118-1-git-send-email-denis@eukrea.com>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394731053-6118-3-git-send-email-denis@eukrea.com>
+Message-ID: <1394731053-6118-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current BGR666 is not consistent with the other color mapings like BGR24.
-BGR666 should be in the same byte order than BGR24.
+According to the datasheet, setting the di0_polarity_disp_clk
+field in the GENERAL di register sets the output clock polarity
+to active high.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 ChangeLog v9->v10:
-- Rebased.
-- Added Philipp Zabel's Ack.
-- Included Lothar Wa?mann's suggestion about imx-ldb.c.
-- Shortened the patch title
-
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-
-ChangeLog v7->v8:
-- Shrinked even more the Cc list.
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
-- Added a better explanation of the change.
-
-ChangeLog v5:
-- New patch.
+- New patch that is now needed by the
+  "staging: imx-drm: Use de-active and pixelclk-active" patch.
 ---
- arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
- arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
- drivers/staging/imx-drm/imx-ldb.c       |    4 ++--
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
- 4 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c |    2 +-
+ drivers/staging/imx-drm/ipuv3-crtc.c    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index c5a9a24..7b3851d 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -18,7 +18,7 @@
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 82a9eba..849b3e1 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -595,7 +595,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		}
+ 	}
  
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		interface-pix-fmt = "bgr666";
-+		interface-pix-fmt = "rgb666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+-	if (!sig->clk_pol)
++	if (sig->clk_pol)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
  
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index f6d3ac3..4646ea9 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -23,7 +23,7 @@
- 	soc {
- 		display1: display at di1 {
- 			compatible = "fsl,imx-parallel-display";
--			interface-pix-fmt = "bgr666";
-+			interface-pix-fmt = "rgb666";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index a8d0178..db6bd64 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -158,7 +158,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 		sig_cfg.Vsync_pol = 1;
  
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 33d2b883..e6d7bc7 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -185,11 +185,11 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 	switch (imx_ldb_ch->chno) {
- 	case 0:
- 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
--			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
- 		break;
- 	case 1:
- 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
--			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
- 		break;
- 	default:
- 		dev_err(ldb->dev, "unable to config di%d panel format\n",
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 6f9abe8..154d293 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 
- 	/* bgr666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
- 
- 	/* bgr24 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
+ 	sig_cfg.enable_pol = 1;
+-	sig_cfg.clk_pol = 1;
++	sig_cfg.clk_pol = 0;
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
 -- 
 1.7.9.5
