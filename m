@@ -1,49 +1,83 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:18:46 +0100
-Subject: [PATCH v4][ 8/8] ARM: imx_v4_v5_defconfig: Enable drivers for
- i.MX25/i.MX35 USB support.
-In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394702326-25558-8-git-send-email-denis@eukrea.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 11:18:33 +0200
+Subject: [PATCH 11/18] dma: edma: Prefix debug prints where the text were
+ identical in prep callbacks
+In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-12-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-Changelog v2->v3:
-- Extra gadget drivers additions were removed from this patch.
+prep_slave_sg and prep_dma_cyclic callbacks have mostly same failure cases
+with the same texts printed in case we hit them. It helps when debugging if
+we know exactly which callback generated the errors.
+At the same time change the debug level for descriptor allocation failure
+from dbg to err since all other error cases are dev_err and this failure is
+similarly fatal as the other ones.
 
-Changelog v1->v2:
-- With the clock fix patches, the usb gadget also work.
-  So I've addeed it to this patch too.
-- CONFIG_USB_OTG_FSM=y was not needed, so it was removed.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/configs/imx_v4_v5_defconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/dma/edma.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index f1aeb7d..ec9b365 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -80,6 +80,7 @@ CONFIG_MTD_UBI=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
- CONFIG_ATA=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- CONFIG_CS89x0=y
-@@ -153,6 +154,11 @@ CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_UDC=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_SDHCI=y
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index e2aa42b8342f..07ac5f4eeb56 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -430,14 +430,14 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	}
+ 
+ 	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+-		dev_err(dev, "Undefined slave buswidth\n");
++		dev_err(dev, "%s: Undefined slave buswidth\n", __func__);
+ 		return NULL;
+ 	}
+ 
+ 	edesc = kzalloc(sizeof(*edesc) + sg_len *
+ 		sizeof(edesc->pset[0]), GFP_ATOMIC);
+ 	if (!edesc) {
+-		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		dev_err(dev, "%s: Failed to allocate a descriptor\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -453,7 +453,8 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 						EDMA_SLOT_ANY);
+ 			if (echan->slot[i] < 0) {
+ 				kfree(edesc);
+-				dev_err(dev, "Failed to allocate slot\n");
++				dev_err(dev, "%s: Failed to allocate slot\n",
++					__func__);
+ 				return NULL;
+ 			}
+ 		}
+@@ -522,7 +523,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	}
+ 
+ 	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+-		dev_err(dev, "Undefined slave buswidth\n");
++		dev_err(dev, "%s: Undefined slave buswidth\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -547,7 +548,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	edesc = kzalloc(sizeof(*edesc) + nslots *
+ 		sizeof(edesc->pset[0]), GFP_ATOMIC);
+ 	if (!edesc) {
+-		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		dev_err(dev, "%s: Failed to allocate a descriptor\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -565,7 +566,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 						EDMA_SLOT_ANY);
+ 			if (echan->slot[i] < 0) {
+ 				kfree(edesc);
+-				dev_err(dev, "Failed to allocate slot\n");
++				dev_err(dev, "%s: Failed to allocate slot\n",
++					__func__);
+ 				return NULL;
+ 			}
+ 		}
 -- 
-1.7.9.5
+1.9.0
