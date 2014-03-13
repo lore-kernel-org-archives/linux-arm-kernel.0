@@ -1,23 +1,41 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 13 Mar 2014 11:27:11 -0700
-Subject: [PATCH] ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
-In-Reply-To: <1394660600-3771-1-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Wed, 12 Mar 2014 16:43:20 -0500")
-References: <1394660600-3771-1-git-send-email-nm@ti.com>
-Message-ID: <7hy50ekl8g.fsf@paris.lan>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 13 Mar 2014 14:27:39 -0400
+Subject: [PATCH v6 4/7] arm64: Add ftrace support
+In-Reply-To: <20140313170834.GE25472@mudshark.cambridge.arm.com>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-5-git-send-email-takahiro.akashi@linaro.org>
+ <20140313170834.GE25472@mudshark.cambridge.arm.com>
+Message-ID: <1394735259.26600.14.camel@pippen.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On Thu, 2014-03-13 at 17:08 +0000, Will Deacon wrote:
 
-> Just like IS_PM34XX_ERRATUM, IS_PM44XX_ERRATUM is valid only if
-> CONFIG_PM is enabled, else, disabling CONFIG_PM results in build
-> failure complaining about the following:
-> arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
-> :(.text+0x8a70): undefined reference to `pm44xx_errata'
->
-> Fixes: c962184 (ARM: OMAP4: PM: add errata support)
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> > +       /*
+> > +        * Note:
+> > +        * No protection against faulting at *parent, which may be seen
+> > +        * on other archs. It's unlikely on AArch64.
+> > +        */
+> > +       old = *parent;
+> > +       *parent = return_hooker;
+> 
+> return_hook? People might take it personally otherwise ;)
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+No, return_hooker is consistent with all the other archs. Hey, it's a
+rugby position! Note, which I was when I played. ;-)
+
+> 
+> > +       trace.func = self_addr;
+> 
+> in kernel/ftrace/ftrace.c there's an smb_wmb() between setting up
+> tracing_graph_pause and setting the ret_stack with a comment saying:
+> 
+>     /* Make sure the tasks see the -1 first: */
+> 
+> Why don't we have a corresponding read-barrier here?
+
+The corresponding rmb is in kernel/trace/trace_function_graph
+ftrace_push_return_trace().
+
+-- Steve
