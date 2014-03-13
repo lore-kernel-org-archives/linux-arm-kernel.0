@@ -1,34 +1,97 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 13 Mar 2014 19:13:45 +0900
-Subject: [PATCH v6 2/7] arm64: Add 'notrace' attribute to unwind_frame() for
- ftrace
+Date: Thu, 13 Mar 2014 19:13:46 +0900
+Subject: [PATCH v6 3/7] ftrace: Add arm64 support to recordmcount
 In-Reply-To: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
  <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1394705630-12384-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1394705630-12384-4-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-walk_stackframe() calls unwind_frame(), and if walk_stackframe() is
-"notrace", unwind_frame() should be also "notrace".
+Recordmcount utility under scripts is run, after compiling each object,
+to find out all the locations of calling _mcount() and put them into
+specific seciton named __mcount_loc.
+Then linker collects all such information into a table in the kernel image
+(between __start_mcount_loc and __stop_mcount_loc) for later use by ftrace.
+
+This patch adds arm64 specific definitions to identify such locations.
+There are two types of implementation, C and Perl. On arm64, only C version
+is used to build the kernel now that CONFIG_HAVE_C_RECORDMCOUNT is on.
+But Perl version is also maintained.
+
+This patch also contains a workaround just in case where a header file,
+elf.h, on host machine doesn't have definitions of EM_AARCH64 nor
+R_AARCH64_ABS64. Without them, compiling C version of recordmcount will
+fail.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/stacktrace.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig      |    2 ++
+ scripts/recordmcount.c  |    9 +++++++++
+ scripts/recordmcount.pl |    5 +++++
+ 3 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index c3b6c63..54122c4 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -35,7 +35,7 @@
-  *	ldp	x29, x30, [sp]
-  *	add	sp, sp, #0x10
-  */
--int unwind_frame(struct stackframe *frame)
-+int notrace unwind_frame(struct stackframe *frame)
- {
- 	unsigned long high, low;
- 	unsigned long fp = frame->fp;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc..340e344 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -27,12 +27,14 @@ config ARM64
+ 	select HARDIRQS_SW_RESEND
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_TRACEHOOK
++	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_DMA_ATTRS
+ 	select HAVE_DMA_CONTIGUOUS
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
++	select HAVE_FTRACE_MCOUNT_RECORD
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+ 	select HAVE_MEMBLOCK
+diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+index 9c22317..047c8cd 100644
+--- a/scripts/recordmcount.c
++++ b/scripts/recordmcount.c
+@@ -40,6 +40,11 @@
+ #define R_METAG_NONE                     3
+ #endif
+ 
++#ifndef EM_AARCH64
++#define EM_AARCH64	183
++#define R_AARCH64_ABS64	257
++#endif
++
+ static int fd_map;	/* File descriptor for file being modified. */
+ static int mmap_failed; /* Boolean flag. */
+ static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
+@@ -347,6 +352,10 @@ do_file(char const *const fname)
+ 	case EM_ARM:	 reltype = R_ARM_ABS32;
+ 			 altmcount = "__gnu_mcount_nc";
+ 			 break;
++	case EM_AARCH64:
++			 reltype = R_AARCH64_ABS64;
++			 altmcount = "_mcount";
++			 break;
+ 	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
+ 	case EM_METAG:	 reltype = R_METAG_ADDR32;
+ 			 altmcount = "_mcount_wrapper";
+diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
+index 91280b8..397b6b8 100755
+--- a/scripts/recordmcount.pl
++++ b/scripts/recordmcount.pl
+@@ -279,6 +279,11 @@ if ($arch eq "x86_64") {
+     $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24|THM_CALL)" .
+ 			"\\s+(__gnu_mcount_nc|mcount)\$";
+ 
++} elsif ($arch eq "arm64") {
++    $alignment = 3;
++    $section_type = '%progbits';
++    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
++    $type = ".quad";
+ } elsif ($arch eq "ia64") {
+     $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s_mcount\$";
+     $type = "data8";
 -- 
 1.7.9.5
