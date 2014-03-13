@@ -1,33 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Mar 2014 09:28:23 +0100
-Subject: [PATCH 0/2] ARM: shmobile: koelsch, lager: Annotate clk_names
- with __initconst
-In-Reply-To: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
-References: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 13 Mar 2014 09:29:34 +0100
+Subject: [PATCH 0/7] ARM: dts: overo: Add new expansion boards
+In-Reply-To: <20140312172247.GC30897@atomide.com>
+References: <1394540435-25401-1-git-send-email-florian.vaussard@epfl.ch>
+ <20140312172247.GC30897@atomide.com>
+Message-ID: <53216C6E.9050706@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 7:29 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add __initconst annotations to recently added clk_names.
->
-> Depends on
-> "[PATCH v2 00/03] ARM: shmobile: Break out and extend clock workaround V2"
->
-> Simon Horman (2):
->   ARM: shmobile: koelsch: Annotate clk_names with __initconst
->   ARM: shmobile: lager: Annotate clk_names with __initconst
+Hi,
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+On 03/12/2014 06:22 PM, Tony Lindgren wrote:
+> * Florian Vaussard <florian.vaussard@epfl.ch> [140311 05:24]:
+>> Hi,
+>>
+>> This series adds the support for 5 new expansion boards from Gumstix:
+>> - Palo43
+>> - Gallop43
+>> - Chestnut43
+>> - Alto35
+>> - Summit
+>>
+>> The 1st patch is a preparatory work, in order to factorize some
+>> peripherals that are common to most Gumstix expansion boards. Patch 2
+>> adds the support for an accelerometer that is present on most boards.
+>>
+>> Palo43, Gallop43 and Chestnut43 are all pretty similar. I tested
+>> on a Gallop43 (with both OMAP35xx and OMAP36xx Overo).
+>>
+>> Alto35 is slightly different. Again, I tested with both OMAP35xx and
+>> OMAP36xx Overo.
+>>
+>> Summit is pretty similar to Tobi. I do not have a Summit at hand,
+>> but given the similarity with Tobi, it should work fine.
+>>
+>> To avoid unnecessary duplications, I put all the common stuff for each
+>> board inside an omap3-overo-xxx-common.dsti include file. By doing so,
+>> I can have minimal SoC-specific omap3-overo-xxx.dts (omap34xx based)
+>> and omap3-overo-storm-xxx.dts (omap36xx based) device trees.
+>>
+>> This series depends on my previous Overo series [1]. A complete testing
+>> tree (including the graphics support, soon to be posted) is available
+>> at [2].
+> 
+> Thanks, applying the whole series into omap-for-v3.15/dt-overo.
+> As it's this close to the merge window, no guarantees anything
+> will get pulled in though.
+> 
 
-Gr{oetje,eeting}s,
+Thanks! Let's see. Anyway, this will not kill baby bears if it can't
+make it into 3.15 :)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Florian
