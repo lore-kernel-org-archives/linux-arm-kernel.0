@@ -1,49 +1,18 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 13 Mar 2014 17:05:46 -0300
-Subject: [PATCH v2 3/6] ARM: mvebu: Add the Core Divider clock to Armada
- 38x SoCs
-In-Reply-To: <53221B41.2030001@cogentembedded.com>
-References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1394739542-30017-4-git-send-email-ezequiel@vanguardiasur.com.ar>
- <53221B41.2030001@cogentembedded.com>
-Message-ID: <20140313200546.GB30590@arch.cereza>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Mar 2014 20:49:59 +0100
+Subject: [PATCH 0/3] irqchip: sun4i: various cleanups
+Message-ID: <1394740202-1952-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 13, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 03/13/2014 10:38 PM, Ezequiel Garcia wrote:
-> 
-> >From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> >The Armada 38x SoC family has a clock provider called "Core Divider",
-> >derived from the fixed 2 GHz main PLL clock. This is similar to the
-> >one on A370, A375 and AXP.
-> 
-> >Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >---
-> >  arch/arm/boot/dts/armada-38x.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> 
-> >diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> >index 38fc3a0..76cc27e 100644
-> >--- a/arch/arm/boot/dts/armada-38x.dtsi
-> >+++ b/arch/arm/boot/dts/armada-38x.dtsi
-> >@@ -337,6 +337,14 @@
-> >  				compatible = "marvell,orion-mdio";
-> >  				reg = <0x72004 0x4>;
-> >  			};
-> >+
-> >+			coredivclk: corediv-clock at e4250 {
-> 
->    I would suggest naming the device just "clock at e4250" on the same grounds
-> of having the generic device names.
-> 
+Hi All,
 
-Right, I overlooked this.
+So here is a second patchset for irq-sun4i.c I'm not 100% sure about these
+changes. They all seem the right thing to do, but they definitely need a
+good review first.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+I've run various tests with this set and everything works as advertised.
+
+Regards,
+
+Hans
