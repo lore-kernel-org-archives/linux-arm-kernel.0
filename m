@@ -1,44 +1,79 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:18:40 +0100
-Subject: [PATCH v4][ 2/8] ARM: dts: mx35: USB block requires only one clock
-In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394702326-25558-2-git-send-email-denis@eukrea.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 11:18:28 +0200
+Subject: [PATCH 06/18] arm: common: edma: API to request non default queue for
+ a channel
+In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+When using eDMA3 via dmaengine all dma channels will use the default queue.
+Since during request time we do not have means to change this it need to be done
+later, before the DMA has been started.
+With the added function it is possible to move the channel to a non default
+queue if it is possible, otherwise (when only one EQ/TC is available for the CC)
+the default queue is going to be used.
+For example: For optimal system performance the audio (cyclic) DMA should
+be placed to a separate queue which is different than what the rest of the
+system is using.
 
-Like other imx SoCs only one USB clock is needed on mx35.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/imx35.dtsi |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/common/edma.c             | 27 +++++++++++++++++++++++++++
+ include/linux/platform_data/edma.h |  2 ++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index e59ccb4..474a73d 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -296,8 +296,7 @@
- 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4000 0x0200>;
- 				interrupts = <37>;
--				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
--				clock-names = "ipg", "ahb", "per";
-+				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
-@@ -306,8 +305,7 @@
- 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4400 0x0200>;
- 				interrupts = <35>;
--				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
--				clock-names = "ipg", "ahb", "per";
-+				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index be267b2080be..eaf6dd19f082 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -712,6 +712,33 @@ int edma_alloc_channel(int channel,
+ }
+ EXPORT_SYMBOL(edma_alloc_channel);
+ 
++/**
++ * edma_request_non_default_queue - try to map the channel to non default queue
++ * @channel: dma channel returned from edma_alloc_channel()
++ *
++ * For certain type of applications like audio it is preferred to not use the
++ * default event queue/tc to avoid eDMA caused latency.
++ *
++ * This function will iterate through the event queues available for the CC and
++ * picks the first EQ/TC which is not set as the default for the CC
++ */
++void edma_request_non_default_queue(int channel)
++{
++	unsigned ctlr = EDMA_CTLR(channel);
++	enum dma_event_q eventq_no = EVENTQ_DEFAULT;
++	int i;
++
++	for (i = 0; i < edma_cc[ctlr]->num_tc; i++) {
++		if (i != edma_cc[ctlr]->default_queue) {
++			eventq_no = i;
++			break;
++		}
++	}
++
++	channel = EDMA_CHAN_SLOT(channel);
++	map_dmach_queue(ctlr, channel, eventq_no);
++}
++EXPORT_SYMBOL(edma_request_non_default_queue);
+ 
+ /**
+  * edma_free_channel - deallocate DMA channel
+diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+index 923f8a3e4ce0..5d0a1b98f205 100644
+--- a/include/linux/platform_data/edma.h
++++ b/include/linux/platform_data/edma.h
+@@ -117,6 +117,8 @@ int edma_alloc_channel(int channel,
+ 	void *data, enum dma_event_q);
+ void edma_free_channel(unsigned channel);
+ 
++void edma_request_non_default_queue(int channel);
++
+ /* alloc/free parameter RAM slots */
+ int edma_alloc_slot(unsigned ctlr, int slot);
+ void edma_free_slot(unsigned slot);
 -- 
-1.7.9.5
+1.9.0
