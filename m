@@ -1,125 +1,84 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 13 Mar 2014 10:15:20 +0800
-Subject: Common clock: function clock and bus clock
-In-Reply-To: <5320336B.3020107@ti.com>
-References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
- <CAN1soZzFfSp2Hj=JBxj+N9iLrjkm3poOa7piJDJT5BY-ycsWHQ@mail.gmail.com>
- <CADApbegGTm=REJbukdyEY9ZVK9hXax+Hodp7MFx3SUb=CV1TbA@mail.gmail.com>
- <5320336B.3020107@ti.com>
-Message-ID: <CADApbeh0zjd=qMguiqQGrn=0v+-SVqgnyL=Gk8D9MiQvHU2XGA@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Thu, 13 Mar 2014 02:21:45 +0000
+Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1394677305.20857.29.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 6:14 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> On 03/12/2014 04:30 AM, Chao Xie wrote:
->>
->> On Tue, Mar 11, 2014 at 10:48 AM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->>>
->>> On Tue, Mar 11, 2014 at 10:06 AM, Chao Xie <xiechao.mail@gmail.com>
->>> wrote:
->>>>
->>>> hi
->>>>
->>>> I can not find any examples for handling function clock and bus clock
->>>> in drivers/clk/.
->>>>
->>>> For a device, it will have a function clock and bus clock. function
->>>> clock will control the fucntionality of this device, while bus clock
->>>> will control the communication part to the bus.
->>>>
->>>> For some SOCes, they do not export bus clock, so from the hardware it
->>>> seems that function clock is combined with bus clock, while for some
->>>> SOCes, they are not.
->>>>
->>>> For most of the device driver, they will enable/disable function clock
->>>> and bus clock both. While for some devices, they may share bus clock,
->>>> and have different function clocks.
->>>>
->>>> In fact, i want to define the APIs as below:
->>>>
->>>> struct clk* soc_register_bus_clock(struct device *dev, char
->>>> **parent_name, ...);
->>>> This function will  create and register bus clock
->>>>
->>>> struct clk* soc_register_fucntion_clock(struct device *dev, char
->>>> **parent_name, ...);
->>>> This function will create and register function clock
->>>>
->>>> struct clk* soc_register_clk(struct device *dev, char **parent_name);
->>>> This function will create and register a device clock. Then this clock
->>>> is enable, it will enable bus clock and function clock both, and it is
->>>> similar for disabling.
->>>>
->>>> struct clk* soc_register_composite_clk(struct device *dev, char
->>>> *bus_clk_name, char *function_clk_name);
->>>> This function will create and register a composite device clock. When
->>>> enable this clock, it will invoke clk_enable(bus_clk) and
->>>> clk_enable(function_clk) both. It is similar for disabling.
->>>>
->>>> So for the device which has its own control register and bits for
->>>> function clock and bus clock. We can call  soc_register_clk.
->>>> For the device share bus clock with other devices, we create the clock
->>>> for the device by calling  soc_register_composite_clk.
->>>>
->>>> 1. Now clk_enable can be preempted by same caller.
->>>> 2. For above devices, the bus clock only have enable/disable ops.
->>>>
->>>> Based on above conditions, I think soc_register_composite_clk is fine.
->>>>
->>>> Does anyone have same problems? Will above proposal break common clock
->>>> rules.
->>>
->>>
->>> I think it's too complex.
->>>
->>> If the bus clock and function clock is only used for gating, maybe you
->>> can set the bus clock as parent of function clock.
->>>
->> You can not do it. Because the function clock may have mux and div, it
->> can not depends on bus clock's rate.
->>
->>> If both of them are complex, why not define two clocks in your device
->>> driver?
->>>
->> It is the problem. In fact for different SOCes, we can not know which
->> device will have such limitation.
->> Even for same device, for SOC-a, it has the limitation, for SOC-b, it does
->> not.
->> So the choice is make all the device drivers to grap two clocks. There
->> are too many of them, and for
->> the devices does not have such limitation, it is redundant.
->> So the point is we donot want to change the device driver, and we want
->> to make the device driver interfaces
->> maintain unchanged. .
->
->
-> Clk pm domain - Is it what you want?
-> drivers/base/power/clock_ops.c
->
-> Usage example:
-> arch/arm/mach-davinci/pm_domain.c
-> arch/arm/mach-keystone/pm_domain.c
->
-> Then you can simply use Runtime PM API to control clocks.
->
-It is not related to clk pm domain. It is related to clock depenency.
+On Wed, 2014-03-12 at 00:02 +0100, Sebastian Hesselbarth wrote:
+> phy_ethtool_get_wol is a helper to get current WOL settings from
+> a phy device. When using this helper on a PHY without .get_wol
+> callback, struct ethtool_wolinfo is never set-up correctly and
+> may contain misleading information about WOL status.
+> 
+> To fix this, always zero relevant fields of struct ethtool_wolinfo
+> regardless of .get_wol callback availability.
 
-For a device, it has bus clock and function clock. usally bus clock is
-a gate type clock.
+Sorry, I still disagree with this.
 
-some devices share same bus clock, but have different function clock.
-If we want to use the device, we have to enable the bus clock and
-function clock both.
+You're trying to make phy_ethtool_get_wol() do two subtly different
+things:
+- Provide an implementation of ethtool_ops::get_wol, leaving the net
+  driver only to look up phy_device
+- Provide a standalone function for executing ETHTOOL_GWOL on a
+  phy_device
 
-The problem is for some SOCes, there is no sharing of bus clock while
-for others, it has, and this limitation can happen at all clocks in
-clock domain.
+You may notice that phy_suspend() already sets wol.cmd = ETHTOOL_GWOL.
+So it seems to me like it's taking responsibility for initialising the
+structure like ethtool_get_wol() does.  The bug is then that
+phy_suspend() doesn't clear the rest of the structure.  That is not the
+responsibility of phy_ethtool_get_wol().
 
-So i do not want to make device driver be aware of it. I just let it
-know there is only one clock, and keep the dependency in clock
-framework.
+Ben.
 
-> Regrads,
-> -grygorii
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> Changelog:
+> v1->v2:
+> - clear whole struct ethtool_wolinfo
+> - check for non-NULL phy_device
+> v2->v3:
+> - only clear ->supported and ->wolopts (Suggested by Ben Hutchings)
+> 
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ben Hutchings <ben@decadent.org.uk>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/phy/phy.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+> index 19c9eca0ef26..94234a91a50f 100644
+> --- a/drivers/net/phy/phy.c
+> +++ b/drivers/net/phy/phy.c
+> @@ -1092,7 +1092,9 @@ EXPORT_SYMBOL(phy_ethtool_set_wol);
+>  
+>  void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
+>  {
+> -	if (phydev->drv->get_wol)
+> +	wol->supported = wol->wolopts = 0;
+> +
+> +	if (phydev && phydev->drv->get_wol)
+>  		phydev->drv->get_wol(phydev, wol);
+>  }
+>  EXPORT_SYMBOL(phy_ethtool_get_wol);
+
+-- 
+Ben Hutchings
+Experience is directly proportional to the value of equipment destroyed.
+                                                         - Carolyn Scheppner
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/2bfd7788/attachment.sig>
