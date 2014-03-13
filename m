@@ -1,118 +1,51 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Thu, 13 Mar 2014 15:34:49 +0800
-Subject: [ARM]Fixmap mapping region is not enough for system of 14+ CPUs.
-In-Reply-To: <alpine.LFD.2.11.1403121306280.1217@knanqh.ubzr>
-References: <53203F9C.8040500@huawei.com> <53204956.30703@huawei.com>
- <alpine.LFD.2.11.1403121306280.1217@knanqh.ubzr>
-Message-ID: <53215F99.8060804@huawei.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 13 Mar 2014 08:03:21 +0000
+Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
+In-Reply-To: <20140312171534.GQ17083@arm.com>
+References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
+ <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
+ <20140312171534.GQ17083@arm.com>
+Message-ID: <CAPvkgC3yxKVAg3qr8_V3Ldv9a=n8+bsU1sejqBcLh85de=mvRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/3/13 1:08, Nicolas Pitre wrote:
-> On Wed, 12 Mar 2014, Liu hua wrote:
-> 
->> Hi Russell, Will or Nicolas,
+On 12 March 2014 17:15, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Mar 12, 2014 at 01:40:20PM +0000, Steve Capper wrote:
+>> An implementation of get_user_pages_fast for ARM. It is based loosely
+>> on the PowerPC implementation. We disable interrupts in the walker to
+>> prevent the call_rcu_sched pagetable freeing code from running under
+>> us.
 >>
->> (In this mail, we only discuss ARM 32-bit linux.)
+>> We also explicitly fire an IPI in the Transparent HugePage splitting
+>> case to prevent splits from interfering with the fast_gup walker.
+>> As THP splits are relatively rare, this should not have a noticable
+>> overhead.
 >>
->> As we know, the region (0xfff00000-0xfffdffff) is reserved as fixmap
->> mapping region.
->>
->> The function "kmap_atomic" maps highmem pages to this region referring
->> to CPUID and per-cpu variable "__kmap_atomic_idx" via
->>
->>   idx = type + KM_TYPE_NR * smp_processor_id();
->>   vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
->>
->> Size of region used by one cpu is 0x10000 (KM_TYPE_NR << PAGE_SHIFT).
->> And the total size of the fixmap mapping region is 0xe0000.
->> (only support 14 CPUs).
->>
->> So in a system of more than 14 CPUs, this region is not large enough.
->> should we change the memory layout on ARM Linux to support 14+ cpu system ?
->> Or can we do anything else to support that ?
-> 
-> How many CPUs do you have?
-> 
-> What about the following patch?  If this doesn't work for you then more 
-> intrusive changes will be needed.
-> 
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 68ea615c2a..254f2df08d 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -14,7 +14,17 @@
->   */
->  
->  #define FIXADDR_START		0xfff00000UL
-> +
-> +#if !defined(CONFIG_HAVE_TCM) && !defined(CONFIG_CPU_XSCALE)
-> +/*
-> + * If no TCM nor on on a XScale then enlarge the fixmap area to
-> + * accommodate up to 30 CPUs.
-> + */
-> +#define FIXADDR_END		0xffff0000UL
-> +#else
->  #define FIXADDR_END		0xfffe0000UL
-One cpu need 0x10000-size region; So this patch can only support
-uo to 15 CPUs
-> +#endif
-> +
->  #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
->  
->  enum fixed_addresses {
-> 
-> 
-> Nicolas
-> 
+>> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+>> ---
+>>  arch/arm/include/asm/pgtable-3level.h |   6 +
+>>  arch/arm/mm/Makefile                  |   1 +
+>>  arch/arm/mm/gup.c                     | 299 ++++++++++++++++++++++++++++++++++
+>>  3 files changed, 306 insertions(+)
+>>  create mode 100644 arch/arm/mm/gup.c
+>
+> Is there anything specific to ARM in this gup.c file? Could we make it
+> more generic like mm/gup.c?
 
-We have 16 CPUs in our system. And your patch cannot work if
-the CPU number exceeds 15.
+Hi Catalin,
+The arm and arm64 cases assume that we can read the pte's atomically,
+that TLB hardware broadcasts can occur (so we have to use the
+page_cache_get_speculative logic), and that hugetlb pages are
+equivalent in pte layout to thp's.
 
-In addition, we can configure NR_CPUS up to 32. So should we
-solve this problem completely?
+Also, I took a quick look at the other architectures, and a summary of
+what I found can be found in this post:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/239326.html
 
-There is an 1M-size hole between DMA mapping region and fixmap
-mapping region(0xffe00000-0xfff00000).if this region are belonged
-to fixmap mapping region, it can only support 30 CPUs.
+Cheers,
+-- 
+Steve
 
-Since we have alloced a second level page table to coverring
-0xffe00000 - 0xffffffff(2M). And 0xffff0000 upwards used as
-vector pages. So if the left region is all used as fixmap mapping
-region(size : 0x1f0000). Up to 31 CPUs is supported.
-
-
-The following patch can solve our problem(up to 30 CPUs), But it
-reduce the DMA region. What do you think about it ?
-Is is necessory to solve this problem completely(up to 32 CPUs)
-?
-
-
-Liu Hua
-
------------------
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 68ea615..8379891 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -13,7 +13,7 @@
-  * 0xfffe0000 and 0xfffeffff.
-  */
-
--#define FIXADDR_START              0xfff00000UL
-+#define FIXADDR_START                0xffe00000UL
- #define FIXADDR_END            0xfffe0000UL
- #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 4afb376..0c40674 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -83,7 +83,7 @@
-  */
- #define IOREMAP_MAX_ORDER      24
-
--#define CONSISTENT_END             (0xffe00000UL)
-+#define CONSISTENT_END               (0xffd00000UL)
-
- #else /* CONFIG_MMU */
+>
+> --
+> Catalin
