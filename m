@@ -1,64 +1,154 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 19:32:09 +0100
-Subject: [PATCH v5 2/3] ARM: dts: add dts files for exynos5260 SoC
-In-Reply-To: <CAPdUM4McDh5gqk2Z=-n5XTZqsLLVe18rO4s810Zrk0vHQu-M2A@mail.gmail.com>
-References: <1394637394-3960-1-git-send-email-rahul.sharma@samsung.com>
- <1394637394-3960-3-git-send-email-rahul.sharma@samsung.com>
- <532102CE.708@samsung.com>
- <CAPdUM4McDh5gqk2Z=-n5XTZqsLLVe18rO4s810Zrk0vHQu-M2A@mail.gmail.com>
-Message-ID: <5321F9A9.9030904@samsung.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 13 Mar 2014 14:33:38 -0400
+Subject: [PATCH v6 5/7] arm64: ftrace: Add dynamic ftrace support
+In-Reply-To: <20140313181033.GH25472@mudshark.cambridge.arm.com>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-6-git-send-email-takahiro.akashi@linaro.org>
+ <20140313181033.GH25472@mudshark.cambridge.arm.com>
+Message-ID: <1394735618.26600.19.camel@pippen.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.03.2014 06:06, Rahul Sharma wrote:
-> On 13 March 2014 06:28, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> On 03/13/2014 12:16 AM, Rahul Sharma wrote:
+On Thu, 2014-03-13 at 18:10 +0000, Will Deacon wrote:
+>  
+> > +#else /* CONFIG_DYNAMIC_FTRACE */
+> > +/*
+> > + * _mcount() is used to build the kernel with -pg option, but all the branch
+> > + * instructions to _mcount() are replaced to NOP initially at kernel start up,
+> > + * and later on, NOP to branch to ftrace_caller() when enabled or branch to
+> > + * NOP when disabled per-function base.
+> > + */
+> > +ENTRY(_mcount)
+> > +	ret
+> > +ENDPROC(_mcount)
+> 
+> Judging by your comment then, this should never be called. Is that right? If
+> so, we could add a BUG-equivalent so we know if we missed an mcount during
+> patching.
 
-[snip]
+Actually, it can be called before the change to nops are done in early
+boot. This is done very early, but everything before ftrace_init() in
+init/main.c can still call _mcount.
 
->>> +               clocks {
->>> +                       compatible = "simple-bus";
->>> +                       #address-cells = <1>;
->>> +                       #size-cells = <0>;
->>
->>
->> Even though you added  #address-cells property I can not see "reg" property
->> in any of "fixed-clock".
->> Isn't it better either we can remove this or add "reg" property?
->> Also all these fixed-clock are missing #clock-cells property.
->>
->
-> Since it is a soc level addition, I enabled provision for adding reg
-> property for
-> fixed clocks in boards files (or in SoC file).
->
 
-All sub-nodes should follow the same pattern.
+> > +	/*
+> > +	 * Note:
+> > +	 * Due to modules and __init, code can disappear and change,
+> > +	 * we need to protect against faulting as well as code changing.
+> > +	 * We do this by aarch64_insn_*() which use the probe_kernel_*().
+> > +	 *
+> > +	 * No lock is held here because all the modifications are run
+> > +	 * through stop_machine().
+> > +	 */
+> > +	if (validate) {
+> > +		if (aarch64_insn_read((void *)pc, &replaced))
+> > +			return -EFAULT;
+> > +
+> > +		if (replaced != old)
+> > +			return -EINVAL;
+> > +	}
+> > +	if (aarch64_insn_patch_text_nosync((void *)pc, new))
+> > +		return -EPERM;
+> 
+> I think you're better off propagating the errors here, rather than
+> overriding them with EFAULT/EINVAL/EPERM.
 
-After recent discussion with DT people, the conclusion is that 
-simple-bus should be used only for MMIO platform devices with "reg" 
-values mapped directly into address space in which the simple-bus node 
-resides.
+The ftrace generic code expects to see these specific errors. Look at
+ftrace_bug() in kernel/trace/ftrace.c.
 
-So for now I'd remove the grouping and keep the clocks in "soc" node 
-directly.
+> 
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +/*
+> > + * Replace tracer function in ftrace_caller()
+> > + */
+> > +int ftrace_update_ftrace_func(ftrace_func_t func)
+> > +{
+> > +	unsigned long pc;
+> > +	unsigned int new;
+> > +
+> > +	pc = (unsigned long)&ftrace_call;
+> > +	new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func, true);
+> > +
+> > +	return ftrace_modify_code(pc, 0, new, false);
+> > +}
+> > +
+> > +/*
+> > + * Turn on the call to ftrace_caller() in instrumented function
+> > + */
+> > +int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+> > +{
+> > +	unsigned long pc = rec->ip;
+> > +	unsigned int old, new;
+> > +
+> > +	old = aarch64_insn_gen_nop();
+> > +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
+> > +
+> > +	return ftrace_modify_code(pc, old, new, true);
+> > +}
+> > +
+> > +/*
+> > + * Turn off the call to ftrace_caller() in instrumented function
+> > + */
+> > +int ftrace_make_nop(struct module *mod,
+> > +		    struct dyn_ftrace *rec, unsigned long addr)
+> > +{
+> > +	unsigned long pc = rec->ip;
+> > +	unsigned int old, new;
+> > +
+> > +	old = aarch64_insn_gen_branch_imm(pc, addr, true);
+> > +	new = aarch64_insn_gen_nop();
+> > +
+> > +	return ftrace_modify_code(pc, old, new, true);
+> > +}
+> > +
+> > +int __init ftrace_dyn_arch_init(void *data)
+> > +{
+> > +	*(unsigned long *)data = 0;
+> > +
+> > +	return 0;
+> > +}
+> > +#endif /* CONFIG_DYNAMIC_FTRACE */
+> > +
+> >  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> >  /*
+> >   * function_graph tracer expects ftrace_return_to_handler() to be called
+> > @@ -61,4 +144,34 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+> >  		return;
+> >  	}
+> >  }
+> > +
+> > +#ifdef CONFIG_DYNAMIC_FTRACE
+> > +/*
+> > + * Turn on/off the call to ftrace_graph_caller() in ftrace_caller()
+> > + * depending on @enable.
+> > + */
+> > +static int ftrace_modify_graph_caller(bool enable)
+> > +{
+> > +	unsigned long pc = (unsigned long)&ftrace_graph_call;
+> > +	unsigned int branch, nop, old, new;
+> > +
+> > +	branch = aarch64_insn_gen_branch_imm(pc,
+> > +			(unsigned long)ftrace_graph_caller, false);
+> > +	nop = aarch64_insn_gen_nop();
+> > +	old = enable ? nop : branch;
+> > +	new = enable ? branch : nop;
+> > +
+> > +	return ftrace_modify_code(pc, old, new, true);
+> 
+> You could rewrite this as:
+> 
+> 	if (enable)
+> 		return ftrace_modify_code(pc, nop, branch, true);
+> 	else
+> 		return ftrace_modify_code(pc, branch, nop, true);
+> 
+> which I find easier to read.
 
-[snip]
+Heh, maybe that could be updated in other archs too. I'll have to think
+about that one.
 
->>> +
->>> +                       dptx_phy_ch0: phyclk_dptx_phy_ch0_txd {
->>> +                               compatible = "fixed-clock";
->>> +                               clock-frequency = <270000000>;
->>> +                               clock-output-names =
->>> "phyclk_dptx_phy_ch0_txd_clk";
->>> +                       };
-
-I'm not sure whether these clocks are really fixed clocks. They are 
-output from certain PHY blocks which are not always-on, while using the 
-fixed clock binding would suggest otherwise. IMHO they should be hidden 
-inside the clock driver, without DT IDs assigned as a temporary hack, 
-until proper support gets added for them (e.g. proper clock provider 
-from appropriate PHY).
-
-Best regards,
-Tomasz
+-- Steve
