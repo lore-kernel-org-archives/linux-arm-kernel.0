@@ -1,54 +1,216 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 13 Mar 2014 16:44:51 -0500
-Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
- !CONFIG_GENERIC_PHY
-In-Reply-To: <20140313152024.GF4599@saruman.home>
-References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
- <20140313152024.GF4599@saruman.home>
-Message-ID: <20140313214450.GG27355@saruman.home>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 13 Mar 2014 14:44:24 -0700
+Subject: [PATCH] ARM: dts: ventana: fix eth1 pci dev node
+Message-ID: <1394747064-4106-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Properly add the PCI device node for the 2nd GigE port so that the device
+driver can get its MAC from DT.  Note that the Ventana bootloader uses
+the ethernet1 alias to populate the MAC address by adding the local-mac-address
+property.  Also remove the unnecesssary 'sky2' alias.
 
-On Thu, Mar 13, 2014 at 10:20:24AM -0500, Felipe Balbi wrote:
-> On Thu, Mar 13, 2014 at 01:11:13PM +0200, Grygorii Strashko wrote:
-> > This fixes a regression on Keystone 2 platforms caused by patch
-> > 57303488cd37da58263e842de134dc65f7c626d5
-> > "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
-> > optional support of generic phy in DWC3 core.
-> > 
-> > On Keystone 2 platforms the USB is not working now because
-> > CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
-> > return -ENOSYS always. The log shows:
-> >  dwc3 2690000.dwc3: failed to initialize core
-> >  dwc3: probe of 2690000.dwc3 failed with error -38
-> > 
-> > Hence, fix it by making NULL a valid phy reference in Generic PHY
-> > APIs stubs in the same way as it was done by the patch
-> > 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
-> > a valid phy reference".
-> > 
-> > CC: Kishon Vijay Abraham I <kishon@ti.com>
-> > CC: Felipe Balbi <balbi@ti.com>
-> > CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> nice :-)
-> 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+This is based on Shawn's for-next branch
 
-Greg, if your tree isn't closed yet, could you consider this patch still
-for v3.15 merge window ? Grygorii found a regression on Keystone
-platforms which this patch fixes. Let me know if you need the original
-patch and myself or Kishon can send it to you.
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6q-gw5400-a.dts  | 40 +++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 39 ++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 39 ++++++++++++++++++++++++++++++----
+ 3 files changed, 106 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 902f983..5d2b912 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -16,7 +16,7 @@
+ 	model = "Gateworks Ventana GW5400-A";
+ 	compatible = "gw,imx6q-gw5400-a", "gw,ventana", "fsl,imx6q";
+ 
+-	/* these are used by bootloader for disabling nodes */
++	/* these are used by bootloader for configuring nodes */
+ 	aliases {
+ 		ethernet0 = &fec;
+ 		ethernet1 = &eth1;
+@@ -26,7 +26,7 @@
+ 		led0 = &led0;
+ 		led1 = &led1;
+ 		led2 = &led2;
+-		sky2 = &eth1;
++
+ 		ssi0 = &ssi1;
+ 		spi0 = &ecspi1;
+ 		usb0 = &usbh1;
+@@ -496,8 +496,40 @@
+ 	reset-gpio = <&gpio1 29 0>;
+ 	status = "okay";
+ 
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
++	pcie at 0,0 {
++		/* 00:00.0 host-bridge */
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		reg = <0x0 0 0 0 0>;
++
++		/*
++		 * GigE PCI dev node needs to be defined so that enet driver
++		 * can use it to obtain its boot-loader specified MAC
++		 */
++		pcie at 0,0 {
++			/* 01:00.0 PCIe switch */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			reg = <0x0 0 0 0 0>;
++
++			pcie at 8,0 {
++				/* 02:08.0 PCIe switch port */
++				#address-cells = <3>;
++				#size-cells = <2>;
++				device_type = "pci";
++				reg = <0x4000 0 0 0 0>;
++				eth1: pcie at 0,0 {
++					/* 08:00.0 GigE */
++					#address-cells = <3>;
++					#size-cells = <2>;
++					device_type = "pci";
++					reg = <0x0 0 0 0 0>;
++					compatible = "marvell,sky2";
++				};
++			};
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index c8e5ae0..46a8582 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -10,7 +10,7 @@
+  */
+ 
+ / {
+-	/* these are used by bootloader for disabling nodes */
++	/* these are used by bootloader for configuring nodes */
+ 	aliases {
+ 		can0 = &can1;
+ 		ethernet0 = &fec;
+@@ -19,7 +19,6 @@
+ 		led1 = &led1;
+ 		led2 = &led2;
+ 		nand = &gpmi;
+-		sky2 = &eth1;
+ 		ssi0 = &ssi1;
+ 		usb0 = &usbh1;
+ 		usb1 = &usbotg;
+@@ -503,8 +502,40 @@
+ 	reset-gpio = <&gpio1 29 0>;
+ 	status = "okay";
+ 
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
++	/*
++	 * GigE PCI dev node needs to be defined so that enet driver
++	 * can use it to obtain its boot-loader specified MAC
++	 */
++	pcie at 0,0 {
++		/* 00:00.0 root host-bridge */
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		reg = <0x0 0 0 0 0>;
++
++		pcie at 0,0 {
++			/* 01:00.0 PCIe switch */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			reg = <0x0 0 0 0 0>;
++
++			pcie at 4,0 {
++				/* 02:04.0 PCIe switch port */
++				#address-cells = <3>;
++				#size-cells = <2>;
++				device_type = "pci";
++				reg = <0x2000 0 0 0 0>;
++				eth1: pcie at 0,0 {
++					/* 04:00.0 GigE */
++					#address-cells = <3>;
++					#size-cells = <2>;
++					device_type = "pci";
++					reg = <0x0 0 0 0 0>;
++					compatible = "marvell,sky2";
++				};
++			};
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 2795dfc..697aa67 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -10,7 +10,7 @@
+  */
+ 
+ / {
+-	/* these are used by bootloader for disabling nodes */
++	/* these are used by bootloader for configuring nodes */
+ 	aliases {
+ 		can0 = &can1;
+ 		ethernet0 = &fec;
+@@ -19,7 +19,6 @@
+ 		led1 = &led1;
+ 		led2 = &led2;
+ 		nand = &gpmi;
+-		sky2 = &eth1;
+ 		ssi0 = &ssi1;
+ 		usb0 = &usbh1;
+ 		usb1 = &usbotg;
+@@ -525,8 +524,40 @@
+ 	reset-gpio = <&gpio1 29 0>;
+ 	status = "okay";
+ 
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
++	/*
++	 * GigE PCI dev node needs to be defined so that enet driver
++	 * can use it to obtain its boot-loader specified MAC
++	 */
++	pcie at 0,0 {
++		/* 00:00.0 root host-bridge */
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		reg = <0x0 0 0 0 0>;
++
++		pcie at 0,0 {
++			/* 01:00.0 PCIe switch */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			reg = <0x0 0 0 0 0>;
++
++			pcie at 8,0 {
++				/* 02:08.0 PCIe switch port */
++				#address-cells = <3>;
++				#size-cells = <2>;
++				device_type = "pci";
++				reg = <0x4000 0 0 0 0>;
++				eth1: pcie at 0,0 {
++					/* 08:00.0 GigE */
++					#address-cells = <3>;
++					#size-cells = <2>;
++					device_type = "pci";
++					reg = <0x0 0 0 0 0>;
++					compatible = "marvell,sky2";
++				};
++			};
++		};
+ 	};
+ };
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/55851acc/attachment.sig>
+1.8.3.2
