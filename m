@@ -1,137 +1,138 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Thu, 13 Mar 2014 17:21:09 +0000
-Subject: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <53209047.8070308@xilinx.com>
-References: <4adb2b4b-2ad6-42b9-929e-cc062f817245@TX2EHSMHS021.ehs.local>
- <20140310105655.GH14999@e106331-lin.cambridge.arm.com>
- <531DA900.5060202@monstr.eu>
- <fa35006e-055d-4ef2-9b65-a0f8cc6a0c8f@AM1EHSMHS016.ehs.local>
- <531ECA33.8050803@monstr.eu> <20140311155057.GJ13293@xsjandreislx>
- <c7840b9d-4c03-4680-9a0e-fb256f3743b4@AM1EHSMHS010.ehs.local>
- <20140312161344.GA3000@xsjandreislx> <53209047.8070308@xilinx.com>
-Message-ID: <5c399e76-42e4-4f8e-852e-91d88b229ae7@TX2EHSMHS006.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Mar 2014 17:25:46 +0000
+Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+In-Reply-To: <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140313172546.GB25870@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 13, 2014 at 02:06:45PM +0000, Antoine T?nart wrote:
+> Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
+> The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
+> timer, apb timers and uarts for now.
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/berlin2q.dtsi | 167 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 167 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> new file mode 100644
+> index 000000000000..1cb76031dfe6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -0,0 +1,167 @@
+> +/*
+> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
+> +	compatible = "marvell,berlin2q", "marvell,berlin";
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <3>;
+> +		};
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		smclk: sysmgr-clock {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <25000000>;
+> +		};
+> +
+> +		sysclk: system-clock {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <400000000>;
+> +		};
+> +	};
 
+I am very much not keen on having container nodes like this.
 
->-----Original Message-----
->From: Michal Simek [mailto:michal.simek at xilinx.com]
->Sent: Wednesday, March 12, 2014 10:20 PM
->To: Soren Brinkmann
->Cc: Michal Simek; monstr at monstr.eu; Mark Rutland; Punnaiah Choudary
->Kalluri; dougthompson at xmission.com; devicetree at vger.kernel.org; linux-
->doc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->kernel at vger.kernel.org; linux-edac at vger.kernel.org; robh+dt at kernel.org;
->Pawel Moll; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
->rob at landley.net; kpc528 at gmail.com; kalluripunnaiahchoudary at gmail.com;
->Punnaiah Choudary Kalluri
->Subject: Re: [RFC PATCH] edac: zynq: Added EDAC support for zynq ddr ecc
->controller
->
->On 03/12/2014 05:13 PM, S?ren Brinkmann wrote:
->> On Wed, 2014-03-12 at 11:27AM +0100, Michal Simek wrote:
->>> On 03/11/2014 04:50 PM, S?ren Brinkmann wrote:
->>>> On Tue, 2014-03-11 at 09:32AM +0100, Michal Simek wrote:
->>>>> On 03/10/2014 11:32 PM, S?ren Brinkmann wrote:
->>>>>> On Mon, 2014-03-10 at 12:58PM +0100, Michal Simek wrote:
->>>>>>> On 03/10/2014 11:56 AM, Mark Rutland wrote:
->>>>>>>> On Sun, Mar 09, 2014 at 02:57:16AM +0000, Punnaiah Choudary
->Kalluri wrote:
->>>>>>>>> Added EDAC support for reporting the ecc errors of zynq ddr
->controller.
->>>>>>>>> The ddr ecc controller corrects single bit errors and detects double
->bit
->>>>>>>>> errors
->>>>>>>>>
->>>>>>>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->>>>>>>>> ---
->>>>>>>>>  .../devicetree/bindings/edac/zynq_edac.txt         |   18 +
->>>>>>>>>  drivers/edac/Kconfig                               |    7 +
->>>>>>>>>  drivers/edac/Makefile                              |    1 +
->>>>>>>>>  drivers/edac/zynq_edac.c                           |  613
->++++++++++++++++++++
->>>>>>>>>  4 files changed, 639 insertions(+), 0 deletions(-)
->>>>>>>>>  create mode 100644
->Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>>>  create mode 100644 drivers/edac/zynq_edac.c
->>>>>>>>>
->>>>>>>>> diff --git
->a/Documentation/devicetree/bindings/edac/zynq_edac.txt
->b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>>> new file mode 100644
->>>>>>>>> index 0000000..c21ff83
->>>>>>>>> --- /dev/null
->>>>>>>>> +++ b/Documentation/devicetree/bindings/edac/zynq_edac.txt
->>>>>>>>> @@ -0,0 +1,18 @@
->>>>>>>>> +Zynq EDAC driver, it does reports the DDR ECC single bit errors
->that are
->>>>>>>>> +corrected and double bit ecc errors that are detected by the DDR
->ECC controller.
->>>>>>>>> +ECC support for DDR is available in half-bus width(16 bit)
->configuration only.
->>>>>>>>> +
->>>>>>>>> +Required properties:
->>>>>>>>> +- compatible: Should be "xlnx,ps7-ddrc" or "xlnx,ps7-ddrc-1.00.a"
->>>>>>>>
->>>>>>>> Is this an or or a xor?
->>>>>>>
->>>>>>> Compatible string should be just xlnx,zynq-ddrc-1.00.a.
->>>>>>> Nothing with ps7.
->>>>>>
->>>>>> Isn't this vendor IP? IMHO, this should be something completely
->>>>>> different. Or if you want some Zynq-specific compat string it should
->>>>>> refer to an actual version string associated with Zynq. 1.00.a is not,
->>>>>> AFAIK.
->>>>>
->>>>> I have checked with Punnaiah that this is Synopsys DDR memory
->controller.
->>>>> Zynq is based on 1.4 version with some customization.
->>>>> It means I think reasonable solution is
->>>>> call it drivers/edac/synopsys_edac.c
->>>>> rename zynq_ in driver to synopsys_ and
->>>>> use xlnx,zynq-ddrc-1.00.a compatible string because zynq is not using
->>>>> clean synopsys version.
->>>>>
->>>>> I am not getting point why you don't like 1.00.a suffix here.
->>>>> Because of historical point of view compatible strings should be
->different
->>>>> for early silicon, silicon v1, silicon v2, silicon v3, etc
->>>>> but we haven't used it at all that's why we can use xilinx scheme
->>>>> which we are using for our soft IPs.
->>>>
->>>> Well, but you refer to Zynq which has silicon revisions you can use to
->>>> refer to a specific Zynq version. That matches data sheets. Zynq-1.00.a
->>>> is just completely made up and wouldn't be found in any data sheet.
->>>
->>> I didn't reply this one but we discussed this with Soren over phone.
->>> No problem to use Synopsys version A07 according TRM.
->>>
->>> Then compatible string is
->>> xlnx,zynq-ddrc-A07 and file name is synopsys_edac.c
->>
->> This seems to make sense. I'm never sure whether leading zeros are
->> actually needed and tend to remove them, but in general this looks like
->> a reasonable string to identify Zynq's DDR controller.
->
->A07 I found in Zynq TRM and probably has any conection to synopsys version
->scheme.
-I have discussed with the design team and confirmed that the synopsis IP
-version is 1.4 and looks like it is wrongly updated in TRM as A07.
-So, I am going to use compatible string as xlnx,zynq-ddrc-1.4 and file name
-as synopsys_edac.c and send you the updated patch soon.
-Thanks for the review and suggestions
+A "clocks" container is non-standard, and not guarantee to probe. The
+fact these clocks probe currently is an artifact of the current
+organisation of Linux rather than any conscious decision.
 
-Regards,
-Punnaiah
->
->Thanks,
->Michal
->
->
->
+The #address-cells and #size-cells properties are useless, as no
+address space is defined. The node is not a simple-bus, has no ranges,
+and doesn't have a compatible string that implies an address space.
 
+Is there any reason you need to use a clocks container here and can't
+put these directly under the root?
 
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		ranges = <0 0xf7000000 0x1000000>;
+> +		interrupt-parent = <&gic>;
+> +
+> +		l2: l2-cache-controller at ac0000 {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0xac0000 0x1000>;
+> +			cache-level = <2>;
+> +		};
+> +
+> +		local-timer at ad0600 {
+> +			compatible = "arm,cortex-a9-twd-timer";
+> +			reg = <0xad0600 0x20>;
+> +			clocks = <&sysclk>;
+> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "okay";
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Given that nodes are assumed by default to be okay, this can be dropped.
+
+I think it only makes sense to have a status property in a common dtsi
+where the value is "disabled".
+
+Otherwise, this dtsi looks sane to me.
+
+Thanks,
+Mark.
