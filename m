@@ -1,49 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Mar 2014 15:42:13 -0700
-Subject: [GIT PULL] omap fixes for v3.15 merge window
-Message-ID: <20140313224213.GA27402@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 13 Mar 2014 15:38:05 -0700
+Subject: [ANNOUNCE] ARM kernel mini-summit @ ELC: Call for Topics,
+ Invitation Request
+Message-ID: <7hmwgtk9ma.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+Hello,
 
-  Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
+We will be holding a one-day, ARM kernel mini-summit at ELC this year in
+San Jose[1].  The mini-summit will be Monday, April 28th, and ELC starts
+on Tuesday.
 
-are available in the git repository at:
+The ARM summit brings together maintainers and developers in the ARM
+community face to face to discuss current work and to plan for what is
+coming next. To keep the group small and encourage open discussion the
+event is invite-only.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-for-merge-window
+To propose a discussion topic and/or request an invitation:
 
-for you to fetch changes up to 77319669af37a1cfc844b801e83343b37e3c7e13:
+1) subscribe yourself to arm-summit-discuss at lists.infradead.org:
+   http://lists.infradead.org/mailman/listinfo/arm-summit-discuss
 
-  ARM: OMAP4: hwmod data: correct the idlemodes for spinlock (2014-03-13 14:09:57 -0700)
+2) send your invite request and/or topic proposal to
+   arm-summit-discuss at lists.infradead.org with a subject prefix of 
+   "[ARM ATTEND]".  Also, please Cc the main linux-arm-kernel list.
 
-----------------------------------------------------------------
-Fixes for omaps that would be good to get in before v3.15-rc1.
+All topics and invitation requests will be reviewed by the program
+committee and decisions will be made by the end of March, so please get
+your requests/topics in soon.
 
-----------------------------------------------------------------
-Florian Vaussard (2):
-      CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy clocks
-      ARM: dts: omap4/5: Use l3_ick for the gpmc node
+ARM mini-summit Program Committee,
 
-Mugunthan V N (1):
-      ARM: dts: am33xx: correcting dt node unit address for usb
+Arnd Bergmann
+Magnus Damm
+Kevin Hilman
+Simon Horman
+Olof Johansson
+Grant Likely
 
-Nishanth Menon (1):
-      ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
-
-Stefan S??rensen (1):
-      ARM: OMAP2+: INTC: Acknowledge stuck active interrupts
-
-Suman Anna (1):
-      ARM: OMAP4: hwmod data: correct the idlemodes for spinlock
-
- arch/arm/boot/dts/am33xx.dtsi              | 4 ++--
- arch/arm/boot/dts/omap4.dtsi               | 2 ++
- arch/arm/boot/dts/omap5.dtsi               | 2 ++
- arch/arm/mach-omap2/irq.c                  | 8 ++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 3 +--
- arch/arm/mach-omap2/pm.h                   | 2 +-
- drivers/clk/ti/clk-44xx.c                  | 1 -
- drivers/clk/ti/clk-54xx.c                  | 1 -
- drivers/clk/ti/clk-7xx.c                   | 1 -
- 9 files changed, 16 insertions(+), 8 deletions(-)
+[1] http://events.linuxfoundation.org/events/embedded-linux-conference
