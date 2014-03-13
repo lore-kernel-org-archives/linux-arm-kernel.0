@@ -1,29 +1,30 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 13 Mar 2014 08:57:02 +0530
-Subject: [PATCH 1/1] clk: exynos-5420: Fix VPLL lock offset
-Message-ID: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 13 Mar 2014 05:01:00 +0100
+Subject: [PATCH 1/3 V2] crypto: Fix the pointer voodoo in unaligned ahash
+In-Reply-To: <20140313015624.GA2680@gondor.apana.org.au>
+References: <1389720829-5963-1-git-send-email-marex@denx.de>
+ <201403130220.29346.marex@denx.de>
+ <20140313015624.GA2680@gondor.apana.org.au>
+Message-ID: <201403130501.00589.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set it as per the user manual.
+On Thursday, March 13, 2014 at 02:56:25 AM, Herbert Xu wrote:
+> On Thu, Mar 13, 2014 at 02:20:29AM +0100, Marek Vasut wrote:
+> > OK, understood. But shall we not preserve the request intact in case a
+> > crypto- api function called crypto_ahash_final() with request which has
+> > .priv already set? Then we would have really funny corruption of the
+> > request going on and I'm not sure that'd be nice.
+> 
+> The priv field is only ever used by ahash.c so how can this happen?
+> The crypto API refers to code in the API itself, excluding drivers
+> and users.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/clk/samsung/clk-exynos5420.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OK, I agree with you that people plumbing in the API itself will know what 
+they're doing.
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 60b26819bed5..7fd6bea467fd 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -33,7 +33,7 @@
- #define RPLL_LOCK		0x10050
- #define IPLL_LOCK		0x10060
- #define SPLL_LOCK		0x10070
--#define VPLL_LOCK		0x10070
-+#define VPLL_LOCK		0x10080
- #define MPLL_LOCK		0x10090
- #define CPLL_CON0		0x10120
- #define DPLL_CON0		0x10128
--- 
-1.7.9.5
+btw. can you please check the V3 of 3/3 for the fixup of the base.completion() 
+call ? I will then do tests and roll V4 of the series.
+
+Best regards,
+Marek Vasut
