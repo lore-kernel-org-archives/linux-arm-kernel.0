@@ -1,58 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Mar 2014 15:46:26 +0100 (CET)
-Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
- the ENMI (irq 0)
-In-Reply-To: <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
-References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
- <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <alpine.DEB.2.02.1403131542060.18573@ionos.tec.linutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 13 Mar 2014 15:49:17 +0100
+Subject: [PATCH v5 2/5] clk/samsung: add support for pll2550xx
+In-Reply-To: <1394636208-3125-3-git-send-email-rahul.sharma@samsung.com>
+References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
+ <1394636208-3125-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <5321C56D.90002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Mar 2014, Hans de Goede wrote:
+Hi Rahul,
 
-> The ENMI needs to have the ack done *after* clearing the interrupt source,
-> otherwise we will get a spurious interrupt for each real interrupt. Switch
-> to the new handle_fasteoi_late_irq handler which gives us the desired behavior.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 12.03.2014 15:56, Rahul Sharma wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> exynos5260 use pll2550xx and it has different bit fields
+> for P,M,S values as compared to pll2550. Support for
+> pll2550xx is added here.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 > ---
->  drivers/irqchip/irq-sun4i.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> index 8a2fbee..4b1c874 100644
-> --- a/drivers/irqchip/irq-sun4i.c
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -77,15 +77,22 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
->  static struct irq_chip sun4i_irq_chip = {
->  	.name		= "sun4i_irq",
->  	.irq_ack	= sun4i_irq_ack,
-> +	.irq_eoi	= sun4i_irq_ack, /* For the ENMI */
->  	.irq_mask	= sun4i_irq_mask,
->  	.irq_unmask	= sun4i_irq_unmask,
-> +	.flags		= IRQCHIP_EOI_THREADED, /* Only affects the ENMI */
+>   drivers/clk/samsung/clk-pll.c |  108 +++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/samsung/clk-pll.h |    1 +
+>   2 files changed, 109 insertions(+)
 
-That's not really true. The flags affect all interrupts which share
-that chip.
+Applied, thanks.
 
->  };
->  
->  static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
->  			 irq_hw_number_t hw)
->  {
-> -	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> -				 handle_level_irq);
-> +	if (hw == 0) /* IRQ 0, the ENMI needs special handling */
-> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> +					 handle_fasteoi_late_irq);
-> +	else
-> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> +					 handle_level_irq);
-
-I wonder what happens when you use the fasteoi handler for all of
-them.
-
-Thanks,
-
-	tglx
+Best regards,
+Tomasz
