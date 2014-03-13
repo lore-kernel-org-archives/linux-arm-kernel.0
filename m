@@ -1,56 +1,78 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Thu, 13 Mar 2014 14:35:26 +0100
-Subject: [PATCH] phy: exynos: fix building as a module
-In-Reply-To: <10501799.dhM9cVfZmk@wuerfel>
-References: <10501799.dhM9cVfZmk@wuerfel>
-Message-ID: <000801cf3ec1$18117040$483450c0$%debski@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 13 Mar 2014 21:37:56 +0800
+Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
+ !CONFIG_GENERIC_PHY
+In-Reply-To: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
+References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <5321B4B4.9010806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, March 12, 2014 4:48 PM
+On Thursday 13 March 2014 07:11 PM, Strashko, Grygorii wrote:
+> This fixes a regression on Keystone 2 platforms caused by patch
+> 57303488cd37da58263e842de134dc65f7c626d5
+> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
+> optional support of generic phy in DWC3 core.
 > 
-> The top-level phy-samsung-usb2 driver may be configured as a loadable
-> module, which currently causes link errors because of the dependency on
-> the exynos{5250,4x12,4210}_usb2_phy_config
-> symbol. Solving this could be achieved by exporting these symbols, but
-> as the SoC-specific parts of the driver are not currently built as
-> modules, it seems better to just link everything into one module and
-> avoid the need for the export.
-
-Thank you for this patch and spotting this error.
-
-Acked-by: Kamil Debski <k.debski@samsung.com>
-
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
-
+> On Keystone 2 platforms the USB is not working now because
+> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
+> return -ENOSYS always. The log shows:
+>  dwc3 2690000.dwc3: failed to initialize core
+>  dwc3: probe of 2690000.dwc3 failed with error -38
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Hence, fix it by making NULL a valid phy reference in Generic PHY
+> APIs stubs in the same way as it was done by the patch
+> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
+> a valid phy reference".
 > 
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile index
-> 2faf78e..7728518 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -13,8 +13,9 @@ obj-$(CONFIG_TI_PIPE3)			+=
-phy-ti-pipe3.o
->  obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
->  obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
->  obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
-> -obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-samsung-usb2.o
-> -obj-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
-> -obj-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
-> -obj-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
-> +obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
-> +phy-exynos-usb2-y			+= phy-samsung-usb2.o
-> +phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+=
-phy-exynos4210-usb2.o
-> +phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+=
-phy-exynos4x12-usb2.o
-> +phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+=
-phy-exynos5250-usb2.o
->  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> CC: Felipe Balbi <balbi@ti.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+This fixes the regression seen in Linux next and patch seems
+reasonable to me.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Felipe, Kishon,
+Can you guys pick this fix if you are ok by it. Thanks
+
+
+>  include/linux/phy/phy.h |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index e2f5ca9..5a9b193 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -204,21 +204,29 @@ static inline void phy_pm_runtime_forbid(struct phy *phy)
+>  
+>  static inline int phy_init(struct phy *phy)
+>  {
+> +	if (!phy)
+> +		return 0;
+>  	return -ENOSYS;
+>  }
+>  
+>  static inline int phy_exit(struct phy *phy)
+>  {
+> +	if (!phy)
+> +		return 0;
+>  	return -ENOSYS;
+>  }
+>  
+>  static inline int phy_power_on(struct phy *phy)
+>  {
+> +	if (!phy)
+> +		return 0;
+>  	return -ENOSYS;
+>  }
+>  
+>  static inline int phy_power_off(struct phy *phy)
+>  {
+> +	if (!phy)
+> +		return 0;
+>  	return -ENOSYS;
+>  }
+>  
+> 
