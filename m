@@ -1,41 +1,32 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:18:43 +0100
-Subject: [PATCH v4][ 5/8] ARM: dts: mbimxsd25 baseboard: Add USB support
-In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394702326-25558-5-git-send-email-denis@eukrea.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 11:18:27 +0200
+Subject: [PATCH 05/18] arm: common: edma: Save the number of event queues/TCs
+In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-Changelog v1->v2:
-- With the clock fix patches, the usb gadget also work.
-  So I've set the otg port to otg instead of host.
----
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+For later use save the number of queues available for the CC.
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-index 62fb3da..ad12da3 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -172,3 +172,16 @@
- 	fsl,uart-has-rtscts;
- 	status = "okay";
- };
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/common/edma.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 19520e2519d9..be267b2080be 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1770,6 +1770,9 @@ static int edma_probe(struct platform_device *pdev)
+ 			map_queue_tc(j, queue_tc_mapping[i][0],
+ 					queue_tc_mapping[i][1]);
+ 
++		/* Save the number of TCs */
++		edma_cc[j]->num_tc = i;
 +
-+&usbhost1 {
-+	phy_type = "serial";
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	phy_type = "utmi";
-+	dr_mode = "otg";
-+	external-vbus-divider;
-+	status = "okay";
-+};
+ 		/* Event queue priority mapping */
+ 		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
+ 			assign_priority_to_queue(j,
 -- 
-1.7.9.5
+1.9.0
