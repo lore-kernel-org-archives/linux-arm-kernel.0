@@ -1,39 +1,75 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 13 Mar 2014 13:09:30 +0100
-Subject: [alsa-devel] [PATCH 14/18] ASoC: davinci: Add edma dmaengine
- platform driver
-In-Reply-To: <53219D08.9070308@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
- <1394702320-21743-15-git-send-email-peter.ujfalusi@ti.com>
- <53218835.3080909@metafoo.de> <53219D08.9070308@ti.com>
-Message-ID: <53219FFA.3030204@metafoo.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 13 Mar 2014 13:16:36 +0100
+Subject: [PATCH v2 2/3] mfd: sec-core: Add of_compatible strings for MFD
+ cells
+In-Reply-To: <53219F80.9000300@samsung.com>
+References: <1394703425-6462-1-git-send-email-k.kozlowski@samsung.com>
+ <1394703425-6462-3-git-send-email-k.kozlowski@samsung.com>
+ <53219F80.9000300@samsung.com>
+Message-ID: <1394712996.20773.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 12:56 PM, Peter Ujfalusi wrote:
-> On 03/13/2014 12:28 PM, Lars-Peter Clausen wrote:
->> On 03/13/2014 10:18 AM, Peter Ujfalusi wrote: [...]
->>> +static const struct snd_pcm_hardware edma_pcm_hardware = { +    .info
->>> = SNDRV_PCM_INFO_MMAP | +                  SNDRV_PCM_INFO_MMAP_VALID | +
->>> SNDRV_PCM_INFO_BATCH | +                  SNDRV_PCM_INFO_PAUSE |
->>> SNDRV_PCM_INFO_RESUME | +                  SNDRV_PCM_INFO_INTERLEAVED, +
->>> .buffer_bytes_max    = 128 * 1024, +    .period_bytes_min    = 32, +
->>> .period_bytes_max    = 64 * 1024, +    .periods_min        = 2, +
->>> .periods_max        = 19, /* Limit by edma dmaengine driver */ +};
->>
->> The idea is that we can auto-discover all the things using the
->> dma_slave_caps API. Too bad we removed the possibility to specify the
->> maximum number of segments from the API. Maybe we need to add it back. Is
->> the 19 a hard-limit or could it be worked around by software in the
->> dmaengine driver?
->
-> The edma dmaengine driver will refuse to configure more than 20 paRAM slots (1
-> for the channel + 19 for the periods). Depending on the SoC we might have
-> different number of paRAM entries available. The intention with the limit was
-> to prevent cases when we run out of paRAM entires for other devices because
-> audio took most of them.
+On Thu, 2014-03-13 at 13:07 +0100, Tomasz Figa wrote:
+> Hi Krzysztof,
+> 
+> On 13.03.2014 10:37, Krzysztof Kozlowski wrote:
+> > Add of_compatible strings for MFD cells for regulator, clock and RTC
+> > drivers in S5M8767, S2MPS11 and S2MPS14 PMIC-s.
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >   drivers/mfd/sec-core.c |    8 ++++++++
+> >   1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+> > index d163c66edebb..c5b9b95b2099 100644
+> > --- a/drivers/mfd/sec-core.c
+> > +++ b/drivers/mfd/sec-core.c
+> > @@ -55,28 +55,36 @@ static const struct mfd_cell s5m8763_devs[] = {
+> >   static const struct mfd_cell s5m8767_devs[] = {
+> >   	{
+> >   		.name = "s5m8767-pmic",
+> > +		.of_compatible = "samsung,s5m8767-regulators",
+> >   	}, {
+> >   		.name = "s5m-rtc",
+> > +		.of_compatible = "samsung,s5m8767-rtc",
+> >   	}, {
+> >   		.name = "s5m8767-clk",
+> > +		.of_compatible = "samsung,s5m8767-clk",
+> >   	}
+> >   };
+> >
+> >   static const struct mfd_cell s2mps11_devs[] = {
+> >   	{
+> >   		.name = "s2mps11-pmic",
+> > +		.of_compatible = "samsung,s2mps11-regulators",
+> >   	}, {
+> >   		.name = "s2mps11-clk",
+> > +		.of_compatible = "samsung,s2mps11-clk",
+> >   	}
+> >   };
+> >
+> >   static const struct mfd_cell s2mps14_devs[] = {
+> >   	{
+> >   		.name = "s2mps14-pmic",
+> > +		.of_compatible = "samsung,s2mps14-regulators",
+> >   	}, {
+> >   		.name = "s2mps14-rtc",
+> > +		.of_compatible = "samsung,s2mps14-rtc",
+> >   	}, {
+> >   		.name = "s2mps14-clk",
+> > +		.of_compatible = "samsung,s2mps14-clk",
+> >   	}
+> >   };
+> 
+> Are these compatible strings documented anywhere?
 
-The reason why we removed the max_segments field from the slave_caps struct 
-was because we though it should be possible to, even when the hardware only 
-supports a fixed amount of segments, emulate support for more in software. 
-If this is not the case with the edma, we need to bring this field back.
+The "-clk" compatible strings are (in next patch). The "-rtc" and
+"-regulators" are not.
+
+Actually they aren't also used by child driver (each child driver parses
+from parent of_node).
+
+Best regards,
+Krzysztof
