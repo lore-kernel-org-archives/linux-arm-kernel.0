@@ -1,39 +1,94 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 12:53:00 +0100
-Subject: [PATCH 1/1] clk: exynos-5420: Fix VPLL lock offset
-In-Reply-To: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
-References: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <53219C1C.1030501@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 13:56:56 +0200
+Subject: [alsa-devel] [PATCH 14/18] ASoC: davinci: Add edma dmaengine
+ platform driver
+In-Reply-To: <53218835.3080909@metafoo.de>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+ <1394702320-21743-15-git-send-email-peter.ujfalusi@ti.com>
+ <53218835.3080909@metafoo.de>
+Message-ID: <53219D08.9070308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On 03/13/2014 12:28 PM, Lars-Peter Clausen wrote:
+> On 03/13/2014 10:18 AM, Peter Ujfalusi wrote: [...]
+>> +static const struct snd_pcm_hardware edma_pcm_hardware = { +    .info
+>> = SNDRV_PCM_INFO_MMAP | +                  SNDRV_PCM_INFO_MMAP_VALID | +
+>> SNDRV_PCM_INFO_BATCH | +                  SNDRV_PCM_INFO_PAUSE |
+>> SNDRV_PCM_INFO_RESUME | +                  SNDRV_PCM_INFO_INTERLEAVED, +
+>> .buffer_bytes_max    = 128 * 1024, +    .period_bytes_min    = 32, +
+>> .period_bytes_max    = 64 * 1024, +    .periods_min        = 2, +
+>> .periods_max        = 19, /* Limit by edma dmaengine driver */ +};
+> 
+> The idea is that we can auto-discover all the things using the
+> dma_slave_caps API. Too bad we removed the possibility to specify the
+> maximum number of segments from the API. Maybe we need to add it back. Is
+> the 19 a hard-limit or could it be worked around by software in the
+> dmaengine driver?
 
-On 13.03.2014 04:27, Sachin Kamat wrote:
-> Set it as per the user manual.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->   drivers/clk/samsung/clk-exynos5420.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 60b26819bed5..7fd6bea467fd 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -33,7 +33,7 @@
->   #define RPLL_LOCK		0x10050
->   #define IPLL_LOCK		0x10060
->   #define SPLL_LOCK		0x10070
-> -#define VPLL_LOCK		0x10070
-> +#define VPLL_LOCK		0x10080
->   #define MPLL_LOCK		0x10090
->   #define CPLL_CON0		0x10120
->   #define DPLL_CON0		0x10128
->
+The edma dmaengine driver will refuse to configure more than 20 paRAM slots (1
+for the channel + 19 for the periods). Depending on the SoC we might have
+different number of paRAM entries available. The intention with the limit was
+to prevent cases when we run out of paRAM entires for other devices because
+audio took most of them.
 
-Looks fine. Will queue for 3.15, since ATM there is no support for PLL 
-rate setting on Exynos 5420 (no rate tables registered).
+>> + +static const struct snd_dmaengine_pcm_config edma_dmaengine_pcm_config
+>> = { +    .pcm_hardware = &edma_pcm_hardware, +    .prepare_slave_config =
+>> snd_dmaengine_pcm_prepare_slave_config, +    .prealloc_buffer_size = 128
+>> * 1024,
+> 
+> Unless there is a very good reason for exactly this size, just leave it 0
+> and let the generic dmaengine driver use the default.
 
-Best regards,
-Tomasz
+I'd rather keep this here. Since I have the .pcm_hardware the core will ignore
+the snd_pcm_hardware.buffer_bytes_max when preallocating and it is in fact
+going to go for:
+	prealloc_buffer_size = 512 * 1024;
+	max_buffer_size = SIZE_MAX;
+
+While I have 128 * 1024 for the snd_pcm_hardware.buffer_bytes_max.
+
+I think as long as I have the .pcm_hardware provided from the edma-pcm driver
+I will have the .prealloc_buffer_size as well.
+
+>> +}; + +static const struct snd_dmaengine_pcm_config 
+>> edma_compat_dmaengine_pcm_config = { +    .pcm_hardware =
+>> &edma_pcm_hardware, +    .prepare_slave_config =
+>> snd_dmaengine_pcm_prepare_slave_config, +    .compat_filter_fn =
+>> edma_filter_fn, +    .prealloc_buffer_size = 128 * 1024, +};
+> 
+> There is no need for different configs for DT and non-DT.
+> 
+>> + +int edma_pcm_platform_register(struct device *dev) +{ +    if
+>> (dev->of_node) +        return snd_dmaengine_pcm_register(dev, +
+>> &edma_dmaengine_pcm_config, +
+>> SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+> 
+> Since the edma dmaengine driver implements the slave cap API there is no
+> need to manually specify SND_DMAENGINE_PCM_FLAG_NO_RESIDUE manually. But
+> since the edma driver sets the granularity to
+> DMA_RESIDUE_GRANULARITY_DESCRIPTOR in this case the generic dmaengine will
+> not set SND_DMAENGINE_PCM_FLAG_NO_RESIDUE automatically since it assumes
+> that the dmaengine driver is capable of properly reporting the DMA
+> position.
+> 
+>> +    else +        return snd_dmaengine_pcm_register(dev, +
+>> &edma_compat_dmaengine_pcm_config, +
+>> SND_DMAENGINE_PCM_FLAG_NO_RESIDUE | +
+>> SND_DMAENGINE_PCM_FLAG_NO_DT | +
+>> SND_DMAENGINE_PCM_FLAG_COMPAT);
+> 
+> 
+> If you set the flags to just SND_DMAENGINE_PCM_FLAG_COMPAT it will do the 
+> right thing in the generic dmaengine driver depending on whether
+> dev->of_node is set or not.
+
+I have missed these in the core. Makes the code simpler for sure.
+
+> There is also a devm_ version of snd_dmaengine_pcm_register() it probably 
+> makes sense to use it here.
+
+I forgot about the devm_ version. True, I'll use that instead.
+
+-- 
+P?ter
