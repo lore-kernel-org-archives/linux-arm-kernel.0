@@ -1,42 +1,45 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 13 Mar 2014 15:38:05 -0700
-Subject: [ANNOUNCE] ARM kernel mini-summit @ ELC: Call for Topics,
- Invitation Request
-Message-ID: <7hmwgtk9ma.fsf@paris.lan>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 13 Mar 2014 22:46:54 +0000
+Subject: [PATCH v2 01/15] efi: delete stray ARM ifdef
+In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1394750828-16351-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+An #ifdef CONFIG_ARM clause in efi-stub-helper.c got included with some
+of the generic stub rework by Roy Franz. Drop it here to make subsequent
+patches less confusing.
 
-We will be holding a one-day, ARM kernel mini-summit at ELC this year in
-San Jose[1].  The mini-summit will be Monday, April 28th, and ELC starts
-on Tuesday.
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ drivers/firmware/efi/efi-stub-helper.c |   14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-The ARM summit brings together maintainers and developers in the ARM
-community face to face to discuss current work and to plan for what is
-coming next. To keep the group small and encourage open discussion the
-event is invite-only.
-
-To propose a discussion topic and/or request an invitation:
-
-1) subscribe yourself to arm-summit-discuss at lists.infradead.org:
-   http://lists.infradead.org/mailman/listinfo/arm-summit-discuss
-
-2) send your invite request and/or topic proposal to
-   arm-summit-discuss at lists.infradead.org with a subject prefix of 
-   "[ARM ATTEND]".  Also, please Cc the main linux-arm-kernel list.
-
-All topics and invitation requests will be reviewed by the program
-committee and decisions will be made by the end of March, so please get
-your requests/topics in soon.
-
-ARM mini-summit Program Committee,
-
-Arnd Bergmann
-Magnus Damm
-Kevin Hilman
-Simon Horman
-Olof Johansson
-Grant Likely
-
-[1] http://events.linuxfoundation.org/events/embedded-linux-conference
+diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+index b6bffbf..6811af7 100644
+--- a/drivers/firmware/efi/efi-stub-helper.c
++++ b/drivers/firmware/efi/efi-stub-helper.c
+@@ -608,18 +608,8 @@ static char *efi_convert_cmdline_to_ascii(efi_system_table_t *sys_table_arg,
+ 	}
+ 
+ 	options_size++;  /* NUL termination */
+-#ifdef CONFIG_ARM
+-	/*
+-	 * For ARM, allocate at a high address to avoid reserved
+-	 * regions at low addresses that we don't know the specfics of
+-	 * at the time we are processing the command line.
+-	 */
+-	status = efi_high_alloc(sys_table_arg, options_size, 0,
+-			    &cmdline_addr, 0xfffff000);
+-#else
+-	status = efi_low_alloc(sys_table_arg, options_size, 0,
+-			    &cmdline_addr);
+-#endif
++
++	status = efi_low_alloc(sys_table_arg, options_size, 0, &cmdline_addr);
+ 	if (status != EFI_SUCCESS)
+ 		return NULL;
+ 
+-- 
+1.7.10.4
