@@ -1,45 +1,58 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 15:44:13 +0100
-Subject: [PATCH v5 1/5] clk/samsung: add support for multiple clock
- providers
-In-Reply-To: <1394636208-3125-2-git-send-email-rahul.sharma@samsung.com>
-References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
- <1394636208-3125-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5321C43D.80100@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 13 Mar 2014 15:46:26 +0100 (CET)
+Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
+ the ENMI (irq 0)
+In-Reply-To: <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
+References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
+ <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <alpine.DEB.2.02.1403131542060.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On Wed, 12 Mar 2014, Hans de Goede wrote:
 
-On 12.03.2014 15:56, Rahul Sharma wrote:
-> Samsung CCF helper functions do not provide support to
-> register multiple Clock Providers for a given SoC. Due to
-> this limitation, SoC platforms are not able to use these
-> helpers for registering multiple clock providers and are
-> forced to bypass this layer.
->
-> This layer is modified accordingly to enable the support
-> for multiple clock providers.
->
-> Clock file for exynos4, exynos5250, exynos5420, exynos5440,
-> S3c64xx, S3c2412 and S3c2443 are also modified as per changed
-> helper functions.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> The ENMI needs to have the ack done *after* clearing the interrupt source,
+> otherwise we will get a spurious interrupt for each real interrupt. Switch
+> to the new handle_fasteoi_late_irq handler which gives us the desired behavior.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->   drivers/clk/samsung/clk-exynos4.c    |   47 +++++++-------
->   drivers/clk/samsung/clk-exynos5250.c |   25 +++++---
->   drivers/clk/samsung/clk-exynos5420.c |   24 ++++---
->   drivers/clk/samsung/clk-exynos5440.c |   18 +++---
->   drivers/clk/samsung/clk-pll.c        |   14 +++--
->   drivers/clk/samsung/clk-s3c2412.c    |   29 +++++----
->   drivers/clk/samsung/clk-s3c2443.c    |   46 +++++++-------
->   drivers/clk/samsung/clk-s3c64xx.c    |   44 +++++++------
->   drivers/clk/samsung/clk.c            |  114 ++++++++++++++++++----------------
->   drivers/clk/samsung/clk.h            |   72 ++++++++++++++-------
->   10 files changed, 251 insertions(+), 182 deletions(-)
+>  drivers/irqchip/irq-sun4i.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+> index 8a2fbee..4b1c874 100644
+> --- a/drivers/irqchip/irq-sun4i.c
+> +++ b/drivers/irqchip/irq-sun4i.c
+> @@ -77,15 +77,22 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+>  static struct irq_chip sun4i_irq_chip = {
+>  	.name		= "sun4i_irq",
+>  	.irq_ack	= sun4i_irq_ack,
+> +	.irq_eoi	= sun4i_irq_ack, /* For the ENMI */
+>  	.irq_mask	= sun4i_irq_mask,
+>  	.irq_unmask	= sun4i_irq_unmask,
+> +	.flags		= IRQCHIP_EOI_THREADED, /* Only affects the ENMI */
 
-Applied, thanks.
+That's not really true. The flags affect all interrupts which share
+that chip.
 
-Best regards,
-Tomasz
+>  };
+>  
+>  static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
+>  			 irq_hw_number_t hw)
+>  {
+> -	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
+> -				 handle_level_irq);
+> +	if (hw == 0) /* IRQ 0, the ENMI needs special handling */
+> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
+> +					 handle_fasteoi_late_irq);
+> +	else
+> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
+> +					 handle_level_irq);
+
+I wonder what happens when you use the fasteoi handler for all of
+them.
+
+Thanks,
+
+	tglx
