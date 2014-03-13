@@ -1,112 +1,343 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 13 Mar 2014 10:02:03 +0900
-Subject: [PATCH] ARM: shmobile: Break out R-Car SYSC PM code
-In-Reply-To: <CAOesGMg9Abd_JwLLjyDARmFzuN3Kh=HsZMmcS1mfncdEdOOUww@mail.gmail.com>
-References: <20140115074308.8471.64824.sendpatchset@w520>
- <CAOesGMjaTB-kBrm1av0uc8N-+4TRBZm5fxjJbsZLJe5OuqLu+g@mail.gmail.com>
- <CANqRtoRMkezRZvoH4Q1T3mwwhU9T=ZOFVGE5KN+sLBEqpXO=mg@mail.gmail.com>
- <CANqRtoQ2PDb5siknAndO3TgDghgTKPVa-ez-t2eQDcypDnsJTw@mail.gmail.com>
- <20140309052210.GB12854@quad.lixom.net>
- <CANqRtoQx16qgC-5wxi_SPDKMy+qztt-aTTa7TEY04+aT4a1=wA@mail.gmail.com>
- <CAOesGMg9Abd_JwLLjyDARmFzuN3Kh=HsZMmcS1mfncdEdOOUww@mail.gmail.com>
-Message-ID: <CANqRtoQTvnHBjM2eQccAJWCddN1LPgjNnd3Q6Gp=iUQkgM7tmQ@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 13 Mar 2014 10:23:14 +0900
+Subject: [PATCH v5 4/5] clk/exynos5260: add macros and documentation for
+ exynos5260
+In-Reply-To: <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
+References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
+ <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <53210882.3040505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 9:04 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Mar 12, 2014 at 3:26 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> On Sun, Mar 9, 2014 at 2:22 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Tue, Feb 25, 2014 at 11:09:52AM +0900, Magnus Damm wrote:
->>>> Hi Olof,
->>>>
->>>> On Thu, Feb 20, 2014 at 6:45 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>> > On Thu, Feb 20, 2014 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> >> I spotted this patch since it adds new include/mach contents, comment below:
->>>> >>
->>>> >> On Tue, Jan 14, 2014 at 11:43 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>> >>
->>>> >>> --- /dev/null
->>>> >>> +++ work/arch/arm/mach-shmobile/include/mach/pm-rcar.h  2014-01-15 13:30:38.000000000 +0900
->>>> >>> @@ -0,0 +1,15 @@
->>>> >>> +#ifndef PM_RCAR_H
->>>> >>> +#define PM_RCAR_H
->>>> >>> +
->>>> >>> +struct rcar_sysc_ch {
->>>> >>> +       unsigned long chan_offs;
->>>> >>> +       unsigned int chan_bit;
->>>> >>> +       unsigned int isr_bit;
->>>> >>> +};
->>>> >>> +
->>>> >>> +int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch);
->>>> >>> +int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch);
->>>> >>> +bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch);
->>>> >>> +void __iomem *rcar_sysc_init(phys_addr_t base);
->>>> >>> +
->>>> >>> +#endif /* PM_RCAR_H */
->>>> >>
->>>> >>
->>>> >> These prototypes are only ever used by code in arch/arm/mach-shmobile,
->>>> >> right? There's no reason to expose it to the global include namespace,
->>>> >> and you'll just have to remove it when the platform is converted to
->>>> >> multiplatform.
->>>> >>
->>>> >> So, I suggest moving this to be at arch/arm/mach-shmobile/pm-rcar.h
->>>> >> instead (and included as "pm-rcar.h" instead of <mach/pm-rcar.h>).
->>>> >
->>>> > Thanks for your help with the patches! You are right that these are
->>>> > never used outside mach-shmobile, and moving headers out of "mach"
->>>> > certainly makes sense.
->>>>
->>>> FYI, the following series includes my attempt to address this issue:
->>>>
->>>> [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
->>>> [PATCH 01/12] ARM: shmobile: Add temporary include workaround
->>>> [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
->>>> [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
->>>> [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
->>>> [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
->>>> [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
->>>> [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
->>>> [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
->>>> [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
->>>> [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
->>>> [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
->>>> [PATCH 12/12] ARM: shmobile: Rework include path for common bits
->>>>
->>>> If you would like me to rework the code somehow then please let me
->>>> know. I also intend to ask a different developer to convert the actual
->>>> boards once these changes have been merged by Simon, hope this is a
->>>> good way forward for you.
->>>
->>> It certainly looks like a good way forward, thanks for doing this.
->>
->> Ok, thanks. The list of patches above is the first step forward from my side.
->>
->> I'm afraid that I'm a bit confused by your comments in thread:
->> "Re: [PATCH v2] ARM: shmobile: Add temporary include workaround"
->>
->> The single v2 patch on the line above is just a bug fixed version of [01/12].
->>
->> Can you please clarify if you're ok with the series or if you want me
->> to rework it somehow?
+Hi Rahul,
+
+On 03/12/2014 11:56 PM, Rahul Sharma wrote:
+> Add macros which are used as Clock IDs in DT and clock file.
+> It also adds the documentation for the exynos5260 clocks.
 >
-> Oh, yeah, that's confusing -- my "looks good, please go ahead" was for
-> patch 2-12, I don't think you actually need 1/12 at this time since
-> you move the include file over and change the include statements in
-> the same time in the other 11 patches?
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>   .../devicetree/bindings/clock/exynos5260-clock.txt |   55 +++++
+>   include/dt-bindings/clock/exynos5260-clk.h         |  233 ++++++++++++++++++++
+>   2 files changed, 288 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+>   create mode 100644 include/dt-bindings/clock/exynos5260-clk.h
+>
+> diff --git a/Documentation/devicetree/bindings/clock/exynos5260-clock.txt b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+> new file mode 100644
+> index 0000000..4128892
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
+> @@ -0,0 +1,55 @@
+> +* Samsung Exynos5260 Clock Controller
+> +
+> +The Exynos5260 clock controller encapsulate all CMUs which are
+> +instantiaited independently from the device-tree. As a whole, these
+> +CMUs generates and supplies clocks to various controllers within
+> +the Exynos5260 SoC.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +	"exynos5260-clock-top"
+> +	"exynos5260-clock-peri"
+> +	"exynos5260-clock-egl"
+> +	"exynos5260-clock-kfc"
+> +	"exynos5260-clock-g2d"
+> +	"exynos5260-clock-mif"
+> +	"exynos5260-clock-mfc"
+> +	"exynos5260-clock-g3d"
+> +	"exynos5260-clock-fsys"
+> +	"exynos5260-clock-aud"
+> +	"exynos5260-clock-isp"
+> +	"exynos5260-clock-gscl"
+> +	"exynos5260-clock-disp"
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +The following is the list of clocks generated by each controller. Each
+> +clock is assigned with a MACRO constant. These constants are defined in
+> +"dt-bindings/clk/exynos5260-clk.h". DT client nodes use this MACRO to
 
-My current set of patches do not move the location of the include file
-just yet. The reason for this is that this series targets SoC code
-only, but both board files and SoC files use the same header files. So
-until all files are converted the workaround is needed.
+nit: s/clk/clock
 
-I'd be happy to adjust the patches to fit your recommendation and move
-the header file in the same patch. But then I need to touch both SoC
-code and board code in the same patch - which is fine - but I would
-like to know what branch to target if so.
+> +specify the clock, which they want to consume.
+> +
+> +Example 1: An example of a clock controller node is listed below.
+> +
+> +	cmu_disp: clock-controller at 0x14550000 {
+> +		compatible = "exynos5260-clock-disp";
+> +		reg = <0x14550000 0x10000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +Example 2: UART controller node that consumes the clock generated by the
+> +		peri clock controller. Refer to the standard clock bindings for
+> +		information about 'clocks' and 'clock-names' property.
+> +
+> +	serial at 12C00000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C00000 0x100>;
+> +		interrupts = <0 146 0>;
+> +		clocks = <&clock_peri PERI_PCLK_UART0>, <&clock_peri PERI_SCLK_UART0>;
+> +		clock-names = "uart", "clk_uart_baud0";
+> +		status = "disabled";
+> +	};
 
-So how would you like to consume this cleanup? And when? =)
+Isn't it better that we should add binding information about fixed-clocks 
+(phyclocks and ioclks) here?
 
-Thanks,
+> +
+> diff --git a/include/dt-bindings/clock/exynos5260-clk.h b/include/dt-bindings/clock/exynos5260-clk.h
+> new file mode 100644
+> index 0000000..d6f4391
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/exynos5260-clk.h
+> @@ -0,0 +1,233 @@
+> +/*
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Provides Constants for Exynos5260 clocks.
+> +*/
+> +
+> +#ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
+> +#define _DT_BINDINGS_CLK_EXYNOS5260_H
+> +
+> +/*
+> + * Clock names:	XXXXX_YYYYYY_ZZZZ
+> + *		|---| |----| |--|
+> + *		 cmu   type   IP
+> + */
+> +
+> +/* List Of Clocks For CMU_TOP */
+> +#define FIN_PLL			1
 
-/ magnus
+This should be removed now.
+
+> +#define TOP_FOUT_DISP_PLL	2
+> +#define TOP_FOUT_AUD_PLL	3
+> +#define TOP_SCLK_MMC0		4
+> +#define TOP_SCLK_MMC1		5
+> +#define TOP_SCLK_MMC2		6
+> +#define TOP_SCLK_HDMIPHY	7
+> +#define TOP_SCLK_FIMD1		8
+> +#define TOP_MOUT_FIMD1		9
+> +#define TOP_MOUT_DISP_PLL	10
+> +#define TOP_HDMI_PHY_PIXEL_CLKO	11
+
+ditto.
+
+> +#define TOP_NR_CLK		12
+> +
+> +/* List Of Clocks For CMU_EGL */
+> +#define EGL_FOUT_EGL_PLL	1
+> +#define EGL_FOUT_EGL_DPLL	2
+> +#define EGL_NR_CLK		3
+> +
+> +/* List Of Clocks For CMU_KFC */
+> +#define KFC_FOUT_KFC_PLL	1
+> +#define KFC_NR_CLK		2
+> +
+> +/* List Of Clocks For CMU_MIF */
+> +#define MIF_FOUT_MEM_PLL	1
+> +#define MIF_FOUT_BUS_PLL	2
+> +#define MIF_FOUT_MEDIA_PLL	3
+> +#define MIF_NR_CLK		4
+> +
+> +/* List Of Clocks For CMU_G3D */
+> +#define G3D_FOUT_G3D_PLL	1
+> +#define G3D_CLK_G3D_HPM		2
+> +#define G3D_CLK_G3D		3
+> +#define G3D_NR_CLK		4
+> +
+> +/* List Of Clocks For CMU_AUD */
+> +#define AUD_CLK_AUD_UART	1
+> +#define AUD_CLK_PCM		2
+> +#define AUD_CLK_I2S		3
+> +#define AUD_CLK_DMAC		4
+> +#define AUD_SCLK_AUD_UART	5
+> +#define AUD_SCLK_PCM		6
+> +#define AUD_SCLK_I2S		7
+> +#define AUD_NR_CLK		8
+> +
+> +/* List Of Clocks For CMU_MFC */
+> +#define MFC_CLK_MFC		1
+> +#define MFC_CLK_SMMU2_MFCM1	2
+> +#define MFC_CLK_SMMU2_MFCM0	3
+> +#define MFC_NR_CLK		4
+> +
+> +/* List Of Clocks For CMU_GSCL */
+> +#define GSCL_CLK_PIXEL_GSCL1	1
+> +#define GSCL_CLK_PIXEL_GSCL0	2
+> +#define GSCL_CLK_MSCL1		3
+> +#define GSCL_CLK_MSCL0		4
+> +#define GSCL_CLK_GSCL1		5
+> +#define GSCL_CLK_GSCL0		6
+> +#define GSCL_CLK_FIMC_LITE_D	7
+> +#define GSCL_CLK_FIMC_LITE_B	8
+> +#define GSCL_CLK_FIMC_LITE_A	9
+> +#define GSCL_CLK_CSIS1		10
+> +#define GSCL_CLK_CSIS0		11
+> +#define GSCL_CLK_SMMU3_LITE_D	12
+> +#define GSCL_CLK_SMMU3_LITE_B	13
+> +#define GSCL_CLK_SMMU3_LITE_A	14
+> +#define GSCL_CLK_SMMU3_GSCL0	15
+> +#define GSCL_CLK_SMMU3_GSCL1	16
+> +#define GSCL_CLK_SMMU3_MSCL0	17
+> +#define GSCL_CLK_SMMU3_MSCL1	18
+> +#define GSCL_SCLK_CSIS1_WRAP	19
+> +#define GSCL_SCLK_CSIS0_WRAP	20
+> +#define GSCL_NR_CLK		21
+> +
+> +/* List Of Clocks For CMU_FSYS */
+> +#define FSYS_CLK_TSI		1
+> +#define FSYS_CLK_USBLINK	2
+> +#define FSYS_CLK_USBHOST20	3
+> +#define FSYS_CLK_USBDRD30	4
+> +#define FSYS_CLK_SROMC		5
+> +#define FSYS_CLK_PDMA		6
+> +#define FSYS_CLK_MMC2		7
+> +#define FSYS_CLK_MMC1		8
+> +#define FSYS_CLK_MMC0		9
+> +#define FSYS_CLK_RTIC		10
+> +#define FSYS_CLK_SMMU_RTIC	11
+> +#define FSYS_PHYCLK_USBDRD30	12
+> +#define FSYS_PHYCLK_USBHOST20	13
+> +#define FSYS_NR_CLK		14
+> +
+> +/* List Of Clocks For CMU_PERI */
+> +#define PERI_CLK_WDT_KFC	1
+> +#define PERI_CLK_WDT_EGL	2
+> +#define PERI_CLK_HSIC3		3
+> +#define PERI_CLK_HSIC2		4
+> +#define PERI_CLK_HSIC1		5
+> +#define PERI_CLK_HSIC0		6
+> +#define PERI_CLK_PCM		7
+> +#define PERI_CLK_MCT		8
+> +#define PERI_CLK_I2S		9
+> +#define PERI_CLK_I2CHDMI	10
+> +#define PERI_CLK_I2C7		11
+> +#define PERI_CLK_I2C6		12
+> +#define PERI_CLK_I2C5		13
+> +#define PERI_CLK_I2C4		14
+> +#define PERI_CLK_I2C9		15
+> +#define PERI_CLK_I2C8		16
+> +#define PERI_CLK_I2C11		17
+> +#define PERI_CLK_I2C10		18
+> +#define PERI_CLK_HDMICEC	19
+> +#define PERI_CLK_EFUSE_WRITER	20
+> +#define PERI_CLK_ABB		21
+> +#define PERI_CLK_UART2		22
+> +#define PERI_CLK_UART1		23
+> +#define PERI_CLK_UART0		24
+> +#define PERI_CLK_ADC		25
+> +#define PERI_CLK_TMU4		26
+> +#define PERI_CLK_TMU3		27
+> +#define PERI_CLK_TMU2		28
+> +#define PERI_CLK_TMU1		29
+> +#define PERI_CLK_TMU0		30
+> +#define PERI_CLK_SPI2		31
+> +#define PERI_CLK_SPI1		32
+> +#define PERI_CLK_SPI0		33
+> +#define PERI_CLK_SPDIF		34
+> +#define PERI_CLK_PWM		35
+> +#define PERI_CLK_UART4		36
+> +#define PERI_CLK_CHIPID		37
+> +#define PERI_CLK_PROVKEY0	38
+> +#define PERI_CLK_PROVKEY1	39
+> +#define PERI_CLK_SECKEY		40
+> +#define PERI_CLK_TOP_RTC	41
+> +#define PERI_CLK_TZPC10		42
+> +#define PERI_CLK_TZPC9		43
+> +#define PERI_CLK_TZPC8		44
+> +#define PERI_CLK_TZPC7		45
+> +#define PERI_CLK_TZPC6		46
+> +#define PERI_CLK_TZPC5		47
+> +#define PERI_CLK_TZPC4		48
+> +#define PERI_CLK_TZPC3		49
+> +#define PERI_CLK_TZPC2		50
+> +#define PERI_CLK_TZPC1		51
+> +#define PERI_CLK_TZPC0		52
+> +#define PERI_SCLK_SPI2		53
+> +#define PERI_SCLK_SPI1		54
+> +#define PERI_SCLK_SPI0		55
+> +#define PERI_SCLK_SPDIF		56
+> +#define PERI_SCLK_I2S		57
+> +#define PERI_SCLK_PCM1		58
+> +#define PERI_SCLK_UART2		59
+> +#define PERI_SCLK_UART1		60
+> +#define PERI_SCLK_UART0		61
+> +#define PERI_NR_CLK		62
+> +
+> +/* List Of Clocks For CMU_DISP */
+> +#define DISP_CLK_SMMU_TV	1
+> +#define DISP_CLK_SMMU_FIMD1M1	2
+> +#define DISP_CLK_SMMU_FIMD1M0	3
+> +#define DISP_CLK_MIXER		4
+> +#define DISP_CLK_MIPIPHY	5
+> +#define DISP_CLK_HDMIPHY	6
+> +#define DISP_CLK_HDMI		7
+> +#define DISP_CLK_FIMD1		8
+> +#define DISP_CLK_DSIM1		9
+> +#define DISP_CLK_DPPHY		10
+> +#define DISP_CLK_DP		11
+> +#define DISP_SCLK_PIXEL		12
+> +#define DISP_MOUT_HDMI_PHY_PIXEL_USER		13
+> +#define DISP_MOUT_HDMI_PHY_PIXEL	14
+> +#define DISP_NR_CLK		15
+> +
+> +/* List Of Clocks For CMU_G2D */
+> +#define G2D_CLK_SMMU3_JPEG	1
+> +#define G2D_CLK_MDMA		2
+> +#define G2D_CLK_JPEG		3
+> +#define G2D_CLK_G2D		4
+> +#define G2D_CLK_SSS		5
+> +#define G2D_CLK_SLIM_SSS	6
+> +#define G2D_CLK_SMMU_SLIM_SSS	7
+> +#define G2D_CLK_SMMU_SSS	8
+> +#define G2D_CLK_SMMU_MDMA	9
+> +#define G2D_CLK_SMMU3_G2D	10
+> +#define G2D_NR_CLK		11
+> +
+> +/* List Of Clocks For CMU_ISP */
+> +#define ISP_CLK_GIC		1
+> +#define ISP_CLK_WDT		2
+> +#define ISP_CLK_UART		3
+> +#define ISP_CLK_SPI1		4
+> +#define ISP_CLK_SPI0		5
+> +#define ISP_CLK_SMMU_SCALERP	6
+> +#define ISP_CLK_SMMU_SCALERC	7
+> +#define ISP_CLK_SMMU_ISPCX	8
+> +#define ISP_CLK_SMMU_ISP	9
+> +#define ISP_CLK_SMMU_FD		10
+> +#define ISP_CLK_SMMU_DRC	11
+> +#define ISP_CLK_PWM		12
+> +#define ISP_CLK_MTCADC		13
+> +#define ISP_CLK_MPWM		14
+> +#define ISP_CLK_MCUCTL		15
+> +#define ISP_CLK_I2C1		16
+> +#define ISP_CLK_I2C0		17
+> +#define ISP_CLK_FIMC_SCALERP	18
+> +#define ISP_CLK_FIMC_SCALERC	19
+> +#define ISP_CLK_FIMC		20
+> +#define ISP_CLK_FIMC_FD		21
+> +#define ISP_CLK_FIMC_DRC	22
+> +#define ISP_CLK_CA5		23
+> +#define ISP_SCLK_SPI0_EXT	24
+> +#define ISP_SCLK_SPI1_EXT	25
+> +#define ISP_SCLK_UART_EXT	26
+> +#define ISP_NR_CLK		27
+> +
+> +#endif
+
+
+-- 
+Best Regards,
+Pankaj Dubey
