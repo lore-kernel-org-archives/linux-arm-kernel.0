@@ -1,76 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 17:59:52 +0900
-Subject: [PATCH v4 09/19] ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init
- to clock-r8a7779.c
+Date: Thu, 13 Mar 2014 17:59:57 +0900
+Subject: [PATCH v4 14/19] ARM: shmobile: marzen-reference: Instantiate clkdevs
+ for SCIF and TMU
 In-Reply-To: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
 References: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1394701202-25823-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1394701202-25823-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r8a7779_earlytimer_init() calls r8a7779_clock_init() and
-r8a7779_clock_init() is defined in clock-r8a7779.c.
+Now that the common clock framework is supported, the clock lookup
+entries in clock-r8a7779.c are not registered anymore. Devices must
+instead reference their clocks in the device tree. However, SCIF and CMT
+devices are still instantiated through platform code, and thus need a
+clock lookup entry.
 
-If both CONFIG_COMMON_CLK and CONFIG_ARCH_R8A7779 are enabled,
-as will be the case when marzen-reference moves to use
-the common clock framework, then setup-r8a7779.c is compiled
-but clock-r8a7779.c is not.
+Retrieve the SCIF and CMT clock entries by name and register clkdevs for
+the corresponding devices. This will be removed when the SCIF and CMT
+devices will be instantiated from the device tree.
 
-As r8a7779_earlytimer_init() is not used by marzen-reference
-simply move it to clock-r8a7779.c.
+Based on work for the Koelsch board by Laurent Pinchart.
 
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7779.c | 11 +++++++++++
- arch/arm/mach-shmobile/setup-r8a7779.c | 10 ----------
- 2 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index b1a5065..e4fc7df 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+---
+v4
+* As suggested by Geert Uytterhoeven and Magnus Damm
+  - Make use of shmobile_clk_workaround()
+  - This patch now depends on
+    "ARM: shmobile: Introduce shmobile_clk_workaround()"
+
+v3
+* Initialise TMU clocks instead of CMT clocks
+  - It is TMU that Marzen uses as a clocksource
+* Refactor clock initialisation hack as per more recent mainline
+  code for Koelsch
+* Use IS_ERR to check the return value of clk_get()
+---
+ arch/arm/mach-shmobile/board-marzen-reference.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index e261431..5823c83 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
 @@ -23,6 +23,7 @@
- #include <linux/io.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
-+#include <linux/sh_timer.h>
- #include <mach/clock.h>
- #include <mach/common.h>
+ #include <linux/clocksource.h>
+ #include <linux/of_platform.h>
  #include <mach/r8a7779.h>
-@@ -263,3 +264,13 @@ void __init r8a7779_clock_init(void)
- 	else
- 		panic("failed to setup r8a7779 clocks\n");
- }
-+
-+/* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
-+void __init __weak r8a7779_register_twd(void) { }
-+
-+void __init r8a7779_earlytimer_init(void)
-+{
-+	r8a7779_clock_init();
-+	r8a7779_register_twd();
-+	shmobile_earlytimer_init();
-+}
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index f6aeb7f..f28b8c7 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -714,16 +714,6 @@ void __init r8a7779_add_standard_devices(void)
- 	r8a7779_register_hpb_dmae();
++#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <asm/irq.h>
+@@ -36,9 +37,29 @@ static void __init marzen_init_timer(void)
+ 	clocksource_of_init();
  }
  
--/* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
--void __init __weak r8a7779_register_twd(void) { }
--
--void __init r8a7779_earlytimer_init(void)
--{
--	r8a7779_clock_init();
--	r8a7779_register_twd();
--	shmobile_earlytimer_init();
--}
--
- void __init r8a7779_add_early_devices(void)
++#ifdef CONFIG_COMMON_CLK
++/*
++ * This is a really crude hack to provide clkdev support to platform
++ * devices until they get moved to DT.
++ */
++static const struct clk_name clk_names[] __initconst = {
++	{ "scif0", NULL, "sh-sci.0" },
++	{ "scif1", NULL, "sh-sci.1" },
++	{ "scif2", NULL, "sh-sci.2" },
++	{ "scif3", NULL, "sh-sci.3" },
++	{ "scif4", NULL, "sh-sci.4" },
++	{ "scif5", NULL, "sh-sci.5" },
++	{ "tmu0", NULL, "sh_tmu.0" },
++	{ "tmu1", NULL, "sh_tmu.1" },
++	{ "tmu2", NULL, "sh_tmu.2" },
++};
++#endif
++
+ static void __init marzen_init(void)
  {
- 	early_platform_add_devices(r8a7779_devices_dt,
+-#ifndef CONFIG_COMMON_CLK
++#ifdef CONFIG_COMMON_CLK
++	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
++#else
+ 	r8a7779_clock_init();
+ #endif
+ 	r8a7779_add_standard_devices_dt();
 -- 
 1.8.5.2
