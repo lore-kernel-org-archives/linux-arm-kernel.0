@@ -1,55 +1,125 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 11:02:35 +0900
-Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
-In-Reply-To: <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
-References: <20140226095916.15676.99394.sendpatchset@w520>
- <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
- <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
- <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
-Message-ID: <20140313020231.GC16719@verge.net.au>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 13 Mar 2014 10:15:20 +0800
+Subject: Common clock: function clock and bus clock
+In-Reply-To: <5320336B.3020107@ti.com>
+References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
+ <CAN1soZzFfSp2Hj=JBxj+N9iLrjkm3poOa7piJDJT5BY-ycsWHQ@mail.gmail.com>
+ <CADApbegGTm=REJbukdyEY9ZVK9hXax+Hodp7MFx3SUb=CV1TbA@mail.gmail.com>
+ <5320336B.3020107@ti.com>
+Message-ID: <CADApbeh0zjd=qMguiqQGrn=0v+-SVqgnyL=Gk8D9MiQvHU2XGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 09:08:06AM +0100, Geert Uytterhoeven wrote:
-> Hi Magnus,
-> 
-> On Thu, Feb 27, 2014 at 4:33 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>>  This is a reworked version of the APMU patch previously posted as
-> >>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
-> >>
-> >> Your previous version also affected r8a7790/Lager.
-> >> Isn't this check no longer needed there? According to the Lager manual,
-> >> MD21 also enables hardware debug mode, and is also controlled by
-> >> SW8-4. Of course the CPU may behave differently, as the CPU cores
-> >> are different.
-> >
-> > Yes, you are correct that the previous version of the patch also
-> > affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
-> > together with JTAG debugging.
-> >
-> > I recently used the patch on Lager and I discovered that I apparently
-> > had been running with MD21 on my Lager since forever, and surprisingly
-> > it worked regardless. Since there is no documentation on r8a7790 or
-> > r8a7791 I simply decided to handle them separately and only enable
-> > where it is needed.
-> 
-> You could have been lucky?
-> 
-> On Koelsch, I only had failures after Real Cold Boot, i.e. on boot up in the
-> morning. And not always, so there could be a timing issue involved.
-> 
-> > I've also been told that it is possible to allow SMP operation
-> > together with JTAG, apparently some magic with RST is needed. It seems
-> > that the power domains are treated differently depending on the MD21
-> > setting. Not sure if this applies to both r8a7790 and r8a7791, but if
-> > we end up with similar fixes we can consolidate. Until then I think
-> > dealing with them one by one makes sense.
-> 
-> Furthermore, I haven't seen any SPI timeouts after I disabled MD21 (holding
-> wood, and rabbit legs ;-). So the SMP memory (in)coherency I saw there
-> could have been caused by a wobbly SMP setup.
+On Wed, Mar 12, 2014 at 6:14 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> On 03/12/2014 04:30 AM, Chao Xie wrote:
+>>
+>> On Tue, Mar 11, 2014 at 10:48 AM, Haojian Zhuang
+>> <haojian.zhuang@gmail.com> wrote:
+>>>
+>>> On Tue, Mar 11, 2014 at 10:06 AM, Chao Xie <xiechao.mail@gmail.com>
+>>> wrote:
+>>>>
+>>>> hi
+>>>>
+>>>> I can not find any examples for handling function clock and bus clock
+>>>> in drivers/clk/.
+>>>>
+>>>> For a device, it will have a function clock and bus clock. function
+>>>> clock will control the fucntionality of this device, while bus clock
+>>>> will control the communication part to the bus.
+>>>>
+>>>> For some SOCes, they do not export bus clock, so from the hardware it
+>>>> seems that function clock is combined with bus clock, while for some
+>>>> SOCes, they are not.
+>>>>
+>>>> For most of the device driver, they will enable/disable function clock
+>>>> and bus clock both. While for some devices, they may share bus clock,
+>>>> and have different function clocks.
+>>>>
+>>>> In fact, i want to define the APIs as below:
+>>>>
+>>>> struct clk* soc_register_bus_clock(struct device *dev, char
+>>>> **parent_name, ...);
+>>>> This function will  create and register bus clock
+>>>>
+>>>> struct clk* soc_register_fucntion_clock(struct device *dev, char
+>>>> **parent_name, ...);
+>>>> This function will create and register function clock
+>>>>
+>>>> struct clk* soc_register_clk(struct device *dev, char **parent_name);
+>>>> This function will create and register a device clock. Then this clock
+>>>> is enable, it will enable bus clock and function clock both, and it is
+>>>> similar for disabling.
+>>>>
+>>>> struct clk* soc_register_composite_clk(struct device *dev, char
+>>>> *bus_clk_name, char *function_clk_name);
+>>>> This function will create and register a composite device clock. When
+>>>> enable this clock, it will invoke clk_enable(bus_clk) and
+>>>> clk_enable(function_clk) both. It is similar for disabling.
+>>>>
+>>>> So for the device which has its own control register and bits for
+>>>> function clock and bus clock. We can call  soc_register_clk.
+>>>> For the device share bus clock with other devices, we create the clock
+>>>> for the device by calling  soc_register_composite_clk.
+>>>>
+>>>> 1. Now clk_enable can be preempted by same caller.
+>>>> 2. For above devices, the bus clock only have enable/disable ops.
+>>>>
+>>>> Based on above conditions, I think soc_register_composite_clk is fine.
+>>>>
+>>>> Does anyone have same problems? Will above proposal break common clock
+>>>> rules.
+>>>
+>>>
+>>> I think it's too complex.
+>>>
+>>> If the bus clock and function clock is only used for gating, maybe you
+>>> can set the bus clock as parent of function clock.
+>>>
+>> You can not do it. Because the function clock may have mux and div, it
+>> can not depends on bus clock's rate.
+>>
+>>> If both of them are complex, why not define two clocks in your device
+>>> driver?
+>>>
+>> It is the problem. In fact for different SOCes, we can not know which
+>> device will have such limitation.
+>> Even for same device, for SOC-a, it has the limitation, for SOC-b, it does
+>> not.
+>> So the choice is make all the device drivers to grap two clocks. There
+>> are too many of them, and for
+>> the devices does not have such limitation, it is redundant.
+>> So the point is we donot want to change the device driver, and we want
+>> to make the device driver interfaces
+>> maintain unchanged. .
+>
+>
+> Clk pm domain - Is it what you want?
+> drivers/base/power/clock_ops.c
+>
+> Usage example:
+> arch/arm/mach-davinci/pm_domain.c
+> arch/arm/mach-keystone/pm_domain.c
+>
+> Then you can simply use Runtime PM API to control clocks.
+>
+It is not related to clk pm domain. It is related to clock depenency.
 
-Hi Magnus,
+For a device, it has bus clock and function clock. usally bus clock is
+a gate type clock.
 
-I am a little confused about the status of this patch?
-Would you like me to queue it up?
+some devices share same bus clock, but have different function clock.
+If we want to use the device, we have to enable the bus clock and
+function clock both.
+
+The problem is for some SOCes, there is no sharing of bus clock while
+for others, it has, and this limitation can happen at all clocks in
+clock domain.
+
+So i do not want to make device driver be aware of it. I just let it
+know there is only one clock, and keep the dependency in clock
+framework.
+
+> Regrads,
+> -grygorii
