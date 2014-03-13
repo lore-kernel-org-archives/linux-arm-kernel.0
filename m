@@ -1,51 +1,104 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Mar 2014 11:18:34 +0200
-Subject: [PATCH 12/18] dma: edma: Add channel number to debug prints
+Date: Thu, 13 Mar 2014 11:18:37 +0200
+Subject: [PATCH 15/18] ASoC: davinci-mcasp: Use dmaengine based platform
+ driver for AM335x/447x
 In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1394702320-21743-13-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-16-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It helps to identify issues if we have some information regarding to the
-channel which the event is associated.
+Use the edma-pcm with AM335x and AM447x SoCs.
+Keep using the davinci-pcm for DaVinci devices, they can be switched to use
+the dmaengine based driver later when they are verified to work correctly.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ sound/soc/davinci/davinci-mcasp.c | 46 +++++++++++++++++++++++++++++++++------
+ 1 file changed, 39 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 07ac5f4eeb56..47abaac7eb18 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -185,7 +185,8 @@ static void edma_execute(struct edma_chan *echan)
- 	edma_resume(echan->ch_num);
+diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
+index b0ae0677f023..604aa982f5c4 100644
+--- a/sound/soc/davinci/davinci-mcasp.c
++++ b/sound/soc/davinci/davinci-mcasp.c
+@@ -36,6 +36,7 @@
  
- 	if (edesc->processed <= MAX_NR_SG) {
--		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
-+		dev_dbg(dev, "first transfer starting on channel %d\n",
-+			echan->ch_num);
- 		edma_start(echan->ch_num);
- 	}
+ #include "davinci-pcm.h"
+ #include "davinci-mcasp.h"
++#include "edma-pcm.h"
  
-@@ -195,7 +196,7 @@ static void edma_execute(struct edma_chan *echan)
- 	 * MAX_NR_SG
- 	 */
- 	if (echan->missed) {
--		dev_dbg(dev, "missed event in execute detected\n");
-+		dev_dbg(dev, "missed event on channel %d\n", echan->ch_num);
- 		edma_clean_channel(echan->ch_num);
- 		edma_stop(echan->ch_num);
- 		edma_start(echan->ch_num);
-@@ -732,7 +733,7 @@ static int edma_alloc_chan_resources(struct dma_chan *chan)
- 	echan->alloced = true;
- 	echan->slot[0] = echan->ch_num;
+ struct davinci_mcasp_context {
+ 	u32	txfmtctl;
+@@ -721,10 +722,12 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
+ {
+ 	struct davinci_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
  
--	dev_dbg(dev, "allocated channel for %u:%u\n",
-+	dev_dbg(dev, "allocated channel %d for %u:%u\n", echan->ch_num,
- 		EDMA_CTLR(echan->ch_num), EDMA_CHAN_SLOT(echan->ch_num));
+-	if (mcasp->version == MCASP_VERSION_4)
++	if (mcasp->version >= MCASP_VERSION_3)
++		/* Using dmaengine PCM */
+ 		snd_soc_dai_set_dma_data(dai, substream,
+ 					&mcasp->dma_data[substream->stream]);
+ 	else
++		/* Using davinci-pcm */
+ 		snd_soc_dai_set_dma_data(dai, substream, mcasp->dma_params);
  
  	return 0;
+@@ -1154,12 +1157,28 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
+ 	if (ret != 0)
+ 		goto err_release_clk;
+ 
+-	if (mcasp->version != MCASP_VERSION_4) {
++	/* Based on the McASP version use different platform driver */
++	switch (mcasp->version) {
++	case MCASP_VERSION_1:
++	case MCASP_VERSION_2:
+ 		ret = davinci_soc_platform_register(&pdev->dev);
+-		if (ret) {
+-			dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
+-			goto err_unregister_component;
+-		}
++		break;
++	case MCASP_VERSION_3:
++		ret = edma_pcm_platform_register(&pdev->dev);
++		break;
++	case MCASP_VERSION_4:
++		/* Using omap-pcm as platform driver */
++		break;
++	default:
++		dev_err(&pdev->dev, "Invalid McASP version: %d\n",
++			mcasp->version);
++		ret = -EINVAL;
++		break;
++	}
++
++	if (ret) {
++		dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
++		goto err_unregister_component;
+ 	}
+ 
+ 	return 0;
+@@ -1177,8 +1196,21 @@ static int davinci_mcasp_remove(struct platform_device *pdev)
+ 	struct davinci_mcasp *mcasp = dev_get_drvdata(&pdev->dev);
+ 
+ 	snd_soc_unregister_component(&pdev->dev);
+-	if (mcasp->version != MCASP_VERSION_4)
++
++	switch (mcasp->version) {
++	case MCASP_VERSION_1:
++	case MCASP_VERSION_2:
+ 		davinci_soc_platform_unregister(&pdev->dev);
++		break;
++	case MCASP_VERSION_3:
++		edma_pcm_platform_unregister(&pdev->dev);
++		break;
++	case MCASP_VERSION_4:
++		/* Using omap-pcm as platform driver */
++		break;
++	default:
++		break;
++	}
+ 
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
 -- 
 1.9.0
