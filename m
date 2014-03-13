@@ -1,55 +1,61 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 13 Mar 2014 22:27:25 +0100
-Subject: [PATCH v3 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
-In-Reply-To: <1394710643-3411-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
- <1394710643-3411-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140313212725.GF2696@katana>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 13 Mar 2014 16:36:36 -0500
+Subject: [PATCH v5 09/11] arm: add support for reserved memory defined by
+ device tree
+In-Reply-To: <CAGa+x856+YyJ-vyfGoFAKmsqwKD+=Wh0-TT_mAaPStOXjd8eSQ@mail.gmail.com>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
+ <1392985527-6260-10-git-send-email-m.szyprowski@samsung.com>
+ <CAGa+x856+YyJ-vyfGoFAKmsqwKD+=Wh0-TT_mAaPStOXjd8eSQ@mail.gmail.com>
+Message-ID: <20140313213636.GR18529@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 4cc2f5f2ecad..c1fd510fd2c4 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -762,7 +762,7 @@
->  		};
->  
->  		i2c0: i2c at 01c2ac00 {
-> -			compatible = "allwinner,sun4i-i2c";
-> +			compatible = "allwinner,sun4i-a10-i2c";
+On Thu, Mar 13, 2014 at 01:46:50PM -0700, Kevin Hilman wrote:
+> On Fri, Feb 21, 2014 at 4:25 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > Enable reserved memory initialization from device tree.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> This patch has hit -next and several legacy (non-DT) boot failures
+> were detected and bisected down to this patch.  A quick scan looks
+> like there needs to be some sanity checking whether a DT is even
+> present.
 
-I still wonder why there is no "allwinner,sun4i-a20-i2c" entry first
-(even if there is no similar entry in the driver *yet*). From the
-devicetree wiki [1]:
+Hmm.  Yes, the code unconditionally calls of_flat_dt_scan(), which will
+gladly touch initial_boot_params, even though it may be uninitialized.
+The below patch should allow these boards to boot...
 
-===
+However, I'm wondering if there is a good reason why we don't parse the
+/reserved-memory nodes at the right after we parse the /memory nodes as
+part of early_init_dt_scan()...
 
-compatible is a list of strings. The first string in the list specifies
-the exact device that the node represents in the form
-"<manufacturer>,<model>". The following strings represent other devices
-that the device is compatible with.
+Thanks,
+  Josh
 
-For example, the Freescale MPC8349 System on Chip (SoC) has a serial
-device which implements the National Semiconductor ns16550 register
-interface. The compatible property for the MPC8349 serial device should
-therefore be: compatible = "fsl,mpc8349-uart", "ns16550". In this case,
-fsl,mpc8349-uart specifies the exact device, and ns16550 states that it
-is register-level compatible with a National Semiconductor 16550 UART.
+--8<--
+Subject: [PATCH] drivers: of: only scan for reserved mem when fdt present
 
-Note: ns16550 doesn't have a manufacturer prefix purely for historical
-reasons. All new compatible values should use the manufacturer prefix.
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ drivers/of/fdt.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This practice allows existing device drivers to be bound to a newer
-device, while still uniquely identifying the exact hardware.
-
-===
-
-[1] http://www.devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/d1b25041/attachment.sig>
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 510c0d8..501bc83 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -557,6 +557,9 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
+  */
+ void __init early_init_fdt_scan_reserved_mem(void)
+ {
++	if (!initial_boot_params)
++		return;
++
+ 	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
+ 	fdt_init_reserved_mem();
+ }
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
