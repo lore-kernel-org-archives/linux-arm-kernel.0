@@ -1,50 +1,195 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 13 Mar 2014 15:06:46 +0100
-Subject: [PATCH v2 2/3] ARM: berlin2q: add the Marvell Armada 1500 pro in the
- documentation
+Date: Thu, 13 Mar 2014 15:06:45 +0100
+Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
 In-Reply-To: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1394719607-25018-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic informations about the Armada 1500 Pro in the Berlin family of the
-Marvell ARM SoC documentation and the Armada 1500 Pro SoC compatible in the
-related device tree documentation.
+Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
+The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
+timer, apb timers and uarts for now.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/arm/Marvell/README                         | 5 +++++
- Documentation/devicetree/bindings/arm/marvell,berlin.txt | 1 +
- 2 files changed, 6 insertions(+)
+ arch/arm/boot/dts/berlin2q.dtsi | 167 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 167 insertions(+)
+ create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 5a930c1528ad..eb6f212625f9 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -224,6 +224,11 @@ Berlin family (Digital Entertainment)
- 		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
- 		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500/
- 		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
-+	88DE3114, Armada 1500 Pro
-+		Design name:	BG2-Q
-+		Core:		Quad Core ARM Cortex-A9, PL310 L2CC
-+		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500-pro/
-+		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500-pro/assets/Marvell_ARMADA_1500_PRO-01_product_brief.pdf
- 	88DE????
- 		Design name:	BG3
- 		Core:		ARM Cortex-A15, CA15 integrated L2CC
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-index 737afa5f8148..86b7f60c74fc 100644
---- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-@@ -11,6 +11,7 @@ In addition, the above compatible shall be extended with the specific
- SoC and board used. Currently known SoC compatibles are:
-     "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
-     "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
-+    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q, 88DE3114)
-     "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
-     "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
- 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+new file mode 100644
+index 000000000000..1cb76031dfe6
+--- /dev/null
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -0,0 +1,167 @@
++/*
++ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#include "skeleton.dtsi"
++
++/ {
++	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
++	compatible = "marvell,berlin2q", "marvell,berlin";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <1>;
++		};
++
++		cpu at 2 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <2>;
++		};
++
++		cpu at 3 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <3>;
++		};
++	};
++
++	clocks {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		smclk: sysmgr-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++
++		sysclk: system-clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <400000000>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		ranges = <0 0xf7000000 0x1000000>;
++		interrupt-parent = <&gic>;
++
++		l2: l2-cache-controller at ac0000 {
++			compatible = "arm,pl310-cache";
++			reg = <0xac0000 0x1000>;
++			cache-level = <2>;
++		};
++
++		local-timer at ad0600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0xad0600 0x20>;
++			clocks = <&sysclk>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			status = "okay";
++		};
++
++		gic: interrupt-controller at ad1000 {
++			compatible = "arm,cortex-a9-gic";
++			reg = <0xad1000 0x1000>, <0xad0100 0x100>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
++
++		apb at e80000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xe80000 0x10000>;
++			interrupt-parent = <&aic>;
++
++			timer0: timer at 2c00 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c00 0x14>;
++				interrupts = <8>;
++				clock-freq = <100000000>;
++				status = "okay";
++			};
++
++			timer1: timer at 2c14 {
++				compatible = "snps,dw-apb-timer";
++				reg = <0x2c14 0x14>;
++				clock-freq = <100000000>;
++				status = "disabled";
++			};
++
++			aic: interrupt-controller at 3800 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0x3800 0x30>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
++		apb at fc0000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xfc0000 0x10000>;
++			interrupt-parent = <&sic>;
++
++			uart0: uart at 9000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x9000 0x100>;
++				interrupt-parent = <&sic>;
++				interrupts = <8>;
++				clock-frequency = <25000000>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++
++			uart1: uart at a000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0xa000 0x100>;
++				interrupt-parent = <&sic>;
++				interrupts = <9>;
++				clock-frequency = <25000000>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++
++			sic: interrupt-controller at e000 {
++				compatible = "snps,dw-apb-ictl";
++				reg = <0xe000 0x30>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++	};
++};
 -- 
 1.8.3.2
