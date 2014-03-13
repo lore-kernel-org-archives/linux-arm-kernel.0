@@ -1,33 +1,37 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 13 Mar 2014 08:25:43 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxNF1bIDQvNF0gQVJNOiBkdHM6IGlteDI1OiBtYmlteHNk?=
- =?UTF-8?B?MjU6IEFkZCBkaXNwbGF5cyBzdXBwb3J0Lg==?=
-In-Reply-To: <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
-References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
- <20140312220756.02f5b006@e6520eb>
- <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
-Message-ID: <1394684743.193831485@f438.i.mail.ru>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 13 Mar 2014 12:32:45 +0800
+Subject: [PATCH 1/3 V2] crypto: Fix the pointer voodoo in unaligned ahash
+In-Reply-To: <201403130501.00589.marex@denx.de>
+References: <1389720829-5963-1-git-send-email-marex@denx.de>
+ <201403130220.29346.marex@denx.de>
+ <20140313015624.GA2680@gondor.apana.org.au>
+ <201403130501.00589.marex@denx.de>
+Message-ID: <20140313043245.GA3368@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 12 ????? 2014, 18:16 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
-> Hi Eric,
+On Thu, Mar 13, 2014 at 05:01:00AM +0100, Marek Vasut wrote:
+> On Thursday, March 13, 2014 at 02:56:25 AM, Herbert Xu wrote:
+> > On Thu, Mar 13, 2014 at 02:20:29AM +0100, Marek Vasut wrote:
+> > > OK, understood. But shall we not preserve the request intact in case a
+> > > crypto- api function called crypto_ahash_final() with request which has
+> > > .priv already set? Then we would have really funny corruption of the
+> > > request going on and I'm not sure that'd be nice.
+> > 
+> > The priv field is only ever used by ahash.c so how can this happen?
+> > The crypto API refers to code in the API itself, excluding drivers
+> > and users.
 > 
-> On Wed, Mar 12, 2014 at 6:07 PM, Eric B?nard <eric@eukrea.com> wrote:
+> OK, I agree with you that people plumbing in the API itself will know what 
+> they're doing.
 > 
-> > if you have an oscilloscope, can you probe PIXCLK, HSYNC, VSYNC and DE
-> > to check the signals are properly configured vs the datasheet of your
-> > display.
-> 
-> Yes, I have measured VSYNC and there is no activity on this line.
-> 
-> Also tried 3.13 with a non-dt kernel and the same issue is seen.
-> 
-> Running FSL 2.6.31 I can see VSYNC at 57Hz and Tux on the display, so
-> the hardware is good.
-> 
-> At least for me imxfb seems to be broken even for the non-dt case.
+> btw. can you please check the V3 of 3/3 for the fixup of the base.completion() 
+> call ? I will then do tests and roll V4 of the series.
 
-I will check the latest changes on the weekends for i.MX27.
+It looks good to me.
 
----
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
