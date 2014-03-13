@@ -1,86 +1,162 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 10:39:48 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791: Fix SCIFA3-5 clocks
-In-Reply-To: <1394649639-23358-1-git-send-email-geert@linux-m68k.org>
-References: <1394649639-23358-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140313013947.GM25813@verge.net.au>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 13 Mar 2014 02:41:24 +0100
+Subject: [PATCH 2/3 V3] crypto: Pull out the functions to save/restore request
+In-Reply-To: <1394674885-7776-1-git-send-email-marex@denx.de>
+References: <1394674885-7776-1-git-send-email-marex@denx.de>
+Message-ID: <1394674885-7776-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 07:40:39PM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> The MSTP clocks for SCIFA3-5 are MSTP1106-1108, not MSTP1105-1107
-> 
-> Also reinsert them at the correct position to preserve sort order.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+The functions to save original request within a newly adjusted request
+and it's counterpart to restore the original request can be re-used by
+more code in the crypto/ahash.c file. Pull these functions out from the
+code so they're available.
 
-Thanks, I have checked this against the documentation and queued it up as a fix.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tom Lendacky <thomas.lendacky@amd.com>
+---
+ crypto/ahash.c | 107 +++++++++++++++++++++++++++++++++------------------------
+ 1 file changed, 62 insertions(+), 45 deletions(-)
 
-> ---
-> The clock index macros for DT sources are already OK.
-> ---
->  arch/arm/mach-shmobile/clock-r8a7791.c |   15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-> index 605fc778e3e2..701383fe3267 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7791.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-> @@ -170,6 +170,7 @@ static struct clk div6_clks[DIV6_NR] = {
->  
->  /* MSTP */
->  enum {
-> +	MSTP1108, MSTP1107, MSTP1106,
->  	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
->  	MSTP917,
->  	MSTP815, MSTP814,
-> @@ -180,12 +181,15 @@ enum {
->  	MSTP522,
->  	MSTP314, MSTP312, MSTP311,
->  	MSTP216, MSTP207, MSTP206,
-> -	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-> +	MSTP204, MSTP203, MSTP202,
->  	MSTP124,
->  	MSTP_NR
->  };
->  
->  static struct clk mstp_clks[MSTP_NR] = {
-> +	[MSTP1108] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 8, MSTPSR11, 0), /* SCIFA5 */
-> +	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA4 */
-> +	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA3 */
->  	[MSTP931] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
->  	[MSTP930] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
->  	[MSTP929] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
-> @@ -218,9 +222,6 @@ static struct clk mstp_clks[MSTP_NR] = {
->  	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
->  	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
->  	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
-> -	[MSTP1105] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 5, MSTPSR11, 0), /* SCIFA3 */
-> -	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA4 */
-> -	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA5 */
->  	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
->  };
->  
-> @@ -259,9 +260,9 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
->  	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
->  	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
-> -	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
-> -	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
-> -	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-> +	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1106]), /* SCIFA3 */
-> +	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1107]), /* SCIFA4 */
-> +	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1108]), /* SCIFA5 */
->  	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
->  	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
->  	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+V2: Rebase on top of 1/3 V2 , no functional changes.
+V3: Rebase on top of 1/3 V3 , no functional changes.
+
+diff --git a/crypto/ahash.c b/crypto/ahash.c
+index c3b1f50..7f521b4 100644
+--- a/crypto/ahash.c
++++ b/crypto/ahash.c
+@@ -191,55 +191,12 @@ static inline unsigned int ahash_align_buffer_size(unsigned len,
+ 	return len + (mask & ~(crypto_tfm_ctx_alignment() - 1));
+ }
+ 
+-static void ahash_op_unaligned_finish(struct ahash_request *req, int err)
+-{
+-	struct ahash_request_priv *priv = req->priv;
+-
+-	if (err == -EINPROGRESS)
+-		return;
+-
+-	if (!err)
+-		memcpy(priv->result, req->result,
+-		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
+-
+-	/* Restore the original crypto request. */
+-	req->result = priv->result;
+-	req->base.complete = priv->complete;
+-	req->base.data = priv->data;
+-	req->priv = priv->priv;
+-
+-	/* Free the req->priv.priv from the ADJUSTED request. */
+-	kzfree(priv);
+-}
+-
+-static void ahash_op_unaligned_done(struct crypto_async_request *req, int err)
+-{
+-	struct ahash_request *areq = req->data;
+-
+-	/*
+-	 * Restore the original request, see ahash_op_unaligned() for what
+-	 * goes where.
+-	 *
+-	 * The "struct ahash_request *req" here is in fact the "req.base"
+-	 * from the ADJUSTED request from ahash_op_unaligned(), thus as it
+-	 * is a pointer to self, it is also the ADJUSTED "req" .
+-	 */
+-
+-	/* First copy areq->result into areq->priv.result */
+-	ahash_op_unaligned_finish(areq, err);
+-
+-	/* Complete the ORIGINAL request. */
+-	areq->base.complete(&areq->base, err);
+-}
+-
+-static int ahash_op_unaligned(struct ahash_request *req,
+-			      int (*op)(struct ahash_request *))
++static int ahash_save_req(struct ahash_request *req, crypto_completion_t cplt)
+ {
+ 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+ 	unsigned long alignmask = crypto_ahash_alignmask(tfm);
+ 	unsigned int ds = crypto_ahash_digestsize(tfm);
+ 	struct ahash_request_priv *priv;
+-	int err;
+ 
+ 	priv = kmalloc(sizeof(*priv) + ahash_align_buffer_size(ds, alignmask),
+ 		       (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
+@@ -279,10 +236,70 @@ static int ahash_op_unaligned(struct ahash_request *req,
+ 	priv->priv = req->priv;
+ 
+ 	req->result = PTR_ALIGN((u8 *)priv->ubuf, alignmask + 1);
+-	req->base.complete = ahash_op_unaligned_done;
++	req->base.complete = cplt;
+ 	req->base.data = req;
+ 	req->priv = priv;
+ 
++	return 0;
++}
++
++static void ahash_restore_req(struct ahash_request *req)
++{
++	struct ahash_request_priv *priv = req->priv;
++
++	/* Restore the original crypto request. */
++	req->result = priv->result;
++	req->base.complete = priv->complete;
++	req->base.data = priv->data;
++	req->priv = priv->priv;
++
++	/* Free the req->priv.priv from the ADJUSTED request. */
++	kzfree(priv);
++}
++
++static void ahash_op_unaligned_finish(struct ahash_request *req, int err)
++{
++	struct ahash_request_priv *priv = req->priv;
++
++	if (err == -EINPROGRESS)
++		return;
++
++	if (!err)
++		memcpy(priv->result, req->result,
++		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
++
++	ahash_restore_req(req);
++}
++
++static void ahash_op_unaligned_done(struct crypto_async_request *req, int err)
++{
++	struct ahash_request *areq = req->data;
++
++	/*
++	 * Restore the original request, see ahash_op_unaligned() for what
++	 * goes where.
++	 *
++	 * The "struct ahash_request *req" here is in fact the "req.base"
++	 * from the ADJUSTED request from ahash_op_unaligned(), thus as it
++	 * is a pointer to self, it is also the ADJUSTED "req" .
++	 */
++
++	/* First copy req->result into req->priv.result */
++	ahash_op_unaligned_finish(areq, err);
++
++	/* Complete the ORIGINAL request. */
++	areq->base.complete(&areq->base, err);
++}
++
++static int ahash_op_unaligned(struct ahash_request *req,
++			      int (*op)(struct ahash_request *))
++{
++	int err;
++
++	err = ahash_save_req(req, ahash_op_unaligned_done);
++	if (err)
++		return err;
++
+ 	err = op(req);
+ 	ahash_op_unaligned_finish(req, err);
+ 
+-- 
+1.8.5.2
