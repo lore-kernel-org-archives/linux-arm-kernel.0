@@ -1,129 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Mar 2014 16:14:19 +0100
-Subject: [PATCH v5 7/7] ARM: sun6i: dt: Add A31 DMA controller to DTSI
-In-Reply-To: <1394723659-4995-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394723659-4995-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1394723659-4995-8-git-send-email-maxime.ripard@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 13 Mar 2014 10:20:24 -0500
+Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
+ !CONFIG_GENERIC_PHY
+In-Reply-To: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
+References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140313152024.GF4599@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a DMA driver, we can add the DMA bindings in the DTSI for the
-controller and the devices supported that can use DMA.
+On Thu, Mar 13, 2014 at 01:11:13PM +0200, Grygorii Strashko wrote:
+> This fixes a regression on Keystone 2 platforms caused by patch
+> 57303488cd37da58263e842de134dc65f7c626d5
+> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
+> optional support of generic phy in DWC3 core.
+> 
+> On Keystone 2 platforms the USB is not working now because
+> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
+> return -ENOSYS always. The log shows:
+>  dwc3 2690000.dwc3: failed to initialize core
+>  dwc3: probe of 2690000.dwc3 failed with error -38
+> 
+> Hence, fix it by making NULL a valid phy reference in Generic PHY
+> APIs stubs in the same way as it was done by the patch
+> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
+> a valid phy reference".
+> 
+> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> CC: Felipe Balbi <balbi@ti.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+nice :-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 7fff9a20f079..e687b0d1e838 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -237,6 +237,15 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun6i-a31-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <0 50 4>;
-+			clocks = <&ahb1_gates 6>;
-+			resets = <&ahb1_rst 6>;
-+			#dma-cells = <1>;
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun6i-a31-pinctrl";
- 			reg = <0x01c20800 0x400>;
-@@ -322,6 +331,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 16>;
- 			resets = <&apb2_rst 16>;
-+			dmas = <&dma 6>, <&dma 6>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -333,6 +344,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 17>;
- 			resets = <&apb2_rst 17>;
-+			dmas = <&dma 7>, <&dma 7>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -344,6 +357,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 18>;
- 			resets = <&apb2_rst 18>;
-+			dmas = <&dma 8>, <&dma 8>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -355,6 +370,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 19>;
- 			resets = <&apb2_rst 19>;
-+			dmas = <&dma 9>, <&dma 9>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -366,6 +383,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 20>;
- 			resets = <&apb2_rst 20>;
-+			dmas = <&dma 10>, <&dma 10>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -377,6 +396,8 @@
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 21>;
- 			resets = <&apb2_rst 21>;
-+			dmas = <&dma 22>, <&dma 22>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -426,6 +447,8 @@
- 			interrupts = <0 65 4>;
- 			clocks = <&ahb1_gates 20>, <&spi0_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 23>, <&dma 23>;
-+			dma-names = "rx", "tx";
- 			resets = <&ahb1_rst 20>;
- 			status = "disabled";
- 		};
-@@ -436,6 +459,8 @@
- 			interrupts = <0 66 4>;
- 			clocks = <&ahb1_gates 21>, <&spi1_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 24>, <&dma 24>;
-+			dma-names = "rx", "tx";
- 			resets = <&ahb1_rst 21>;
- 			status = "disabled";
- 		};
-@@ -446,6 +471,8 @@
- 			interrupts = <0 67 4>;
- 			clocks = <&ahb1_gates 22>, <&spi2_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 25>, <&dma 25>;
-+			dma-names = "rx", "tx";
- 			resets = <&ahb1_rst 22>;
- 			status = "disabled";
- 		};
-@@ -456,6 +483,8 @@
- 			interrupts = <0 68 4>;
- 			clocks = <&ahb1_gates 23>, <&spi3_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 26>, <&dma 26>;
-+			dma-names = "rx", "tx";
- 			resets = <&ahb1_rst 23>;
- 			status = "disabled";
- 		};
+Acked-by: Felipe Balbi <balbi@ti.com>
+
 -- 
-1.9.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/f77ff56e/attachment.sig>
