@@ -1,189 +1,134 @@
 From: Peter.Chen@freescale.com (Peter Chen)
-Date: Thu, 13 Mar 2014 03:17:38 +0000
-Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
-In-Reply-To: <1394618518-13803-3-git-send-email-denis@eukrea.com>
+Date: Thu, 13 Mar 2014 03:18:59 +0000
+Subject: [PATCH v3][ 4/9] usb: chipidea: usbmisc: Add USB Host support
+ for i.MX25/i.MX35 CPUs
+In-Reply-To: <1394618518-13803-4-git-send-email-denis@eukrea.com>
 References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
- <1394618518-13803-3-git-send-email-denis@eukrea.com>
-Message-ID: <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
+ <1394618518-13803-4-git-send-email-denis@eukrea.com>
+Message-ID: <b7113548623a45e88ce7ca2258310ae6@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
  
+> This adds the i.MX25 and the i.MX35 support in the ChipIdea usbmisc
+> driver.
 > 
-> It also adapt the dts that uses it.
+> The i.MX25 and i.MX35 usb controllers are similar enough to be able to
+> use the same code.
 > 
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
->  arch/arm/boot/dts/imx23.dtsi       |    2 +-
->  arch/arm/boot/dts/imx27.dtsi       |    4 ++--
->  arch/arm/boot/dts/imx28.dtsi       |    4 ++--
->  arch/arm/boot/dts/imx51.dtsi       |    2 +-
->  arch/arm/boot/dts/imx53.dtsi       |    4 ++--
->  arch/arm/boot/dts/imx6qdl.dtsi     |    4 ++--
->  arch/arm/boot/dts/imx6sl.dtsi      |    4 ++--
->  drivers/usb/chipidea/ci_hdrc_imx.c |    2 +-
->  8 files changed, 13 insertions(+), 13 deletions(-)
+> Changelog v2->v3:
+> - Add a commit log
 > 
-> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-> index bbcfb5a..e3c9924 100644
-> --- a/arch/arm/boot/dts/imx23.dtsi
-> +++ b/arch/arm/boot/dts/imx23.dtsi
-> @@ -522,7 +522,7 @@
->  			compatible = "fsl,imx23-usb", "fsl,imx27-usb";
->  			reg = <0x80080000 0x40000>;
->  			interrupts = <11>;
-> -			fsl,usbphy = <&usbphy0>;
-> +			usb-phy = <&usbphy0>;
->  			clocks = <&clks 40>;
->  			status = "disabled";
->  		};
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 83a8247..94bcf1a 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -466,7 +466,7 @@
->  				interrupts = <56>;
->  				clocks = <&clks 15>;
->  				fsl,usbmisc = <&usbmisc 0>;
-> -				fsl,usbphy = <&usbphy0>;
-> +				usb-phy = <&usbphy0>;
->  				status = "disabled";
->  			};
+> Changelog v1->v2:
+> - converted two remaining defines to BIT()
+> - Removed a variable declaration that was not used in usbmisc_imx25_init
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c |   58
+> ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
 > 
-> @@ -485,7 +485,7 @@
->  				interrupts = <55>;
->  				clocks = <&clks 15>;
->  				fsl,usbmisc = <&usbmisc 2>;
-> -				fsl,usbphy = <&usbphy2>;
-> +				usb-phy = <&usbphy2>;
->  				status = "disabled";
->  			};
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c
+> b/drivers/usb/chipidea/usbmisc_imx.c
+> index cd061ab..3523c09 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,26 @@
+>  #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 90a5795..52ad72f 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -1143,7 +1143,7 @@
->  			reg = <0x80080000 0x10000>;
->  			interrupts = <93>;
->  			clocks = <&clks 60>;
-> -			fsl,usbphy = <&usbphy0>;
-> +			usb-phy = <&usbphy0>;
->  			status = "disabled";
->  		};
+> +#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
+> +#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+> +#define MXC_EHCI_INTERFACE_MASK		(0xf)
+> +
+
+Have a check for my comment for above Macros please.
+
+Peter
+
+> +#define MX25_OTG_SIC_SHIFT		29
+> +#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
+> +#define MX25_OTG_PM_BIT			BIT(24)
+> +#define MX25_OTG_PP_BIT			BIT(11)
+> +#define MX25_OTG_OCPOL_BIT		BIT(3)
+> +
+> +#define MX25_H1_SIC_SHIFT		21
+> +#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
+> +#define MX25_H1_PP_BIT			BIT(18)
+> +#define MX25_H1_PM_BIT			BIT(16)
+> +#define MX25_H1_IPPUE_UP_BIT		BIT(7)
+> +#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
+> +#define MX25_H1_TLL_BIT			BIT(5)
+> +#define MX25_H1_USBTE_BIT		BIT(4)
+> +#define MX25_H1_OCPOL_BIT		BIT(2)
+> +
+>  #define MX27_H1_PM_BIT			BIT(8)
+>  #define MX27_H2_PM_BIT			BIT(16)
+>  #define MX27_OTG_PM_BIT			BIT(24)
+> @@ -50,6 +70,39 @@ struct imx_usbmisc {
 > 
-> @@ -1152,7 +1152,7 @@
->  			reg = <0x80090000 0x10000>;
->  			interrupts = <92>;
->  			clocks = <&clks 61>;
-> -			fsl,usbphy = <&usbphy1>;
-> +			usb-phy = <&usbphy1>;
->  			status = "disabled";
->  		};
+>  static struct imx_usbmisc *usbmisc;
 > 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index cb3204a..b290947 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -249,7 +249,7 @@
->  				interrupts = <18>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 0>;
-> -				fsl,usbphy = <&usbphy0>;
-> +				usb-phy = <&usbphy0>;
->  				status = "disabled";
->  			};
+> +static int usbmisc_imx25_init(struct imx_usbmisc_data *data) {
+> +	unsigned long flags;
+> +	u32 val = 0;
+> +
+> +	if (data->index > 1)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	switch (data->index) {
+> +	case 0:
+> +		val = readl(usbmisc->base);
+> +		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
+> +		val |= (MXC_EHCI_INTERFACE_DIFF_UNI & MXC_EHCI_INTERFACE_MASK)
+> << MX25_OTG_SIC_SHIFT;
+> +		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
+> +		writel(val, usbmisc->base);
+> +		break;
+> +	case 1:
+> +		val = readl(usbmisc->base);
+> +		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |
+> MX25_H1_IPPUE_UP_BIT);
+> +		val |= (MXC_EHCI_INTERFACE_SINGLE_UNI &
+> MXC_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
+> +		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT
+> |
+> +			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
+> +
+> +		writel(val, usbmisc->base);
+> +
+> +		break;
+> +	}
+> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>  static int usbmisc_imx25_post(struct imx_usbmisc_data *data)  {
+>  	void __iomem *reg;
+> @@ -159,6 +212,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data
+> *data)  }
 > 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index f0962e5..b10a3de 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -276,7 +276,7 @@
->  				interrupts = <18>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 0>;
-> -				fsl,usbphy = <&usbphy0>;
-> +				usb-phy = <&usbphy0>;
->  				status = "disabled";
->  			};
+>  static const struct usbmisc_ops imx25_usbmisc_ops = {
+> +	.init = usbmisc_imx25_init,
+>  	.post = usbmisc_imx25_post,
+>  };
 > 
-> @@ -286,7 +286,7 @@
->  				interrupts = <14>;
->  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
->  				fsl,usbmisc = <&usbmisc 1>;
-> -				fsl,usbphy = <&usbphy1>;
-> +				usb-phy = <&usbphy1>;
->  				status = "disabled";
->  			};
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
-> b/arch/arm/boot/dts/imx6qdl.dtsi index cfc85be..d2f0087 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -789,7 +789,7 @@
->  				reg = <0x02184000 0x200>;
->  				interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks 162>;
-> -				fsl,usbphy = <&usbphy1>;
-> +				usb-phy = <&usbphy1>;
->  				fsl,usbmisc = <&usbmisc 0>;
->  				status = "disabled";
->  			};
-> @@ -799,7 +799,7 @@
->  				reg = <0x02184200 0x200>;
->  				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks 162>;
-> -				fsl,usbphy = <&usbphy2>;
-> +				usb-phy = <&usbphy2>;
->  				fsl,usbmisc = <&usbmisc 1>;
->  				status = "disabled";
->  			};
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi
-> b/arch/arm/boot/dts/imx6sl.dtsi index 6477447..33f501a 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -651,7 +651,7 @@
->  				reg = <0x02184000 0x200>;
->  				interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks IMX6SL_CLK_USBOH3>;
-> -				fsl,usbphy = <&usbphy1>;
-> +				usb-phy = <&usbphy1>;
->  				fsl,usbmisc = <&usbmisc 0>;
->  				status = "disabled";
->  			};
-> @@ -661,7 +661,7 @@
->  				reg = <0x02184200 0x200>;
->  				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&clks IMX6SL_CLK_USBOH3>;
-> -				fsl,usbphy = <&usbphy2>;
-> +				usb-phy = <&usbphy2>;
->  				fsl,usbmisc = <&usbmisc 1>;
->  				status = "disabled";
->  			};
-> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c
-> b/drivers/usb/chipidea/ci_hdrc_imx.c
-> index c00f772..9a74100 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> @@ -130,7 +130,7 @@ static int ci_hdrc_imx_probe(struct platform_device
-> *pdev)
->  		return ret;
->  	}
-> 
-> -	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy",
-> 0);
-> +	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
->  	if (IS_ERR(data->phy)) {
->  		ret = PTR_ERR(data->phy);
->  		goto err_clk;
+> @@ -200,6 +254,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[]
+> = {
+>  		.data = &imx25_usbmisc_ops,
+>  	},
+>  	{
+> +		.compatible = "fsl,imx35-usbmisc",
+> +		.data = &imx25_usbmisc_ops,
+> +	},
+> +	{
+>  		.compatible = "fsl,imx27-usbmisc",
+>  		.data = &imx27_usbmisc_ops,
+>  	},
 > --
 > 1.7.9.5
 > 
-
-According to Power_ePAPR_APPROVED_v1.1.pdf
-"ethernet-phy" is the node name, it is the same with Sergei's suggestion.
-But you have changed the property name at this patch, in fact, "fsl,usbphy"
-is ok for property name, "fsl,usb-phy" may be better, but not worth a patch
-to change it.
-
-Peter
+> 
