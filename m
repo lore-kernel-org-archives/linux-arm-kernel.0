@@ -1,165 +1,99 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 13 Mar 2014 09:49:16 +0900
-Subject: [PATCH v5 3/3] ARM: dts: add dts files for xyref5260 board
-In-Reply-To: <1394637394-3960-4-git-send-email-rahul.sharma@samsung.com>
-References: <1394637394-3960-1-git-send-email-rahul.sharma@samsung.com>
- <1394637394-3960-4-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5321008C.3090203@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 13 Mar 2014 01:36:43 +0100
+Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART inputs
+In-Reply-To: <6599423.XddAUl3dCe@typ>
+References: <6599423.XddAUl3dCe@typ>
+Message-ID: <3174671.zfR1X00SEg@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+Hi Max,
 
-On 03/13/2014 12:16 AM, Rahul Sharma wrote:
-> The patch adds the dts files for xyref5260 board which
-> is based on Exynos5260 Evt0 sample.
+
+Am Sonntag, 9. M?rz 2014, 20:43:11 schrieb Max Schwarz:
+> Enable integrated pull-ups on the UART RX pins of Rockchip RK3188.
+> 
+> This fixes UART receive on the radxa Rock board, which has an input diode
+> preventing the RX pin from being raised from the outside.
 >
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Max Schwarz <max.schwarz@online.de>
+
+Your patch changes the default behaviour for all rk3188 uarts, while the patch 
+description suggests a Radxa Rock specific problem.
+On my preproduction Radxa Rock the issue is not present, but I think I 
+remember reading somewhere, that the diodes where added in the mass-production 
+model.
+
+So I've dug a bit through different sources:
+
+- the schematics of another rk3188 based device, did not use diodes for the 
+uarts like the Radxa, but
+
+- the default values for pull configuration supports your observation:
+	gpio1-0: pull-up
+	gpio1-1: pull down [currently also none]
+	gpio1-4: pull up
+	gpio1-5: pull-down
+		and so on for the two other pin-groups.
+
+- and rockchip vendor kernels do not seem to change the uart pull configs
+
+I've tested both your patch + enabling the pull down for the txd pin too. Both 
+variants work on my radxa.
+
+So I agree with you but would like to determine if we should also set the txd 
+to pull down in one go, to restore the default pull setting of these pins or 
+should leave them as is.
+Thoughts?
+
+
+Heiko
+
+
 > ---
->   arch/arm/boot/dts/Makefile                      |    1 +
->   arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts |  110 +++++++++++++++++++++++
->   2 files changed, 111 insertions(+)
->   create mode 100644 arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b9d6a8b..5a391bf 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->   	exynos5250-arndale.dtb \
->   	exynos5250-smdk5250.dtb \
->   	exynos5250-snow.dtb \
-> +	exynos5260-xyref5260-evt0.dtb \
->   	exynos5420-arndale-octa.dtb \
->   	exynos5420-smdk5420.dtb \
->   	exynos5440-sd5v1.dtb \
-> diff --git a/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts b/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
-> new file mode 100644
-> index 0000000..d7d0aeb
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
-> @@ -0,0 +1,110 @@
-> +/*
-> + * SAMSUNG XYREF5260 EVT0 board device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5260.dtsi"
-> +
-> +/ {
-> +	model = "SAMSUNG XYREF5260 EVT0 board based on EXYNOS5260";
-> +	compatible = "samsung,xyref5260", "samsung,exynos5260";
-> +
-> +	memory {
-> +		reg = <0x20000000 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySAC2,115200";
-> +	};
-> +
-> +	clocks {
-> +		fin_pll: xxti {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <24000000>;
-> +			clock-output-names = "fin_pll";
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		xrtcxti: xrtcxti {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "xrtcxti";
-> +		};
-
-clock-cells property is missing here.
-
-> +
-> +		spdif_extclk: ioclk_spdif_extclk {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <49152000>;
-> +			clock-output-names = "ioclk_spdif_extclk";
-> +		};
-
-ditto.
-
-> +	};
-> +};
-
-May I know why other phyclocks and ioclks have not been added?
-
-> +
-> +&pinctrl_0 {
-> +	hdmi_hpd_irq: hdmi-hpd-irq {
-> +		samsung,pins = "gpx3-7";
-> +		samsung,pin-function = <0>;
-> +		samsung,pin-pud = <1>;
-> +		samsung,pin-drv = <0>;
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	status = "okay";
-> +};
-> +
-> +&mmc_0 {
-> +	status = "okay";
-> +	num-slots = <1>;
-> +	broken-cd;
-> +	bypass-smu;
-> +	supports-highspeed;
-> +	supports-hs200-mode; /* 200 Mhz */
-> +	card-detect-delay = <200>;
-> +	samsung,dw-mshc-ciu-div = <3>;
-> +	samsung,dw-mshc-sdr-timing = <0 4>;
-> +	samsung,dw-mshc-ddr-timing = <0 2>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd0_rdqs &sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +
-> +	slot at 0 {
-> +		reg = <0>;
-> +		bus-width = <8>;
-> +	};
-> +};
-> +
-> +&mmc_2 {
-> +	status = "okay";
-> +	num-slots = <1>;
-> +	supports-highspeed;
-> +	card-detect-delay = <200>;
-> +	samsung,dw-mshc-ciu-div = <3>;
-> +	samsung,dw-mshc-sdr-timing = <2 3>;
-> +	samsung,dw-mshc-ddr-timing = <1 2>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +
-> +	slot at 0 {
-> +		reg = <0>;
-> +		bus-width = <4>;
-> +		disable-wp;
-> +	};
-> +};
-
-
--- 
-Best Regards,
-Pankaj Dubey
+>  arch/arm/boot/dts/rk3188.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index 412f4d0..2e10bd7 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -149,7 +149,7 @@
+> 
+>  			uart0 {
+>  				uart0_xfer: uart0-xfer {
+> -					rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 
+&pcfg_pull_none>,
+> +					rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_up>,
+>  							<RK_GPIO1 1 RK_FUNC_1 &pcfg_pull_none>;
+>  				};
+> 
+> @@ -164,7 +164,7 @@
+> 
+>  			uart1 {
+>  				uart1_xfer: uart1-xfer {
+> -					rockchip,pins = <RK_GPIO1 4 RK_FUNC_1 
+&pcfg_pull_none>,
+> +					rockchip,pins = <RK_GPIO1 4 RK_FUNC_1 &pcfg_pull_up>,
+>  							<RK_GPIO1 5 RK_FUNC_1 &pcfg_pull_none>;
+>  				};
+> 
+> @@ -179,7 +179,7 @@
+> 
+>  			uart2 {
+>  				uart2_xfer: uart2-xfer {
+> -					rockchip,pins = <RK_GPIO1 8 RK_FUNC_1 
+&pcfg_pull_none>,
+> +					rockchip,pins = <RK_GPIO1 8 RK_FUNC_1 &pcfg_pull_up>,
+>  							<RK_GPIO1 9 RK_FUNC_1 &pcfg_pull_none>;
+>  				};
+>  				/* no rts / cts for uart2 */
+> @@ -187,7 +187,7 @@
+> 
+>  			uart3 {
+>  				uart3_xfer: uart3-xfer {
+> -					rockchip,pins = <RK_GPIO1 10 RK_FUNC_1 
+&pcfg_pull_none>,
+> +					rockchip,pins = <RK_GPIO1 10 RK_FUNC_1 &pcfg_pull_up>,
+>  							<RK_GPIO1 11 RK_FUNC_1 &pcfg_pull_none>;
+>  				};
