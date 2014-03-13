@@ -1,109 +1,68 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 13 Mar 2014 18:36:16 -0500
-Subject: [RFC 3/5] ARM: OMAP2+: timer: Add clocksource initialization
- and powerup support
-In-Reply-To: <CAL_JsqJVPVybd90WUv_nCqUJMUgR+Ep3yxrX2+psNYqic-WQ1Q@mail.gmail.com>
-References: <1394742919-32163-1-git-send-email-joelf@ti.com>	<1394742919-32163-4-git-send-email-joelf@ti.com>
- <CAL_JsqJVPVybd90WUv_nCqUJMUgR+Ep3yxrX2+psNYqic-WQ1Q@mail.gmail.com>
-Message-ID: <532240F0.1030403@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 13 Mar 2014 19:44:48 -0400
+Subject: [PATCH v3 0/6] Armada 380 NAND support
+In-Reply-To: <1394742273-5113-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1394742273-5113-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140313234448.GB15608@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 04:52 PM, Rob Herring wrote:
-> On Thu, Mar 13, 2014 at 3:35 PM, Joel Fernandes <joelf@ti.com> wrote:
->> Introduce a generic omap timer initialization function that can
->> be used by all SoCs for which support is available in the clocksource
->> driver introduced in the series.
->>
->> The function will also be responsible for calling clock initialization
->> required for everything else to work.
->>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  arch/arm/mach-omap2/common.h |    1 +
->>  arch/arm/mach-omap2/timer.c  |   28 ++++++++++++++++++++++++++++
->>  2 files changed, 29 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
->> index a6aae30..e58d9a4 100644
->> --- a/arch/arm/mach-omap2/common.h
->> +++ b/arch/arm/mach-omap2/common.h
->> @@ -92,6 +92,7 @@ extern void omap3_secure_sync32k_timer_init(void);
->>  extern void omap3_gptimer_timer_init(void);
->>  extern void omap4_local_timer_init(void);
->>  extern void omap5_realtime_timer_init(void);
->> +void omap_generic_timer_init(void);
->>
->>  void omap2420_init_early(void);
->>  void omap2430_init_early(void);
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index 74044aa..08c73a0 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -324,6 +324,25 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
->>         return r;
->>  }
->>
->> +int __init omap_dmtimer_powerup(struct omap_dm_timer *timer,
->> +                                       struct device_node *np) {
+On Thu, Mar 13, 2014 at 05:24:27PM -0300, Ezequiel Garcia wrote:
+> This patchset adds support for the NAND on Armada 380/385 SoCs.
 > 
-> This function seems unrelated to the commit message.
-
-Ok, I'll add it in the message.
-
+> The first patch adds a new "armada-380-corediv-clock" compatible
+> string, with its proper SoC-specific structure, adding the register
+> layout for this SoC family.
 > 
->> +       struct omap_hwmod *oh;
->> +       const char *oh_name = NULL;
->> +
->> +       of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
->> +       if (!oh_name)
->> +               return -ENODEV;
->> +
->> +       oh = omap_hwmod_lookup(oh_name);
->> +       if (!oh)
->> +               return -ENODEV;
->> +
->> +       omap_hwmod_setup_one(oh_name);
->> +
->> +       omap_hwmod_enable(oh);
->> +       return 0;
->> +}
->> +
->>  static void __init omap2_gp_clockevent_init(int gptimer_id,
->>                                                 const char *fck_source,
->>                                                 const char *property)
->> @@ -615,6 +634,15 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
->>                                2, "sys_clkin_ck", NULL);
->>  #endif
->>
->> +void omap_generic_timer_init(void)
->> +{
->> +       if (!of_have_populated_dt())
->> +               BUG_ON("Generic timer init should only be used for DT boot\n");
+> The second and third patches add the devicetree changes to support
+> the Core Divider clock.
 > 
-> I thought omap2 is always DT boot now.
-
-That's right, sorry- I'll get rid of the check.
-
->> +
->> +       omap_clk_init();
+> After adding its clock source, the fourth and fifth patches add
+> the NAND devicetree changes. The NAND controller is compatible with
+> the Armada 370 controller, so we are currently support it using the
+> same compatible string.
 > 
-> Can't you use CLK_OF_DECLARE and remove this? Then you can remove the
-> init_time function hook completely.
-
-There is some dev-id conn-id -> DT node mapping done. I'll let Tero comment
-more on this.
-
-Thanks,
--Joel
-
+> The last patch updates the binding documentation for the Core Divider
+> clock, which is missing the information about the already supported
+> Armada 375 compatible string.
 > 
->> +       clocksource_of_init();
->> +}
->> +
->>  #ifdef CONFIG_ARCH_OMAP4
->>  #ifdef CONFIG_HAVE_ARM_TWD
->>  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
->> --
->> 1.7.9.5
->>
+> This series is based on linux-next 20140307. I expect it will apply
+> cleanly on v3.15-rc1; if that's not the case, I'll send a rebased patchset.
+> 
+> The clock and devicetree changes are mostly independent so they
+> can be merged through the clock and mvebu tree respectively.
+> 
+> Changes from v2:
+> 
+>   * Removed the unneeded 'nand' label from the flash at d0000 node.
+> 
+>   * Renamed 'coredivclk at e4250' to 'clock at e4250' according to
+>     ePAPR recomendation, below.
+> 
+> Changes from v1:
+> 
+>   * Changed nand at d0000 with flash at d0000 in the devicetree. The
+>     latter is compliant with ePAPR recomendation (see ePAPR v1.1,
+>     section 2.2.2, Generic Names Recommendation).
+> 
+> Ezequiel Garcia (6):
+>   clk: mvebu: Support Armada 380 SoC on the core divider clock
+
+Applied to mvebu/clk-3xx
+
+>   ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
+>   ARM: mvebu: Add the Core Divider clock to Armada 38x SoCs
+>   ARM: mvebu: Add support for NAND controller in Armada 38x SoC
+>   ARM: mvebu: Enable NAND controller in Armada 385-DB
+
+Applied to mvebu/dt
+
+>   clk: mvebu: Update binding documentation for the core divider clock
+
+Applied to mvebu/clk-3xx
+
+I'll push for-next with tonight's additions in an hour or so.
+
+thx,
+
+Jason.
