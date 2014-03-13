@@ -1,66 +1,61 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 13 Mar 2014 15:38:32 -0400 (EDT)
-Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
- phy_ethtool_get_wol
-In-Reply-To: <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140313.153832.967564223480298567.davem@davemloft.net>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 13 Mar 2014 16:38:57 -0300
+Subject: [PATCH v2 1/6] clk: mvebu: Support Armada 380 SoC on the core divider
+ clock
+In-Reply-To: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <1394739542-30017-2-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Wed, 12 Mar 2014 00:02:55 +0100
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-> phy_ethtool_get_wol is a helper to get current WOL settings from
-> a phy device. When using this helper on a PHY without .get_wol
-> callback, struct ethtool_wolinfo is never set-up correctly and
-> may contain misleading information about WOL status.
-> 
-> To fix this, always zero relevant fields of struct ethtool_wolinfo
-> regardless of .get_wol callback availability.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+This commit adds support for the Core Divider clocks of the Armada
+380 SoCs. Similarly to Armada 370 and XP, the Core Divider clocks of
+the 380 have gate capabilities. The only difference is the register layout.
 
-I'm starting to see this situation more clearly now, especially with
-Ben's most recent commentary.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/clk/mvebu/clk-corediv.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-The basic notion is that one must do ethtool ops are designed such that
-the top-level execution context in net/core/ethtool.c takes care of
-initializing the structure.
-
-In this case, we're referring specifically to ethtool_get_wol(), which
-runs any time ETHTOOL_GWOL is requested.
-
-Therefore no ethtool_ops->get_wol() implementation should duplicate
-this work, that goes for all of such cases which invoke the function
-we are talking about here, phy_ethtool_get_wol().
-
-So the first change is definitely to remove:
-
-	wol->supported = 0;
-	wol->wolopts = 0;
-
-from:
-
-drivers/net/ethernet/marvell/mv643xx_eth.c:mv643xx_eth_get_wol()
-drivers/net/ethernet/ti/cpsw.c:cpsw_get_wol()
-
-Next, I think phy_suspend() must create the same environment the
-call sites above guarentee for phy_ethtool_get_wol(), namely
-by changing the declaration of 'wol' to:
-
-	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
-
-which will cause the compiler to clear out the rest of the structure
-for us, as the same declaration does in ethtool_get_wol().
-
-Finally, purge the spurious clears in phydev_ops->get_wol(), namely
-in at803x_get_wol() and m88e1318_get_wol().
-
-So, to reiterate, OPS never have to be mindful of initializing the
-ethtool result with zeros.  However, anyone who calls into OPS
-directly must provide said expected state.
-
-Are we all on the same page now?
+diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
+index 4da6076..911dbb6 100644
+--- a/drivers/clk/mvebu/clk-corediv.c
++++ b/drivers/clk/mvebu/clk-corediv.c
+@@ -204,6 +204,22 @@ static const struct clk_corediv_soc_desc armada370_corediv_soc = {
+ 	.ratio_offset = 0x8,
+ };
+ 
++static const struct clk_corediv_soc_desc armada380_corediv_soc = {
++	.descs = mvebu_corediv_desc,
++	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
++	.ops = {
++		.enable = clk_corediv_enable,
++		.disable = clk_corediv_disable,
++		.is_enabled = clk_corediv_is_enabled,
++		.recalc_rate = clk_corediv_recalc_rate,
++		.round_rate = clk_corediv_round_rate,
++		.set_rate = clk_corediv_set_rate,
++	},
++	.ratio_reload = BIT(8),
++	.enable_bit_offset = 16,
++	.ratio_offset = 0x4,
++};
++
+ static const struct clk_corediv_soc_desc armada375_corediv_soc = {
+ 	.descs = mvebu_corediv_desc,
+ 	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
+@@ -290,3 +306,10 @@ static void __init armada375_corediv_clk_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(armada375_corediv_clk, "marvell,armada-375-corediv-clock",
+ 	       armada375_corediv_clk_init);
++
++static void __init armada380_corediv_clk_init(struct device_node *node)
++{
++	return mvebu_corediv_clk_init(node, &armada380_corediv_soc);
++}
++CLK_OF_DECLARE(armada380_corediv_clk, "marvell,armada-380-corediv-clock",
++	       armada380_corediv_clk_init);
+-- 
+1.9.0
