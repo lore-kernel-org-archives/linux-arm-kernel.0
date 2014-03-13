@@ -1,49 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Mar 2014 18:01:05 +0000
-Subject: [PATCH] arm64: Add ARCH_HAS_SG_CHAIN
-In-Reply-To: <1394732963-12174-1-git-send-email-lauraa@codeaurora.org>
-References: <1394732963-12174-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140313180105.GG25472@mudshark.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Mar 2014 19:03:50 +0100
+Subject: [PATCH v3 0/4] irq: sun4i IRQ 0 / ENMI fixes
+Message-ID: <1394733834-26839-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 05:49:23PM +0000, Laura Abbott wrote:
-> It's useful to be able to chain scatterlists together for very large
-> scatter allocations. Define ARCH_HAS_SG_CHAIN to let this happen.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm64/include/asm/scatterlist.h | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 arch/arm64/include/asm/scatterlist.h
-> 
-> diff --git a/arch/arm64/include/asm/scatterlist.h b/arch/arm64/include/asm/scatterlist.h
-> new file mode 100644
-> index 0000000..7b2602a
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/scatterlist.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __ASM_SCATTERLIST_H
-> +#define __ASM_SCATTERLIST_H
-> +
-> +#include <asm-generic/scatterlist.h>
-> +
-> +#define ARCH_HAS_SG_CHAIN
+Hi All,
 
-Hmm, I wonder if this should be a Kconfig option instead, to avoid the need
-for the dummy header?
+Here is v3 of my sun4i IRQ 0 / ENMI fixes patch-set, changelog below:
 
-Will
+v2:
+
+PATCH 1/4 irq: Add handle_fasteoi_late_irq irq handler
+New patch by Thomas Gleixner, adding a new irq handler with the "call eoi
+after the irq-handler has run its course" behavior we need to avoid double
+irqs on the ENMI.
+
+PATCH 2/4 irqchip: sun4i: Fix irq 0 not working
+Modified to avoid spurious calls to the irq 0 handler, as suggested by Maxime.
+
+PATCH 3/4 irqchip: sun4i: Fix a comment about mask register
+Added Maxime's Acked-by
+
+PATCH 4/4 irqchip: sun4i: Use handle_fasteoi_late_irq for the
+New patch switching the handler for irq 0 over to the new
+handle_fasteoi_late_irq handler, thereby fixing the double interrupts issue
+
+
+v3:
+
+PATCH 1/4 irq: Add a new IRQCHIP_EOI_THREADED flag
+New patch by Thomas Gleixner, replacing his "irq: Add handle_fasteoi_late_irq
+irq handler" patch.
+
+PATCH 2/4 irqchip: sun4i: Fix irq 0 not working
+Added Maxime's Acked-by
+
+PATCH 4/4 irqchip: sun4i: Don't ack IRQs != 0, fix acking of IRQ
+New patch replacing my "irqchip: sun4i: Use handle_fasteoi_late_irq ..."
+patch. This also drops acking for IRQ != 0. I've done both changes in
+one patch to avoid regressing for IRQ 0.
+
+
+Thanks for all the help to all involved.
+
+Regards,
+
+Hans
