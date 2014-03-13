@@ -1,38 +1,36 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 16:33:57 +0100
-Subject: [PATCH v5 2/3] ARM: dts: add dts files for exynos5260 SoC
-In-Reply-To: <1394637394-3960-3-git-send-email-rahul.sharma@samsung.com>
-References: <1394637394-3960-1-git-send-email-rahul.sharma@samsung.com>
- <1394637394-3960-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5321CFE5.2000907@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 13 Mar 2014 19:31:23 +0400
+Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
+In-Reply-To: <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
+ <1394618518-13803-3-git-send-email-denis@eukrea.com>
+ <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <5321CF4B.9000308@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On 12.03.2014 16:16, Rahul Sharma wrote:
-> The patch adds the dts files for exynos5260.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5260-pinctrl.dtsi |  574 +++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5260.dtsi         |  400 ++++++++++++++++++++
->   2 files changed, 974 insertions(+)
->   create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
->   create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
->
+On 13-03-2014 7:17, Peter Chen wrote:
 
-[snip]
+>> It also adapt the dts that uses it.
 
+>> Signed-off-by: Denis Carikli <denis@eukrea.com>
+[...]
 
-> +		mmc_0: mmc0 at 12140000 {
+> According to Power_ePAPR_APPROVED_v1.1.pdf
+> "ethernet-phy" is the node name, it is the same with Sergei's suggestion.
 
-Node names should specify type of the device, so unit-specific IDs 
-should be avoided. Please simply use mmc at 12140000. The same comment for 
-remaining MMC nodes below.
+    Nobody's talking about "ehternet-phy" here.
 
-Best regards,
-Tomasz
+> But you have changed the property name at this patch, in fact, "fsl,usbphy"
+> is ok for property name, "fsl,usb-phy" may be better, but not worth a patch
+> to change it.
+
+    No, it's not better and both are not OK because they're still Freescale 
+specific while the de-facto standard property "usb-phy" is already used by 
+other USB drivers for the same purpose.
+
+> Peter
+
+WBR, Sergei
