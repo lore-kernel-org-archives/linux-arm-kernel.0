@@ -1,48 +1,47 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 13 Mar 2014 09:24:15 +0100
-Subject: [PATCH 0/3] ARM: dts: overo: Add graphics output
-In-Reply-To: <5320093D.2010600@ti.com>
+Date: Thu, 13 Mar 2014 09:25:43 +0100
+Subject: [PATCH 1/3] ARM: dts: overo: Add support for DVI output
+In-Reply-To: <53200894.5020602@ti.com>
 References: <1394541257-25605-1-git-send-email-florian.vaussard@epfl.ch>
- <5320093D.2010600@ti.com>
-Message-ID: <53216B2F.5000409@epfl.ch>
+ <1394541257-25605-2-git-send-email-florian.vaussard@epfl.ch>
+ <53200894.5020602@ti.com>
+Message-ID: <53216B87.9070007@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 03/12/2014 08:14 AM, Tomi Valkeinen wrote:
+On 03/12/2014 08:11 AM, Tomi Valkeinen wrote:
 > On 11/03/14 14:34, Florian Vaussard wrote:
->> Hi,
+>> Summit and Tobi expansion boards have a HDMI connector with a TFP410
+>> encoder. Add a common include file for this configuration, and then
+>> use it for Summit and Tobi.
 >>
->> This series enables the DVI / LCD graphics present on some of
->> the Overo expansion boards.
->>
->> DVI output:
->> - Tobi
->> - Summit
->>
->> LCD (3.5''):
->> - Alto35
->>
->> LCD (4.3''):
->> - Chestnut43
->> - Palo43
->> - Gallop43
->>
->> I tested on Tobi, Alto35 and Gallop43 using both OMAP35xx and OMAP36xx
->> Overo boards.
->>
->> This series depends on Tomi's DSS patches [1] that are not yet merged.
->> It also depends on previous Overo series [2] and [3] that are under
->> review. A complete testing tree is available [4].
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  arch/arm/boot/dts/omap3-overo-common-dvi.dtsi    | 109 +++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap3-overo-summit-common.dtsi |   1 +
+>>  arch/arm/boot/dts/omap3-overo-tobi-common.dtsi   |   1 +
+>>  3 files changed, 111 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
 > 
-> Looks good to me. Unfortunately the video bindings are still being
-> discussed (mainly the ports/endpoints), so there might be changes needed
-> when some kind of conclusion is reached.
+> <snip>
+> 
+>> +&dss {
+>> +	status = "ok";
+>> +
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&dss_dpi_pins
+>> +		     &i2c3_pins>;
+> 
+> The i2c3 pins don't belong here, they are not related to dss. The
+> dvi-connector uses i2c3, but I don't think they belong there either, as
+> the i2c3 bus can be used by multiple devices. So I guess they should be
+> set in &i2c3 node.
 > 
 
-Yes, I saw. This is why I posted this separately from the other patches.
-I will update if necessary, let's wait.
+You are right. And as I am already using i2c3 for other things, this
+duplicates the pinctrl. I will drop it.
 
 Regards,
 Florian
