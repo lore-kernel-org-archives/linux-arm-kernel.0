@@ -1,51 +1,119 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Mar 2014 10:13:09 +0000
-Subject: [PATCH] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <1394055789-31479-1-git-send-email-lauraa@codeaurora.org>
-References: <1394055789-31479-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140313101308.GB30339@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 13 Mar 2014 19:13:43 +0900
+Subject: [PATCH v6 0/7] arm64: Add ftrace support
+In-Reply-To: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+This patchset implements a function tracer on arm64.
+There was another implementation from Cavium network, but both of us agreed
+to use my patchset as future base. He is supposed to review this code, too.
 
-On Wed, Mar 05, 2014 at 09:43:09PM +0000, Laura Abbott wrote:
-> +#define PTE_SET_FN(_name, pteop) \
-> +static int pte_set_##_name(pte_t *ptep, pgtable_t token, unsigned long addr, \
-> +			void *data) \
-> +{ \
-> +	pte_t pte = pteop(*ptep); \
-> +\
-> +	set_pte(ptep, pte); \
-> +	return 0; \
-> +} \
-> +
-> +#define SET_MEMORY_FN(_name, callback) \
-> +int set_memory_##_name(unsigned long addr, int numpages) \
-> +{ \
-> +	unsigned long start = addr; \
-> +	unsigned long size = PAGE_SIZE*numpages; \
-> +	unsigned long end = start + size; \
-> +\
-> +	if (start < MODULES_VADDR || start >= MODULES_END) \
-> +		return -EINVAL;\
-> +\
-> +	if (end < MODULES_VADDR || end >= MODULES_END) \
-> +		return -EINVAL; \
-> +\
-> +	apply_to_page_range(&init_mm, start, size, callback, NULL); \
-> +	flush_tlb_kernel_range(start, end); \
-> +	return 0;\
-> +}
+The only issue that I had some concern on was "fault protection" code
+in prepare_ftrace_return(). With discussions with Steven and Tim (as author
+of arm ftrace), I removed that code since I'm not quite sure about possibility
+of "fault" occurrences in this function.
 
-The code seems correct but I don't really like this macro expansion. We
-changed the pte_mk* functions already to inline functions, so we should
-do the same with these set_memory_*() functions. Similar to s390, we
-could have a change_module_page_attr() or have two set/clear functions
-like x86 that just change the pte attribute (I think the latter allows
-us to no longer define pte_mkexec etc).
+The code is tested on ARMv8 Fast Model with the following tracers & events:
+     function tracer with dynamic ftrace
+     function graph tracer with dynamic ftrace
+     syscall tracepoint (but only for AArch64 tasks)
+     irqsoff & preemptirqsoff (which use CALLER_ADDRx)
+and also verified with in-kernel tests, FTRACE_SELFTEST, FTRACE_STARTUP_TEST
+and EVENT_TRACE_TEST_SYSCALLS.
 
-Thanks.
+Prerequisites are:
+ * "arm64: make a single hook to syscall_trace() for all syscall features" patch
+ * "arm64: split syscall_trace() into separate functions for enter/exit" patch
+ * "arm64: Add regs_return_value() in syscall.h" patch
+
+Please be careful:
+* Patch [3/7] gets warnings from checkpatch, but they are based on the
+  original's coding style.
+* Patch [7/7] may conflict with my audit patch because both changes the same
+  location in syscall_trace_enter/exit(). I expect the functions are called
+  in this order:
+  On entry,
+     * tracehook_report_syscall(ENTER)
+     * trace_sys_enter()
+     * audit_syscall_entry()
+  On exit,
+     * audit_sysscall_exit()
+     * trace_sys_exit()
+     * tracehook_report_syscall(EXIT) 
+
+Changes from v5 to v6:
+* changed the order of patches to avoid any bisect error (I have not tried
+  though)
+* added EM_AARCH64 and R_AARCH64_ABS64 definitions in scripts/recordmcount.c
+  just in case elf.h on host machine doesn't have them. [3/7]
+* updated a frame pointer (x29) in _mcount() to make it look like a normal
+  function [4/7]
+* aligned with the patch, "arm64: split syscall_trace() into separate
+  functions for enter/exit" [7/7]
+* defined ARCH_TRACE_IGNORE_COMPAT_SYSCALLS in order not to trace compat
+  syscalls [7/7]
+
+Chnages from v4 to v5:
+* improved the description of stack layout [1/7]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v3 [5/7]
+
+Changes from v3 to v4:
+* removed unnecessary "#ifdef" [1,2/7]
+* changed stack depth from 48B to 16B in mcount()/ftrace_caller() (a bug) [1/7]
+* changed MCOUNT_INSN_SIZE to AARCH64_INSN_SIZE [1,7/7]
+* added a guard againt TIF_SYSCALL_TRACEPOINT [5/7]
+* corrected the second argument passed to trace_sys_exit() (a bug) [5/7]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [5/7]
+
+Changes from v2 to v3:
+* optimized register usages in asm (by not saving x0, x1, and x2)
+* removed "fault protection" code in prepare_ftrace_return()
+* rewrote ftrace_modify_code() using "hotpatch" interfaces
+* revised descriptions in comments
+
+Changes from v1 to v2:
+* splitted one patch into some pieces for easier review
+  (especially function tracer + dynamic ftrace + CALLER_ADDRx)
+* put return_address() in a separate file
+* renamed __mcount to _mcount (it was my mistake)
+* changed stackframe handling to get parent's frame pointer
+* removed ARCH_SUPPORTS_FTRACE_OPS
+* switched to "hotpatch" interfaces from Huawai
+* revised descriptions in comments
+
+AKASHI Takahiro (7):
+  arm64: add __ASSEMBLY__ in asm/insn.h
+  arm64: Add 'notrace' attribute to unwind_frame() for ftrace
+  ftrace: Add arm64 support to recordmcount
+  arm64: Add ftrace support
+  arm64: ftrace: Add dynamic ftrace support
+  arm64: ftrace: Add CALLER_ADDRx macros
+  arm64: ftrace: Add system call tracepoint
+
+ arch/arm64/Kconfig                 |    6 +
+ arch/arm64/include/asm/ftrace.h    |   69 ++++++++++++
+ arch/arm64/include/asm/insn.h      |    2 +
+ arch/arm64/include/asm/syscall.h   |    1 +
+ arch/arm64/include/asm/unistd.h    |    2 +
+ arch/arm64/kernel/Makefile         |    7 +-
+ arch/arm64/kernel/arm64ksyms.c     |    4 +
+ arch/arm64/kernel/entry-ftrace.S   |  218 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ftrace.c         |  177 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/ptrace.c         |   48 ++++----
+ arch/arm64/kernel/return_address.c |   55 +++++++++
+ arch/arm64/kernel/stacktrace.c     |    2 +-
+ scripts/recordmcount.c             |    9 ++
+ scripts/recordmcount.pl            |    5 +
+ 14 files changed, 583 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ftrace.h
+ create mode 100644 arch/arm64/kernel/entry-ftrace.S
+ create mode 100644 arch/arm64/kernel/ftrace.c
+ create mode 100644 arch/arm64/kernel/return_address.c
 
 -- 
-Catalin
+1.7.9.5
