@@ -1,43 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Mar 2014 11:18:25 +0200
-Subject: [PATCH 03/18] dma: edma: Set DMA_CYCLIC capability flag
-In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1394702320-21743-4-git-send-email-peter.ujfalusi@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 13 Mar 2014 10:18:40 +0100
+Subject: [PATCH v4][ 2/8] ARM: dts: mx35: USB block requires only one clock
+In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+Message-ID: <1394702326-25558-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Indicate that the edma dmaengine driver has support for cyclic mode.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Like other imx SoCs only one USB clock is needed on mx35.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/common/edma.c | 1 +
- drivers/dma/edma.c     | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/imx35.dtsi |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 41bca32409fc..86a8b263278f 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1574,6 +1574,7 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
- 		return ERR_PTR(ret);
- 
- 	dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
-+	dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
- 	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
- 				   &edma_filter_info);
- 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index b54cd2dedde0..86d6a3fb0d92 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -887,6 +887,7 @@ static int edma_probe(struct platform_device *pdev)
- 
- 	dma_cap_zero(ecc->dma_slave.cap_mask);
- 	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
- 
- 	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
- 
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index e59ccb4..474a73d 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -296,8 +296,7 @@
+ 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4000 0x0200>;
+ 				interrupts = <37>;
+-				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
+-				clock-names = "ipg", "ahb", "per";
++				clocks = <&clks 73>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				status = "disabled";
+ 			};
+@@ -306,8 +305,7 @@
+ 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4400 0x0200>;
+ 				interrupts = <35>;
+-				clocks = <&clks 9>, <&clks 73>, <&clks 28>;
+-				clock-names = "ipg", "ahb", "per";
++				clocks = <&clks 73>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				status = "disabled";
+ 			};
 -- 
-1.9.0
+1.7.9.5
