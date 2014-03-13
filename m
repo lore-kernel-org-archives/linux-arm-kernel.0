@@ -1,54 +1,26 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Mar 2014 11:18:40 +0200
-Subject: [PATCH 18/18] ASoC: davinci-mcasp: Place constraint on the period
- size based on FIFO config
-In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1394702320-21743-19-git-send-email-peter.ujfalusi@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 13 Mar 2014 10:28:32 +0100
+Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
+In-Reply-To: <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>	<1390410577-22073-4-git-send-email-denis@eukrea.com>
+ <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
+Message-ID: <53217A40.7030607@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to place constraint on the period size (and indirectly to buffer
-size) if the read or write AFIFO is enabled and it is configured for more
-than one word otherwise the DMA will fail in buffer configuration where
-the sizes are not aligned with the requested FIFO configuration.
+On 03/12/2014 06:27 PM, Fabio Estevam wrote:
+> Hi Denis,
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/davinci/davinci-mcasp.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> I turned on the backlight supply via bootloader (kernel still does not
+> support MC34704 PMIC yet),
 
-diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
-index 958933614ca4..17d1112bce24 100644
---- a/sound/soc/davinci/davinci-mcasp.c
-+++ b/sound/soc/davinci/davinci-mcasp.c
-@@ -717,7 +717,27 @@ static int davinci_mcasp_trigger(struct snd_pcm_substream *substream,
- 	return ret;
- }
- 
-+static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
-+				 struct snd_soc_dai *cpu_dai)
-+{
-+	struct davinci_mcasp *mcasp = snd_soc_dai_get_drvdata(cpu_dai);
-+	int afifo_numevt;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		afifo_numevt = mcasp->txnumevt;
-+	else
-+		afifo_numevt = mcasp->rxnumevt;
-+
-+	if (afifo_numevt > 1)
-+		snd_pcm_hw_constraint_step(substream->runtime, 0,
-+					   SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
-+					   afifo_numevt);
-+
-+	return 0;
-+}
-+
- static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
-+	.startup	= davinci_mcasp_startup,
- 	.trigger	= davinci_mcasp_trigger,
- 	.hw_params	= davinci_mcasp_hw_params,
- 	.set_fmt	= davinci_mcasp_set_dai_fmt,
--- 
-1.9.0
+Maybe this patchset[1] could help, but it still requires some work, and 
+I don't have the hardware to test anymore right now.
+So feel free to improve it and resubmit it.
+
+References:
+-----------
+[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/thread.html#214619
+
+Denis.
