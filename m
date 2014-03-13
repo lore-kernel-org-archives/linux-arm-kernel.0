@@ -1,98 +1,47 @@
 From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Thu, 13 Mar 2014 16:57:26 +0100
-Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort,
- route the call to the KVM MMIO bus
+Date: Thu, 13 Mar 2014 16:57:28 +0100
+Subject: [RFC PATCH 3/4] ARM: KVM: enable linking against eventfd
 In-Reply-To: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
 References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <1394726249-1547-4-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
-handle the MMIO access through any registered read/write callbacks. This
-is a dependency for eventfd support (ioeventfd and irqfd).
-
-However, accesses to the VGIC are still left implemented independently,
-since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
+This enables and compiles the ioeventfd capability of KVM on ARM. The
+irqfd feature will not be included in a build, due to the lack of IRQ
+routing in the VGIC implementation of KVM.
 
 Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
 ---
- arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic.c |  5 ++++-
- 2 files changed, 36 insertions(+), 1 deletion(-)
+ arch/arm/kvm/Kconfig  | 1 +
+ arch/arm/kvm/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 4cb5a93..1d17831 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	return 0;
- }
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 466bd29..a4b0312 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -20,6 +20,7 @@ config KVM
+ 	bool "Kernel-based Virtual Machine (KVM) support"
+ 	select PREEMPT_NOTIFIERS
+ 	select ANON_INODES
++	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select KVM_MMIO
+ 	select KVM_ARM_HOST
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 789bca9..2fa2f82 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
  
-+/**
-+ * kvm_handle_mmio - handle an in-kernel MMIO access
-+ * @vcpu:	pointer to the vcpu performing the access
-+ * @run:	pointer to the kvm_run structure
-+ * @mmio:	pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		struct kvm_exit_mmio *mmio)
-+{
-+	int ret;
-+	if (mmio->is_write) {
-+		ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
-+				mmio->len, &mmio->data);
-+
-+	} else {
-+		ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
-+				mmio->len, &mmio->data);
-+	}
-+	if (!ret) {
-+		kvm_prepare_mmio(run, mmio);
-+		kvm_handle_mmio_return(vcpu, run);
-+	}
-+
-+	return !ret;
-+}
-+
- int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		 phys_addr_t fault_ipa)
- {
-@@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	if (vgic_handle_mmio(vcpu, run, &mmio))
- 		return 1;
+ KVM := ../../../virt/kvm
+-kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
++kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
  
-+	if (handle_kernel_mmio(vcpu, run, &mmio))
-+		return 1;
-+
- 	kvm_prepare_mmio(run, &mmio);
- 	return 0;
- }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8ca405c..afdecc3 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -849,13 +849,16 @@ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
- }
- 
- /**
-- * vgic_handle_mmio - handle an in-kernel MMIO access
-+ * vgic_handle_mmio - handle an in-kernel vgic MMIO access
-  * @vcpu:	pointer to the vcpu performing the access
-  * @run:	pointer to the kvm_run structure
-  * @mmio:	pointer to the data describing the access
-  *
-  * returns true if the MMIO access has been performed in kernel space,
-  * and false if it needs to be emulated in user space.
-+ *
-+ * This is handled outside of kvm_handle_mmio because the kvm_io_bus only
-+ * passes the VM pointer, while we need the VCPU performing the access.
-  */
- bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio)
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
 -- 
 1.8.3.2
