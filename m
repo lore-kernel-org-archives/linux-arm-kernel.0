@@ -1,71 +1,36 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:18:44 +0100
-Subject: [PATCH v4][ 6/8] ARM: dts: i.MX35: Add USB support.
-In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394702326-25558-6-git-send-email-denis@eukrea.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 11:18:29 +0200
+Subject: [PATCH 07/18] DMA: edma: Use different eventq for cyclic channels
+In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+To improve latency with cyclic DMA operation it is preferred to
+use different eventq/tc than the default which is used by all
+other drivers (mmc, spi, i2c, etc).
+When preparing the cyclic dma ask for non default queue for the
+channel which is going to be used with cyclic mode.
+
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Changelog v3->v4:
-- Moved the compatible of usbphy on top to match the other nodes.
-- the usb phy's names were renamed from usbphy to usb-phy.
-- The patch renaming the fsl,usbphy property in usb-phy was removed.
-  So this patch was adapted to that.
+ drivers/dma/edma.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Changelog v2->v3:
-- rebased on top of the "usb: chipidea: Use standard usb-phy property." patch.
-- Fixed the usbphy nodes index and added and added a reg property.
-
-Changelog v1->v2:
-- The usbphy nodes were made to look like the ones in imx53.dtsi
-- The patch was rebased on top of the clock fixes commits.
----
- arch/arm/boot/dts/imx35.dtsi |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index 474a73d..4759abb 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -298,6 +298,7 @@
- 				interrupts = <37>;
- 				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 0>;
-+				fsl,usbphy = <&usbphy0>;
- 				status = "disabled";
- 			};
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 86d6a3fb0d92..604c7c94c731 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -624,6 +624,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 		edesc->pset[i].opt |= TCINTEN;
+ 	}
  
-@@ -307,6 +308,7 @@
- 				interrupts = <35>;
- 				clocks = <&clks 73>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				fsl,usbphy = <&usbphy1>;
- 				status = "disabled";
- 			};
++	/* Use different eventq/tc for cyclic DMA to reduce latency */
++	edma_request_non_default_queue(echan->ch_num);
++
+ 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+ }
  
-@@ -355,4 +357,20 @@
- 			};
- 		};
- 	};
-+
-+	usbphy {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usbphy0: usb-phy at 0 {
-+			reg = <0>;
-+			compatible = "usb-nop-xceiv";
-+		};
-+
-+		usbphy1: usb-phy at 1 {
-+			reg = <1>;
-+			compatible = "usb-nop-xceiv";
-+		};
-+	};
- };
 -- 
-1.7.9.5
+1.9.0
