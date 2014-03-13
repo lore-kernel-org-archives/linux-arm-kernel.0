@@ -1,139 +1,68 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Fri, 14 Mar 2014 01:54:17 +0530
-Subject: [PATCH 2/2] [RFC] arm: iommu: Refactoring dma-mapping iommu code
-Message-ID: <CAD15aga6=Au6qtuiZuxgZxtNuE8U++4vOW8caySxbZfTmoFAsQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Mar 2014 13:24:25 -0700
+Subject: [PATCH v3 0/2] ARM: OMAP4+: Fix gpmc_fck clock
+In-Reply-To: <53216D58.2040304@epfl.ch>
+References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
+ <53216D58.2040304@epfl.ch>
+Message-ID: <20140313202425.GC5981@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Taking out complete function defination to lib/iommu-helper.c
-from arch/arm/mm/dma-mapping.c
+* Florian Vaussard <florian.vaussard@epfl.ch> [140313 01:36]:
+> Hi,
+> 
+> On 02/26/2014 11:38 AM, Florian Vaussard wrote:
+> > Hello,
+> > 
+> > Trying to get my SMSC9221 working on OMAP4 with DT,
+> > I faced a misconfigured gpmc_fck (dummy clock set to 0)
+> > resulting in serveral division-by-zero, misconfigured
+> > timings and driver lost in the La La Land.
+> > 
+> > To solve this, patch 1 removes gpmc_fck from the dummy
+> > clocks, and patch 2 adds the gpmc_fck DT node and
+> > reference it from the gpmc node.
+> > 
+> > *Note*: For DRA7, there is no DTS node for the GPMC, so I
+> > was unable to set the corresponding clock. And without
+> > a public TRM, I cannot do much more.
+> > 
+> > Tested on DuoVero/Parlor (OMAP4430) with SMSC9221 (DTS
+> > was posted on the OMAP ML [1]).
+> > 
+> > Regards,
+> > Florian
+> > 
+> > [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110801
+> > ---
+> > Since v2:
+> > - Added OMAP5 and DRA7
+> > Since v1:
+> > - Removed the gpmc_fck clock node, and reference directly l3_ick
+> > 
+> > Florian Vaussard (2):
+> >   CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy clocks
+> >   ARM: DTS: OMAP4/5: Use l3_ick for the gpmc node
+> > 
+> 
+> Any other comments on these two patches? If it is not going into 3.15
+> before the merge window, it will have to go through the -rc cycle as the
+> Duovero/Parlor .dts will be upstream.
 
-Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
----
- arch/arm/mm/dma-mapping.c    | 38 ++++----------------------------------
- include/linux/iommu-helper.h |  2 ++
- lib/iommu-helper.c           | 33 +++++++++++++++++++++++++++++++++
- 3 files changed, 39 insertions(+), 34 deletions(-)
+Applying both into omap-for-v3.15/fixes with Cc: stable v3.14+.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ae301c8e..331465e 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1143,39 +1143,6 @@ static int __iommu_free_buffer(struct device
-*dev, struct page **pages,
- }
+Regards,
 
- /*
-- * Create a CPU mapping for a specified pages
-- */
--static void *
--__iommu_alloc_remap(struct page **pages, size_t size, gfp_t gfp, pgprot_t prot,
--                   const void *caller)
--{
--       unsigned int i, nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
--       struct vm_struct *area;
--       unsigned long p;
--
--       area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
--                                 caller);
--       if (!area)
--               return NULL;
--
--       area->pages = pages;
--       area->nr_pages = nr_pages;
--       p = (unsigned long)area->addr;
--
--       for (i = 0; i < nr_pages; i++) {
--               phys_addr_t phys = __pfn_to_phys(page_to_pfn(pages[i]));
--               if (ioremap_page_range(p, p + PAGE_SIZE, phys, prot))
--                       goto err;
--               p += PAGE_SIZE;
--       }
--       return area->addr;
--err:
--       unmap_kernel_range((unsigned long)area->addr, size);
--       vunmap(area->addr);
--       return NULL;
--}
--
--/*
-  * Create a mapping in device IO address space for specified pages
-  */
- static dma_addr_t
-@@ -1263,6 +1230,7 @@ static void *arm_iommu_alloc_attrs(struct device
-*dev, size_t size,
-        pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-        struct page **pages;
-        void *addr = NULL;
-+       unsigned long flags = 0;
-
-        *handle = DMA_ERROR_CODE;
-        size = PAGE_ALIGN(size);
-@@ -1290,7 +1258,9 @@ static void *arm_iommu_alloc_attrs(struct device
-*dev, size_t size,
-        if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
-                return pages;
-
--       addr = __iommu_alloc_remap(pages, size, gfp, prot,
-+       flags = VM_ARM_DMA_CONSISTENT | VM_USERMAP;
-+
-+       addr = iommu_alloc_remap(pages, size, flags, prot,
-                                   __builtin_return_address(0));
-        if (!addr)
-                goto err_mapping;
-diff --git a/include/linux/iommu-helper.h b/include/linux/iommu-helper.h
-index d580508..52dde70 100644
---- a/include/linux/iommu-helper.h
-+++ b/include/linux/iommu-helper.h
-@@ -43,5 +43,7 @@ extern dma_addr_t iommu_mapper(struct iommu_domain *domain,
-
- extern void iommu_unmapper(struct iommu_domain *domain, dma_addr_t iova,
-                        size_t size);
-+extern void *iommu_alloc_remap(struct page **pages, size_t size, unsigned long
-+                       flags, pgprot_t prot, const void *caller);
-
- #endif
-diff --git a/lib/iommu-helper.c b/lib/iommu-helper.c
-index b6ea51b..ae4f0d6 100644
---- a/lib/iommu-helper.c
-+++ b/lib/iommu-helper.c
-@@ -176,3 +176,36 @@ void iommu_unmapper(struct iommu_domain *domain,
-dma_addr_t iova, size_t size)
-
-        iommu_unmap(domain, iova, size);
- }
-+
-+/*
-+ * Create a CPU mapping for a specified pages
-+ */
-+void *
-+iommu_alloc_remap(struct page **pages, size_t size, unsigned long flags,
-+                       pgprot_t prot, const void *caller)
-+{
-+       unsigned int i, nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+       struct vm_struct *area;
-+       unsigned long p;
-+
-+       area = get_vm_area_caller(size, flags, caller);
-+
-+       if (!area)
-+               return NULL;
-+
-+       area->pages = pages;
-+       area->nr_pages = nr_pages;
-+       p = (unsigned long)area->addr;
-+
-+       for (i = 0; i < nr_pages; i++) {
-+               phys_addr_t phys = __pfn_to_phys(page_to_pfn(pages[i]));
-+               if (ioremap_page_range(p, p + PAGE_SIZE, phys, prot))
-+                       goto err;
-+               p += PAGE_SIZE;
-+       }
-+       return area->addr;
-+err:
-+       unmap_kernel_range((unsigned long)area->addr, size);
-+       vunmap(area->addr);
-+       return NULL;
-+}
---
-1.8.1.3
+Tony
+ 
+> >  arch/arm/boot/dts/omap4.dtsi | 2 ++
+> >  arch/arm/boot/dts/omap5.dtsi | 2 ++
+> >  drivers/clk/ti/clk-44xx.c    | 1 -
+> >  drivers/clk/ti/clk-54xx.c    | 1 -
+> >  drivers/clk/ti/clk-7xx.c     | 1 -
+> >  5 files changed, 4 insertions(+), 3 deletions(-)
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
