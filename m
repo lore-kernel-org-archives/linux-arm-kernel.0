@@ -1,59 +1,157 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 18:17:28 +0100
-Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+Date: Thu, 13 Mar 2014 18:17:27 +0100
+Subject: [PATCH v11][ 06/12] ARM: dts: imx5*,
+ imx6*: correct display-timings nodes.
 In-Reply-To: <1394731053-6118-1-git-send-email-denis@eukrea.com>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394731053-6118-7-git-send-email-denis@eukrea.com>
+Message-ID: <1394731053-6118-6-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a way to pass signal polarity informations
-  between DRM panels, and the display drivers.
+The imx-drm driver can't use the de-active and
+pixelclk-active display-timings properties yet.
 
-To do that, a pol_flags field was added to drm_display_mode.
+Instead the data-enable and the pixel data clock
+polarity are hardcoded in the imx-drm driver.
+
+So theses properties are now set to keep
+the same behaviour when imx-drm will start
+using them.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v10->v11:
-- Since the imx-drm won't be able to retrive its regulators
-  from the device tree when using display-timings nodes,
-  and that I was told that the drm simple-panel driver 
-  already supported that, I then, instead, added what was
-  lacking to make the eukrea displays work with the
-  drm-simple-panel driver.
-
-  That required a way to get back the display polarity
-  informations from the imx-drm driver without affecting
-  userspace.
+ChangeLog v9->v10:
+- New patch that was splitted out of:
+  "staging imx-drm: Use de-active and pixelclk-active
+  display-timings."
 ---
- include/drm/drm_crtc.h |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx51-babbage.dts       |    2 ++
+ arch/arm/boot/dts/imx53-m53evk.dts        |    2 ++
+ arch/arm/boot/dts/imx53-tx53-x03x.dts     |    2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi     |    2 ++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi     |    2 ++
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi    |    2 ++
+ 9 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index f764654..61a4fe1 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -131,6 +131,13 @@ enum drm_mode_status {
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 9e9deb2..4732a00 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -38,6 +38,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
  
- #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index 4646ea9..d6e1046 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -40,6 +40,8 @@
+ 					vfront-porch = <9>;
+ 					vsync-len = <3>;
+ 					vsync-active = <1>;
++					de-active = <1>;
++					pixelclk-active = <0>;
+ 				};
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+index 0217dde3..4092a81 100644
+--- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
++++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+@@ -93,7 +93,7 @@
+ 					hsync-active = <0>;
+ 					vsync-active = <0>;
+ 					de-active = <1>;
+-					pixelclk-active = <1>;
++					pixelclk-active = <0>;
+ 				};
  
-+#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-+#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-+#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
-+#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
-+#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
-+#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
-+
- struct drm_display_mode {
- 	/* Header */
- 	struct list_head head;
-@@ -183,6 +190,7 @@ struct drm_display_mode {
- 	int vrefresh;		/* in Hz */
- 	int hsync;		/* in kHz */
- 	enum hdmi_picture_aspect picture_aspect_ratio;
-+	unsigned int pol_flags;
- };
- 
- static inline bool drm_mode_is_stereo(const struct drm_display_mode *mode)
+ 				ET0500 {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index c8e5ae0..43f48f2 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -494,6 +494,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 2795dfc..59ecfd1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -516,6 +516,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 99be301..e9419a2 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -349,6 +349,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 009abd6..230bbc6 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -405,6 +405,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 3bec128..ed4c72f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -349,6 +349,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 7a88d9a..7d1c84c 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -463,6 +463,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
 -- 
 1.7.9.5
