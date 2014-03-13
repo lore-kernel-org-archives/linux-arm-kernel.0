@@ -1,176 +1,132 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 13 Mar 2014 22:47:03 +0000
-Subject: [PATCH v2 10/15] arm64: Add function to create identity mappings
+Date: Thu, 13 Mar 2014 22:47:00 +0000
+Subject: [PATCH v2 07/15] efi: Add shared printk wrapper for consistent
+ prefixing
 In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
 References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1394750828-16351-11-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1394750828-16351-8-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+From: Roy Franz <roy.franz@linaro.org>
 
-At boot time, before switching to a virtual UEFI memory map, firmware
-expects UEFI memory and IO regions to be identity mapped whenever
-kernel makes runtime services calls. The existing early boot code
-creates an identity map of kernel text/data but this is not sufficient
-for UEFI. This patch adds a create_id_mapping() function which reuses
-the core code of the existing create_mapping().
+Add a wrapper for printk to standardize the prefix for informational and
+error messages from the EFI stub.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 ---
- arch/arm64/include/asm/mmu.h |    2 ++
- arch/arm64/mm/mmu.c          |   65 ++++++++++++++++++++++++++++++------------
- 2 files changed, 49 insertions(+), 18 deletions(-)
+ drivers/firmware/efi/efi-stub-helper.c |   25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index f600d40..29ed1d8 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -28,5 +28,7 @@ extern void paging_init(void);
- extern void setup_mm_for_reboot(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
-+/* create an identity mapping for memory (or io if map_io is true) */
-+extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
- 
- #endif
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6b7e895..357956a 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -168,7 +168,8 @@ static void __init *early_alloc(unsigned long sz)
+diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+index 661f425..4c8ab86 100644
+--- a/drivers/firmware/efi/efi-stub-helper.c
++++ b/drivers/firmware/efi/efi-stub-helper.c
+@@ -45,6 +45,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
+ 	}
  }
  
- static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
--				  unsigned long end, unsigned long pfn)
-+				  unsigned long end, unsigned long pfn,
-+				  pgprot_t prot)
- {
- 	pte_t *pte;
- 
-@@ -180,16 +181,28 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
--		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
-+		set_pte(pte, pfn_pte(pfn, prot));
- 		pfn++;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
- static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
--				  unsigned long end, phys_addr_t phys)
-+				  unsigned long end, phys_addr_t phys,
-+				  int map_io)
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-+	pmdval_t prot_sect;
-+	pgprot_t prot_pte;
++#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
++#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
 +
-+	if (map_io) {
-+		prot_sect = PMD_TYPE_SECT | PMD_SECT_AF |
-+			    PMD_ATTRINDX(MT_DEVICE_nGnRE);
-+		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
-+	} else {
-+		prot_sect = prot_sect_kernel;
-+		prot_pte = PAGE_KERNEL_EXEC;
-+	}
  
- 	/*
- 	 * Check for initial section mappings in the pgd/pud and remove them.
-@@ -205,7 +218,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
- 			pmd_t old_pmd =*pmd;
--			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
-+			set_pmd(pmd, __pmd(phys | prot_sect));
- 			/*
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
-@@ -213,21 +226,23 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 			if (!pmd_none(old_pmd))
- 				flush_tlb_all();
- 		} else {
--			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
-+			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-+				       prot_pte);
+ static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+ 				       efi_memory_desc_t **map,
+@@ -324,7 +327,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 				nr_files * sizeof(*files),
+ 				(void **)&files);
+ 	if (status != EFI_SUCCESS) {
+-		efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
++		pr_efi_err(sys_table_arg, "Failed to alloc mem for file handle list\n");
+ 		goto fail;
+ 	}
+ 
+@@ -376,13 +379,13 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 					image->device_handle, &fs_proto,
+ 						(void **)&io);
+ 			if (status != EFI_SUCCESS) {
+-				efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
++				pr_efi_err(sys_table_arg, "Failed to handle fs_proto\n");
+ 				goto free_files;
+ 			}
+ 
+ 			status = efi_call_phys2(io->open_volume, io, &fh);
+ 			if (status != EFI_SUCCESS) {
+-				efi_printk(sys_table_arg, "Failed to open volume\n");
++				pr_efi_err(sys_table_arg, "Failed to open volume\n");
+ 				goto free_files;
+ 			}
  		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
- }
+@@ -390,7 +393,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 		status = efi_call_phys5(fh->open, fh, &h, filename_16,
+ 					EFI_FILE_MODE_READ, (u64)0);
+ 		if (status != EFI_SUCCESS) {
+-			efi_printk(sys_table_arg, "Failed to open file: ");
++			pr_efi_err(sys_table_arg, "Failed to open file: ");
+ 			efi_char16_printk(sys_table_arg, filename_16);
+ 			efi_printk(sys_table_arg, "\n");
+ 			goto close_handles;
+@@ -402,7 +405,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 		status = efi_call_phys4(h->get_info, h, &info_guid,
+ 					&info_sz, NULL);
+ 		if (status != EFI_BUFFER_TOO_SMALL) {
+-			efi_printk(sys_table_arg, "Failed to get file info size\n");
++			pr_efi_err(sys_table_arg, "Failed to get file info size\n");
+ 			goto close_handles;
+ 		}
  
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
--				  unsigned long end, unsigned long phys)
-+				  unsigned long end, unsigned long phys,
-+				  int map_io)
- {
- 	pud_t *pud = pud_offset(pgd, addr);
- 	unsigned long next;
+@@ -411,7 +414,7 @@ grow:
+ 					EFI_LOADER_DATA, info_sz,
+ 					(void **)&info);
+ 		if (status != EFI_SUCCESS) {
+-			efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
++			pr_efi_err(sys_table_arg, "Failed to alloc mem for file info\n");
+ 			goto close_handles;
+ 		}
  
- 	do {
- 		next = pud_addr_end(addr, end);
--		alloc_init_pmd(pud, addr, next, phys);
-+		alloc_init_pmd(pud, addr, next, phys, map_io);
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -236,30 +251,44 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-  * Create the page directory entries and any necessary page tables for the
-  * mapping specified by 'md'.
-  */
--static void __init create_mapping(phys_addr_t phys, unsigned long virt,
--				  phys_addr_t size)
-+static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
-+				    unsigned long virt, phys_addr_t size,
-+				    int map_io)
- {
- 	unsigned long addr, length, end, next;
--	pgd_t *pgd;
--
--	if (virt < VMALLOC_START) {
--		pr_warning("BUG: not creating mapping for 0x%016llx at 0x%016lx - outside kernel range\n",
--			   phys, virt);
--		return;
--	}
+@@ -427,7 +430,7 @@ grow:
+ 		efi_call_phys1(sys_table_arg->boottime->free_pool, info);
  
- 	addr = virt & PAGE_MASK;
- 	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+ 		if (status != EFI_SUCCESS) {
+-			efi_printk(sys_table_arg, "Failed to get file info\n");
++			pr_efi_err(sys_table_arg, "Failed to get file info\n");
+ 			goto close_handles;
+ 		}
  
--	pgd = pgd_offset_k(addr);
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(pgd, addr, next, phys);
-+		alloc_init_pud(pgd, addr, next, phys, map_io);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
+@@ -446,13 +449,13 @@ grow:
+ 		status = efi_high_alloc(sys_table_arg, file_size_total, 0x1000,
+ 				    &file_addr, max_addr);
+ 		if (status != EFI_SUCCESS) {
+-			efi_printk(sys_table_arg, "Failed to alloc highmem for files\n");
++			pr_efi_err(sys_table_arg, "Failed to alloc highmem for files\n");
+ 			goto close_handles;
+ 		}
  
-+static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-+				  phys_addr_t size)
-+{
-+	if (virt < VMALLOC_START) {
-+		pr_warn("BUG: not creating mapping for 0x%016llx@0x%016lx - outside kernel range\n",
-+			phys, virt);
-+		return;
-+	}
-+	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
-+}
-+
-+void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-+{
-+	if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
-+		pr_warn("BUG: not creating id mapping for 0x%016llx\n", addr);
-+		return;
-+	}
-+	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
-+			 addr, addr, size, map_io);
-+}
-+
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
+ 		/* We've run out of free low memory. */
+ 		if (file_addr > max_addr) {
+-			efi_printk(sys_table_arg, "We've run out of free low memory\n");
++			pr_efi_err(sys_table_arg, "We've run out of free low memory\n");
+ 			status = EFI_INVALID_PARAMETER;
+ 			goto free_file_total;
+ 		}
+@@ -473,7 +476,7 @@ grow:
+ 							&chunksize,
+ 							(void *)addr);
+ 				if (status != EFI_SUCCESS) {
+-					efi_printk(sys_table_arg, "Failed to read file\n");
++					pr_efi_err(sys_table_arg, "Failed to read file\n");
+ 					goto free_file_total;
+ 				}
+ 				addr += chunksize;
+@@ -558,7 +561,7 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
+ 				       &new_addr);
+ 	}
+ 	if (status != EFI_SUCCESS) {
+-		efi_printk(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
++		pr_efi_err(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
+ 		return status;
+ 	}
+ 
 -- 
 1.7.10.4
