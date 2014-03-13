@@ -1,49 +1,47 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 13 Mar 2014 17:04:10 -0300
-Subject: [PATCH v2 5/6] ARM: mvebu: Enable NAND controller in Armada 385-DB
-In-Reply-To: <53221AD4.3090002@cogentembedded.com>
+Date: Thu, 13 Mar 2014 17:05:46 -0300
+Subject: [PATCH v2 3/6] ARM: mvebu: Add the Core Divider clock to Armada
+ 38x SoCs
+In-Reply-To: <53221B41.2030001@cogentembedded.com>
 References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1394739542-30017-6-git-send-email-ezequiel@vanguardiasur.com.ar>
- <53221AD4.3090002@cogentembedded.com>
-Message-ID: <20140313200410.GA30590@arch.cereza>
+ <1394739542-30017-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <53221B41.2030001@cogentembedded.com>
+Message-ID: <20140313200546.GB30590@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mar 13, Sergei Shtylyov wrote:
-> On 03/13/2014 10:39 PM, Ezequiel Garcia wrote:
+> Hello.
+> 
+> On 03/13/2014 10:38 PM, Ezequiel Garcia wrote:
 > 
 > >From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> >The Armada 385-DB board has a NAND flash, so enable it in the
-> >devicetree and add the partitions as prepared in the factory images.
+> >The Armada 38x SoC family has a clock provider called "Core Divider",
+> >derived from the fixed 2 GHz main PLL clock. This is similar to the
+> >one on A370, A375 and AXP.
 > 
 > >Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > >---
-> >  arch/arm/boot/dts/armada-385-db.dts | 21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
+> >  arch/arm/boot/dts/armada-38x.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > 
-> >diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-> >index 9a13642..edcf7ff 100644
-> >--- a/arch/arm/boot/dts/armada-385-db.dts
-> >+++ b/arch/arm/boot/dts/armada-385-db.dts
-> >@@ -80,6 +80,27 @@
-> >  					reg = <1>;
-> >  				};
+> >diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> >index 38fc3a0..76cc27e 100644
+> >--- a/arch/arm/boot/dts/armada-38x.dtsi
+> >+++ b/arch/arm/boot/dts/armada-38x.dtsi
+> >@@ -337,6 +337,14 @@
+> >  				compatible = "marvell,orion-mdio";
+> >  				reg = <0x72004 0x4>;
 > >  			};
 > >+
-> >+			flash: flash at d0000 {
+> >+			coredivclk: corediv-clock at e4250 {
 > 
->    Note that you don't have to label your device the same way as it's named,
-> i.e. you could have labelled it "nand" if it would make things clearer.
-
-Right.
-
->    Although I don't readily see the value of labeling nodes in the board's
-> .dts file. Do you really expect to refer to it somewhere?
+>    I would suggest naming the device just "clock at e4250" on the same grounds
+> of having the generic device names.
 > 
 
-Yeah, I was thinking the same thing just after I sent this. No, I don't think
-we need the label.
+Right, I overlooked this.
 
 -- 
 Ezequiel Garc?a, Free Electrons
