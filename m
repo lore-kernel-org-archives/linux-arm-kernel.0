@@ -1,29 +1,66 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Thu, 13 Mar 2014 20:25:43 +0100
-Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART inputs
-In-Reply-To: <3174671.zfR1X00SEg@phil>
-References: <6599423.XddAUl3dCe@typ> <3174671.zfR1X00SEg@phil>
-Message-ID: <2567235.KcPFJfGIvp@typ>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 13 Mar 2014 15:38:32 -0400 (EDT)
+Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140313.153832.967564223480298567.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Wed, 12 Mar 2014 00:02:55 +0100
 
-> So I agree with you but would like to determine if we should also set the
-> txd to pull down in one go, to restore the default pull setting of these
-> pins or should leave them as is.
-> Thoughts?
-As soon as the UART is enabled, that TX pull-down does not do anything because 
-the UART will actively drive the pin. I don't know what happens if the UART is 
-suspended through runtime PM, though. I skimmed over the 8250_dw and saw 
-support for that.
+> phy_ethtool_get_wol is a helper to get current WOL settings from
+> a phy device. When using this helper on a PHY without .get_wol
+> callback, struct ethtool_wolinfo is never set-up correctly and
+> may contain misleading information about WOL status.
+> 
+> To fix this, always zero relevant fields of struct ethtool_wolinfo
+> regardless of .get_wol callback availability.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-On the radxa board, there is even an external pull-up on the TX pin. The UART 
-idle level is high, so that makes sense. If we wanted to pull the pin 
-somewhere, I guess it should be up, not down. 
+I'm starting to see this situation more clearly now, especially with
+Ben's most recent commentary.
 
-My vote would be to keep the patch as it is. In any case, it's an improvement 
-of the status quo and does not change TX behavior.
+The basic notion is that one must do ethtool ops are designed such that
+the top-level execution context in net/core/ethtool.c takes care of
+initializing the structure.
 
-Cheers,
-  Max
+In this case, we're referring specifically to ethtool_get_wol(), which
+runs any time ETHTOOL_GWOL is requested.
+
+Therefore no ethtool_ops->get_wol() implementation should duplicate
+this work, that goes for all of such cases which invoke the function
+we are talking about here, phy_ethtool_get_wol().
+
+So the first change is definitely to remove:
+
+	wol->supported = 0;
+	wol->wolopts = 0;
+
+from:
+
+drivers/net/ethernet/marvell/mv643xx_eth.c:mv643xx_eth_get_wol()
+drivers/net/ethernet/ti/cpsw.c:cpsw_get_wol()
+
+Next, I think phy_suspend() must create the same environment the
+call sites above guarentee for phy_ethtool_get_wol(), namely
+by changing the declaration of 'wol' to:
+
+	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
+
+which will cause the compiler to clear out the rest of the structure
+for us, as the same declaration does in ethtool_get_wol().
+
+Finally, purge the spurious clears in phydev_ops->get_wol(), namely
+in at803x_get_wol() and m88e1318_get_wol().
+
+So, to reiterate, OPS never have to be mindful of initializing the
+ethtool result with zeros.  However, anyone who calls into OPS
+directly must provide said expected state.
+
+Are we all on the same page now?
