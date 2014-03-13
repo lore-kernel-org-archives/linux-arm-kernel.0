@@ -1,45 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 10:16:31 +0900
-Subject: [PATCH v2 00/03] ARM: shmobile: Break out and extend clock
- workaround V2
-In-Reply-To: <20140312233608.17009.65690.sendpatchset@w520>
-References: <20140312233608.17009.65690.sendpatchset@w520>
-Message-ID: <20140313011627.GA9077@verge.net.au>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 13 Mar 2014 02:20:29 +0100
+Subject: [PATCH 1/3 V2] crypto: Fix the pointer voodoo in unaligned ahash
+In-Reply-To: <20140312120814.GA25881@gondor.apana.org.au>
+References: <1389720829-5963-1-git-send-email-marex@denx.de>
+ <1393806108-6374-1-git-send-email-marex@denx.de>
+ <20140312120814.GA25881@gondor.apana.org.au>
+Message-ID: <201403130220.29346.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 08:36:08AM +0900, Magnus Damm wrote:
-> ARM: shmobile: Break out and extend clock workaround V2
+On Wednesday, March 12, 2014 at 01:08:14 PM, Herbert Xu wrote:
+> On Mon, Mar 03, 2014 at 01:21:46AM +0100, Marek Vasut wrote:
+> > Add documentation for the pointer voodoo that is happening in
+> > crypto/ahash.c in ahash_op_unaligned(). This code is quite confusing, so
+> > add a beefy chunk of documentation.
+> > 
+> > Moreover, make sure the mangled request is completely restored after
+> > finishing this unaligned operation. This means restoring all of .result,
+> > .priv, .base.data and .base.complete .
 > 
-> [PATCH v2 01/03] ARM: shmobile: Introduce shmobile_clk_workaround()
-> [PATCH 02/03] ARM: shmobile: Use shmobile_clk_workaround() on Lager
-> [PATCH 03/03] ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
+> There is no point in saving priv because it is only meant to be
+> used by the crypto API.
 
-If the series is v2 please annotate all patches in the series as v2,
-even if they haven't changed.
+OK, understood. But shall we not preserve the request intact in case a crypto-
+api function called crypto_ahash_final() with request which has .priv already 
+set? Then we would have really funny corruption of the request going on and I'm 
+not sure that'd be nice.
 
-> These patches consolidates the clkdev workaround present in the DT
-> reference version of board code for Lager and Koelsch, and it also
-> extends it to allow static enablement of a selected set of clocks
-> during boot. The latter is needed for USB PCI support patches that
-> have been posted.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Changes since V1:
->  - Reworked dependencies, updated header file path in patch [1/3].
-> 
->  Written against renesas.git tag renesas-devel-v3.14-rc6-20140311
-> 
->  arch/arm/mach-shmobile/Makefile                  |    2 
->  arch/arm/mach-shmobile/board-koelsch-reference.c |   71 ++++++++--------------
->  arch/arm/mach-shmobile/board-lager-reference.c   |   65 +++++++-------------
->  arch/arm/mach-shmobile/clock.c                   |   29 ++++++++
->  arch/arm/mach-shmobile/include/mach/clock.h      |   16 ++++
->  5 files changed, 99 insertions(+), 84 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Otherwise the patch looks OK to me.
+
+Thanks!
+
+Best regards,
+Marek Vasut
