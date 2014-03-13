@@ -1,38 +1,51 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 13 Mar 2014 19:11:31 +0900
-Subject: [PATCH v4 3/3] arm64: Add regs_return_value() in syscall.h
-In-Reply-To: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1394705491-12343-4-git-send-email-takahiro.akashi@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Mar 2014 10:13:09 +0000
+Subject: [PATCH] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <1394055789-31479-1-git-send-email-lauraa@codeaurora.org>
+References: <1394055789-31479-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140313101308.GB30339@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro, regs_return_value, is used mainly for audit to record system
-call's results, but may also be used in test_kprobes.c.
+Hi Laura,
 
-Acked-by Will Deacon <will.deacon@arm.com>
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/ptrace.h |    5 +++++
- 1 file changed, 5 insertions(+)
+On Wed, Mar 05, 2014 at 09:43:09PM +0000, Laura Abbott wrote:
+> +#define PTE_SET_FN(_name, pteop) \
+> +static int pte_set_##_name(pte_t *ptep, pgtable_t token, unsigned long addr, \
+> +			void *data) \
+> +{ \
+> +	pte_t pte = pteop(*ptep); \
+> +\
+> +	set_pte(ptep, pte); \
+> +	return 0; \
+> +} \
+> +
+> +#define SET_MEMORY_FN(_name, callback) \
+> +int set_memory_##_name(unsigned long addr, int numpages) \
+> +{ \
+> +	unsigned long start = addr; \
+> +	unsigned long size = PAGE_SIZE*numpages; \
+> +	unsigned long end = start + size; \
+> +\
+> +	if (start < MODULES_VADDR || start >= MODULES_END) \
+> +		return -EINVAL;\
+> +\
+> +	if (end < MODULES_VADDR || end >= MODULES_END) \
+> +		return -EINVAL; \
+> +\
+> +	apply_to_page_range(&init_mm, start, size, callback, NULL); \
+> +	flush_tlb_kernel_range(start, end); \
+> +	return 0;\
+> +}
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 0e7fa49..5800ec1 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -134,6 +134,11 @@ struct pt_regs {
- #define user_stack_pointer(regs) \
- 	((regs)->sp)
- 
-+static inline unsigned long regs_return_value(struct pt_regs *regs)
-+{
-+	return regs->regs[0];
-+}
-+
- /*
-  * Are the current registers suitable for user mode? (used to maintain
-  * security in signal handlers)
+The code seems correct but I don't really like this macro expansion. We
+changed the pte_mk* functions already to inline functions, so we should
+do the same with these set_memory_*() functions. Similar to s390, we
+could have a change_module_page_attr() or have two set/clear functions
+like x86 that just change the pte attribute (I think the latter allows
+us to no longer define pte_mkexec etc).
+
+Thanks.
+
 -- 
-1.7.9.5
+Catalin
