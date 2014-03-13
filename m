@@ -1,70 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Mar 2014 10:34:57 +0100
-Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
- the ENMI (irq 0)
-In-Reply-To: <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
-References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
- <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140313093457.GF2815@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 13 Mar 2014 10:37:01 +0100
+Subject: [PATCH v2 0/3] clk: s2mps11: Add support for S2MPS14 clocks
+Message-ID: <1394703425-6462-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 06:17:07PM +0100, Hans de Goede wrote:
-> The ENMI needs to have the ack done *after* clearing the interrupt source,
-> otherwise we will get a spurious interrupt for each real interrupt. Switch
-> to the new handle_fasteoi_late_irq handler which gives us the desired behavior.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/irqchip/irq-sun4i.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> index 8a2fbee..4b1c874 100644
-> --- a/drivers/irqchip/irq-sun4i.c
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -77,15 +77,22 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
->  static struct irq_chip sun4i_irq_chip = {
->  	.name		= "sun4i_irq",
->  	.irq_ack	= sun4i_irq_ack,
-> +	.irq_eoi	= sun4i_irq_ack, /* For the ENMI */
+Hi,
 
-Hmmm, I wonder if that actually does something.
+This is second version of patchset adding support for the S2MPS14
+device to the s2mps11 clock driver.
 
-There's been a patch floating around that I was sure was merged, but
-apparently wasn't that remove sun4i_irq_ack, because the register we
-were writing to are in read only, and it wasn't doing anything.
 
->  	.irq_mask	= sun4i_irq_mask,
->  	.irq_unmask	= sun4i_irq_unmask,
-> +	.flags		= IRQCHIP_EOI_THREADED, /* Only affects the ENMI */
->  };
->  
->  static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
->  			 irq_hw_number_t hw)
->  {
-> -	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> -				 handle_level_irq);
-> +	if (hw == 0) /* IRQ 0, the ENMI needs special handling */
-> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> +					 handle_fasteoi_late_irq);
-> +	else
-> +		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> +					 handle_level_irq);
-> +
->  	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+The patchset *depends on*:
+==========================
+1. Work done by Tushar Behera:
+   [PATCH V2 0/2] Add support for clocks in S5M8767
+   http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27264
+2. Support for S2MPS14 in main sec-core MFD driver (already in linux-next
+   and Lee's tree).
 
-Could that solve the other NMI-related issue we have with Carlo's
-patches?
+Changes since v1:
+=================
+1. Patch 1/3: Update driver description in Kconfig.
+2. Patch 2/3: Add of_compatible to all MFD cells.
+3. Add Yadwinder's Review-by.
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (3):
+  clk: s2mps11: Add support for S2MPS14 clocks
+  mfd: sec-core: Add of_compatible strings for MFD cells
+  Documentation: mfd: s2mps11: Describe S5M8767 and S2MPS14 clocks
+
+ Documentation/devicetree/bindings/mfd/s2mps11.txt |   24 +++++---
+ drivers/clk/Kconfig                               |    8 +--
+ drivers/clk/clk-s2mps11.c                         |   61 ++++++++++++++++-----
+ drivers/mfd/sec-core.c                            |    8 +++
+ 4 files changed, 73 insertions(+), 28 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/d6eb9a31/attachment.sig>
+1.7.9.5
