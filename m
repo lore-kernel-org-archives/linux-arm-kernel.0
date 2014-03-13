@@ -1,61 +1,94 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 13 Mar 2014 10:45:16 -0700
-Subject: [PATCH 2/2] arm64: Support DMA_ATTR_WRITE_COMBINE
+Date: Thu, 13 Mar 2014 10:45:15 -0700
+Subject: [PATCH 1/2] arm64: Implement custom mmap functions for dma mapping
 In-Reply-To: <5320A573.9080501@codeaurora.org>
-Message-ID: <1394732716-11507-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1394732716-11507-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA_ATTR_WRITE_COMBINE is currently ignored. Set the pgprot
-appropriately for non coherent opperations.
+The current dma_ops do not specify an mmap function so maping
+falls back to the default implementation. There are at least
+two issues with using the default implementation:
+
+1) The pgprot is always pgprot_noncached (strongly ordered)
+memory even with coherent operations
+2) dma_common_mmap calls virt_to_page on the remapped non-coherent
+address which leads to invalid memory being mapped.
+
+Fix both these issue by implementing a custom mmap function which
+correctly accounts for remapped addresses and sets vm_pg_prot
+appropriately.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- Potential addition on top of the coherent work as well. Writecombine
- and dmacoherent seem to be the same at the moment but it might be
- good practice to have the two be separate?
-
- arch/arm64/mm/dma-mapping.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 9a639bf..d2c0027 100644
+index e923a5b..9a639bf 100644
 --- a/arch/arm64/mm/dma-mapping.c
 +++ b/arch/arm64/mm/dma-mapping.c
-@@ -29,6 +29,15 @@
- struct dma_map_ops *dma_ops;
- EXPORT_SYMBOL(dma_ops);
- 
-+
-+static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
-+{
-+	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
-+			    pgprot_writecombine(prot) :
-+			    pgprot_dmacoherent(prot);
-+	return prot;
-+}
-+
- static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
- 					  dma_addr_t *dma_handle, gfp_t flags,
- 					  struct dma_attrs *attrs)
-@@ -72,7 +81,7 @@ static void *arm64_swiotlb_alloc_noncoherent(struct device *dev, size_t size,
- 	for (i = 0; i < (size >> PAGE_SHIFT); i++)
- 		map[i] = page + i;
- 	coherent_ptr = vmap(map, size >> PAGE_SHIFT, VM_MAP,
--			    pgprot_dmacoherent(pgprot_default));
-+			    __get_dma_pgprot(attrs, pgprot_default));
- 	kfree(map);
- 	if (!coherent_ptr)
- 		goto no_map;
-@@ -232,7 +241,7 @@ static int arm64_swiotlb_mmap_coherent(struct device *dev,
- 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		struct dma_attrs *attrs)
- {
--	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
-+	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
- 	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+@@ -194,9 +194,52 @@ static void arm64_swiotlb_sync_sg_for_device(struct device *dev,
+ 			       sg->length, dir);
  }
  
++/* vma->vm_page_prot must be set appropriately before calling this function */
++static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
++			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
++{
++	int ret = -ENXIO;
++	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
++					PAGE_SHIFT;
++	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
++	unsigned long off = vma->vm_pgoff;
++
++	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
++		return ret;
++
++	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      vma->vm_end - vma->vm_start,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
++static int arm64_swiotlb_mmap_noncoherent(struct device *dev,
++		struct vm_area_struct *vma,
++		void *cpu_addr, dma_addr_t dma_addr, size_t size,
++		struct dma_attrs *attrs)
++{
++	/* Just use whatever page_prot attributes were specified */
++	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
++}
++
++static int arm64_swiotlb_mmap_coherent(struct device *dev,
++		struct vm_area_struct *vma,
++		void *cpu_addr, dma_addr_t dma_addr, size_t size,
++		struct dma_attrs *attrs)
++{
++	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
++	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
++}
++
+ struct dma_map_ops noncoherent_swiotlb_dma_ops = {
+ 	.alloc = arm64_swiotlb_alloc_noncoherent,
+ 	.free = arm64_swiotlb_free_noncoherent,
++	.mmap = arm64_swiotlb_mmap_noncoherent,
+ 	.map_page = arm64_swiotlb_map_page,
+ 	.unmap_page = arm64_swiotlb_unmap_page,
+ 	.map_sg = arm64_swiotlb_map_sg_attrs,
+@@ -213,6 +256,7 @@ EXPORT_SYMBOL(noncoherent_swiotlb_dma_ops);
+ struct dma_map_ops coherent_swiotlb_dma_ops = {
+ 	.alloc = arm64_swiotlb_alloc_coherent,
+ 	.free = arm64_swiotlb_free_coherent,
++	.mmap = arm64_swiotlb_mmap_coherent,
+ 	.map_page = swiotlb_map_page,
+ 	.unmap_page = swiotlb_unmap_page,
+ 	.map_sg = swiotlb_map_sg_attrs,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
