@@ -1,80 +1,42 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 13 Mar 2014 19:02:06 +0800
-Subject: [PATCH 1/2] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
- (BG2Q) device tree
-In-Reply-To: <20140313104303.GB4418@piout.net>
-References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
- <1394622364-6848-2-git-send-email-antoine.tenart@free-electrons.com>
- <532182EB.7090002@gmail.com> <20140313104303.GB4418@piout.net>
-Message-ID: <20140313190206.762108a2@xhacker>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 13 Mar 2014 12:12:50 +0100 (CET)
+Subject: [PATCH v2 4/4] irqchip: sun4i: Use handle_fasteoi_late_irq for
+ the ENMI (irq 0)
+In-Reply-To: <20140313093457.GF2815@lukather>
+References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
+ <1394644627-12315-5-git-send-email-hdegoede@redhat.com>
+ <20140313093457.GF2815@lukather>
+Message-ID: <alpine.DEB.2.02.1403131212090.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 13 Mar 2014, Maxime Ripard wrote:
 
-On Thu, 13 Mar 2014 03:43:03 -0700
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> On 13/03/2014 at 10:05:31 +0000, Sebastian Hesselbarth wrote :
-> > On 03/12/2014 11:06 AM, Antoine T?nart wrote:
-> > >+			compatible = "arm,cortex-a9-twd-timer";
-> > >+			reg = <0xad0600 0x20>;
-> > >+			clocks = <&sysclk>;
+> On Wed, Mar 12, 2014 at 06:17:07PM +0100, Hans de Goede wrote:
+> > The ENMI needs to have the ack done *after* clearing the interrupt source,
+> > otherwise we will get a spurious interrupt for each real interrupt. Switch
+> > to the new handle_fasteoi_late_irq handler which gives us the desired behavior.
 > > 
-> > Playing with Chromecast, I remember local-timer running at sysclk/3 or
-
-twdclk is running at cpuclk/3. 
-
-On chromecast, freq of cpuclk is the same as sysclk. But parent of twdclk
-is cpuclk.
-
-> > something. I know berlin2/berlin2cd is wrong here. Can you check that
-> > for berlin2q local-timer also runs at sysclk/n?
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > ---
+> >  drivers/irqchip/irq-sun4i.c | 11 +++++++++--
+> >  1 file changed, 9 insertions(+), 2 deletions(-)
 > > 
+> > diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+> > index 8a2fbee..4b1c874 100644
+> > --- a/drivers/irqchip/irq-sun4i.c
+> > +++ b/drivers/irqchip/irq-sun4i.c
+> > @@ -77,15 +77,22 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+> >  static struct irq_chip sun4i_irq_chip = {
+> >  	.name		= "sun4i_irq",
+> >  	.irq_ack	= sun4i_irq_ack,
+> > +	.irq_eoi	= sun4i_irq_ack, /* For the ENMI */
 > 
-> Actually, what we have is sysclk = cpuclk/3 so I guess it depends on
-> what you call sysclk.
+> Hmmm, I wonder if that actually does something.
 > 
-> > >+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> > >+			status = "okay";
-> > >+		};
-> > >+
-> > >+		apb at e80000 {
-> > >+			compatible = "simple-bus";
-> > >+			#address-cells = <1>;
-> > >+			#size-cells = <1>;
-> > >+
-> > >+			ranges = <0 0xe80000 0x10000>;
-> > >+			interrupt-parent = <&aic>;
-> > >+
-> > >+			timer0: timer at 2c00 {
-> > >+				compatible = "snps,dw-apb-timer";
-> > >+				reg = <0x2c00 0x14>;
-> > >+				interrupts = <8>;
-> > >+				clock-freq = <100000000>;
-> > >+				status = "okay";
-> > >+			};
-> > >+
-> > >+			timer1: timer at 2c14 {
-> > >+				compatible = "snps,dw-apb-timer";
-> > >+				reg = <0x2c14 0x14>;
-> > >+				clock-freq = <100000000>;
-> > >+				status = "disabled";
-> > >+			};
-> > 
-> > berlin2/berlin2cd have a vast amount of 8 apb timers. Any timers missing
-> > here or did Marvell remove them?
+> There's been a patch floating around that I was sure was merged, but
+> apparently wasn't that remove sun4i_irq_ack, because the register we
+> were writing to are in read only, and it wasn't doing anything.
 
-We still have 8 apb timers
-
-> > 
-> > 
-> > Also for uart, can you please double-check if there is no uart2?
-> > 
-> 
-> We don't have those informations, maybe Jisheng can help ?
-
-uart2 is removed
-
-Thanks,
-Jisheng 
+Well, it looks like it does something otherwise Hans would not see any
+improvement of the situation.
