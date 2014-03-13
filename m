@@ -1,132 +1,77 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 13 Mar 2014 22:47:00 +0000
-Subject: [PATCH v2 07/15] efi: Add shared printk wrapper for consistent
- prefixing
+Date: Thu, 13 Mar 2014 22:47:05 +0000
+Subject: [PATCH v2 12/15] doc: arm64: add description of EFI stub support
 In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
 References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1394750828-16351-8-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1394750828-16351-13-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Franz <roy.franz@linaro.org>
+From: Mark Salter <msalter@redhat.com>
 
-Add a wrapper for printk to standardize the prefix for informational and
-error messages from the EFI stub.
+Add explanation of arm64 EFI stub and kernel image header changes
+needed to masquerade as a PE/COFF application.
 
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Grant Likely <grant.likely@linaro.org>
+CC: linux-doc at vger.kernel.org
+CC: Rob Landley <rob@landley.net>
 ---
- drivers/firmware/efi/efi-stub-helper.c |   25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ Documentation/arm64/booting.txt |    4 ++++
+ Documentation/efi-stub.txt      |   12 +++++++++---
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-index 661f425..4c8ab86 100644
---- a/drivers/firmware/efi/efi-stub-helper.c
-+++ b/drivers/firmware/efi/efi-stub-helper.c
-@@ -45,6 +45,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
- 	}
- }
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index a9691cc..aa95d38c 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -85,6 +85,10 @@ The decompressed kernel image contains a 64-byte header as follows:
+ Header notes:
  
-+#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
-+#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
+ - code0/code1 are responsible for branching to stext.
++- when booting through EFI, code0/code1 are initially skipped.
++  res5 is an offset to the PE header and the PE header has the EFI
++  entry point (efi_stub_entry). When the stub has done its work, it
++  jumps to code0 to resume the normal boot process.
+ 
+ The image must be placed at the specified offset (currently 0x80000)
+ from the start of the system RAM and called there. The start of the
+diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+index 26be7b0..7747024 100644
+--- a/Documentation/efi-stub.txt
++++ b/Documentation/efi-stub.txt
+@@ -12,6 +12,11 @@ arch/arm/boot/compressed/efi-header.S and
+ arch/arm/boot/compressed/efi-stub.c. EFI stub code that is shared
+ between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+ 
++For arm64, there is no compressed kernel support, so the Image itself
++masquerades as a PE/COFF image and the EFI stub is linked into the
++kernel. The arm64 EFI stub lives in arch/arm64/kernel/efi-entry.S
++and arch/arm64/kernel/efi-stub.c.
 +
+ By using the EFI boot stub it's possible to boot a Linux kernel
+ without the use of a conventional EFI boot loader, such as grub or
+ elilo. Since the EFI boot stub performs the jobs of a boot loader, in
+@@ -28,7 +33,8 @@ the extension the EFI firmware loader will refuse to execute it. It's
+ not possible to execute bzImage.efi from the usual Linux file systems
+ because EFI firmware doesn't have support for them. For ARM the
+ arch/arm/boot/zImage should be copied to the system partition, and it
+-may not need to be renamed.
++may not need to be renamed. Similarly for arm64, arch/arm64/boot/Image
++should be copied but not necessarily renamed.
  
- static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
- 				       efi_memory_desc_t **map,
-@@ -324,7 +327,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 				nr_files * sizeof(*files),
- 				(void **)&files);
- 	if (status != EFI_SUCCESS) {
--		efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
-+		pr_efi_err(sys_table_arg, "Failed to alloc mem for file handle list\n");
- 		goto fail;
- 	}
  
-@@ -376,13 +379,13 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 					image->device_handle, &fs_proto,
- 						(void **)&io);
- 			if (status != EFI_SUCCESS) {
--				efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
-+				pr_efi_err(sys_table_arg, "Failed to handle fs_proto\n");
- 				goto free_files;
- 			}
+ **** Passing kernel parameters from the EFI shell
+@@ -72,7 +78,7 @@ is passed to bzImage.efi.
  
- 			status = efi_call_phys2(io->open_volume, io, &fh);
- 			if (status != EFI_SUCCESS) {
--				efi_printk(sys_table_arg, "Failed to open volume\n");
-+				pr_efi_err(sys_table_arg, "Failed to open volume\n");
- 				goto free_files;
- 			}
- 		}
-@@ -390,7 +393,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 		status = efi_call_phys5(fh->open, fh, &h, filename_16,
- 					EFI_FILE_MODE_READ, (u64)0);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to open file: ");
-+			pr_efi_err(sys_table_arg, "Failed to open file: ");
- 			efi_char16_printk(sys_table_arg, filename_16);
- 			efi_printk(sys_table_arg, "\n");
- 			goto close_handles;
-@@ -402,7 +405,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 		status = efi_call_phys4(h->get_info, h, &info_guid,
- 					&info_sz, NULL);
- 		if (status != EFI_BUFFER_TOO_SMALL) {
--			efi_printk(sys_table_arg, "Failed to get file info size\n");
-+			pr_efi_err(sys_table_arg, "Failed to get file info size\n");
- 			goto close_handles;
- 		}
+ **** The "dtb=" option
  
-@@ -411,7 +414,7 @@ grow:
- 					EFI_LOADER_DATA, info_sz,
- 					(void **)&info);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
-+			pr_efi_err(sys_table_arg, "Failed to alloc mem for file info\n");
- 			goto close_handles;
- 		}
- 
-@@ -427,7 +430,7 @@ grow:
- 		efi_call_phys1(sys_table_arg->boottime->free_pool, info);
- 
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to get file info\n");
-+			pr_efi_err(sys_table_arg, "Failed to get file info\n");
- 			goto close_handles;
- 		}
- 
-@@ -446,13 +449,13 @@ grow:
- 		status = efi_high_alloc(sys_table_arg, file_size_total, 0x1000,
- 				    &file_addr, max_addr);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to alloc highmem for files\n");
-+			pr_efi_err(sys_table_arg, "Failed to alloc highmem for files\n");
- 			goto close_handles;
- 		}
- 
- 		/* We've run out of free low memory. */
- 		if (file_addr > max_addr) {
--			efi_printk(sys_table_arg, "We've run out of free low memory\n");
-+			pr_efi_err(sys_table_arg, "We've run out of free low memory\n");
- 			status = EFI_INVALID_PARAMETER;
- 			goto free_file_total;
- 		}
-@@ -473,7 +476,7 @@ grow:
- 							&chunksize,
- 							(void *)addr);
- 				if (status != EFI_SUCCESS) {
--					efi_printk(sys_table_arg, "Failed to read file\n");
-+					pr_efi_err(sys_table_arg, "Failed to read file\n");
- 					goto free_file_total;
- 				}
- 				addr += chunksize;
-@@ -558,7 +561,7 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
- 				       &new_addr);
- 	}
- 	if (status != EFI_SUCCESS) {
--		efi_printk(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
-+		pr_efi_err(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
- 		return status;
- 	}
- 
+-For the ARM architecture, we also need to be able to provide a device
+-tree to the kernel. This is done with the "dtb=" command line option,
++For the ARM and arm64 architectures, we also need to be able to provide a
++device tree to the kernel. This is done with the "dtb=" command line option,
+ and is processed in the same manner as the "initrd=" option that is
+ described above.
 -- 
 1.7.10.4
