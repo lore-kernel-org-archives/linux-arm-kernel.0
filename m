@@ -1,63 +1,206 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 13 Mar 2014 13:59:08 +0900
-Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
-In-Reply-To: <20140313020231.GC16719@verge.net.au>
-References: <20140226095916.15676.99394.sendpatchset@w520>
- <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
- <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
- <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
- <20140313020231.GC16719@verge.net.au>
-Message-ID: <CANqRtoRCO+b3CGaOQW2FoetoOC0JCXmXK39Fgi_VinNGmbarJA@mail.gmail.com>
+From: r.sh.open@gmail.com (Rahul Sharma)
+Date: Thu, 13 Mar 2014 10:31:49 +0530
+Subject: [PATCH v5 3/3] ARM: dts: add dts files for xyref5260 board
+In-Reply-To: <5321008C.3090203@samsung.com>
+References: <1394637394-3960-1-git-send-email-rahul.sharma@samsung.com>
+ <1394637394-3960-4-git-send-email-rahul.sharma@samsung.com>
+ <5321008C.3090203@samsung.com>
+Message-ID: <CAPdUM4PaXGceKyeO=kXaGy=VqapETg9m4RAMci_BD6=jsW-gNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Thanks Pankaj,
 
-On Thu, Mar 13, 2014 at 11:02 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Feb 27, 2014 at 09:08:06AM +0100, Geert Uytterhoeven wrote:
->> Hi Magnus,
->>
->> On Thu, Feb 27, 2014 at 4:33 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> >>>  This is a reworked version of the APMU patch previously posted as
->> >>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
->> >>
->> >> Your previous version also affected r8a7790/Lager.
->> >> Isn't this check no longer needed there? According to the Lager manual,
->> >> MD21 also enables hardware debug mode, and is also controlled by
->> >> SW8-4. Of course the CPU may behave differently, as the CPU cores
->> >> are different.
->> >
->> > Yes, you are correct that the previous version of the patch also
->> > affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
->> > together with JTAG debugging.
->> >
->> > I recently used the patch on Lager and I discovered that I apparently
->> > had been running with MD21 on my Lager since forever, and surprisingly
->> > it worked regardless. Since there is no documentation on r8a7790 or
->> > r8a7791 I simply decided to handle them separately and only enable
->> > where it is needed.
->>
->> You could have been lucky?
->>
->> On Koelsch, I only had failures after Real Cold Boot, i.e. on boot up in the
->> morning. And not always, so there could be a timing issue involved.
->>
->> > I've also been told that it is possible to allow SMP operation
->> > together with JTAG, apparently some magic with RST is needed. It seems
->> > that the power domains are treated differently depending on the MD21
->> > setting. Not sure if this applies to both r8a7790 and r8a7791, but if
->> > we end up with similar fixes we can consolidate. Until then I think
->> > dealing with them one by one makes sense.
->>
->> Furthermore, I haven't seen any SPI timeouts after I disabled MD21 (holding
->> wood, and rabbit legs ;-). So the SMP memory (in)coherency I saw there
->> could have been caused by a wobbly SMP setup.
+On 13 March 2014 06:19, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Hi Rahul,
 >
-> Hi Magnus,
 >
-> I am a little confused about the status of this patch?
-> Would you like me to queue it up?
+> On 03/13/2014 12:16 AM, Rahul Sharma wrote:
+>>
+>> The patch adds the dts files for xyref5260 board which
+>> is based on Exynos5260 Evt0 sample.
+>>
+>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                      |    1 +
+>>   arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts |  110
+>> +++++++++++++++++++++++
+>>   2 files changed, 111 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index b9d6a8b..5a391bf 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>         exynos5250-arndale.dtb \
+>>         exynos5250-smdk5250.dtb \
+>>         exynos5250-snow.dtb \
+>> +       exynos5260-xyref5260-evt0.dtb \
+>>         exynos5420-arndale-octa.dtb \
+>>         exynos5420-smdk5420.dtb \
+>>         exynos5440-sd5v1.dtb \
+>> diff --git a/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
+>> b/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
+>> new file mode 100644
+>> index 0000000..d7d0aeb
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5260-xyref5260-evt0.dts
+>> @@ -0,0 +1,110 @@
+>> +/*
+>> + * SAMSUNG XYREF5260 EVT0 board device tree source
+>> + *
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *             http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +#include "exynos5260.dtsi"
+>> +
+>> +/ {
+>> +       model = "SAMSUNG XYREF5260 EVT0 board based on EXYNOS5260";
+>> +       compatible = "samsung,xyref5260", "samsung,exynos5260";
+>> +
+>> +       memory {
+>> +               reg = <0x20000000 0x80000000>;
+>> +       };
+>> +
+>> +       chosen {
+>> +               bootargs = "console=ttySAC2,115200";
+>> +       };
+>> +
+>> +       clocks {
+>> +               fin_pll: xxti {
+>> +                       compatible = "fixed-clock";
+>> +                       clock-frequency = <24000000>;
+>> +                       clock-output-names = "fin_pll";
+>> +                       #clock-cells = <0>;
+>> +               };
+>> +
+>> +               xrtcxti: xrtcxti {
+>> +                       compatible = "fixed-clock";
+>> +                       clock-frequency = <32768>;
+>> +                       clock-output-names = "xrtcxti";
+>> +               };
+>
+>
+> clock-cells property is missing here.
+>
 
-Yes, please!
+I have added #clock-cells only for clocks which
+are supposed to be referred. IMO we need it otherwise.
 
-/ magnus
+>
+>> +
+>> +               spdif_extclk: ioclk_spdif_extclk {
+>> +                       compatible = "fixed-clock";
+>> +                       clock-frequency = <49152000>;
+>> +                       clock-output-names = "ioclk_spdif_extclk";
+>> +               };
+>
+>
+> ditto.
+>
+>> +       };
+>> +};
+>
+>
+> May I know why other phyclocks and ioclks have not been added?
+>
+
+Phyclocks should be added in SoC file. Please refer the other patch.
+
+Ioclocks have 2 dimensions. 1) A board may or may not have these.
+But if board doesn't have them, we may end up with orphans in clock
+tree. 2) Adding them in SoC is not meaningful because rate is board
+dependent and cannot be mentioned in SoC file. Without rate, probe
+will not be successful.
+
+What I followed here is adding IO clocks which are resulting into
+orphan clocks.
+
+What we can do is to allow the registration of fixed-io-clocks in clock
+driver which are provided without RATE? If this looks good, I can post
+the respective patch for clock driver and dt correction.
+
+I want to request experts to comment on this.
+
+Regards,
+Rahul Sharma
+
+>
+>> +
+>> +&pinctrl_0 {
+>> +       hdmi_hpd_irq: hdmi-hpd-irq {
+>> +               samsung,pins = "gpx3-7";
+>> +               samsung,pin-function = <0>;
+>> +               samsung,pin-pud = <1>;
+>> +               samsung,pin-drv = <0>;
+>> +       };
+>> +};
+>> +
+>> +&uart0 {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&uart1 {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&uart2 {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&uart3 {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&mmc_0 {
+>> +       status = "okay";
+>> +       num-slots = <1>;
+>> +       broken-cd;
+>> +       bypass-smu;
+>> +       supports-highspeed;
+>> +       supports-hs200-mode; /* 200 Mhz */
+>> +       card-detect-delay = <200>;
+>> +       samsung,dw-mshc-ciu-div = <3>;
+>> +       samsung,dw-mshc-sdr-timing = <0 4>;
+>> +       samsung,dw-mshc-ddr-timing = <0 2>;
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&sd0_rdqs &sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4
+>> &sd0_bus8>;
+>> +
+>> +       slot at 0 {
+>> +               reg = <0>;
+>> +               bus-width = <8>;
+>> +       };
+>> +};
+>> +
+>> +&mmc_2 {
+>> +       status = "okay";
+>> +       num-slots = <1>;
+>> +       supports-highspeed;
+>> +       card-detect-delay = <200>;
+>> +       samsung,dw-mshc-ciu-div = <3>;
+>> +       samsung,dw-mshc-sdr-timing = <2 3>;
+>> +       samsung,dw-mshc-ddr-timing = <1 2>;
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+>> +
+>> +       slot at 0 {
+>> +               reg = <0>;
+>> +               bus-width = <4>;
+>> +               disable-wp;
+>> +       };
+>> +};
+>
+>
+>
+> --
+> Best Regards,
+> Pankaj Dubey
+>
