@@ -1,63 +1,41 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 18:17:32 +0100
-Subject: [PATCH 11/12] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
+Date: Thu, 13 Mar 2014 18:17:33 +0100
+Subject: [PATCH 12/12] ARM: imx_v6_v7_defconfig: Add more drm drivers.
 In-Reply-To: <1394731053-6118-1-git-send-email-denis@eukrea.com>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394731053-6118-11-git-send-email-denis@eukrea.com>
+Message-ID: <1394731053-6118-12-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DRM_PANEL_SIMPLE is needed by the eukrea
+mbimxsd51's displays.
+
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v9->v11:
-- Now uses the drm-panel instead of the display-timings.
-
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-- The backlight is now on at boot.
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-
-ChangeLog v5->v6:
-- Reordered the Cc list.
-
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
-
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
+- New patch, splitting it would be overkill.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index 7c280f8..4a3f805 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,9 +17,19 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight: backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+		default-on;
-+	};
-+
- 	panel: panel {
- 		compatible = "eukrea,mbimxsd51-cmo-qvga", "simple-panel";
- 		power-supply = <&reg_lcd_3v3>;
-+		backlight = <&backlight>;
- 	};
- 
- 	reg_lcd_3v3: lcd-en {
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 09e9743..0316926 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -183,6 +183,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_CODA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+@@ -245,6 +246,7 @@ CONFIG_DRM_IMX_TVE=y
+ CONFIG_DRM_IMX_LDB=y
+ CONFIG_DRM_IMX_IPUV3_CORE=y
+ CONFIG_DRM_IMX_IPUV3=y
++CONFIG_DRM_IMX_HDMI=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PWM=y
 -- 
 1.7.9.5
