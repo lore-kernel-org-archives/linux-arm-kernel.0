@@ -1,54 +1,20 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 13 Mar 2014 10:43:09 -0700
-Subject: [RFC] cpufreq-cpu0: allow OPP table supplied by platform
-In-Reply-To: <20140313194424.122ec572@xhacker>
-References: <20140313184859.7d6f6512@xhacker>
- <CAKohpokLv0m+Cky7nCUOgP-djTMrA6jyka_EZ07+_exCAexXXg@mail.gmail.com>
- <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
- <20140313194424.122ec572@xhacker>
-Message-ID: <232645eb-183a-4a7c-997b-db3ab149d72b@TX2EHSMHS013.ehs.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Mar 2014 11:44:33 -0600
+Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
+In-Reply-To: <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+ <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <5321EE81.1030207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-13 at 07:44PM +0800, Jisheng Zhang wrote:
-> Fixing lakml :)
+On 03/13/2014 11:40 AM, Tim Harvey wrote:
+> When using interrupt-maps, the size of a map entry is #address-cells +
+>  #interrupt-cells for the parent interrupt controller.  For the ARM GIC
+> address-cells should be 0 as this is not used.
 > 
-> sorry
-> 
-> On Thu, 13 Mar 2014 03:56:46 -0700
-> Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> 
-> > Fixing Rafael's id.
-> > 
-> > On 13 March 2014 16:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > > On 13 March 2014 16:18, Jisheng Zhang <jszhang@marvell.com> wrote:
-> > >> Hi all,
-> > >>
-> > >> cpufreq-cpu0 is suitable for Marvell Berlin SoC. But there's one issue
-> > >> to address. The opp is different between chips even on the same step
-> > >> SoC, BG2Q for example. we can calculate the OPP table from the value of
-> > >> one OTP register. We have two solutions:
-> > >>
-> > >> 1. bootloader reads OTP register and calculate the OPP table then change
-> > >> dtb danamically
-> > >>
-> > >> 2. supply one driver in mach-berlin to initialize the OPP table; and
-> > >> modify cpufreq-cpu0 to allow platform supply OPP table, fall back to
-> > >> of_init_opp_table() if there's no OPP table.
-> > >>
-> > >> Which solution is better?
-> > >
-> > > I think we can go ahead with second option here. We can just check if opp
-> > > tables are already initialized or not. In case they are, don't probe from
-> > > dt..
-> > >
-> > > But lets see with others have to say here..
+> This patch fixes the example by correctly specifying #address-cells = 0.
 
-This might become useful for Zynq as well. We essentially allow to boot
-with all kind of different frequencies and depending on how the PLL, and clock
-registers get setup by the bootloader, certain frequencies may or may
-not become possible. Having a way to dynamically build an OPP table
-would probably be a nicer way than having to tell everybody to adjust
-the DT according to how the bootloader sets up the clocks.
-
-	S?ren
+If the #address-cells property is required (well, or even optional...)
+in the node, shouldn't it be included in the list of required/optional
+properties above, and not solely included in the example?
