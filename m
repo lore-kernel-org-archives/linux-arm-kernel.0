@@ -1,28 +1,30 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 15:50:13 +0100
-Subject: [PATCH v5 3/5] clk/samsung: add support for pll2650xx
-In-Reply-To: <1394636208-3125-4-git-send-email-rahul.sharma@samsung.com>
-References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
- <1394636208-3125-4-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5321C5A5.9040808@samsung.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 13 Mar 2014 20:27:04 +0530
+Subject: [PATCH 1/1] clk: exynos-5420: Fix VPLL lock offset
+In-Reply-To: <53219C1C.1030501@samsung.com>
+References: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
+ <53219C1C.1030501@samsung.com>
+Message-ID: <CAK9yfHyVVjfip2p6gDM8ghJ301NH9kTtVK1La53WPFfxxLD9nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 12.03.2014 15:56, Rahul Sharma wrote:
-> Add support for pll2650xx in samsung pll file. This PLL variant
-> is close to pll36xx but uses CON2 registers instead of CON1.
+On 13 March 2014 17:23, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
 >
-> Aud_pll in Exynos5260 is pll2650xx and uses this code.
 >
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> ---
->   drivers/clk/samsung/clk-pll.c |  101 +++++++++++++++++++++++++++++++++++++++++
->   drivers/clk/samsung/clk-pll.h |    1 +
->   2 files changed, 102 insertions(+)
+> On 13.03.2014 04:27, Sachin Kamat wrote:
+>>
+>> Set it as per the user manual.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
 
-Applied with Pankaj's reviewed-by, thanks.
+>
+> Looks fine. Will queue for 3.15, since ATM there is no support for PLL rate
+> setting on Exynos 5420 (no rate tables registered).
 
-Best regards,
-Tomasz
+Yes, that is correct. Thanks Tomasz.
+
+-- 
+With warm regards,
+Sachin
