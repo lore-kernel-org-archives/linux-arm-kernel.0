@@ -1,46 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 13 Mar 2014 19:44:24 +0800
-Subject: [RFC] cpufreq-cpu0: allow OPP table supplied by platform
-In-Reply-To: <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
-References: <20140313184859.7d6f6512@xhacker>
- <CAKohpokLv0m+Cky7nCUOgP-djTMrA6jyka_EZ07+_exCAexXXg@mail.gmail.com>
- <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
-Message-ID: <20140313194424.122ec572@xhacker>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 13 Mar 2014 12:53:00 +0100
+Subject: [PATCH 1/1] clk: exynos-5420: Fix VPLL lock offset
+In-Reply-To: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
+References: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <53219C1C.1030501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing lakml :)
+Hi Sachin,
 
-sorry
+On 13.03.2014 04:27, Sachin Kamat wrote:
+> Set it as per the user manual.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>   drivers/clk/samsung/clk-exynos5420.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 60b26819bed5..7fd6bea467fd 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -33,7 +33,7 @@
+>   #define RPLL_LOCK		0x10050
+>   #define IPLL_LOCK		0x10060
+>   #define SPLL_LOCK		0x10070
+> -#define VPLL_LOCK		0x10070
+> +#define VPLL_LOCK		0x10080
+>   #define MPLL_LOCK		0x10090
+>   #define CPLL_CON0		0x10120
+>   #define DPLL_CON0		0x10128
+>
 
-On Thu, 13 Mar 2014 03:56:46 -0700
-Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Looks fine. Will queue for 3.15, since ATM there is no support for PLL 
+rate setting on Exynos 5420 (no rate tables registered).
 
-> Fixing Rafael's id.
-> 
-> On 13 March 2014 16:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > On 13 March 2014 16:18, Jisheng Zhang <jszhang@marvell.com> wrote:
-> >> Hi all,
-> >>
-> >> cpufreq-cpu0 is suitable for Marvell Berlin SoC. But there's one issue
-> >> to address. The opp is different between chips even on the same step
-> >> SoC, BG2Q for example. we can calculate the OPP table from the value of
-> >> one OTP register. We have two solutions:
-> >>
-> >> 1. bootloader reads OTP register and calculate the OPP table then change
-> >> dtb danamically
-> >>
-> >> 2. supply one driver in mach-berlin to initialize the OPP table; and
-> >> modify cpufreq-cpu0 to allow platform supply OPP table, fall back to
-> >> of_init_opp_table() if there's no OPP table.
-> >>
-> >> Which solution is better?
-> >
-> > I think we can go ahead with second option here. We can just check if opp
-> > tables are already initialized or not. In case they are, don't probe from
-> > dt..
-> >
-> > But lets see with others have to say here..
-> >
-> > --
-> > viresh
+Best regards,
+Tomasz
