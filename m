@@ -1,58 +1,129 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Mar 2014 15:53:40 +0000
-Subject: [RFC PATCH] arm64: Fix __addr_ok and __range_ok macros
-In-Reply-To: <5321B56D.1030004@codeaurora.org>
-References: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
- <20140313112019.GD30339@arm.com> <5321B56D.1030004@codeaurora.org>
-Message-ID: <20140313155340.GL30339@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 15:54:15 +0000
+Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
+In-Reply-To: <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313155415.GB25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 01:41:01PM +0000, Christopher Covington wrote:
-> On 03/13/2014 07:20 AM, Catalin Marinas wrote:
-> > On Wed, Mar 05, 2014 at 10:41:28PM +0000, Christopher Covington wrote:
-> >> @@ -83,7 +83,7 @@ static inline void set_fs(mm_segment_t fs)
-> >>   * Returns 1 if the range is valid, 0 otherwise.
-> >>   *
-> >>   * This is equivalent to the following test:
-> >> - * (u65)addr + (u65)size < (u65)current->addr_limit
-> >> + * (u65)addr + (u65)size <= current->addr_limit
-> >>   *
-> >>   * This needs 65-bit arithmetic.
-> >>   */
-> >> @@ -91,7 +91,7 @@ static inline void set_fs(mm_segment_t fs)
-> >>  ({									\
-> >>  	unsigned long flag, roksum;					\
-> >>  	__chk_user_ptr(addr);						\
-> >> -	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, cc"		\
-> >> +	asm("adds %1, %1, %3; ccmp %1, %4, #3, cc; cset %0, ls"		\
-> >>  		: "=&r" (flag), "=&r" (roksum)				\
-> >>  		: "1" (addr), "Ir" (size),				\
-> >>  		  "r" (current_thread_info()->addr_limit)		\
-> > 
-> > Just trying to understand: if adds does not set the C flag, we go on and
-> > do the ccmp. If addr + size <= addr_limit, "cset ls" sets the flag
-> > variable. If addr + size actually sets the C flag, we need to make sure
-> > that "cset ls" doesn't trigger, which would mean to set C flag and clear
-> > Z flag. So why do you change the ccmp flags from #2 to #3? It looks to
-> > me like #2 is enough.
+On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
+> CALLER_ADDRx returns caller's address at specified level in call stacks.
+> They are used for several tracers like irqsoff and preemptoff.
+> Strange to say, however, they are refered even without FTRACE.
 > 
-> #2 is indeed sufficient. I'll respin using it.
+> Please note that this implementation assumes that we have frame pointers.
+> (which means kernel should be compiled with -fno-omit-frame-pointer.)
+
+How do you ensure that -fno-omit-frame-pointer is passed?
+
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/ftrace.h    |   13 ++++++++-
+>  arch/arm64/kernel/Makefile         |    3 +-
+>  arch/arm64/kernel/return_address.c |   55 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 69 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/kernel/return_address.c
 > 
-> I think Will's suggested approach could also work but I figure since I've
-> taken the time to understand the assembly I might as well fix the problem
-> there rather than adding another step in the calculation for developers and
-> compilers to parse. (I don't know if this code is performance critical, but I
-> nevertheless wanted to see how the compiler handled Will's approach.
-> Unfortunately my initial implementation resulted in unaligned opcode errors
-> and I haven't yet dug in.)
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index ed5c448..c44c4b1 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -18,6 +18,7 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  extern void _mcount(unsigned long);
+> +extern void *return_address(unsigned int);
+>  
+>  struct dyn_arch_ftrace {
+>  	/* No extra data needed for arm64 */
+> @@ -33,6 +34,16 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>  	 */
+>  	return addr;
+>  }
+> -#endif /* __ASSEMBLY__ */
+> +
+> +#define HAVE_ARCH_CALLER_ADDR
+> +
+> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
 
-If it's only one condition change, I would prefer the inline asm fix. I
-haven't done any benchmarks with a C-only implementation to assess the
-impact.
+Could we change the core definitions of these macros (in linux/ftrace.h) to
+use return_address, then provide an overridable version of return_address
+that defaults to __builtin_return_address, instead of copy-pasting this
+sequence?
 
-For __addr_ok() I think the compiler should be good enough as we don't
-need 65-bit arithmetics but we can leave it as it is.
+> diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+> new file mode 100644
+> index 0000000..89102a6
+> --- /dev/null
+> +++ b/arch/arm64/kernel/return_address.c
+> @@ -0,0 +1,55 @@
+> +/*
+> + * arch/arm64/kernel/return_address.c
+> + *
+> + * Copyright (C) 2013 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/export.h>
+> +#include <linux/ftrace.h>
+> +
+> +#include <asm/stacktrace.h>
+> +
+> +struct return_address_data {
+> +	unsigned int level;
+> +	void *addr;
+> +};
+> +
+> +static int save_return_addr(struct stackframe *frame, void *d)
+> +{
+> +	struct return_address_data *data = d;
+> +
+> +	if (!data->level) {
+> +		data->addr = (void *)frame->pc;
+> +		return 1;
+> +	} else {
+> +		--data->level;
+> +		return 0;
+> +	}
+> +}
+> +
+> +void *return_address(unsigned int level)
+> +{
+> +	struct return_address_data data;
+> +	struct stackframe frame;
+> +	register unsigned long current_sp asm ("sp");
+> +
+> +	data.level = level + 2;
+> +	data.addr = NULL;
+> +
+> +	frame.fp = (unsigned long)__builtin_frame_address(0);
+> +	frame.sp = current_sp;
+> +	frame.pc = (unsigned long)return_address; /* dummy */
+> +
+> +	walk_stackframe(&frame, save_return_addr, &data);
+> +
+> +	if (!data.level)
+> +		return data.addr;
+> +	else
+> +		return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(return_address);
 
--- 
-Catalin
+This whole file is basically copied from arch/arm/, but it's not too much
+code. Ideally the toolchain would have made use of the frame pointer, but it
+looks like it doesn't bother.
+
+Will
