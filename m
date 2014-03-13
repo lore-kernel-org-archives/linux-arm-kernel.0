@@ -1,59 +1,38 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 13 Mar 2014 09:33:28 +0100
-Subject: [PATCH v3 0/2] ARM: OMAP4+: Fix gpmc_fck clock
-In-Reply-To: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <53216D58.2040304@epfl.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Mar 2014 09:52:17 +0100
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <CACRpkdZrRYY0U5zDwoKRarAH=W6UmxGKX_gWR6nYPM64t6Dzpg@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+ <1394463171.2270.54.camel@shinybook.infradead.org>
+ <CACRpkdZrRYY0U5zDwoKRarAH=W6UmxGKX_gWR6nYPM64t6Dzpg@mail.gmail.com>
+Message-ID: <4757683.7Ln0Vh5c4G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 13 March 2014 09:17:04 Linus Walleij wrote:
+> 
+> Again as Russell stated that doesn't necessarily influence any memory
+> coherency or the physical address pointer written into the DMAC
+> hardware at all, does it? The transfers can still happen between the
+> peripheral and DMAC, and the IOMMU can still be sitting in the middle
+> of things, in front of the DMAC not the device, needing to be flushed etc.
+> 
+> Sorry if I don't get it... maybe this is one of these funny Intel things
+> I cannot wrap my head around properly.
 
-On 02/26/2014 11:38 AM, Florian Vaussard wrote:
-> Hello,
-> 
-> Trying to get my SMSC9221 working on OMAP4 with DT,
-> I faced a misconfigured gpmc_fck (dummy clock set to 0)
-> resulting in serveral division-by-zero, misconfigured
-> timings and driver lost in the La La Land.
-> 
-> To solve this, patch 1 removes gpmc_fck from the dummy
-> clocks, and patch 2 adds the gpmc_fck DT node and
-> reference it from the gpmc node.
-> 
-> *Note*: For DRA7, there is no DTS node for the GPMC, so I
-> was unable to set the corresponding clock. And without
-> a public TRM, I cannot do much more.
-> 
-> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221 (DTS
-> was posted on the OMAP ML [1]).
-> 
-> Regards,
-> Florian
-> 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110801
-> ---
-> Since v2:
-> - Added OMAP5 and DRA7
-> Since v1:
-> - Removed the gpmc_fck clock node, and reference directly l3_ick
-> 
-> Florian Vaussard (2):
->   CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy clocks
->   ARM: DTS: OMAP4/5: Use l3_ick for the gpmc node
-> 
+The device pointer we pass into dma_map_* can be used for anything that
+the underlying dma_map_ops implementation requires. This includes
+determining:
 
-Any other comments on these two patches? If it is not going into 3.15
-before the merge window, it will have to go through the -rc cycle as the
-Duovero/Parlor .dts will be upstream.
+* coherency
+* offsets between bus and cpu physical address
+* presence of IOMMU
+* limits in available bus address space (dma_mask)
+* iommu context ID (normally the location on the PCI bus)
 
-Regards,
-Florian
+The difference is that on ARM we usually care about the first
+four, which may be different for each device. The case that Dave is
+interested in is when these four are known implicitly but the fifth
+one is not know but depends on the slave device.
 
->  arch/arm/boot/dts/omap4.dtsi | 2 ++
->  arch/arm/boot/dts/omap5.dtsi | 2 ++
->  drivers/clk/ti/clk-44xx.c    | 1 -
->  drivers/clk/ti/clk-54xx.c    | 1 -
->  drivers/clk/ti/clk-7xx.c     | 1 -
->  5 files changed, 4 insertions(+), 3 deletions(-)
-> 
+	Arnd
