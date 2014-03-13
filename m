@@ -1,68 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 13 Mar 2014 19:44:48 -0400
-Subject: [PATCH v3 0/6] Armada 380 NAND support
-In-Reply-To: <1394742273-5113-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1394742273-5113-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140313234448.GB15608@titan.lakedaemon.net>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 13 Mar 2014 18:49:09 -0500
+Subject: [RFC 4/5] clocksource: omap-timer: Introduce clocksource driver
+ for OMAP SoCs
+In-Reply-To: <20140313204851.GB23432@atomide.com>
+References: <1394742919-32163-1-git-send-email-joelf@ti.com>
+ <1394742919-32163-5-git-send-email-joelf@ti.com>
+ <20140313204851.GB23432@atomide.com>
+Message-ID: <532243F5.4040609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 05:24:27PM -0300, Ezequiel Garcia wrote:
-> This patchset adds support for the NAND on Armada 380/385 SoCs.
+On 03/13/2014 03:48 PM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@TI.com> [140313 13:43]:
+>> We introduce functions to initialize clocksource and clockevent, use
+>> CLOCKSOURCE_OF_DECLARE to declare the clocksource, and handle the clocksource
+>> selection on a per-SoC basis (Currently only AM335x is supported). Powering up
+>> of the timer will be done with the help of the mach-omap layer function that's
+>> introduced earlier in the series.
+>>
+>> We make a local copy of dmtimer API for use by clocksource, the original
+>> dmtimer API in plat-omap is kept as-is till the migration of all SoCs is
+>> completed after which it can't be deleted.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  drivers/clocksource/Makefile     |    1 +
+>>  drivers/clocksource/omap-timer.c | 1157 ++++++++++++++++++++++++++++++++++++++
+>>  drivers/clocksource/omap-timer.h |  422 ++++++++++++++
+>>  3 files changed, 1580 insertions(+)
+>>  create mode 100644 drivers/clocksource/omap-timer.c
+>>  create mode 100644 drivers/clocksource/omap-timer.h
 > 
-> The first patch adds a new "armada-380-corediv-clock" compatible
-> string, with its proper SoC-specific structure, adding the register
-> layout for this SoC family.
-> 
-> The second and third patches add the devicetree changes to support
-> the Core Divider clock.
-> 
-> After adding its clock source, the fourth and fifth patches add
-> the NAND devicetree changes. The NAND controller is compatible with
-> the Armada 370 controller, so we are currently support it using the
-> same compatible string.
-> 
-> The last patch updates the binding documentation for the Core Divider
-> clock, which is missing the information about the already supported
-> Armada 375 compatible string.
-> 
-> This series is based on linux-next 20140307. I expect it will apply
-> cleanly on v3.15-rc1; if that's not the case, I'll send a rebased patchset.
-> 
-> The clock and devicetree changes are mostly independent so they
-> can be merged through the clock and mvebu tree respectively.
-> 
-> Changes from v2:
-> 
->   * Removed the unneeded 'nand' label from the flash at d0000 node.
-> 
->   * Renamed 'coredivclk at e4250' to 'clock at e4250' according to
->     ePAPR recomendation, below.
-> 
-> Changes from v1:
-> 
->   * Changed nand at d0000 with flash at d0000 in the devicetree. The
->     latter is compliant with ePAPR recomendation (see ePAPR v1.1,
->     section 2.2.2, Generic Names Recommendation).
-> 
-> Ezequiel Garcia (6):
->   clk: mvebu: Support Armada 380 SoC on the core divider clock
+> Hmm this leaves duplicate arch/arm/plat-omap/dmtimer.c code, please
 
-Applied to mvebu/clk-3xx
+Sure, ofcourse- but how else can we make sure everything works while we do
+the migration in steps. We can get rid of the duplicate once everything is
+migrated.
 
->   ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
->   ARM: mvebu: Add the Core Divider clock to Armada 38x SoCs
->   ARM: mvebu: Add support for NAND controller in Armada 38x SoC
->   ARM: mvebu: Enable NAND controller in Armada 385-DB
+> sort out that issue too by allowing omap1 and omap3 still to use
+> the legacy timer init functions but with timer code under
+> drivers/clocksource/omap-timer.c.
 
-Applied to mvebu/dt
+Sorry, I didn't follow. I didn't see OMAP3 using legacy timer stuff. To me
+it looks like OMAP3 migration should be straight forward along the same
+lines as this RFC patchset. Could you elaborate a bit more what the legacy
+functions you mentioned for OMAP1 are? I will just like to keep everything
+in drivers/clocksource/ private for now till we're done migrating most
+platforms. IMO once we get system timers working for omap2+, then we can
+look into omap1 :)
 
->   clk: mvebu: Update binding documentation for the core divider clock
+> And not the that drivers/clocksource/omap-timer.h won't be needed at
+> all, those defines can stay private to the drivers/clocksource/omap-timer.c.
 
-Applied to mvebu/clk-3xx
+Actually- I wanted it separate because omap-timer.c is already huge at 1157
+lines. Infact the largest among the clocksource drivers. Is that fair?
 
-I'll push for-next with tonight's additions in an hour or so.
+> So this patch really should just be moving of the code to the new
+> location.
 
-thx,
+To be honest, its not just a simple moving of code, there are new things
+such as selecting correct timer, new functions for clockevent and
+clocksource init, different handling of clocks etc.
 
-Jason.
+Thanks,
+-Joel
