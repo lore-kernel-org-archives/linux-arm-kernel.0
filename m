@@ -1,79 +1,41 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Mar 2014 11:18:28 +0200
-Subject: [PATCH 06/18] arm: common: edma: API to request non default queue for
- a channel
-In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1394702320-21743-7-git-send-email-peter.ujfalusi@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 13 Mar 2014 10:18:43 +0100
+Subject: [PATCH v4][ 5/8] ARM: dts: mbimxsd25 baseboard: Add USB support
+In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+Message-ID: <1394702326-25558-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using eDMA3 via dmaengine all dma channels will use the default queue.
-Since during request time we do not have means to change this it need to be done
-later, before the DMA has been started.
-With the added function it is possible to move the channel to a non default
-queue if it is possible, otherwise (when only one EQ/TC is available for the CC)
-the default queue is going to be used.
-For example: For optimal system performance the audio (cyclic) DMA should
-be placed to a separate queue which is different than what the rest of the
-system is using.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/common/edma.c             | 27 +++++++++++++++++++++++++++
- include/linux/platform_data/edma.h |  2 ++
- 2 files changed, 29 insertions(+)
+Changelog v1->v2:
+- With the clock fix patches, the usb gadget also work.
+  So I've set the otg port to otg instead of host.
+---
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index be267b2080be..eaf6dd19f082 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -712,6 +712,33 @@ int edma_alloc_channel(int channel,
- }
- EXPORT_SYMBOL(edma_alloc_channel);
- 
-+/**
-+ * edma_request_non_default_queue - try to map the channel to non default queue
-+ * @channel: dma channel returned from edma_alloc_channel()
-+ *
-+ * For certain type of applications like audio it is preferred to not use the
-+ * default event queue/tc to avoid eDMA caused latency.
-+ *
-+ * This function will iterate through the event queues available for the CC and
-+ * picks the first EQ/TC which is not set as the default for the CC
-+ */
-+void edma_request_non_default_queue(int channel)
-+{
-+	unsigned ctlr = EDMA_CTLR(channel);
-+	enum dma_event_q eventq_no = EVENTQ_DEFAULT;
-+	int i;
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index 62fb3da..ad12da3 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+@@ -172,3 +172,16 @@
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
 +
-+	for (i = 0; i < edma_cc[ctlr]->num_tc; i++) {
-+		if (i != edma_cc[ctlr]->default_queue) {
-+			eventq_no = i;
-+			break;
-+		}
-+	}
++&usbhost1 {
++	phy_type = "serial";
++	dr_mode = "host";
++	status = "okay";
++};
 +
-+	channel = EDMA_CHAN_SLOT(channel);
-+	map_dmach_queue(ctlr, channel, eventq_no);
-+}
-+EXPORT_SYMBOL(edma_request_non_default_queue);
- 
- /**
-  * edma_free_channel - deallocate DMA channel
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 923f8a3e4ce0..5d0a1b98f205 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -117,6 +117,8 @@ int edma_alloc_channel(int channel,
- 	void *data, enum dma_event_q);
- void edma_free_channel(unsigned channel);
- 
-+void edma_request_non_default_queue(int channel);
-+
- /* alloc/free parameter RAM slots */
- int edma_alloc_slot(unsigned ctlr, int slot);
- void edma_free_slot(unsigned slot);
++&usbotg {
++	phy_type = "utmi";
++	dr_mode = "otg";
++	external-vbus-divider;
++	status = "okay";
++};
 -- 
-1.9.0
+1.7.9.5
