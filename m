@@ -1,94 +1,53 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 13 Mar 2014 10:45:15 -0700
-Subject: [PATCH 1/2] arm64: Implement custom mmap functions for dma mapping
-In-Reply-To: <5320A573.9080501@codeaurora.org>
-Message-ID: <1394732716-11507-1-git-send-email-lauraa@codeaurora.org>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 13 Mar 2014 10:40:05 -0700
+Subject: [PATCH 2/2] ARM: dts: imx: fix invalid #address-cells value
+In-Reply-To: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1394732405-2260-3-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dma_ops do not specify an mmap function so maping
-falls back to the default implementation. There are at least
-two issues with using the default implementation:
+The invalid value of #address-cells in the imx6 pcie host controller node
+causes of_irq_parse_raw() to incorrectly advance through an interrupt-map
+table of more than one interrupt.
 
-1) The pgprot is always pgprot_noncached (strongly ordered)
-memory even with coherent operations
-2) dma_common_mmap calls virt_to_page on the remapped non-coherent
-address which leads to invalid memory being mapped.
+This patch resolves this issue and allows proper interrupt mapping for an
+imx6 pcie host connected to a P2P bridge when using legacy interrupts.
 
-Fix both these issue by implementing a custom mmap function which
-correctly accounts for remapped addresses and sets vm_pg_prot
-appropriately.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-samsung-soc <linux-samsung-soc@vger.kernel.org>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: linux-tegra <linux-tegra@vger.kernel.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm64/mm/dma-mapping.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e923a5b..9a639bf 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -194,9 +194,52 @@ static void arm64_swiotlb_sync_sg_for_device(struct device *dev,
- 			       sg->length, dir);
- }
- 
-+/* vma->vm_page_prot must be set appropriately before calling this function */
-+static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
-+			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
-+{
-+	int ret = -ENXIO;
-+	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
-+					PAGE_SHIFT;
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
-+	unsigned long off = vma->vm_pgoff;
-+
-+	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-+		return ret;
-+
-+	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      vma->vm_end - vma->vm_start,
-+				      vma->vm_page_prot);
-+	}
-+
-+	return ret;
-+}
-+
-+static int arm64_swiotlb_mmap_noncoherent(struct device *dev,
-+		struct vm_area_struct *vma,
-+		void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		struct dma_attrs *attrs)
-+{
-+	/* Just use whatever page_prot attributes were specified */
-+	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-+}
-+
-+static int arm64_swiotlb_mmap_coherent(struct device *dev,
-+		struct vm_area_struct *vma,
-+		void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		struct dma_attrs *attrs)
-+{
-+	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
-+	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-+}
-+
- struct dma_map_ops noncoherent_swiotlb_dma_ops = {
- 	.alloc = arm64_swiotlb_alloc_noncoherent,
- 	.free = arm64_swiotlb_free_noncoherent,
-+	.mmap = arm64_swiotlb_mmap_noncoherent,
- 	.map_page = arm64_swiotlb_map_page,
- 	.unmap_page = arm64_swiotlb_unmap_page,
- 	.map_sg = arm64_swiotlb_map_sg_attrs,
-@@ -213,6 +256,7 @@ EXPORT_SYMBOL(noncoherent_swiotlb_dma_ops);
- struct dma_map_ops coherent_swiotlb_dma_ops = {
- 	.alloc = arm64_swiotlb_alloc_coherent,
- 	.free = arm64_swiotlb_free_coherent,
-+	.mmap = arm64_swiotlb_mmap_coherent,
- 	.map_page = swiotlb_map_page,
- 	.unmap_page = swiotlb_unmap_page,
- 	.map_sg = swiotlb_map_sg_attrs,
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index af8d28d..2285299 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -49,7 +49,7 @@
+ 	intc: interrupt-controller at 00a01000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-		#address-cells = <1>;
++		#address-cells = <0>;
+ 		#size-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0x00a01000 0x1000>,
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
