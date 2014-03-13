@@ -1,157 +1,122 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 18:17:27 +0100
-Subject: [PATCH v11][ 06/12] ARM: dts: imx5*,
- imx6*: correct display-timings nodes.
+Date: Thu, 13 Mar 2014 18:17:29 +0100
+Subject: [PATCH 08/12] imx-drm: Use drm_display_mode timings flags.
 In-Reply-To: <1394731053-6118-1-git-send-email-denis@eukrea.com>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394731053-6118-6-git-send-email-denis@eukrea.com>
+Message-ID: <1394731053-6118-8-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx-drm driver can't use the de-active and
-pixelclk-active display-timings properties yet.
-
-Instead the data-enable and the pixel data clock
-polarity are hardcoded in the imx-drm driver.
-
-So theses properties are now set to keep
-the same behaviour when imx-drm will start
-using them.
+The previous hardware behaviour was kept if the
+flags are not set.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v9->v10:
-- New patch that was splitted out of:
-  "staging imx-drm: Use de-active and pixelclk-active
-  display-timings."
+ChangeLog v10->v11:
+- This patch was splitted-out and adapted from:
+  "Prepare imx-drm for extra display-timings retrival."
+- The display-timings dt specific part was removed.
+- The flags names were changed to use the DRM ones from:
+  "drm: drm_display_mode: add signal polarity flags"
 ---
- arch/arm/boot/dts/imx51-babbage.dts       |    2 ++
- arch/arm/boot/dts/imx53-m53evk.dts        |    2 ++
- arch/arm/boot/dts/imx53-tx53-x03x.dts     |    2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi     |    2 ++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi     |    2 ++
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi |    2 ++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  |    2 ++
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  |    2 ++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi    |    2 ++
- 9 files changed, 17 insertions(+), 1 deletion(-)
+ drivers/staging/imx-drm/imx-drm-core.c      |   10 ++++++++++
+ drivers/staging/imx-drm/imx-drm.h           |    6 ++++++
+ drivers/staging/imx-drm/imx-hdmi.c          |    3 +++
+ drivers/staging/imx-drm/imx-ldb.c           |    3 +++
+ drivers/staging/imx-drm/imx-tve.c           |    3 +++
+ drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    6 ++++--
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c     |    7 ++++++-
+ drivers/staging/imx-drm/ipuv3-crtc.c        |   21 +++++++++++++++++++--
+ 3 files changed, 29 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 9e9deb2..4732a00 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -38,6 +38,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
+diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+index b95cba1..3abeea3 100644
+--- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
++++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+@@ -29,9 +29,11 @@ enum ipuv3_type {
  
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 4646ea9..d6e1046 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -40,6 +40,8 @@
- 					vfront-porch = <9>;
- 					vsync-len = <3>;
- 					vsync-active = <1>;
-+					de-active = <1>;
-+					pixelclk-active = <0>;
- 				};
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-index 0217dde3..4092a81 100644
---- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-+++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-@@ -93,7 +93,7 @@
- 					hsync-active = <0>;
- 					vsync-active = <0>;
- 					de-active = <1>;
--					pixelclk-active = <1>;
-+					pixelclk-active = <0>;
- 				};
+ #define CLK_POL_ACTIVE_LOW	0
+ #define CLK_POL_ACTIVE_HIGH	1
++#define CLK_POL_PRESERVE	2
  
- 				ET0500 {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index c8e5ae0..43f48f2 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -494,6 +494,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 2795dfc..59ecfd1 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -516,6 +516,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 99be301..e9419a2 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -349,6 +349,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 009abd6..230bbc6 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -405,6 +405,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 3bec128..ed4c72f 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -349,6 +349,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 7a88d9a..7d1c84c 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -463,6 +463,8 @@
- 				vfront-porch = <7>;
- 				hsync-len = <60>;
- 				vsync-len = <10>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
- 			};
- 		};
- 	};
+ #define ENABLE_POL_NEGEDGE	0
+ #define ENABLE_POL_POSEDGE	1
++#define ENABLE_POL_PRESERVE	2
+ 
+ /*
+  * Bitfield of Display Interface signal polarities.
+@@ -43,10 +45,10 @@ struct ipu_di_signal_cfg {
+ 	unsigned clksel_en:1;
+ 	unsigned clkidle_en:1;
+ 	unsigned data_pol:1;	/* true = inverted */
+-	unsigned clk_pol:1;
+-	unsigned enable_pol:1;
+ 	unsigned Hsync_pol:1;	/* true = active high */
+ 	unsigned Vsync_pol:1;
++	u8 clk_pol;
++	u8 enable_pol;
+ 
+ 	u16 width;
+ 	u16 height;
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 53646aa..791080b 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 
+ 	if (sig->clk_pol == CLK_POL_ACTIVE_HIGH)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
++	else if (sig->clk_pol == CLK_POL_ACTIVE_LOW)
++		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
+ 
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+ 
+@@ -604,10 +606,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		     DI_SYNC_AS_GEN);
+ 
+ 	reg = ipu_di_read(di, DI_POL);
+-	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
++	reg &= ~(DI_POL_DRDY_DATA_POLARITY);
+ 
+ 	if (sig->enable_pol == ENABLE_POL_POSEDGE)
+ 		reg |= DI_POL_DRDY_POLARITY_15;
++	else if (sig->enable_pol == ENABLE_POL_NEGEDGE)
++		reg &= ~DI_POL_DRDY_POLARITY_15;
++
+ 	if (sig->data_pol)
+ 		reg |= DI_POL_DRDY_DATA_POLARITY;
+ 
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 8cfeb47..c75034e 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -157,8 +157,25 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		sig_cfg.Vsync_pol = 1;
+ 
+-	sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
+-	sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
++	if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_POSEDGE)
++		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
++	else if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
++		sig_cfg.enable_pol = ENABLE_POL_NEGEDGE;
++	else if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_PRESERVE)
++		sig_cfg.enable_pol = ENABLE_POL_PRESERVE;
++	else
++		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
++
++	if (mode->private_flags & DRM_MODE_FLAG_POL_DE_POSEDGE)
++		sig_cfg.clk_pol = CLK_POL_ACTIVE_HIGH;
++	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
++		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
++	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_PRESERVE)
++		sig_cfg.clk_pol = CLK_POL_PRESERVE;
++	else
++		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
++
++
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
 -- 
 1.7.9.5
