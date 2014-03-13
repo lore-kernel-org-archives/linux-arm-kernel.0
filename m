@@ -1,7 +1,7 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Mar 2014 17:42:50 +0100
-Subject: [GIT PULL] Allwinner defconfig additions for 3.15
-Message-ID: <20140313164250.GA13112@lukather>
+Date: Thu, 13 Mar 2014 17:43:27 +0100
+Subject: [GIT PULL] Allwinner core additions for 3.15
+Message-ID: <20140313164327.GA13229@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,23 +17,24 @@ The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
 are available in the git repository at:
 
-  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.15
+  https://github.com/mripard/linux.git tags/sunxi-core-for-3.15
 
-for you to fetch changes up to 4f26b761531c00605010d595b495901106729f8b:
+for you to fetch changes up to 8db21ad469fda194913db2c5b11635bcc21345fc:
 
-  ARM: sunxi: Enable A31 SPI and SID in the defconfig (2014-02-07 20:26:40 +0100)
+  ARM: sunxi: Add the new watchog compatibles to the reboot code (2014-03-13 11:46:20 +0100)
 
 ----------------------------------------------------------------
-Allwinner defconfig additions for 3.15
+Allwinner core additions for 3.15
 
-Enables SPI and SID drivers in sunxi defconfig
+Just a minor commit to adjust the restart code to take into account the new
+compatibles
 
 ----------------------------------------------------------------
 Maxime Ripard (1):
-      ARM: sunxi: Enable A31 SPI and SID in the defconfig
+      ARM: sunxi: Add the new watchog compatibles to the reboot code
 
- arch/arm/configs/sunxi_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-sunxi/sunxi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -45,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/4652e06e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/5741f18d/attachment.sig>
