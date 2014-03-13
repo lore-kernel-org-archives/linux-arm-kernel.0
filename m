@@ -1,87 +1,120 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 13 Mar 2014 23:57:58 +0900
-Subject: [PATCH v6 3/7] ftrace: Add arm64 support to recordmcount
-In-Reply-To: <20140313123819.GF12331@mudshark.cambridge.arm.com>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-4-git-send-email-takahiro.akashi@linaro.org>
- <20140313123819.GF12331@mudshark.cambridge.arm.com>
-Message-ID: <5321C776.30208@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Mar 2014 11:01:08 -0400 (EDT)
+Subject: [ARM]Fixmap mapping region is not enough for system of 14+ CPUs.
+In-Reply-To: <53215F99.8060804@huawei.com>
+References: <53203F9C.8040500@huawei.com> <53204956.30703@huawei.com>
+ <alpine.LFD.2.11.1403121306280.1217@knanqh.ubzr>
+ <53215F99.8060804@huawei.com>
+Message-ID: <alpine.LFD.2.11.1403131049410.1217@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 09:38 PM, Will Deacon wrote:
-> On Thu, Mar 13, 2014 at 10:13:46AM +0000, AKASHI Takahiro wrote:
->> Recordmcount utility under scripts is run, after compiling each object,
->> to find out all the locations of calling _mcount() and put them into
->> specific seciton named __mcount_loc.
->> Then linker collects all such information into a table in the kernel image
->> (between __start_mcount_loc and __stop_mcount_loc) for later use by ftrace.
->>
->> This patch adds arm64 specific definitions to identify such locations.
->> There are two types of implementation, C and Perl. On arm64, only C version
->> is used to build the kernel now that CONFIG_HAVE_C_RECORDMCOUNT is on.
->> But Perl version is also maintained.
->>
->> This patch also contains a workaround just in case where a header file,
->> elf.h, on host machine doesn't have definitions of EM_AARCH64 nor
->> R_AARCH64_ABS64. Without them, compiling C version of recordmcount will
->> fail.
->
-> [...]
->
->> diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
->> index 9c22317..047c8cd 100644
->> --- a/scripts/recordmcount.c
->> +++ b/scripts/recordmcount.c
->> @@ -40,6 +40,11 @@
->>   #define R_METAG_NONE                     3
->>   #endif
->>
->> +#ifndef EM_AARCH64
->> +#define EM_AARCH64	183
->> +#define R_AARCH64_ABS64	257
->> +#endif
->> +
->>   static int fd_map;	/* File descriptor for file being modified. */
->>   static int mmap_failed; /* Boolean flag. */
->>   static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
->> @@ -347,6 +352,10 @@ do_file(char const *const fname)
->>   	case EM_ARM:	 reltype = R_ARM_ABS32;
->>   			 altmcount = "__gnu_mcount_nc";
->>   			 break;
->> +	case EM_AARCH64:
->> +			 reltype = R_AARCH64_ABS64;
->> +			 altmcount = "_mcount";
->
-> Shouldn't you be setting gpfx = '_' instead of overriding altmcount like
-> this?
+On Thu, 13 Mar 2014, Liu hua wrote:
 
-Yep. Fix it.
+> On 2014/3/13 1:08, Nicolas Pitre wrote:
+> > On Wed, 12 Mar 2014, Liu hua wrote:
+> > 
+> >> Hi Russell, Will or Nicolas,
+> >>
+> >> (In this mail, we only discuss ARM 32-bit linux.)
+> >>
+> >> As we know, the region (0xfff00000-0xfffdffff) is reserved as fixmap
+> >> mapping region.
+> >>
+> >> The function "kmap_atomic" maps highmem pages to this region referring
+> >> to CPUID and per-cpu variable "__kmap_atomic_idx" via
+> >>
+> >>   idx = type + KM_TYPE_NR * smp_processor_id();
+> >>   vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+> >>
+> >> Size of region used by one cpu is 0x10000 (KM_TYPE_NR << PAGE_SHIFT).
+> >> And the total size of the fixmap mapping region is 0xe0000.
+> >> (only support 14 CPUs).
+> >>
+> >> So in a system of more than 14 CPUs, this region is not large enough.
+> >> should we change the memory layout on ARM Linux to support 14+ cpu system ?
+> >> Or can we do anything else to support that ?
+> > 
+> > How many CPUs do you have?
+> > 
+> > What about the following patch?  If this doesn't work for you then more 
+> > intrusive changes will be needed.
+> > 
+> > diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> > index 68ea615c2a..254f2df08d 100644
+> > --- a/arch/arm/include/asm/fixmap.h
+> > +++ b/arch/arm/include/asm/fixmap.h
+> > @@ -14,7 +14,17 @@
+> >   */
+> >  
+> >  #define FIXADDR_START		0xfff00000UL
+> > +
+> > +#if !defined(CONFIG_HAVE_TCM) && !defined(CONFIG_CPU_XSCALE)
+> > +/*
+> > + * If no TCM nor on on a XScale then enlarge the fixmap area to
+> > + * accommodate up to 30 CPUs.
+> > + */
+> > +#define FIXADDR_END		0xffff0000UL
+> > +#else
+> >  #define FIXADDR_END		0xfffe0000UL
+> One cpu need 0x10000-size region; So this patch can only support
+> uo to 15 CPUs
+Hmmm... You're right of course.
 
->> +			 break;
->>   	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
->>   	case EM_METAG:	 reltype = R_METAG_ADDR32;
->>   			 altmcount = "_mcount_wrapper";
->> diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
->> index 91280b8..397b6b8 100755
->> --- a/scripts/recordmcount.pl
->> +++ b/scripts/recordmcount.pl
->> @@ -279,6 +279,11 @@ if ($arch eq "x86_64") {
->>       $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24|THM_CALL)" .
->>   			"\\s+(__gnu_mcount_nc|mcount)\$";
->>
->> +} elsif ($arch eq "arm64") {
->> +    $alignment = 3;
->> +    $section_type = '%progbits';
->> +    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
->
-> What about "mcount" (i.e. no underscore)?
+> We have 16 CPUs in our system. And your patch cannot work if
+> the CPU number exceeds 15.
+> 
+> In addition, we can configure NR_CPUS up to 32. So should we
+> solve this problem completely?
+> 
+> There is an 1M-size hole between DMA mapping region and fixmap
+> mapping region(0xffe00000-0xfff00000).if this region are belonged
+> to fixmap mapping region, it can only support 30 CPUs.
+> 
+> Since we have alloced a second level page table to coverring
+> 0xffe00000 - 0xffffffff(2M). And 0xffff0000 upwards used as
+> vector pages. So if the left region is all used as fixmap mapping
+> region(size : 0x1f0000). Up to 31 CPUs is supported.
+> 
+> 
+> The following patch can solve our problem(up to 30 CPUs), But it
+> reduce the DMA region. What do you think about it ?
+> Is is necessory to solve this problem completely(up to 32 CPUs)
+> ?
+> 
+> 
+> Liu Hua
+> 
+> -----------------
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 68ea615..8379891 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -13,7 +13,7 @@
+>   * 0xfffe0000 and 0xfffeffff.
+>   */
+> 
+> -#define FIXADDR_START              0xfff00000UL
+> +#define FIXADDR_START                0xffe00000UL
+>  #define FIXADDR_END            0xfffe0000UL
+>  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 4afb376..0c40674 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -83,7 +83,7 @@
+>   */
+>  #define IOREMAP_MAX_ORDER      24
+> 
+> -#define CONSISTENT_END             (0xffe00000UL)
+> +#define CONSISTENT_END               (0xffd00000UL)
 
-I don't think it works since such regex doesn't match to "CALL26   _mcount".
+Some systems might possibly have issues with a smaller DMA region. 
+I don't recall which though.
 
-Thanks,
--Takahiro AKASHI
+you should also update Documentation/arm/memory.txt in your patch.
+Then I'd suggest you can repost it more formally for comments.
 
-> Will
->
+
+Nicolas
