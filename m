@@ -1,119 +1,97 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 09:03:05 +0900
-Subject: [PATCH v3 15/20] ARM: shmobile: marzen-reference: Instantiate
- clkdevs for SCIF and TMU
-In-Reply-To: <1792922.9Bi30kDKcG@avalon>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-16-git-send-email-horms+renesas@verge.net.au>
- <1792922.9Bi30kDKcG@avalon>
-Message-ID: <20140313000304.GG25813@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Mar 2014 17:04:19 -0700
+Subject: [PATCH] ARM: shmobile: Break out R-Car SYSC PM code
+In-Reply-To: <CANqRtoQx16qgC-5wxi_SPDKMy+qztt-aTTa7TEY04+aT4a1=wA@mail.gmail.com>
+References: <20140115074308.8471.64824.sendpatchset@w520>
+ <CAOesGMjaTB-kBrm1av0uc8N-+4TRBZm5fxjJbsZLJe5OuqLu+g@mail.gmail.com>
+ <CANqRtoRMkezRZvoH4Q1T3mwwhU9T=ZOFVGE5KN+sLBEqpXO=mg@mail.gmail.com>
+ <CANqRtoQ2PDb5siknAndO3TgDghgTKPVa-ez-t2eQDcypDnsJTw@mail.gmail.com>
+ <20140309052210.GB12854@quad.lixom.net>
+ <CANqRtoQx16qgC-5wxi_SPDKMy+qztt-aTTa7TEY04+aT4a1=wA@mail.gmail.com>
+Message-ID: <CAOesGMg9Abd_JwLLjyDARmFzuN3Kh=HsZMmcS1mfncdEdOOUww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:24:01PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> Thank you for the patch.
-> 
-> On Wednesday 26 February 2014 16:33:31 Simon Horman wrote:
-> > Now that the common clock framework is supported, the clock lookup
-> > entries in clock-r8a7779.c are not registered anymore. Devices must
-> > instead reference their clocks in the device tree. However, SCIF and CMT
-> > devices are still instantiated through platform code, and thus need a
-> > clock lookup entry.
-> > 
-> > Retrieve the SCIF and CMT clock entries by name and register clkdevs for
-> > the corresponding devices. This will be removed when the SCIF and CMT
-> > devices will be instantiated from the device tree.
-> > 
-> > Based on work for the Koelsch board by Laurent Pinchart.
-> > 
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > v3
-> > * Initialise TMU clocks instead of CMT clocks
-> >   - It is TMU that Marzen uses as a clocksource
-> > * Refactor clock initialisation hack as per more recent mainline
-> >   code for Koelsch
-> > * Use IS_ERR to check the return value of clk_get()
-> > ---
-> >  arch/arm/mach-shmobile/board-marzen-reference.c | 31 +++++++++++++++++++++-
-> > 1 file changed, 30 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
-> > b/arch/arm/mach-shmobile/board-marzen-reference.c index e261431..a5974d2
-> > 100644
-> > --- a/arch/arm/mach-shmobile/board-marzen-reference.c
-> > +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-> > @@ -19,7 +19,9 @@
-> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> > USA */
-> > 
-> > +#include <linux/clk.h>
-> >  #include <linux/clk/shmobile.h>
-> > +#include <linux/clkdev.h>
-> >  #include <linux/clocksource.h>
-> >  #include <linux/of_platform.h>
-> >  #include <mach/r8a7779.h>
-> > @@ -38,7 +40,34 @@ static void __init marzen_init_timer(void)
-> > 
-> >  static void __init marzen_init(void)
-> >  {
-> > -#ifndef CONFIG_COMMON_CLK
-> > +#ifdef CONFIG_COMMON_CLK
-> > +	static const struct clk_name {
-> > +		const char *clk;
-> > +		const char *con_id;
-> > +		const char *dev_id;
-> > +	} clk_names[] = {
-> > +		{ "scif0", NULL, "sh-sci.0" },
-> > +		{ "scif1", NULL, "sh-sci.1" },
-> > +		{ "scif2", NULL, "sh-sci.2" },
-> > +		{ "scif3", NULL, "sh-sci.3" },
-> > +		{ "scif4", NULL, "sh-sci.4" },
-> > +		{ "scif5", NULL, "sh-sci.5" },
-> 
-> Any chance to switch the board the DT-based SCIF instead ? ;-)
+On Wed, Mar 12, 2014 at 3:26 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On Sun, Mar 9, 2014 at 2:22 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Feb 25, 2014 at 11:09:52AM +0900, Magnus Damm wrote:
+>>> Hi Olof,
+>>>
+>>> On Thu, Feb 20, 2014 at 6:45 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> > On Thu, Feb 20, 2014 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> >> I spotted this patch since it adds new include/mach contents, comment below:
+>>> >>
+>>> >> On Tue, Jan 14, 2014 at 11:43 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> >>
+>>> >>> --- /dev/null
+>>> >>> +++ work/arch/arm/mach-shmobile/include/mach/pm-rcar.h  2014-01-15 13:30:38.000000000 +0900
+>>> >>> @@ -0,0 +1,15 @@
+>>> >>> +#ifndef PM_RCAR_H
+>>> >>> +#define PM_RCAR_H
+>>> >>> +
+>>> >>> +struct rcar_sysc_ch {
+>>> >>> +       unsigned long chan_offs;
+>>> >>> +       unsigned int chan_bit;
+>>> >>> +       unsigned int isr_bit;
+>>> >>> +};
+>>> >>> +
+>>> >>> +int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch);
+>>> >>> +int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch);
+>>> >>> +bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch);
+>>> >>> +void __iomem *rcar_sysc_init(phys_addr_t base);
+>>> >>> +
+>>> >>> +#endif /* PM_RCAR_H */
+>>> >>
+>>> >>
+>>> >> These prototypes are only ever used by code in arch/arm/mach-shmobile,
+>>> >> right? There's no reason to expose it to the global include namespace,
+>>> >> and you'll just have to remove it when the platform is converted to
+>>> >> multiplatform.
+>>> >>
+>>> >> So, I suggest moving this to be at arch/arm/mach-shmobile/pm-rcar.h
+>>> >> instead (and included as "pm-rcar.h" instead of <mach/pm-rcar.h>).
+>>> >
+>>> > Thanks for your help with the patches! You are right that these are
+>>> > never used outside mach-shmobile, and moving headers out of "mach"
+>>> > certainly makes sense.
+>>>
+>>> FYI, the following series includes my attempt to address this issue:
+>>>
+>>> [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
+>>> [PATCH 01/12] ARM: shmobile: Add temporary include workaround
+>>> [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
+>>> [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
+>>> [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
+>>> [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
+>>> [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
+>>> [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
+>>> [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
+>>> [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
+>>> [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
+>>> [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
+>>> [PATCH 12/12] ARM: shmobile: Rework include path for common bits
+>>>
+>>> If you would like me to rework the code somehow then please let me
+>>> know. I also intend to ask a different developer to convert the actual
+>>> boards once these changes have been merged by Simon, hope this is a
+>>> good way forward for you.
+>>
+>> It certainly looks like a good way forward, thanks for doing this.
+>
+> Ok, thanks. The list of patches above is the first step forward from my side.
+>
+> I'm afraid that I'm a bit confused by your comments in thread:
+> "Re: [PATCH v2] ARM: shmobile: Add temporary include workaround"
+>
+> The single v2 patch on the line above is just a bug fixed version of [01/12].
+>
+> Can you please clarify if you're ok with the series or if you want me
+> to rework it somehow?
 
-As is typical for me, I'd like to handle that as a follow-up
-rather than a pre-requisite.
+Oh, yeah, that's confusing -- my "looks good, please go ahead" was for
+patch 2-12, I don't think you actually need 1/12 at this time since
+you move the include file over and change the include statements in
+the same time in the other 11 patches?
 
-> 
-> > +		{ "tmu00", NULL, "sh_tmu.0" },
-> > +		{ "tmu01", NULL, "sh_tmu.1" },
-> > +		{ "tmu02", NULL, "sh_tmu.2" },
-> 
-> Those clocks should be tmu0, tmu1 and tmu2.
 
-Thanks, I have fixed that.
-
-> 
-> > +	};
-> > +	struct clk *clk;
-> > +	unsigned int i;
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(clk_names); ++i) {
-> > +		clk = clk_get(NULL, clk_names[i].clk);
-> > +		if (!IS_ERR(clk)) {
-> > +			clk_register_clkdev(clk, clk_names[i].con_id,
-> > +					    clk_names[i].dev_id);
-> > +			clk_put(clk);
-> > +		}
-> > +	}
-> > +#else
-> >  	r8a7779_clock_init();
-> >  #endif
-> >  	r8a7779_add_standard_devices_dt();
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-Olof
