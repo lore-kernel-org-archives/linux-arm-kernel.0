@@ -1,177 +1,283 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 13 Mar 2014 19:29:03 +0900
-Subject: [PATCH v5 3/5] clk/samsung: add support for pll2650xx
-In-Reply-To: <532109C6.2060100@samsung.com>
-References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
- <1394636208-3125-4-git-send-email-rahul.sharma@samsung.com>
- <532109C6.2060100@samsung.com>
-Message-ID: <CAGcde9FiFkbtuCrG1TWAmbcM-LLMu8fAMKS-L4keZ2ehuEDn=g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Mar 2014 10:33:29 +0000
+Subject: [PATCH v2 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <01c501cf3dac$022879b0$06796d10$@samsung.com>
+References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
+ <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
+ <20140311182922.GD3263@e106331-lin.cambridge.arm.com>
+ <01c501cf3dac$022879b0$06796d10$@samsung.com>
+Message-ID: <20140313103329.GD5035@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:28 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> Hi Rahul,
->
->
-> On 03/12/2014 11:56 PM, Rahul Sharma wrote:
->>
->> Add support for pll2650xx in samsung pll file. This PLL variant
->> is close to pll36xx but uses CON2 registers instead of CON1.
->>
->> Aud_pll in Exynos5260 is pll2650xx and uses this code.
->>
->> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> ---
->>   drivers/clk/samsung/clk-pll.c |  101
->> +++++++++++++++++++++++++++++++++++++++++
->>   drivers/clk/samsung/clk-pll.h |    1 +
->>   2 files changed, 102 insertions(+)
->>
->> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
->> index 18e42ef..b07fad2 100644
->> --- a/drivers/clk/samsung/clk-pll.c
->> +++ b/drivers/clk/samsung/clk-pll.c
->> @@ -1049,6 +1049,101 @@ static const struct clk_ops
->> samsung_pll2550xx_clk_min_ops = {
->>         .recalc_rate = samsung_pll2550xx_recalc_rate,
->>   };
->>   +/*
->> + * PLL2650XX Clock Type
->> + */
->> +
->> +/* Maximum lock time can be 3000 * PDIV cycles */
->> +#define PLL2650XX_LOCK_FACTOR 3000
->> +
->> +#define PLL2650XX_MDIV_SHIFT           9
->> +#define PLL2650XX_PDIV_SHIFT           3
->> +#define PLL2650XX_SDIV_SHIFT           0
->> +#define PLL2650XX_KDIV_SHIFT           0
->> +#define PLL2650XX_MDIV_MASK            0x1ff
->> +#define PLL2650XX_PDIV_MASK            0x3f
->> +#define PLL2650XX_SDIV_MASK            0x7
->> +#define PLL2650XX_KDIV_MASK            0xffff
->> +#define PLL2650XX_PLL_ENABLE_SHIFT     23
->> +#define PLL2650XX_PLL_LOCKTIME_SHIFT   21
->> +#define PLL2650XX_PLL_FOUTMASK_SHIFT   31
->> +
->> +static unsigned long samsung_pll2650xx_recalc_rate(struct clk_hw *hw,
->> +                               unsigned long parent_rate)
->> +{
->> +       struct samsung_clk_pll *pll = to_clk_pll(hw);
->> +       u32 mdiv, pdiv, sdiv, pll_con0, pll_con2;
->> +       s16 kdiv;
->> +       u64 fvco = parent_rate;
->> +
->> +       pll_con0 = __raw_readl(pll->con_reg);
->> +       pll_con2 = __raw_readl(pll->con_reg + 8);
->> +       mdiv = (pll_con0 >> PLL2650XX_MDIV_SHIFT) & PLL2650XX_MDIV_MASK;
->> +       pdiv = (pll_con0 >> PLL2650XX_PDIV_SHIFT) & PLL2650XX_PDIV_MASK;
->> +       sdiv = (pll_con0 >> PLL2650XX_SDIV_SHIFT) & PLL2650XX_SDIV_MASK;
->> +       kdiv = (s16)(pll_con2 & PLL2650XX_KDIV_MASK);
->> +
->> +       fvco *= (mdiv << 16) + kdiv;
->> +       do_div(fvco, (pdiv << sdiv));
->> +       fvco >>= 16;
->> +
->> +       return (unsigned long)fvco;
->> +}
->> +
->> +static int samsung_pll2650xx_set_rate(struct clk_hw *hw, unsigned long
->> drate,
->> +                                       unsigned long parent_rate)
->> +{
->> +       struct samsung_clk_pll *pll = to_clk_pll(hw);
->> +       u32 tmp, pll_con0, pll_con2;
->> +       const struct samsung_pll_rate_table *rate;
->> +
->> +       rate = samsung_get_pll_settings(pll, drate);
->> +       if (!rate) {
->> +               pr_err("%s: Invalid rate : %lu for pll clk %s\n",
->> __func__,
->> +                       drate, __clk_get_name(hw->clk));
->> +               return -EINVAL;
->> +       }
->> +
->> +       pll_con0 = __raw_readl(pll->con_reg);
->> +       pll_con2 = __raw_readl(pll->con_reg + 8);
->> +
->> +        /* Change PLL PMS values */
->> +       pll_con0 &= ~(PLL2650XX_MDIV_MASK << PLL2650XX_MDIV_SHIFT |
->> +                       PLL2650XX_PDIV_MASK << PLL2650XX_PDIV_SHIFT |
->> +                       PLL2650XX_SDIV_MASK << PLL2650XX_SDIV_SHIFT);
->> +       pll_con0 |= rate->mdiv << PLL2650XX_MDIV_SHIFT;
->> +       pll_con0 |= rate->pdiv << PLL2650XX_PDIV_SHIFT;
->> +       pll_con0 |= rate->sdiv << PLL2650XX_SDIV_SHIFT;
->> +       pll_con0 |= 1 << PLL2650XX_PLL_ENABLE_SHIFT;
->> +       pll_con0 |= 1 << PLL2650XX_PLL_FOUTMASK_SHIFT;
->> +
->> +       pll_con2 &= ~(PLL2650XX_KDIV_MASK << PLL2650XX_KDIV_SHIFT);
->> +       pll_con2 |= ((~(rate->kdiv) + 1) & PLL2650XX_KDIV_MASK)
->> +                       << PLL2650XX_KDIV_SHIFT;
->> +
->> +       /* Set PLL lock time. */
->> +       __raw_writel(PLL2650XX_LOCK_FACTOR * rate->pdiv, pll->lock_reg);
->> +
->> +       __raw_writel(pll_con0, pll->con_reg);
->> +       __raw_writel(pll_con2, pll->con_reg + 8);
->> +
->> +       do {
->> +               tmp = __raw_readl(pll->con_reg);
->> +       } while (!(tmp & (0x1 << PLL2650XX_PLL_LOCKTIME_SHIFT)));
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct clk_ops samsung_pll2650xx_clk_ops = {
->> +       .recalc_rate = samsung_pll2650xx_recalc_rate,
->> +       .set_rate = samsung_pll2650xx_set_rate,
->> +       .round_rate = samsung_pll_round_rate,
->> +};
->> +
->> +static const struct clk_ops samsung_pll2650xx_clk_min_ops = {
->> +       .recalc_rate = samsung_pll2650xx_recalc_rate,
->> +};
->> +
->>   static void __init _samsung_clk_register_pll(struct samsung_clk_provider
->> *ctx,
->>                                 struct samsung_pll_clock *pll_clk,
->>                                 void __iomem *base)
->> @@ -1157,6 +1252,12 @@ static void __init _samsung_clk_register_pll(struct
->> samsung_clk_provider *ctx,
->>                 else
->>                         init.ops = &samsung_pll2550xx_clk_ops;
->>                 break;
->> +       case pll_2650xx:
->> +               if (!pll->rate_table)
->> +                       init.ops = &samsung_pll2650xx_clk_min_ops;
->> +               else
->> +                       init.ops = &samsung_pll2650xx_clk_ops;
->> +               break;
->>         default:
->>                 pr_warn("%s: Unknown pll type for pll clk %s\n",
->>                         __func__, pll_clk->name);
->> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
->> index ec4bc1d..c0ed4d4 100644
->> --- a/drivers/clk/samsung/clk-pll.h
->> +++ b/drivers/clk/samsung/clk-pll.h
->> @@ -32,6 +32,7 @@ enum samsung_pll_type {
->>         pll_s3c2410_upll,
->>         pll_s3c2440_mpll,
->>         pll_2550xx,
->> +       pll_2650xx,
->>   };
->>     #define PLL_35XX_RATE(_rate, _m, _p, _s)                    \
->
->
-> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->
-> --
-> Best Regards,
-> Pankaj Dubey
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Wed, Mar 12, 2014 at 04:31:56AM +0000, Kukjin Kim wrote:
+> Mark Rutland wrote:
+> > 
+> Hi Mark,
+> 
+> > On Mon, Mar 10, 2014 at 10:51:17PM +0000, Kukjin Kim wrote:
+> > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > ---
+> > >  arch/arm64/boot/dts/samsung-gh7.dtsi     | 106
+> > +++++++++++++++++++++++++++++++
+> > >  arch/arm64/boot/dts/samsung-ssdk-gh7.dts |  26 ++++++++
+> > >  2 files changed, 132 insertions(+)
+> > >  create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+> > >  create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> > >
+> > > diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi
+> > b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> > > new file mode 100644
+> > > index 0000000..b5e8488
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> > > @@ -0,0 +1,106 @@
+> > > +/*
+> > > + * SAMSUNG GH7 SoC device tree source
+> > > + *
+> > > + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> > > + *		http://www.samsung.com
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > +*/
+> > > +
+> > > +/memreserve/ 0x80000000 0x0C400000;
+> > 
+> > Please have a comment as to what this memreserve is intended to protect.
+> > This is very large, and we don't want pointless memreserves.
+> > 
+> Well, you mean I need to comment about each reserved memory area?
+
+Please have a comment about what each /memreserve/ is intended to
+protect.
+
+> We need the reserved memory for EL3 monitor, UEFI services, secure
+> interpreter, hypervisor and Scan-chain for debug...BTW isn't it depending on
+> each hardware platform and usage model?
+
+If it depends on each particular model then it doesn't belong in the
+shared dtsi, and each dts should have the /memreserve/ for that
+platform.
+
+Why would the hypervisor or secure OS memory ever be accessible to the
+kernel such that it would require a memreserve? That sounds
+fundamentally broken.
+
+I was under the impression that if using UEFI we can identify and
+reserve the UEFI services by walking to UEFI memory map. If we don't use
+them, they don't need to be protected. As such, I don't see why they
+need a memreserve for them.
+
+> Just note, I will change the reserve memory area and size. From at
+> 0xf8000000 and size is 128MB(0x8000000).
+
+Ok.
+
+> > What address does the kernel end up getting loaded at on this board?
+> > 
+> We load the kernel image from at 0x80080000 after changing the reserve
+> memory area.
+
+Ok.
+
+> > > +/ {
+> > > +	interrupt-parent = <&gic>;
+> > > +	#address-cells = <2>;
+> > > +	#size-cells = <2>;
+> > > +
+> > > +	aliases {
+> > > +		serial0 = "/amba/uart at 12c00000";
+> > > +	};
+> > > +
+> > > +	cpus {
+> > > +		#address-cells = <2>;
+> > > +		#size-cells = <0>;
+> > > +
+> > > +		cpu at 000 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,armv8";
+> > 
+> > The "arm,armv8" should be a fallback rather than the only entry. The
+> > precise core should be first (see arch/arm64/boot/dts/apm-storm.dtsi for
+> > an example).
+> > 
+> Well, do I really need another name if GH7 has just 'ARMv8 core' exactly?
+
+Yes please. You presumably don't have "just 'ARMv8 core'", but rather a
+specific ARMv8 implementation.
+
+> > > +			reg = <0x0 0x000>;
+> > 
+> > Any reason for padding these to three hexadecimal digits (in both the
+> > reg and unit-address)?
+> > 
+> Yes, I already commented on Olof's question before, other cores will be
+> added and it should be separated from this.
+
+Ok.
+
+> > > +			enable-method = "spin-table";
+> > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > +		};
+> > > +		cpu at 001 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,armv8";
+> > > +			reg = <0x0 0x001>;
+> > > +			enable-method = "spin-table";
+> > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > +		};
+> > > +		cpu at 002 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,armv8";
+> > > +			reg = <0x0 0x002>;
+> > > +			enable-method = "spin-table";
+> > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > +		};
+> > > +		cpu at 003 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,armv8";
+> > > +			reg = <0x0 0x003>;
+> > > +			enable-method = "spin-table";
+> > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > +		};
+> > > +	};
+> > > +
+> > > +	gic: interrupt-controller at 1C000000 {
+> > > +		compatible = "arm,cortex-a15-gic";
+> > 
+> > We should have a more specific compatible string early in the list here
+> > too.
+> > 
+> Well, I think more specific compatible string is not required for gic, there
+> were discussion about using another compatible string for gic-v2. And
+> cortex-a15-gic should be fine at this moment and if another name is required
+> as per previous discussion, we will then.
+
+While it's probably ok to have "arm,cortex-a15-gic" in the compatible
+list, it would be good to also have a more specific string, so we can
+identify the GIC implementation precisely in future (in case we need to
+perform any workarounds, or there's some kind of optimisation we could
+perform for some implementations).
+
+> > > +		#interrupt-cells = <3>;
+> > > +		interrupt-controller;
+> > > +		reg = <0x0 0x1C001000 0 0x1000>,	/* GIC Dist */
+> > > +		      <0x0 0x1C002000 0 0x1000>,	/* GIC CPU */
+> > > +		      <0x0 0x1C004000 0 0x2000>,	/* GIC VCPU Control
+> */
+> > > +		      <0x0 0x1C006000 0 0x2000>;	/* GIC VCPU */
+> > > +		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+> > > +	};
+> > > +
+> > > +	timer {
+> > > +		compatible = "arm,armv8-timer";
+> > > +		interrupts = <1 13 0xff01>,	/* Secure Phys IRQ */
+> > > +			     <1 14 0xff01>,	/* Non-secure Phys IRQ */
+> > > +			     <1 11 0xff01>,	/* Virt IRQ */
+> > > +			     <1 10 0xff01>;	/* Hyp IRQ */
+> > > +	};
+> > > +
+> > > +	pmu {
+> > > +		compatible = "arm,armv8-pmuv3";
+> > 
+> > This is missing a specific compatible string.
+> > 
+> I don't know why I need another specific compatible string here because I
+> thought the 'armv8-pmuv3' is enough.
+
+Each CPU microarchitecture has different PMU events and quirks. While
+the CPU PMU might be compatible with ARMv8's PMUv3, it will also have
+implementation-specific events, and may have quirks we need to work
+around in future.
+
+As with 32-bit, we'd expect these to be of the form
+"${implementor},${cpu}-pmu".
+
+> > > +		interrupts = <0 294 0>,
+> > > +			     <0 295 0>,
+> > > +			     <0 296 0>,
+> > > +			     <0 297 0>,
+> > > +			     <0 298 0>,
+> > > +			     <0 299 0>,
+> > > +			     <0 300 0>,
+> > > +			     <0 301 0>;
+> > > +	};
+> > 
+> > There are four CPUs described, yet eight interrupts here. There should
+> > be one per CPU.
+> > 
+> Yes right. I added them here by mistake, the other four interrupts will be
+> used for other 4 cores will be added later though.
+
+Ok.
+
+> > > +	amba {
+> > > +		compatible = "arm,amba-bus";
+> > > +		#address-cells = <2>;
+> > > +		#size-cells = <2>;
+> > > +		ranges;
+> > > +
+> > > +		serial at 12c00000 {
+> > > +			compatible = "arm,pl011", "arm,primecell";
+> > > +			reg = <0 0x12c00000 0 0x10000>;
+> > > +			interrupts = <0 418 0>;
+> > > +		};
+> > > +
+> > > +		serial at 12c20000 {
+> > > +			compatible = "arm,pl011", "arm,primecell";
+> > > +			reg = <0 0x12c20000 0 0x10000>;
+> > > +			interrupts = <0 420 0>;
+> > > +		};
+> > 
+> > These are both missing required clocks.
+> > 
+> Yes right.
+
+So you'll add these?
+
+> > > diff --git a/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> > b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> > > new file mode 100644
+> > > index 0000000..47afbc4
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> > > @@ -0,0 +1,26 @@
+> > > +/*
+> > > + * SAMSUNG SSDK-GH7 board device tree source
+> > > + *
+> > > + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> > > + *		http://www.samsung.com
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > +*/
+> > > +
+> > > +/dts-v1/;
+> > > +#include "samsung-gh7.dtsi"
+> > > +
+> > > +/ {
+> > > +	model = "SAMSUNG SSDK-GH7 board based on GH7 SoC";
+> > 
+> > Is the "based on GH7 SoC" part necessary? Does the "SSDK-GH7" not give
+> > that away?
+> > 
+> In this case, yes, SSDK-GH7 is enough but I though, in case of different
+> board adding what SoC is used on the board in that is useful. Anyway, OK.
+
+Looking at ePAPR, the recommended format is "manufacturer,model", and
+the string is intended to identify a particular implementation. It is
+not intended to give details about the implementation that can be
+derived from the name.
+
+We seem to have ignored the format (and to some degree purpose) of the
+model property so far, but I don't see any reason to fill it with
+unnecessary information.
+
+Thanks,
+Mark.
