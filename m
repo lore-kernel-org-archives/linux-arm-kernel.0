@@ -1,47 +1,39 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Thu, 13 Mar 2014 16:57:28 +0100
-Subject: [RFC PATCH 3/4] ARM: KVM: enable linking against eventfd
-In-Reply-To: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
-References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <1394726249-1547-4-git-send-email-a.motakis@virtualopensystems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 16:05:34 +0000
+Subject: [PATCH v6 3/7] ftrace: Add arm64 support to recordmcount
+In-Reply-To: <5321C776.30208@linaro.org>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-4-git-send-email-takahiro.akashi@linaro.org>
+ <20140313123819.GF12331@mudshark.cambridge.arm.com>
+ <5321C776.30208@linaro.org>
+Message-ID: <20140313160534.GC25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables and compiles the ioeventfd capability of KVM on ARM. The
-irqfd feature will not be included in a build, due to the lack of IRQ
-routing in the VGIC implementation of KVM.
+On Thu, Mar 13, 2014 at 02:57:58PM +0000, AKASHI Takahiro wrote:
+> On 03/13/2014 09:38 PM, Will Deacon wrote:
+> > On Thu, Mar 13, 2014 at 10:13:46AM +0000, AKASHI Takahiro wrote:
+> >> diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
+> >> index 91280b8..397b6b8 100755
+> >> --- a/scripts/recordmcount.pl
+> >> +++ b/scripts/recordmcount.pl
+> >> @@ -279,6 +279,11 @@ if ($arch eq "x86_64") {
+> >>       $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24|THM_CALL)" .
+> >>   			"\\s+(__gnu_mcount_nc|mcount)\$";
+> >>
+> >> +} elsif ($arch eq "arm64") {
+> >> +    $alignment = 3;
+> >> +    $section_type = '%progbits';
+> >> +    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
+> >
+> > What about "mcount" (i.e. no underscore)?
+> 
+> I don't think it works since such regex doesn't match to "CALL26   _mcount".
 
-Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
----
- arch/arm/kvm/Kconfig  | 1 +
- arch/arm/kvm/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+What I meant was, do you need to match "mcount" as well? However, after
+speaking to our GCC guys, they say they only support "_mcount" (preferred)
+and "__mcount" (which GCC itself doesn't emit) so you can leave this regex
+as-is.
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd29..a4b0312 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -20,6 +20,7 @@ config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
-+	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 789bca9..2fa2f82 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- 
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
--- 
-1.8.3.2
+Will
