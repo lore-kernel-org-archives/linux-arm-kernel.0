@@ -1,41 +1,24 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 13 Mar 2014 14:27:39 -0400
-Subject: [PATCH v6 4/7] arm64: Add ftrace support
-In-Reply-To: <20140313170834.GE25472@mudshark.cambridge.arm.com>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-5-git-send-email-takahiro.akashi@linaro.org>
- <20140313170834.GE25472@mudshark.cambridge.arm.com>
-Message-ID: <1394735259.26600.14.camel@pippen.local.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 18:28:06 +0000
+Subject: [PATCH v4 1/3] arm64: make a single hook to syscall_trace() for
+ all syscall features
+In-Reply-To: <1394705491-12343-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313182805.GJ25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-13 at 17:08 +0000, Will Deacon wrote:
-
-> > +       /*
-> > +        * Note:
-> > +        * No protection against faulting at *parent, which may be seen
-> > +        * on other archs. It's unlikely on AArch64.
-> > +        */
-> > +       old = *parent;
-> > +       *parent = return_hooker;
+On Thu, Mar 13, 2014 at 10:11:29AM +0000, AKASHI Takahiro wrote:
+> Currently syscall_trace() is called only for ptrace.
+> With additional TIF_xx flags defined, it is now called in all the cases
+> of audit, ftrace and seccomp in addition to ptrace.
 > 
-> return_hook? People might take it personally otherwise ;)
+> Acked-by: Richard Guy Briggs <rgb@redhat.com>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
 
-No, return_hooker is consistent with all the other archs. Hey, it's a
-rugby position! Note, which I was when I played. ;-)
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> 
-> > +       trace.func = self_addr;
-> 
-> in kernel/ftrace/ftrace.c there's an smb_wmb() between setting up
-> tracing_graph_pause and setting the ret_stack with a comment saying:
-> 
->     /* Make sure the tasks see the -1 first: */
-> 
-> Why don't we have a corresponding read-barrier here?
-
-The corresponding rmb is in kernel/trace/trace_function_graph
-ftrace_push_return_trace().
-
--- Steve
+Will
