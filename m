@@ -1,38 +1,40 @@
 From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 13 Mar 2014 16:39:02 -0300
-Subject: [PATCH v2 6/6] clk: mvebu: Update binding documentation for the core
- divider clock
+Date: Thu, 13 Mar 2014 16:38:58 -0300
+Subject: [PATCH v2 2/6] ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
 In-Reply-To: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1394739542-30017-7-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <1394739542-30017-3-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-The Core Divider clock support two new compatible strings for Armada
-375 and Armada 380 SoCs. Add the compatible strings to the documentation.
+Armada 38x SoCs have a 2 GHz fixed main PLL that is used to feed
+other clocks. This commit adds a DT representation of this clock
+through a fixed-clock compatible node.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-index c62391f..520562a 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-@@ -4,7 +4,10 @@ The following is a list of provided IDs and clock names on Armada 370/XP:
-  0 = nand (NAND clock)
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 812ce28..38fc3a0 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -341,6 +341,13 @@
+ 	};
  
- Required properties:
--- compatible : must be "marvell,armada-370-corediv-clock"
-+- compatible : must be "marvell,armada-370-corediv-clock",
-+		       "marvell,armada-375-corediv-clock",
-+		       "marvell,armada-380-corediv-clock",
+ 	clocks {
++		/* 2 GHz fixed main PLL */
++		mainpll: mainpll {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <2000000000>;
++		};
 +
- - reg : must be the register address of Core Divider control register
- - #clock-cells : from common clock binding; shall be set to 1
- - clocks : must be set to the parent's phandle
+ 		/* 25 MHz reference crystal */
+ 		refclk: oscillator {
+ 			compatible = "fixed-clock";
 -- 
 1.9.0
