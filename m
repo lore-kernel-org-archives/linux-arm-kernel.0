@@ -1,150 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 18:00:01 +0900
-Subject: [PATCH v4 18/19] ARM: shmobile: Remove Marzen reference DTS
+Date: Thu, 13 Mar 2014 17:59:59 +0900
+Subject: [PATCH v4 16/19] ARM: shmobile: Remove non-multiplatform Marzen
+ reference support
 In-Reply-To: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
 References: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1394701202-25823-19-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1394701202-25823-17-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DTS file r8a7790-marzen.dts can be used with
-board-marzen.c and board-marzen-reference.c, proceed with removing
-r8a7790-marzen-reference.dts.
+Now that r8a7779 has CCF support remove the legacy Marzen reference
+Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
+case.
+
+Starting from this commit Marzen board support is always enabled via
+CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
+between board-marzen.c and board-marzen-reference.c
+
+The file board-marzen-reference.c can no longer be used together with
+the legacy sh-clk clock framework, instead CCF is used.
 
 Based on work for the Koelsch board by Laurent Pinchart.
 
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 120 -------------------------
- 1 file changed, 120 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+ arch/arm/boot/dts/Makefile           |  1 -
+ arch/arm/mach-shmobile/Kconfig       | 13 -------------
+ arch/arm/mach-shmobile/Makefile      |  1 -
+ arch/arm/mach-shmobile/Makefile.boot |  1 -
+ 4 files changed, 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-deleted file mode 100644
-index 76f5eef..0000000
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ /dev/null
-@@ -1,120 +0,0 @@
--/*
-- * Reference Device Tree Source for the Marzen board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- * Copyright (C) 2013 Simon Horman
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f56e594..69cd6b7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -251,7 +251,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
+ 	r8a7778-bockw-reference.dtb \
+ 	r8a7740-armadillo800eva-reference.dtb \
+ 	r8a7779-marzen.dtb \
+-	r8a7779-marzen-reference.dtb \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7790-lager.dtb \
+ 	sh73a0-kzm9g.dtb \
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 215c742..d8abb4d 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -249,19 +249,6 @@ config MACH_MARZEN
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select USE_OF
+ 
+-config MACH_MARZEN_REFERENCE
+-	bool "MARZEN board - Reference Device Tree Implementation"
+-	depends on ARCH_R8A7779
+-	select ARCH_REQUIRE_GPIOLIB
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select USE_OF
+-	---help---
+-	   Use reference implementation of Marzen board support
+-	   which makes use of device tree at the expense
+-	   of not supporting a number of devices.
 -
--/dts-v1/;
--#include "r8a7779.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/interrupt-controller/irq.h>
+-	   This is intended to aid developers
 -
--/ {
--	model = "marzen";
--	compatible = "renesas,marzen-reference", "renesas,r8a7779";
--
--	chosen {
--		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
--	};
--
--	memory {
--		device_type = "memory";
--		reg = <0x60000000 0x40000000>;
--	};
--
--	fixedregulator3v3: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--
--	lan0 at 18000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x18000000 0x100>;
--		pinctrl-0 = <&lan0_pins>;
--		pinctrl-names = "default";
--
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		vddvario-supply = <&fixedregulator3v3>;
--		vdd33a-supply = <&fixedregulator3v3>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		led2 {
--			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
--		};
--		led3 {
--			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
--		};
--		led4 {
--			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
--		};
--	};
--};
--
--&irqpin0 {
--	status = "okay";
--};
--
--&pfc {
--	pinctrl-0 = <&scif2_pins &scif4_pins>;
--	pinctrl-names = "default";
--
--	lan0_pins: lan0 {
--		intc {
--			renesas,groups = "intc_irq1_b";
--			renesas,function = "intc";
--		};
--		lbsc {
--			renesas,groups = "lbsc_ex_cs0";
--			renesas,function = "lbsc";
--		};
--	};
--
--	scif2_pins: serial2 {
--		renesas,groups = "scif2_data_c";
--		renesas,function = "scif2";
--	};
--
--	scif4_pins: serial4 {
--		renesas,groups = "scif4_data";
--		renesas,function = "scif4";
--	};
--
--	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
--	};
--
--	hspi0_pins: hspi0 {
--		renesas,groups = "hspi0";
--		renesas,function = "hspi0";
--	};
--};
--
--&sdhi0 {
--	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
--
--	vmmc-supply = <&fixedregulator3v3>;
--	bus-width = <4>;
--	status = "okay";
--};
--
--&hspi0 {
--	pinctrl-0 = <&hspi0_pins>;
--	pinctrl-names = "default";
--	status = "okay";
--};
+ config MACH_LAGER
+ 	bool "Lager board"
+ 	depends on ARCH_R8A7790
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index ed49315..591966e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -69,7 +69,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+ obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+-obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 99455ec..4200b94 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -14,7 +14,6 @@ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
+-loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
+ 
+ __ZRELADDR	:= $(sort $(loadaddr-y))
+    zreladdr-y   += $(__ZRELADDR)
 -- 
 1.8.5.2
