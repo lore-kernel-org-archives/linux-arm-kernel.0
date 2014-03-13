@@ -1,30 +1,23 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 13 Mar 2014 12:25:54 -0600
-Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
-In-Reply-To: <5321EE81.1030207@wwwdotorg.org>
-References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
- <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
- <5321EE81.1030207@wwwdotorg.org>
-Message-ID: <20140313182554.GA15990@obsidianresearch.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 13 Mar 2014 11:27:11 -0700
+Subject: [PATCH] ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
+In-Reply-To: <1394660600-3771-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Wed, 12 Mar 2014 16:43:20 -0500")
+References: <1394660600-3771-1-git-send-email-nm@ti.com>
+Message-ID: <7hy50ekl8g.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 11:44:33AM -0600, Stephen Warren wrote:
-> On 03/13/2014 11:40 AM, Tim Harvey wrote:
-> > When using interrupt-maps, the size of a map entry is #address-cells +
-> >  #interrupt-cells for the parent interrupt controller.  For the ARM GIC
-> > address-cells should be 0 as this is not used.
-> > 
-> > This patch fixes the example by correctly specifying #address-cells = 0.
-> 
-> If the #address-cells property is required (well, or even optional...)
-> in the node, shouldn't it be included in the list of required/optional
-> properties above, and not solely included in the example?
+Nishanth Menon <nm@ti.com> writes:
 
-AFAIK, #address-cells = 0 is the same as not including a
-#address-cells at all.
+> Just like IS_PM34XX_ERRATUM, IS_PM44XX_ERRATUM is valid only if
+> CONFIG_PM is enabled, else, disabling CONFIG_PM results in build
+> failure complaining about the following:
+> arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
+> :(.text+0x8a70): undefined reference to `pm44xx_errata'
+>
+> Fixes: c962184 (ARM: OMAP4: PM: add errata support)
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Omitting entirely is what other interrupt-controller bindings are
-doing, so I'd just drop mention of #address-cells completely.
-
-Jason
+Acked-by: Kevin Hilman <khilman@linaro.org>
