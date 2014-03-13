@@ -1,31 +1,118 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 12 Mar 2014 23:39:40 -0700
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20140312081350.GC30808@shlinux2.ap.freescale.net>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <20140312081350.GC30808@shlinux2.ap.freescale.net>
-Message-ID: <20140313063940.GU31517@norris-Latitude-E6410>
+From: sdu.liu@huawei.com (Liu hua)
+Date: Thu, 13 Mar 2014 15:34:49 +0800
+Subject: [ARM]Fixmap mapping region is not enough for system of 14+ CPUs.
+In-Reply-To: <alpine.LFD.2.11.1403121306280.1217@knanqh.ubzr>
+References: <53203F9C.8040500@huawei.com> <53204956.30703@huawei.com>
+ <alpine.LFD.2.11.1403121306280.1217@knanqh.ubzr>
+Message-ID: <53215F99.8060804@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 04:13:51PM +0800, Huang Shijie wrote:
-> On Mon, Feb 24, 2014 at 06:37:34PM +0800, Huang Shijie wrote:
->    Could you please review this patch set? I really hope it can be merged
->    as soon as possibel.  But now, the patch set has stalled for a long time.
+On 2014/3/13 1:08, Nicolas Pitre wrote:
+> On Wed, 12 Mar 2014, Liu hua wrote:
+> 
+>> Hi Russell, Will or Nicolas,
+>>
+>> (In this mail, we only discuss ARM 32-bit linux.)
+>>
+>> As we know, the region (0xfff00000-0xfffdffff) is reserved as fixmap
+>> mapping region.
+>>
+>> The function "kmap_atomic" maps highmem pages to this region referring
+>> to CPUID and per-cpu variable "__kmap_atomic_idx" via
+>>
+>>   idx = type + KM_TYPE_NR * smp_processor_id();
+>>   vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+>>
+>> Size of region used by one cpu is 0x10000 (KM_TYPE_NR << PAGE_SHIFT).
+>> And the total size of the fixmap mapping region is 0xe0000.
+>> (only support 14 CPUs).
+>>
+>> So in a system of more than 14 CPUs, this region is not large enough.
+>> should we change the memory layout on ARM Linux to support 14+ cpu system ?
+>> Or can we do anything else to support that ?
+> 
+> How many CPUs do you have?
+> 
+> What about the following patch?  If this doesn't work for you then more 
+> intrusive changes will be needed.
+> 
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 68ea615c2a..254f2df08d 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -14,7 +14,17 @@
+>   */
+>  
+>  #define FIXADDR_START		0xfff00000UL
+> +
+> +#if !defined(CONFIG_HAVE_TCM) && !defined(CONFIG_CPU_XSCALE)
+> +/*
+> + * If no TCM nor on on a XScale then enlarge the fixmap area to
+> + * accommodate up to 30 CPUs.
+> + */
+> +#define FIXADDR_END		0xffff0000UL
+> +#else
+>  #define FIXADDR_END		0xfffe0000UL
+One cpu need 0x10000-size region; So this patch can only support
+uo to 15 CPUs
+> +#endif
+> +
+>  #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+>  
+>  enum fixed_addresses {
+> 
+> 
+> Nicolas
+> 
 
-I'm sorry for the delay. Others are in the same position of delay (e.g.,
-Lee's SPI-NOR driver), because I simply have not had the time to really
-devote this the attention it deserves, especially considering how it
-rearchitects such an important, commonly-used driver.
+We have 16 CPUs in our system. And your patch cannot work if
+the CPU number exceeds 15.
 
-Nonetheless, I will try to give your patches some more attention soon.
+In addition, we can configure NR_CPUS up to 32. So should we
+solve this problem completely?
 
->    Since you have pushed the patches for m25p80.c, i have to rebase this
->    patch set again and again...
+There is an 1M-size hole between DMA mapping region and fixmap
+mapping region(0xffe00000-0xfff00000).if this region are belonged
+to fixmap mapping region, it can only support 30 CPUs.
 
-You mean locally? I promise you, I can handle rebasing on my reviewing
-end for small one-line conflicts like new chip IDs, so don't rebase and
-resend simply for that. Unless I find substantive things that you should
-change, I'd only expect at most one more rebase to be necessary.
+Since we have alloced a second level page table to coverring
+0xffe00000 - 0xffffffff(2M). And 0xffff0000 upwards used as
+vector pages. So if the left region is all used as fixmap mapping
+region(size : 0x1f0000). Up to 31 CPUs is supported.
 
-Brian
+
+The following patch can solve our problem(up to 30 CPUs), But it
+reduce the DMA region. What do you think about it ?
+Is is necessory to solve this problem completely(up to 32 CPUs)
+?
+
+
+Liu Hua
+
+-----------------
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 68ea615..8379891 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -13,7 +13,7 @@
+  * 0xfffe0000 and 0xfffeffff.
+  */
+
+-#define FIXADDR_START              0xfff00000UL
++#define FIXADDR_START                0xffe00000UL
+ #define FIXADDR_END            0xfffe0000UL
+ #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
+
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 4afb376..0c40674 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -83,7 +83,7 @@
+  */
+ #define IOREMAP_MAX_ORDER      24
+
+-#define CONSISTENT_END             (0xffe00000UL)
++#define CONSISTENT_END               (0xffd00000UL)
+
+ #else /* CONFIG_MMU */
