@@ -1,59 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Mar 2014 11:20:20 +0000
-Subject: [RFC PATCH] arm64: Fix __addr_ok and __range_ok macros
-In-Reply-To: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
-References: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20140313112019.GD30339@arm.com>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Thu, 13 Mar 2014 19:21:12 +0800
+Subject: [PATCH v5] can: xilinx CAN controller support.
+In-Reply-To: <546dbc60-dd7b-4249-bab8-ad7e008b9aad@AM1EHSMHS001.ehs.local>
+References: <5254bfec-c6fd-4681-a34d-706d51e60fbb@VA3EHSMHS004.ehs.local>
+ <531DD493.3030306@monstr.eu> <531DD5E7.7090406@pengutronix.de>
+ <3245971.RIuVmbVL0Z@wuerfel>
+ <1964213d-6bd9-49fa-805e-42e1e0630fd5@VA3EHSMHS029.ehs.local>
+ <20140311044555.GA12373@localhost>
+ <546dbc60-dd7b-4249-bab8-ad7e008b9aad@AM1EHSMHS001.ehs.local>
+Message-ID: <20140313112112.GB8806@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 05, 2014 at 10:41:28PM +0000, Christopher Covington wrote:
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -66,12 +66,12 @@ static inline void set_fs(mm_segment_t fs)
->  #define segment_eq(a,b)	((a) == (b))
->  
->  /*
-> - * Return 1 if addr < current->addr_limit, 0 otherwise.
-> + * Return 1 if addr <= current->addr_limit, 0 otherwise.
->   */
->  #define __addr_ok(addr)							\
->  ({									\
->  	unsigned long flag;						\
-> -	asm("cmp %1, %0; cset %0, lo"					\
-> +	asm("cmp %1, %0; cset %0, ls"					\
->  		: "=&r" (flag)						\
->  		: "r" (addr), "0" (current_thread_info()->addr_limit)	\
->  		: "cc");						\
+Hi Michal,
 
-As Will said, this doesn't look right. Why do you need TASK_SIZE_64 to
-be valid?
+On Tue, Mar 11, 2014 at 10:38:14AM +0100, Michal Simek wrote:
+> On 03/11/2014 05:45 AM, Fengguang Wu wrote:
+> >>> You probably want something like
+> >>>
+> >>> 	config CAN_XILINX
+> >>> 	tristate "Xilinx CAN"
+> >>> 	depends on ARCH_ZYNQ || MICROBLAZE || COMPILE_TEST
+> >>> 	depends on COMMON_CLK && HAS_MMIO  # whatever you need for other architectures
+> >>
+> >> Fengguang: Are you use COMPILE_TEST in zero day testing system?
+> > 
+> > Yeah, the randconfig build/boot tests should cover both COMPILE_TEST
+> > and !COMPILE_TEST cases.
+> 
+> But the point is that randconfig is really random it means it definitely can
+> cover but not there is no certainty that for that build, you are running,
+> has both option for all architectures enabled.
+> Or do I read it wrongly?
 
-> @@ -83,7 +83,7 @@ static inline void set_fs(mm_segment_t fs)
->   * Returns 1 if the range is valid, 0 otherwise.
->   *
->   * This is equivalent to the following test:
-> - * (u65)addr + (u65)size < (u65)current->addr_limit
-> + * (u65)addr + (u65)size <= current->addr_limit
->   *
->   * This needs 65-bit arithmetic.
->   */
-> @@ -91,7 +91,7 @@ static inline void set_fs(mm_segment_t fs)
->  ({									\
->  	unsigned long flag, roksum;					\
->  	__chk_user_ptr(addr);						\
-> -	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, cc"		\
-> +	asm("adds %1, %1, %3; ccmp %1, %4, #3, cc; cset %0, ls"		\
->  		: "=&r" (flag), "=&r" (roksum)				\
->  		: "1" (addr), "Ir" (size),				\
->  		  "r" (current_thread_info()->addr_limit)		\
+Good point!  Since the 0day system is running randconfig tests
+everyday, it has very good opportunity to cover the COMPILE_TEST case.
+But to be sure, I'll explicitly enable COMPILE_TEST in some cases.
 
-Just trying to understand: if adds does not set the C flag, we go on and
-do the ccmp. If addr + size <= addr_limit, "cset ls" sets the flag
-variable. If addr + size actually sets the C flag, we need to make sure
-that "cset ls" doesn't trigger, which would mean to set C flag and clear
-Z flag. So why do you change the ccmp flags from #2 to #3? It looks to
-me like #2 is enough.
-
--- 
-Catalin
+Thanks,
+Fengguang
