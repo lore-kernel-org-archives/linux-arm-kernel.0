@@ -1,52 +1,43 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 13 Mar 2014 10:40:04 -0700
-Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
-In-Reply-To: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
-References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+Date: Thu, 13 Mar 2014 10:41:45 -0700
+Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping when
+ possible
+In-Reply-To: <201403061633.31260.marex@denx.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
+ <000201cf38e6$5b02d6e0$110884a0$%han@samsung.com>
+ <201403061633.31260.marex@denx.de>
+Message-ID: <CAJ+vNU2XrAL+BTTB8i4hQhkZ_NfcS0VrWuHUjeFfU9hhGjNXbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using interrupt-maps, the size of a map entry is #address-cells +
- #interrupt-cells for the parent interrupt controller.  For the ARM GIC
-address-cells should be 0 as this is not used.
+On Thu, Mar 6, 2014 at 7:33 AM, Marek Vasut <marex@denx.de> wrote:
+> On Thursday, March 06, 2014 at 03:47:03 AM, Jingoo Han wrote:
+>> On Wednesday, March 05, 2014 10:26 PM, Lucas Stach wrote:
+>> > This is the recommended method of doing the IRQ
+>> > mapping. For old devicetrees we fall back to the
+>> > previous practice.
+>> >
+>> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> (+cc Mohit KUMAR, Richard Zhu, Pratyush Anand, Marek Vasut,
+>>        Kishon Vijay Abraham I)
+>>
+>> Acked-by: Jingoo Han <jg1.han@samsung.com>
+>>
+>> It works properly on Exynos platform.
+>> Thank you.
+>
+> Looks reasonable,
+>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+>
 
-This patch fixes the example by correctly specifying #address-cells = 0.
+I've tested this on the Gateworks Ventana products with P2P bridges
+and with the patch I just submitted here:
+http://thread.gmane.org/gmane.linux.kernel.pci/30017
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-samsung-soc <linux-samsung-soc@vger.kernel.org>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: linux-tegra <linux-tegra@vger.kernel.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@linaro.org>
----
- Documentation/devicetree/bindings/arm/gic.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Tested-by: Tim Harvey <tharvey@gateworks.com>
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index bae0d87..b59ff1f 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -55,7 +55,7 @@ Example:
- 	intc: interrupt-controller at fff11000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--		#address-cells = <1>;
-+		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0xfff11000 0x1000>,
- 		      <0xfff10100 0x100>;
--- 
-1.8.3.2
+Tim
