@@ -1,100 +1,43 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:18:42 +0100
-Subject: [PATCH v4][ 4/8] ARM: dts: imx25.dtsi: Fix USB support.
-In-Reply-To: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394702326-25558-4-git-send-email-denis@eukrea.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Mar 2014 11:18:25 +0200
+Subject: [PATCH 03/18] dma: edma: Set DMA_CYCLIC capability flag
+In-Reply-To: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1394702320-21743-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Indicate that the edma dmaengine driver has support for cyclic mode.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Changelog v3->v4:
-- Added Fabio Estevam's Signed-off-by: it was given
-  as a mail response to this patch.
-- Moved the compatible of usbphy on top to match the other nodes.
-- the usb phy's names were renamed from usbphy to usb-phy.
-- The patch renaming the fsl,usbphy property in usb-phy was removed.
-  So this patch was adapted to that.
+ arch/arm/common/edma.c | 1 +
+ drivers/dma/edma.c     | 1 +
+ 2 files changed, 2 insertions(+)
 
-Changelog v2->v3:
-- rebased on top of the "usb: chipidea: Use standard usb-phy property." patch.
-- Fixed the usbphy nodes index and added and added a reg property.
-
-Changelog v1->v2:
-- The usbphy nodes were made to look like the ones in imx53.dtsi
-- The patch was rebased on top of the clock fixes commits.
----
- arch/arm/boot/dts/imx25.dtsi |   29 ++++++++++++++++++-----------
- 1 file changed, 18 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 829791e..18f68f3 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -482,22 +482,13 @@
- 				clocks = <&clks 99>;
- 			};
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 41bca32409fc..86a8b263278f 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1574,6 +1574,7 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 		return ERR_PTR(ret);
  
--			usbphy1: usbphy at 1 {
--				compatible = "nop-usbphy";
--				status = "disabled";
--			};
--
--			usbphy2: usbphy at 2 {
--				compatible = "nop-usbphy";
--				status = "disabled";
--			};
--
- 			usbotg: usb at 53ff4000 {
- 				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
- 				reg = <0x53ff4000 0x0200>;
- 				interrupts = <37>;
- 				clocks = <&clks 70>;
- 				fsl,usbmisc = <&usbmisc 0>;
-+				fsl,usbphy = <&usbphy0>;
- 				status = "disabled";
- 			};
+ 	dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
++	dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
+ 	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
+ 				   &edma_filter_info);
  
-@@ -507,6 +498,7 @@
- 				interrupts = <35>;
- 				clocks = <&clks 70>;
- 				fsl,usbmisc = <&usbmisc 1>;
-+				fsl,usbphy = <&usbphy1>;
- 				status = "disabled";
- 			};
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index b54cd2dedde0..86d6a3fb0d92 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -887,6 +887,7 @@ static int edma_probe(struct platform_device *pdev)
  
-@@ -516,7 +508,6 @@
- 				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
- 				clock-names = "ipg", "ahb", "per";
- 				reg = <0x53ff4600 0x00f>;
--				status = "disabled";
- 			};
+ 	dma_cap_zero(ecc->dma_slave.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
++	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
  
- 			dryice at 53ffc000 {
-@@ -548,4 +539,20 @@
- 			};
- 		};
- 	};
-+
-+	usbphy {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usbphy0: usb-phy at 0 {
-+			reg = <0>;
-+			compatible = "usb-nop-xceiv";
-+		};
-+
-+		usbphy1: usb-phy at 1 {
-+			reg = <1>;
-+			compatible = "usb-nop-xceiv";
-+		};
-+	};
- };
+ 	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
+ 
 -- 
-1.7.9.5
+1.9.0
