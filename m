@@ -1,91 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Mar 2014 13:02:54 -0700
-Subject: [GIT PULL 2/2] omap overo related device tree changes for v3.15
-In-Reply-To: <20140313200135.GA5981@atomide.com>
-References: <20140313200135.GA5981@atomide.com>
-Message-ID: <20140313200253.GB5981@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 13 Mar 2014 17:04:10 -0300
+Subject: [PATCH v2 5/6] ARM: mvebu: Enable NAND controller in Armada 385-DB
+In-Reply-To: <53221AD4.3090002@cogentembedded.com>
+References: <1394739542-30017-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1394739542-30017-6-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <53221AD4.3090002@cogentembedded.com>
+Message-ID: <20140313200410.GA30590@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+On Mar 13, Sergei Shtylyov wrote:
+> On 03/13/2014 10:39 PM, Ezequiel Garcia wrote:
+> 
+> >From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> >The Armada 385-DB board has a NAND flash, so enable it in the
+> >devicetree and add the partitions as prepared in the factory images.
+> 
+> >Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> >---
+> >  arch/arm/boot/dts/armada-385-db.dts | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> 
+> >diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+> >index 9a13642..edcf7ff 100644
+> >--- a/arch/arm/boot/dts/armada-385-db.dts
+> >+++ b/arch/arm/boot/dts/armada-385-db.dts
+> >@@ -80,6 +80,27 @@
+> >  					reg = <1>;
+> >  				};
+> >  			};
+> >+
+> >+			flash: flash at d0000 {
+> 
+>    Note that you don't have to label your device the same way as it's named,
+> i.e. you could have labelled it "nand" if it would make things clearer.
 
-  Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
+Right.
 
-are available in the git repository at:
+>    Although I don't readily see the value of labeling nodes in the board's
+> .dts file. Do you really expect to refer to it somewhere?
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-overo-signed
+Yeah, I was thinking the same thing just after I sent this. No, I don't think
+we need the label.
 
-for you to fetch changes up to 28b191118c11719bb27db621425a70be28a40e08:
-
-  ARM: dts: Add support for the Overo Summit (2014-03-12 10:21:16 -0700)
-
-----------------------------------------------------------------
-Updates to the .dts files to support more Gumstix boards.
-
-These are sent separately from the rest of the .dts changes
-as these depend on the fixes merged into v3.14-rc4, and
-needed a bit more time to get updated on the fixes.
-
-----------------------------------------------------------------
-Florian Vaussard (16):
-      ARM: dts: overo: reorganize include files
-      ARM: dts: omap3-tobi: Add missing pinctrl
-      ARM: dts: omap3-overo: Add missing pinctrl
-      ARM: dts: omap3-overo: Enable WiFi/BT combo
-      ARM: dts: omap3-overo: Add HSUSB PHY
-      ARM: dts: omap: Add common file for SMSC9221
-      ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
-      ARM: dts: omap3-tobi: Add AT24C01 EEPROM
-      ARM: dts: overo: Push uart3 pinmux down to expansion board
-      ARM: dts: overo: Create a file for common Gumstix peripherals
-      ARM: dts: overo: Add LIS33DE accelerometer
-      ARM: dts: Add support for the Overo Palo43
-      ARM: dts: Add support for the Overo Gallop43
-      ARM: dts: Add support for the Overo Alto35
-      ARM: dts: Add support for the Overo Chestnut43
-      ARM: dts: Add support for the Overo Summit
-
- arch/arm/boot/dts/Makefile                         |  10 +
- arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi          |  58 ++++++
- arch/arm/boot/dts/omap3-overo-alto35-common.dtsi   |  77 +++++++
- arch/arm/boot/dts/omap3-overo-alto35.dts           |  22 ++
- arch/arm/boot/dts/omap3-overo-base.dtsi            | 221 +++++++++++++++++++++
- .../boot/dts/omap3-overo-chestnut43-common.dtsi    |  69 +++++++
- arch/arm/boot/dts/omap3-overo-chestnut43.dts       |  38 ++++
- .../boot/dts/omap3-overo-common-peripherals.dtsi   |  94 +++++++++
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |  57 ++++++
- arch/arm/boot/dts/omap3-overo-gallop43.dts         |  38 ++++
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |  53 +++++
- arch/arm/boot/dts/omap3-overo-palo43.dts           |  38 ++++
- arch/arm/boot/dts/omap3-overo-storm-alto35.dts     |  21 ++
- arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts |  38 ++++
- arch/arm/boot/dts/omap3-overo-storm-gallop43.dts   |  38 ++++
- arch/arm/boot/dts/omap3-overo-storm-palo43.dts     |  38 ++++
- arch/arm/boot/dts/omap3-overo-storm-summit.dts     |  30 +++
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts       |   2 +-
- arch/arm/boot/dts/omap3-overo-storm.dtsi           |  35 ++++
- arch/arm/boot/dts/omap3-overo-summit-common.dtsi   |  31 +++
- arch/arm/boot/dts/omap3-overo-summit.dts           |  30 +++
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi     |  51 +----
- arch/arm/boot/dts/omap3-overo-tobi.dts             |   2 +-
- arch/arm/boot/dts/omap3-overo.dtsi                 |  97 ++-------
- 24 files changed, 1063 insertions(+), 125 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-alto35.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-base.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-palo43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-alto35.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-chestnut43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-gallop43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-palo43.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-summit.dts
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-summit-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
