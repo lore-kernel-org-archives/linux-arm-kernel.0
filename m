@@ -1,44 +1,58 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 13 Mar 2014 16:12:59 -0300
-Subject: [PATCH v2 0/3] mv_xor: Spinlock cleanup
-In-Reply-To: <1394221607-15064-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1394221607-15064-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140313191259.GB21811@arch.cereza>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 13 Mar 2014 15:19:25 -0400
+Subject: [PATCH 0/6] Armada 380 NAND support
+In-Reply-To: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1394637404-7651-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140313191925.GE7811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 07, Ezequiel Garcia wrote:
-> Vinod, Dan,
-> 
-> This series is v2 of the one previously sent by Thomas Petazzoni [1].
-> I've tried to address the comments made by Andi and Dan, and also kept
-> Thomas' ultimate goal: get rid of the mv_xor_slot_cleanup() function
-> (which takes the spinlock).
-> 
-> The first patch removes the unneeded call to mv_xor_clean_completed_slots(),
-> in mv_xor_as explained by Dan [2].
-> 
-> The other two patches replace the calls to mv_xor_slot_cleanup() with
-> calls to __mv_xor_slot_cleanup(). This allows to have the same "spinlock held"
-> requirement on all callers.
-> 
-> The patchset is based on v3.14-rc5 and has been tested on an Armada XP GP board.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg297176.html
-> [2] http://www.spinics.net/lists/arm-kernel/msg297518.html
-> 
-> Ezequiel Garcia (3):
->   dma: mv_xor: Remove unneeded mv_xor_clean_completed_slots() call
->   dma: mv_xor: Remove all callers of mv_xor_slot_cleanup()
->   dma: mv_xor: Rename __mv_xor_slot_cleanup() to mv_xor_slot_cleanup()
-> 
->  drivers/dma/mv_xor.c | 24 +++++++++++-------------
->  1 file changed, 11 insertions(+), 13 deletions(-)
-> 
+Ezequiel,
 
-Ping?
+On Wed, Mar 12, 2014 at 12:16:38PM -0300, Ezequiel Garcia wrote:
+> This patchset adds support for the NAND on Armada 380/385 SoCs.
+> 
+> The first patch adds a new "armada-380-corediv-clock" compatible
+> string, with its proper SoC-specific structure, adding the register
+> layout for this SoC family.
+> 
+> The second and third patches add the devicetree changes to support
+> the Core Divider clock.
+> 
+> After adding its clock source, the fourth and fifth patches add
+> the NAND devicetree changes. The NAND controller is compatible with
+> the Armada 370 controller, so we are currently support it using the
+> same compatible string.
+> 
+> The last patch updates the binding documentation for the Core Divider
+> clock, which is missing the information about the already supported
+> Armada 375 compatible string.
+> 
+> This series is based on linux-next 20140307. I expect it will apply
+> cleanly on v3.15-rc1; if that's not the case, I'll send a rebased patchset.
+> 
+> The clock and devicetree changes are mostly independent so they
+> can be merged through the clock and mvebu tree respectively.
+> 
+> Ezequiel Garcia (6):
+>   clk: mvebu: Support Armada 380 SoC on the core divider clock
+>   ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
+>   ARM: mvebu: Add the Core Divider clock to Armada 38x SoCs
+>   ARM: mvebu: Add support for NAND controller in Armada 38x SoC
+>   ARM: mvebu: Enable NAND controller in Armada 385-DB
+>   clk: mvebu: Update binding documentation for the core divider clock
+> 
+>  .../bindings/clock/mvebu-corediv-clock.txt         |  5 ++++-
+>  arch/arm/boot/dts/armada-385-db.dts                | 21 ++++++++++++++++++
+>  arch/arm/boot/dts/armada-38x.dtsi                  | 25 ++++++++++++++++++++++
+>  drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++++++++++
+>  4 files changed, 73 insertions(+), 1 deletion(-)
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+This clock changes looks really clean and simple.  Mike says he has time
+for one more pull.  Can you fixup the s/nand/flash/ and resend?  I'd
+like to pull this and your fix in and possibly send a pull request for
+v3.15 tomorrow.
+
+thx,
+
+Jason.
