@@ -1,81 +1,77 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 13:37:54 +0100
-Subject: [PATCH v2 2/3] mfd: sec-core: Add of_compatible strings for MFD
- cells
-In-Reply-To: <1394712996.20773.1.camel@AMDC1943>
-References: <1394703425-6462-1-git-send-email-k.kozlowski@samsung.com>
- <1394703425-6462-3-git-send-email-k.kozlowski@samsung.com>
- <53219F80.9000300@samsung.com> <1394712996.20773.1.camel@AMDC1943>
-Message-ID: <5321A6A2.9070509@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Mar 2014 12:38:19 +0000
+Subject: [PATCH v6 3/7] ftrace: Add arm64 support to recordmcount
+In-Reply-To: <1394705630-12384-4-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313123819.GF12331@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.03.2014 13:16, Krzysztof Kozlowski wrote:
-> On Thu, 2014-03-13 at 13:07 +0100, Tomasz Figa wrote:
->> Hi Krzysztof,
->>
->> On 13.03.2014 10:37, Krzysztof Kozlowski wrote:
->>> Add of_compatible strings for MFD cells for regulator, clock and RTC
->>> drivers in S5M8767, S2MPS11 and S2MPS14 PMIC-s.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> ---
->>>    drivers/mfd/sec-core.c |    8 ++++++++
->>>    1 file changed, 8 insertions(+)
->>>
->>> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
->>> index d163c66edebb..c5b9b95b2099 100644
->>> --- a/drivers/mfd/sec-core.c
->>> +++ b/drivers/mfd/sec-core.c
->>> @@ -55,28 +55,36 @@ static const struct mfd_cell s5m8763_devs[] = {
->>>    static const struct mfd_cell s5m8767_devs[] = {
->>>    	{
->>>    		.name = "s5m8767-pmic",
->>> +		.of_compatible = "samsung,s5m8767-regulators",
->>>    	}, {
->>>    		.name = "s5m-rtc",
->>> +		.of_compatible = "samsung,s5m8767-rtc",
->>>    	}, {
->>>    		.name = "s5m8767-clk",
->>> +		.of_compatible = "samsung,s5m8767-clk",
->>>    	}
->>>    };
->>>
->>>    static const struct mfd_cell s2mps11_devs[] = {
->>>    	{
->>>    		.name = "s2mps11-pmic",
->>> +		.of_compatible = "samsung,s2mps11-regulators",
->>>    	}, {
->>>    		.name = "s2mps11-clk",
->>> +		.of_compatible = "samsung,s2mps11-clk",
->>>    	}
->>>    };
->>>
->>>    static const struct mfd_cell s2mps14_devs[] = {
->>>    	{
->>>    		.name = "s2mps14-pmic",
->>> +		.of_compatible = "samsung,s2mps14-regulators",
->>>    	}, {
->>>    		.name = "s2mps14-rtc",
->>> +		.of_compatible = "samsung,s2mps14-rtc",
->>>    	}, {
->>>    		.name = "s2mps14-clk",
->>> +		.of_compatible = "samsung,s2mps14-clk",
->>>    	}
->>>    };
->>
->> Are these compatible strings documented anywhere?
->
-> The "-clk" compatible strings are (in next patch). The "-rtc" and
-> "-regulators" are not.
+On Thu, Mar 13, 2014 at 10:13:46AM +0000, AKASHI Takahiro wrote:
+> Recordmcount utility under scripts is run, after compiling each object,
+> to find out all the locations of calling _mcount() and put them into
+> specific seciton named __mcount_loc.
+> Then linker collects all such information into a table in the kernel image
+> (between __start_mcount_loc and __stop_mcount_loc) for later use by ftrace.
+> 
+> This patch adds arm64 specific definitions to identify such locations.
+> There are two types of implementation, C and Perl. On arm64, only C version
+> is used to build the kernel now that CONFIG_HAVE_C_RECORDMCOUNT is on.
+> But Perl version is also maintained.
+> 
+> This patch also contains a workaround just in case where a header file,
+> elf.h, on host machine doesn't have definitions of EM_AARCH64 nor
+> R_AARCH64_ABS64. Without them, compiling C version of recordmcount will
+> fail.
 
-Hmm, this doesn't sound good.
+[...]
 
-> Actually they aren't also used by child driver (each child driver parses
-> from parent of_node).
+> diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+> index 9c22317..047c8cd 100644
+> --- a/scripts/recordmcount.c
+> +++ b/scripts/recordmcount.c
+> @@ -40,6 +40,11 @@
+>  #define R_METAG_NONE                     3
+>  #endif
+>  
+> +#ifndef EM_AARCH64
+> +#define EM_AARCH64	183
+> +#define R_AARCH64_ABS64	257
+> +#endif
+> +
+>  static int fd_map;	/* File descriptor for file being modified. */
+>  static int mmap_failed; /* Boolean flag. */
+>  static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
+> @@ -347,6 +352,10 @@ do_file(char const *const fname)
+>  	case EM_ARM:	 reltype = R_ARM_ABS32;
+>  			 altmcount = "__gnu_mcount_nc";
+>  			 break;
+> +	case EM_AARCH64:
+> +			 reltype = R_AARCH64_ABS64;
+> +			 altmcount = "_mcount";
 
-Do you need to add compatible strings to mfd_cell entries of such cells 
-then?
+Shouldn't you be setting gpfx = '_' instead of overriding altmcount like
+this?
 
-Best regards,
-Tomasz
+> +			 break;
+>  	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
+>  	case EM_METAG:	 reltype = R_METAG_ADDR32;
+>  			 altmcount = "_mcount_wrapper";
+> diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
+> index 91280b8..397b6b8 100755
+> --- a/scripts/recordmcount.pl
+> +++ b/scripts/recordmcount.pl
+> @@ -279,6 +279,11 @@ if ($arch eq "x86_64") {
+>      $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24|THM_CALL)" .
+>  			"\\s+(__gnu_mcount_nc|mcount)\$";
+>  
+> +} elsif ($arch eq "arm64") {
+> +    $alignment = 3;
+> +    $section_type = '%progbits';
+> +    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
+
+What about "mcount" (i.e. no underscore)?
+
+Will
