@@ -1,49 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Mar 2014 18:37:05 +0000
-Subject: [PATCH v6 4/7] arm64: Add ftrace support
-In-Reply-To: <1394735259.26600.14.camel@pippen.local.home>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-5-git-send-email-takahiro.akashi@linaro.org>
- <20140313170834.GE25472@mudshark.cambridge.arm.com>
- <1394735259.26600.14.camel@pippen.local.home>
-Message-ID: <20140313183705.GK25472@mudshark.cambridge.arm.com>
+Date: Thu, 13 Mar 2014 18:41:49 +0000
+Subject: [PATCH v4 2/3] arm64: split syscall_trace() into separate
+ functions for enter/exit
+In-Reply-To: <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313184149.GL25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 06:27:39PM +0000, Steven Rostedt wrote:
-> On Thu, 2014-03-13 at 17:08 +0000, Will Deacon wrote:
+On Thu, Mar 13, 2014 at 10:11:30AM +0000, AKASHI Takahiro wrote:
+> As done in arm, this change makes it easy to confirm we invoke syscall
+> related hooks, including syscall tracepoint, audit and seccomp which would
+> be implemented later, in correct order. That is, undoing operations in the
+> opposite order on exit that they were done on entry.
 > 
-> > > +       /*
-> > > +        * Note:
-> > > +        * No protection against faulting at *parent, which may be seen
-> > > +        * on other archs. It's unlikely on AArch64.
-> > > +        */
-> > > +       old = *parent;
-> > > +       *parent = return_hooker;
-> > 
-> > return_hook? People might take it personally otherwise ;)
-> 
-> No, return_hooker is consistent with all the other archs. Hey, it's a
-> rugby position! Note, which I was when I played. ;-)
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/kernel/entry.S  |   10 ++++-----
+>  arch/arm64/kernel/ptrace.c |   48 ++++++++++++++++++++++++++++++++++----------
+>  2 files changed, 41 insertions(+), 17 deletions(-)
 
-Hehe, in which case your children will be able to execute that line of
-ftrace!
+[...]
 
-> > 
-> > > +       trace.func = self_addr;
-> > 
-> > in kernel/ftrace/ftrace.c there's an smb_wmb() between setting up
-> > tracing_graph_pause and setting the ret_stack with a comment saying:
-> > 
-> >     /* Make sure the tasks see the -1 first: */
-> > 
-> > Why don't we have a corresponding read-barrier here?
-> 
-> The corresponding rmb is in kernel/trace/trace_function_graph
-> ftrace_push_return_trace().
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 6a8928b..9993a8f 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1058,29 +1058,27 @@ long arch_ptrace(struct task_struct *child, long request,
+>  	return ptrace_request(child, request, addr, data);
+>  }
+>  
+> -asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+>  	unsigned long saved_reg;
+>  
+>  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>  		return regs->syscallno;
+>  
+> +	/*
+> +	 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
+> +	 * used to denote syscall entry/exit:
+> +	 *   0 -> entry
+> +	 */
 
-Okey doke then, I guess we don't really care about tracing_graph_pause
-getting out-of-sync with curr_ret_stack.
+You could add an enum, like we have on ARM (ptrace_syscall_dir) for the two
+directions.
+
+>  	if (is_compat_task()) {
+> -		/* AArch32 uses ip (r12) for scratch */
+>  		saved_reg = regs->regs[12];
+> -		regs->regs[12] = dir;
+> +		regs->regs[12] = 0;
+>  	} else {
+> -		/*
+> -		 * Save X7. X7 is used to denote syscall entry/exit:
+> -		 *   X7 = 0 -> entry, = 1 -> exit
+> -		 */
+>  		saved_reg = regs->regs[7];
+> -		regs->regs[7] = dir;
+> +		regs->regs[7] = 0;
+
+This code could also be refactored so we calculated the register number
+once, then avoid the if (is_compact_task()) check all over the place.
+
+Similarly on the exit path.
 
 Will
