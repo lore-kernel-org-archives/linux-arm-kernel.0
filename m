@@ -1,187 +1,81 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Mar 2014 13:36:28 +0100
-Subject: [PATCH v5 4/5] clk/exynos5260: add macros and documentation for
- exynos5260
-In-Reply-To: <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
-References: <1394636208-3125-1-git-send-email-rahul.sharma@samsung.com>
- <1394636208-3125-5-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5321A64C.3070902@samsung.com>
+Date: Thu, 13 Mar 2014 13:37:54 +0100
+Subject: [PATCH v2 2/3] mfd: sec-core: Add of_compatible strings for MFD
+ cells
+In-Reply-To: <1394712996.20773.1.camel@AMDC1943>
+References: <1394703425-6462-1-git-send-email-k.kozlowski@samsung.com>
+ <1394703425-6462-3-git-send-email-k.kozlowski@samsung.com>
+ <53219F80.9000300@samsung.com> <1394712996.20773.1.camel@AMDC1943>
+Message-ID: <5321A6A2.9070509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 12.03.2014 15:56, Rahul Sharma wrote:
-> Add macros which are used as Clock IDs in DT and clock file.
-> It also adds the documentation for the exynos5260 clocks.
+On 13.03.2014 13:16, Krzysztof Kozlowski wrote:
+> On Thu, 2014-03-13 at 13:07 +0100, Tomasz Figa wrote:
+>> Hi Krzysztof,
+>>
+>> On 13.03.2014 10:37, Krzysztof Kozlowski wrote:
+>>> Add of_compatible strings for MFD cells for regulator, clock and RTC
+>>> drivers in S5M8767, S2MPS11 and S2MPS14 PMIC-s.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> ---
+>>>    drivers/mfd/sec-core.c |    8 ++++++++
+>>>    1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+>>> index d163c66edebb..c5b9b95b2099 100644
+>>> --- a/drivers/mfd/sec-core.c
+>>> +++ b/drivers/mfd/sec-core.c
+>>> @@ -55,28 +55,36 @@ static const struct mfd_cell s5m8763_devs[] = {
+>>>    static const struct mfd_cell s5m8767_devs[] = {
+>>>    	{
+>>>    		.name = "s5m8767-pmic",
+>>> +		.of_compatible = "samsung,s5m8767-regulators",
+>>>    	}, {
+>>>    		.name = "s5m-rtc",
+>>> +		.of_compatible = "samsung,s5m8767-rtc",
+>>>    	}, {
+>>>    		.name = "s5m8767-clk",
+>>> +		.of_compatible = "samsung,s5m8767-clk",
+>>>    	}
+>>>    };
+>>>
+>>>    static const struct mfd_cell s2mps11_devs[] = {
+>>>    	{
+>>>    		.name = "s2mps11-pmic",
+>>> +		.of_compatible = "samsung,s2mps11-regulators",
+>>>    	}, {
+>>>    		.name = "s2mps11-clk",
+>>> +		.of_compatible = "samsung,s2mps11-clk",
+>>>    	}
+>>>    };
+>>>
+>>>    static const struct mfd_cell s2mps14_devs[] = {
+>>>    	{
+>>>    		.name = "s2mps14-pmic",
+>>> +		.of_compatible = "samsung,s2mps14-regulators",
+>>>    	}, {
+>>>    		.name = "s2mps14-rtc",
+>>> +		.of_compatible = "samsung,s2mps14-rtc",
+>>>    	}, {
+>>>    		.name = "s2mps14-clk",
+>>> +		.of_compatible = "samsung,s2mps14-clk",
+>>>    	}
+>>>    };
+>>
+>> Are these compatible strings documented anywhere?
 >
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
-> ---
->   .../devicetree/bindings/clock/exynos5260-clock.txt |   55 +++++
->   include/dt-bindings/clock/exynos5260-clk.h         |  233 ++++++++++++++++++++
->   2 files changed, 288 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
->   create mode 100644 include/dt-bindings/clock/exynos5260-clk.h
->
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5260-clock.txt b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
-> new file mode 100644
-> index 0000000..4128892
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
-> @@ -0,0 +1,55 @@
-> +* Samsung Exynos5260 Clock Controller
-> +
-> +The Exynos5260 clock controller encapsulate all CMUs which are
+> The "-clk" compatible strings are (in next patch). The "-rtc" and
+> "-regulators" are not.
 
-s/encapsulate/encapsulates/
+Hmm, this doesn't sound good.
 
-Anyway, I don't think there is any global clock controller entity that 
-should be described here. The binding is related to several separate 
-entities found on Exynos5260, i.e. particular CMUs.
+> Actually they aren't also used by child driver (each child driver parses
+> from parent of_node).
 
-> +instantiaited independently from the device-tree. As a whole, these
-
-s/instantiaited/instantiated/
-s/the device-tree/device tree/
-
-> +CMUs generates and supplies clocks to various controllers within
-
-s/generates/generate/
-s/supplies/supply/
-
-> +the Exynos5260 SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be one of the following.
-> +	"exynos5260-clock-top"
-> +	"exynos5260-clock-peri"
-> +	"exynos5260-clock-egl"
-> +	"exynos5260-clock-kfc"
-> +	"exynos5260-clock-g2d"
-> +	"exynos5260-clock-mif"
-> +	"exynos5260-clock-mfc"
-> +	"exynos5260-clock-g3d"
-> +	"exynos5260-clock-fsys"
-> +	"exynos5260-clock-aud"
-> +	"exynos5260-clock-isp"
-> +	"exynos5260-clock-gscl"
-> +	"exynos5260-clock-disp"
-
-Compatible strings should be prefixed with Samsung's vendor prefix, i.e. 
-"samsung,".
-
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-
-As implemented in patch [1] the clock core will be able to sort out 
-dependencies between particular clock providers based on clock consumer 
-bindings. This means that it would be a good idea to add clock 
-properties to this binding and strictly specify which clocks outside 
-particular CMU block are fed into the block.
-
-So for example, if CMU TOP uses fin_pll clock, its node would need to 
-have "clock-names" property with "fin_pll" entry and "clocks" property 
-with respective entry pointing to the fixed rate clock node.
-
-In general, all external, IO and PHY clocks fed into CMU blocks should 
-be listed this way to have dependencies between clocks properly defined 
-in the system.
-
-[1] http://thread.gmane.org/gmane.linux.kernel/1654635
-
-> +
-> +The following is the list of clocks generated by each controller.
-
-There is no list below. IMHO this sentence should be removed.
-
-> Each
-> +clock is assigned with a MACRO constant. These constants are defined in
-> +"dt-bindings/clk/exynos5260-clk.h". DT client nodes use this MACRO to
-> +specify the clock, which they want to consume.
-
-IMHO the whole paragraph above can be rewritten taking 
-samsung,s3c64xx-clock.txt as an example:
-
-Each clock is assigned an identifier and client nodes can use this 
-identifier to specify the clock which they consume. All available clocks 
-are defined as preprocessor macros in dt-bindings/clock/exynos5260-clk.h 
-header and can be used in device tree sources.
-
-In addition to the above, a list of external clocks that need or may be 
-present should be added. Again, see samsung,s3c64xx-clock.txt for an 
-example.
-
-> +
-> +Example 1: An example of a clock controller node is listed below.
-> +
-> +	cmu_disp: clock-controller at 0x14550000 {
-> +		compatible = "exynos5260-clock-disp";
-
-Incorrect compatible string.
-
-> +		reg = <0x14550000 0x10000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +Example 2: UART controller node that consumes the clock generated by the
-> +		peri clock controller. Refer to the standard clock bindings for
-> +		information about 'clocks' and 'clock-names' property.
-> +
-> +	serial at 12C00000 {
-> +		compatible = "samsung,exynos4210-uart";
-> +		reg = <0x12C00000 0x100>;
-> +		interrupts = <0 146 0>;
-> +		clocks = <&clock_peri PERI_PCLK_UART0>, <&clock_peri PERI_SCLK_UART0>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +		status = "disabled";
-> +	};
-> +
-> diff --git a/include/dt-bindings/clock/exynos5260-clk.h b/include/dt-bindings/clock/exynos5260-clk.h
-> new file mode 100644
-> index 0000000..d6f4391
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/exynos5260-clk.h
-> @@ -0,0 +1,233 @@
-> +/*
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Provides Constants for Exynos5260 clocks.
-> +*/
-> +
-> +#ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
-> +#define _DT_BINDINGS_CLK_EXYNOS5260_H
-> +
-> +/*
-> + * Clock names:	XXXXX_YYYYYY_ZZZZ
-> + *		|---| |----| |--|
-> + *		 cmu   type   IP
-> + */
-> +
-> +/* List Of Clocks For CMU_TOP */
-> +#define FIN_PLL			1
-> +#define TOP_FOUT_DISP_PLL	2
-> +#define TOP_FOUT_AUD_PLL	3
-> +#define TOP_SCLK_MMC0		4
-
-[snip]
-
-> +#define DISP_CLK_DSIM1		9
-> +#define DISP_CLK_DPPHY		10
-> +#define DISP_CLK_DP		11
-> +#define DISP_SCLK_PIXEL		12
-> +#define DISP_MOUT_HDMI_PHY_PIXEL_USER		13
-> +#define DISP_MOUT_HDMI_PHY_PIXEL	14
-
-nit: Incorrect alignment. Please indent further all the numbers to match 
-the longest indentation level.
+Do you need to add compatible strings to mfd_cell entries of such cells 
+then?
 
 Best regards,
 Tomasz
