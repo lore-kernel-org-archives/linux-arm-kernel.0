@@ -1,94 +1,96 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Mar 2014 17:59:59 +0900
-Subject: [PATCH v4 16/19] ARM: shmobile: Remove non-multiplatform Marzen
- reference support
-In-Reply-To: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
-References: <1394701202-25823-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1394701202-25823-17-git-send-email-horms+renesas@verge.net.au>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 13 Mar 2014 10:07:45 +0100
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <20140313022246.GA8802@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <3299454.uLzSWehPDg@avalon> <20140313022246.GA8802@verge.net.au>
+Message-ID: <28465199.RhyHDRhTSc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that r8a7779 has CCF support remove the legacy Marzen reference
-Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
-case.
+Hi Simon,
 
-Starting from this commit Marzen board support is always enabled via
-CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
-between board-marzen.c and board-marzen-reference.c
+On Thursday 13 March 2014 11:22:47 Simon Horman wrote:
+> On Wed, Mar 12, 2014 at 11:12:02AM +0100, Laurent Pinchart wrote:
+> > On Wednesday 12 March 2014 16:55:23 Simon Horman wrote:
+> > > On Wed, Feb 26, 2014 at 02:02:37PM +0100, Laurent Pinchart wrote:
+> >  > On Wednesday 26 February 2014 13:53:17 Laurent Pinchart wrote:
+> > > > > On Wednesday 26 February 2014 16:33:17 Simon Horman wrote:
+> > > > > > The R8A7779 SoC has several clocks that are too custom to be
+> > > > > > supported in a generic driver. Those clocks can be divided in two
+> > > > > > categories:
+> > > > > > 
+> > > > > > - Fixed rate clocks with multiplier and divisor set according to
+> > > > > >   boot mode configuration
+> > > > > > 
+> > > > > > - Custom divider clocks with SoC-specific divider values
+> > > > > > 
+> > > > > > This driver supports both.
+> > > > > 
+> > > > > Looking at the R8A7779 datasheet it looks like we only have fixed
+> > > > > rate clocks, without any configurable divider clock. Did I miss
+> > > > > something ?
+> > > 
+> > > Sorry, its a cut-and past error on my part.
+> > > I will revise the changelog.
+> > > 
+> > > > > > Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
+> > > > > > 
+> > > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > > > 
+> > > > > > ---
+> > > > > > v3
+> > > > > > * As suggested by Laurent Pinchart
+> > > > > > 
+> > > > > >   - Added external clock input
+> > > > > >   - Use PLLA ratio set bu MD11 and MD12
+> > > > > >   - Add _div suffixes of fields of struct cpt_clk_config
+> > > > > >   - Register PLLA as a fixed factor clock
+> > > > > >   - Use sizeof() instead of sizeof
+> > > > > >   - Use num_clks instead of CPG_NUM_CLOCKS in
+> > > > > >   r8a7779_cpg_clocks_init()
+> > > > > >   
+> > > > > >   - I kept this as r8a7779 binding rather than moving to a R-Car
+> > > > > >   Gen1 binding which could be shared with other SoCs as I do not
+> > > > > >   believe that the SoCs is are sufficiently similar.
+> > > > > 
+> > > > > I had a look at the M1 datasheet and I still find its CPG very
+> > > > > similar with the H1 CPG. The PLLA multiplier and divider are
+> > > > > different, but if you look closely, they're both exactly twice the
+> > > > > value compared to H1, so there's no difference in practice.
+> > > > > 
+> > > > > What differences do you see that would make it impractical to share
+> > > > > a single driver for both ?
+> > > 
+> > > Thanks for pointing that out. Looking over the M1 datasheet again I
+> > > agree with you that there does seem to be rather a lot of similarities
+> > > with the H1. And I agree that it is likely that the driver could be
+> > > shared.
+> > > 
+> > > However, I'd like to leave that as future work at this time.
+> > > 
+> > > The reason for this is that on the one hand I believe such work sould be
+> > > done in conjunctin with integrating the driver on the bockw board.
+> > > And that seems to be non-trivial to me.
+> > 
+> > We can always rename the driver later, that's not a big issue, but we
+> > can't change compatibility strings. I would thus like to see
+> > "renesas,rcar-gen1-cpg-clocks" listed in the DT bindings.
+> 
+> I know that we have done such things in the past but these days I feel that
+> it is a bit contentious as it is a binding for a software abstraction
+> rather than the hardware. And as far as I know bindings are supposed to
+> describe the hardware.
 
-The file board-marzen-reference.c can no longer be used together with
-the legacy sh-clk clock framework, instead CCF is used.
+Sure, and I consider rcar-gen1-cpf is a hardware description. We have two 
+generations of SoCs in the R-Car series so far, the first generation (H1 and 
+M1) and the second generation (H2 and M2). The second generation is even 
+explictly named as such in the M2 datasheet. SoCs within a generation share 
+hardware characteristics, and it makes sense to reflect that in compatible 
+strings.
 
-Based on work for the Koelsch board by Laurent Pinchart.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/Makefile           |  1 -
- arch/arm/mach-shmobile/Kconfig       | 13 -------------
- arch/arm/mach-shmobile/Makefile      |  1 -
- arch/arm/mach-shmobile/Makefile.boot |  1 -
- 4 files changed, 16 deletions(-)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f56e594..69cd6b7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -251,7 +251,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
- 	r8a7778-bockw-reference.dtb \
- 	r8a7740-armadillo800eva-reference.dtb \
- 	r8a7779-marzen.dtb \
--	r8a7779-marzen-reference.dtb \
- 	r8a7791-koelsch.dtb \
- 	r8a7790-lager.dtb \
- 	sh73a0-kzm9g.dtb \
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 215c742..d8abb4d 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -249,19 +249,6 @@ config MACH_MARZEN
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select USE_OF
- 
--config MACH_MARZEN_REFERENCE
--	bool "MARZEN board - Reference Device Tree Implementation"
--	depends on ARCH_R8A7779
--	select ARCH_REQUIRE_GPIOLIB
--	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select USE_OF
--	---help---
--	   Use reference implementation of Marzen board support
--	   which makes use of device tree at the expense
--	   of not supporting a number of devices.
--
--	   This is intended to aid developers
--
- config MACH_LAGER
- 	bool "Lager board"
- 	depends on ARCH_R8A7790
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index ed49315..591966e 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -69,7 +69,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
- obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
- obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
--obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
- obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 99455ec..4200b94 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -14,7 +14,6 @@ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
- loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
- loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
- loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
--loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
- 
- __ZRELADDR	:= $(sort $(loadaddr-y))
-    zreladdr-y   += $(__ZRELADDR)
 -- 
-1.8.5.2
+Regards,
+
+Laurent Pinchart
