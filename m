@@ -1,37 +1,63 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 13 Mar 2014 12:32:45 +0800
-Subject: [PATCH 1/3 V2] crypto: Fix the pointer voodoo in unaligned ahash
-In-Reply-To: <201403130501.00589.marex@denx.de>
-References: <1389720829-5963-1-git-send-email-marex@denx.de>
- <201403130220.29346.marex@denx.de>
- <20140313015624.GA2680@gondor.apana.org.au>
- <201403130501.00589.marex@denx.de>
-Message-ID: <20140313043245.GA3368@gondor.apana.org.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 13 Mar 2014 13:59:08 +0900
+Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
+In-Reply-To: <20140313020231.GC16719@verge.net.au>
+References: <20140226095916.15676.99394.sendpatchset@w520>
+ <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
+ <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
+ <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
+ <20140313020231.GC16719@verge.net.au>
+Message-ID: <CANqRtoRCO+b3CGaOQW2FoetoOC0JCXmXK39Fgi_VinNGmbarJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 05:01:00AM +0100, Marek Vasut wrote:
-> On Thursday, March 13, 2014 at 02:56:25 AM, Herbert Xu wrote:
-> > On Thu, Mar 13, 2014 at 02:20:29AM +0100, Marek Vasut wrote:
-> > > OK, understood. But shall we not preserve the request intact in case a
-> > > crypto- api function called crypto_ahash_final() with request which has
-> > > .priv already set? Then we would have really funny corruption of the
-> > > request going on and I'm not sure that'd be nice.
-> > 
-> > The priv field is only ever used by ahash.c so how can this happen?
-> > The crypto API refers to code in the API itself, excluding drivers
-> > and users.
-> 
-> OK, I agree with you that people plumbing in the API itself will know what 
-> they're doing.
-> 
-> btw. can you please check the V3 of 3/3 for the fixup of the base.completion() 
-> call ? I will then do tests and roll V4 of the series.
+Hi Simon,
 
-It looks good to me.
+On Thu, Mar 13, 2014 at 11:02 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Feb 27, 2014 at 09:08:06AM +0100, Geert Uytterhoeven wrote:
+>> Hi Magnus,
+>>
+>> On Thu, Feb 27, 2014 at 4:33 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> >>>  This is a reworked version of the APMU patch previously posted as
+>> >>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+>> >>
+>> >> Your previous version also affected r8a7790/Lager.
+>> >> Isn't this check no longer needed there? According to the Lager manual,
+>> >> MD21 also enables hardware debug mode, and is also controlled by
+>> >> SW8-4. Of course the CPU may behave differently, as the CPU cores
+>> >> are different.
+>> >
+>> > Yes, you are correct that the previous version of the patch also
+>> > affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
+>> > together with JTAG debugging.
+>> >
+>> > I recently used the patch on Lager and I discovered that I apparently
+>> > had been running with MD21 on my Lager since forever, and surprisingly
+>> > it worked regardless. Since there is no documentation on r8a7790 or
+>> > r8a7791 I simply decided to handle them separately and only enable
+>> > where it is needed.
+>>
+>> You could have been lucky?
+>>
+>> On Koelsch, I only had failures after Real Cold Boot, i.e. on boot up in the
+>> morning. And not always, so there could be a timing issue involved.
+>>
+>> > I've also been told that it is possible to allow SMP operation
+>> > together with JTAG, apparently some magic with RST is needed. It seems
+>> > that the power domains are treated differently depending on the MD21
+>> > setting. Not sure if this applies to both r8a7790 and r8a7791, but if
+>> > we end up with similar fixes we can consolidate. Until then I think
+>> > dealing with them one by one makes sense.
+>>
+>> Furthermore, I haven't seen any SPI timeouts after I disabled MD21 (holding
+>> wood, and rabbit legs ;-). So the SMP memory (in)coherency I saw there
+>> could have been caused by a wobbly SMP setup.
+>
+> Hi Magnus,
+>
+> I am a little confused about the status of this patch?
+> Would you like me to queue it up?
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Yes, please!
+
+/ magnus
