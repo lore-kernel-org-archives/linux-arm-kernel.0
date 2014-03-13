@@ -1,71 +1,22 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Mar 2014 18:41:49 +0000
-Subject: [PATCH v4 2/3] arm64: split syscall_trace() into separate
- functions for enter/exit
-In-Reply-To: <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140313184149.GL25472@mudshark.cambridge.arm.com>
+Date: Thu, 13 Mar 2014 18:43:11 +0000
+Subject: [PATCH v7 2/2] arm64: audit: Add audit hook in
+ syscall_trace_enter/exit()
+In-Reply-To: <1394705767-12423-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1393564635-3921-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705767-12423-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705767-12423-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140313184311.GM25472@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:11:30AM +0000, AKASHI Takahiro wrote:
-> As done in arm, this change makes it easy to confirm we invoke syscall
-> related hooks, including syscall tracepoint, audit and seccomp which would
-> be implemented later, in correct order. That is, undoing operations in the
-> opposite order on exit that they were done on entry.
+On Thu, Mar 13, 2014 at 10:16:07AM +0000, AKASHI Takahiro wrote:
+> This patch adds auditing functions on entry to or exit from
+> every system call invocation.
 > 
+> Acked-by: Richard Guy Briggs <rgb@redhat.com>
 > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/entry.S  |   10 ++++-----
->  arch/arm64/kernel/ptrace.c |   48 ++++++++++++++++++++++++++++++++++----------
->  2 files changed, 41 insertions(+), 17 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 6a8928b..9993a8f 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1058,29 +1058,27 @@ long arch_ptrace(struct task_struct *child, long request,
->  	return ptrace_request(child, request, addr, data);
->  }
->  
-> -asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
-> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  {
->  	unsigned long saved_reg;
->  
->  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
->  		return regs->syscallno;
->  
-> +	/*
-> +	 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
-> +	 * used to denote syscall entry/exit:
-> +	 *   0 -> entry
-> +	 */
-
-You could add an enum, like we have on ARM (ptrace_syscall_dir) for the two
-directions.
-
->  	if (is_compat_task()) {
-> -		/* AArch32 uses ip (r12) for scratch */
->  		saved_reg = regs->regs[12];
-> -		regs->regs[12] = dir;
-> +		regs->regs[12] = 0;
->  	} else {
-> -		/*
-> -		 * Save X7. X7 is used to denote syscall entry/exit:
-> -		 *   X7 = 0 -> entry, = 1 -> exit
-> -		 */
->  		saved_reg = regs->regs[7];
-> -		regs->regs[7] = dir;
-> +		regs->regs[7] = 0;
-
-This code could also be refactored so we calculated the register number
-once, then avoid the if (is_compact_task()) check all over the place.
-
-Similarly on the exit path.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
 Will
