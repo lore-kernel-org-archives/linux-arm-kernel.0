@@ -1,81 +1,189 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Thu, 13 Mar 2014 00:16:35 -0300
-Subject: Common clock: function clock and bus clock
-In-Reply-To: <CADApbeh0zjd=qMguiqQGrn=0v+-SVqgnyL=Gk8D9MiQvHU2XGA@mail.gmail.com>
-References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
- <CAN1soZzFfSp2Hj=JBxj+N9iLrjkm3poOa7piJDJT5BY-ycsWHQ@mail.gmail.com>
- <CADApbegGTm=REJbukdyEY9ZVK9hXax+Hodp7MFx3SUb=CV1TbA@mail.gmail.com>
- <5320336B.3020107@ti.com>
- <CADApbeh0zjd=qMguiqQGrn=0v+-SVqgnyL=Gk8D9MiQvHU2XGA@mail.gmail.com>
-Message-ID: <53212313.9040305@elopez.com.ar>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Thu, 13 Mar 2014 03:17:38 +0000
+Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
+In-Reply-To: <1394618518-13803-3-git-send-email-denis@eukrea.com>
+References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
+ <1394618518-13803-3-git-send-email-denis@eukrea.com>
+Message-ID: <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ 
+> 
+> It also adapt the dts that uses it.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  arch/arm/boot/dts/imx23.dtsi       |    2 +-
+>  arch/arm/boot/dts/imx27.dtsi       |    4 ++--
+>  arch/arm/boot/dts/imx28.dtsi       |    4 ++--
+>  arch/arm/boot/dts/imx51.dtsi       |    2 +-
+>  arch/arm/boot/dts/imx53.dtsi       |    4 ++--
+>  arch/arm/boot/dts/imx6qdl.dtsi     |    4 ++--
+>  arch/arm/boot/dts/imx6sl.dtsi      |    4 ++--
+>  drivers/usb/chipidea/ci_hdrc_imx.c |    2 +-
+>  8 files changed, 13 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index bbcfb5a..e3c9924 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -522,7 +522,7 @@
+>  			compatible = "fsl,imx23-usb", "fsl,imx27-usb";
+>  			reg = <0x80080000 0x40000>;
+>  			interrupts = <11>;
+> -			fsl,usbphy = <&usbphy0>;
+> +			usb-phy = <&usbphy0>;
+>  			clocks = <&clks 40>;
+>  			status = "disabled";
+>  		};
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 83a8247..94bcf1a 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -466,7 +466,7 @@
+>  				interrupts = <56>;
+>  				clocks = <&clks 15>;
+>  				fsl,usbmisc = <&usbmisc 0>;
+> -				fsl,usbphy = <&usbphy0>;
+> +				usb-phy = <&usbphy0>;
+>  				status = "disabled";
+>  			};
+> 
+> @@ -485,7 +485,7 @@
+>  				interrupts = <55>;
+>  				clocks = <&clks 15>;
+>  				fsl,usbmisc = <&usbmisc 2>;
+> -				fsl,usbphy = <&usbphy2>;
+> +				usb-phy = <&usbphy2>;
+>  				status = "disabled";
+>  			};
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 90a5795..52ad72f 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -1143,7 +1143,7 @@
+>  			reg = <0x80080000 0x10000>;
+>  			interrupts = <93>;
+>  			clocks = <&clks 60>;
+> -			fsl,usbphy = <&usbphy0>;
+> +			usb-phy = <&usbphy0>;
+>  			status = "disabled";
+>  		};
+> 
+> @@ -1152,7 +1152,7 @@
+>  			reg = <0x80090000 0x10000>;
+>  			interrupts = <92>;
+>  			clocks = <&clks 61>;
+> -			fsl,usbphy = <&usbphy1>;
+> +			usb-phy = <&usbphy1>;
+>  			status = "disabled";
+>  		};
+> 
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index cb3204a..b290947 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -249,7 +249,7 @@
+>  				interrupts = <18>;
+>  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+>  				fsl,usbmisc = <&usbmisc 0>;
+> -				fsl,usbphy = <&usbphy0>;
+> +				usb-phy = <&usbphy0>;
+>  				status = "disabled";
+>  			};
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index f0962e5..b10a3de 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -276,7 +276,7 @@
+>  				interrupts = <18>;
+>  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+>  				fsl,usbmisc = <&usbmisc 0>;
+> -				fsl,usbphy = <&usbphy0>;
+> +				usb-phy = <&usbphy0>;
+>  				status = "disabled";
+>  			};
+> 
+> @@ -286,7 +286,7 @@
+>  				interrupts = <14>;
+>  				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+>  				fsl,usbmisc = <&usbmisc 1>;
+> -				fsl,usbphy = <&usbphy1>;
+> +				usb-phy = <&usbphy1>;
+>  				status = "disabled";
+>  			};
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+> b/arch/arm/boot/dts/imx6qdl.dtsi index cfc85be..d2f0087 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -789,7 +789,7 @@
+>  				reg = <0x02184000 0x200>;
+>  				interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks 162>;
+> -				fsl,usbphy = <&usbphy1>;
+> +				usb-phy = <&usbphy1>;
+>  				fsl,usbmisc = <&usbmisc 0>;
+>  				status = "disabled";
+>  			};
+> @@ -799,7 +799,7 @@
+>  				reg = <0x02184200 0x200>;
+>  				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks 162>;
+> -				fsl,usbphy = <&usbphy2>;
+> +				usb-phy = <&usbphy2>;
+>  				fsl,usbmisc = <&usbmisc 1>;
+>  				status = "disabled";
+>  			};
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi
+> b/arch/arm/boot/dts/imx6sl.dtsi index 6477447..33f501a 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -651,7 +651,7 @@
+>  				reg = <0x02184000 0x200>;
+>  				interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks IMX6SL_CLK_USBOH3>;
+> -				fsl,usbphy = <&usbphy1>;
+> +				usb-phy = <&usbphy1>;
+>  				fsl,usbmisc = <&usbmisc 0>;
+>  				status = "disabled";
+>  			};
+> @@ -661,7 +661,7 @@
+>  				reg = <0x02184200 0x200>;
+>  				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks IMX6SL_CLK_USBOH3>;
+> -				fsl,usbphy = <&usbphy2>;
+> +				usb-phy = <&usbphy2>;
+>  				fsl,usbmisc = <&usbmisc 1>;
+>  				status = "disabled";
+>  			};
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c
+> b/drivers/usb/chipidea/ci_hdrc_imx.c
+> index c00f772..9a74100 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -130,7 +130,7 @@ static int ci_hdrc_imx_probe(struct platform_device
+> *pdev)
+>  		return ret;
+>  	}
+> 
+> -	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy",
+> 0);
+> +	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+>  	if (IS_ERR(data->phy)) {
+>  		ret = PTR_ERR(data->phy);
+>  		goto err_clk;
+> --
+> 1.7.9.5
+> 
 
-El mi? 12 mar 2014 23:15:20 ART, Chao Xie escribi?:
-> On Wed, Mar 12, 2014 at 6:14 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
->> On 03/12/2014 04:30 AM, Chao Xie wrote:
->>>
->>> On Tue, Mar 11, 2014 at 10:48 AM, Haojian Zhuang
->>> <haojian.zhuang@gmail.com> wrote:
->>>>
->>>> On Tue, Mar 11, 2014 at 10:06 AM, Chao Xie <xiechao.mail@gmail.com>
->>>> wrote:
->>>>>
->>>>> hi
->>>>>
->>>>> I can not find any examples for handling function clock and bus clock
->>>>> in drivers/clk/.
->>>>>
->>>>> For a device, it will have a function clock and bus clock. function
->>>>> clock will control the fucntionality of this device, while bus clock
->>>>> will control the communication part to the bus.
->>>>>
->>>>> For some SOCes, they do not export bus clock, so from the hardware it
->>>>> seems that function clock is combined with bus clock, while for some
->>>>> SOCes, they are not.
->>>>>
->>>>> For most of the device driver, they will enable/disable function clock
->>>>> and bus clock both. While for some devices, they may share bus clock,
->>>>> and have different function clocks.
+According to Power_ePAPR_APPROVED_v1.1.pdf
+"ethernet-phy" is the node name, it is the same with Sergei's suggestion.
+But you have changed the property name at this patch, in fact, "fsl,usbphy"
+is ok for property name, "fsl,usb-phy" may be better, but not worth a patch
+to change it.
 
-You can define two normal clocks and use them like this
-
-* If a device has both bus and module
-
-clocks = <&abc ...>, <&xyz ...>;
-clock-names = "bus", "module";
-
-* If a device only has module clock
-
-clocks = <&xyz ...>;
-clock-names = "module";
-
-Then on the driver to control this specific hardware you can do 
-something like
-
-/* mandatory module clock */
-mod = devm_clk_get(dev, "module");
-if (!IS_ERR(mod))
-	clk_prepare_enable(mod)
-else
-	goto fail;	
-
-/* optional bus clock */
-bus = devm_clk_get(dev, "bus");
-if (!IS_ERR(bus))
-	clk_prepare_enable(bus)
-
-
-The framework keeps count of how many times clocks have been enabled, so 
-as long as a device needs the bus clock, it will remain operational.
-
-You can find many examples of this pattern with
-
-$ grep 'clock-names.*ahb' arch/arm/boot/dts/*dts*
-
-Cheers,
-
-Emilio
+Peter
