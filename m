@@ -1,46 +1,58 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 13 Mar 2014 10:49:23 -0700
-Subject: [PATCH] arm64: Add ARCH_HAS_SG_CHAIN
-Message-ID: <1394732963-12174-1-git-send-email-lauraa@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Mar 2014 17:49:15 +0000
+Subject: [PATCH 1/2] arm64: Implement custom mmap functions for dma mapping
+In-Reply-To: <1394732716-11507-1-git-send-email-lauraa@codeaurora.org>
+References: <1394732716-11507-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140313174915.GN30339@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's useful to be able to chain scatterlists together for very large
-scatter allocations. Define ARCH_HAS_SG_CHAIN to let this happen.
+On Thu, Mar 13, 2014 at 05:45:15PM +0000, Laura Abbott wrote:
+> +/* vma->vm_page_prot must be set appropriately before calling this function */
+> +static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+> +			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> +{
+> +	int ret = -ENXIO;
+> +	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
+> +					PAGE_SHIFT;
+> +	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> +	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
+> +	unsigned long off = vma->vm_pgoff;
+> +
+> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+> +		return ret;
+> +
+> +	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
+> +		ret = remap_pfn_range(vma, vma->vm_start,
+> +				      pfn + off,
+> +				      vma->vm_end - vma->vm_start,
+> +				      vma->vm_page_prot);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int arm64_swiotlb_mmap_noncoherent(struct device *dev,
+> +		struct vm_area_struct *vma,
+> +		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +		struct dma_attrs *attrs)
+> +{
+> +	/* Just use whatever page_prot attributes were specified */
+> +	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+> +}
+> +
+> +static int arm64_swiotlb_mmap_coherent(struct device *dev,
+> +		struct vm_area_struct *vma,
+> +		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +		struct dma_attrs *attrs)
+> +{
+> +	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
+> +	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+> +}
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/include/asm/scatterlist.h | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 arch/arm64/include/asm/scatterlist.h
+So I think we got the naming the other way around. The
+noncoherent_dma_ops assume that the DMA is non-coherent and therefore
+must change the pgprot.
 
-diff --git a/arch/arm64/include/asm/scatterlist.h b/arch/arm64/include/asm/scatterlist.h
-new file mode 100644
-index 0000000..7b2602a
---- /dev/null
-+++ b/arch/arm64/include/asm/scatterlist.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __ASM_SCATTERLIST_H
-+#define __ASM_SCATTERLIST_H
-+
-+#include <asm-generic/scatterlist.h>
-+
-+#define ARCH_HAS_SG_CHAIN
-+
-+#endif
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Catalin
