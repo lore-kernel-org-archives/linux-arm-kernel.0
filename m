@@ -1,26 +1,38 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 13 Mar 2014 10:28:32 +0100
-Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
-In-Reply-To: <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
-References: <1390410577-22073-1-git-send-email-denis@eukrea.com>	<1390410577-22073-4-git-send-email-denis@eukrea.com>
- <CAOMZO5AHdTbCQUPGjQaK0v6KJR3+fTN9Pb1sqaYwuKXgfK5U5g@mail.gmail.com>
-Message-ID: <53217A40.7030607@eukrea.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Mar 2014 10:29:17 +0100
+Subject: [PATCH v2 2/4] irqchip: sun4i: Fix irq 0 not working
+In-Reply-To: <1394644627-12315-3-git-send-email-hdegoede@redhat.com>
+References: <1394644627-12315-1-git-send-email-hdegoede@redhat.com>
+ <1394644627-12315-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140313092917.GE2815@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2014 06:27 PM, Fabio Estevam wrote:
-> Hi Denis,
-Hi,
+On Wed, Mar 12, 2014 at 06:17:05PM +0100, Hans de Goede wrote:
+> SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 3 things:
+> 1) no more irqs pending
+> 2) irq 0 pending
+> 3) spurious irq
+> 
+> So if we immediately get a reading of 0, check the irq-pending reg
+> to differentiate between 2 and 3. We only do this once to avoid
+> the extra check in the common case of 1) hapening after having
+> read the vector-reg once.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-> I turned on the backlight supply via bootloader (kernel still does not
-> support MC34704 PMIC yet),
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Maybe this patchset[1] could help, but it still requires some work, and 
-I don't have the hardware to test anymore right now.
-So feel free to improve it and resubmit it.
+Maxime
 
-References:
------------
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/thread.html#214619
-
-Denis.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140313/b1b0a8a0/attachment.sig>
