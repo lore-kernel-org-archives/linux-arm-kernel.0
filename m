@@ -1,96 +1,92 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 13 Mar 2014 10:07:45 +0100
-Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <20140313022246.GA8802@verge.net.au>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <3299454.uLzSWehPDg@avalon> <20140313022246.GA8802@verge.net.au>
-Message-ID: <28465199.RhyHDRhTSc@avalon>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 13 Mar 2014 11:13:53 +0200
+Subject: [PATCH] arm: omap: cm-t3530: Add MMC2/SDIO/WLAN support
+In-Reply-To: <20140312174423.GC1996@atomide.com>
+References: <1394621352-32438-1-git-send-email-sr@denx.de>
+ <20140312174423.GC1996@atomide.com>
+Message-ID: <532176D1.2070000@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 03/12/14 19:44, Tony Lindgren wrote:
+> * Stefan Roese <sr@denx.de> [140312 03:52]:
+>> Add support for the MMC2/SDIO WiFi Libertas (Marvell) module available
+>> on the CM-T3530 SOM.
+>>
+>> Signed-off-by: Stefan Roese <sr@denx.de>
+>> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>> Cc: Tony Lindgren <tony@atomide.com>
 
-On Thursday 13 March 2014 11:22:47 Simon Horman wrote:
-> On Wed, Mar 12, 2014 at 11:12:02AM +0100, Laurent Pinchart wrote:
-> > On Wednesday 12 March 2014 16:55:23 Simon Horman wrote:
-> > > On Wed, Feb 26, 2014 at 02:02:37PM +0100, Laurent Pinchart wrote:
-> >  > On Wednesday 26 February 2014 13:53:17 Laurent Pinchart wrote:
-> > > > > On Wednesday 26 February 2014 16:33:17 Simon Horman wrote:
-> > > > > > The R8A7779 SoC has several clocks that are too custom to be
-> > > > > > supported in a generic driver. Those clocks can be divided in two
-> > > > > > categories:
-> > > > > > 
-> > > > > > - Fixed rate clocks with multiplier and divisor set according to
-> > > > > >   boot mode configuration
-> > > > > > 
-> > > > > > - Custom divider clocks with SoC-specific divider values
-> > > > > > 
-> > > > > > This driver supports both.
-> > > > > 
-> > > > > Looking at the R8A7779 datasheet it looks like we only have fixed
-> > > > > rate clocks, without any configurable divider clock. Did I miss
-> > > > > something ?
-> > > 
-> > > Sorry, its a cut-and past error on my part.
-> > > I will revise the changelog.
-> > > 
-> > > > > > Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
-> > > > > > 
-> > > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > > > 
-> > > > > > ---
-> > > > > > v3
-> > > > > > * As suggested by Laurent Pinchart
-> > > > > > 
-> > > > > >   - Added external clock input
-> > > > > >   - Use PLLA ratio set bu MD11 and MD12
-> > > > > >   - Add _div suffixes of fields of struct cpt_clk_config
-> > > > > >   - Register PLLA as a fixed factor clock
-> > > > > >   - Use sizeof() instead of sizeof
-> > > > > >   - Use num_clks instead of CPG_NUM_CLOCKS in
-> > > > > >   r8a7779_cpg_clocks_init()
-> > > > > >   
-> > > > > >   - I kept this as r8a7779 binding rather than moving to a R-Car
-> > > > > >   Gen1 binding which could be shared with other SoCs as I do not
-> > > > > >   believe that the SoCs is are sufficiently similar.
-> > > > > 
-> > > > > I had a look at the M1 datasheet and I still find its CPG very
-> > > > > similar with the H1 CPG. The PLLA multiplier and divider are
-> > > > > different, but if you look closely, they're both exactly twice the
-> > > > > value compared to H1, so there's no difference in practice.
-> > > > > 
-> > > > > What differences do you see that would make it impractical to share
-> > > > > a single driver for both ?
-> > > 
-> > > Thanks for pointing that out. Looking over the M1 datasheet again I
-> > > agree with you that there does seem to be rather a lot of similarities
-> > > with the H1. And I agree that it is likely that the driver could be
-> > > shared.
-> > > 
-> > > However, I'd like to leave that as future work at this time.
-> > > 
-> > > The reason for this is that on the one hand I believe such work sould be
-> > > done in conjunctin with integrating the driver on the bockw board.
-> > > And that seems to be non-trivial to me.
-> > 
-> > We can always rename the driver later, that's not a big issue, but we
-> > can't change compatibility strings. I would thus like to see
-> > "renesas,rcar-gen1-cpg-clocks" listed in the DT bindings.
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+>> ---
+>> This patch is based on current mainline (v3.14-rc6) plus this compulab patch
+>> series from Dmitry:
+>>
+>> [PATCH 00/11] ARM: dts: sbc-t3x: add support for more boards
+>> http://www.spinics.net/lists/arm-kernel/msg300078.html
 > 
-> I know that we have done such things in the past but these days I feel that
-> it is a bit contentious as it is a binding for a software abstraction
-> rather than the hardware. And as far as I know bindings are supposed to
-> describe the hardware.
-
-Sure, and I consider rcar-gen1-cpf is a hardware description. We have two 
-generations of SoCs in the R-Car series so far, the first generation (H1 and 
-M1) and the second generation (H2 and M2). The second generation is even 
-explictly named as such in the M2 datasheet. SoCs within a generation share 
-hardware characteristics, and it makes sense to reflect that in compatible 
-strings.
+> Thanks applying into omap-for-v3.15/dt, no guarantees it gets merged though
+> as it's getting so close to the merge window.
+> 
+> Regards,
+> 
+> Tony
+> 
+>>  arch/arm/boot/dts/omap3-cm-t3530.dts | 36 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 36 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
+>> index 9faf1cd..d145849 100644
+>> --- a/arch/arm/boot/dts/omap3-cm-t3530.dts
+>> +++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
+>> @@ -9,4 +9,40 @@
+>>  / {
+>>  	model = "CompuLab CM-T3530";
+>>  	compatible = "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
+>> +
+>> +	/* Regulator to trigger the reset signal of the Wifi module */
+>> +	mmc2_sdio_reset: regulator-mmc2-sdio-reset {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "regulator-mmc2-sdio-reset";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		gpio = <&twl_gpio 2 GPIO_ACTIVE_HIGH>;
+>> +		enable-active-high;
+>> +	};
+>> +};
+>> +
+>> +&omap3_pmx_core {
+>> +	mmc2_pins: pinmux_mmc2_pins {
+>> +		pinctrl-single,pins = <
+>> +			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
+>> +			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
+>> +			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
+>> +			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
+>> +			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
+>> +			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
+>> +			OMAP3_CORE1_IOPAD(0x2164, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat4.sdmmc2_dir_dat0 */
+>> +			OMAP3_CORE1_IOPAD(0x2166, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat5.sdmmc2_dir_dat1 */
+>> +			OMAP3_CORE1_IOPAD(0x2168, PIN_OUTPUT | MUX_MODE1)		/* sdmmc2_dat6.sdmmc2_dir_cmd */
+>> +			OMAP3_CORE1_IOPAD(0x216a, PIN_INPUT | MUX_MODE1)		/* sdmmc2_dat7.sdmmc2_clkin */
+>> +		>;
+>> +	};
+>> +};
+>> +
+>> +&mmc2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc2_pins>;
+>> +	vmmc-supply = <&mmc2_sdio_reset>;
+>> +	non-removable;
+>> +	bus-width = <4>;
+>> +	cap-power-off-card;
+>>  };
+>> -- 
+>> 1.8.5.5
+>>
+> 
 
 -- 
 Regards,
-
-Laurent Pinchart
+Igor.
