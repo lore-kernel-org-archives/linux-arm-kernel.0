@@ -1,62 +1,57 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 13 Mar 2014 19:17:00 +0900
-Subject: [PATCH v3 0/3] arm64: Add seccomp support
-In-Reply-To: <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Thu, 13 Mar 2014 19:17:01 +0900
+Subject: [PATCH v3 1/3] asm-generic: Add generic seccomp.h for secure
+ computing mode 1
+In-Reply-To: <1394705823-12465-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1394705823-12465-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705823-12465-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1394705823-12465-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Please apply this patch after my ftrace patch and audit patch in order
-to avoid some conflict on arm64/Kconfig.)
+Those values (__NR_seccomp_*) are used solely in secure_computing()
+to identify mode 1 system calls. If compat system calls have different
+syscall numbers, asm/seccomp.h may override them.
 
-This patch enables secure computing (system call filtering) on arm64.
-System calls can be allowed or denied by loaded bpf-style rules.
-Architecture specific part is to run secure_computing() on syscall entry
-and check the result. See [2/3]
-
-Prerequisites are:
- * "arm64: make a single hook to syscall_trace() for all syscall features" patch
- * "arm64: split syscall_trace() into separate functions for enter/exit" patch
- * "arm64: Add audit support" patch
-
-This code is tested on ARMv8 fast model using libseccomp v2.1.1 with
-modifications for arm64 and verified by its "live" tests, 20, 21 and 24.
-
-Changes v2 -> v3:
-* removed unnecessary 'type cast' operations [2/3]
-* check for a return value (-1) of secure_computing() explicitly [2/3]
-* aligned with the patch, "arm64: split syscall_trace() into separate
-  functions for enter/exit" [2/3]
-* changed default of CONFIG_SECCOMP to n [2/3]
-
-Changes v1 -> v2:
-* added generic seccomp.h for arm64 to utilize it [1,2/3] 
-* changed syscall_trace() to return more meaningful value (-EPERM)
-  on seccomp failure case [2/3]
-* aligned with the change in "arm64: make a single hook to syscall_trace()
-  for all syscall features" v2 [2/3]
-* removed is_compat_task() definition from compat.h [3/3]
-
-AKASHI Takahiro (3):
-  asm-generic: Add generic seccomp.h for secure computing mode 1
-  arm64: Add seccomp support
-  arm64: is_compat_task is defined both in asm/compat.h and
-    linux/compat.h
-
- arch/arm64/Kconfig                |   14 ++++++++++++++
- arch/arm64/include/asm/compat.h   |    5 -----
- arch/arm64/include/asm/seccomp.h  |   25 +++++++++++++++++++++++++
- arch/arm64/include/asm/unistd.h   |    3 +++
- arch/arm64/kernel/entry.S         |    4 ++++
- arch/arm64/kernel/hw_breakpoint.c |    2 +-
- arch/arm64/kernel/process.c       |    2 +-
- arch/arm64/kernel/ptrace.c        |    8 +++++++-
- arch/arm64/kernel/signal.c        |    2 +-
- include/asm-generic/seccomp.h     |   28 ++++++++++++++++++++++++++++
- 10 files changed, 84 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm64/include/asm/seccomp.h
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ include/asm-generic/seccomp.h |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
  create mode 100644 include/asm-generic/seccomp.h
 
+diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
+new file mode 100644
+index 0000000..5e97022
+--- /dev/null
++++ b/include/asm-generic/seccomp.h
+@@ -0,0 +1,28 @@
++/*
++ * include/asm-generic/seccomp.h
++ *
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef _ASM_GENERIC_SECCOMP_H
++#define _ASM_GENERIC_SECCOMP_H
++
++#include <asm-generic/unistd.h>
++
++#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
++#define __NR_seccomp_read_32		__NR_read
++#define __NR_seccomp_write_32		__NR_write
++#define __NR_seccomp_exit_32		__NR_exit
++#define __NR_seccomp_sigreturn_32	__NR_rt_sigreturn
++#endif /* CONFIG_COMPAT && ! already defined */
++
++#define __NR_seccomp_read		__NR_read
++#define __NR_seccomp_write		__NR_write
++#define __NR_seccomp_exit		__NR_exit
++#define __NR_seccomp_sigreturn		__NR_rt_sigreturn
++
++#endif /* _ASM_GENERIC_SECCOMP_H */
 -- 
 1.7.9.5
