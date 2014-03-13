@@ -1,51 +1,71 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 13 Mar 2014 21:47:45 +0800
-Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
- !CONFIG_GENERIC_PHY
-In-Reply-To: <5321B5FA.2030806@ti.com>
-References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
- <5321B4B4.9010806@ti.com> <5321B5FA.2030806@ti.com>
-Message-ID: <5321B701.5050004@ti.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Thu, 13 Mar 2014 15:06:47 +0100
+Subject: [PATCH v2 3/3] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device
+ tree
+In-Reply-To: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1394719607-25018-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 March 2014 09:43 PM, Kishon Vijay Abraham I wrote:
-> Hi Santosh,
-> 
-> On Thursday 13 March 2014 07:07 PM, Santosh Shilimkar wrote:
->> On Thursday 13 March 2014 07:11 PM, Strashko, Grygorii wrote:
->>> This fixes a regression on Keystone 2 platforms caused by patch
->>> 57303488cd37da58263e842de134dc65f7c626d5
->>> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
->>> optional support of generic phy in DWC3 core.
->>>
->>> On Keystone 2 platforms the USB is not working now because
->>> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
->>> return -ENOSYS always. The log shows:
->>>   dwc3 2690000.dwc3: failed to initialize core
->>>   dwc3: probe of 2690000.dwc3 failed with error -38
->>>
->>> Hence, fix it by making NULL a valid phy reference in Generic PHY
->>> APIs stubs in the same way as it was done by the patch
->>> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
->>> a valid phy reference".
->>>
->>> CC: Kishon Vijay Abraham I <kishon@ti.com>
->>> CC: Felipe Balbi <balbi@ti.com>
->>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>> ---
->> This fixes the regression seen in Linux next and patch seems
->> reasonable to me.
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Felipe, Kishon,
->> Can you guys pick this fix if you are ok by it. Thanks
-> 
-> I've already given a PULL request to Greg for 3.15. Is it ok to take this in -rc cycle?
-> 
-Am not sure because this is breaking the existing functionality.
-May be you can request Greg to pull this fix as well.
+Adds initial support for the Marvell BG2-Q DMP. The board has 2GB of
+memory, an uart activated and what's initially supported by the Marvell
+Armada 1500 pro dtsi.
 
-Regards,
-Santosh
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile                 |  3 ++-
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 032030361bef..4a1c0cf01b93 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2-sony-nsz-gs7.dtb	\
+-	berlin2cd-google-chromecast.dtb
++	berlin2cd-google-chromecast.dtb	\
++	berlin2q-marvell-dmp.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+new file mode 100644
+index 000000000000..2da9c41e29d8
+--- /dev/null
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "berlin2q.dtsi"
++
++/ {
++	model = "Marvell BG2-Q DMP";
++	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>;
++	};
++
++	choosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+-- 
+1.8.3.2
