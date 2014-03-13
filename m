@@ -1,138 +1,63 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Mar 2014 17:25:46 +0000
-Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
-In-Reply-To: <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
- <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140313172546.GB25870@e106331-lin.cambridge.arm.com>
+Date: Thu, 13 Mar 2014 17:31:28 +0000
+Subject: [PATCH v3 1/2] i2c: sunxi: Change i2c compatibles
+In-Reply-To: <1394710643-3411-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394710643-3411-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140313173128.GC25870@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 02:06:45PM +0000, Antoine T?nart wrote:
-> Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
-> The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
-> timer, apb timers and uarts for now.
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/berlin2q.dtsi | 167 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 167 insertions(+)
->  create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> new file mode 100644
-> index 000000000000..1cb76031dfe6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -0,0 +1,167 @@
-> +/*
-> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
-> +	compatible = "marvell,berlin2q", "marvell,berlin";
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			next-level-cache = <&l2>;
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			next-level-cache = <&l2>;
-> +			reg = <1>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			next-level-cache = <&l2>;
-> +			reg = <2>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			next-level-cache = <&l2>;
-> +			reg = <3>;
-> +		};
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		smclk: sysmgr-clock {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <25000000>;
-> +		};
-> +
-> +		sysclk: system-clock {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <400000000>;
-> +		};
-> +	};
+On Thu, Mar 13, 2014 at 11:37:22AM +0000, Maxime Ripard wrote:
+> The Allwinner A10 compatibles were following a slightly different compatible
+> patterns than the rest of the SoCs for historical reasons. Move to the other
+> pattern for consistency across all Allwinner Socs.
 
-I am very much not keen on having container nodes like this.
-
-A "clocks" container is non-standard, and not guarantee to probe. The
-fact these clocks probe currently is an artifact of the current
-organisation of Linux rather than any conscious decision.
-
-The #address-cells and #size-cells properties are useless, as no
-address space is defined. The node is not a simple-bus, has no ranges,
-and doesn't have a compatible string that implies an address space.
-
-Is there any reason you need to use a clocks container here and can't
-put these directly under the root?
-
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		ranges = <0 0xf7000000 0x1000000>;
-> +		interrupt-parent = <&gic>;
-> +
-> +		l2: l2-cache-controller at ac0000 {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0xac0000 0x1000>;
-> +			cache-level = <2>;
-> +		};
-> +
-> +		local-timer at ad0600 {
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0xad0600 0x20>;
-> +			clocks = <&sysclk>;
-> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			status = "okay";
-
-Given that nodes are assumed by default to be okay, this can be dropped.
-
-I think it only makes sense to have a status property in a common dtsi
-where the value is "disabled".
-
-Otherwise, this dtsi looks sane to me.
+Dropping support for the existing string breaks existing DTBs. Is this
+really necessary?
 
 Thanks,
 Mark.
+
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 2 +-
+>  drivers/i2c/busses/i2c-mv64xxx.c                      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index befd4fb4764f..5c30026921ae 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -5,7 +5,7 @@ Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+>   - compatible      : Should be either:
+> -                     - "allwinner,sun4i-i2c"
+> +                     - "allwinner,sun4i-a10-i2c"
+>                       - "allwinner,sun6i-a31-i2c"
+>                       - "marvell,mv64xxx-i2c"
+>                       - "marvell,mv78230-i2c"
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index 203a5482a866..2f817b0978a2 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -692,7 +692,7 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
+>   *****************************************************************************
+>   */
+>  static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> -	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+> +	{ .compatible = "allwinner,sun4i-a10-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+>  	{ .compatible = "allwinner,sun6i-a31-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+>  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+>  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> -- 
+> 1.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
