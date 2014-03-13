@@ -1,58 +1,34 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Mar 2014 19:03:52 +0100
-Subject: [PATCH v3 2/4] irqchip: sun4i: Fix irq 0 not working
+Date: Thu, 13 Mar 2014 19:03:53 +0100
+Subject: [PATCH v3 3/4] irqchip: sun4i: Fix a comment about mask register
+ initialization
 In-Reply-To: <1394733834-26839-1-git-send-email-hdegoede@redhat.com>
 References: <1394733834-26839-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1394733834-26839-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1394733834-26839-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SUN4I_IRQ_VECTOR_REG containing 0 can mean one of 3 things:
-1) no more irqs pending
-2) irq 0 pending
-3) spurious irq
-
-So if we immediately get a reading of 0, check the irq-pending reg
-to differentiate between 2 and 3. We only do this once to avoid
-the extra check in the common case of 1) hapening after having
-read the vector-reg once.
+The comment was claiming that we were masking all irqs, while the code actually
+*un*masks all of them.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/irqchip/irq-sun4i.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-sun4i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index a5438d8..5c25048 100644
+index 5c25048..8a2fbee 100644
 --- a/drivers/irqchip/irq-sun4i.c
 +++ b/drivers/irqchip/irq-sun4i.c
-@@ -140,10 +140,24 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
- {
- 	u32 irq, hwirq;
+@@ -109,7 +109,7 @@ static int __init sun4i_of_init(struct device_node *node,
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
  
-+	/*
-+	 * hwirq == 0 can mean one of 3 things:
-+	 * 1) no more irqs pending
-+	 * 2) irq 0 pending
-+	 * 3) spurious irq
-+	 * So if we immediately get a reading of 0, check the irq-pending reg
-+	 * to differentiate between 2 and 3. We only do this once to avoid
-+	 * the extra check in the common case of 1 hapening after having
-+	 * read the vector-reg once.
-+	 */
- 	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
--	while (hwirq != 0) {
-+	if (hwirq == 0 &&
-+		  !(readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0)) & BIT(0)))
-+		return;
-+
-+	do {
- 		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
- 		handle_IRQ(irq, regs);
- 		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
--	}
-+	} while (hwirq != 0);
- }
+-	/* Mask all the interrupts */
++	/* Unmask all the interrupts, ENABLE_REG(x) is used for masking */
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
+ 	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
 -- 
 1.9.0
