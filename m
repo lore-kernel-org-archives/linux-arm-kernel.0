@@ -1,58 +1,55 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 13 Mar 2014 10:57:05 +0900
-Subject: [PATCHv2 0/5] ARM: dts: exynos: Add missing dt data to bring
- kernel of Exynos4x12
-In-Reply-To: <53204328.7070607@samsung.com>
-References: <1394605156-7768-1-git-send-email-cw00.choi@samsung.com>
- <53204328.7070607@samsung.com>
-Message-ID: <53211071.4040408@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Mar 2014 11:02:35 +0900
+Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
+In-Reply-To: <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
+References: <20140226095916.15676.99394.sendpatchset@w520>
+ <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
+ <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
+ <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
+Message-ID: <20140313020231.GC16719@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
-
-On 03/12/2014 08:21 PM, Tomasz Figa wrote:
-> Hi Chanwoo,
+On Thu, Feb 27, 2014 at 09:08:06AM +0100, Geert Uytterhoeven wrote:
+> Hi Magnus,
 > 
-> On 12.03.2014 07:19, Chanwoo Choi wrote:
->> This patch add missing dt data of Exynos4x12 to bring up kernel feature and
->> code clean. This patchset is based on 'v3.15-next/dt-clk-exynos' branch.
->> - git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>
->> exynos4x12/exynos4412/exynos4212.dtsi
->> - Add ADC (Analog and Digital Converter) to get raw data
->> - Add PMU (Performance Monitoring Unit) for perf event
->> - Add gps_alive power domain to remove power leakage when gps-alive isn't used
->> - Remove duplicate dt data of interrput combiner controller
->>
->> exynos4412-trats.dts
->> - Add ADC dt data with ntc thermistor child to read temperature
->>
->> Changes from v1:
->> - Use clock macro name for Exynos4 instead of constant for ADC
->> - Remove unnecessary description about patch content
->> - Move gps-alive power domain's dt data from exynos4x12.dts to exynos4.dts
->> - Move thermistor dt node outside of ADC dt node and modify node name of thermistor
->>
->> Chanwoo Choi (5):
->>    ARM: dts: exynos4x12: Add ADC's dt data to read raw data
->>    ARM: dts: exynos4x12: Add PMU dt data to support PMU(Perforamnce Monitoring Unit)
->>    ARM: dts: exynos4x12: Add GPS_ALIVE power domain
->>    ARM: dts: exynos: Move common dt data for interrupt combiner controller
->>    ARM: dts: exynos4412-trats2: Add ADC/themistor dt data to get temperature of SoC/battery
->>
->>   arch/arm/boot/dts/exynos4.dtsi          |  5 +++++
->>   arch/arm/boot/dts/exynos4212.dtsi       | 13 ++++---------
->>   arch/arm/boot/dts/exynos4412-trats2.dts | 21 +++++++++++++++++++++
->>   arch/arm/boot/dts/exynos4412.dtsi       | 14 ++++----------
->>   arch/arm/boot/dts/exynos4x12.dtsi       | 26 ++++++++++++++++++++++++++
->>   5 files changed, 60 insertions(+), 19 deletions(-)
->>
+> On Thu, Feb 27, 2014 at 4:33 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >>>  This is a reworked version of the APMU patch previously posted as
+> >>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+> >>
+> >> Your previous version also affected r8a7790/Lager.
+> >> Isn't this check no longer needed there? According to the Lager manual,
+> >> MD21 also enables hardware debug mode, and is also controlled by
+> >> SW8-4. Of course the CPU may behave differently, as the CPU cores
+> >> are different.
+> >
+> > Yes, you are correct that the previous version of the patch also
+> > affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
+> > together with JTAG debugging.
+> >
+> > I recently used the patch on Lager and I discovered that I apparently
+> > had been running with MD21 on my Lager since forever, and surprisingly
+> > it worked regardless. Since there is no documentation on r8a7790 or
+> > r8a7791 I simply decided to handle them separately and only enable
+> > where it is needed.
 > 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> You could have been lucky?
 > 
+> On Koelsch, I only had failures after Real Cold Boot, i.e. on boot up in the
+> morning. And not always, so there could be a timing issue involved.
+> 
+> > I've also been told that it is possible to allow SMP operation
+> > together with JTAG, apparently some magic with RST is needed. It seems
+> > that the power domains are treated differently depending on the MD21
+> > setting. Not sure if this applies to both r8a7790 and r8a7791, but if
+> > we end up with similar fixes we can consolidate. Until then I think
+> > dealing with them one by one makes sense.
+> 
+> Furthermore, I haven't seen any SPI timeouts after I disabled MD21 (holding
+> wood, and rabbit legs ;-). So the SMP memory (in)coherency I saw there
+> could have been caused by a wobbly SMP setup.
 
-Please review or comment this patchset.
+Hi Magnus,
 
-Best Regards,
-Chanwoo Choi
+I am a little confused about the status of this patch?
+Would you like me to queue it up?
