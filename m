@@ -1,69 +1,86 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 13 Mar 2014 11:06:37 +0100
-Subject: [GIT PULL] at91: DT update for 3.15 #1
-Message-ID: <1394705197-29992-1-git-send-email-nicolas.ferre@atmel.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 13 Mar 2014 10:08:36 +0000
+Subject: [PATCH 2/2] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device
+ tree
+In-Reply-To: <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1394622364-6848-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394622364-6848-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <532183A4.5020600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 03/12/2014 11:06 AM, Antoine T?nart wrote:
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/Makefile         |  3 ++-
+>   arch/arm/boot/dts/berlin2q-dmp.dts | 32 ++++++++++++++++++++++++++++++++
+>   2 files changed, 34 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/berlin2q-dmp.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 032030361bef..1a2adadfb962 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+>   dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>   dtb-$(CONFIG_ARCH_BERLIN) += \
+>   	berlin2-sony-nsz-gs7.dtb	\
+> -	berlin2cd-google-chromecast.dtb
+> +	berlin2cd-google-chromecast.dtb	\
+> +	berlin2q-dmp.dtb
 
-This is one request for AT91 DT update for 3.15. A lot of forgotten bits that
-are corrected here, and old DT properties that are removed, nothing really new.
-I think that the little modifications to the documentation can also go the
-arm-soc way: there is no fundamental change to the binding, only more coherence
-added.
+If it is "the" Marvell reference board, the file should be named
+berlin2q-marvell-dmp.dtb.
 
-Thanks, best regards,
+>   dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+>   	da850-evm.dtb
+>   dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+> diff --git a/arch/arm/boot/dts/berlin2q-dmp.dts b/arch/arm/boot/dts/berlin2q-dmp.dts
+> new file mode 100644
+> index 000000000000..6a98860e0251
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/berlin2q-dmp.dts
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +#include "berlin2q.dtsi"
+> +
+> +/ {
+> +	model = "Marvell BG2-Q DMP";
+> +	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x40000000>;
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+Please double-check Jisheng's comment about memory size.
 
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+> +	};
+> +
+> +	choosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	soc {
+> +		apb at fc0000 {
+> +			uart0: uart at 9000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
 
-are available in the git repository at:
+And Arnd's comment about using &uart0 instead.
 
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
+Beside the comments made, this all looks fine.
 
-for you to fetch changes up to 1d33a2c9e9279f1e41836effb91309c90608a0e2:
+Sebastian
 
-  ARM: at91/dt: at91-cosino: remove useless adc properties (2014-03-12 19:11:29 +0100)
-
-----------------------------------------------------------------
-First batch of AT91 DT material for 3.15
-- activate DMA for NAND flash controller
-- some binding documentation update for usba and ADC (iio) drivers
-- removal of some deprecated ADC (iio) properties
-
-----------------------------------------------------------------
-Alexandre Belloni (9):
-      ARM: at91/DT: atmel_usba correct atmel,vbus-gpio meaning
-      Documentation: dt: iio: improve atmel-adc documentation
-      Documentation: dt: iio: move arm/atmel-adc.txt to iio/adc/at91_adc.txt
-      ARM: at91/dt: at91-ariag25: remove useless adc properties
-      ARM: at91/dt: at91sam9260: remove useless adc properties
-      ARM: at91/dt: at91sam9g45: remove useless adc properties
-      ARM: at91/dt: at91sam9x5: remove useless adc properties
-      ARM: at91/dt: sama5d3: remove useless adc properties
-      ARM: at91/dt: at91-cosino: remove useless adc properties
-
-Ludovic Desroches (1):
-      ARM: at91: sama5d3: get rid of atmel_tsadcc driver
-
-Nicolas Ferre (1):
-      ARM: at91/DT: add NAND + DMA property
-
- .../{arm/atmel-adc.txt => iio/adc/at91_adc.txt}    | 33 +++++++++++-----------
- .../devicetree/bindings/usb/atmel-usb.txt          |  4 +--
- arch/arm/boot/dts/at91-ariag25.dts                 |  1 -
- arch/arm/boot/dts/at91-cosino.dtsi                 |  1 -
- arch/arm/boot/dts/at91-cosino_mega2560.dts         |  1 -
- arch/arm/boot/dts/at91sam9260.dtsi                 | 11 ++++----
- arch/arm/boot/dts/at91sam9g45.dtsi                 | 12 ++++----
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  1 +
- arch/arm/boot/dts/at91sam9x5.dtsi                  | 14 +++++----
- arch/arm/boot/dts/sama5d3.dtsi                     | 28 ++++++------------
- arch/arm/boot/dts/sama5d3xdm.dtsi                  |  6 ++--
- 11 files changed, 52 insertions(+), 60 deletions(-)
- rename Documentation/devicetree/bindings/{arm/atmel-adc.txt => iio/adc/at91_adc.txt} (73%)
-
--- 
-Nicolas Ferre
+> +};
+>
