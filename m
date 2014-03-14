@@ -1,69 +1,91 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Mar 2014 21:31:46 +0800
-Subject: [PATCH 2/2] ARM: dts: imx: fix invalid #address-cells value
-In-Reply-To: <1394732405-2260-3-git-send-email-tharvey@gateworks.com>
-References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
- <1394732405-2260-3-git-send-email-tharvey@gateworks.com>
-Message-ID: <20140314133144.GE813@S2101-09.ap.freescale.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Mar 2014 14:39:33 +0100
+Subject: [PATCH v11 13/27] iommu/exynos: support for device tree
+In-Reply-To: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
+References: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
+Message-ID: <53230695.9080606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:40:05AM -0700, Tim Harvey wrote:
-> The invalid value of #address-cells in the imx6 pcie host controller node
-> causes of_irq_parse_raw() to incorrectly advance through an interrupt-map
-> table of more than one interrupt.
-> 
-> This patch resolves this issue and allows proper interrupt mapping for an
-> imx6 pcie host connected to a P2P bridge when using legacy interrupts.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-samsung-soc <linux-samsung-soc@vger.kernel.org>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: linux-tegra <linux-tegra@vger.kernel.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
+Hi KyongHo,
+
+On 14.03.2014 06:09, Cho KyongHo wrote:
+> This commit adds device tree support for System MMU.
+>
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 > ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index af8d28d..2285299 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -49,7 +49,7 @@
->  	intc: interrupt-controller at 00a01000 {
->  		compatible = "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> -		#address-cells = <1>;
-> +		#address-cells = <0>;
->  		#size-cells = <1>;
+>   drivers/iommu/Kconfig        |    5 ++---
+>   drivers/iommu/exynos-iommu.c |   21 +++++++++++++++++----
+>   2 files changed, 19 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index df56e4c..22af807 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -178,16 +178,15 @@ config TEGRA_IOMMU_SMMU
+>
+>   config EXYNOS_IOMMU
+>   	bool "Exynos IOMMU Support"
+> -	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
+> +	depends on ARCH_EXYNOS
+>   	select IOMMU_API
+> +	default n
+>   	help
+>   	  Support for the IOMMU(System MMU) of Samsung Exynos application
 
-So we should probably just drop both #address-cells and #size-cells?  If
-so, please help patch imx6sl.dtsi as well.
+nit: There should be a white space before the opening parenthesis.
 
-Shawn
+>   	  processor family. This enables H/W multimedia accellerators to see
 
->  		interrupt-controller;
->  		reg = <0x00a01000 0x1000>,
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+typo: s/accellerators/accelerators/
+
+>   	  non-linear physical memory chunks as a linear memory in their
+>   	  address spaces
+>
+> -	  If unsure, say N here.
+> -
+>   config EXYNOS_IOMMU_DEBUG
+>   	bool "Debugging log for Exynos IOMMU"
+>   	depends on EXYNOS_IOMMU
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 33b424d..34feb04 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -26,6 +26,7 @@
+>   #include <linux/list.h>
+>   #include <linux/memblock.h>
+>   #include <linux/export.h>
+> +#include <linux/of.h>
+>
+>   #include <asm/cacheflush.h>
+>   #include <asm/pgtable.h>
+> @@ -497,7 +498,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+>   	read_unlock_irqrestore(&data->lock, flags);
+>   }
+>
+> -static int exynos_sysmmu_probe(struct platform_device *pdev)
+> +static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>   {
+>   	int irq, ret;
+>   	struct device *dev = &pdev->dev;
+> @@ -557,11 +558,23 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> -static struct platform_driver exynos_sysmmu_driver = {
+> -	.probe		= exynos_sysmmu_probe,
+> -	.driver		= {
+> +#ifdef CONFIG_OF
+> +static struct of_device_id sysmmu_of_match[] __initconst = {
+> +	{ .compatible	= "samsung,sysmmu-v1", },
+> +	{ .compatible	= "samsung,sysmmu-v2", },
+> +	{ .compatible	= "samsung,sysmmu-v3.1", },
+> +	{ .compatible	= "samsung,sysmmu-v3.2", },
+> +	{ .compatible	= "samsung,sysmmu-v3.3", },
+
+Do you need all these compatible strings? I mean, are there any 
+implementation differences that can't be identified by reading IP 
+registers, such as REG_MMU_VERSION?
+
+Best regards,
+Tomasz
