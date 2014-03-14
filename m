@@ -1,50 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Mar 2014 11:35:12 +0100
-Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
-In-Reply-To: <531F49C3.2020506@atmel.com>
-References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
- <531F49C3.2020506@atmel.com>
-Message-ID: <CACRpkdYTq0UmJ0JwzwHLjK8Qa=svoLtqxmm6+ntRnnD_NstCrw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 11:34:29 +0100
+Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
+References: <cover.1393568715.git.mohit.kumar@st.com>
+ <7430033.eK9aHCDe8b@wuerfel>
+ <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
+Message-ID: <201403141134.30157.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 6:37 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Monday 03 March 2014, Mohit KUMAR DCG wrote:
+> Hello Arnd,
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Friday, February 28, 2014 5:28 PM
+> > To: Mohit KUMAR DCG
+> > Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+> > 
+> > On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
+> > > +                       interrupts = <0 68 0x4>;
+> > > +                       interrupt-map-mask = <0 0 0 0>;
+> > > +                       interrupt-map = <0x0 0 &gic 68>;
+> > >
+> > 
+> > From the discussion we just had on the imx version of this driver, I suspect
+> > what you want instead is to drop the interrupts property and fix the interrupt
+> > map to be
+> > 
+> > interrupt-map = <0x0 0 &gic 0 68 0x4>;
+> > 
+> 
+> - yes, I should have fix interrupt map. Pls let us know if any other point needs to be
+> Incorporated in this series.
+> 
 
-> Linus,
->
-> For the nature of this feature, I would like to have your clear advice
-> as this is needed and has been proposed twice (at least). This feature
-> is needed for power management states of GPIOs.
+I just noticed from your code that you use the 68 interrupt both for MSI and
+legacy interrupts. Is this what the hardware does? I was asking above that
+the 'interrupts' property be dropped, but I guess that won't work if it's
+also used for MSI.
 
-It seems that this is aligned with what other pin control drivers do
-to move pins to low power states. As long as the same pins are
-never used for "ordinary" GPIO through gpiolib I think doing this is
-just some electric aspect of the pin and controlled by the device using
-it as part of its normal low-power operation. No different from e.g.
-setting a different biasing or decoupling or grounding the pin or whatever.
+Please clarify.
 
-The fact that the register or bit(s) are named ...gpio-something... is
-irrelevant if they cannot be accessed as such.
+Aside from this, all patches
 
-If you want to be *really* picky you can start go about to edit
-your gpio-ranges so that it is impossible to cross-reference one of
-these GPIOs to a pin, and thus impossible to use them from the
-GPIO subsystem. (Right now the at91 driver is using
-pinctrl_add_gpio_range() so switch this to using ranges defined
-from the device tree if you are fully migrated to DT.)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Basically this is a system issue, how you guys want to handle the
-AT91 low-power modes.
-
-I think you are three maintainers of AT91:
-
-M:      Andrew Victor <linux@maxim.org.za>
-M:      Nicolas Ferre <nicolas.ferre@atmel.com>
-M:      Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-
-Can you get a majority vote on how you want this to work on AT91?
-If two out of three AT91 maintainers ACK the patch I will apply it, and
-then you three can fight amongst yourselves ;-)
-
-Yours,
-Linus Walleij
+	Arnd
