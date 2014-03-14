@@ -1,36 +1,120 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 14 Mar 2014 15:34:16 +0000
-Subject: [PATCH v7 1/3] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-In-Reply-To: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1394811258-1500-2-git-send-email-Liviu.Dudau@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 14 Mar 2014 17:34:29 +0200
+Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
+In-Reply-To: <53231829.3060602@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-8-git-send-email-rogerq@ti.com> <5322DC0E.1020600@ti.com>
+ <5322F20C.50600@ti.com> <53231829.3060602@ti.com>
+Message-ID: <53232185.6090305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
-is wrong. It returns a mapped (i.e. virtual) address that can start from
-zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
-architectures that use !CONFIG_GENERIC_MAP define.
+On 03/14/2014 04:54 PM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Friday 14 March 2014 05:41 PM, Roger Quadros wrote:
+>> On 03/14/2014 12:38 PM, Kishon Vijay Abraham I wrote:
+>>> Hi Roger,
+>>>
+>>> On Friday 07 March 2014 06:39 PM, Roger Quadros wrote:
+>>>> Add nodes for the Super Speed USB controllers, omap-control-usb,
+>>>> USB2 PHY and USB3 PHY devices.
+>>>>
+>>>> Remove ocp2scp1 address space from hwmod data as it is
+>>>> now provided via device tree.
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
+>>>>    arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
+>>>>    2 files changed, 110 insertions(+), 10 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>>>> index 597979b..1e73900 100644
+>>>> --- a/arch/arm/boot/dts/dra7.dtsi
+>>>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>>>> @@ -811,6 +811,116 @@
+>>>>                clocks = <&sata_ref_clk>;
+>>>>                ti,hwmods = "sata";
+>>>>            };
+>>>> +
+>>>> +        omap_control_usb2phy1: control-phy at 4a002300 {
+>>>> +            compatible = "ti,control-phy-usb2";
+>>>> +            reg = <0x4a002300 0x4>;
+>>>> +            reg-names = "power";
+>>>> +        };
+>>>> +
+>>>> +        omap_control_usb3phy1: control-phy at 4a002370 {
+>>>> +            compatible = "ti,control-phy-pipe3";
+>>>> +            reg = <0x4a002370 0x4>;
+>>>> +            reg-names = "power";
+>>>> +        };
+>>>> +
+>>>> +        omap_control_usb2phy2: control-phy at 0x4a002e74 {
+>>>> +            compatible = "ti,control-phy-usb2-dra7";
+>>>> +            reg = <0x4a002e74 0x4>;
+>>>> +            reg-names = "power";
+>>>> +        };
+>>>> +
+>>>> +        /* OCP2SCP1 */
+>>>> +        ocp2scp at 4a080000 {
+>>>> +            compatible = "ti,omap-ocp2scp";
+>>>> +            #address-cells = <1>;
+>>>> +            #size-cells = <1>;
+>>>> +            ranges;
+>>>> +            reg = <0x4a080000 0x20>;
+>>>> +            ti,hwmods = "ocp2scp1";
+>>>> +
+>>>> +            usb2_phy1: phy at 4a084000 {
+>>>> +                compatible = "ti,omap-usb2";
+>>>> +                reg = <0x4a084000 0x400>;
+>>>> +                ctrl-module = <&omap_control_usb2phy1>;
+>>>> +                clocks = <&usb_phy1_always_on_clk32k>,
+>>>> +                     <&usb_otg_ss1_refclk960m>;
+>>>> +                clock-names =    "wkupclk",
+>>>> +                        "refclk";
+>>>> +                #phy-cells = <0>;
+>>>> +            };
+>>>> +
+>>>> +            usb2_phy2: phy at 4a085000 {
+>>>> +                compatible = "ti,omap-usb2";
+>>>> +                reg = <0x4a085000 0x400>;
+>>>> +                ctrl-module = <&omap_control_usb2phy2>;
+>>>> +                clocks = <&usb_phy2_always_on_clk32k>,
+>>>> +                     <&usb_otg_ss2_refclk960m>;
+>>>> +                clock-names =    "wkupclk",
+>>>> +                        "refclk";
+>>>> +                #phy-cells = <0>;
+>>>> +            };
+>>>> +
+>>>> +            usb3_phy1: phy at 4a084400 {
+>>>> +                compatible = "ti,omap-usb3";
+>>>> +                reg = <0x4a084400 0x80>,
+>>>> +                      <0x4a084800 0x64>,
+>>>> +                      <0x4a084c00 0x40>;
+>>>> +                reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+>>>> +                ctrl-module = <&omap_control_usb3phy1>;
+>>>> +                clocks = <&usb_phy3_always_on_clk32k>,
+>>>> +                     <&sys_clkin1>,
+>>>> +                     <&usb_otg_ss1_refclk960m>,
+>>>> +                     <&dpll_core_h13x2_ck>;
+>>>> +                clock-names =    "wkupclk",
+>>>> +                        "sysclk",
+>>>> +                        "refclk",
+>>>> +                        "optclk";
+>>>
+>>> Do we use this 'optclk' in driver?
+>>
+>> No we don't. Still the device seems to work without it.
+>> This is supposed to be USB_LFPS_TX_GFCLK or USB3PHY_REF_CLK.
+> 
+> I think it should be enabled. Did you check the status of this clock in CM_L3INIT_CLKSTCTRL? Moreover USB_LFPS_TX_GFCLK is an interface clock, so IIUC setting the module mode will enable it.
+> 
+> Btw how did you tell dpll_core_h13x2_ck enables USB_LFPS_TX_GFCLK?
+> 
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
----
- include/asm-generic/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>From the clock tree tool. It looks like the clock is gated automatically with the module mode
+as you suggested. I'll get rid of this clock reference then.
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index d5afe96..df72051 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -331,7 +331,7 @@ static inline void iounmap(void __iomem *addr)
- #ifndef CONFIG_GENERIC_IOMAP
- static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
- {
--	return (void __iomem *) port;
-+	return (void __iomem *)(PCI_IOBASE + (port & IO_SPACE_LIMIT));
- }
- 
- static inline void ioport_unmap(void __iomem *p)
--- 
-1.9.0
+cheers,
+-roger
