@@ -1,38 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 12:08:53 +0100
-Subject: [PATCH v17 1/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
- PHY DTS entries
-In-Reply-To: <1394655573-32645-2-git-send-email-lho@apm.com>
-References: <1394655573-32645-1-git-send-email-lho@apm.com>
- <1394655573-32645-2-git-send-email-lho@apm.com>
-Message-ID: <201403141208.53772.arnd@arndb.de>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Fri, 14 Mar 2014 19:08:53 +0800
+Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+In-Reply-To: <201403141134.30157.arnd@arndb.de>
+References: <cover.1393568715.git.mohit.kumar@st.com>
+ <7430033.eK9aHCDe8b@wuerfel>
+ <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
+ <201403141134.30157.arnd@arndb.de>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FD6D7D1C@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 March 2014, Loc Ho wrote:
-> +                       sataphy1clk: sataphy1clk at 1f21c000 {
-> +                               compatible = "apm,xgene-device-clock";
-> +                               #clock-cells = <1>;
-> +                               clocks = <&socplldiv2 0>;
-> +                               clock-names = "socplldiv2";
+Hello Arnd,
 
-I think we still need to resolve the question regarding the
-"clock-names" properties in your clock provider nodes. I've commented
-on this in the past, since it shows up in all the x-gene drivers,
-but it's very inconsistent.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, March 14, 2014 4:04 PM
+> To: Mohit KUMAR DCG
+> Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+> 
+> On Monday 03 March 2014, Mohit KUMAR DCG wrote:
+> > Hello Arnd,
+> >
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: Friday, February 28, 2014 5:28 PM
+> > > To: Mohit KUMAR DCG
+> > > Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node
+> > > information
+> > >
+> > > On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
+> > > > +                       interrupts = <0 68 0x4>;
+> > > > +                       interrupt-map-mask = <0 0 0 0>;
+> > > > +                       interrupt-map = <0x0 0 &gic 68>;
+> > > >
+> > >
+> > > From the discussion we just had on the imx version of this driver, I
+> > > suspect what you want instead is to drop the interrupts property and
+> > > fix the interrupt map to be
+> > >
+> > > interrupt-map = <0x0 0 &gic 0 68 0x4>;
+> > >
+> >
+> > - yes, I should have fix interrupt map. Pls let us know if any other
+> > point needs to be Incorporated in this series.
+> >
+> 
+> I just noticed from your code that you use the 68 interrupt both for MSI and
+> legacy interrupts. Is this what the hardware does? I was asking above that
+> the 'interrupts' property be dropped, but I guess that won't work if it's also
+> used for MSI.
+>
+> Please clarify.
 
-The binding says
+- Yes, single interrupt line for PCIe  is shared between MSI and legacy interrupt.
 
-+- clock-names : shall be the name of the device clock. If missing, use the
-+                device name.
+> 
+> Aside from this, all patches
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-which to me makes no sense. What will "use the device name", and
-which device? Your clock driver doesn't actually use these strings,
-so could you please fix the binding to remove this, and stop adding
-the strings to any clock nodes?
-
-Since nothing ever used these and they are marked "optional"
-in the binding, I don't think there is a chance of breaking
-anything by changing it now.
-
-	Arnd
+- Thanks :-)
+Mohit
+> 
+> 	Arnd
