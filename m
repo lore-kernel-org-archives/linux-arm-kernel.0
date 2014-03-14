@@ -1,109 +1,76 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 14 Mar 2014 14:11:56 +0200
-Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
-In-Reply-To: <5322DC0E.1020600@ti.com>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-8-git-send-email-rogerq@ti.com> <5322DC0E.1020600@ti.com>
-Message-ID: <5322F20C.50600@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 14 Mar 2014 20:14:49 +0800
+Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
+In-Reply-To: <CAJ+vNU2YYbsH8iOWJ_B-vcHdfWYW1oFsWY_=YEd-ojJASOZgtQ@mail.gmail.com>
+References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+ <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+ <5321EE81.1030207@wwwdotorg.org>
+ <20140313182554.GA15990@obsidianresearch.com>
+ <CAJ+vNU2YYbsH8iOWJ_B-vcHdfWYW1oFsWY_=YEd-ojJASOZgtQ@mail.gmail.com>
+Message-ID: <20140314121448.GB813@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 12:38 PM, Kishon Vijay Abraham I wrote:
-> Hi Roger,
+On Thu, Mar 13, 2014 at 03:25:50PM -0700, Tim Harvey wrote:
+> On Thu, Mar 13, 2014 at 11:25 AM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+> > On Thu, Mar 13, 2014 at 11:44:33AM -0600, Stephen Warren wrote:
+> >> On 03/13/2014 11:40 AM, Tim Harvey wrote:
+> >> > When using interrupt-maps, the size of a map entry is #address-cells +
+> >> >  #interrupt-cells for the parent interrupt controller.  For the ARM GIC
+> >> > address-cells should be 0 as this is not used.
+> >> >
+> >> > This patch fixes the example by correctly specifying #address-cells = 0.
+> >>
+> >> If the #address-cells property is required (well, or even optional...)
+> >> in the node, shouldn't it be included in the list of required/optional
+> >> properties above, and not solely included in the example?
+> >
+> > AFAIK, #address-cells = 0 is the same as not including a
+> > #address-cells at all.
+> >
+> > Omitting entirely is what other interrupt-controller bindings are
+> > doing, so I'd just drop mention of #address-cells completely.
+> >
+> > Jason
 > 
-> On Friday 07 March 2014 06:39 PM, Roger Quadros wrote:
->> Add nodes for the Super Speed USB controllers, omap-control-usb,
->> USB2 PHY and USB3 PHY devices.
->>
->> Remove ocp2scp1 address space from hwmod data as it is
->> now provided via device tree.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
->>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
->>   2 files changed, 110 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->> index 597979b..1e73900 100644
->> --- a/arch/arm/boot/dts/dra7.dtsi
->> +++ b/arch/arm/boot/dts/dra7.dtsi
->> @@ -811,6 +811,116 @@
->>               clocks = <&sata_ref_clk>;
->>               ti,hwmods = "sata";
->>           };
->> +
->> +        omap_control_usb2phy1: control-phy at 4a002300 {
->> +            compatible = "ti,control-phy-usb2";
->> +            reg = <0x4a002300 0x4>;
->> +            reg-names = "power";
->> +        };
->> +
->> +        omap_control_usb3phy1: control-phy at 4a002370 {
->> +            compatible = "ti,control-phy-pipe3";
->> +            reg = <0x4a002370 0x4>;
->> +            reg-names = "power";
->> +        };
->> +
->> +        omap_control_usb2phy2: control-phy at 0x4a002e74 {
->> +            compatible = "ti,control-phy-usb2-dra7";
->> +            reg = <0x4a002e74 0x4>;
->> +            reg-names = "power";
->> +        };
->> +
->> +        /* OCP2SCP1 */
->> +        ocp2scp at 4a080000 {
->> +            compatible = "ti,omap-ocp2scp";
->> +            #address-cells = <1>;
->> +            #size-cells = <1>;
->> +            ranges;
->> +            reg = <0x4a080000 0x20>;
->> +            ti,hwmods = "ocp2scp1";
->> +
->> +            usb2_phy1: phy at 4a084000 {
->> +                compatible = "ti,omap-usb2";
->> +                reg = <0x4a084000 0x400>;
->> +                ctrl-module = <&omap_control_usb2phy1>;
->> +                clocks = <&usb_phy1_always_on_clk32k>,
->> +                     <&usb_otg_ss1_refclk960m>;
->> +                clock-names =    "wkupclk",
->> +                        "refclk";
->> +                #phy-cells = <0>;
->> +            };
->> +
->> +            usb2_phy2: phy at 4a085000 {
->> +                compatible = "ti,omap-usb2";
->> +                reg = <0x4a085000 0x400>;
->> +                ctrl-module = <&omap_control_usb2phy2>;
->> +                clocks = <&usb_phy2_always_on_clk32k>,
->> +                     <&usb_otg_ss2_refclk960m>;
->> +                clock-names =    "wkupclk",
->> +                        "refclk";
->> +                #phy-cells = <0>;
->> +            };
->> +
->> +            usb3_phy1: phy at 4a084400 {
->> +                compatible = "ti,omap-usb3";
->> +                reg = <0x4a084400 0x80>,
->> +                      <0x4a084800 0x64>,
->> +                      <0x4a084c00 0x40>;
->> +                reg-names = "phy_rx", "phy_tx", "pll_ctrl";
->> +                ctrl-module = <&omap_control_usb3phy1>;
->> +                clocks = <&usb_phy3_always_on_clk32k>,
->> +                     <&sys_clkin1>,
->> +                     <&usb_otg_ss1_refclk960m>,
->> +                     <&dpll_core_h13x2_ck>;
->> +                clock-names =    "wkupclk",
->> +                        "sysclk",
->> +                        "refclk",
->> +                        "optclk";
+> Jason / Stephen,
 > 
-> Do we use this 'optclk' in driver?
+> Yes, it does indeed default to 0 if not specified.  For arm-gic it
+> would appear #address-cells must be 0, so should we remove all places
+> its set explicitly to 0 in dts as wel as the example in
+> Documentation/devicetree/bindings?
+> 
+> Looking through arch/arm/boot/dts I'm seeing other dts configs using
+> 'arm,cortex-a9-gic' which I'm guessing are equally as wrong as the
+> imx6 situation:
+>  - arch/arm/boot/dts/highbank.dts
+>  - arch/arm/boot/dts/sh73a0.dtsi
+> 
+> I'm also seeing a number of places where its set explicitly to 0:
+>  - Documentation/devicetree/bindings/arm/gic.txt
+>  - Documentation/devicetree/bindings/arm/vexpress.txt
+>  - arch/arm/boot/dts/bcm11351.dtsi
+>  - arch/arm/boot/dts/hi3620.dtsi
+>  - arch/arm/boot/dts/imx6qdl.dtsi
+>  - arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> 
+> If I extend this search to the other compatible gic interrupt
+> controllers implemented in drivers/irqchip/irq-gic.c
+> (arm,cortex-a15-gic, qcom,msm-8660-qgic, qcom,msm-qgic2) I find even
+> more examples where #address-cells is set explicitly to 0 or to 1 (and
+> I would believe a value of 1 is invalid, just as it is in my case).
+> 
+> I'm happy to broaden my patch, but I certainly want to make sure I'm
+> doing the right thing with it, as I don't have the ability to test all
+> the other devicetree configs and am by no means a devicetree expert.
+> 
+> Recommendations?
 
-No we don't. Still the device seems to work without it.
-This is supposed to be USB_LFPS_TX_GFCLK or USB3PHY_REF_CLK.
+Copy Rob, who might want to comment a bit.
 
-Any idea why it works without that on OMAP5 as well?
+My understanding is that #address-cells and #size-cells are only valid
+for a node that may have child nodes.  Will gic node possibly get any
+child node?
 
-cheers,
--roger
+Shawn
