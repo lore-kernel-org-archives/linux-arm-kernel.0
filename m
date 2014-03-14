@@ -1,43 +1,21 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 14 Mar 2014 10:30:28 -0700
-Subject: [PATCH] ARM: davinci: fix DT booting with default defconfig
-Message-ID: <1394818228-1846-1-git-send-email-khilman@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Mar 2014 17:39:40 +0000
+Subject: [PATCH] arm64: enable generic CPU feature modalias matching for
+ this architecture
+In-Reply-To: <1393895404-14776-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1393895404-14776-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140314173940.GL18126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Davinci boards tend to have older booloaders without DTB support.
-Enable appended DTB support by default to allow DT booting on older
-platforms.  While there, also enable /proc/device-tree support for
-easy verification of DT boot.
+On Tue, Mar 04, 2014 at 01:10:04AM +0000, Ard Biesheuvel wrote:
+> +static inline bool cpu_have_feature(unsigned int num)
+> +{
+> +	return !!(elf_hwcap & (1UL << num));
+> +}
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Sekhar, this applies on top of your latest defconfig cleanup queued
-for v3.15 and validated with DT and legacy boot on DA850 EVM.
+Do we still need !! if the return type is bool? (I can remove it myself,
+no need to resend the patch)
 
- arch/arm/configs/davinci_all_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index fff4eb6f62c2..2df72ffb09a2 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -40,6 +40,8 @@ CONFIG_LEDS=y
- CONFIG_USE_OF=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_AUTO_ZRELADDR=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE=y
-@@ -70,6 +72,7 @@ CONFIG_MTD_CFI_AMDSTD=m
- CONFIG_MTD_PHYSMAP=m
- CONFIG_MTD_NAND=m
- CONFIG_MTD_NAND_DAVINCI=m
-+CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=1
 -- 
-1.8.3
+Catalin
