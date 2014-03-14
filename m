@@ -1,99 +1,79 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Fri, 14 Mar 2014 16:50:23 +0000
-Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
- protected by an IOMMU
-In-Reply-To: <alpine.DEB.2.02.1402242036490.31489@kaball.uk.xensource.com>
-References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
- <1392914159.32657.18.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1402241214570.4471@kaball.uk.xensource.com>
- <20140224151636.GA13489@kroah.com>
- <alpine.DEB.2.02.1402242036490.31489@kaball.uk.xensource.com>
-Message-ID: <5323334F.90700@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Sat, 15 Mar 2014 01:51:51 +0900
+Subject: [PATCH v4 2/3] arm64: split syscall_trace() into separate
+ functions for enter/exit
+In-Reply-To: <20140313184149.GL25472@mudshark.cambridge.arm.com>
+References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
+ <20140313184149.GL25472@mudshark.cambridge.arm.com>
+Message-ID: <532333A7.1000801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2014 08:49 PM, Stefano Stabellini wrote:
-> On Mon, 24 Feb 2014, gregkh at linuxfoundation.org wrote: 
-> Julien is proposing to store the list of "safe" devices on an hash table
-> in the Xen specific code (in arch/arm/xen/enlighten.c, see
-> http://marc.info/?l=linux-kernel&m=139291370526082&w=2).
-> Whenever Linux is about to do DMA, we would check in the hashtable to
-> figure out whether we need to go through the swiotlb or we can simply
-> use the native dma_ops.
-> 
-> Ian and I were thinking that it would be much easier and faster to have
-> a "xen_safe_device" parameter in struct device and just check for that.
-> It doesn't actually need to be in struct device, it could simply be a
-> flag in struct device_dma_parameters as Ian was suggesting.
-> 
-> Julien, could you please come up with a simple patch to demonstrate the
-> concept?
+On 03/14/2014 03:41 AM, Will Deacon wrote:
+> On Thu, Mar 13, 2014 at 10:11:30AM +0000, AKASHI Takahiro wrote:
+>> As done in arm, this change makes it easy to confirm we invoke syscall
+>> related hooks, including syscall tracepoint, audit and seccomp which would
+>> be implemented later, in correct order. That is, undoing operations in the
+>> opposite order on exit that they were done on entry.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/kernel/entry.S  |   10 ++++-----
+>>   arch/arm64/kernel/ptrace.c |   48 ++++++++++++++++++++++++++++++++++----------
+>>   2 files changed, 41 insertions(+), 17 deletions(-)
+>
+> [...]
+>
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 6a8928b..9993a8f 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -1058,29 +1058,27 @@ long arch_ptrace(struct task_struct *child, long request,
+>>   	return ptrace_request(child, request, addr, data);
+>>   }
+>>
+>> -asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>   {
+>>   	unsigned long saved_reg;
+>>
+>>   	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>>   		return regs->syscallno;
+>>
+>> +	/*
+>> +	 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
+>> +	 * used to denote syscall entry/exit:
+>> +	 *   0 -> entry
+>> +	 */
+>
+> You could add an enum, like we have on ARM (ptrace_syscall_dir) for the two
+> directions.
+>
+>>   	if (is_compat_task()) {
+>> -		/* AArch32 uses ip (r12) for scratch */
+>>   		saved_reg = regs->regs[12];
+>> -		regs->regs[12] = dir;
+>> +		regs->regs[12] = 0;
+>>   	} else {
+>> -		/*
+>> -		 * Save X7. X7 is used to denote syscall entry/exit:
+>> -		 *   X7 = 0 -> entry, = 1 -> exit
+>> -		 */
+>>   		saved_reg = regs->regs[7];
+>> -		regs->regs[7] = dir;
+>> +		regs->regs[7] = 0;
+>
+> This code could also be refactored so we calculated the register number
+> once, then avoid the if (is_compact_task()) check all over the place.
+>
+> Similarly on the exit path.
 
-Hello Stefano and Greg,
+OK, I will implement tracehook_report_syscall() as in arm.
 
-Sorry for the late answer. I wrote a simple patch which depend on patch #1.
-Let me know if it's the right direction.
+-Takahiro AKASHI
 
-Regards,
 
-commit ca55e82bc191678b284792d2f0d200fa1ce08e16
-Author: Julien Grall <julien.grall@linaro.org>
-Date:   Fri Mar 14 16:27:01 2014 +0000
-
-    ARM: platform_device: dev_archdata: Add xen specific boolean
-    
-    Until now, every DMA-capable devices are using specific Xen DMA ops when Linux
-    is running as DOM0. These DMA ops call swiotlb-xen to bounce buffer.
-    
-    With the support of IOMMU drivers in Xen, every device protected by IOMMU
-    must not use swiotlb DMA ops.
-    
-    This patch introduces a boolean in dev_archdata to indicate if the device
-    can safely use its own DMA ops or swiotlb ops.
-    
-    Signed-off-by: Julien Grall <julien.grall@linaro.org>
-
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index dc662fc..345a96e 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -17,6 +17,9 @@ struct dev_archdata {
- #ifdef CONFIG_ARM_DMA_USE_IOMMU
-        struct dma_iommu_mapping        *mapping;
- #endif
-+#ifdef CONFIG_XEN
-+       bool    is_protected;
-+#endif
- };
- 
- struct omap_device;
-diff --git a/arch/arm/include/asm/xen/dma-mapping.h b/arch/arm/include/asm/xen/dma-mapping.h
-index 002fc57..d6cc012 100644
---- a/arch/arm/include/asm/xen/dma-mapping.h
-+++ b/arch/arm/include/asm/xen/dma-mapping.h
-@@ -5,9 +5,21 @@
- 
- extern struct dma_map_ops *xen_dma_ops;
- 
-+#ifdef CONFIG_XEN
-+static inline bool xen_is_protected_device(const struct device *dev)
-+{
-+       return dev->archdata.is_protected;
-+}
-+#else
-+static inline bool xen_is_protected_device(const struct device *dev)
-+{
-+       return 0;
-+}
-+#endif
-+
- static inline bool need_xen_dma_ops(struct device *dev)
- {
--       return xen_initial_domain();
-+       return xen_initial_domain() && !xen_is_protected_device(dev);
- }
- 
- #endif /* _ASM_ARM_XEN_DMA_MAPPING_H */
-
--- 
-Julien Grall
+> Will
+>
