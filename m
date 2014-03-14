@@ -1,120 +1,39 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 14 Mar 2014 17:34:29 +0200
-Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
-In-Reply-To: <53231829.3060602@ti.com>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-8-git-send-email-rogerq@ti.com> <5322DC0E.1020600@ti.com>
- <5322F20C.50600@ti.com> <53231829.3060602@ti.com>
-Message-ID: <53232185.6090305@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 14 Mar 2014 15:34:31 +0000
+Subject: [PATCH v7 5/6] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1394811272-1547-6-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 04:54 PM, Kishon Vijay Abraham I wrote:
-> 
-> 
-> On Friday 14 March 2014 05:41 PM, Roger Quadros wrote:
->> On 03/14/2014 12:38 PM, Kishon Vijay Abraham I wrote:
->>> Hi Roger,
->>>
->>> On Friday 07 March 2014 06:39 PM, Roger Quadros wrote:
->>>> Add nodes for the Super Speed USB controllers, omap-control-usb,
->>>> USB2 PHY and USB3 PHY devices.
->>>>
->>>> Remove ocp2scp1 address space from hwmod data as it is
->>>> now provided via device tree.
->>>>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> ---
->>>>    arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
->>>>    arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
->>>>    2 files changed, 110 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->>>> index 597979b..1e73900 100644
->>>> --- a/arch/arm/boot/dts/dra7.dtsi
->>>> +++ b/arch/arm/boot/dts/dra7.dtsi
->>>> @@ -811,6 +811,116 @@
->>>>                clocks = <&sata_ref_clk>;
->>>>                ti,hwmods = "sata";
->>>>            };
->>>> +
->>>> +        omap_control_usb2phy1: control-phy at 4a002300 {
->>>> +            compatible = "ti,control-phy-usb2";
->>>> +            reg = <0x4a002300 0x4>;
->>>> +            reg-names = "power";
->>>> +        };
->>>> +
->>>> +        omap_control_usb3phy1: control-phy at 4a002370 {
->>>> +            compatible = "ti,control-phy-pipe3";
->>>> +            reg = <0x4a002370 0x4>;
->>>> +            reg-names = "power";
->>>> +        };
->>>> +
->>>> +        omap_control_usb2phy2: control-phy at 0x4a002e74 {
->>>> +            compatible = "ti,control-phy-usb2-dra7";
->>>> +            reg = <0x4a002e74 0x4>;
->>>> +            reg-names = "power";
->>>> +        };
->>>> +
->>>> +        /* OCP2SCP1 */
->>>> +        ocp2scp at 4a080000 {
->>>> +            compatible = "ti,omap-ocp2scp";
->>>> +            #address-cells = <1>;
->>>> +            #size-cells = <1>;
->>>> +            ranges;
->>>> +            reg = <0x4a080000 0x20>;
->>>> +            ti,hwmods = "ocp2scp1";
->>>> +
->>>> +            usb2_phy1: phy at 4a084000 {
->>>> +                compatible = "ti,omap-usb2";
->>>> +                reg = <0x4a084000 0x400>;
->>>> +                ctrl-module = <&omap_control_usb2phy1>;
->>>> +                clocks = <&usb_phy1_always_on_clk32k>,
->>>> +                     <&usb_otg_ss1_refclk960m>;
->>>> +                clock-names =    "wkupclk",
->>>> +                        "refclk";
->>>> +                #phy-cells = <0>;
->>>> +            };
->>>> +
->>>> +            usb2_phy2: phy at 4a085000 {
->>>> +                compatible = "ti,omap-usb2";
->>>> +                reg = <0x4a085000 0x400>;
->>>> +                ctrl-module = <&omap_control_usb2phy2>;
->>>> +                clocks = <&usb_phy2_always_on_clk32k>,
->>>> +                     <&usb_otg_ss2_refclk960m>;
->>>> +                clock-names =    "wkupclk",
->>>> +                        "refclk";
->>>> +                #phy-cells = <0>;
->>>> +            };
->>>> +
->>>> +            usb3_phy1: phy at 4a084400 {
->>>> +                compatible = "ti,omap-usb3";
->>>> +                reg = <0x4a084400 0x80>,
->>>> +                      <0x4a084800 0x64>,
->>>> +                      <0x4a084c00 0x40>;
->>>> +                reg-names = "phy_rx", "phy_tx", "pll_ctrl";
->>>> +                ctrl-module = <&omap_control_usb3phy1>;
->>>> +                clocks = <&usb_phy3_always_on_clk32k>,
->>>> +                     <&sys_clkin1>,
->>>> +                     <&usb_otg_ss1_refclk960m>,
->>>> +                     <&dpll_core_h13x2_ck>;
->>>> +                clock-names =    "wkupclk",
->>>> +                        "sysclk",
->>>> +                        "refclk",
->>>> +                        "optclk";
->>>
->>> Do we use this 'optclk' in driver?
->>
->> No we don't. Still the device seems to work without it.
->> This is supposed to be USB_LFPS_TX_GFCLK or USB3PHY_REF_CLK.
-> 
-> I think it should be enabled. Did you check the status of this clock in CM_L3INIT_CLKSTCTRL? Moreover USB_LFPS_TX_GFCLK is an interface clock, so IIUC setting the module mode will enable it.
-> 
-> Btw how did you tell dpll_core_h13x2_ck enables USB_LFPS_TX_GFCLK?
-> 
+This is a useful function and we should make it visible outside the
+generic PCI code. Export it as a GPL symbol.
 
->From the clock tree tool. It looks like the clock is gated automatically with the module mode
-as you suggested. I'll get rid of this clock reference then.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+---
+ drivers/pci/host-bridge.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-cheers,
--roger
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 06ace62..8708b652 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -17,12 +17,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+ 	return bus;
+ }
+ 
+-static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
++struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+ {
+ 	struct pci_bus *root_bus = find_pci_root_bus(bus);
+ 
+ 	return to_pci_host_bridge(root_bus->bridge);
+ }
++EXPORT_SYMBOL_GPL(find_pci_host_bridge);
+ 
+ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 				 void (*release_fn)(struct pci_host_bridge *),
+-- 
+1.9.0
