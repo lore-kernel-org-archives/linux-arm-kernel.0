@@ -1,45 +1,34 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 14 Mar 2014 14:50:41 +0530
-Subject: [PATCH 3/3] ARM: OMAP2+: Add machine entry for dra72x devices
-In-Reply-To: <1394788841-15112-1-git-send-email-rnayak@ti.com>
-References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
-Message-ID: <1394788841-15112-4-git-send-email-rnayak@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 14 Mar 2014 13:23:55 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2N11bIDMvNV0gdmlkZW86IG14M2ZiOiBJbnRyb2R1Y2Ug?=
+ =?UTF-8?B?cmVndWxhdG9yIHN1cHBvcnQu?=
+In-Reply-To: <1394788369-5096-3-git-send-email-denis@eukrea.com>
+References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
+ <1394788369-5096-3-git-send-email-denis@eukrea.com>
+Message-ID: <1394789035.649593084@f301.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only difference from the dra75x devices is the missing .smp entry.
+???????, 14 ????? 2014, 10:12 +01:00 ?? Denis Carikli <denis@eukrea.com>:
+> This commit is based on the following commit by Fabio Estevam:
+>   4344429 video: mxsfb: Introduce regulator support
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+...
+> +	if (np) {
+> +		if (regulator_name)
+> +			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
+> +
+> +		if (IS_ERR(mx3fbi->reg_lcd))
+> +			return PTR_ERR(mx3fbi->reg_lcd);
+> +	} else {
+> +		/* Permit that driver without a regulator in non-dt mode */
+> +		mx3fbi->reg_lcd = regulator_get(dev, "lcd");
+> +	}
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+I am still completely do not understand why do you need to have
+"regulator_name" property?
+Why this cannot be devm_regulator_get(dev, "lcd") in both DT and non-DT case?
+
 ---
- arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 8e3daa1..d803d99 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -253,4 +253,22 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
- 	.dt_compat	= dra7xx_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-+
-+static const char *dra72_boards_compat[] __initdata = {
-+	"ti,dra72x",
-+	"ti,dra7",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(DRA72_DT, "Generic DRA72 (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= omap5_map_io,
-+	.init_early	= dra7xx_init_early,
-+	.init_late	= dra7xx_init_late,
-+	.init_irq	= omap_gic_of_init,
-+	.init_machine	= omap_generic_init,
-+	.init_time	= omap5_realtime_timer_init,
-+	.dt_compat	= dra72_boards_compat,
-+	.restart	= omap44xx_restart,
-+MACHINE_END
- #endif
--- 
-1.7.9.5
