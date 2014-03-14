@@ -1,221 +1,43 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 14 Mar 2014 11:55:53 +0100
-Subject: =?UTF-8?q?=5BPATCH=20v15=5D=5B=203/3=5D=20ARM=3A=20dts=3A=20imx25=3A=20mbimxsd25=3A=20Add=20displays=20support=2E?=
-In-Reply-To: <1394794553-14719-1-git-send-email-denis@eukrea.com>
-References: <1394794553-14719-1-git-send-email-denis@eukrea.com>
-Message-ID: <1394794553-14719-3-git-send-email-denis@eukrea.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 11:58:53 +0100
+Subject: [PATCH] ARM: mach-ux500|nomadik|u300: Align to common DT bindings
+ for mmci
+In-Reply-To: <CAPDyKFrw092mbirDBffF6TraUoXDLh5movp_sf9PYERG88P-Qw@mail.gmail.com>
+References: <1394713963-18300-1-git-send-email-ulf.hansson@linaro.org>
+ <20140313174703.GO21483@n2100.arm.linux.org.uk>
+ <CAPDyKFrw092mbirDBffF6TraUoXDLh5movp_sf9PYERG88P-Qw@mail.gmail.com>
+Message-ID: <CACRpkdZzObyJQmbAvovcor9NXeVnhEFO82jtxLZOdm48TPnudQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CMO-QVGA(With backlight), DVI-VGA and DVI-SVGA displays
-were added.
+On Fri, Mar 14, 2014 at 8:27 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 13 March 2014 18:47, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> On Thu, Mar 13, 2014 at 01:32:43PM +0100, Ulf Hansson wrote:
+>>> As the first step in preparing the mmci driver for converting to the
+>>> mmc_of_parse API, let's align to the common names of DT bindings for
+>>> the mmc/sd highspeed modes.
+>>
+>> NAK.  These bindings have been documented as being there since March
+>> 14th 2012, and therefore need to be supported for ever by the driver.
+>> You can _augment_ the bindings with the generic ones, and change the
+>> DT files, but you can't remove the parsing of the old property names.
+>
+> I was kind of expecting this response. :-)
+>
+> So, since we made a mistake about adding these DT bindings we are now
+> unable to remove them, is there really no way back?
+>
+> In this particular case, I am confident that it should be safe to
+> remove them, but I guess this is more matter of principle, right?
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v14->v15:
-- Moved the Cc into git-send-email.
-- Added a reg property in the regulator at 0 node.
+I can guarantee that there are no deployed U300, Nomadik or
+Ux500 systems out there with DTBs deployed in them, and
+for certain no products. At one point that was the criterion...
+All setups actually use the appended device tree.
 
-ChangeLog v13->v14:
-- Remove people not concerned by this patch from the Cc list.
-- changed the fsl,pwmr lcdc property to fsl,lpccr,
-  to match the previous patches in that serie.
+In worst case I guess mmc-cap-sd-highspeed and
+mmc-cap-mmc-highspeed could be put as aliases into the
+generic parser?
 
-ChangeLog v10->v13:
-- This patch is the display part splitted out from the patch adding
-  support for the cpuimx25(and its baseboard).
-- Shawn Guo was added to the Cc list.
-- The regulator part was updated to match the current style.
-- The new GPIO defines are now used in the dts(i).
----
- .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   72 ++++++++++++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts  |   45 ++++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts   |   45 ++++++++++++
- 3 files changed, 163 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..68d0834
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-cmo-qvga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	cmo_qvga: display {
-+		model = "CMO-QVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xcad08b80>;
-+		bus-width = <18>;
-+		native-mode = <&qvga_timings>;
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <30>;
-+				hfront-porch = <38>;
-+				vback-porch = <20>;
-+				vfront-porch = <3>;
-+				hsync-len = <15>;
-+				vsync-len = <4>;
-+			};
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_lcd_3v3: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+			regulator-name = "lcd-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio1 26 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	imx25-eukrea-mbimxsd25-baseboard-cmo-qvga {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x80000000>;
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&cmo_qvga>;
-+	fsl,lpccr = <0x00a903ff>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..8eee2f6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-svga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_svga: display {
-+		model = "DVI-SVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_svga_timings>;
-+		display-timings {
-+			dvi_svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..447da62
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-vga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_vga: display {
-+		model = "DVI-VGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_vga_timings>;
-+		display-timings {
-+			dvi_vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+Yours,
+Linus Walleij
