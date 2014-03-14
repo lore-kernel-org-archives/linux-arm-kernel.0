@@ -1,38 +1,48 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Fri, 14 Mar 2014 10:18:20 +0000
-Subject: [PATCH v2 2/4] documentaion: DT: allow a A5 compatible string in
- global timer
+Date: Fri, 14 Mar 2014 10:18:21 +0000
+Subject: [PATCH v2 3/4] dts: ca5: add the global timer for the A5
 In-Reply-To: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
 References: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <1394792302-24451-3-git-send-email-matthew.leach@arm.com>
+Message-ID: <1394792302-24451-4-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global timer is present on the Cortex A5. Add a compatibility
-string to the DT binding to allow a Cortex A5 global timer.
+The Cortex A5 contains a global timer: add the appropriate device tree
+node.
 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 ---
- Documentation/devicetree/bindings/arm/global_timer.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-index 1e54898..bdae3a8 100644
---- a/Documentation/devicetree/bindings/arm/global_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-@@ -4,8 +4,11 @@
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index c544a55..d2709b7 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -88,6 +88,14 @@
+ 		interrupts = <1 13 0x304>;
+ 	};
  
- ** Timer node required properties:
++	timer at 2c000200 {
++		compatible = "arm,cortex-a5-global-timer",
++		             "arm,cortex-a9-global-timer";
++		reg = <0x2c000200 0x20>;
++		interrupts = <1 11 0x304>;
++		clocks = <&oscclk0>;
++	};
++
+ 	watchdog at 2c000620 {
+ 		compatible = "arm,cortex-a5-twd-wdt";
+ 		reg = <0x2c000620 0x20>;
+@@ -120,7 +128,7 @@
+ 		compatible = "arm,vexpress,config-bus";
+ 		arm,vexpress,config-bridge = <&v2m_sysreg>;
  
--- compatible : Should be "arm,cortex-a9-global-timer"
--		Driver supports versions r2p0 and above.
-+- compatible : should contain
-+	     * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
-+	     * "arm,cortex-a9-global-timer" for Cortex-A9 global
-+	         timers or any compatible implementation. Note: driver
-+	         supports versions r2p0 and above.
- 
- - interrupts : One interrupt to each core
- 
+-		osc at 0 {
++		oscclk0: osc at 0 {
+ 			/* CPU and internal AXI reference clock */
+ 			compatible = "arm,vexpress-osc";
+ 			arm,vexpress-sysreg,func = <1 0>;
 -- 
 1.8.5.3
