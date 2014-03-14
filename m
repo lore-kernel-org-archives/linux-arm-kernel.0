@@ -1,52 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 14 Mar 2014 14:45:17 +0530
-Subject: [PATCH] ARM: OMAP2+: hwmod: fix missing braces in _init()
-Message-ID: <1394788517-15014-1-git-send-email-rnayak@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 10:20:55 +0100
+Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value
+ for number of delays
+In-Reply-To: <1394634313.28839.57.camel@joe-AO722>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <1394614210-15698-5-git-send-email-maxime.coquelin@st.com>
+ <1394634313.28839.57.camel@joe-AO722>
+Message-ID: <CACRpkda0Z15zC=d8xe+KyHqgmTCHbnUjL14fBmtscpR-2kHtFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Anna <s-anna@ti.com>
+On Wed, Mar 12, 2014 at 3:25 PM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2014-03-12 at 09:50 +0100, Maxime COQUELIN wrote:
+>> This patch replaces the raw values with ARRAY_SIZE for assigning the
+>> ninput_delays and noutput_delays fields of STiH416's st_pctl_data struct.
+>
+> trivial note:
+>
+>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> []
+>> @@ -384,9 +384,9 @@ static unsigned int stih416_delays[] = {0, 300, 500, 750, 1000, 1250, 1500,
+>>  static const struct st_pctl_data  stih416_data = {
+>>       .rt_style       = st_retime_style_dedicated,
+>>       .input_delays   = stih416_delays,
+>> -     .ninput_delays  = 14,
+>> +     .ninput_delays  = ARRAY_SIZE(stih416_delays),
+>>       .output_delays  = stih416_delays,
+>> -     .noutput_delays = 14,
+>> +     .noutput_delays = ARRAY_SIZE(stih416_delays),
+>>       .alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
+>>  };
+>>
+>
+> drivers/pinctrl/pinctrl-st.c-   unsigned int    *input_delays;
+> drivers/pinctrl/pinctrl-st.c-   unsigned int    *output_delays;
+>
+> It may be better to change these to const unsigned int *
+> and change
+>
+> static unsigned int stih416_delays[] = {
+>
+> to static const
 
-Bug was introduced by commit 'f92d959: ARM: OMAP2+: hwmod:
-Extract no-idle and no-reset info from DT'
+Good point. Patches accepted :-)
 
-There were 2 versions of the patch posted which resulted in the above
-commit. While v1 [1] had the bug, v2 [2] had it fixed.
-However v1 apparently seemed to have been pulled in by mistake
-introducing the bug.
-
-Given of_find_property() does return NULL when the node passed is
-NULL, it did not introduce any functional issues as such, just the
-fact that the second if check was executed unnecessarily.
-
-[1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg94220.html
-[2] http://www.spinics.net/lists/linux-omap/msg98490.html
-
-Cc: Nishanth Menon <nm@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 1f33f5d..66c60fe 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2546,11 +2546,12 @@ static int __init _init(struct omap_hwmod *oh, void *data)
- 		return -EINVAL;
- 	}
- 
--	if (np)
-+	if (np) {
- 		if (of_find_property(np, "ti,no-reset-on-init", NULL))
- 			oh->flags |= HWMOD_INIT_NO_RESET;
- 		if (of_find_property(np, "ti,no-idle-on-init", NULL))
- 			oh->flags |= HWMOD_INIT_NO_IDLE;
-+	}
- 
- 	oh->_state = _HWMOD_STATE_INITIALIZED;
- 
--- 
-1.7.9.5
+Yours,
+Linus Walleij
