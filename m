@@ -1,136 +1,104 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 14 Mar 2014 19:00:17 +0000
-Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <201403141946.23921.arnd@arndb.de>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <201403141805.29204.arnd@arndb.de>
- <20140314171921.GY6457@e106497-lin.cambridge.arm.com>
- <201403141946.23921.arnd@arndb.de>
-Message-ID: <20140314190017.GA6457@e106497-lin.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 14 Mar 2014 20:05:31 +0100
+Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
+ disabling
+Message-ID: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 06:46:23PM +0000, Arnd Bergmann wrote:
-> On Friday 14 March 2014, Liviu Dudau wrote:
-> > You are right, that was lazy of me. What about this version?
-> 
-> Yes, that seems better. Thanks for fixing it up.
-> 
-> But back to the more important question that I realized we have
-> not resolved yet:
-> 
-> You now have two completely independent allocation functions for
-> logical I/O space numbers, and they will return different numbers
-> for any nontrivial scenario.
-> 
-> > +int of_pci_range_to_resource(struct of_pci_range *range,
-> > +       struct device_node *np, struct resource *res)
-> > +{
-> > +       res->flags = range->flags;
-> > +       res->parent = res->child = res->sibling = NULL;
-> > +       res->name = np->full_name;
-> > +
-> > +       if (res->flags & IORESOURCE_IO) {
-> > +               unsigned long port = -1;
-> > +               int err = pci_register_io_range(range->cpu_addr, range->size);
-> > +               if (err)
-> > +                       goto invalid_range;
-> > +               port = pci_address_to_pio(range->cpu_addr);
-> > +               if (port == (unsigned long)-1) {
-> > +                       err = -EINVAL;
-> > +                       goto invalid_range;
-> > +               }
-> > +               res->start = port;
-> > +       } else {
-> 
-> This one concatenates the I/O spaces and assumes that each space starts
-> at bus address zero, and takes little precaution to avoid filling up IO_SPACE_LIMIT
-> if the sizes are too big.
+pwm-leds calls .config() and .disable() in a row. This exhibits that it may
+happen that the channel gets disabled before CDTY has been updated with CUPD.
+The issue gets quite worse with long periods.
+So, ensure by reading ISR that at least one period has past before disabling the
+channel.
 
-Actually, you are attaching too much meaning to this one. pci_register_io_range()
-only tries to remember the ranges, nothing else. And it *does* check that the
-total sum of registered ranges does not exceed IO_SPACE_LIMIT. This is used before
-we have any resource mapped for that range (actually it is used to *create* the
-resource for the range) so there is no other helping hand.
+The other issue is that it may happen that CUPD is not flushed before enabling
+the channel so it will update CDTY/CPRD just after one period. So we always set
+CUPD, even when the channel is not enabled.
 
-It doesn't assume that space starts at bus address zero, it ignores the bus address.
-It only handles CPU addresses for the range, to help with generating logical IO ports.
-If you have overlapping CPU addresses with different bus addresses it will not work,
-but then I guess you will have different problems then.
+Tested on at91sam9g45 and sama5d31ek.
 
-> 
-> >+unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
-> >+{
-> >+       unsigned long start, len, virt_start;
-> >+       int err;
-> >+
-> >+       if (res->end > IO_SPACE_LIMIT)
-> >+               return -EINVAL;
-> >+
-> >+       /*
-> >+        * try finding free space for the whole size first,
-> >+        * fall back to 64K if not available
-> >+        */
-> >+       len = resource_size(res);
-> >+       start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-> >+                               res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
-> >+       if (start == IO_SPACE_PAGES && len > SZ_64K) {
-> >+               len = SZ_64K;
-> >+               start = 0;
-> >+               start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-> >+                                       start, len / PAGE_SIZE, 0);
-> >+       }
-> >+
-> >+       /* no 64K area found */
-> >+       if (start == IO_SPACE_PAGES)
-> >+               return -ENOMEM;
-> >+
-> >+       /* ioremap physical aperture to virtual aperture */
-> >+       virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
-> >+       err = ioremap_page_range(virt_start, virt_start + len,
-> >+                               phys_addr, __pgprot(PROT_DEVICE_nGnRE));
-> >+       if (err)
-> >+               return err;
-> >+
-> >+       bitmap_set(pci_iospace, start, len / PAGE_SIZE);
-> >+
-> >+       /* return io_offset */
-> >+       return start * PAGE_SIZE - res->start;
-> >+}
-> 
-> While this one will try to fall back to smaller sizes, and will honor nonzero
-> bus addresses.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
+ 1 file changed, 29 insertions(+), 17 deletions(-)
 
-Yes, because this one does the actual allocation. And it needs to know how
-the mapping from CPU to bus works.
-
-
-> 
-> I think we shouldn't even try to do the same thing twice, but instead just
-> use a single allocator. I'd prefer the one I came up with, but I realize
-> that I am biased here ;-)
-
-I agree, but I think the two functions serve two different and distinct roles.
-
-Best regards,
-Liviu
-
-
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 0adc952cc4ef..0e589594b1cb 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -16,11 +16,13 @@
+ #include <linux/platform_device.h>
+ #include <linux/pwm.h>
+ #include <linux/slab.h>
++#include <linux/delay.h>
+ 
+ /* The following is global registers for PWM controller */
+ #define PWM_ENA			0x04
+ #define PWM_DIS			0x08
+ #define PWM_SR			0x0C
++#define PWM_ISR			0x1C
+ /* Bit field in SR */
+ #define PWM_SR_ALL_CH_ON	0x0F
+ 
+@@ -157,24 +159,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	unsigned int val;
+ 
+-	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+-		/*
+-		 * If the PWM channel is enabled, using the update register,
+-		 * it needs to set bit 10 of CMR to 0
+-		 */
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
+ 
+-		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+-		val &= ~PWM_CMR_UPD_CDTY;
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+-	} else {
+-		/*
+-		 * If the PWM channel is disabled, write value to duty and
+-		 * period registers directly.
+-		 */
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+-	}
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
++
++	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
++	val &= ~PWM_CMR_UPD_CDTY;
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
++
++	/*
++	 * If the PWM channel is enabled, only update CDTY by using the update
++	 * register, it needs to set bit 10 of CMR to 0
++	 */
++	if (test_bit(PWMF_ENABLED, &pwm->flags))
++		return;
++	/*
++	 * If the PWM channel is disabled, write value to duty and period
++	 * registers directly.
++	 */
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+ }
+ 
+ static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
+@@ -245,6 +248,15 @@ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 
++	/*
++	 * Wait for at least a complete period to have passed before disabling a
++	 * channel to be sure that CDTY has been updated
++	 */
++	atmel_pwm_readl(atmel_pwm, PWM_ISR);
++
++	while (!(atmel_pwm_readl(atmel_pwm, PWM_ISR) & (1 << pwm->hwpwm)))
++		usleep_range(10, 100);
++
+ 	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
+ 
+ 	clk_disable(atmel_pwm->clk);
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.8.3.2
