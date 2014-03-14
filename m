@@ -1,94 +1,126 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 20:05:52 +0100
-Subject: [PATCH v17 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <CAPw-ZTnVE0B+hJKGX=EPP5mjoA7-diTvi9hxNhBuAFL2hANz+Q@mail.gmail.com>
-References: <1394655573-32645-1-git-send-email-lho@apm.com>
- <201403141241.16599.arnd@arndb.de>
- <CAPw-ZTnVE0B+hJKGX=EPP5mjoA7-diTvi9hxNhBuAFL2hANz+Q@mail.gmail.com>
-Message-ID: <201403142005.52991.arnd@arndb.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 14 Mar 2014 12:10:55 -0700
+Subject: [PATCH v3 10/52] arm, kvm: Fix CPU hotplug callback registration
+In-Reply-To: <53229701.8050405@linux.vnet.ibm.com>
+References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
+ <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
+ <20140312232127.GC24808@cbox> <53229701.8050405@linux.vnet.ibm.com>
+Message-ID: <20140314191055.GF28661@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Loc Ho wrote:
-> > On Wednesday 12 March 2014, Loc Ho wrote:
-
-> > gets called. Can you clarify what this register access does?
-> > If it's just setting a index into a mux output, would it make
-> > sense to have an optional DT property containing an integer with
-> > the mux setting you want to set? That way you wouldn't even
-> > have to have two compatible strings but just do
-> >
-> >         ret = of_property_read_u32(node, "apm,ahci-mux", &mux);
-> >         if (!ret)
-> >                 xgene_ahci_mux_select(ctx, mux);
-> >
+On Fri, Mar 14, 2014 at 11:13:29AM +0530, Srivatsa S. Bhat wrote:
+> On 03/13/2014 04:51 AM, Christoffer Dall wrote:
+> > On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
+> >> Subsystems that want to register CPU hotplug callbacks, as well as perform
+> >> initialization for the CPUs that are already online, often do it as shown
+> >> below:
+> >>
+> >> 	get_online_cpus();
+> >>
+> >> 	for_each_online_cpu(cpu)
+> >> 		init_cpu(cpu);
+> >>
+> >> 	register_cpu_notifier(&foobar_cpu_notifier);
+> >>
+> >> 	put_online_cpus();
+> >>
+> >> This is wrong, since it is prone to ABBA deadlocks involving the
+> >> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+> >> with CPU hotplug operations).
+> >>
+> >> Instead, the correct and race-free way of performing the callback
+> >> registration is:
+> >>
+> >> 	cpu_notifier_register_begin();
+> >>
+> >> 	for_each_online_cpu(cpu)
+> >> 		init_cpu(cpu);
+> >>
+> >> 	/* Note the use of the double underscored version of the API */
+> >> 	__register_cpu_notifier(&foobar_cpu_notifier);
+> >>
+> >> 	cpu_notifier_register_done();
+> >>
+> >>
+> >> Fix the kvm code in arm by using this latter form of callback registration.
+> >>
+> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Cc: Gleb Natapov <gleb@kernel.org>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Ingo Molnar <mingo@kernel.org>
+> >> Cc: kvmarm at lists.cs.columbia.edu
+> >> Cc: kvm at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+> >> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+> >> ---
+> >>
+> >>  arch/arm/kvm/arm.c |    7 ++++++-
+> >>  1 file changed, 6 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index bd18bb8..f0e50a0 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
+> >>  		}
+> >>  	}
+> >>  
+> >> +	cpu_notifier_register_begin();
+> >> +
+> >>  	err = init_hyp_mode();
+> >>  	if (err)
+> >>  		goto out_err;
+> >>  
+> >> -	err = register_cpu_notifier(&hyp_init_cpu_nb);
+> >> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+> >>  	if (err) {
+> >>  		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+> >>  		goto out_err;
+> >>  	}
+> >>  
+> >> +	cpu_notifier_register_done();
+> >> +
+> >>  	hyp_cpu_pm_init();
+> >>  
+> >>  	kvm_coproc_table_init();
+> >>  	return 0;
+> >>  out_err:
+> >> +	cpu_notifier_register_done();
+> >>  	return err;
+> >>  }
+> >>  
+> >>
+> > 
+> > Just so we're clear, the existing code was simply racy as not prone to
+> > deadlocks, right?
+> > 
+> > This makes it clear that the test above for compatible CPUs can be quite
+> > easily evaded by using CPU hotplug, but we don't really have a good
+> > solution for handling that yet...  Hmmm, grumble grumble, I guess if you
+> > hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
+> > 
 > 
-> Given that fact that I will break up the resource. Let's just use the
-> resource for the MUX to handle this. For the IP that doesn't existed,
-> I will just not list it.
-
-Ah, that sounds good. It also means that if the firmware has set up
-the mux already, you don't have to touch it again. That would probably
-be the preferred case.
-
-I'm undecided about the value that you write in there. That could either
-be passed through DT as I suggested above for extra flexibility, or you
-can keep it hardcoded if you are absolutely sure that there will never
-need to be a case where you have to set it to something other than '1',
-
-> > > +     /*
-> > > +      * Can't use devm_ioremap_resource due to overlapping region.
-> > > +      * 0xYYYY.0000 - host core
-> > > +      * 0xYYYY.7000 - Mux (if applicable)
-> > > +      * 0xYYYY.A000 - PHY indirect access
-> > > +      * 0xYYYY.C000 - Clock
-> > > +      * 0xYYYY.D000 - RAM shutdown removal
-> > > +      * As we map the entire region as one, it overlaps with the PHY driver.
-> > > +      */
-> > > +     ctx->csr_base = devm_ioremap(dev, res->start, resource_size(res));
-> > > +     if (!ctx->csr_base) {
-> > > +             dev_err(dev, "can't map %pR\n", res);
-> > > +             return -ENOMEM;
-> > > +     }
-> >
-> > I still think we should try not to have overlapping memory areas here.
-> > Could you split up the registers into another range in the reg property
-> > to leave the PHY registers out?
+> In this particular case, there was no deadlock possibility, rather the
+> existing code had insufficient synchronization against CPU hotplug.
 > 
-> Let me do this:
+> init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
+> using on_each_cpu(). If a CPU came online after this point and before calling
+> register_cpu_notifier(), that CPU would remain uninitialized because this
+> subsystem would miss the hot-online event. This patch fixes this bug and
+> also uses the new synchronization method (instead of get/put_online_cpus())
+> to ensure that we don't deadlock with CPU hotplug.
 > 
-> 1. One resource for the RAM shutdown
-> 2. One resource for the host controller
-> 3. One optional resource for the MUX if needed.
+
+Yes, that was my conclusion as well.  Thanks for clarifying.  (It could
+be noted in the commit message as well if you should feel so inclined).
+
+> > In any case:
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > 
 > 
-> With #3, this also solved the MUX detection and avoid having another
-> node "apm,ahci-mux".
-
-My suggestion was not to have another device node, just a property that
-contains a value to be written into the mux register if present.
-
-> > Also, please read the thread named "[PATCH 0/7] of: setup dma
-> > parameters using dma-ranges and dma-coherent" and comment there
-> > about what you think we should do here. I assume we will have to
-> > add "dma-ranges" properties in a number of places to get this
-> > all to work fine any 64-bit SoC. Do you know if you have any
-> > DMA master devices in x-gene that are not 64-bit capable?
-> >
+> Thanks a lot!
 > 
-> I will read and follow later. We do have non-64-bit devices such as
-> SDIO and SPI. But these IP's have translation in the bus similar to
-> PCIe PIM.
-
-Is there also an IOMMU, or just the PIM? If there is no IOMMU,
-we will actually have to use the swiotlb code here, otherwise we
-can rely on the IOMMU to do the translation so we can pretend that
-there is always 64-bit DMA capability.
-
-In theory, the PIM could be dynamically reprogrammed for each
-DMA, as an extremely primitive IOMMU implementation, but I don't
-know what the impact on performance would be from doing that.
-It would also prevent you from starting multiple concurrent DMAs,
-although I suspect that is not an important case for SPI and SDIO.
-
-	Arnd
+Thanks,
+-Christoffer
