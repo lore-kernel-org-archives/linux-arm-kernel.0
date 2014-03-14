@@ -1,48 +1,39 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 14 Mar 2014 15:40:55 -0400
-Subject: ARM: mach-bcm: dt updates for 3.15 - part 2
-Message-ID: <20140314194054.GA6134@beef>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 14 Mar 2014 20:49:30 +0100
+Subject: leds-atmel-pwm and atmel-pwm-bl removal
+Message-ID: <20140314194930.GF3106@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a33705ee8a8af40bbaa379e4567ca451c38fc0d6:
+Hi,
 
-  ARM: dts: remove bcm11351-brt.dts (2014-03-05 01:28:56 -0500)
+With the new generic pwm framework and the pwm-atmel driver using it, we
+don't need leds-atmel-pwm or atmel-pwm-bl anymore. However, a few boards
+are still using those:
 
-are available in the git repository at:
+arch/arm/mach-at91/board-sam9263ek.c
+arch/arm/mach-at91/board-sam9m10g45ek.c
+arch/avr32/boards/atngw100/mrmt.c
+arch/avr32/boards/merisc/setup.c
+arch/avr32/boards/favr-32/setup.c
 
-  git://github.com/broadcom/mach-bcm tags/armsoc/for-3.15/dt-2
+Some other avr32 boards are compiling it as a module but don't seem to
+make any use of it.
 
-for you to fetch changes up to a97d67d1c4c331644f26704976f92a5b160c3f77:
+I will take care of the mach-at91 boards and I can test on those. I can
+do the same for the avr32 boards but I won't be able to test (only
+to compile). Is anyone of you interested in testing those changes ?
 
-  ARM: dts: bcm28155-ap: leave camldo1 on to fix reboot (2014-03-14 12:22:39 -0400)
+I couldn't reach the initial authors of those files...
 
-----------------------------------------------------------------
-ARM: mach-bcm: dt updates for 3.15 - part 2
+Could we simply remove the driver from the avr32 boards ? I'm under the
+impression that they don't get much interest anyway, since april 2009,
+I only see tree wide changes and I can't believe they didn't get broken
+a way or another.
 
-- BCM21664 SoC support
-- BCM59056 PMU support
-- BCM281xx reboot fix
+Regards,
 
-----------------------------------------------------------------
-Markus Mayer (2):
-      ARM: DT: bcm21664: Device tree bindings
-      ARM: dts: bcm21664: Add device tree files.
-
-Matt Porter (2):
-      ARM: dts: add bcm590xx pmu support and enable for bcm28155-ap
-      ARM: dts: bcm28155-ap: leave camldo1 on to fix reboot
-
- .../devicetree/bindings/arm/bcm/bcm21664.txt       |  15 ++
- .../devicetree/bindings/arm/bcm/kona-resetmgr.txt  |  14 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/bcm21664-garnet.dts              |  56 ++++
- arch/arm/boot/dts/bcm21664.dtsi                    | 292 +++++++++++++++++++++
- arch/arm/boot/dts/bcm28155-ap.dts                  |  48 +++-
- arch/arm/boot/dts/bcm59056.dtsi                    |  74 ++++++
- 7 files changed, 500 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm21664.txt
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/kona-resetmgr.txt
- create mode 100644 arch/arm/boot/dts/bcm21664-garnet.dts
- create mode 100644 arch/arm/boot/dts/bcm21664.dtsi
- create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
