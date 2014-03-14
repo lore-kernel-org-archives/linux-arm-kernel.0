@@ -1,190 +1,137 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 14 Mar 2014 09:36:32 +0200
-Subject: [RFC][PATCH 1/1] ion: support multiple address space map
-Message-ID: <20140314.093632.1854857348878394627.hdoyu@nvidia.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 14 Mar 2014 14:51:25 +0800
+Subject: [PATCH v4][ 3/8] usb: chipidea: usbmisc: Add USB support for
+ i.MX25/i.MX35 CPUs
+In-Reply-To: <1394702326-25558-3-git-send-email-denis@eukrea.com>
+References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
+ <1394702326-25558-3-git-send-email-denis@eukrea.com>
+Message-ID: <20140314065124.GB23870@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 13, 2014 at 10:18:41AM +0100, Denis Carikli wrote:
+> This adds the i.MX25 and the i.MX35 support in the
+> ChipIdea usbmisc driver.
+> 
+> The i.MX25 and i.MX35 usb controllers are similar enough to be
+> able to use the same code.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> Changelog v3->v4:
+> - The MXC_EHCI_INTERFACE_* were renamed in MX25_EHCI_INTERFACE_*
+> - Since the peripheral mode also works with USB OTG,
+>   the commit summary was updated to reflect that.
+> 
+> Changelog v2->v3:
+> - Add a commit log
+> 
+> Changelog v1->v2:
+> - converted two remaining defines to BIT()
+> - Removed a variable declaration that was not used in usbmisc_imx25_init
+> ---
+>  drivers/usb/chipidea/usbmisc_imx.c |   58 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index cd061ab..419b895 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -21,6 +21,26 @@
+>  #define MX25_USB_PHY_CTRL_OFFSET	0x08
+>  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
+>  
+> +#define MX25_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
+> +#define MX25_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+> +#define MX25_EHCI_INTERFACE_MASK	(0xf)
+> +
+> +#define MX25_OTG_SIC_SHIFT		29
+> +#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
+> +#define MX25_OTG_PM_BIT			BIT(24)
+> +#define MX25_OTG_PP_BIT			BIT(11)
+> +#define MX25_OTG_OCPOL_BIT		BIT(3)
+> +
+> +#define MX25_H1_SIC_SHIFT		21
+> +#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
+> +#define MX25_H1_PP_BIT			BIT(18)
+> +#define MX25_H1_PM_BIT			BIT(16)
+> +#define MX25_H1_IPPUE_UP_BIT		BIT(7)
+> +#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
+> +#define MX25_H1_TLL_BIT			BIT(5)
+> +#define MX25_H1_USBTE_BIT		BIT(4)
+> +#define MX25_H1_OCPOL_BIT		BIT(2)
+> +
+>  #define MX27_H1_PM_BIT			BIT(8)
+>  #define MX27_H2_PM_BIT			BIT(16)
+>  #define MX27_OTG_PM_BIT			BIT(24)
+> @@ -50,6 +70,39 @@ struct imx_usbmisc {
+>  
+>  static struct imx_usbmisc *usbmisc;
+>  
+> +static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
+> +{
+> +	unsigned long flags;
+> +	u32 val = 0;
+> +
+> +	if (data->index > 1)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	switch (data->index) {
+> +	case 0:
+> +		val = readl(usbmisc->base);
+> +		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
+> +		val |= (MX25_EHCI_INTERFACE_DIFF_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
+> +		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
+> +		writel(val, usbmisc->base);
+> +		break;
+> +	case 1:
+> +		val = readl(usbmisc->base);
+> +		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
+> +		val |= (MX25_EHCI_INTERFACE_SINGLE_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
+> +		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
+> +			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
+> +
+> +		writel(val, usbmisc->base);
+> +
+> +		break;
+> +	}
+> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>  static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
+>  {
+>  	void __iomem *reg;
+> @@ -159,6 +212,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
+>  }
+>  
+>  static const struct usbmisc_ops imx25_usbmisc_ops = {
+> +	.init = usbmisc_imx25_init,
+>  	.post = usbmisc_imx25_post,
+>  };
+>  
+> @@ -200,6 +254,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>  		.data = &imx25_usbmisc_ops,
+>  	},
+>  	{
+> +		.compatible = "fsl,imx35-usbmisc",
+> +		.data = &imx25_usbmisc_ops,
+> +	},
+> +	{
+>  		.compatible = "fsl,imx27-usbmisc",
+>  		.data = &imx27_usbmisc_ops,
+>  	},
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
 
-Our H/Ws(inc. GPU) can accept a dmabuf fd which is originally
-allocated via ION. GPU tries to map this buffer into  GPU address
-space via ION dmabuf backend(.map_dma_buf). Our Tegra IOMMU supports
-multiple address space in IOMMU. Basically each device has its own
-address space assigned by IOMMU. Usually DMA API hides the existance
-of IOMMU from driver code. To support this multiple IOMMU address
-space, I think that at least "ion_map_dma_buf" needs to create IOMMU
-mapping *per* device(address space). And I made the following patch
-*experimentally*.
+Applied, thanks.
 
-Is this the right solution to solve this multiple IOMMU address space?
-
-Any comment would be really appreciated.
-
----8<------8<------8<------8<------8<------8<------8<------8<---
-From: Hiroshi Doyu <hdoyu@nvidia.com>
-
-Ion doesn't support multiple address space. The recent IOMMU usually
-provide multiple address spaces, where a mapping depends on an address
-space. An address space is bind to a device pointer passed from
-attachment. Those info needs to be stored in a buffer info. If the
-same buffer needs to be mapped into the same AS, the same mapping info
-needs to be passed back.
-
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- drivers/staging/android/ion/ion.c      | 96 +++++++++++++++++++++++++++++++++-
- drivers/staging/android/ion/ion_priv.h | 10 ++++
- 2 files changed, 104 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-index 0836717..e260434 100644
---- a/drivers/staging/android/ion/ion.c
-+++ b/drivers/staging/android/ion/ion.c
-@@ -872,17 +872,109 @@ static void ion_buffer_sync_for_device(struct ion_buffer *buffer,
- static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
- 					enum dma_data_direction direction)
- {
-+	int err, i, empty = -1;
-+	struct dma_iommu_mapping *iommu_map;
- 	struct dma_buf *dmabuf = attachment->dmabuf;
- 	struct ion_buffer *buffer = dmabuf->priv;
-+	unsigned int nents = buffer->sg_table->nents;
-+	struct ion_mapping *map_ptr;
-+	struct scatterlist *sg;
-+
-+	iommu_map = to_dma_iommu_mapping(attachment->dev);
-+	if (!iommu_map) {
-+		ion_buffer_sync_for_device(buffer, attachment->dev, direction);
-+		return buffer->sg_table;
-+	}
-+
-+	mutex_lock(&buffer->lock);
-+	for (i = 0; i < ARRAY_SIZE(buffer->mapping); i++) {
-+		map_ptr = &buffer->mapping[i];
-+		if (!map_ptr->dev) {
-+			empty = i;
-+			continue;
-+		}
-+
-+		if (to_dma_iommu_mapping(map_ptr->dev) == iommu_map) {
-+			kref_get(&map_ptr->kref);
-+			mutex_unlock(&buffer->lock);
-+			return &map_ptr->sgt;
-+		}
-+	}
- 
--	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
--	return buffer->sg_table;
-+	if (!empty) {
-+		err = -ENOMEM;
-+		goto err_no_space;
-+	}
-+
-+	map_ptr = &buffer->mapping[empty];
-+	err = sg_alloc_table(&map_ptr->sgt, nents, GFP_KERNEL);
-+	if (err)
-+		goto err_sg_alloc_table;
-+
-+	for_each_sg(buffer->sg_table->sgl, sg, nents, i)
-+		memcpy(map_ptr->sgt.sgl + i, sg, sizeof(*sg));
-+
-+	nents = dma_map_sg(attachment->dev, map_ptr->sgt.sgl, nents, direction);
-+	if (!nents) {
-+		err = -EINVAL;
-+		goto err_dma_map_sg;
-+	}
-+
-+	kref_init(&map_ptr->kref);
-+	map_ptr->dev = attachment->dev;
-+	mutex_unlock(&buffer->lock);
-+	return &map_ptr->sgt;
-+
-+err_dma_map_sg:
-+	sg_free_table(&map_ptr->sgt);
-+err_sg_alloc_table:
-+err_no_space:
-+	mutex_unlock(&buffer->lock);
-+	return ERR_PTR(err);
-+}
-+
-+static void __ion_unmap_dma_buf(struct kref *kref)
-+{
-+	struct ion_mapping *map_ptr;
-+
-+	map_ptr = container_of(kref, struct ion_mapping, kref);
-+	dma_unmap_sg(map_ptr->dev, map_ptr->sgt.sgl, map_ptr->sgt.nents,
-+		     DMA_BIDIRECTIONAL);
-+	sg_free_table(&map_ptr->sgt);
-+	memset(map_ptr, 0, sizeof(*map_ptr));
- }
- 
- static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
- 			      struct sg_table *table,
- 			      enum dma_data_direction direction)
- {
-+	int i;
-+	struct dma_iommu_mapping *iommu_map;
-+	struct dma_buf *dmabuf = attachment->dmabuf;
-+	struct ion_buffer *buffer = dmabuf->priv;
-+	struct ion_mapping *map_ptr;
-+
-+	iommu_map = to_dma_iommu_mapping(attachment->dev);
-+	if (!iommu_map)
-+		return;
-+
-+	mutex_lock(&buffer->lock);
-+	for (i = 0; i < ARRAY_SIZE(buffer->mapping); i++) {
-+		map_ptr = &buffer->mapping[i];
-+		if (!map_ptr->dev)
-+			continue;
-+
-+		if (to_dma_iommu_mapping(map_ptr->dev) == iommu_map) {
-+			kref_put(&map_ptr->kref, __ion_unmap_dma_buf);
-+			mutex_unlock(&buffer->lock);
-+			return;
-+		}
-+	}
-+
-+	dev_warn(attachment->dev, "Not found a map(%p)\n",
-+		 to_dma_iommu_mapping(attachment->dev));
-+
-+	mutex_unlock(&buffer->lock);
- }
- 
- void ion_pages_sync_for_device(struct device *dev, struct page *page,
-diff --git a/drivers/staging/android/ion/ion_priv.h b/drivers/staging/android/ion/ion_priv.h
-index 1eba3f2..441c251 100644
---- a/drivers/staging/android/ion/ion_priv.h
-+++ b/drivers/staging/android/ion/ion_priv.h
-@@ -26,11 +26,19 @@
- #include <linux/sched.h>
- #include <linux/shrinker.h>
- #include <linux/types.h>
-+#include <linux/scatterlist.h>
- 
- #include "ion.h"
- 
- struct ion_buffer *ion_handle_buffer(struct ion_handle *handle);
- 
-+struct ion_mapping {
-+	struct device *dev; /* to get a map and dma_ops */
-+	struct sg_table sgt;
-+	struct kref kref;
-+};
-+#define NUM_ION_MAPPING 5 /* FIXME: dynamically allocate more than this */
-+
- /**
-  * struct ion_buffer - metadata for a particular buffer
-  * @ref:		refernce count
-@@ -84,6 +92,8 @@ struct ion_buffer {
- 	int handle_count;
- 	char task_comm[TASK_COMM_LEN];
- 	pid_t pid;
-+
-+	struct ion_mapping mapping[NUM_ION_MAPPING];
- };
- void ion_buffer_destroy(struct ion_buffer *buffer);
- 
 -- 
-1.8.1.5
+
+Best Regards,
+Peter Chen
