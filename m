@@ -1,68 +1,97 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Mar 2014 14:14:06 -0500
-Subject: PL310 errata workarounds
-In-Reply-To: <20140314175701.GR21483@n2100.arm.linux.org.uk>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140314150110.GQ21483@n2100.arm.linux.org.uk>
- <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
- <20140314175701.GR21483@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqL02dw7B+GEL4921f_7m=RRUokW0n64TxSJnMWN3MMfrQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 20:16:10 +0100
+Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <20140314190017.GA6457@e106497-lin.cambridge.arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <201403141946.23921.arnd@arndb.de>
+ <20140314190017.GA6457@e106497-lin.cambridge.arm.com>
+Message-ID: <201403142016.11105.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 12:57 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
->> The obvious fix is to convert l2x0_flush_line to a function ptr which
->> just further complicates the code.
->
-> I currently regard this code as unmaintainable, so right now I'm in the
-> process of completely rewriting it, going back to the specs and checking
-> what is required.  Sharing code between the L210, L220 and L310 looks
-> good from the point of view of keeping the line count down, but actually
-> they're quite different and have various different requirements.
->
-> Out of those, L220 is the odd one out: all operations are background
-> operations there, which means they have to be waited for.  Currently,
-> if you have one of these, and you build a multiplatform kernel which
-> includes PL310 support, you don't wait for any of these and you probably
-> see a lot of data corruption as a result.
+On Friday 14 March 2014, Liviu Dudau wrote:
+> On Fri, Mar 14, 2014 at 06:46:23PM +0000, Arnd Bergmann wrote:
+> > On Friday 14 March 2014, Liviu Dudau wrote:
+> > 
+> > > +int of_pci_range_to_resource(struct of_pci_range *range,
+> > > +       struct device_node *np, struct resource *res)
+> > > +{
+> > > +       res->flags = range->flags;
+> > > +       res->parent = res->child = res->sibling = NULL;
+> > > +       res->name = np->full_name;
+> > > +
+> > > +       if (res->flags & IORESOURCE_IO) {
+> > > +               unsigned long port = -1;
+> > > +               int err = pci_register_io_range(range->cpu_addr, range->size);
+> > > +               if (err)
+> > > +                       goto invalid_range;
+> > > +               port = pci_address_to_pio(range->cpu_addr);
+> > > +               if (port == (unsigned long)-1) {
+> > > +                       err = -EINVAL;
+> > > +                       goto invalid_range;
+> > > +               }
+> > > +               res->start = port;
+> > > +       } else {
+> > 
+> > This one concatenates the I/O spaces and assumes that each space starts
+> > at bus address zero, and takes little precaution to avoid filling up IO_SPACE_LIMIT
+> > if the sizes are too big.
+> 
+> Actually, you are attaching too much meaning to this one. pci_register_io_range()
+> only tries to remember the ranges, nothing else. And it *does* check that the
+> total sum of registered ranges does not exceed IO_SPACE_LIMIT. This is used before
+> we have any resource mapped for that range (actually it is used to *create* the
+> resource for the range) so there is no other helping hand.
+> 
+> It doesn't assume that space starts at bus address zero, it ignores the bus address.
+> It only handles CPU addresses for the range, to help with generating logical IO ports.
+> If you have overlapping CPU addresses with different bus addresses it will not work,
+> but then I guess you will have different problems then.
 
-Oops. I guess there are not many users as the L220 was primarily used
-with the 1176 (and 11MP?) IIRC. I guess one of the primary 1176 based
-platforms currently used is RPi, but it appears the BCM2835 doesn't
-have an L2 (other than some custom L2 for the GPU).
+The problem is that it tries to set up a mapping so that pci_address_to_pio
+returns the actual port number, but the port that you assign to res->start
+above is assumed to match the 'start' variable below. If the value ends
+up different, the BARs that get set by the PCI bus scan are not in the
+same place that got ioremapped into the virtual I/O aperture.
 
-> PL210 and PL310 are very similar, but PL310 has all the nasty errata
-> against it.  Both of these have the nice behaviour that provided you
-> stick to the "atomic" operations (physical addressed operations, and
-> cache sync) and you don't need to do the errata workaround dances,
-> then you don't need the spinlocks... which means less contention on
-> a SMP system.
+> > >+unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
+> > >+{
+> > >+       unsigned long start, len, virt_start;
+> > >+       int err;
+> > >+
+> > >+       if (res->end > IO_SPACE_LIMIT)
+> > >+               return -EINVAL;
+> > >+
+> > >+       /*
+> > >+        * try finding free space for the whole size first,
+> > >+        * fall back to 64K if not available
+> > >+        */
+> > >+       len = resource_size(res);
+> > >+       start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> > >+                               res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
+> > >+       if (start == IO_SPACE_PAGES && len > SZ_64K) {
+> > >+               len = SZ_64K;
+> > >+               start = 0;
+> > >+               start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> > >+                                       start, len / PAGE_SIZE, 0);
+> > >+       }
+> > >+
+> > >+       /* no 64K area found */
+> > >+       if (start == IO_SPACE_PAGES)
+> > >+               return -ENOMEM;
+> > >+
+> > >+       /* ioremap physical aperture to virtual aperture */
+> > >+       virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
+> > >+       err = ioremap_page_range(virt_start, virt_start + len,
+> > >+                               phys_addr, __pgprot(PROT_DEVICE_nGnRE));
+> > >+       if (err)
+> > >+               return err;
+> > >+
+> > >+       bitmap_set(pci_iospace, start, len / PAGE_SIZE);
+> > >+
+> > >+       /* return io_offset */
+> > >+       return start * PAGE_SIZE - res->start;
+> > >+}
 
-I would definitely like to see removing the spinlock. readl/writel can
-be a hotspot because of this if you have them in any critical path.
-
-Really, if you are flushing such large buffers that you need the
-optimization, you should fix how the buffers are mapped rather than
-optimizing the flush.
-
->
-> Besides, the L2 mess extends outside this file:
->
-> static int sirfsoc_pm_enter(suspend_state_t state)
-> {
-> ...
->                 outer_flush_all();
->                 outer_disable();
->
-> So, outer_disable() is defined to disable the L2 cache in a way that
-> doesn't result in data loss to the system (which would crash it) so
-> why is there that outer_flush_all() call there...  *REMOVED*.
-
-Isn't l2x0_disable racy in SMP? What happens to a write between the
-flush and the disable? If it is only usable when running single core,
-then we can remove the spinlock there. I don't think any of the custom
-disable functions like highbank take the lock.
-
-Rob
+	Arnd
