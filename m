@@ -1,61 +1,47 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 14 Mar 2014 12:47:28 +0100
-Subject: [RFC PATCH V3 3/6] arm: mm: implement get_user_pages_fast
-In-Reply-To: <20140312171126.GK27965@twins.programming.kicks-ass.net>
-References: <1394631623-17883-1-git-send-email-steve.capper@linaro.org>
- <1394631623-17883-4-git-send-email-steve.capper@linaro.org>
- <20140312163200.GJ27965@twins.programming.kicks-ass.net>
- <20140312165510.GA9950@mudshark.cambridge.arm.com>
- <20140312171126.GK27965@twins.programming.kicks-ass.net>
-Message-ID: <20140314114728.GX3104@twins.programming.kicks-ass.net>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 14 Mar 2014 20:49:18 +0900
+Subject: [PATCH v11 01/27] iommu/exynos: do not include removed header
+In-Reply-To: <CAK9yfHzRasE3jroDUZgAa=DN5N=2ZDAxgNiHDCip+f2868BAVQ@mail.gmail.com>
+References: <20140314140129.68a41cc1bd9e0a48a198ca13@samsung.com>
+ <CAK9yfHzRasE3jroDUZgAa=DN5N=2ZDAxgNiHDCip+f2868BAVQ@mail.gmail.com>
+Message-ID: <000e01cf3f7b$6edcdfd0$4c969f70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 06:11:26PM +0100, Peter Zijlstra wrote:
-> Ah this is because you have context tagged TLBs so your context switch
-> doesn't locally flush TLBs and therefore you cannot keep track of this?
+> From: Sachin Kamat [mailto:sachin.kamat at linaro.org]
+> Sent: Friday, March 14, 2014 7:00 PM
 > 
-> Too much x86 in my head I suppose.
+> On 14 March 2014 10:31, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> > Commit 25e9d28d92 (ARM: EXYNOS: remove system mmu initialization from
+> > exynos tree) removed arch/arm/mach-exynos/mach/sysmmu.h header without
+> > removing remaining use of it from exynos-iommu driver, thus causing a
+> > compilation error.
+> >
+> > This patch fixes the error by removing respective include line
+> > from exynos-iommu.c.
+> >
+> > CC: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > ---
+> >  drivers/iommu/exynos-iommu.c |    3 +--
+> >  1 file changed, 1 insertion(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> > index 0740189..4876d35 100644
+> > --- a/drivers/iommu/exynos-iommu.c
+> > +++ b/drivers/iommu/exynos-iommu.c
+> > @@ -12,6 +12,7 @@
+> >  #define DEBUG
+> >  #endif
+> >
+> > +#include <linux/kernel.h>
+> 
+> This change doesn't look related to the patch subject/description.
+> 
+Yes. But it is simply added without any side-effect.
+Do you think it should be in a separate patch?.
+Actually, the added line is a redundant.
 
-Something you could consider is something like:
+Regards,
 
-typdef struct {
-	...
-+	unsigned long tlb_flush_count;
-} mm_context_t;
-
-struct thread_info {
-	...
-+	unsigned long tlb_flush_count;
-};
-
-
-void flush_tlb*() {
-	ACCESS_ONCE(mm->context.tlb_flush_counter)++;
-
-	...
-}
-
-void switch_to(prev, next) {
-	...
-
-	if (prev->mm != next->mm &&
-	    next->mm.context.tlb_flush_counter !=
-	    task_thread_info(next)->tlb_flush_counter) {
-		task_thread_info(next)->tlb_flush_counter =
-			next->mm.context.tlb_flush_counter;
-		local_tlb_flush(next->mm);
-	}
-}
-
-That way you don't have to IPI cpus that don't currently run tasks of
-that mm because the next time they get scheduled the switch_to() bit
-will flush their mm for you.
-
-And thus you can keep a tight tlb invalidate mask.
-
-Now I'm not at all sure this is beneficial for ARM, just a thought.
-
-Also I suppose one should think about the case where the counter
-wrapped. The easy way out there is to unconditionally flush the entire
-machine in flush_tlb*() when that happens.
+KyongHo.
