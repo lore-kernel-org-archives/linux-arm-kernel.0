@@ -1,289 +1,134 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 14 Mar 2014 14:26:10 +0900
-Subject: [PATCH v6 5/7] arm64: ftrace: Add dynamic ftrace support
-In-Reply-To: <20140313181033.GH25472@mudshark.cambridge.arm.com>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-6-git-send-email-takahiro.akashi@linaro.org>
- <20140313181033.GH25472@mudshark.cambridge.arm.com>
-Message-ID: <532292F2.1000306@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Mar 2014 22:39:37 -0700
+Subject: [PATCH] ARM: shmobile: Break out R-Car SYSC PM code
+In-Reply-To: <CANqRtoQTvnHBjM2eQccAJWCddN1LPgjNnd3Q6Gp=iUQkgM7tmQ@mail.gmail.com>
+References: <20140115074308.8471.64824.sendpatchset@w520>
+ <CAOesGMjaTB-kBrm1av0uc8N-+4TRBZm5fxjJbsZLJe5OuqLu+g@mail.gmail.com>
+ <CANqRtoRMkezRZvoH4Q1T3mwwhU9T=ZOFVGE5KN+sLBEqpXO=mg@mail.gmail.com>
+ <CANqRtoQ2PDb5siknAndO3TgDghgTKPVa-ez-t2eQDcypDnsJTw@mail.gmail.com>
+ <20140309052210.GB12854@quad.lixom.net>
+ <CANqRtoQx16qgC-5wxi_SPDKMy+qztt-aTTa7TEY04+aT4a1=wA@mail.gmail.com>
+ <CAOesGMg9Abd_JwLLjyDARmFzuN3Kh=HsZMmcS1mfncdEdOOUww@mail.gmail.com>
+ <CANqRtoQTvnHBjM2eQccAJWCddN1LPgjNnd3Q6Gp=iUQkgM7tmQ@mail.gmail.com>
+Message-ID: <20140314053937.GA11610@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 03:10 AM, Will Deacon wrote:
-> On Thu, Mar 13, 2014 at 10:13:48AM +0000, AKASHI Takahiro wrote:
->> This patch allows "dynamic ftrace" if CONFIG_DYNAMIC_FTRACE is enabled.
->> Here we can turn on and off tracing dynamically per-function base.
->>
->> On arm64, this is done by patching single branch instruction to _mcount()
->> inserted by gcc -pg option. The branch is replaced to NOP initially at
->> kernel start up, and later on, NOP to branch to ftrace_caller() when
->> enabled or branch to NOP when disabled.
->> Please note that ftrace_caller() is a counterpart of _mcount() in case of
->> 'static' ftrace.
->>
->> More details on architecture specific requirements are described in
->> Documentation/trace/ftrace-design.txt.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/Kconfig               |    1 +
->>   arch/arm64/include/asm/ftrace.h  |   15 +++++
->>   arch/arm64/kernel/entry-ftrace.S |   43 +++++++++++++++
->>   arch/arm64/kernel/ftrace.c       |  113 ++++++++++++++++++++++++++++++++++++++
->>   4 files changed, 172 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 6b3fef6..6954959 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -33,6 +33,7 @@ config ARM64
->>   	select HAVE_DMA_API_DEBUG
->>   	select HAVE_DMA_ATTRS
->>   	select HAVE_DMA_CONTIGUOUS
->> +	select HAVE_DYNAMIC_FTRACE
->>   	select HAVE_EFFICIENT_UNALIGNED_ACCESS
->>   	select HAVE_FTRACE_MCOUNT_RECORD
->>   	select HAVE_FUNCTION_TRACER
->> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->> index 58ea595..ed5c448 100644
->> --- a/arch/arm64/include/asm/ftrace.h
->> +++ b/arch/arm64/include/asm/ftrace.h
->> @@ -18,6 +18,21 @@
->>
->>   #ifndef __ASSEMBLY__
->>   extern void _mcount(unsigned long);
->> +
->> +struct dyn_arch_ftrace {
->> +	/* No extra data needed for arm64 */
->> +};
->> +
->> +extern unsigned long ftrace_graph_call;
->> +
->> +static inline unsigned long ftrace_call_adjust(unsigned long addr)
->> +{
->> +	/*
->> +	 * addr is the address of the mcount call instruction.
->> +	 * recordmcount does the necessary offset calculation.
->> +	 */
->> +	return addr;
->> +}
->
-> You could just as easily implement this as a dummy macro, but I guess it
-> doesn't matter either way.
+On Thu, Mar 13, 2014 at 10:02:03AM +0900, Magnus Damm wrote:
+> On Thu, Mar 13, 2014 at 9:04 AM, Olof Johansson <olof@lixom.net> wrote:
+> > On Wed, Mar 12, 2014 at 3:26 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >> On Sun, Mar 9, 2014 at 2:22 PM, Olof Johansson <olof@lixom.net> wrote:
+> >>> On Tue, Feb 25, 2014 at 11:09:52AM +0900, Magnus Damm wrote:
+> >>>> Hi Olof,
+> >>>>
+> >>>> On Thu, Feb 20, 2014 at 6:45 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >>>> > On Thu, Feb 20, 2014 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
+> >>>> >> I spotted this patch since it adds new include/mach contents, comment below:
+> >>>> >>
+> >>>> >> On Tue, Jan 14, 2014 at 11:43 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >>>> >>
+> >>>> >>> --- /dev/null
+> >>>> >>> +++ work/arch/arm/mach-shmobile/include/mach/pm-rcar.h  2014-01-15 13:30:38.000000000 +0900
+> >>>> >>> @@ -0,0 +1,15 @@
+> >>>> >>> +#ifndef PM_RCAR_H
+> >>>> >>> +#define PM_RCAR_H
+> >>>> >>> +
+> >>>> >>> +struct rcar_sysc_ch {
+> >>>> >>> +       unsigned long chan_offs;
+> >>>> >>> +       unsigned int chan_bit;
+> >>>> >>> +       unsigned int isr_bit;
+> >>>> >>> +};
+> >>>> >>> +
+> >>>> >>> +int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch);
+> >>>> >>> +int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch);
+> >>>> >>> +bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch);
+> >>>> >>> +void __iomem *rcar_sysc_init(phys_addr_t base);
+> >>>> >>> +
+> >>>> >>> +#endif /* PM_RCAR_H */
+> >>>> >>
+> >>>> >>
+> >>>> >> These prototypes are only ever used by code in arch/arm/mach-shmobile,
+> >>>> >> right? There's no reason to expose it to the global include namespace,
+> >>>> >> and you'll just have to remove it when the platform is converted to
+> >>>> >> multiplatform.
+> >>>> >>
+> >>>> >> So, I suggest moving this to be at arch/arm/mach-shmobile/pm-rcar.h
+> >>>> >> instead (and included as "pm-rcar.h" instead of <mach/pm-rcar.h>).
+> >>>> >
+> >>>> > Thanks for your help with the patches! You are right that these are
+> >>>> > never used outside mach-shmobile, and moving headers out of "mach"
+> >>>> > certainly makes sense.
+> >>>>
+> >>>> FYI, the following series includes my attempt to address this issue:
+> >>>>
+> >>>> [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
+> >>>> [PATCH 01/12] ARM: shmobile: Add temporary include workaround
+> >>>> [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
+> >>>> [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
+> >>>> [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
+> >>>> [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
+> >>>> [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
+> >>>> [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
+> >>>> [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
+> >>>> [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
+> >>>> [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
+> >>>> [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
+> >>>> [PATCH 12/12] ARM: shmobile: Rework include path for common bits
+> >>>>
+> >>>> If you would like me to rework the code somehow then please let me
+> >>>> know. I also intend to ask a different developer to convert the actual
+> >>>> boards once these changes have been merged by Simon, hope this is a
+> >>>> good way forward for you.
+> >>>
+> >>> It certainly looks like a good way forward, thanks for doing this.
+> >>
+> >> Ok, thanks. The list of patches above is the first step forward from my side.
+> >>
+> >> I'm afraid that I'm a bit confused by your comments in thread:
+> >> "Re: [PATCH v2] ARM: shmobile: Add temporary include workaround"
+> >>
+> >> The single v2 patch on the line above is just a bug fixed version of [01/12].
+> >>
+> >> Can you please clarify if you're ok with the series or if you want me
+> >> to rework it somehow?
+> >
+> > Oh, yeah, that's confusing -- my "looks good, please go ahead" was for
+> > patch 2-12, I don't think you actually need 1/12 at this time since
+> > you move the include file over and change the include statements in
+> > the same time in the other 11 patches?
+> 
+> My current set of patches do not move the location of the include file
+> just yet. The reason for this is that this series targets SoC code
+> only, but both board files and SoC files use the same header files. So
+> until all files are converted the workaround is needed.
 
-FYI, all archs define this as an inline function.
-Leave it as it is.
+Oh, my bad. When I saw the change from <mach/file.h> to "file.h", I missed that
+there was no diff move that accompanied it.
 
->>   #endif /* __ASSEMBLY__ */
->>
->>   #endif /* __ASM_FTRACE_H */
->> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
->> index 0ac31c8..c0fbe10 100644
->> --- a/arch/arm64/kernel/entry-ftrace.S
->> +++ b/arch/arm64/kernel/entry-ftrace.S
->> @@ -86,6 +86,7 @@
->>   	add	\reg, \reg, #8
->>   	.endm
->>
->> +#ifndef CONFIG_DYNAMIC_FTRACE
->>   /*
->>    * void _mcount(unsigned long return_address)
->>    * @return_address: return address to instrumented function
->> @@ -134,6 +135,48 @@ skip_ftrace_call:
->>   #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
->>   ENDPROC(_mcount)
->>
->> +#else /* CONFIG_DYNAMIC_FTRACE */
->> +/*
->> + * _mcount() is used to build the kernel with -pg option, but all the branch
->> + * instructions to _mcount() are replaced to NOP initially at kernel start up,
->> + * and later on, NOP to branch to ftrace_caller() when enabled or branch to
->> + * NOP when disabled per-function base.
->> + */
->> +ENTRY(_mcount)
->> +	ret
->> +ENDPROC(_mcount)
->
-> Judging by your comment then, this should never be called. Is that right? If
-> so, we could add a BUG-equivalent so we know if we missed an mcount during
-> patching.
+> I'd be happy to adjust the patches to fit your recommendation and move
+> the header file in the same patch. But then I need to touch both SoC
+> code and board code in the same patch - which is fine - but I would
+> like to know what branch to target if so.
 
-Steven explained this.
+We're still talking mostly about code under mach-shmobile though, right?
+I think most of these header files are only actually used underneath of there.
 
->> +/*
->> + * void ftrace_caller(unsigned long return_address)
->> + * @return_address: return address to instrumented function
->> + *
->> + * This function is a counterpart of _mcount() in 'static' ftrace, and
->> + * makes calls to:
->> + *     - tracer function to probe instrumented function's entry,
->> + *     - ftrace_graph_caller to set up an exit hook
->> + */
->> +ENTRY(ftrace_caller)
->> +	mcount_enter
->> +
->> +	mcount_get_pc0	x0		//     function's pc
->> +	mcount_get_lr	x1		//     function's lr
->> +
->> +	.global ftrace_call
->> +ftrace_call:				// tracer(pc, lr);
->> +	nop				// This will be replaced with "bl xxx"
->> +					// where xxx can be any kind of tracer.
->> +
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +	.global ftrace_graph_call
->> +ftrace_graph_call:			// ftrace_graph_caller();
->> +	nop				// If enabled, this will be replaced
->> +					// "b ftrace_graph_caller"
->> +#endif
->> +
->> +	mcount_exit
->> +ENDPROC(ftrace_caller)
->> +#endif /* CONFIG_DYNAMIC_FTRACE */
->> +
->>   ENTRY(ftrace_stub)
->>   	ret
->>   ENDPROC(ftrace_stub)
->> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
->> index a559ab8..8c26476 100644
->> --- a/arch/arm64/kernel/ftrace.c
->> +++ b/arch/arm64/kernel/ftrace.c
->> @@ -17,6 +17,89 @@
->>   #include <asm/ftrace.h>
->>   #include <asm/insn.h>
->>
->> +#ifdef CONFIG_DYNAMIC_FTRACE
->> +/*
->> + * Replace a single instruction, which may be a branch or NOP.
->> + * If @validate == true, a replaced instruction is checked against 'old'.
->> + */
->> +static int ftrace_modify_code(unsigned long pc, unsigned int old,
->> +			      unsigned int new, bool validate)
->> +{
->> +	unsigned int replaced;
->
-> u32 is a bit clearer for instructions.
+If so, then it's fine to just do it in one branch. The rules for how we sort
+our branches are guidelines, and where it doesn't make sense to follow them, we
+don't. :)
 
-Fix it.
+> So how would you like to consume this cleanup? And when? =)
 
->> +	/*
->> +	 * Note:
->> +	 * Due to modules and __init, code can disappear and change,
->> +	 * we need to protect against faulting as well as code changing.
->> +	 * We do this by aarch64_insn_*() which use the probe_kernel_*().
->> +	 *
->> +	 * No lock is held here because all the modifications are run
->> +	 * through stop_machine().
->> +	 */
->> +	if (validate) {
->> +		if (aarch64_insn_read((void *)pc, &replaced))
->> +			return -EFAULT;
->> +
->> +		if (replaced != old)
->> +			return -EINVAL;
->> +	}
->> +	if (aarch64_insn_patch_text_nosync((void *)pc, new))
->> +		return -EPERM;
->
-> I think you're better off propagating the errors here, rather than
-> overriding them with EFAULT/EINVAL/EPERM.
+For something like this, that has a build-time possibility to check for
+introduced breakage (i.e. no likelihood for some strange random regression at
+runtime), I'm OK with the patches coming in late. I.e. there's time for 3.15 if
+you want to try getting it in. If not, we can queue it up as a base branch for
+any other changes for 3.16.
 
-Steven explained this.
+As far as how to consume it: send a branch with these patches on there, we'll
+merge it in. If it's relatively conflict-free we'll do it under next/clenaup
+for early merge, otherwise we'll save it for the end of our branches, etc. It'd
+be a great cleanup to get merged so we'll make it work somehow!
 
->> +
->> +	return 0;
->> +}
->> +
->> +/*
->> + * Replace tracer function in ftrace_caller()
->> + */
->> +int ftrace_update_ftrace_func(ftrace_func_t func)
->> +{
->> +	unsigned long pc;
->> +	unsigned int new;
->> +
->> +	pc = (unsigned long)&ftrace_call;
->> +	new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func, true);
->> +
->> +	return ftrace_modify_code(pc, 0, new, false);
->> +}
->> +
->> +/*
->> + * Turn on the call to ftrace_caller() in instrumented function
->> + */
->> +int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->> +{
->> +	unsigned long pc = rec->ip;
->> +	unsigned int old, new;
->> +
->> +	old = aarch64_insn_gen_nop();
->> +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
->> +
->> +	return ftrace_modify_code(pc, old, new, true);
->> +}
->> +
->> +/*
->> + * Turn off the call to ftrace_caller() in instrumented function
->> + */
->> +int ftrace_make_nop(struct module *mod,
->> +		    struct dyn_ftrace *rec, unsigned long addr)
->> +{
->> +	unsigned long pc = rec->ip;
->> +	unsigned int old, new;
->> +
->> +	old = aarch64_insn_gen_branch_imm(pc, addr, true);
->> +	new = aarch64_insn_gen_nop();
->> +
->> +	return ftrace_modify_code(pc, old, new, true);
->> +}
->> +
->> +int __init ftrace_dyn_arch_init(void *data)
->> +{
->> +	*(unsigned long *)data = 0;
->> +
->> +	return 0;
->> +}
->> +#endif /* CONFIG_DYNAMIC_FTRACE */
->> +
->>   #ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>   /*
->>    * function_graph tracer expects ftrace_return_to_handler() to be called
->> @@ -61,4 +144,34 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
->>   		return;
->>   	}
->>   }
->> +
->> +#ifdef CONFIG_DYNAMIC_FTRACE
->> +/*
->> + * Turn on/off the call to ftrace_graph_caller() in ftrace_caller()
->> + * depending on @enable.
->> + */
->> +static int ftrace_modify_graph_caller(bool enable)
->> +{
->> +	unsigned long pc = (unsigned long)&ftrace_graph_call;
->> +	unsigned int branch, nop, old, new;
->> +
->> +	branch = aarch64_insn_gen_branch_imm(pc,
->> +			(unsigned long)ftrace_graph_caller, false);
->> +	nop = aarch64_insn_gen_nop();
->> +	old = enable ? nop : branch;
->> +	new = enable ? branch : nop;
->> +
->> +	return ftrace_modify_code(pc, old, new, true);
->
-> You could rewrite this as:
->
-> 	if (enable)
-> 		return ftrace_modify_code(pc, nop, branch, true);
-> 	else
-> 		return ftrace_modify_code(pc, branch, nop, true);
->
-> which I find easier to read.
 
-Yep, fix it.
-
--Takahiro AKASHI
-
-> Will
->
+-Olof
