@@ -1,43 +1,80 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 14 Mar 2014 19:11:04 +0100
-Subject: [PATCH 3/3] spi: psdev: add passive serial driver
-In-Reply-To: <CACRpkdZoO_hXw-p5ZHeUzMHULq_DEJNzpim0mcO5DBOgP=d60A@mail.gmail.com>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
- <20140312163427.GV28112@sirena.org.uk>
- <20140314101907.GF4234@pengutronix.de>
- <20140314102223.GR366@sirena.org.uk>
- <CACRpkdZoO_hXw-p5ZHeUzMHULq_DEJNzpim0mcO5DBOgP=d60A@mail.gmail.com>
-Message-ID: <20140314181104.GA32765@pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 14 Mar 2014 19:20:58 +0100
+Subject: [PATCH 1/2] ata: ahci_st: build fixes
+Message-ID: <1848075.ERJNt1KrUa@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 02:59:47PM +0100, Linus Walleij wrote:
-> On Fri, Mar 14, 2014 at 11:22 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Fri, Mar 14, 2014 at 11:19:07AM +0100, Michael Grzeschik wrote:
-> >
-> >> It is actually not more than that. I took the spidev character device
-> >> driver as reference implementation. Any Idea where to put this driver
-> >> instead.
-> >
-> > Like I say somewhere where it sits with other FPGA programming stuff (if
-> > that's what it does) would be my first thought.
-> 
-> I'd suggest you try to use drivers/firmware.
-> 
-> That subsystem is a bit x86-centrix at the moment but looking at the
-> stuff that is in there (like supporting BIOS updates through sysfs and
-> other low-level firmware communication) this stuff is close enough.
+* The config option for ahci_st driver was renamed from
+  CONFIG_SATA_AHCI_ST to CONFIG_AHCI_ST but Makefile was
+  not updated.  Fix it (also while at it move the ahci_st
+  driver entry below ahci_imx and ahci_sunxi ones).
 
-Indeed, the directory could need some refurbishing. It is also not even
-sourced by drivers/Kconfig but instead by the architectures that depend
-on it. Beside that, it seems to be the place to be.
+* Fix a few build issues in the ahci_st driver itself.
 
-Thanks,
-Michael
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/ata/Makefile  |    2 +-
+ drivers/ata/ahci_st.c |   12 +++++-------
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Index: b/drivers/ata/Makefile
+===================================================================
+--- a/drivers/ata/Makefile	2014-03-14 16:45:04.036724382 +0100
++++ b/drivers/ata/Makefile	2014-03-14 19:07:02.304579137 +0100
+@@ -5,7 +5,6 @@ obj-$(CONFIG_ATA)		+= libata.o
+ obj-$(CONFIG_SATA_AHCI)		+= ahci.o libahci.o
+ obj-$(CONFIG_SATA_ACARD_AHCI)	+= acard-ahci.o libahci.o
+ obj-$(CONFIG_SATA_AHCI_PLATFORM) += ahci_platform.o libahci.o
+-obj-$(CONFIG_SATA_AHCI_ST)      += ahci_st.o
+ obj-$(CONFIG_SATA_FSL)		+= sata_fsl.o
+ obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
+ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+@@ -13,6 +12,7 @@ obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460e
+ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+ obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
+ obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o
++obj-$(CONFIG_AHCI_ST)		+= ahci_st.o
+ 
+ # SFF w/ custom DMA
+ obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
+Index: b/drivers/ata/ahci_st.c
+===================================================================
+--- a/drivers/ata/ahci_st.c	2014-03-14 19:03:11.368583073 +0100
++++ b/drivers/ata/ahci_st.c	2014-03-14 19:13:53.900572116 +0100
+@@ -87,7 +87,7 @@ static int st_ahci_deassert_resets(struc
+ 	return 0;
+ }
+ 
+-static int st_ahci_exit(struct device *dev)
++static void st_ahci_exit(struct device *dev)
+ {
+ 	struct st_ahci_drv_data *drv_data = dev_get_drvdata(dev);
+ 	struct ahci_host_priv *hpriv = drv_data->hpriv;
+@@ -96,12 +96,10 @@ static int st_ahci_exit(struct device *d
+ 	if (drv_data->pwr) {
+ 		err = reset_control_assert(drv_data->pwr);
+ 		if (err)
+-			dev_err(&pdev->dev, "unable to pwrdwn\n");
++			dev_err(dev, "unable to pwrdwn\n");
+ 	}
+ 
+ 	ahci_platform_disable_resources(hpriv);
+-
+-	return 0;
+ }
+ 
+ static int st_ahci_probe_resets(struct platform_device *pdev)
+@@ -186,9 +184,9 @@ static int st_ahci_suspend(struct device
+ 	struct ahci_host_priv *hpriv = drv_data->hpriv;
+ 	int err;
+ 
+-	ret = ahci_platform_suspend_host(dev);
+-	if (ret)
+-		return ret;
++	err = ahci_platform_suspend_host(dev);
++	if (err)
++		return err;
+ 
+ 	if (drv_data->pwr) {
+ 		err = reset_control_assert(drv_data->pwr);
