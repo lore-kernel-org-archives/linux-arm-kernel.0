@@ -1,26 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 14 Mar 2014 09:28:12 +0900
-Subject: [PATCH 0/2] ARM: shmobile: koelsch, lager: Annotate clk_names
- with __initconst
-In-Reply-To: <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
-References: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
-Message-ID: <20140314002811.GC28137@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 14 Mar 2014 09:34:08 +0900
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Clock Updates for
+ v3.15
+Message-ID: <cover.1394757110.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 09:28:23AM +0100, Geert Uytterhoeven wrote:
-> On Thu, Mar 13, 2014 at 7:29 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add __initconst annotations to recently added clk_names.
-> >
-> > Depends on
-> > "[PATCH v2 00/03] ARM: shmobile: Break out and extend clock workaround V2"
-> >
-> > Simon Horman (2):
-> >   ARM: shmobile: koelsch: Annotate clk_names with __initconst
-> >   ARM: shmobile: lager: Annotate clk_names with __initconst
-> 
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Thanks, I will queue these up.
+Please consider this fourth round of
+Renesas ARM based SoC clock updates for v3.15.
+
+I am sending this pull request after the release of v3.14-rc6
+as it only includes a fix.
+
+This pull request is based on the previous round of
+such requests, tagged as renesas-clock3-for-v3.15,
+which I have already sent a pull-request for.
+
+
+The following changes since commit d93023f81d2c79595e64e4f516f03af4e4c73c13:
+
+  ARM: shmobile: r7s72100: fix bus clock calculation (2014-03-06 13:22:02 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock4-for-v3.15
+
+for you to fetch changes up to a51a9d67ba061c1263d078c27e8a3020d61fe236:
+
+  ARM: shmobile: r8a7791: Fix SCIFA3-5 clocks (2014-03-13 10:37:14 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM Based SoC Clock Updates for v3.15
+
+r8a7791 (R-Car M2) SoC
+* Correct SCIFA3-5 clocks
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: r8a7791: Fix SCIFA3-5 clocks
+
+ arch/arm/mach-shmobile/clock-r8a7791.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
