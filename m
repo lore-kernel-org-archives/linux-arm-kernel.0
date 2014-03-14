@@ -1,129 +1,67 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 14 Mar 2014 02:37:06 +0100
-Subject: [PATCH 3/3 V4] crypto: Simplify the ahash_finup implementation
-In-Reply-To: <1394761026-7292-1-git-send-email-marex@denx.de>
-References: <1394761026-7292-1-git-send-email-marex@denx.de>
-Message-ID: <1394761026-7292-3-git-send-email-marex@denx.de>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 13 Mar 2014 18:53:59 -0700
+Subject: [PATCH 1/2] arm64: Implement custom mmap functions for dma mapping
+In-Reply-To: <20140313174915.GN30339@arm.com>
+References: <1394732716-11507-1-git-send-email-lauraa@codeaurora.org>
+ <20140313174915.GN30339@arm.com>
+Message-ID: <53226137.3070404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahash_def_finup() can make use of the request save/restore functions,
-thus make it so. This simplifies the code a little and unifies the code
-paths.
+On 3/13/2014 10:49 AM, Catalin Marinas wrote:
+> On Thu, Mar 13, 2014 at 05:45:15PM +0000, Laura Abbott wrote:
+>> +/* vma->vm_page_prot must be set appropriately before calling this function */
+>> +static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+>> +			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
+>> +{
+>> +	int ret = -ENXIO;
+>> +	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
+>> +					PAGE_SHIFT;
+>> +	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>> +	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
+>> +	unsigned long off = vma->vm_pgoff;
+>> +
+>> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>> +		return ret;
+>> +
+>> +	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
+>> +		ret = remap_pfn_range(vma, vma->vm_start,
+>> +				      pfn + off,
+>> +				      vma->vm_end - vma->vm_start,
+>> +				      vma->vm_page_prot);
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int arm64_swiotlb_mmap_noncoherent(struct device *dev,
+>> +		struct vm_area_struct *vma,
+>> +		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>> +		struct dma_attrs *attrs)
+>> +{
+>> +	/* Just use whatever page_prot attributes were specified */
+>> +	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+>> +}
+>> +
+>> +static int arm64_swiotlb_mmap_coherent(struct device *dev,
+>> +		struct vm_area_struct *vma,
+>> +		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>> +		struct dma_attrs *attrs)
+>> +{
+>> +	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
+>> +	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+>> +}
+>
+> So I think we got the naming the other way around. The
+> noncoherent_dma_ops assume that the DMA is non-coherent and therefore
+> must change the pgprot.
 
-Note that the same remark about free()ing the req->priv applies here, the
-req->priv can only be free()'d after the original request was restored.
+I spent way too long convincing myself this was right and I was still 
+wrong. I'll fix it up for v2 (I have one more patch I need to put in for 
+CMA integration as well)
 
-Finally, squash a bug in the invocation of completion in the ASYNC path.
-In both ahash_def_finup_done{1,2}, the function areq->base.complete(X, err);
-was called with X=areq->base.data . This is incorrect , as X=&areq->base
-is the correct value. By analysis of the data structures, we see the areq is
-of type 'struct ahash_request' , areq->base is of type 'struct crypto_async_request'
-and areq->base.completion is of type crypto_completion_t, which is defined in
-include/linux/crypto.h as:
-
-  typedef void (*crypto_completion_t)(struct crypto_async_request *req, int err);
-
-This is one lead that the X should be &areq->base . Next up, we can inspect
-other code which calls the completion callback to give us kind-of statistical
-idea of how this callback is used. We can try:
-
-  $ git grep base\.complete\( drivers/crypto/
-
-Finally, by inspecting ahash_request_set_callback() implementation defined
-in include/crypto/hash.h , we observe that the .data entry of 'struct
-crypto_async_request' is intended for arbitrary data, not for completion
-argument.
-
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Tom Lendacky <thomas.lendacky@amd.com>
----
- crypto/ahash.c | 36 +++++++++---------------------------
- 1 file changed, 9 insertions(+), 27 deletions(-)
-
-V2: Same as with 1/3 V2, move the restoration and freeing of the private
-    data right past memcpy() of the buffer.
-V3: - Swap the names of req<->areq variables to be consistent with the rest
-      of the crypto API again.
-    - Squash another bug in areq->base.complete(X, err); invocation, see the
-      commit message, which was augmented with the last paragraph.
-V4: Rebase, no functional change.
-
-diff --git a/crypto/ahash.c b/crypto/ahash.c
-index fcc6077..6e72233 100644
---- a/crypto/ahash.c
-+++ b/crypto/ahash.c
-@@ -349,19 +349,16 @@ static void ahash_def_finup_finish2(struct ahash_request *req, int err)
- 		memcpy(priv->result, req->result,
- 		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
- 
--	kzfree(priv);
-+	ahash_restore_req(req);
- }
- 
- static void ahash_def_finup_done2(struct crypto_async_request *req, int err)
- {
- 	struct ahash_request *areq = req->data;
--	struct ahash_request_priv *priv = areq->priv;
--	crypto_completion_t complete = priv->complete;
--	void *data = priv->data;
- 
- 	ahash_def_finup_finish2(areq, err);
- 
--	complete(data, err);
-+	areq->base.complete(&areq->base, err);
- }
- 
- static int ahash_def_finup_finish1(struct ahash_request *req, int err)
-@@ -381,38 +378,23 @@ out:
- static void ahash_def_finup_done1(struct crypto_async_request *req, int err)
- {
- 	struct ahash_request *areq = req->data;
--	struct ahash_request_priv *priv = areq->priv;
--	crypto_completion_t complete = priv->complete;
--	void *data = priv->data;
- 
- 	err = ahash_def_finup_finish1(areq, err);
- 
--	complete(data, err);
-+	areq->base.complete(&areq->base, err);
- }
- 
- static int ahash_def_finup(struct ahash_request *req)
- {
- 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
--	unsigned long alignmask = crypto_ahash_alignmask(tfm);
--	unsigned int ds = crypto_ahash_digestsize(tfm);
--	struct ahash_request_priv *priv;
--
--	priv = kmalloc(sizeof(*priv) + ahash_align_buffer_size(ds, alignmask),
--		       (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
--		       GFP_KERNEL : GFP_ATOMIC);
--	if (!priv)
--		return -ENOMEM;
--
--	priv->result = req->result;
--	priv->complete = req->base.complete;
--	priv->data = req->base.data;
-+	int err;
- 
--	req->result = PTR_ALIGN((u8 *)priv->ubuf, alignmask + 1);
--	req->base.complete = ahash_def_finup_done1;
--	req->base.data = req;
--	req->priv = priv;
-+	err = ahash_save_req(req, ahash_def_finup_done1);
-+	if (err)
-+		return err;
- 
--	return ahash_def_finup_finish1(req, tfm->update(req));
-+	err = tfm->update(req);
-+	return ahash_def_finup_finish1(req, err);
- }
- 
- static int ahash_no_export(struct ahash_request *req, void *out)
+Thanks,
+Laura
 -- 
-1.8.5.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
