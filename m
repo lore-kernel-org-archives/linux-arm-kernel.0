@@ -1,63 +1,35 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 14 Mar 2014 18:23:54 +0530
-Subject: [PATCH 1/1] clk: exynos5420: Register APLL rate table
-Message-ID: <1394801634-887-1-git-send-email-sachin.kamat@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 14 Mar 2014 13:05:52 +0000
+Subject: [PATCH 1/2] ARM: DT: fix gic interrupt controller documentation
+In-Reply-To: <20140313182554.GA15990@obsidianresearch.com>
+References: <1394732405-2260-1-git-send-email-tharvey@gateworks.com>
+ <1394732405-2260-2-git-send-email-tharvey@gateworks.com>
+ <5321EE81.1030207@wwwdotorg.org>
+ <20140313182554.GA15990@obsidianresearch.com>
+Message-ID: <CACxGe6sEjW+J1ZHq-qb=7yPWLEnfWkSxZvwHUVO3L9vL5rsm1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register APLL rate table in Exynos5420 clock driver.
-Will be required for the CPUFreq driver.
+On Thu, Mar 13, 2014 at 6:25 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Thu, Mar 13, 2014 at 11:44:33AM -0600, Stephen Warren wrote:
+>> On 03/13/2014 11:40 AM, Tim Harvey wrote:
+>> > When using interrupt-maps, the size of a map entry is #address-cells +
+>> >  #interrupt-cells for the parent interrupt controller.  For the ARM GIC
+>> > address-cells should be 0 as this is not used.
+>> >
+>> > This patch fixes the example by correctly specifying #address-cells = 0.
+>>
+>> If the #address-cells property is required (well, or even optional...)
+>> in the node, shouldn't it be included in the list of required/optional
+>> properties above, and not solely included in the example?
+>
+> AFAIK, #address-cells = 0 is the same as not including a
+> #address-cells at all.
+>
+> Omitting entirely is what other interrupt-controller bindings are
+> doing, so I'd just drop mention of #address-cells completely.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/clk/samsung/clk-exynos5420.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Correct. Just drop it.
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 7fd6bea467fd..358513724adc 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -775,6 +775,30 @@ static struct of_device_id ext_clk_match[] __initdata = {
- 	{ },
- };
- 
-+static const struct samsung_pll_rate_table apll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_35XX_RATE(rate, m, p, s) */
-+	PLL_35XX_RATE(2000000000, 250, 3, 0),
-+	PLL_35XX_RATE(1900000000, 475, 6, 0),
-+	PLL_35XX_RATE(1800000000, 225, 3, 0),
-+	PLL_35XX_RATE(1700000000, 425, 6, 0),
-+	PLL_35XX_RATE(1600000000, 200, 3, 0),
-+	PLL_35XX_RATE(1500000000, 250, 4, 0),
-+	PLL_35XX_RATE(1400000000, 175, 3, 0),
-+	PLL_35XX_RATE(1300000000, 325, 6, 0),
-+	PLL_35XX_RATE(1200000000, 200, 2, 1),
-+	PLL_35XX_RATE(1100000000, 275, 3, 1),
-+	PLL_35XX_RATE(1000000000, 250, 3, 1),
-+	PLL_35XX_RATE(900000000, 150, 2, 1),
-+	PLL_35XX_RATE(800000000, 200, 3, 1),
-+	PLL_35XX_RATE(700000000, 175, 3, 1),
-+	PLL_35XX_RATE(600000000, 200, 2, 2),
-+	PLL_35XX_RATE(500000000, 250, 3, 2),
-+	PLL_35XX_RATE(400000000, 200, 3, 2),
-+	PLL_35XX_RATE(300000000, 200, 2, 3),
-+	PLL_35XX_RATE(200000000, 200, 3, 3),
-+};
-+
- /* register exynos5420 clocks */
- static void __init exynos5420_clk_init(struct device_node *np)
- {
-@@ -790,6 +814,10 @@ static void __init exynos5420_clk_init(struct device_node *np)
- 	samsung_clk_of_register_fixed_ext(exynos5420_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5420_fixed_rate_ext_clks),
- 			ext_clk_match);
-+
-+	if (_get_rate("fin_pll") == 24 * MHZ)
-+		exynos5420_plls[apll].rate_table = apll_24mhz_tbl;
-+
- 	samsung_clk_register_pll(exynos5420_plls, ARRAY_SIZE(exynos5420_plls),
- 					reg_base);
- 	samsung_clk_register_fixed_rate(exynos5420_fixed_rate_clks,
--- 
-1.7.9.5
+g.
