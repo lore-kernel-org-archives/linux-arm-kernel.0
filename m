@@ -1,48 +1,36 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Mar 2014 14:43:42 +0100
-Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
- gate clocks
-In-Reply-To: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
-References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
-Message-ID: <5323078E.4060903@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 14:54:00 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <5322F82A.9000507@ahsoftware.de>
+References: <5316FFCE.1060603@ti.com>
+ <1394018461-757-1-git-send-email-holler@ahsoftware.de>
+ <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
+ <5322D529.4070904@ahsoftware.de>
+ <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
+ <5322F82A.9000507@ahsoftware.de>
+Message-ID: <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+On Fri, Mar 14, 2014 at 1:38 PM, Alexander Holler <holler@ahsoftware.de> wrote:
 
-On 14.03.2014 06:09, Cho KyongHo wrote:
-> exynos-iommu driver must care about master H/W's gate clock as well as
-> System MMU's gate clock. To enhance readability of the source code,
-> macros to gate/ungate those clocks are defined.
+>> In that case it is hardly a fix that we need to rush out to the entire
+>> world.
 >
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->   drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
->   1 file changed, 22 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 71e77f1..cef62d0 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -101,6 +101,16 @@
->   #define REG_PB1_SADDR		0x054
->   #define REG_PB1_EADDR		0x058
->
-> +#define __clk_gate_ctrl(data, clk, en)	do {		\
-> +		if (data->clk)				\
-> +			clk_##en##able(data->clk);	\
-> +	} while (0)
-> +
-> +#define __sysmmu_clk_enable(data)	__clk_gate_ctrl(data, clk, en)
-> +#define __sysmmu_clk_disable(data)	__clk_gate_ctrl(data, clk, dis)
-> +#define __master_clk_enable(data)	__clk_gate_ctrl(data, clk_master, en)
-> +#define __master_clk_disable(data)	__clk_gate_ctrl(data, clk_master, dis)
-> +
+> And I thought the reason for -rc is actually to fix bugs. But I never
+> understood the magical ways and timings patches make their way into
+> mainline. ;)
 
-I'd say that such macros only obfuscate code, without any gains, as you 
-can see in diffstat - this patch adds more lines than it removes.
+OK so it works like this: early in the -rc cycle we fix any bugs, documentation
+or whatever. At this point it's *regressions* so the fix need to fix something
+that broke in the merge window (or an earlier merge window).
 
-Please drop this change.
+If it is a new feature that never worked in the first place I would
+not call that
+a regression. There are no existing users out there that can experience
+regressions from a previously working system.
 
-Best regards,
-Tomasz
+So this is why I'm a bit conservative.
+
+Yours,
+Linus Walleij
