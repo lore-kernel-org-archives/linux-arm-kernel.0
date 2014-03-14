@@ -1,36 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 14 Mar 2014 10:22:23 +0000
-Subject: [PATCH 3/3] spi: psdev: add passive serial driver
-In-Reply-To: <20140314101907.GF4234@pengutronix.de>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
- <20140312163427.GV28112@sirena.org.uk>
- <20140314101907.GF4234@pengutronix.de>
-Message-ID: <20140314102223.GR366@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 11:35:12 +0100
+Subject: [PATCH] pinctrl: at91: add the config GPIO_OUTPUT_x
+In-Reply-To: <531F49C3.2020506@atmel.com>
+References: <1393984400-14687-1-git-send-email-wenyou.yang@atmel.com>
+ <531F49C3.2020506@atmel.com>
+Message-ID: <CACRpkdYTq0UmJ0JwzwHLjK8Qa=svoLtqxmm6+ntRnnD_NstCrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 11:19:07AM +0100, Michael Grzeschik wrote:
+On Tue, Mar 11, 2014 at 6:37 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> Second, the driver has "per se" nothing to do with SPI, beside it needs
-> a clock and data line to transfer an image to the FPGA. (One way,
-> therefor: passive). It needs to use some SPI controller to do that. Even
-> the SPI Bitbang driver. Because of this, it depends on the SPI
-> framework.
+> Linus,
+>
+> For the nature of this feature, I would like to have your clear advice
+> as this is needed and has been proposed twice (at least). This feature
+> is needed for power management states of GPIOs.
 
-Lots of drivers use SPI but they sit in the relevant frameworks rather
-than in the SPI framework.
+It seems that this is aligned with what other pin control drivers do
+to move pins to low power states. As long as the same pins are
+never used for "ordinary" GPIO through gpiolib I think doing this is
+just some electric aspect of the pin and controlled by the device using
+it as part of its normal low-power operation. No different from e.g.
+setting a different biasing or decoupling or grounding the pin or whatever.
 
-> It is actually not more than that. I took the spidev character device
-> driver as reference implementation. Any Idea where to put this driver
-> instead.
+The fact that the register or bit(s) are named ...gpio-something... is
+irrelevant if they cannot be accessed as such.
 
-Like I say somewhere where it sits with other FPGA programming stuff (if
-that's what it does) would be my first thought.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/57c1f7d4/attachment-0001.sig>
+If you want to be *really* picky you can start go about to edit
+your gpio-ranges so that it is impossible to cross-reference one of
+these GPIOs to a pin, and thus impossible to use them from the
+GPIO subsystem. (Right now the at91 driver is using
+pinctrl_add_gpio_range() so switch this to using ranges defined
+from the device tree if you are fully migrated to DT.)
+
+Basically this is a system issue, how you guys want to handle the
+AT91 low-power modes.
+
+I think you are three maintainers of AT91:
+
+M:      Andrew Victor <linux@maxim.org.za>
+M:      Nicolas Ferre <nicolas.ferre@atmel.com>
+M:      Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+
+Can you get a majority vote on how you want this to work on AT91?
+If two out of three AT91 maintainers ACK the patch I will apply it, and
+then you three can fight amongst yourselves ;-)
+
+Yours,
+Linus Walleij
