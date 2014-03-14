@@ -1,68 +1,45 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 15 Mar 2014 01:13:52 +0900
-Subject: [PATCH v6 4/7] arm64: Add ftrace support
-In-Reply-To: <20140314100735.GC13541@arm.com>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-5-git-send-email-takahiro.akashi@linaro.org>
- <20140313170834.GE25472@mudshark.cambridge.arm.com>
- <53228959.3040000@linaro.org> <20140314100735.GC13541@arm.com>
-Message-ID: <53232AC0.1020808@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Mar 2014 11:32:15 -0500
+Subject: [PATCH v2 2/4] documentaion: DT: allow a A5 compatible string in
+ global timer
+In-Reply-To: <1394792302-24451-3-git-send-email-matthew.leach@arm.com>
+References: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
+ <1394792302-24451-3-git-send-email-matthew.leach@arm.com>
+Message-ID: <CAL_JsqL89P6YfVCThxXmZic6usxsOERT5kDMj1M54j0fwh-ObQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 07:07 PM, Will Deacon wrote:
-> On Fri, Mar 14, 2014 at 04:45:13AM +0000, AKASHI Takahiro wrote:
->> On 03/14/2014 02:08 AM, Will Deacon wrote:
->>> On Thu, Mar 13, 2014 at 10:13:47AM +0000, AKASHI Takahiro wrote:
->>>> This patch implements arm64 specific part to support function tracers,
->>>> such as function (CONFIG_FUNCTION_TRACER), function_graph
->>>> (CONFIG_FUNCTION_GRAPH_TRACER) and function profiler
->>>> (CONFIG_FUNCTION_PROFILER).
->>>>
->>>> With 'function' tracer, all the functions in the kernel are traced with
->>>> timestamps in ${sysfs}/tracing/trace. If function_graph tracer is
->>>> specified, call graph is generated.
->>>>
->>>> The kernel must be compiled with -pg option so that _mcount() is inserted
->>>> at the beginning of functions. This function is called on every function's
->>>> entry as long as tracing is enabled.
->>>> In addition, function_graph tracer also needs to be able to probe function's
->>>> exit. ftrace_graph_caller() & return_to_handler do this by faking link
->>>> register's value to intercept function's return path.
->>>>
->>>> More details on architecture specific requirements are described in
->>>> Documentation/trace/ftrace-design.txt.
->>>
->>> [...]
->>
->> You seem not to like this statement :-)
+On Fri, Mar 14, 2014 at 5:18 AM, Matthew Leach <matthew.leach@arm.com> wrote:
+> The global timer is present on the Cortex A5. Add a compatibility
+> string to the DT binding to allow a Cortex A5 global timer.
 >
-> Huh? I was just using '[...]' to signify that I'd removed a lot of context
-> (since the code all looked fine there). Otherwise, review emails can get
-> really long.
+> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 
-Please ignore my comment.
+Acked-by: Rob Herring <robh@kernel.org>
 
->>>> +       str     x0, [sp, #-16]!
->>>> +       mov     x0, x29                 //     parent's fp
->>>> +       bl      ftrace_return_to_handler// addr = ftrace_return_to_hander(fp);
->>>> +       mov     x30, x0                 // restore the original return address
->>>> +       ldr     x0, [sp], #16
->>>> +       ret
->>>
->>> and an ENDPROC here.
->>
->> Fix it.
->> But please note that this (return_to_handler) is not a real function.
->> Declaring it as ENDPROC is not very useful.
+> ---
+>  Documentation/devicetree/bindings/arm/global_timer.txt | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 >
-> Then use END(...). The opening macro was the main point, since that avoid
-> the need for an explicit .globl.
-
-Fix it.
-
--Takahiro AKASHI
-
-> Will
+> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+> index 1e54898..bdae3a8 100644
+> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+> @@ -4,8 +4,11 @@
+>
+>  ** Timer node required properties:
+>
+> -- compatible : Should be "arm,cortex-a9-global-timer"
+> -               Driver supports versions r2p0 and above.
+> +- compatible : should contain
+> +            * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
+> +            * "arm,cortex-a9-global-timer" for Cortex-A9 global
+> +                timers or any compatible implementation. Note: driver
+> +                supports versions r2p0 and above.
+>
+>  - interrupts : One interrupt to each core
+>
+> --
+> 1.8.5.3
+>
 >
