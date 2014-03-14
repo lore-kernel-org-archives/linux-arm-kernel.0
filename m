@@ -1,9 +1,9 @@
 From: ricardo.crudo@gmail.com (Ricardo Crudo)
-Date: Fri, 14 Mar 2014 13:05:08 -0300
+Date: Fri, 14 Mar 2014 12:57:28 -0300
 Subject: Enable neon float hardware support
 In-Reply-To: <CAPjqk-JL+GSHc08dz=Fi7eLSX_W9hpj9JwWHO1AQxLuBTCrqmw@mail.gmail.com>
 References: <CAPjqk-JL+GSHc08dz=Fi7eLSX_W9hpj9JwWHO1AQxLuBTCrqmw@mail.gmail.com>
-Message-ID: <CAPjqk-+1xGNZN4dvXqiwO682Qm9TfK_HOgwhDQnTof5GSS930Q@mail.gmail.com>
+Message-ID: <CAPjqk-Jf9qXbzWynuUU+qV4-EMd7GFvDNAQFsoQoUP6KNa=Ahg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
