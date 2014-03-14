@@ -1,126 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 14 Mar 2014 12:10:55 -0700
-Subject: [PATCH v3 10/52] arm, kvm: Fix CPU hotplug callback registration
-In-Reply-To: <53229701.8050405@linux.vnet.ibm.com>
-References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
- <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
- <20140312232127.GC24808@cbox> <53229701.8050405@linux.vnet.ibm.com>
-Message-ID: <20140314191055.GF28661@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 20:10:39 +0100
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <201403141838.08900.arnd@arndb.de>
+ <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
+Message-ID: <201403142010.39886.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 11:13:29AM +0530, Srivatsa S. Bhat wrote:
-> On 03/13/2014 04:51 AM, Christoffer Dall wrote:
-> > On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
-> >> Subsystems that want to register CPU hotplug callbacks, as well as perform
-> >> initialization for the CPUs that are already online, often do it as shown
-> >> below:
-> >>
-> >> 	get_online_cpus();
-> >>
-> >> 	for_each_online_cpu(cpu)
-> >> 		init_cpu(cpu);
-> >>
-> >> 	register_cpu_notifier(&foobar_cpu_notifier);
-> >>
-> >> 	put_online_cpus();
-> >>
-> >> This is wrong, since it is prone to ABBA deadlocks involving the
-> >> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-> >> with CPU hotplug operations).
-> >>
-> >> Instead, the correct and race-free way of performing the callback
-> >> registration is:
-> >>
-> >> 	cpu_notifier_register_begin();
-> >>
-> >> 	for_each_online_cpu(cpu)
-> >> 		init_cpu(cpu);
-> >>
-> >> 	/* Note the use of the double underscored version of the API */
-> >> 	__register_cpu_notifier(&foobar_cpu_notifier);
-> >>
-> >> 	cpu_notifier_register_done();
-> >>
-> >>
-> >> Fix the kvm code in arm by using this latter form of callback registration.
-> >>
-> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Cc: Gleb Natapov <gleb@kernel.org>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Ingo Molnar <mingo@kernel.org>
-> >> Cc: kvmarm at lists.cs.columbia.edu
-> >> Cc: kvm at vger.kernel.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
-> >> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> >> ---
-> >>
-> >>  arch/arm/kvm/arm.c |    7 ++++++-
-> >>  1 file changed, 6 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index bd18bb8..f0e50a0 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
-> >>  		}
-> >>  	}
-> >>  
-> >> +	cpu_notifier_register_begin();
-> >> +
-> >>  	err = init_hyp_mode();
-> >>  	if (err)
-> >>  		goto out_err;
-> >>  
-> >> -	err = register_cpu_notifier(&hyp_init_cpu_nb);
-> >> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> >>  	if (err) {
-> >>  		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-> >>  		goto out_err;
-> >>  	}
-> >>  
-> >> +	cpu_notifier_register_done();
-> >> +
-> >>  	hyp_cpu_pm_init();
-> >>  
-> >>  	kvm_coproc_table_init();
-> >>  	return 0;
-> >>  out_err:
-> >> +	cpu_notifier_register_done();
-> >>  	return err;
-> >>  }
-> >>  
-> >>
-> > 
-> > Just so we're clear, the existing code was simply racy as not prone to
-> > deadlocks, right?
-> > 
-> > This makes it clear that the test above for compatible CPUs can be quite
-> > easily evaded by using CPU hotplug, but we don't really have a good
-> > solution for handling that yet...  Hmmm, grumble grumble, I guess if you
-> > hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
+On Friday 14 March 2014, Liviu Dudau wrote:
 > > 
 > 
-> In this particular case, there was no deadlock possibility, rather the
-> existing code had insufficient synchronization against CPU hotplug.
+> I haven't seen any reaction from Bjorn on this, so I threaded carefully on that
+> subject. I'm new to this so I don't know how to handle this.
 > 
-> init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
-> using on_each_cpu(). If a CPU came online after this point and before calling
-> register_cpu_notifier(), that CPU would remain uninitialized because this
-> subsystem would miss the hot-online event. This patch fixes this bug and
-> also uses the new synchronization method (instead of get/put_online_cpus())
-> to ensure that we don't deadlock with CPU hotplug.
-> 
+> To my mind, and looking at the way every architecture has been setup, the pcibios_*
+> function are intended to be provided by the architecture.
 
-Yes, that was my conclusion as well.  Thanks for clarifying.  (It could
-be noted in the commit message as well if you should feel so inclined).
+That is definitely correct.
 
-> > In any case:
-> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > 
-> 
-> Thanks a lot!
-> 
-Thanks,
--Christoffer
+> No matter how much wishful
+> thinking we are going to put in here, it will not change the fact that the non-arm64
+> specific version of pcibios_fixup_bus() that I wrote is not shared by anyone else
+> and it will remain "for arm64 use only" regardless to where it is placed until the
+> next architecture comes into the kernel. And even then its adoption is questionable.
+
+Agreed as well.
+
+> If we are looking for simple and common implementations of this function, maybe we
+> should look at why microblaze and powerpc versions, that are identical, are not being
+> made the default __weak implementation.
+
+Microblaze could most likely just be moved over to your version. The only
+reason it is shared with the powerpc implementation is that they were
+anticipating the code to become shared again and that it was known to
+be working with flattened device tree.
+
+> As for the other two functions, I've no special attachment to where they are present
+> and I'm happy to move them into drivers/pci on the condition that the patchset doesn't
+> double in size. The reason why I'm weary of touching other architectures in a significant
+> way is the current lack of engineering bandwidth and way of testing all the architectures.
+> My low friction approach has been to introduce them in arm64 and then slowly move them
+> into core (and yes, I know about good intentions and the road to hell.)
+
+I think everyone working on PCI is fed up with having arch-specific implementations
+of all these, and Bjorn has been very supportive of generic infrastructure in the
+past. Even just adding a generic infrastructure in a common place that is used
+only by one architecture in my mind would be a significant improvement.
+
+	Arnd
