@@ -1,78 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 14 Mar 2014 12:35:51 +0100 (CET)
-Subject: [PATCH 1/3] irqchip: sun4i: Don't mask + unmask for the non
- oneshot case
-In-Reply-To: <1394740202-1952-2-git-send-email-hdegoede@redhat.com>
-References: <1394740202-1952-1-git-send-email-hdegoede@redhat.com>
- <1394740202-1952-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <alpine.DEB.2.02.1403141228290.18573@ionos.tec.linutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 14 Mar 2014 12:36:44 +0100
+Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+In-Reply-To: <20140314113202.GB3106@piout.net>
+References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+ <5322CC8B.6010905@gmail.com> <20140314113202.GB3106@piout.net>
+Message-ID: <5322E9CC.9060602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Mar 2014, Hans de Goede wrote:
+On 03/14/2014 12:32 PM, Alexandre Belloni wrote:
+> On 14/03/2014 at 10:31:55 +0100, Sebastian Hesselbarth wrote :
+>> On 03/13/2014 03:06 PM, Antoine T?nart wrote:
+>>> +		local-timer at ad0600 {
+>>> +			compatible = "arm,cortex-a9-twd-timer";
+>>> +			reg = <0xad0600 0x20>;
+>>> +			clocks = <&sysclk>;
+>>
+>> If I understand Jisheng correctly, this should be cpuclk/3. When
+>> removing the clocks {} container above, please also take care of
+>> it.
+>>
+>
+> You understood correctly
+>
+>> You can do
+>>
+>> cpuclk: cpu-clock {
+>> 	compatible = "fixed-clock";
+>> 	#clock-cells = <0>;
+>> 	clock-frequency = <1200000000>; /* <- put correct freq here */
+>> };
+>>
+>> sysclk: system-clock {
+>> 	compatible = "fixed-factor-clock";
+>> 	#clock-cells = <0>;
+>> 	clocks = <&cpuclk>;
+>> 	clock-multi = <1>;
+>> 	clock-div = <3>;
+>> };
+>>
+>> Hopefully, we'll have proper clock drivers soon so we can just replace
+>> referenced "fixed-*" clocks.
+>>
+>
+> I'm working on that, do you have some code that you can share right now ?
 
-> Since sun4i and sun5i are single core SOCs there is no need to mask non
-> oneshot IRQs, to achieve this we use handle_fasteoi_irq with a dummy eoi.
+No, nothing specific. You can have a look at drivers/clk/mvebu/ and see
+how we deal with it on mvebu. For now, you can stick with bg2q and I'll
+see how we extend that drivers for bg2/bg2cd then.
 
-This is slightly wrong :)
+BTW: We really enjoy having a mvebu subfolder in drivers/clk as it makes
+things easier. If you prepare any clk drivers for berlin, I'd suggest to
+put them in drivers/clk/berlin from the beginning.
 
-Even on a SMP system there is no need to mask the interrupt when the
-controller works like that sunxi one. If the controller is not broken
-beyond repair then it does not deliver the same interrupt to a
-different cpu. Such a thing would always deliver it to all cores and
-those would race to grab the spinlock and mask it. I've seen such
-horror, but don't ask how that performs.
-
-The reason why you can spare the mask/unmask dance is that the
-controller does not require any action and clears the interrupt when
-the level goes back to inactive. That happens when the device handler
-acks it at the device level.
-
-Now there might be the case when the device reactivates the interrupt
-before the RETI. But that does not matter as we run the primary
-interrupt handlers with interrupts disabled.
-
-Thanks,
-
-	tglx
- 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/irqchip/irq-sun4i.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> index a0ed1ea..0a71990 100644
-> --- a/drivers/irqchip/irq-sun4i.c
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -74,8 +74,17 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
->  	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
->  }
->  
-> +/*
-> + * Since sun4i and sun5i are single core SOCs there is no need to mask non
-> + * oneshot IRQs, to achieve this we use handle_fasteoi_irq with a dummy eoi.
-> + */
-> +static void sun4i_irq_dummy_eoi(struct irq_data *irqd)
-> +{
-> +}
-> +
->  static struct irq_chip sun4i_irq_chip = {
->  	.name		= "sun4i_irq",
-> +	.irq_eoi	= sun4i_irq_dummy_eoi,
->  	.irq_mask	= sun4i_irq_mask,
->  	.irq_unmask	= sun4i_irq_unmask,
->  };
-> @@ -97,7 +106,7 @@ static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
->  					 handle_fasteoi_irq);
->  	else
->  		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> -					 handle_level_irq);
-> +					 handle_fasteoi_irq);
->  
->  	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
->  
-> -- 
-> 1.9.0
-> 
-> 
+Sebastian
