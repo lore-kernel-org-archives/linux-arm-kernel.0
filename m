@@ -1,147 +1,154 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 14 Mar 2014 12:00:14 +0900
-Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
-In-Reply-To: <20140313155415.GB25472@mudshark.cambridge.arm.com>
+Date: Fri, 14 Mar 2014 12:50:40 +0900
+Subject: [PATCH v6 7/7] arm64: ftrace: Add system call tracepoint
+In-Reply-To: <20140313162548.GD25472@mudshark.cambridge.arm.com>
 References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
  <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>
- <20140313155415.GB25472@mudshark.cambridge.arm.com>
-Message-ID: <532270BE.6000409@linaro.org>
+ <1394705630-12384-8-git-send-email-takahiro.akashi@linaro.org>
+ <20140313162548.GD25472@mudshark.cambridge.arm.com>
+Message-ID: <53227C90.8070708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 12:54 AM, Will Deacon wrote:
-> On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
->> CALLER_ADDRx returns caller's address at specified level in call stacks.
->> They are used for several tracers like irqsoff and preemptoff.
->> Strange to say, however, they are refered even without FTRACE.
+On 03/14/2014 01:25 AM, Will Deacon wrote:
+> On Thu, Mar 13, 2014 at 10:13:50AM +0000, AKASHI Takahiro wrote:
+>> This patch allows system call entry or exit to be traced as ftrace events,
+>> ie. sys_enter_*/sys_exit_*, if CONFIG_FTRACE_SYSCALLS is enabled.
+>> Those events appear and can be controlled under
+>>      ${sysfs}/tracing/events/syscalls/
 >>
->> Please note that this implementation assumes that we have frame pointers.
->> (which means kernel should be compiled with -fno-omit-frame-pointer.)
->
-> How do you ensure that -fno-omit-frame-pointer is passed?
-
-arm64 selects ARCH_WANT_FRAME_POINTERS, then FRAME_POINTER is on (lib/Kconfig.debug)
-and so -fno-omit-frame-pointer is appended (${TOP}/Makefile).
-(stacktrace.c also assumes FRAME_POINTER.)
-
-Do you think I should remove the comment above?
-
+>> Please note that we can't trace compat system calls here because
+>> AArch32 mode does not share the same syscall table with AArch64.
+>> Just define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS in order to avoid unexpected
+>> results (bogus syscalls reported or even hang-up).
+>>
 >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >> ---
->>   arch/arm64/include/asm/ftrace.h    |   13 ++++++++-
->>   arch/arm64/kernel/Makefile         |    3 +-
->>   arch/arm64/kernel/return_address.c |   55 ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 69 insertions(+), 2 deletions(-)
->>   create mode 100644 arch/arm64/kernel/return_address.c
+>>   arch/arm64/Kconfig               |    1 +
+>>   arch/arm64/include/asm/ftrace.h  |   20 ++++++++++++++++
+>>   arch/arm64/include/asm/syscall.h |    1 +
+>>   arch/arm64/include/asm/unistd.h  |    2 ++
+>>   arch/arm64/kernel/ptrace.c       |   48 ++++++++++++++++++++++----------------
+>>   5 files changed, 52 insertions(+), 20 deletions(-)
 >>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 6954959..b1dcdb4 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -43,6 +43,7 @@ config ARM64
+>>   	select HAVE_MEMBLOCK
+>>   	select HAVE_PATA_PLATFORM
+>>   	select HAVE_PERF_EVENTS
+>> +	select HAVE_SYSCALL_TRACEPOINTS
+>>   	select IRQ_DOMAIN
+>>   	select MODULES_USE_ELF_RELA
+>>   	select NO_BOOTMEM
 >> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->> index ed5c448..c44c4b1 100644
+>> index c44c4b1..4ef06f1 100644
 >> --- a/arch/arm64/include/asm/ftrace.h
 >> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -44,6 +44,26 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>>   #define CALLER_ADDR4 ((unsigned long)return_address(4))
+>>   #define CALLER_ADDR5 ((unsigned long)return_address(5))
+>>   #define CALLER_ADDR6 ((unsigned long)return_address(6))
+>> +
+>> +#include <asm/compat.h>
+>> +
+>> +/*
+>> + * Because AArch32 mode does not share the same syscall table with AArch64,
+>> + * tracing compat syscalls may result in reporting bogus syscalls or even
+>> + * hang-up, so just do not trace them.
+>> + * See kernel/trace/trace_syscalls.c
+>> + *
+>> + * x86 code says:
+>> + * If the user realy wants these, then they should use the
+>> + * raw syscall tracepoints with filtering.
+>
+> Fair enough.
+>
+>> + */
+>> +#define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS 1
+>
+> You don't need the '1' here.
+
+OK.
+
+>> +static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
+>> +{
+>> +        if (is_compat_task())
+>> +                return true;
+>> +        return false;
+>> +}
+>
+> return is_compat_task();
+
+Fix it.
+
+>>   #endif /* ifndef __ASSEMBLY__ */
+>>
+>>   #endif /* __ASM_FTRACE_H */
+>> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+>> index 70ba9d4..383771e 100644
+>> --- a/arch/arm64/include/asm/syscall.h
+>> +++ b/arch/arm64/include/asm/syscall.h
 >> @@ -18,6 +18,7 @@
 >>
->>   #ifndef __ASSEMBLY__
->>   extern void _mcount(unsigned long);
->> +extern void *return_address(unsigned int);
+>>   #include <linux/err.h>
 >>
->>   struct dyn_arch_ftrace {
->>   	/* No extra data needed for arm64 */
->> @@ -33,6 +34,16 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
->>   	 */
->>   	return addr;
->>   }
->> -#endif /* __ASSEMBLY__ */
+>> +extern const void *sys_call_table[];
+>>
+>>   static inline int syscall_get_nr(struct task_struct *task,
+>>   				 struct pt_regs *regs)
+>> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+>> index 82ce217..c335479 100644
+>> --- a/arch/arm64/include/asm/unistd.h
+>> +++ b/arch/arm64/include/asm/unistd.h
+>> @@ -28,3 +28,5 @@
+>>   #endif
+>>   #define __ARCH_WANT_SYS_CLONE
+>>   #include <uapi/asm/unistd.h>
 >> +
->> +#define HAVE_ARCH_CALLER_ADDR
+>> +#define NR_syscalls (__NR_syscalls)
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 9993a8f..9c52b3e 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -41,6 +41,9 @@
+>>   #include <asm/traps.h>
+>>   #include <asm/system_misc.h>
+>>
+>> +#define CREATE_TRACE_POINTS
+>> +#include <trace/events/syscalls.h>
 >> +
->> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
->> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
->> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
->> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
->> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
->> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
->> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>>   /*
+>>    * TODO: does not yet catch signals sent when the child dies.
+>>    * in exit.c or in signal.c.
+>> @@ -1062,29 +1065,31 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>   {
+>>   	unsigned long saved_reg;
+>>
+>> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>> -		return regs->syscallno;
+>> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+>> +		/*
+>> +		 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
+>> +		 * used to denote syscall entry/exit:
+>> +		 *   0 -> entry
+>> +		 */
+>> +		if (is_compat_task()) {
 >
-> Could we change the core definitions of these macros (in linux/ftrace.h) to
-> use return_address, then provide an overridable version of return_address
-> that defaults to __builtin_return_address, instead of copy-pasting this
-> sequence?
+> if (arch_trace_is_compat_syscall())
 
-I think I understand what you mean, and will try to post a separate RFC,
-but I also want to hold off this change on this patch since such a change
-may raise a small controversy from other archs' maintainers.
+I don't mind either way, but this part of code comes from the original
+syscall_trace() (ie. ptrace stuff), and has nothing to do with ftrace events.
+(You know, arch_trace_is_compat_syscall() is currently defined in asm/ftrace.h.)
+So I'd like to keep it unchanged unless you really want.
 
->> diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
->> new file mode 100644
->> index 0000000..89102a6
->> --- /dev/null
->> +++ b/arch/arm64/kernel/return_address.c
->> @@ -0,0 +1,55 @@
->> +/*
->> + * arch/arm64/kernel/return_address.c
->> + *
->> + * Copyright (C) 2013 Linaro Limited
->> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/export.h>
->> +#include <linux/ftrace.h>
->> +
->> +#include <asm/stacktrace.h>
->> +
->> +struct return_address_data {
->> +	unsigned int level;
->> +	void *addr;
->> +};
->> +
->> +static int save_return_addr(struct stackframe *frame, void *d)
->> +{
->> +	struct return_address_data *data = d;
->> +
->> +	if (!data->level) {
->> +		data->addr = (void *)frame->pc;
->> +		return 1;
->> +	} else {
->> +		--data->level;
->> +		return 0;
->> +	}
->> +}
->> +
->> +void *return_address(unsigned int level)
->> +{
->> +	struct return_address_data data;
->> +	struct stackframe frame;
->> +	register unsigned long current_sp asm ("sp");
->> +
->> +	data.level = level + 2;
->> +	data.addr = NULL;
->> +
->> +	frame.fp = (unsigned long)__builtin_frame_address(0);
->> +	frame.sp = current_sp;
->> +	frame.pc = (unsigned long)return_address; /* dummy */
->> +
->> +	walk_stackframe(&frame, save_return_addr, &data);
->> +
->> +	if (!data.level)
->> +		return data.addr;
->> +	else
->> +		return NULL;
->> +}
->> +EXPORT_SYMBOL_GPL(return_address);
+> With those changes:
 >
-> This whole file is basically copied from arch/arm/, but it's not too much
-> code. Ideally the toolchain would have made use of the frame pointer, but it
-> looks like it doesn't bother.
+>    Acked-by: Will Deacon <will.deacon@arm.com>
 
-I confirmed that __builtin_return_address([123456]) doesn't work
-even with -fno-omit-frame-pointer.
-Keep this as it is.
-
+Thank you,
 -Takahiro AKASHI
 
 > Will
