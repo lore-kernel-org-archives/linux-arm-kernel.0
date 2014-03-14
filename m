@@ -1,101 +1,48 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 14 Mar 2014 16:38:35 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2N11bIDMvNV0gdmlkZW86IG14M2ZiOiBJbnRyb2R1Y2Ug?=
- =?UTF-8?B?cmVndWxhdG9yIHN1cHBvcnQu?=
-In-Reply-To: <5322E6AA.1010400@eukrea.com>
-References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
- <1394789035.649593084@f301.i.mail.ru> <5322E6AA.1010400@eukrea.com>
-Message-ID: <1394800715.9118331@f120.i.mail.ru>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 14 Mar 2014 12:48:31 +0000
+Subject: [PATCH v2 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <20140313103329.GD5035@e106331-lin.cambridge.arm.com>
+References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
+ <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
+ <20140311182922.GD3263@e106331-lin.cambridge.arm.com>
+ <01c501cf3dac$022879b0$06796d10$@samsung.com>
+ <20140313103329.GD5035@e106331-lin.cambridge.arm.com>
+Message-ID: <20140314124831.GU366@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????, 14 ????? 2014, 12:23 +01:00 ?? Denis Carikli <denis@eukrea.com>:
+On Thu, Mar 13, 2014 at 10:33:29AM +0000, Mark Rutland wrote:
+> On Wed, Mar 12, 2014 at 04:31:56AM +0000, Kukjin Kim wrote:
 
-Sascha, Shawn, can you comment on that?
+> > > > +/ {
+> > > > +	model = "SAMSUNG SSDK-GH7 board based on GH7 SoC";
 
-> On 03/14/2014 10:23 AM, Alexander Shiyan wrote:
-> > Why this cannot be devm_regulator_get(dev, "lcd") in both DT and non-DT case?
-> 
-> I need to add device tree support to the mx3fb driver.
-> My first approach gave a binding that looked like that:
-> 
-> cmo_qvga: display {
->    model = "CMO-QVGA";
->    [...]
->    display-timings {
->      qvga_timings: 320x240 {
->        hactive = <320>;
->        vactive = <240>;
->        [...]
->     };
-> };
-> 
-> ipu: ipu at 53fc0000 {
->    compatible = "fsl,imx31-ipu";
->    reg = < 0x53fc0000 0x5f
->    0x53fc0088 0x2b >;
->    interrupts = <42 41>;
->    dma-channels = <32>;
->    #dma-cells = <1>;
->    clocks = <&clks 55>;
->    clock-names = "";
-> };
-> 
-> lcdc: mx3fb at 53fc00b4 {
->    compatible = "fsl,mx3-fb";
->    reg = <0x53fc00b4 0x0b>;
->    clocks = <&clks 55>;
->    dmas = <&ipu 14>;
->    dma-names = "tx";
->    display = <&cmo_qvga>;
-> };
-> 
-> The issue was that exporting the "dma ipu driver" was not a good idea.
-> I was told to instead make bindings that looks very similar to the ipuv3 
-> driver[1]
-> So at the end that gave something like that:
-> 
-> cmo_qvga: display at di0 {
->    compatible = "fsl,mx3-parallel-display";
->    regulator-name = "lcd";
->    lcd-supply = <&reg_lcd_3v3>;
->    model = "CMO-QVGA";
->    display-timings {
->      qvga_timings: 320x240 {
->        hactive = <320>;
->        vactive = <240>;
->        [...]
->     };
-> };
-> 
-> ipu: ipu at 53fc0000 {
->    compatible = "fsl,imx35-ipu";
->    reg = <0x53fc0000 0x4000>;
->    clocks = <&clks 55>;
->    display = <&cmo_qvga>;
-> };
-> 
-> So here fsl,imx35-ipu is binded to the mx3fb driver.
-> But the mx3fb driver still need to use the dma-ipu driver somehow.
-> That's why the dma-ipu driver is handled behind the scenes, that way
-> it's not exported to the device tree bindings.
-> 
-> Now, since the mx3fb driver is binded to the "fsl,imx35-ipu" compatible,
-> if I would do a "mx3fbi->reg_lcd = devm_regulator_get(dev, "lcd");",
-> that would then lookup for the regulator in the mx3fb node
-> (The last "ipu at 53fc0000" here).
-> 
-> Instead the regulator can be found in the display node,
-> which has no driver associated with it.
-> 
-> In the case of the ipuv3, the parallel display driver is associated
-> with the display at di0 node, so the device matches with the device tree
-> node directly.
-> 
-> References:
-> -----------
-> [1] The ipuv3 driver is in drivers/staging/imx-drm/
-> [2] the dma ipu driver is in drivers/dma/ipu/
-> 
+> > > Is the "based on GH7 SoC" part necessary? Does the "SSDK-GH7" not give
+> > > that away?
 
----
+> > In this case, yes, SSDK-GH7 is enough but I though, in case of different
+> > board adding what SoC is used on the board in that is useful. Anyway, OK.
+
+> Looking at ePAPR, the recommended format is "manufacturer,model", and
+> the string is intended to identify a particular implementation. It is
+> not intended to give details about the implementation that can be
+> derived from the name.
+
+> We seem to have ignored the format (and to some degree purpose) of the
+> model property so far, but I don't see any reason to fill it with
+> unnecessary information.
+
+Might it be worth defining a property explicitly intended to be used as
+a display name for human consumption?  Half the problem with model is
+that we don't have a way to use it for quirking so nobody ever really
+looks at it (though I guess we will want that at some point now we're
+going for fixed ABI stuff), but not having a place to put a pretty name
+does encourage this sort of thing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/14d82e38/attachment.sig>
