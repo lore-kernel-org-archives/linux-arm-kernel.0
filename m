@@ -1,143 +1,148 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 14 Mar 2014 08:00:53 +0530
-Subject: [RFC 4/6] sched: powerpc: create a dedicated topology table
-In-Reply-To: <53203F2D.4030209@arm.com>
-References: <1394003906-11630-1-git-send-email-vincent.guittot@linaro.org>
- <1394003906-11630-5-git-send-email-vincent.guittot@linaro.org>
- <531EE087.7050707@linux.vnet.ibm.com>
- <CAKfTPtCJEX7qknTb85FqJfuT03oNFN3rTOncy5Df37w65+GX8Q@mail.gmail.com>
- <531FE5B4.6090502@linux.vnet.ibm.com>
- <CAKfTPtDLzOMpVGUqBpMFiN_cwKERFDCqH1zLKsRbrqeD11DzWw@mail.gmail.com>
- <53203F2D.4030209@arm.com>
-Message-ID: <532269DD.7070106@linux.vnet.ibm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 14 Mar 2014 12:00:14 +0900
+Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
+In-Reply-To: <20140313155415.GB25472@mudshark.cambridge.arm.com>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>
+ <20140313155415.GB25472@mudshark.cambridge.arm.com>
+Message-ID: <532270BE.6000409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2014 04:34 PM, Dietmar Eggemann wrote:
-> On 12/03/14 07:44, Vincent Guittot wrote:
->> On 12 March 2014 05:42, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>> On 03/11/2014 06:48 PM, Vincent Guittot wrote:
->>>> On 11 March 2014 11:08, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>>>> Hi Vincent,
->>>>>
->>>>> On 03/05/2014 12:48 PM, Vincent Guittot wrote:
->>>>>> Create a dedicated topology table for handling asymetric feature.
->>>>>> The current proposal creates a new level which describes which groups of CPUs
->>>>>> take adavantge of SD_ASYM_PACKING. The useless level will be removed during the
->>>>>> build of the sched_domain topology.
->>>>>>
->>>>>> Another solution would be to set SD_ASYM_PACKING in the sd_flags of SMT level
->>>>>> during the boot sequence and before the build of the sched_domain topology.
->>>>>
->>>>> Is the below what you mean as the other solution? If it is so, I would
->>>>> strongly recommend this approach rather than adding another level to the
->>>>> topology level to represent the asymmetric behaviour.
->>>>>
->>>>> +static struct sched_domain_topology_level powerpc_topology[] = {
->>>>> +#ifdef CONFIG_SCHED_SMT
->>>>> +       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
->>>>> SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() },
->>>>> +#endif
->>>>> +       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->>>>> +       { NULL, },
->>>>> +};
->>>>
->>>> Not exactly like that but something like below
->>>>
->>>> +static struct sched_domain_topology_level powerpc_topology[] = {
->>>> +#ifdef CONFIG_SCHED_SMT
->>>> + { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
->>>> SD_INIT_NAME(SMT) },
->>>> +#endif
->>>> + { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->>>> + { NULL, },
->>>> +};
->>>> +
->>>> +static void __init set_sched_topology(void)
->>>> +{
->>>> +#ifdef CONFIG_SCHED_SMT
->>>> + powerpc_topology[0].sd_flags |= arch_sd_sibling_asym_packing();
->>>> +#endif
->>>> + sched_domain_topology = powerpc_topology;
->>>> +}
->>>
->>> I think we can set it in powerpc_topology[] and not bother about setting
->>> additional flags outside of this array. It is clearer this way.
+On 03/14/2014 12:54 AM, Will Deacon wrote:
+> On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
+>> CALLER_ADDRx returns caller's address at specified level in call stacks.
+>> They are used for several tracers like irqsoff and preemptoff.
+>> Strange to say, however, they are refered even without FTRACE.
 >>
->> IIRC, the arch_sd_sibling_asym_packing of powerpc can be set at
->> runtime which prevents it from being put directly in the table. Or it
->> means that we should use a function pointer in the table for setting
->> flags instead of a static value like the current proposal.
-> 
-> Right,
-> 
-> static struct sched_domain_topology_level powerpc_topology[] = {
-> #ifdef CONFIG_SCHED_SMT
->         { cpu_asmt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES |
-> SD_ASYM_PACKING, SD_INIT_NAME(ASMT) },
->         { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES |
-> arch_sd_sibling_asym_packing() | SD_SHARE_POWERDOMAIN, SD_INIT_NAME(SMT) },
-> #endif
->         { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->         { NULL, },
-> };
-> 
-> is not compiling:
-> 
->   CC      arch/powerpc/kernel/smp.o
-> arch/powerpc/kernel/smp.c:787:2: error: initializer element is not constant
-> arch/powerpc/kernel/smp.c:787:2: error: (near initialization for
-> 'powerpc_topology[1].sd_flags')
-> 
-> So I'm in favour of a function pointer, even w/o the 'int cpu' parameter
-> to circumvent the issue that it is too easy to create broken sd setups.
+>> Please note that this implementation assumes that we have frame pointers.
+>> (which means kernel should be compiled with -fno-omit-frame-pointer.)
+>
+> How do you ensure that -fno-omit-frame-pointer is passed?
 
-Alright, this looks fine to me. You could use the function pointer to
-retrieve flags and have all initializations of sched domain features
-consolidated in the table.
+arm64 selects ARCH_WANT_FRAME_POINTERS, then FRAME_POINTER is on (lib/Kconfig.debug)
+and so -fno-omit-frame-pointer is appended (${TOP}/Makefile).
+(stacktrace.c also assumes FRAME_POINTER.)
 
-Regards
-Preeti U Murthy
-> 
-> -- Dietmar
-> 
+Do you think I should remove the comment above?
+
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/ftrace.h    |   13 ++++++++-
+>>   arch/arm64/kernel/Makefile         |    3 +-
+>>   arch/arm64/kernel/return_address.c |   55 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 69 insertions(+), 2 deletions(-)
+>>   create mode 100644 arch/arm64/kernel/return_address.c
 >>
->>>
->>> On an additional note, on powerpc we would want to clear the
->>> SD_SHARE_POWERDOMAIN flag at the CPU domain. On Power8, considering we
->>> have 8 threads per core, we would want to consolidate tasks atleast upto
->>> 4 threads without significant performance impact before spilling over to
->>> the other cores. By doing so, besides making use of the higher power of
->>> the core we could do cpuidle management at the core level for the
->>> remaining idle cores as a result of this consolidation.
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> index ed5c448..c44c4b1 100644
+>> --- a/arch/arm64/include/asm/ftrace.h
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -18,6 +18,7 @@
 >>
->> OK. i will add the SD_SHARE_POWERDOMAIN like below
+>>   #ifndef __ASSEMBLY__
+>>   extern void _mcount(unsigned long);
+>> +extern void *return_address(unsigned int);
 >>
->> Thanks
->> Vincent
->>
->>>
->>> So the powerpc_topology[] would be something like the below:
->>>
->>> +static struct sched_domain_topology_level powerpc_topology[] = {
->>> +#ifdef CONFIG_SCHED_SMT
->>> +       { cpu_smt_mask, SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES,
->>> SD_INIT_NAME(SMT) | arch_sd_sibling_asym_packing() | SD_SHARE_POWERDOMAIN },
->>> +#endif
->>> +       { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->>> +       { NULL, },
->>> +};
->>>
->>> The amount of consolidation to the threads in a core, we will probably
->>> take care of it in cpu capacity or a similar parameter, but the above
->>> topology level would be required to request the scheduler to try
->>> consolidating tasks to cores till the cpu capacity(3/4/5 threads) has
->>> exceeded.
->>>
->>> Regards
->>> Preeti U Murthy
->>>
->>>
->>
-> 
-> 
+>>   struct dyn_arch_ftrace {
+>>   	/* No extra data needed for arm64 */
+>> @@ -33,6 +34,16 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>>   	 */
+>>   	return addr;
+>>   }
+>> -#endif /* __ASSEMBLY__ */
+>> +
+>> +#define HAVE_ARCH_CALLER_ADDR
+>> +
+>> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
+>> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
+>> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
+>> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
+>> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
+>> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>
+> Could we change the core definitions of these macros (in linux/ftrace.h) to
+> use return_address, then provide an overridable version of return_address
+> that defaults to __builtin_return_address, instead of copy-pasting this
+> sequence?
+
+I think I understand what you mean, and will try to post a separate RFC,
+but I also want to hold off this change on this patch since such a change
+may raise a small controversy from other archs' maintainers.
+
+>> diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+>> new file mode 100644
+>> index 0000000..89102a6
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/return_address.c
+>> @@ -0,0 +1,55 @@
+>> +/*
+>> + * arch/arm64/kernel/return_address.c
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited
+>> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/export.h>
+>> +#include <linux/ftrace.h>
+>> +
+>> +#include <asm/stacktrace.h>
+>> +
+>> +struct return_address_data {
+>> +	unsigned int level;
+>> +	void *addr;
+>> +};
+>> +
+>> +static int save_return_addr(struct stackframe *frame, void *d)
+>> +{
+>> +	struct return_address_data *data = d;
+>> +
+>> +	if (!data->level) {
+>> +		data->addr = (void *)frame->pc;
+>> +		return 1;
+>> +	} else {
+>> +		--data->level;
+>> +		return 0;
+>> +	}
+>> +}
+>> +
+>> +void *return_address(unsigned int level)
+>> +{
+>> +	struct return_address_data data;
+>> +	struct stackframe frame;
+>> +	register unsigned long current_sp asm ("sp");
+>> +
+>> +	data.level = level + 2;
+>> +	data.addr = NULL;
+>> +
+>> +	frame.fp = (unsigned long)__builtin_frame_address(0);
+>> +	frame.sp = current_sp;
+>> +	frame.pc = (unsigned long)return_address; /* dummy */
+>> +
+>> +	walk_stackframe(&frame, save_return_addr, &data);
+>> +
+>> +	if (!data.level)
+>> +		return data.addr;
+>> +	else
+>> +		return NULL;
+>> +}
+>> +EXPORT_SYMBOL_GPL(return_address);
+>
+> This whole file is basically copied from arch/arm/, but it's not too much
+> code. Ideally the toolchain would have made use of the frame pointer, but it
+> looks like it doesn't bother.
+
+I confirmed that __builtin_return_address([123456]) doesn't work
+even with -fno-omit-frame-pointer.
+Keep this as it is.
+
+-Takahiro AKASHI
+
+> Will
+>
