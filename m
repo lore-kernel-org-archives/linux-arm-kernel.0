@@ -1,24 +1,23 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Fri, 14 Mar 2014 12:51:33 -0400
-Subject: [PATCH 2/6] ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
-In-Reply-To: <1394127959-3159-3-git-send-email-f.fainelli@gmail.com>
-References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
- <1394127959-3159-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20140314165133.GB25092@beef>
+Date: Fri, 14 Mar 2014 12:54:10 -0400
+Subject: [PATCH v5 5/5] ARM: dts: add bcm590xx pmu support and enable for
+ bcm28155-ap
+In-Reply-To: <1394633237-16837-6-git-send-email-mporter@linaro.org>
+References: <1394633237-16837-1-git-send-email-mporter@linaro.org>
+ <1394633237-16837-6-git-send-email-mporter@linaro.org>
+Message-ID: <20140314165410.GC25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 06, 2014 at 09:45:55AM -0800, Florian Fainelli wrote:
-> Low-level debugging using the Broadcom Kona UART only makes sense on the
-> ARCH_BCM_MOBILE platform and would otherwise prevent ARCH_BCM_63XX from
-> picking up the right UART implementation by default.
+On Wed, Mar 12, 2014 at 10:07:17AM -0400, Matt Porter wrote:
+> Add a dtsi to support the BCM590xx PMUs used by the BCM281xx family
+> of SoCs. Enable regulators for use with the dwc2 and sdhci on
+> bcm28155-ap.
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/Kconfig.debug | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 
-Applied to mach-bcm armsoc/for-3.15/soc-3
+Applied to mach-bcm armsoc/for-3.15/dt
 
-Thanks,
-Matt
+-Matt
