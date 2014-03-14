@@ -1,96 +1,42 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 14 Mar 2014 12:23:22 +0100
-Subject: [PATCH v7][ 3/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <1394789035.649593084@f301.i.mail.ru>
-References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
- <1394788369-5096-3-git-send-email-denis@eukrea.com>
- <1394789035.649593084@f301.i.mail.ru>
-Message-ID: <5322E6AA.1010400@eukrea.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Mar 2014 15:21:59 +0400
+Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
+In-Reply-To: <171967ece1414f9ba0e80664777892cb@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
+ <1394618518-13803-3-git-send-email-denis@eukrea.com>
+ <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
+ <5321CF4B.9000308@cogentembedded.com>
+ <171967ece1414f9ba0e80664777892cb@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <5322E657.8030905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 10:23 AM, Alexander Shiyan wrote:
-> Why this cannot be devm_regulator_get(dev, "lcd") in both DT and non-DT case?
+Hello.
 
-I need to add device tree support to the mx3fb driver.
-My first approach gave a binding that looked like that:
+On 14-03-2014 5:57, Peter Chen wrote:
 
-cmo_qvga: display {
-   model = "CMO-QVGA";
-   [...]
-   display-timings {
-     qvga_timings: 320x240 {
-       hactive = <320>;
-       vactive = <240>;
-       [...]
-    };
-};
+>>> According to Power_ePAPR_APPROVED_v1.1.pdf "ethernet-phy" is the node
+>>> name, it is the same with Sergei's suggestion.
 
-ipu: ipu at 53fc0000 {
-   compatible = "fsl,imx31-ipu";
-   reg = < 0x53fc0000 0x5f
-   0x53fc0088 0x2b >;
-   interrupts = <42 41>;
-   dma-channels = <32>;
-   #dma-cells = <1>;
-   clocks = <&clks 55>;
-   clock-names = "";
-};
+>>      Nobody's talking about "ehternet-phy" here.
 
-lcdc: mx3fb at 53fc00b4 {
-   compatible = "fsl,mx3-fb";
-   reg = <0x53fc00b4 0x0b>;
-   clocks = <&clks 55>;
-   dmas = <&ipu 14>;
-   dma-names = "tx";
-   display = <&cmo_qvga>;
-};
+> Hmm, you take "ethernet-phy" as an example, and suggest changing to "usb-phy" at last email.
 
-The issue was that exporting the "dma ipu driver" was not a good idea.
-I was told to instead make bindings that looks very similar to the ipuv3 
-driver[1]
-So at the end that gave something like that:
+    Then it's a wrong mail. I'm not mixing nodes and properties.
 
-cmo_qvga: display at di0 {
-   compatible = "fsl,mx3-parallel-display";
-   regulator-name = "lcd";
-   lcd-supply = <&reg_lcd_3v3>;
-   model = "CMO-QVGA";
-   display-timings {
-     qvga_timings: 320x240 {
-       hactive = <320>;
-       vactive = <240>;
-       [...]
-    };
-};
+>>> But you have changed the property name at this patch, in fact,
+>> "fsl,usbphy"
+>>> is ok for property name, "fsl,usb-phy" may be better, but not worth a
+>>> patch to change it.
 
-ipu: ipu at 53fc0000 {
-   compatible = "fsl,imx35-ipu";
-   reg = <0x53fc0000 0x4000>;
-   clocks = <&clks 55>;
-   display = <&cmo_qvga>;
-};
+>>      No, it's not better and both are not OK because they're still
+>> Freescale specific while the de-facto standard property "usb-phy" is
+>> already used by other USB drivers for the same purpose.
 
-So here fsl,imx35-ipu is binded to the mx3fb driver.
-But the mx3fb driver still need to use the dma-ipu driver somehow.
-That's why the dma-ipu driver is handled behind the scenes, that way
-it's not exported to the device tree bindings.
+> Am I missing something, property name should be the same for all platforms?
 
-Now, since the mx3fb driver is binded to the "fsl,imx35-ipu" compatible,
-if I would do a "mx3fbi->reg_lcd = devm_regulator_get(dev, "lcd");",
-that would then lookup for the regulator in the mx3fb node
-(The last "ipu at 53fc0000" here).
+    If they're doing the same standard thing, yes.
 
-Instead the regulator can be found in the display node,
-which has no driver associated with it.
+> Peter
 
-In the case of the ipuv3, the parallel display driver is associated
-with the display at di0 node, so the device matches with the device tree
-node directly.
-
-References:
------------
-[1] The ipuv3 driver is in drivers/staging/imx-drm/
-[2] the dma ipu driver is in drivers/dma/ipu/
-
-Denis.
+WBR, Sergei
