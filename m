@@ -1,56 +1,66 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 14 Mar 2014 14:32:29 -0500
-Subject: [RFC] cpufreq-cpu0: allow OPP table supplied by platform
-In-Reply-To: <532321FB.7080106@ti.com>
-References: <20140313184859.7d6f6512@xhacker>
- <CAKohpokLv0m+Cky7nCUOgP-djTMrA6jyka_EZ07+_exCAexXXg@mail.gmail.com>
- <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
- <20140313194424.122ec572@xhacker>
- <20140314123205.GC813@S2101-09.ap.freescale.net> <532321FB.7080106@ti.com>
-Message-ID: <5323594D.30406@ti.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 14 Mar 2014 14:32:51 -0500
+Subject: [RFC 4/5] clocksource: omap-timer: Introduce clocksource driver
+ for OMAP SoCs
+In-Reply-To: <20140314155202.GA27560@atomide.com>
+References: <1394742919-32163-1-git-send-email-joelf@ti.com>
+ <1394742919-32163-5-git-send-email-joelf@ti.com>
+ <20140313204851.GB23432@atomide.com> <532243F5.4040609@ti.com>
+ <20140314155202.GA27560@atomide.com>
+Message-ID: <53235963.4080503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 10:36 AM, Nishanth Menon wrote:
-> On 03/14/2014 07:32 AM, Shawn Guo wrote:
->> On Thu, Mar 13, 2014 at 07:44:24PM +0800, Jisheng Zhang wrote:
->>>> On 13 March 2014 16:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->>>>> On 13 March 2014 16:18, Jisheng Zhang <jszhang@marvell.com> wrote:
->>>>>> Hi all,
->>>>>>
->>>>>> cpufreq-cpu0 is suitable for Marvell Berlin SoC. But there's one issue
->>>>>> to address. The opp is different between chips even on the same step
->>>>>> SoC, BG2Q for example. we can calculate the OPP table from the value of
->>>>>> one OTP register. We have two solutions:
->>>>>>
->>>>>> 1. bootloader reads OTP register and calculate the OPP table then change
->>>>>> dtb danamically
->>>>>>
->>>>>> 2. supply one driver in mach-berlin to initialize the OPP table; and
->>>>>> modify cpufreq-cpu0 to allow platform supply OPP table, fall back to
->>>>>> of_init_opp_table() if there's no OPP table.
->>>>>>
->>>>>> Which solution is better?
->>>>>
->>>>> I think we can go ahead with second option here. We can just check if opp
->>>>> tables are already initialized or not. In case they are, don't probe from
->>>>> dt..
->>>>>
->>>>> But lets see with others have to say here..
+On 03/14/2014 10:52 AM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@ti.com> [140313 16:52]:
+>> On 03/13/2014 03:48 PM, Tony Lindgren wrote:
+>>> * Joel Fernandes <joelf@TI.com> [140313 13:43]:
+>>>> We introduce functions to initialize clocksource and clockevent, use
+>>>> CLOCKSOURCE_OF_DECLARE to declare the clocksource, and handle the clocksource
+>>>> selection on a per-SoC basis (Currently only AM335x is supported). Powering up
+>>>> of the timer will be done with the help of the mach-omap layer function that's
+>>>> introduced earlier in the series.
+>>>>
+>>>> We make a local copy of dmtimer API for use by clocksource, the original
+>>>> dmtimer API in plat-omap is kept as-is till the migration of all SoCs is
+>>>> completed after which it can't be deleted.
+>>>>
+>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>>> ---
+>>>>  drivers/clocksource/Makefile     |    1 +
+>>>>  drivers/clocksource/omap-timer.c | 1157 ++++++++++++++++++++++++++++++++++++++
+>>>>  drivers/clocksource/omap-timer.h |  422 ++++++++++++++
+>>>>  3 files changed, 1580 insertions(+)
+>>>>  create mode 100644 drivers/clocksource/omap-timer.c
+>>>>  create mode 100644 drivers/clocksource/omap-timer.h
+>>>
+>>> Hmm this leaves duplicate arch/arm/plat-omap/dmtimer.c code, please
 >>
->> Yea, we had gone for the second option on imx6q-cpufreq driver with
->> commit 20b7cbe (cpufreq: imx6q: add of_init_opp_table).
->
-> There might be a better alternative here given the scope of potential
-> reuse cross SoCs - a generic opp modifier logic which'd work for all
-> of us. I will let Dave Gerlach post his series to give an idea.
+>> Sure, ofcourse- but how else can we make sure everything works while we do
+>> the migration in steps. We can get rid of the duplicate once everything is
+>> migrated.
+> 
+> That's not doing incremental changes then. You're not even modifying
+> the existing omap_dm_timer functions, so please do the changes in incremental
+> steps where things keep working throughout the series.
 
-I have posted an RFC for a small opp-modifier framework along with a 
-driver that uses it to enable or disable OPPs based on a register value. 
-I copied everyone from this thread but in case I forgot anyone the 
-series is here http://marc.info/?l=linux-pm&m=139482524506817&w=2.
+That is much more work than appears- it is much easier to remove what you
+don't want after everything is moved, than to pick things up part by part
+and move it.. That way we also don't accidentally remove something we
+shouldn't be and introduced more regressions.. right?
 
-Regards,
-Dave
+Plus this is an RFC that I whipped up in 2 days so I didn't this
+expectations should be too high ;-)
 
->
+>>> And not the that drivers/clocksource/omap-timer.h won't be needed at
+>>> all, those defines can stay private to the drivers/clocksource/omap-timer.c.
+>>
+>> Actually- I wanted it separate because omap-timer.c is already huge at 1157
+>> lines. Infact the largest among the clocksource drivers. Is that fair?
+> 
+> No need for it. We want to keep these functions private to the driver.
+
+Ok, I can do that. I don't mind either way.
+
+Thanks,
+-Joel
