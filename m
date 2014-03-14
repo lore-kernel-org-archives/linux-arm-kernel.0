@@ -1,83 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Mar 2014 23:07:50 +0000
-Subject: [PATCHv2 2/3] arm64: Support DMA_ATTR_WRITE_COMBINE
-In-Reply-To: <CAL_JsqKziSNiuN8VjXSv9Lm1vjn9Tc+OLxuVs5mDr3pnaEA4Mw@mail.gmail.com>
-References: <1394732716-11507-2-git-send-email-lauraa@codeaurora.org>
- <1394826745-24191-2-git-send-email-lauraa@codeaurora.org>
- <CAL_JsqKziSNiuN8VjXSv9Lm1vjn9Tc+OLxuVs5mDr3pnaEA4Mw@mail.gmail.com>
-Message-ID: <79FAFAEF-04F8-43EF-A0DD-8123E204D451@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 14 Mar 2014 16:07:05 -0700
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com> (Tomasz
+ Figa's message of "Mon, 3 Mar 2014 17:02:06 +0100")
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <7h38ikgz1i.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 Mar 2014, at 20:24, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Mar 14, 2014 at 2:52 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
->> DMA_ATTR_WRITE_COMBINE is currently ignored. Set the pgprot
->> appropriately for non coherent opperations.
->> 
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->> arch/arm64/mm/dma-mapping.c | 15 +++++++++++++--
->> 1 file changed, 13 insertions(+), 2 deletions(-)
->> 
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index 0cdd2f6..608c343 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -29,6 +29,17 @@
->> struct dma_map_ops *dma_ops;
->> EXPORT_SYMBOL(dma_ops);
->> 
->> +
->> +static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
->> +                                       bool coherent)
->> +{
->> +       if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
->> +               return pgprot_writecombine(prot)
-> 
-> Does this compile? Missing semicolon.
-> 
->> +       else if (!coherent)
->> +               return pgprot_dmacoherent(prot);
->> +       return prot;
-> 
-> Isn't DMA_ATTR_WRITE_COMBINE supposed to be an optimization over plain
-> non-cached?
+Tomasz Figa <tomasz.figa@gmail.com> writes:
 
-Since writecombine and dmacoherent are the same, we probably shouldn?t
-even bother with the check as it doesn?t have any effect.
+> This patch introduces generic code to perform power domain look-up using
+> device tree and automatically bind devices to their power domains.
+> Generic device tree binding is introduced to specify power domains of
+> devices in their device tree nodes.
+>
+> Backwards compatibility with legacy Samsung-specific power domain
+> bindings is provided, but for now the new code is not compiled when
+> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+> will change as soon as Exynos power domain code gets converted to use
+> the generic framework in further patch.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-> But coherent would be more optimal over just write
-> combine, so we would want to continue to ignore DMA_ATTR_WRITE_COMBINE
-> in the coherent case. Something like this:
-> 
->      if (coherent)
->               return prot;
->      else if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
->               return pgprot_writecombine(prot);
->      return pgprot_dmacoherent(prot);
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
 
-I?ve got request from graphics people in the past about using
-writecombine even though the DMA is fully coherent. The reason is that
-some (frame)buffers are more efficient to fill with non-cacheable
-memory than cacheable + write allocate which affects the whole CPU
-cache.
+The approach and binding both look good to me, other than a few minor
+nits on comments and question on the locking below...
 
-> But then this function is never used in the coherent case, so I'm
-> confused by Catalin's comment. The original version seems sufficient
-> to me.
+[...]
 
-I think we need mmap function for both coherent and non-coherent cases
-since the default dma_mmap_coherent() just uses pgprot_noncached() which
-gives us Strongly Ordered.
+> @@ -2177,3 +2181,297 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>  	list_add(&genpd->gpd_list_node, &gpd_list);
+>  	mutex_unlock(&gpd_list_lock);
+>  }
+> +
+> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+> +/*
+> + * DEVICE TREE BASED POWER DOMAIN PROVIDERS
 
-So my proposal:
+why all caps?
 
-	if (!coherent)
-		return pgprot_dmacoherent(prot);
-	else if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
-		return pgprot_writecombine(prot);
-	return prot;
+[...]
 
-I could even use dmacoherent instead of writecombine to avoid confusion.
+> +/* See of_genpd_get_from_provider(). */
+> +static struct generic_pm_domain *__of_genpd_get_from_provider(
+> +					struct of_phandle_args *genpdspec)
+> +{
+> +	struct of_genpd_provider *provider;
+> +	struct generic_pm_domain *genpd = ERR_PTR(-EPROBE_DEFER);
+> +
+> +	/* Check if we have such a provider in our array */
 
-Catalin
+I think you want to take the mutex here...
+
+> +	list_for_each_entry(provider, &of_genpd_providers, link) {
+> +		if (provider->node == genpdspec->np)
+> +			genpd = provider->xlate(genpdspec, provider->data);
+> +		if (!IS_ERR(genpd))
+> +			break;
+> +	}
+
+...and release it here, right?
+
+[...]
+
+> +/*
+> + * DEVICE<->DOMAIN BINDING USING DEVICE TREE LOOK-UP
+
+hmm, more yelling?
+
+
+Otherwise, looks good to me.
+
+Kevin
