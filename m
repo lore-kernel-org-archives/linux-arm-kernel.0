@@ -1,42 +1,104 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 14 Mar 2014 19:33:12 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
-References: <5316FFCE.1060603@ti.com>	<1394018461-757-1-git-send-email-holler@ahsoftware.de>	<CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>	<5322D529.4070904@ahsoftware.de>	<CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>	<5322F82A.9000507@ahsoftware.de>
- <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
-Message-ID: <53234B68.5090300@ahsoftware.de>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 14 Mar 2014 20:41:41 +0200
+Subject: [PATCH v5 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <1394819415-2511-3-git-send-email-sthokal@xilinx.com>
+References: <1394819415-2511-1-git-send-email-sthokal@xilinx.com>
+ <1394819415-2511-3-git-send-email-sthokal@xilinx.com>
+Message-ID: <1394822501.28803.280.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.03.2014 14:54, schrieb Linus Walleij:
-> On Fri, Mar 14, 2014 at 1:38 PM, Alexander Holler <holler@ahsoftware.de> wrote:
->
->>> In that case it is hardly a fix that we need to rush out to the entire
->>> world.
->>
->> And I thought the reason for -rc is actually to fix bugs. But I never
->> understood the magical ways and timings patches make their way into
->> mainline. ;)
->
-> OK so it works like this: early in the -rc cycle we fix any bugs, documentation
-> or whatever. At this point it's *regressions* so the fix need to fix something
-> that broke in the merge window (or an earlier merge window).
+On Fri, 2014-03-14 at 23:20 +0530, Srikanth Thokala wrote:
+> This is the driver for the AXI Video Direct Memory Access (AXI
+> VDMA) core, which is a soft Xilinx IP core that provides high-
+> bandwidth direct memory access between memory and AXI4-Stream
+> type video target peripherals. The core provides efficient two
+> dimensional DMA operations with independent asynchronous read
+> and write channel operation.
+> 
+> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
 
-Sorry, but I don't believe that. It's always time to fix regressions and 
-bugs.
+Few comments below.
 
-> If it is a new feature that never worked in the first place I would
-> not call that
-> a regression. There are no existing users out there that can experience
-> regressions from a previously working system.
+[]
 
-I believe that no (stable) kernel should introduce new known bugs (if 
-fixes are available) and I wouldn't make a difference if it's a new 
-feature or not. Usually people don't care if something is new or not if 
-it has bugs
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
 
-Anyway, I'm just curious and try to understand, I have a fix. ;)
+[]
 
-Regards,
+> +/**
+> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+> + * @dchan: DMA channel
+> + * @xt: Interleaved template pointer
+> + * @flags: transfer ack flags
+> + *
+> + * Return: Async transaction descriptor on success and NULL on failure
+> + */
+> +static struct dma_async_tx_descriptor *
+> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+> +				 struct dma_interleaved_template *xt,
+> +				 unsigned long flags)
+> +{
+> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> +	struct xilinx_vdma_tx_descriptor *desc;
+> +	struct xilinx_vdma_tx_segment *segment, *prev = NULL;
+> +	struct xilinx_vdma_desc_hw *hw;
+> +
+> +	if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM))
+> +		return NULL;
 
-Alexander Holler
+!is_slave_direction()
+
+[]
+
+> +static int xilinx_vdma_chan_probe(struct xilinx_vdma_device *xdev,
+> +				  struct device_node *node)
+> +{
+> +	struct xilinx_vdma_chan *chan;
+> +	bool has_dre = false;
+> +	u32 value, width;
+> +	int err;
+
+[]
+
+> +	width = value >> 3; /* Convert bits to bytes */
+> +
+> +	/* If data width is greater than 8 bytes, DRE is not in hw */
+> +	if (width > 8)
+> +		has_dre = false;
+> +
+> +	if (!has_dre)
+> +		xdev->common.copy_align = fls(width - 1);
+
+Is width power of two? For me looks like it should be fls(width) - 1;
+
+So, device can't work with alignment less than defined in this case,
+correct?
+
+[]
+
+> +/**
+> + * xilinx_vdma_probe - Driver probe function
+> + * @pdev: Pointer to the platform_device structure
+> + *
+> + * Return: '0' on success and failure value on error
+> + */
+> +static int xilinx_vdma_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *node = pdev->dev.of_node;
+> +	struct xilinx_vdma_device *xdev;
+> +	struct device_node *child;
+> +	struct resource *io;
+> +	u32 num_frames;
+> +	int i, err;
+> +
+> +	dev_info(&pdev->dev, "Probing xilinx axi vdma engine\n");
+
+dev_dbg? Or move this to the end of function and change text to
+something like "Probed ..."
+
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
