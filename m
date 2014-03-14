@@ -1,52 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 20:10:39 +0100
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <201403141838.08900.arnd@arndb.de>
- <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
-Message-ID: <201403142010.39886.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Mar 2014 14:14:06 -0500
+Subject: PL310 errata workarounds
+In-Reply-To: <20140314175701.GR21483@n2100.arm.linux.org.uk>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140314150110.GQ21483@n2100.arm.linux.org.uk>
+ <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
+ <20140314175701.GR21483@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqL02dw7B+GEL4921f_7m=RRUokW0n64TxSJnMWN3MMfrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Liviu Dudau wrote:
-> > 
-> 
-> I haven't seen any reaction from Bjorn on this, so I threaded carefully on that
-> subject. I'm new to this so I don't know how to handle this.
-> 
-> To my mind, and looking at the way every architecture has been setup, the pcibios_*
-> function are intended to be provided by the architecture.
+On Fri, Mar 14, 2014 at 12:57 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
+>> The obvious fix is to convert l2x0_flush_line to a function ptr which
+>> just further complicates the code.
+>
+> I currently regard this code as unmaintainable, so right now I'm in the
+> process of completely rewriting it, going back to the specs and checking
+> what is required.  Sharing code between the L210, L220 and L310 looks
+> good from the point of view of keeping the line count down, but actually
+> they're quite different and have various different requirements.
+>
+> Out of those, L220 is the odd one out: all operations are background
+> operations there, which means they have to be waited for.  Currently,
+> if you have one of these, and you build a multiplatform kernel which
+> includes PL310 support, you don't wait for any of these and you probably
+> see a lot of data corruption as a result.
 
-That is definitely correct.
+Oops. I guess there are not many users as the L220 was primarily used
+with the 1176 (and 11MP?) IIRC. I guess one of the primary 1176 based
+platforms currently used is RPi, but it appears the BCM2835 doesn't
+have an L2 (other than some custom L2 for the GPU).
 
-> No matter how much wishful
-> thinking we are going to put in here, it will not change the fact that the non-arm64
-> specific version of pcibios_fixup_bus() that I wrote is not shared by anyone else
-> and it will remain "for arm64 use only" regardless to where it is placed until the
-> next architecture comes into the kernel. And even then its adoption is questionable.
+> PL210 and PL310 are very similar, but PL310 has all the nasty errata
+> against it.  Both of these have the nice behaviour that provided you
+> stick to the "atomic" operations (physical addressed operations, and
+> cache sync) and you don't need to do the errata workaround dances,
+> then you don't need the spinlocks... which means less contention on
+> a SMP system.
 
-Agreed as well.
+I would definitely like to see removing the spinlock. readl/writel can
+be a hotspot because of this if you have them in any critical path.
 
-> If we are looking for simple and common implementations of this function, maybe we
-> should look at why microblaze and powerpc versions, that are identical, are not being
-> made the default __weak implementation.
+Really, if you are flushing such large buffers that you need the
+optimization, you should fix how the buffers are mapped rather than
+optimizing the flush.
 
-Microblaze could most likely just be moved over to your version. The only
-reason it is shared with the powerpc implementation is that they were
-anticipating the code to become shared again and that it was known to
-be working with flattened device tree.
+>
+> Besides, the L2 mess extends outside this file:
+>
+> static int sirfsoc_pm_enter(suspend_state_t state)
+> {
+> ...
+>                 outer_flush_all();
+>                 outer_disable();
+>
+> So, outer_disable() is defined to disable the L2 cache in a way that
+> doesn't result in data loss to the system (which would crash it) so
+> why is there that outer_flush_all() call there...  *REMOVED*.
 
-> As for the other two functions, I've no special attachment to where they are present
-> and I'm happy to move them into drivers/pci on the condition that the patchset doesn't
-> double in size. The reason why I'm weary of touching other architectures in a significant
-> way is the current lack of engineering bandwidth and way of testing all the architectures.
-> My low friction approach has been to introduce them in arm64 and then slowly move them
-> into core (and yes, I know about good intentions and the road to hell.)
+Isn't l2x0_disable racy in SMP? What happens to a write between the
+flush and the disable? If it is only usable when running single core,
+then we can remove the spinlock there. I don't think any of the custom
+disable functions like highbank take the lock.
 
-I think everyone working on PCI is fed up with having arch-specific implementations
-of all these, and Bjorn has been very supportive of generic infrastructure in the
-past. Even just adding a generic infrastructure in a common place that is used
-only by one architecture in my mind would be a significant improvement.
-
-	Arnd
+Rob
