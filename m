@@ -1,34 +1,34 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 14 Mar 2014 13:23:55 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2N11bIDMvNV0gdmlkZW86IG14M2ZiOiBJbnRyb2R1Y2Ug?=
- =?UTF-8?B?cmVndWxhdG9yIHN1cHBvcnQu?=
-In-Reply-To: <1394788369-5096-3-git-send-email-denis@eukrea.com>
-References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
- <1394788369-5096-3-git-send-email-denis@eukrea.com>
-Message-ID: <1394789035.649593084@f301.i.mail.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 10:28:34 +0100
+Subject: [PATCH] irq: Consider a negative return value of irq_startup() as
+ an error
+In-Reply-To: <alpine.DEB.2.02.1403121555140.18573@ionos.tec.linutronix.de>
+References: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
+ <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
+ <CACRpkdZ6D1XfDBdJEcR8G2HWkNcZSfz08Yvx8f0s+CqTUmybkg@mail.gmail.com>
+ <alpine.DEB.2.02.1403080857160.18573@ionos.tec.linutronix.de>
+ <CACRpkdb=51_D6kxWcmSSRdr3kROXiwJbRzQDS-1VxEJpBjVyUA@mail.gmail.com>
+ <alpine.DEB.2.02.1403121555140.18573@ionos.tec.linutronix.de>
+Message-ID: <CACRpkdaDo5uQVWQ-BxLbGJcjQVYc7+oBczH3tUD1-syFi1oQfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????, 14 ????? 2014, 10:12 +01:00 ?? Denis Carikli <denis@eukrea.com>:
-> This commit is based on the following commit by Fabio Estevam:
->   4344429 video: mxsfb: Introduce regulator support
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-...
-> +	if (np) {
-> +		if (regulator_name)
-> +			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
-> +
-> +		if (IS_ERR(mx3fbi->reg_lcd))
-> +			return PTR_ERR(mx3fbi->reg_lcd);
-> +	} else {
-> +		/* Permit that driver without a regulator in non-dt mode */
-> +		mx3fbi->reg_lcd = regulator_get(dev, "lcd");
-> +	}
+On Wed, Mar 12, 2014 at 4:10 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
 
-I am still completely do not understand why do you need to have
-"regulator_name" property?
-Why this cannot be devm_regulator_get(dev, "lcd") in both DT and non-DT case?
+> I pushed out the patch to a separate branch
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip irq/for-gpio
+>
+> and merged that branch back into irq/core.
+>
+> So you can just pull irq/for-gpio into the gpio work and base the gpio
+> related changes on top of that. Just mention it in the pull request to
+> the other Linus that it contains an irq/core change which avoids merge
+> dependencies.
 
----
+OK I first merged in the v3.14-rc6 as base and then pulled this in,
+so I will proceed to switch the calls over to request/release
+resources.
+
+Yours,
+Linus Walleij
