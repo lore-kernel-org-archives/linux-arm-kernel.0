@@ -1,41 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Mar 2014 20:32:06 +0800
-Subject: [RFC] cpufreq-cpu0: allow OPP table supplied by platform
-In-Reply-To: <20140313194424.122ec572@xhacker>
-References: <20140313184859.7d6f6512@xhacker>
- <CAKohpokLv0m+Cky7nCUOgP-djTMrA6jyka_EZ07+_exCAexXXg@mail.gmail.com>
- <CAKohpoke1i8xmKProgF+ki7Q=Q+YxbPnewdtbyPqu7857DLLWA@mail.gmail.com>
- <20140313194424.122ec572@xhacker>
-Message-ID: <20140314123205.GC813@S2101-09.ap.freescale.net>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 14 Mar 2014 13:38:02 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
+References: <5316FFCE.1060603@ti.com>	<1394018461-757-1-git-send-email-holler@ahsoftware.de>	<CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>	<5322D529.4070904@ahsoftware.de>
+ <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
+Message-ID: <5322F82A.9000507@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 07:44:24PM +0800, Jisheng Zhang wrote:
-> > On 13 March 2014 16:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > > On 13 March 2014 16:18, Jisheng Zhang <jszhang@marvell.com> wrote:
-> > >> Hi all,
-> > >>
-> > >> cpufreq-cpu0 is suitable for Marvell Berlin SoC. But there's one issue
-> > >> to address. The opp is different between chips even on the same step
-> > >> SoC, BG2Q for example. we can calculate the OPP table from the value of
-> > >> one OTP register. We have two solutions:
-> > >>
-> > >> 1. bootloader reads OTP register and calculate the OPP table then change
-> > >> dtb danamically
-> > >>
-> > >> 2. supply one driver in mach-berlin to initialize the OPP table; and
-> > >> modify cpufreq-cpu0 to allow platform supply OPP table, fall back to
-> > >> of_init_opp_table() if there's no OPP table.
-> > >>
-> > >> Which solution is better?
-> > >
-> > > I think we can go ahead with second option here. We can just check if opp
-> > > tables are already initialized or not. In case they are, don't probe from
-> > > dt..
-> > >
-> > > But lets see with others have to say here..
+Am 14.03.2014 12:02, schrieb Linus Walleij:
+> On Fri, Mar 14, 2014 at 11:08 AM, Alexander Holler <holler@ahsoftware.de> wrote:
+>> Am 11.03.2014 11:15, schrieb Linus Walleij:
+>>> On Wed, Mar 5, 2014 at 12:21 PM, Alexander Holler <holler@ahsoftware.de> wrote:
+>>>
+>>>> The driver missed an of_xlate function to translate gpio numbers
+>>>> as found in the DT to the correct chip and number.
+>>>>
+>>>> While there I've set #gpio_cells to a fixed value of 2.
+>>>>
+>>>> I've used gpio-pxa.c as template for those changes and tested my changes
+>>>> successfully on a da850 board using entries for gpio-leds in a DT. So I didn't
+>>>> reinvent the wheel but just copied and tested stuff.
+>>>>
+>>>> Thanks to Grygorii Strashko for the hint to the existing code in gpio-pxa.
+>>>>
+>>>> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>
+>>> This v2 version applied, thanks!
+>>
+>> Thanks, but actually that should have been a fix for 3.14 with which the
+>> OF functionality for davinci gpio gets introduced. I assum with the
+>> patch in for-next, 3.14 will appear with that functionality broken and
+>> it will become a candidate for -stable.
+>
+> I just get the impression that DT support for DaVinci in v3.14 is so risky
+> and unstable that noone except those implementing it (i.e. you) is really
+> using it, is that correct?
 
-Yea, we had gone for the second option on imx6q-cpufreq driver with
-commit 20b7cbe (cpufreq: imx6q: add of_init_opp_table).
+Yes. DT support for DaVinci is still incomplete and I don't think there 
+are much people out there which already try to use it. Nevertheless is 
+using DT a much easier way (and more future-proof) than patching 
+board-files, if a board isn't one of those few supported dev-boards and 
+needs different configurations.
 
-Shawn
+> In that case it is hardly a fix that we need to rush out to the entire world.
+
+Hmm, I think it's better to send something working and tested to world, 
+than something untested and non-working.
+
+And especially things like pinctrl and gpio are fundamental to even try 
+to use DT. E.g. in my case I didn't even try to use DT for DaVinci 
+because it doesn't make sense without support for DT in gpio. And now 
+people will get promised but broken support for gpio in 3.14, which 
+might cost a lot of time, if someone tries to use it.
+
+And I thought the reason for -rc is actually to fix bugs. But I never 
+understood the magical ways and timings patches make their way into 
+mainline. ;)
+
+Regards,
+
+Alexander Holler
