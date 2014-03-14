@@ -1,46 +1,70 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 14 Mar 2014 14:25:29 -0500
-Subject: [RFC 3/9] PM / OPP: Add hook to modify OPPs after they are loaded.
+Date: Fri, 14 Mar 2014 14:25:33 -0500
+Subject: [RFC 7/9] ARM: dts: omap4460: Add opp-modifier entry and add higher
+ OPPs
 In-Reply-To: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
 References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1394825135-60110-4-git-send-email-d-gerlach@ti.com>
+Message-ID: <1394825135-60110-8-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a hook inside opp_init_cpufreq_table to allow all cpufreq drivers
-to utilize OPP modifier functionality. Hook will return success if no
-phandle is present for devices that do not use opp-modifier.
+Add an entry for opp_modifier which configures OPPs on omap4460. Within
+this, nodes are defined with the opp-modifier propety that are defined
+as a list of frequency, offset from base register, and register value.
+The CPU node passes a phandle to the appropriate child node to get the
+correct table.
+
+This patch also adds higher eFused OPPs for omap4460.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- drivers/base/power/opp.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/omap4460.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index fa41874..eaedc6b 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -24,6 +24,7 @@
- #include <linux/pm_opp.h>
- #include <linux/of.h>
- #include <linux/export.h>
-+#include <linux/opp-modifier.h>
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 6b32f52..5271121 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -8,6 +8,7 @@
+  * kind, whether express or implied.
+  */
+ #include "omap4.dtsi"
++#include <dt-bindings/opp/ti.h>
  
- /*
-  * Internal data structure organization with the OPP layer library is as
-@@ -629,6 +630,13 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
- 	struct dev_pm_opp *opp;
- 	struct cpufreq_frequency_table *freq_table;
- 	int i = 0;
-+	int ret;
+ / {
+ 	cpus {
+@@ -18,9 +19,13 @@
+ 				350000  1025000
+ 				700000  1200000
+ 				920000  1313000
++				1200000 1380000
++				1500000 1390000
+ 			>;
+ 			clock-latency = <300000>; /* From legacy driver */
+ 
++			platform-opp-modifier = <&mpu_opp_modifier>;
 +
-+	ret = opp_modify_dev_table(dev);
-+	if (ret) {
-+		pr_err("failed to modify OPP table: %d\n", ret);
-+		return ret;
-+	}
+ 			/* cooling options */
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <2>;
+@@ -50,6 +55,18 @@
  
- 	/* Pretend as if I am an updater */
- 	mutex_lock(&dev_opp_list_lock);
+ 			#thermal-sensor-cells = <0>;
+ 		};
++
++		opp_modifier: opp_modifier at 0x4A002218 {
++			compatible = "opp-modifier-reg-bit";
++			reg = <0x4A002218 0x04>;
++
++			mpu_opp_modifier: mpu_opp_modifier {
++				opp-modifier = <
++				/* kHz	offset	value */
++				1500000	0	OMAP4_EFUSE_HAS_PERF_SILICON_BIT
++				>;
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.9.0
