@@ -1,48 +1,32 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Fri, 14 Mar 2014 10:18:21 +0000
-Subject: [PATCH v2 3/4] dts: ca5: add the global timer for the A5
+Date: Fri, 14 Mar 2014 10:18:22 +0000
+Subject: [PATCH v2 4/4] KConfig: Vexpress: build the ARM_GLOBAL_TIMER with
+ vexpress platform
 In-Reply-To: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
 References: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <1394792302-24451-4-git-send-email-matthew.leach@arm.com>
+Message-ID: <1394792302-24451-5-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex A5 contains a global timer: add the appropriate device tree
-node.
+The Cortex A5 now contains bindings for the global timer
+driver. Ensure that the driver is built with a vexpress platform.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 ---
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/mach-vexpress/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index c544a55..d2709b7 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -88,6 +88,14 @@
- 		interrupts = <1 13 0x304>;
- 	};
- 
-+	timer at 2c000200 {
-+		compatible = "arm,cortex-a5-global-timer",
-+		             "arm,cortex-a9-global-timer";
-+		reg = <0x2c000200 0x20>;
-+		interrupts = <1 11 0x304>;
-+		clocks = <&oscclk0>;
-+	};
-+
- 	watchdog at 2c000620 {
- 		compatible = "arm,cortex-a5-twd-wdt";
- 		reg = <0x2c000620 0x20>;
-@@ -120,7 +128,7 @@
- 		compatible = "arm,vexpress,config-bus";
- 		arm,vexpress,config-bridge = <&v2m_sysreg>;
- 
--		osc at 0 {
-+		oscclk0: osc at 0 {
- 			/* CPU and internal AXI reference clock */
- 			compatible = "arm,vexpress-osc";
- 			arm,vexpress-sysreg,func = <1 0>;
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 4a70be4..4fb2a65 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_VEXPRESS
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
++	select ARM_GLOBAL_TIMER
+ 	select ARM_TIMER_SP804
+ 	select COMMON_CLK
+ 	select COMMON_CLK_VERSATILE
 -- 
 1.8.5.3
