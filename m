@@ -1,65 +1,65 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 14 Mar 2014 14:25:34 -0500
-Subject: [RFC 8/9] ARM: dts: dra7: Add opp-modifier device entry and add
- higher OPPs
+Date: Fri, 14 Mar 2014 14:25:32 -0500
+Subject: [RFC 6/9] ARM: dts: omap443x: Add opp-modifier entry and add higher
+ OPPs
 In-Reply-To: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
 References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1394825135-60110-9-git-send-email-d-gerlach@ti.com>
+Message-ID: <1394825135-60110-7-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for opp-modifier which configures OPPs on 43xx. Within
+Add an entry for opp_modifier which configures OPPs on omap443x. Within
 this, nodes are defined with the opp-modifier propety that are defined as
-a list of frequency, offset from base register, and efuse value.
-The CPU node passes a phandle to the appropriate child node to get the
-correct table.
+a list of frequency, offset from base register, and register value. The
+CPU node passes a phandle to the appropriate child node to get the correct
+table.
 
-This patch also adds higher eFused OPPs for dra7.
+This patch also adds higher eFused OPPs for omap443x.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi  | 18 ++++++++++++++++++
- include/dt-bindings/opp/ti.h |  3 +++
- 2 files changed, 21 insertions(+)
+ arch/arm/boot/dts/omap443x.dtsi | 16 ++++++++++++++++
+ include/dt-bindings/opp/ti.h    |  2 ++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1fd75aa..ffd0bae 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+index 8c1cfad..1c7e730 100644
+--- a/arch/arm/boot/dts/omap443x.dtsi
++++ b/arch/arm/boot/dts/omap443x.dtsi
 @@ -9,6 +9,7 @@
+  */
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/dra.h>
+ #include "omap4.dtsi"
 +#include <dt-bindings/opp/ti.h>
  
- #include "skeleton.dtsi"
+ / {
+ 	cpus {
+@@ -20,9 +21,12 @@
+ 				600000  1200000
+ 				800000  1313000
+ 				1008000 1375000
++				1200000 1388000
+ 			>;
+ 			clock-latency = <300000>; /* From legacy driver */
  
-@@ -46,7 +47,10 @@
- 				/* kHz    uV */
- 				1000000	1060000
- 				1176000	1160000
-+				1500000	1260000
- 				>;
-+
 +			platform-opp-modifier = <&mpu_opp_modifier>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-@@ -621,6 +625,20 @@
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
++
+ 			/* cooling options */
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <3>;
+@@ -42,6 +46,18 @@
+ 
+ 			#thermal-sensor-cells = <0>;
  		};
 +
-+		opp_modifier: opp_modifier at 0x4AE0C20C {
-+			compatible = "opp-modifier-reg-val";
-+			reg = <0x4AE0C20C 0x04>;
-+			opp,reg-mask = <0x000000F7>;
++		opp_modifier: opp_modifier at 0x4A002218 {
++			compatible = "opp-modifier-reg-bit";
++			reg = <0x4A002218 0x04>;
 +
 +			mpu_opp_modifier: mpu_opp_modifier {
 +				opp-modifier = <
 +				/* kHz	offset	value */
-+				1500000	0	DRA7_EFUSE_HAS_HIGH_MPU_OPP
-+				1176000	0	DRA7_EFUSE_HAS_OD_MPU_OPP
++				1200000	0	OMAP4_EFUSE_HAS_PERF_SILICON_BIT
 +				>;
 +			};
 +		};
@@ -67,15 +67,14 @@ index 1fd75aa..ffd0bae 100644
  };
  
 diff --git a/include/dt-bindings/opp/ti.h b/include/dt-bindings/opp/ti.h
-index cb62c32..0f5efe8 100644
+index d3717be..cb62c32 100644
 --- a/include/dt-bindings/opp/ti.h
 +++ b/include/dt-bindings/opp/ti.h
-@@ -27,4 +27,7 @@
+@@ -25,4 +25,6 @@
+ #define AM43XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT		(1 << 4)
+ #define AM43XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT             (1 << 5)
  
- #define OMAP4_EFUSE_HAS_PERF_SILICON_BIT		(1 << 17)
- 
-+#define DRA7_EFUSE_HAS_OD_MPU_OPP			11
-+#define DRA7_EFUSE_HAS_HIGH_MPU_OPP			15
++#define OMAP4_EFUSE_HAS_PERF_SILICON_BIT		(1 << 17)
 +
  #endif		/* __DT_BINDINGS_OPP_TI_H__ */
 -- 
