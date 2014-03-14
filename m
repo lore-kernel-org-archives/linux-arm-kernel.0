@@ -1,99 +1,285 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 14 Mar 2014 09:38:09 +0900
-Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <28465199.RhyHDRhTSc@avalon>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <3299454.uLzSWehPDg@avalon> <20140313022246.GA8802@verge.net.au>
- <28465199.RhyHDRhTSc@avalon>
-Message-ID: <20140314003808.GD28137@verge.net.au>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 13 Mar 2014 17:50:41 -0700
+Subject: [PATCH] arm64: Add ARCH_HAS_SG_CHAIN
+In-Reply-To: <20140313180105.GG25472@mudshark.cambridge.arm.com>
+References: <1394732963-12174-1-git-send-email-lauraa@codeaurora.org>
+ <20140313180105.GG25472@mudshark.cambridge.arm.com>
+Message-ID: <53225261.7080608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:07:45AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Thursday 13 March 2014 11:22:47 Simon Horman wrote:
-> > On Wed, Mar 12, 2014 at 11:12:02AM +0100, Laurent Pinchart wrote:
-> > > On Wednesday 12 March 2014 16:55:23 Simon Horman wrote:
-> > > > On Wed, Feb 26, 2014 at 02:02:37PM +0100, Laurent Pinchart wrote:
-> > >  > On Wednesday 26 February 2014 13:53:17 Laurent Pinchart wrote:
-> > > > > > On Wednesday 26 February 2014 16:33:17 Simon Horman wrote:
-> > > > > > > The R8A7779 SoC has several clocks that are too custom to be
-> > > > > > > supported in a generic driver. Those clocks can be divided in two
-> > > > > > > categories:
-> > > > > > > 
-> > > > > > > - Fixed rate clocks with multiplier and divisor set according to
-> > > > > > >   boot mode configuration
-> > > > > > > 
-> > > > > > > - Custom divider clocks with SoC-specific divider values
-> > > > > > > 
-> > > > > > > This driver supports both.
-> > > > > > 
-> > > > > > Looking at the R8A7779 datasheet it looks like we only have fixed
-> > > > > > rate clocks, without any configurable divider clock. Did I miss
-> > > > > > something ?
-> > > > 
-> > > > Sorry, its a cut-and past error on my part.
-> > > > I will revise the changelog.
-> > > > 
-> > > > > > > Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
-> > > > > > > 
-> > > > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > > > > 
-> > > > > > > ---
-> > > > > > > v3
-> > > > > > > * As suggested by Laurent Pinchart
-> > > > > > > 
-> > > > > > >   - Added external clock input
-> > > > > > >   - Use PLLA ratio set bu MD11 and MD12
-> > > > > > >   - Add _div suffixes of fields of struct cpt_clk_config
-> > > > > > >   - Register PLLA as a fixed factor clock
-> > > > > > >   - Use sizeof() instead of sizeof
-> > > > > > >   - Use num_clks instead of CPG_NUM_CLOCKS in
-> > > > > > >   r8a7779_cpg_clocks_init()
-> > > > > > >   
-> > > > > > >   - I kept this as r8a7779 binding rather than moving to a R-Car
-> > > > > > >   Gen1 binding which could be shared with other SoCs as I do not
-> > > > > > >   believe that the SoCs is are sufficiently similar.
-> > > > > > 
-> > > > > > I had a look at the M1 datasheet and I still find its CPG very
-> > > > > > similar with the H1 CPG. The PLLA multiplier and divider are
-> > > > > > different, but if you look closely, they're both exactly twice the
-> > > > > > value compared to H1, so there's no difference in practice.
-> > > > > > 
-> > > > > > What differences do you see that would make it impractical to share
-> > > > > > a single driver for both ?
-> > > > 
-> > > > Thanks for pointing that out. Looking over the M1 datasheet again I
-> > > > agree with you that there does seem to be rather a lot of similarities
-> > > > with the H1. And I agree that it is likely that the driver could be
-> > > > shared.
-> > > > 
-> > > > However, I'd like to leave that as future work at this time.
-> > > > 
-> > > > The reason for this is that on the one hand I believe such work sould be
-> > > > done in conjunctin with integrating the driver on the bockw board.
-> > > > And that seems to be non-trivial to me.
-> > > 
-> > > We can always rename the driver later, that's not a big issue, but we
-> > > can't change compatibility strings. I would thus like to see
-> > > "renesas,rcar-gen1-cpg-clocks" listed in the DT bindings.
-> > 
-> > I know that we have done such things in the past but these days I feel that
-> > it is a bit contentious as it is a binding for a software abstraction
-> > rather than the hardware. And as far as I know bindings are supposed to
-> > describe the hardware.
-> 
-> Sure, and I consider rcar-gen1-cpf is a hardware description. We have two 
-> generations of SoCs in the R-Car series so far, the first generation (H1 and 
-> M1) and the second generation (H2 and M2). The second generation is even 
-> explictly named as such in the M2 datasheet. SoCs within a generation share 
-> hardware characteristics, and it makes sense to reflect that in compatible 
-> strings.
+On 3/13/2014 11:01 AM, Will Deacon wrote:
+> On Thu, Mar 13, 2014 at 05:49:23PM +0000, Laura Abbott wrote:
+>> It's useful to be able to chain scatterlists together for very large
+>> scatter allocations. Define ARCH_HAS_SG_CHAIN to let this happen.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+>>   arch/arm64/include/asm/scatterlist.h | 21 +++++++++++++++++++++
+>>   1 file changed, 21 insertions(+)
+>>   create mode 100644 arch/arm64/include/asm/scatterlist.h
+>>
+>> diff --git a/arch/arm64/include/asm/scatterlist.h b/arch/arm64/include/asm/scatterlist.h
+>> new file mode 100644
+>> index 0000000..7b2602a
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/scatterlist.h
+>> @@ -0,0 +1,21 @@
+>> +/*
+>> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#ifndef __ASM_SCATTERLIST_H
+>> +#define __ASM_SCATTERLIST_H
+>> +
+>> +#include <asm-generic/scatterlist.h>
+>> +
+>> +#define ARCH_HAS_SG_CHAIN
+>
+> Hmm, I wonder if this should be a Kconfig option instead, to avoid the need
+> for the dummy header?
+>
+> Will
+>
 
-I think that if it is documented, as it is for R-Car Gen 2, then
-this is entirely reasonable and I agree that it describes the hardware.
+Yeah, it does seem non-standard at this point. Something like the
+following perhaps?
 
-However, if it is not documented I don't think that we can make assumptions
-and thus I don't think it is appropriate for R-Car Gen 1.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1594945..8122294 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -82,6 +82,7 @@ config ARM
+  	  <http://www.arm.linux.org.uk/>.
+
+  config ARM_HAS_SG_CHAIN
++	select ARCH_HAS_SG_CHAIN
+  	bool
+
+  config NEED_SG_DMA_LENGTH
+diff --git a/arch/arm/include/asm/scatterlist.h 
+b/arch/arm/include/asm/scatterlist.h
+index cefdb8f..2f87870 100644
+--- a/arch/arm/include/asm/scatterlist.h
++++ b/arch/arm/include/asm/scatterlist.h
+@@ -1,10 +1,6 @@
+  #ifndef _ASMARM_SCATTERLIST_H
+  #define _ASMARM_SCATTERLIST_H
+
+-#ifdef CONFIG_ARM_HAS_SG_CHAIN
+-#define ARCH_HAS_SG_CHAIN
+-#endif
+-
+  #include <asm/memory.h>
+  #include <asm/types.h>
+  #include <asm-generic/scatterlist.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc..f2f95f4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -2,6 +2,7 @@ config ARM64
+  	def_bool y
+  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+  	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_HAS_SG_CHAIN
+  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+  	select ARCH_WANT_OPTIONAL_GPIOLIB
+  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 0c8e553..13e2e8b 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -44,6 +44,7 @@ config IA64
+  	select HAVE_MOD_ARCH_SPECIFIC
+  	select MODULES_USE_ELF_RELA
+  	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_HAS_SG_CHAIN
+  	default y
+  	help
+  	  The Itanium Processor Family is Intel's 64-bit successor to
+diff --git a/arch/ia64/include/asm/scatterlist.h 
+b/arch/ia64/include/asm/scatterlist.h
+index 08fd93b..c19b59d 100644
+--- a/arch/ia64/include/asm/scatterlist.h
++++ b/arch/ia64/include/asm/scatterlist.h
+@@ -2,6 +2,5 @@
+  #define _ASM_IA64_SCATTERLIST_H
+
+  #include <asm-generic/scatterlist.h>
+-#define ARCH_HAS_SG_CHAIN
+
+  #endif /* _ASM_IA64_SCATTERLIST_H */
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 957bf34..659aee2 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -141,6 +141,7 @@ config PPC
+  	select HAVE_DEBUG_STACKOVERFLOW
+  	select HAVE_IRQ_EXIT_ON_IRQ_STACK
+  	select ARCH_USE_CMPXCHG_LOCKREF if PPC64
++	select ARCH_HAS_SG_CHAIN
+
+  config GENERIC_CSUM
+  	def_bool CPU_LITTLE_ENDIAN
+diff --git a/arch/powerpc/include/asm/scatterlist.h 
+b/arch/powerpc/include/asm/scatterlist.h
+index de1f620..1f51af5 100644
+--- a/arch/powerpc/include/asm/scatterlist.h
++++ b/arch/powerpc/include/asm/scatterlist.h
+@@ -12,6 +12,4 @@
+  #include <asm/dma.h>
+  #include <asm-generic/scatterlist.h>
+
+-#define ARCH_HAS_SG_CHAIN
+-
+  #endif /* _ASM_POWERPC_SCATTERLIST_H */
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index 65a0775..d6c2059 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -142,6 +142,7 @@ config S390
+  	select SYSCTL_EXCEPTION_TRACE
+  	select VIRT_CPU_ACCOUNTING
+  	select VIRT_TO_BUS
++	select ARCH_HAS_SG_CHAIN
+
+  config SCHED_OMIT_FRAME_POINTER
+  	def_bool y
+diff --git a/arch/s390/include/asm/scatterlist.h 
+b/arch/s390/include/asm/scatterlist.h
+index 6d45ef6..4aaea56 100644
+--- a/arch/s390/include/asm/scatterlist.h
++++ b/arch/s390/include/asm/scatterlist.h
+@@ -1,3 +1,2 @@
+  #include <asm-generic/scatterlist.h>
+
+-#define ARCH_HAS_SG_CHAIN
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 7d8b7e9..7a179fe 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -42,6 +42,7 @@ config SPARC
+  	select MODULES_USE_ELF_RELA
+  	select ODD_RT_SIGACTION
+  	select OLD_SIGSUSPEND
++	select ARCH_HAS_SG_CHAIN
+
+  config SPARC32
+  	def_bool !64BIT
+diff --git a/arch/sparc/include/asm/scatterlist.h 
+b/arch/sparc/include/asm/scatterlist.h
+index 92bb638..6eab378 100644
+--- a/arch/sparc/include/asm/scatterlist.h
++++ b/arch/sparc/include/asm/scatterlist.h
+@@ -3,6 +3,4 @@
+
+  #include <asm-generic/scatterlist.h>
+
+-#define ARCH_HAS_SG_CHAIN
+-
+  #endif /* !(_SPARC_SCATTERLIST_H) */
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 0af5250..76997dc 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -127,6 +127,7 @@ config X86
+  	select HAVE_DEBUG_STACKOVERFLOW
+  	select HAVE_IRQ_EXIT_ON_IRQ_STACK if X86_64
+  	select HAVE_CC_STACKPROTECTOR
++	select ARCH_HAS_SG_CHAIN
+
+  config INSTRUCTION_DECODER
+  	def_bool y
+diff --git a/arch/x86/include/asm/scatterlist.h 
+b/arch/x86/include/asm/scatterlist.h
+index 4240878..b08f91d 100644
+--- a/arch/x86/include/asm/scatterlist.h
++++ b/arch/x86/include/asm/scatterlist.h
+@@ -3,6 +3,4 @@
+
+  #include <asm-generic/scatterlist.h>
+
+-#define ARCH_HAS_SG_CHAIN
+-
+  #endif /* _ASM_X86_SCATTERLIST_H */
+diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
+index a964f72..4b152c8 100644
+--- a/include/linux/scatterlist.h
++++ b/include/linux/scatterlist.h
+@@ -136,7 +136,7 @@ static inline void sg_set_buf(struct scatterlist 
+*sg, const void *buf,
+  static inline void sg_chain(struct scatterlist *prv, unsigned int 
+prv_nents,
+  			    struct scatterlist *sgl)
+  {
+-#ifndef ARCH_HAS_SG_CHAIN
++#ifndef CONFIG_ARCH_HAS_SG_CHAIN
+  	BUG();
+  #endif
+
+diff --git a/include/scsi/scsi.h b/include/scsi/scsi.h
+index 0a4edfe..d34cf2d 100644
+--- a/include/scsi/scsi.h
++++ b/include/scsi/scsi.h
+@@ -31,7 +31,7 @@ enum scsi_timeouts {
+   * Like SCSI_MAX_SG_SEGMENTS, but for archs that have sg chaining. 
+This limit
+   * is totally arbitrary, a setting of 2048 will get you at least 8mb ios.
+   */
+-#ifdef ARCH_HAS_SG_CHAIN
++#ifdef CONFIG_ARCH_HAS_SG_CHAIN
+  #define SCSI_MAX_SG_CHAIN_SEGMENTS	2048
+  #else
+  #define SCSI_MAX_SG_CHAIN_SEGMENTS	SCSI_MAX_SG_SEGMENTS
+diff --git a/lib/Kconfig b/lib/Kconfig
+index 991c98b..32c68d3 100644
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -451,4 +451,11 @@ config UCS2_STRING
+
+  source "lib/fonts/Kconfig"
+
++#
++# sg chaining option
++#
++
++config ARCH_HAS_SG_CHAIN
++	def_bool n
++
+  endmenu
+diff --git a/lib/scatterlist.c b/lib/scatterlist.c
+index 3a8e8e8..4251cbd 100644
+--- a/lib/scatterlist.c
++++ b/lib/scatterlist.c
+@@ -73,7 +73,7 @@ EXPORT_SYMBOL(sg_nents);
+   **/
+  struct scatterlist *sg_last(struct scatterlist *sgl, unsigned int nents)
+  {
+-#ifndef ARCH_HAS_SG_CHAIN
++#ifndef CONFIG_ARCH_HAS_SG_CHAIN
+  	struct scatterlist *ret = &sgl[nents - 1];
+  #else
+  	struct scatterlist *sg, *ret = NULL;
+@@ -251,7 +251,7 @@ int __sg_alloc_table(struct sg_table *table, 
+unsigned int nents,
+
+  	if (nents == 0)
+  		return -EINVAL;
+-#ifndef ARCH_HAS_SG_CHAIN
++#ifndef CONFIG_ARCH_HAS_SG_CHAIN
+  	if (WARN_ON_ONCE(nents > max_ents))
+  		return -EINVAL;
+  #endif
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
