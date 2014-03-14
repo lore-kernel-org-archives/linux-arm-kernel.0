@@ -1,51 +1,84 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 14 Mar 2014 12:09:39 -0700
-Subject: [PATCH] KVM: ARM: vgic: plug irq injection race
-In-Reply-To: <86d2horgh5.fsf@arm.com>
-References: <1392388086-24730-1-git-send-email-marc.zyngier@arm.com>
- <20140314042052.GH24808@cbox> <86d2horgh5.fsf@arm.com>
-Message-ID: <20140314190939.GE28661@cbox>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 14 Mar 2014 14:25:26 -0500
+Subject: [RFC 0/9] Introduce OPP modifier for ARM SoCs
+Message-ID: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 02:40:22PM +0000, Marc Zyngier wrote:
-> On Fri, Mar 14 2014 at 04:20:52 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Fri, Feb 14, 2014 at 02:28:06PM +0000, Marc Zyngier wrote:
-> >> As it stands, nothing prevents userspace from injecting an interrupt
-> >> before the guest's GIC is actually initialized.
-> >> 
-> >> This goes unnoticed so far (as everything is pretty much statically
-> >> allocated), but ends up exploding in a spectacular way once we switch
-> >> to a more dynamic allocation (the GIC data structure isn't there yet).
-> >> 
-> >> The fix is to test for the "ready" flag in the VGIC distributor before
-> >> trying to inject the interrupt. Note that in order to avoid breaking
-> >> userspace, we have to ignore what is essentially an error.
-> >> 
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic.c | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >> index be456ce..d40fe61 100644
-> >> --- a/virt/kvm/arm/vgic.c
-> >> +++ b/virt/kvm/arm/vgic.c
-> >> @@ -1386,7 +1386,8 @@ out:
-> >>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-> >>  			bool level)
-> >>  {
-> >> -	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-> >> +	if (likely(vgic_initialized(kvm)) &&
-> >
-> > Do we need a barrier in kvm_vgic_init before setting the
-> > kvm->arch.vgic.ready to ensure we observe the correctly initialized
-> > values of the irq_spi_cpu field here?
-> 
-> Ah, I see. Yes, possibly.
-> 
-You can probably just mode the assignment of ready=true below the
-critical section and you should be good, right?
+There are many SoCs that can have different operating points supported
+depending on different conditions even for otherwise identical parts. 
+It does not make sense to define many different iterations of a device tree
+file for each possible permutation of the same device especially when this data
+may exist within the part. 
 
-Thanks,
--Christoffer
+This proposal introduces a framework and example driver to help in enabling
+or disabling appropriate OPPs based on a register value. The information needed
+for deciding which OPPs are to be enabled is defined in the device tree in a
+table so that one device tree file is able to support any version of the part.
+This series is mostly untested besides 335x and only is intended to demonstrate
+the approach for dynamically changing available OPPs.
+
+The framework allows other drivers to register themselves and
+then through a single function call modify which OPPs are available for a device.
+
+The included opp-modifier-reg driver can already support many different SoCs
+that have a manufacturer modifiable register defining which OPPs are possible
+on the SoC. This series includes example entries for am335x, am437x, omap4,
+dra7, and imx6q. 
+
+The opp-modifier-reg driver expects all possible OPPs to be loaded for the
+device already and then is able to modify the table based on the details
+passed compared to the defined register.
+
+This RFC only applies to MPU OPPs and only supports modifying the OPP list to
+contain supported OPPs during boot but this driver could easily be extended
+to support modifying the OPPs of other IPs that have them easily by placing
+the hook (in patch 3 here) elsewhere. The hook for opp-modifier was placed
+in its current only as a proof of concept; if there is a better location it
+should be moved.
+
+This series is tested on am33xx but must be used with 2.x+ silicon as the
+earlier revision does not support the same OPPs. Also for the additional OPPs
+the maximum voltage supplied by the regulator for the MPU rail on both am335
+and am437x would need to be extended but those patches were left out of this
+series to focus on opp-modifier.
+
+Comments? Is this a reasonable direction to take?
+
+Dave Gerlach (9):
+  opp-modifier: Introduce OPP Modifier Framework
+  opp-modifier: Add opp-modifier-reg driver
+  PM / OPP: Add hook to modify OPPs after they are loaded.
+  ARM: dts: AM33XX: Add opp-modifier device entry and add higher OPPs
+  ARM: dts: AM4372: Add opp-modifier device entry and add higher OPPs
+  ARM: dts: omap443x: Add opp-modifier entry and add higher OPPs
+  ARM: dts: omap4460: Add opp-modifier entry and add higher OPPs
+  ARM: dts: dra7: Add opp-modifier device entry and add higher OPPs
+  ARM: dts: imx6q: Add opp-modifier device entry
+
+ .../devicetree/bindings/power/opp-modifier.txt     | 111 +++++++++
+ arch/arm/boot/dts/am33xx.dtsi                      |  27 ++-
+ arch/arm/boot/dts/am4372.dtsi                      |  30 +++
+ arch/arm/boot/dts/dra7.dtsi                        |  18 ++
+ arch/arm/boot/dts/imx6q.dtsi                       |  18 ++
+ arch/arm/boot/dts/omap443x.dtsi                    |  16 ++
+ arch/arm/boot/dts/omap4460.dtsi                    |  17 ++
+ drivers/base/power/opp.c                           |   8 +
+ drivers/power/Makefile                             |   2 +
+ drivers/power/opp/Makefile                         |   2 +
+ drivers/power/opp/core.c                           | 126 ++++++++++
+ drivers/power/opp/opp-modifier-reg.c               | 259 +++++++++++++++++++++
+ include/dt-bindings/opp/imx.h                      |  17 ++
+ include/dt-bindings/opp/ti.h                       |  33 +++
+ include/linux/opp-modifier.h                       |  35 +++
+ 15 files changed, 717 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/opp-modifier.txt
+ create mode 100644 drivers/power/opp/Makefile
+ create mode 100644 drivers/power/opp/core.c
+ create mode 100644 drivers/power/opp/opp-modifier-reg.c
+ create mode 100644 include/dt-bindings/opp/imx.h
+ create mode 100644 include/dt-bindings/opp/ti.h
+ create mode 100644 include/linux/opp-modifier.h
+
+-- 
+1.9.0
