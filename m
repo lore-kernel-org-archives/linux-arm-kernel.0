@@ -1,36 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 14 Mar 2014 10:13:53 +0100
-Subject: [PATCH v3 1/2] i2c: sunxi: Change i2c compatibles
-In-Reply-To: <20140313173128.GC25870@e106331-lin.cambridge.arm.com>
-References: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
- <1394710643-3411-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140313173128.GC25870@e106331-lin.cambridge.arm.com>
-Message-ID: <20140314091353.GK2815@lukather>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 14 Mar 2014 14:45:17 +0530
+Subject: [PATCH] ARM: OMAP2+: hwmod: fix missing braces in _init()
+Message-ID: <1394788517-15014-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 05:31:28PM +0000, Mark Rutland wrote:
-> On Thu, Mar 13, 2014 at 11:37:22AM +0000, Maxime Ripard wrote:
-> > The Allwinner A10 compatibles were following a slightly different compatible
-> > patterns than the rest of the SoCs for historical reasons. Move to the other
-> > pattern for consistency across all Allwinner Socs.
-> 
-> Dropping support for the existing string breaks existing DTBs. Is
-> this really necessary?
+From: Suman Anna <s-anna@ti.com>
 
-I added new ones at first, and Rob said it wasn't worth it since we
-were a "work-in-progress" platform.
+Bug was introduced by commit 'f92d959: ARM: OMAP2+: hwmod:
+Extract no-idle and no-reset info from DT'
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229438.html
+There were 2 versions of the patch posted which resulted in the above
+commit. While v1 [1] had the bug, v2 [2] had it fixed.
+However v1 apparently seemed to have been pulled in by mistake
+introducing the bug.
 
+Given of_find_property() does return NULL when the node passed is
+NULL, it did not introduce any functional issues as such, just the
+fact that the second if check was executed unnecessarily.
+
+[1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg94220.html
+[2] http://www.spinics.net/lists/linux-omap/msg98490.html
+
+Cc: Nishanth Menon <nm@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 1f33f5d..66c60fe 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2546,11 +2546,12 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (np)
++	if (np) {
+ 		if (of_find_property(np, "ti,no-reset-on-init", NULL))
+ 			oh->flags |= HWMOD_INIT_NO_RESET;
+ 		if (of_find_property(np, "ti,no-idle-on-init", NULL))
+ 			oh->flags |= HWMOD_INIT_NO_IDLE;
++	}
+ 
+ 	oh->_state = _HWMOD_STATE_INITIALIZED;
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/8d5d4eb4/attachment.sig>
+1.7.9.5
