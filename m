@@ -1,36 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Mar 2014 14:54:00 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <5322F82A.9000507@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5322F82A.9000507@ahsoftware.de>
-Message-ID: <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
+Date: Fri, 14 Mar 2014 14:59:47 +0100
+Subject: [PATCH 3/3] spi: psdev: add passive serial driver
+In-Reply-To: <20140314102223.GR366@sirena.org.uk>
+References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
+ <20140312163427.GV28112@sirena.org.uk>
+ <20140314101907.GF4234@pengutronix.de>
+ <20140314102223.GR366@sirena.org.uk>
+Message-ID: <CACRpkdZoO_hXw-p5ZHeUzMHULq_DEJNzpim0mcO5DBOgP=d60A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 1:38 PM, Alexander Holler <holler@ahsoftware.de> wrote:
-
->> In that case it is hardly a fix that we need to rush out to the entire
->> world.
+On Fri, Mar 14, 2014 at 11:22 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Mar 14, 2014 at 11:19:07AM +0100, Michael Grzeschik wrote:
 >
-> And I thought the reason for -rc is actually to fix bugs. But I never
-> understood the magical ways and timings patches make their way into
-> mainline. ;)
+>> It is actually not more than that. I took the spidev character device
+>> driver as reference implementation. Any Idea where to put this driver
+>> instead.
+>
+> Like I say somewhere where it sits with other FPGA programming stuff (if
+> that's what it does) would be my first thought.
 
-OK so it works like this: early in the -rc cycle we fix any bugs, documentation
-or whatever. At this point it's *regressions* so the fix need to fix something
-that broke in the merge window (or an earlier merge window).
+I'd suggest you try to use drivers/firmware.
 
-If it is a new feature that never worked in the first place I would
-not call that
-a regression. There are no existing users out there that can experience
-regressions from a previously working system.
-
-So this is why I'm a bit conservative.
+That subsystem is a bit x86-centrix at the moment but looking at the
+stuff that is in there (like supporting BIOS updates through sysfs and
+other low-level firmware communication) this stuff is close enough.
 
 Yours,
 Linus Walleij
