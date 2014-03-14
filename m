@@ -1,170 +1,68 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 14 Mar 2014 14:02:43 +0900
-Subject: [PATCH v11 03/27] iommu/exynos: change error handling when page table
- update is failed
-Message-ID: <20140314140243.853cb1fc76afdc7e713c58da@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 14 Mar 2014 13:55:07 +0900
+Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
+In-Reply-To: <1394734070.26600.6.camel@pippen.local.home>
+References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>	
+ <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>	
+ <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>	
+ <20140313155415.GB25472@mudshark.cambridge.arm.com>
+ <1394734070.26600.6.camel@pippen.local.home>
+Message-ID: <53228BAB.7080005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes not to panic on any error when updating page table.
-Instead prints error messages with callstack.
+On 03/14/2014 03:07 AM, Steven Rostedt wrote:
+> On Thu, 2014-03-13 at 15:54 +0000, Will Deacon wrote:
+>> On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
+>>> CALLER_ADDRx returns caller's address at specified level in call stacks.
+>>> They are used for several tracers like irqsoff and preemptoff.
+>>> Strange to say, however, they are refered even without FTRACE.
+>>>
+>>> Please note that this implementation assumes that we have frame pointers.
+>>> (which means kernel should be compiled with -fno-omit-frame-pointer.)
+>>
+>> How do you ensure that -fno-omit-frame-pointer is passed?
+>
+> Perhaps -pg does the same thing?
+>
+>>> +#define HAVE_ARCH_CALLER_ADDR
+>>> +
+>>> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>>> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
+>>> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
+>>> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
+>>> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
+>>> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
+>>> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>>
+>> Could we change the core definitions of these macros (in linux/ftrace.h) to
+>> use return_address, then provide an overridable version of return_address
+>> that defaults to __builtin_return_address, instead of copy-pasting this
+>> sequence?
+>
+> We could add a new macro:
+>
+> /* All archs should have this, but we define it for consistency */
+> #ifndef ftrace_return_address0
+> # define ftrace_return_address0  __builtin_return_address(0)
+> #endif
+> /* Archs may use other ways for ADDR1 and beyond */
+> #ifndef ftrace_return_address
+> # define ftrace_return_address(n) __builtin_return_address(n)
+> #endif
+>
+> And then have:
+>
+> #define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
+> #define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
+> [...]
+>
+> And then you would only need to redefine ftrace_return_address.
 
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
----
- drivers/iommu/exynos-iommu.c |   58 ++++++++++++++++++++++++++++++++----------
- 1 file changed, 44 insertions(+), 14 deletions(-)
+I'm going to create a separate RFC, including fixes for other archs.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 1c3a397..4a74ed8 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -812,13 +812,18 @@ finish:
- static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
- 					short *pgcounter)
- {
-+	if (lv1ent_section(sent)) {
-+		WARN(1, "Trying mapping on %#08lx mapped with 1MiB page", iova);
-+		return ERR_PTR(-EADDRINUSE);
-+	}
-+
- 	if (lv1ent_fault(sent)) {
- 		unsigned long *pent;
- 
- 		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
- 		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
- 		if (!pent)
--			return NULL;
-+			return ERR_PTR(-ENOMEM);
- 
- 		*sent = mk_lv1ent_page(__pa(pent));
- 		*pgcounter = NUM_LV2ENTRIES;
-@@ -829,14 +834,21 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
- 	return page_entry(sent, iova);
- }
- 
--static int lv1set_section(unsigned long *sent, phys_addr_t paddr, short *pgcnt)
-+static int lv1set_section(unsigned long *sent, unsigned long iova,
-+			  phys_addr_t paddr, short *pgcnt)
- {
--	if (lv1ent_section(sent))
-+	if (lv1ent_section(sent)) {
-+		WARN(1, "Trying mapping on 1MiB@%#08lx that is mapped",
-+			iova);
- 		return -EADDRINUSE;
-+	}
- 
- 	if (lv1ent_page(sent)) {
--		if (*pgcnt != NUM_LV2ENTRIES)
-+		if (*pgcnt != NUM_LV2ENTRIES) {
-+			WARN(1, "Trying mapping on 1MiB@%#08lx that is mapped",
-+				iova);
- 			return -EADDRINUSE;
-+		}
- 
- 		kfree(page_entry(sent, 0));
- 
-@@ -854,8 +866,10 @@ static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
- 								short *pgcnt)
- {
- 	if (size == SPAGE_SIZE) {
--		if (!lv2ent_fault(pent))
-+		if (!lv2ent_fault(pent)) {
-+			WARN(1, "Trying mapping on 4KiB where mapping exists");
- 			return -EADDRINUSE;
-+		}
- 
- 		*pent = mk_lv2ent_spage(paddr);
- 		pgtable_flush(pent, pent + 1);
-@@ -864,7 +878,10 @@ static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
- 		int i;
- 		for (i = 0; i < SPAGES_PER_LPAGE; i++, pent++) {
- 			if (!lv2ent_fault(pent)) {
--				memset(pent, 0, sizeof(*pent) * i);
-+				WARN(1,
-+				"Trying mapping on 64KiB where mapping exists");
-+				if (i > 0)
-+					memset(pent - i, 0, sizeof(*pent) * i);
- 				return -EADDRINUSE;
- 			}
- 
-@@ -892,7 +909,7 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 	entry = section_entry(priv->pgtable, iova);
- 
- 	if (size == SECT_SIZE) {
--		ret = lv1set_section(entry, paddr,
-+		ret = lv1set_section(entry, iova, paddr,
- 					&priv->lv2entcnt[lv1ent_offset(iova)]);
- 	} else {
- 		unsigned long *pent;
-@@ -900,17 +917,16 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 		pent = alloc_lv2entry(entry, iova,
- 					&priv->lv2entcnt[lv1ent_offset(iova)]);
- 
--		if (!pent)
--			ret = -ENOMEM;
-+		if (IS_ERR(pent))
-+			ret = PTR_ERR(pent);
- 		else
- 			ret = lv2set_page(pent, paddr, size,
- 					&priv->lv2entcnt[lv1ent_offset(iova)]);
- 	}
- 
--	if (ret) {
-+	if (ret)
- 		pr_debug("%s: Failed to map iova 0x%lx/0x%x bytes\n",
- 							__func__, iova, size);
--	}
- 
- 	spin_unlock_irqrestore(&priv->pgtablelock, flags);
- 
-@@ -924,6 +940,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
- 	struct sysmmu_drvdata *data;
- 	unsigned long flags;
- 	unsigned long *ent;
-+	size_t err_pgsize;
- 
- 	BUG_ON(priv->pgtable == NULL);
- 
-@@ -932,7 +949,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
- 	ent = section_entry(priv->pgtable, iova);
- 
- 	if (lv1ent_section(ent)) {
--		BUG_ON(size < SECT_SIZE);
-+		if (size < SECT_SIZE) {
-+			err_pgsize = SECT_SIZE;
-+			goto err;
-+		}
- 
- 		*ent = 0;
- 		pgtable_flush(ent, ent + 1);
-@@ -964,7 +984,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
- 	}
- 
- 	/* lv1ent_large(ent) == true here */
--	BUG_ON(size < LPAGE_SIZE);
-+	if (size < LPAGE_SIZE) {
-+		err_pgsize = LPAGE_SIZE;
-+		goto err;
-+	}
- 
- 	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
- 	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
-@@ -979,8 +1002,15 @@ done:
- 		sysmmu_tlb_invalidate_entry(data->dev, iova);
- 	spin_unlock_irqrestore(&priv->lock, flags);
- 
--
- 	return size;
-+err:
-+	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-+
-+	WARN(1,
-+	"%s: Failed due to size(%#x) @ %#08lx is smaller than page size %#x\n",
-+	__func__, size, iova, err_pgsize);
-+
-+	return 0;
- }
- 
- static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
--- 
-1.7.9.5
+-Takahiro AKASHI
+
+> -- Steve
+>
+>
