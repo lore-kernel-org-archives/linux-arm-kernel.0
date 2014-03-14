@@ -1,43 +1,51 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 14 Mar 2014 10:07:44 +0100
-Subject: [PATCH] net: phy: fix uninitalized ethtool_wolinfo in phy_suspend
-In-Reply-To: <20140313.153832.967564223480298567.davem@davemloft.net>
-References: <20140313.153832.967564223480298567.davem@davemloft.net>
-Message-ID: <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Fri, 14 Mar 2014 10:12:45 +0100
+Subject: [PATCH v7][ 1/5] video: mx3fb: Use devm_kzalloc
+Message-ID: <1394788369-5096-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Callers of phy_ethtool_get_wol are supposed to provide a properly
-cleared struct ethtool_wolinfo. Therefore, fix phy_suspend to clear
-it before passing it to phy_ethtool_get_wol.
+Replace kzalloc by devm_kzalloc and remove the kfree() calls.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-Cc: David Miller <davem@davemloft.net>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Ben Hutchings <ben@decadent.org.uk>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+ChangeLog v6->v7:
+- Removed the Cc from the patch, they went into 
+  git send-email instead.
+ChangeLog v5->v6:
+ - New patch need
 ---
- drivers/net/phy/phy_device.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/video/fbdev/mx3fb.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 4b03e63639b7..7512e28866f1 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -683,10 +683,9 @@ EXPORT_SYMBOL(phy_detach);
- int phy_suspend(struct phy_device *phydev)
- {
- 	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
--	struct ethtool_wolinfo wol;
-+	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
+diff --git a/drivers/video/fbdev/mx3fb.c b/drivers/video/fbdev/mx3fb.c
+index 142e860..ee95de8 100644
+--- a/drivers/video/fbdev/mx3fb.c
++++ b/drivers/video/fbdev/mx3fb.c
+@@ -1496,7 +1496,7 @@ static int mx3fb_probe(struct platform_device *pdev)
+ 	if (!sdc_reg)
+ 		return -EINVAL;
  
- 	/* If the device has WOL enabled, we cannot suspend the PHY */
--	wol.cmd = ETHTOOL_GWOL;
- 	phy_ethtool_get_wol(phydev, &wol);
- 	if (wol.wolopts)
- 		return -EBUSY;
+-	mx3fb = kzalloc(sizeof(*mx3fb), GFP_KERNEL);
++	mx3fb = devm_kzalloc(&pdev->dev, sizeof(*mx3fb), GFP_KERNEL);
+ 	if (!mx3fb)
+ 		return -ENOMEM;
+ 
+@@ -1542,7 +1542,6 @@ ersdc0:
+ 	dmaengine_put();
+ 	iounmap(mx3fb->reg_base);
+ eremap:
+-	kfree(mx3fb);
+ 	dev_err(dev, "mx3fb: failed to register fb\n");
+ 	return ret;
+ }
+@@ -1561,7 +1560,6 @@ static int mx3fb_remove(struct platform_device *dev)
+ 	dmaengine_put();
+ 
+ 	iounmap(mx3fb->reg_base);
+-	kfree(mx3fb);
+ 	return 0;
+ }
+ 
 -- 
-1.8.5.3
+1.7.9.5
