@@ -1,59 +1,36 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 14 Mar 2014 14:38:57 -0700
-Subject: [PATCH v17 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <201403142206.36611.arnd@arndb.de>
-References: <1394655573-32645-1-git-send-email-lho@apm.com>
- <201403142005.52991.arnd@arndb.de>
- <CAPw-ZT=1KWEowD_i=qoWwg372XdzC4p227rpNo7ov+NwOYFUDA@mail.gmail.com>
- <201403142206.36611.arnd@arndb.de>
-Message-ID: <CAPw-ZTkk3n_6wh-bWnaMf0aL6mgZWxNH7Sf=J9ucv0uvH2trVw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 14 Mar 2014 15:57:44 -0700
+Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <001201cf245e$37a37a20$a6ea6e60$@samsung.com>
+References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
+ <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
+ <003501cf23de$a4a878d0$edf96a70$@samsung.com>
+ <CAAhSdy3Y3N7pSr3Y0rB7p340sX_kGPFT7mmBa2Rvf2pdSJYAfA@mail.gmail.com>
+ <003a01cf23e4$07f07af0$17d170d0$@samsung.com>
+ <CAAhSdy2p5rfBR59sGbs_mZvh3WmnPAJA2=OwEmdN2xrxp7R2Ug@mail.gmail.com>
+ <001201cf245e$37a37a20$a6ea6e60$@samsung.com>
+Message-ID: <20140314225744.GH28661@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sat, Feb 08, 2014 at 08:42:09AM +0900, Jungseok Lee wrote:
 
->> >> > gets called. Can you clarify what this register access does?
->> >> > If it's just setting a index into a mux output, would it make
->> >> > sense to have an optional DT property containing an integer with
->> >> > the mux setting you want to set? That way you wouldn't even
->> >> > have to have two compatible strings but just do
->> >> >
->> >> >         ret = of_property_read_u32(node, "apm,ahci-mux", &mux);
->> >> >         if (!ret)
->> >> >                 xgene_ahci_mux_select(ctx, mux);
->> >> >
->> >>
->> >> Given that fact that I will break up the resource. Let's just use the
->> >> resource for the MUX to handle this. For the IP that doesn't existed,
->> >> I will just not list it.
->> >
->> > Ah, that sounds good. It also means that if the firmware has set up
->> > the mux already, you don't have to touch it again. That would probably
->> > be the preferred case.
->> >
->> > I'm undecided about the value that you write in there. That could either
->> > be passed through DT as I suggested above for extra flexibility, or you
->> > can keep it hardcoded if you are absolutely sure that there will never
->> > need to be a case where you have to set it to something other than '1',
->>
->> It is only a mux between two IP's. Writing 1 is fine. For ACPI, it can
->> be missing and handled by the firmware or can be handled just like the
->> DTS way.
->
-> Why can't you have it handled by the firmware in the DTS case?
->
-> I still think it's rather unlikely that we will actually see ACPI support
-> on your platform, btw.
->
-> I'm willing to look at the patches you need for it, but I'm not very
-> optimistic, in particular because of the kind of hacks you need
-> for random bits of hardware.
->
+[...]
 
-I am about to post another version. Can you look at the next version?
-If you still think it needs to be moved to the FW (either U-Boot or
-Tianocore UEFI boot loader), I will then move out of the Linux driver
-code.
+> 
+> No, I am not.
+> My original intention is to clarify the interface between KVM and VM if
+> DVFS scheme is applied to VM. Currently, PSCI v0.2 does not define it.
+> Thus, I wonder why this interface is not covered.
+> 
 
--Loc
+Why would you run DVFS in a VM?  When the VCPUs in a VM are idle they
+consume zero resources.  The host would be doing the DVFS for thermal
+regulation and such.
+
+The only thing I can see being relevant is having some mechanism of
+informing the host of characteristics of the guest so the host can be
+more educated when enforcing power policy, but that requires a
+theoretical discussion and rationale first.
+
+-Christoffer
