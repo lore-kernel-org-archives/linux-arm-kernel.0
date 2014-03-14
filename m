@@ -1,68 +1,94 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 14 Mar 2014 13:55:07 +0900
-Subject: [PATCH v6 6/7] arm64: ftrace: Add CALLER_ADDRx macros
-In-Reply-To: <1394734070.26600.6.camel@pippen.local.home>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>	
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>	
- <1394705630-12384-7-git-send-email-takahiro.akashi@linaro.org>	
- <20140313155415.GB25472@mudshark.cambridge.arm.com>
- <1394734070.26600.6.camel@pippen.local.home>
-Message-ID: <53228BAB.7080005@linaro.org>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 14 Mar 2014 14:02:54 +0900
+Subject: [PATCH v11 04/27] iommu/exynos: fix L2TLB invalidation
+Message-ID: <20140314140254.32dbc0cd8cde8f4ffcf71c9f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 03:07 AM, Steven Rostedt wrote:
-> On Thu, 2014-03-13 at 15:54 +0000, Will Deacon wrote:
->> On Thu, Mar 13, 2014 at 10:13:49AM +0000, AKASHI Takahiro wrote:
->>> CALLER_ADDRx returns caller's address at specified level in call stacks.
->>> They are used for several tracers like irqsoff and preemptoff.
->>> Strange to say, however, they are refered even without FTRACE.
->>>
->>> Please note that this implementation assumes that we have frame pointers.
->>> (which means kernel should be compiled with -fno-omit-frame-pointer.)
->>
->> How do you ensure that -fno-omit-frame-pointer is passed?
->
-> Perhaps -pg does the same thing?
->
->>> +#define HAVE_ARCH_CALLER_ADDR
->>> +
->>> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
->>> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
->>> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
->>> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
->>> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
->>> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
->>> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
->>
->> Could we change the core definitions of these macros (in linux/ftrace.h) to
->> use return_address, then provide an overridable version of return_address
->> that defaults to __builtin_return_address, instead of copy-pasting this
->> sequence?
->
-> We could add a new macro:
->
-> /* All archs should have this, but we define it for consistency */
-> #ifndef ftrace_return_address0
-> # define ftrace_return_address0  __builtin_return_address(0)
-> #endif
-> /* Archs may use other ways for ADDR1 and beyond */
-> #ifndef ftrace_return_address
-> # define ftrace_return_address(n) __builtin_return_address(n)
-> #endif
->
-> And then have:
->
-> #define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
-> #define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
-> [...]
->
-> And then you would only need to redefine ftrace_return_address.
+L2TLB is 8-way set-associative TLB with 512 entries. The number of
+sets is 64.
+A single 4KB(small page) translation information is cached
+only to a set whose index is the same with the lower 6 bits of the page
+frame number.
+A single 64KB(large page) translation information can be
+cached to any 16 sets whose top two bits of their indices are the same
+with the bit [5:4] of the page frame number.
+A single 1MB(section) or larger translation information can be cached to
+any set in the TLB.
 
-I'm going to create a separate RFC, including fixes for other archs.
+It is required to invalidate entire sets that may cache the target
+translation information to guarantee that the L2TLB has no stale data.
 
--Takahiro AKASHI
+Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+---
+ drivers/iommu/exynos-iommu.c |   31 ++++++++++++++++++++++++++-----
+ 1 file changed, 26 insertions(+), 5 deletions(-)
 
-> -- Steve
->
->
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 4a74ed8..0d26aeb 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -225,9 +225,14 @@ static void __sysmmu_tlb_invalidate(void __iomem *sfrbase)
+ }
+ 
+ static void __sysmmu_tlb_invalidate_entry(void __iomem *sfrbase,
+-						unsigned long iova)
++				unsigned long iova, unsigned int num_inv)
+ {
+-	__raw_writel((iova & SPAGE_MASK) | 1, sfrbase + REG_MMU_FLUSH_ENTRY);
++	unsigned int i;
++	for (i = 0; i < num_inv; i++) {
++		__raw_writel((iova & SPAGE_MASK) | 1,
++				sfrbase + REG_MMU_FLUSH_ENTRY);
++		iova += SPAGE_SIZE;
++	}
+ }
+ 
+ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
+@@ -477,7 +482,8 @@ static bool exynos_sysmmu_disable(struct device *dev)
+ 	return disabled;
+ }
+ 
+-static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
++static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
++					size_t size)
+ {
+ 	unsigned long flags;
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+@@ -487,9 +493,24 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
+ 	if (is_sysmmu_active(data)) {
+ 		int i;
+ 		for (i = 0; i < data->nsfrs; i++) {
++			unsigned int maj;
++			unsigned int num_inv = 1;
++			maj = __raw_readl(data->sfrbases[i] + REG_MMU_VERSION);
++			/*
++			 * L2TLB invalidation required
++			 * 4KB page: 1 invalidation
++			 * 64KB page: 16 invalidation
++			 * 1MB page: 64 invalidation
++			 * because it is set-associative TLB
++			 * with 8-way and 64 sets.
++			 * 1MB page can be cached in one of all sets.
++			 * 64KB page can be one of 16 consecutive sets.
++			 */
++			if ((maj >> 28) == 2) /* major version number */
++				num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
+ 			if (sysmmu_block(data->sfrbases[i])) {
+ 				__sysmmu_tlb_invalidate_entry(
+-						data->sfrbases[i], iova);
++					data->sfrbases[i], iova, num_inv);
+ 				sysmmu_unblock(data->sfrbases[i]);
+ 			}
+ 		}
+@@ -999,7 +1020,7 @@ done:
+ 
+ 	spin_lock_irqsave(&priv->lock, flags);
+ 	list_for_each_entry(data, &priv->clients, node)
+-		sysmmu_tlb_invalidate_entry(data->dev, iova);
++		sysmmu_tlb_invalidate_entry(data->dev, iova, size);
+ 	spin_unlock_irqrestore(&priv->lock, flags);
+ 
+ 	return size;
+-- 
+1.7.9.5
