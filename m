@@ -1,70 +1,110 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 14 Mar 2014 14:25:33 -0500
-Subject: [RFC 7/9] ARM: dts: omap4460: Add opp-modifier entry and add higher
- OPPs
+Date: Fri, 14 Mar 2014 14:25:30 -0500
+Subject: [RFC 4/9] ARM: dts: AM33XX: Add opp-modifier device entry and add
+ higher OPPs
 In-Reply-To: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
 References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1394825135-60110-8-git-send-email-d-gerlach@ti.com>
+Message-ID: <1394825135-60110-5-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for opp_modifier which configures OPPs on omap4460. Within
-this, nodes are defined with the opp-modifier propety that are defined
-as a list of frequency, offset from base register, and register value.
-The CPU node passes a phandle to the appropriate child node to get the
-correct table.
+Add an entry for opp_modifier which configures OPPs on am33xx. Within this
+nodes are defined with opp-modifier propety that are defined as a list
+of frequency, offset from base register, and efuse value. The CPU node
+passes a phandle to the appropriate child node of the efuse node.
 
-This patch also adds higher eFused OPPs for omap4460.
+This patch also adds the ES2.x OPPs for am33xx.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/omap4460.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi | 27 +++++++++++++++++++++++++--
+ include/dt-bindings/opp/ti.h  | 22 ++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 2 deletions(-)
+ create mode 100644 include/dt-bindings/opp/ti.h
 
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-index 6b32f52..5271121 100644
---- a/arch/arm/boot/dts/omap4460.dtsi
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -8,6 +8,7 @@
-  * kind, whether express or implied.
-  */
- #include "omap4.dtsi"
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 6d95d3d..a09f4fb 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/am33xx.h>
 +#include <dt-bindings/opp/ti.h>
  
- / {
- 	cpus {
-@@ -18,9 +19,13 @@
- 				350000  1025000
- 				700000  1200000
- 				920000  1313000
-+				1200000 1380000
-+				1500000 1390000
- 			>;
- 			clock-latency = <300000>; /* From legacy driver */
+ #include "skeleton.dtsi"
  
+@@ -52,12 +53,17 @@
+ 			 */
+ 			operating-points = <
+ 				/* kHz    uV */
++				1000000 1351000
++				800000	1285000
+ 				720000  1285000
+ 				600000  1225000
+-				500000  1125000
+-				275000  1125000
++				300000  1125000
+ 			>;
++
+ 			voltage-tolerance = <2>; /* 2 percentage */
++
 +			platform-opp-modifier = <&mpu_opp_modifier>;
 +
- 			/* cooling options */
- 			cooling-min-level = <0>;
- 			cooling-max-level = <2>;
-@@ -50,6 +55,18 @@
- 
- 			#thermal-sensor-cells = <0>;
+ 			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 	};
+@@ -818,6 +824,23 @@
+ 			reg = <0x48310000 0x2000>;
+ 			interrupts = <111>;
  		};
 +
-+		opp_modifier: opp_modifier at 0x4A002218 {
++		opp_modifier: opp_modifier at 0x44e107fc {
 +			compatible = "opp-modifier-reg-bit";
-+			reg = <0x4A002218 0x04>;
++			reg = <0x44e107fc 0x04>;
++
++			opp,reg-bit-enable-low;
 +
 +			mpu_opp_modifier: mpu_opp_modifier {
 +				opp-modifier = <
 +				/* kHz	offset	value */
-+				1500000	0	OMAP4_EFUSE_HAS_PERF_SILICON_BIT
++				1000000	0	AM33XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT
++				800000	0	AM33XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT
++				720000	0	AM33XX_EFUSE_SMA_OPP_120_720MHZ_BIT
++				600000	0	AM33XX_EFUSE_SMA_OPP_100_600MHZ_BIT
 +				>;
 +			};
 +		};
  	};
  };
  
+diff --git a/include/dt-bindings/opp/ti.h b/include/dt-bindings/opp/ti.h
+new file mode 100644
+index 0000000..58436c1
+--- /dev/null
++++ b/include/dt-bindings/opp/ti.h
+@@ -0,0 +1,22 @@
++/*
++ * This header provides constants for TI SoC OPP bindings.
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __DT_BINDINGS_OPP_TI_H__
++#define __DT_BINDINGS_OPP_TI_H__
++
++#define AM33XX_EFUSE_SMA_OPP_50_300MHZ_BIT              (1 << 4)
++#define AM33XX_EFUSE_SMA_OPP_100_300MHZ_BIT             (1 << 5)
++#define AM33XX_EFUSE_SMA_OPP_100_600MHZ_BIT             (1 << 6)
++#define AM33XX_EFUSE_SMA_OPP_120_720MHZ_BIT             (1 << 7)
++#define AM33XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT		(1 << 8)
++#define AM33XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT             (1 << 9)
++
++#endif		/* __DT_BINDINGS_OPP_TI_H__ */
 -- 
 1.9.0
