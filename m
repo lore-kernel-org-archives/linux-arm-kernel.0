@@ -1,55 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Mar 2014 20:52:13 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <53234B68.5090300@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5322F82A.9000507@ahsoftware.de>
- <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
- <53234B68.5090300@ahsoftware.de>
-Message-ID: <CACRpkdZ2+kfOim1OEWbYR_Tj36i+8HmYXh+nqO9h1Em8gqy=3Q@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 14 Mar 2014 12:52:25 -0700
+Subject: [PATCHv2 3/3] arm64: Use arm64 coherent APIs for non-coherent freeing
+In-Reply-To: <1394732716-11507-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1394826745-24191-3-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 7:33 PM, Alexander Holler <holler@ahsoftware.de> wrote:
-> Am 14.03.2014 14:54, schrieb Linus Walleij:
->
->> On Fri, Mar 14, 2014 at 1:38 PM, Alexander Holler <holler@ahsoftware.de>
->> wrote:
->>
->>>> In that case it is hardly a fix that we need to rush out to the entire
->>>> world.
->>>
->>>
->>> And I thought the reason for -rc is actually to fix bugs. But I never
->>> understood the magical ways and timings patches make their way into
->>> mainline. ;)
->>
->>
->> OK so it works like this: early in the -rc cycle we fix any bugs,
->> documentation
->> or whatever. At this point it's *regressions* so the fix need to fix
->> something
->> that broke in the merge window (or an earlier merge window).
->
->
-> Sorry, but I don't believe that. It's always time to fix regressions and
-> bugs.
+The noncoherent free function currently unconditionally frees
+back to the page allocator which is incorrect for CMA pages.
+call the coherent free function to correctly differentiate
+between pages.
 
-This thing is not binary. Please consult
-Documentation/development-process/2.Process
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm64/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-In this case we are very late in the release cycle, the patch is not
-a simple oneliner and I need some more backing proof to know it
-is a reasonable fix to push at this time and will not cause new
-problems.
-
-So a few Tested-by's from the people using this driver would for
-example convince me that it is solving a real problem for them
-and it needs to go into fixes.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 608c343..99ff063 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -104,7 +104,7 @@ static void arm64_swiotlb_free_noncoherent(struct device *dev, size_t size,
+ 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+ 
+ 	vunmap(vaddr);
+-	swiotlb_free_coherent(dev, size, swiotlb_addr, dma_handle);
++	arm64_swiotlb_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+ }
+ 
+ static dma_addr_t arm64_swiotlb_map_page(struct device *dev,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
