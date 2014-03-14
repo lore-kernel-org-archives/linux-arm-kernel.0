@@ -1,194 +1,202 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 14 Mar 2014 13:45:13 +0900
-Subject: [PATCH v6 4/7] arm64: Add ftrace support
-In-Reply-To: <20140313170834.GE25472@mudshark.cambridge.arm.com>
-References: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705630-12384-5-git-send-email-takahiro.akashi@linaro.org>
- <20140313170834.GE25472@mudshark.cambridge.arm.com>
-Message-ID: <53228959.3040000@linaro.org>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 14 Mar 2014 13:59:08 +0900
+Subject: [PATCH v11 00/27] iommu/exynos: Fixes and Enhancements of System MMU
+ driver with DT
+Message-ID: <20140314135908.91d5da82f455051e56bee4d6@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 02:08 AM, Will Deacon wrote:
-> On Thu, Mar 13, 2014 at 10:13:47AM +0000, AKASHI Takahiro wrote:
->> This patch implements arm64 specific part to support function tracers,
->> such as function (CONFIG_FUNCTION_TRACER), function_graph
->> (CONFIG_FUNCTION_GRAPH_TRACER) and function profiler
->> (CONFIG_FUNCTION_PROFILER).
->>
->> With 'function' tracer, all the functions in the kernel are traced with
->> timestamps in ${sysfs}/tracing/trace. If function_graph tracer is
->> specified, call graph is generated.
->>
->> The kernel must be compiled with -pg option so that _mcount() is inserted
->> at the beginning of functions. This function is called on every function's
->> entry as long as tracing is enabled.
->> In addition, function_graph tracer also needs to be able to probe function's
->> exit. ftrace_graph_caller() & return_to_handler do this by faking link
->> register's value to intercept function's return path.
->>
->> More details on architecture specific requirements are described in
->> Documentation/trace/ftrace-design.txt.
->
-> [...]
+Sorry for the delayed posting the v11 patchset.
 
-You seem not to like this statement :-)
+The current exynos-iommu(System MMU) driver does not work autonomously
+since it is lack of support for power management of peripheral blocks.
+For example, MFC device driver must ensure that its System MMU is disabled
+before MFC block is power-down not to invalidate IOTLB in the System MMU
+when I/O memory mapping is changed. Because a System MMU resides in the
+same H/W block, access to control registers of System MMU while the H/W
+block is turned off must be prohibited.
 
->> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
->> new file mode 100644
->> index 0000000..0ac31c8
->> --- /dev/null
->> +++ b/arch/arm64/kernel/entry-ftrace.S
->> @@ -0,0 +1,175 @@
->> +/*
->> + * arch/arm64/kernel/entry-ftrace.S
->> + *
->> + * Copyright (C) 2013 Linaro Limited
->> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +#include <asm/ftrace.h>
->> +#include <asm/insn.h>
->> +
->> +/*
->> + * Gcc with -pg will put the following code in the beginning of each function:
->> + *      mov x0, x30
->> + *      bl _mcount
->> + *     [function's body ...]
->> + * "bl _mcount" may be replaced to "bl ftrace_caller" or NOP if dynamic
->> + * ftrace is enabled.
->> + *
->> + * Please note that x0 as an argument will not be used here because we can
->> + * get lr(x30) of instrumented function at any time by winding up call stack
->> + * as long as the kernel is compiled without -fomit-frame-pointer.
->> + * (or CONFIG_FRAME_POINTER, this is forced on arm64)
->> + *
->> + * stack layout after mcount_enter in _mcount():
->> + *
->> + * current sp/fp =>  0:+-----+
->> + * in _mcount()               | x29 | -> instrumented function's fp
->> + *                    +-----+
->> + *                    | x30 | -> _mcount()'s lr (= instrumented function's pc)
->> + * old sp      => +16:+-----+
->> + * when instrumented   |     |
->> + * function calls      | ... |
->> + * _mcount()          |     |
->> + *                    |     |
->> + * instrumented => +xx:+--- --+
->> + * function's fp       | x29 | -> parent's fp
->> + *                    +-----+
->> + *                    | x30 | -> instrumented function's lr (= parent's pc)
->> + *                    +-----+
->> + *                    | ... |
->
-> I guess it's just the diff that's misaligning your ASCII art here?
+This set of changes solves the above problem with setting each System MMUs
+as the parent of the device which owns the System MMU to receive the
+information when the device is turned off or turned on.
 
-Yes, I think so. Misaligned due to "tab"
+Another big change to the driver is the support for devicetree.
+The bindings for System MMU is described in
+Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
 
->> +/*
->> + * void return_to_handler(void)
->> + *
->> + * Run ftrace_return_to_handler() before going back to parent.
->> + * @fp is checked against the value passed by ftrace_graph_caller()
->> + * only when CONFIG_FUNCTION_GRAPH_FP_TEST is enabled.a
->> + */
->> +       .global return_to_handler
->> +return_to_handler:
->
-> ENTRY(return_to_handler)
+In addition, this patchset also includes several bug fixes and enhancements
+of the current driver.
 
-Fix it.
+Change log:
+v11:
+- Rebased on the latest works on clock, arm/samsung, iommu branches
+- Change the property to link System MMU and its master H/W
+  'iommu' in the master's node -> 'mmu-masters' in the System MMU's node
+- Changed compatible string:
+  "samsung,sysmmu-v1"
+  "samsung,sysmmu-v2"
+  "samsung,sysmmu-v3.1"
+  "samsung,sysmmu-v3.2"
+  "samsung,sysmmu-v3.3"
+- Change the implementation of retrieving System MMU version -> simpler
+- Check NULL pointer before call to clk_enable() and clk_disable()
+- Allow a single master to link to multiple System MMUs.
+  (fimc-is, fimd/g2d/Scaler in Exynos5420)
+- Workarounds of known problems of System MMU
+- Code enhancements:
+  * Compilable for 64-bit
+  * Enhanced error messages
 
->> +       str     x0, [sp, #-16]!
->> +       mov     x0, x29                 //     parent's fp
->> +       bl      ftrace_return_to_handler// addr = ftrace_return_to_hander(fp);
->> +       mov     x30, x0                 // restore the original return address
->> +       ldr     x0, [sp], #16
->> +       ret
->
-> and an ENDPROC here.
+v10:
+- Rebased on the following branches
+  git.linaro.org/git-ro/people/mturquette/linux.git/clk-next
+  git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
+  git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
+  git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/master (3.12-rc3)
+- Set parent clock to all System MMU clocks.
+- Add clock and DT descriptos for Exynos5420
+- Modified error handling in exynos_iommu_init()
+- Split "iommu/exynos: support for device tree" patch into the following 6 patches
+  iommu/exynos: handle only one instance of System MMU
+  iommu/exynos: always enable runtime PM
+  iommu/exynos: always use a single clock descriptor
+  iommu/exynos: remove dbgname from drvdata of a System MMU
+  iommu/exynos: use managed driver helper functions
+  iommu/exynos: support for device tree
+- Remove 'interrupt-names' and 'status' properties from DT
+- Change n:1 relationship between master:System MMU into 1:1 relationship.
+- Removed custom fault handler and print the status of System MMU
+  whenever System MMU fault is occurred.
+- Post Antonios Motakis's commit together:
+  "iommu/exynos: add devices attached to the System MMU to an IOMMU group"
 
-Fix it.
-But please note that this (return_to_handler) is not a real function.
-Declaring it as ENDPROC is not very useful.
+v9:
+- Rebased on the following branches
+  git.linaro.org/git-ro/people/mturquette/linux.git/clk-next
+  git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/samsung-next
+  git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/master (3.11-rc4)
+- Split "add bus notifier for registering System MMU" into 5 patches
+- Call clk_prepare() that was missing in v8.
+- Fixed base address of sysmmu_tv in exynos4210.dtsi
+- BUG_ON() instead of return -EADDRINUSE when trying mapping on an mapped area
+- Moved camif_top to 317 in drivers/clk/samsung/clk-exynos5250.c
+- Removed 'iommu' property from 'codec'(mfc) node
+- Does not make 'master' clock to be the parent of 'sysmmu' clock.
+   'master' clock is enabled before accessing control registers of System MMU
+   and disabled after the access.
 
->> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
->> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
->> new file mode 100644
->> index 0000000..a559ab8
->> --- /dev/null
->> +++ b/arch/arm64/kernel/ftrace.c
->> @@ -0,0 +1,64 @@
->> +/*
->> + * arch/arm64/kernel/ftrace.c
->> + *
->> + * Copyright (C) 2013 Linaro Limited
->> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/ftrace.h>
->> +#include <linux/swab.h>
->> +#include <linux/uaccess.h>
->> +
->> +#include <asm/cacheflush.h>
->> +#include <asm/ftrace.h>
->> +#include <asm/insn.h>
->> +
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +/*
->> + * function_graph tracer expects ftrace_return_to_handler() to be called
->> + * on the way back to parent. For this purpose, this function is called
->> + * in _mcount() or ftrace_caller() to replace return address (*parent) on
->> + * the call stack to return_to_handler.
->> + *
->> + * Note that @frame_pointer is used only for sanity check later.
->> + */
->> +void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
->> +                          unsigned long frame_pointer)
->> +{
->> +       unsigned long return_hooker = (unsigned long)&return_to_handler;
->> +       unsigned long old;
->> +       struct ftrace_graph_ent trace;
->> +       int err;
->> +
->> +       if (unlikely(atomic_read(&current->tracing_graph_pause)))
->> +               return;
->> +
->> +       /*
->> +        * Note:
->> +        * No protection against faulting at *parent, which may be seen
->> +        * on other archs. It's unlikely on AArch64.
->> +        */
->> +       old = *parent;
->> +       *parent = return_hooker;
->
-> return_hook? People might take it personally otherwise ;)
+v8:
+- Reordered patch list: moved "change rwloc to spinlock" to the last.
+- Fixed remained bug in "fix page table maintenance".
+- Always return 0 from exynos_iommu_attach_device().
+- Removed prefetch buffer setting when System MMU is enabled
+  due to the restriction of prefetch buffers:
+  A prefetch buffer must not hit from more than one DMA.
+  For instance with GScalers, if a single prefetch buffer is initialized
+  with 0x0 ~ 0xFFFFFFFF and a GScaler works on source buffer at 0x10000000
+  and target buffer @ 0x20000000, the System MMU may be got deadlock.
+  Clients must initialize prefetch buffers with custom function defined
+  in exynos-iommu drivers whenever they need to enable prefetch buffers.
+- The clock of System MMU has no relationship with the clock of its master H/W.
+  The clock of master H/W is always enabled when exynos-iommu driver needs to
+  access MMIO area and disabled as soon as the access finishes.
+- Removed err_page variable used in exynos_iommu_unmap() in the previous patch
+  "fix page table maintenance".
+- Split a big patch "add bus notifier for registering System MMU".
+   Extracted the following 2 patches: 9/12 and 10/12.
+- And some additional fixes...
 
-I didn't know what "(return) hooker" means.
-Anyway, leave it as it is after you and Steven's discussion.
+v7:
+- Rebased on the stable 3.10
+- Registered PM domains and gate clocks with DT
+- Changed connection method between a System MMU and its master H/W
+   'mmu-master' property in the node of System MMU
+   --> 'iommu' property in the node of master H/W
+- Marking device descriptor of master H/W of a System MMU with bus notifier.
+- Power management (PM_RUNTIME, PM_SLEEP) of System MMUs with gpd_dev_ops
+   of Generic IO Powerdomain. gpd_dev_ops are set to the master H/Ws
+   before they are probed in the bus notifier.
+- Removed additional debugging features like debugfs entries and
+   version names.
+- Removed support for advanced features of System MMU 3.2 and 3.3
+   the current IOMMU API cannot handle the feature
+  (A kind of L2 TLB that fetches several consequence page table entries.
+   It must be initialized by the driver of master H/W whenever it works.)
 
->> +       trace.func = self_addr;
->
-> in kernel/ftrace/ftrace.c there's an smb_wmb() between setting up
-> tracing_graph_pause and setting the ret_stack with a comment saying:
->
->      /* Make sure the tasks see the -1 first: */
->
-> Why don't we have a corresponding read-barrier here?
+v6:
+- Rebased on the branch, next/iommu-exynos of
+  git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-I think Steven answered it.
+v5:
+- new bugfix: patch 01
+- Reordered patches
+  * patch 01 ~ 05: Bugfix and enhancements of the existing driver
+  * patch 06 ~ 10: Device Tree support and callbacks for power management
+  * patch 11     : System MMU 3.2 and 3.3 support
+  * patch 12 ~ 14: Debugging features
+- Additional code compaction
 
--Takahiro AKASHI
+v4:
+- Remove Change-Id from v3 patches
+- Change the order of the third and the first patch
+  Thanks to Kukjin Kim.
+- Fix memory leak when allocating and assigning exynos_iommu_owner to client
+  device if the client device has multiple System MMUs.
+  Thanks to Rahul Sharma.
 
-> Will
->
+v3:
+- Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+- Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+  Thanks to Prathyush.
+
+v2:
+- Split the patch to iommu/exynos into 9 patches
+- Support for System MMU 3.3
+- Some code compaction
+
+
+Patch summary:
+[PATCH v11 01/27] iommu/exynos: do not include removed header
+[PATCH v11 02/27] iommu/exynos: add missing cache flush for removed page table entries
+[PATCH v11 03/27] iommu/exynos: change error handling when page table update is failed
+[PATCH v11 04/27] iommu/exynos: fix L2TLB invalidation
+[PATCH v11 05/27] iommu/exynos: remove prefetch buffer setting
+[PATCH v11 06/27] iommu/exynos: allocate lv2 page table from own slab
+[PATCH v11 07/27] iommu/exynos: always enable runtime PM
+[PATCH v11 08/27] iommu/exynos: always use a single clock descriptor
+[PATCH v11 09/27] iommu/exynos: remove dbgname from drvdata of a System MMU
+[PATCH v11 10/27] iommu/exynos: use managed device helper functions
+[PATCH v11 11/27] clk: exynos: add gate clock descriptions of System MMU
+[PATCH v11 12/27] ARM: dts: Add description of System MMU of Exynos SoCs
+[PATCH v11 13/27] iommu/exynos: support for device tree
+[PATCH v11 14/27] iommu/exynos: gating clocks of master H/W
+[PATCH v11 15/27] iommu/exynos: use convenient macro to handle gate clocks
+[PATCH v11 16/27] iommu/exynos: remove custom fault handler
+[PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API functions
+[PATCH v11 18/27] iommu/exynos: turn on useful configuration options
+[PATCH v11 19/27] iommu/exynos: add support for power management subsystems.
+[PATCH v11 20/27] iommu/exynos: allow having multiple System MMUs for a master H/W
+[PATCH v11 21/27] iommu/exynos: change rwlock to spinlock
+[PATCH v11 22/27] iommu/exynos: add devices attached to the System MMU to an IOMMU group
+[PATCH v11 23/27] iommu/exynos: fix address handling
+[PATCH v11 24/27] iommu/exynos: use exynos-iommu specific typedef
+[PATCH v11 25/27] iommu/exynos: use simpler function to get MMU version
+[PATCH v11 26/27] iommu/exynos: apply workaround of caching fault page table entries
+[PATCH v11 27/27] iommu/exynos: enhanced error messages
+
+Diffstats:
+ .../devicetree/bindings/clock/exynos5250-clock.txt |    3 +
+ .../devicetree/bindings/clock/exynos5420-clock.txt |    3 +
+ .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |   86 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |  107 ++
+ arch/arm/boot/dts/exynos4210.dtsi                  |   23 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   77 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |  266 +++-
+ arch/arm/boot/dts/exynos5420.dtsi                  |  205 ++-
+ drivers/clk/samsung/clk-exynos5250.c               |    5 +
+ drivers/clk/samsung/clk-exynos5420.c               |   13 +-
+ drivers/iommu/Kconfig                              |    5 +-
+ drivers/iommu/exynos-iommu.c                       | 1421 ++++++++++++++------
+ include/dt-bindings/clock/exynos5250.h             |    4 +
+ include/dt-bindings/clock/exynos5420.h             |    6 +-
+ 14 files changed, 1798 insertions(+), 426 deletions(-)
