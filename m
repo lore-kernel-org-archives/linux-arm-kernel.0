@@ -1,242 +1,157 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Mar 2014 18:17:21 +0100
-Subject: RESEND [PATCH V9 2/2] ARM: dts: exynos5250: Enable ahci sata and
- sata phy
-In-Reply-To: <CAKuRcOLC-2rP1O4Lk=TjsZw4RLx5DzdddU07QRHmsqvzGFB87Q@mail.gmail.com>
-References: <1393931452-18237-1-git-send-email-yuvaraj.cd@samsung.com>
- <5315D5D6.2070308@ti.com>
- <CAKuRcOLC-2rP1O4Lk=TjsZw4RLx5DzdddU07QRHmsqvzGFB87Q@mail.gmail.com>
-Message-ID: <532339A1.7060509@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 14 Mar 2014 17:19:22 +0000
+Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <201403141805.29204.arnd@arndb.de>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-3-git-send-email-Liviu.Dudau@arm.com>
+ <201403141805.29204.arnd@arndb.de>
+Message-ID: <20140314171921.GY6457@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yuvaraj,
+On Fri, Mar 14, 2014 at 05:05:28PM +0000, Arnd Bergmann wrote:
+> On Friday 14 March 2014, Liviu Dudau wrote:
+> > +int of_pci_range_to_resource(struct of_pci_range *range,
+> > +       struct device_node *np, struct resource *res)
+> > +{
+> > +       res->flags = range->flags;
+> > +       if (res->flags & IORESOURCE_IO) {
+> > +               unsigned long port = -1;
+> > +               int err = pci_register_io_range(range->cpu_addr, range->size);
+> > +               if (err)
+> > +                       return err;
+> > +               port = pci_address_to_pio(range->cpu_addr);
+> > +               if (port == (unsigned long)-1) {
+> > +                       res->start = (resource_size_t)OF_BAD_ADDR;
+> > +                       res->end = (resource_size_t)OF_BAD_ADDR;
+> > +                       return -EINVAL;
+> > +               }
+> 
+> The error handling is inconsistent here: in one case you set the resource
+> to OF_BAD_ADDR, in the other one you don't.
+> 
+> 	Arnd
+> 
 
-On 14.03.2014 09:25, Yuvaraj Kumar wrote:
-> kgene,
-> Please pick this patch.
->
-> On Tue, Mar 4, 2014 at 7:02 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>
->>
->> On Tuesday 04 March 2014 04:40 PM, Yuvaraj Kumar C D wrote:
->>>
->>> This patch adds dt entry for ahci sata controller and its
->>> corresponding phy controller.phy node has been added w.r.t
->>> new generic phy framework.
->>>
->>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>
->>
->> FWIW
->> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
->>
->>> ---
->>>    .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --------
->>>    .../devicetree/bindings/ata/exynos-sata.txt        |   25 +++++++++-----
->>>    .../devicetree/bindings/phy/samsung-phy.txt        |   36
->>> ++++++++++++++++++++
->>>    arch/arm/boot/dts/exynos5250-arndale.dts           |   21 ++++++++++++
->>>    arch/arm/boot/dts/exynos5250-smdk5250.dts          |   17 +++++----
->>>    arch/arm/boot/dts/exynos5250.dtsi                  |   18 +++++++---
->>>    6 files changed, 98 insertions(+), 33 deletions(-)
->>>    delete mode 100644
->>> Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
->>> b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
->>> deleted file mode 100644
->>> index 37824fa..0000000
->>> --- a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
->>> +++ /dev/null
->>> @@ -1,14 +0,0 @@
->>> -* Samsung SATA PHY Controller
->>> -
->>> -SATA PHY nodes are defined to describe on-chip SATA Physical layer
->>> controllers.
->>> -Each SATA PHY controller should have its own node.
->>> -
->>> -Required properties:
->>> -- compatible        : compatible list, contains
->>> "samsung,exynos5-sata-phy"
->>> -- reg               : <registers mapping>
->>> -
->>> -Example:
->>> -        sata at ffe07000 {
->>> -                compatible = "samsung,exynos5-sata-phy";
->>> -                reg = <0xffe07000 0x1000>;
->>> -        };
->>> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt
->>> b/Documentation/devicetree/bindings/ata/exynos-sata.txt
->>> index 0849f10..b2adb1f 100644
->>> --- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
->>> +++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
->>> @@ -4,14 +4,21 @@ SATA nodes are defined to describe on-chip Serial ATA
->>> controllers.
->>>    Each SATA controller should have its own node.
->>>
->>>    Required properties:
->>> -- compatible        : compatible list, contains "samsung,exynos5-sata"
->>> -- interrupts        : <interrupt mapping for SATA IRQ>
->>> -- reg               : <registers mapping>
->>> -- samsung,sata-freq : <frequency in MHz>
->>> +- compatible           : compatible list, contains "samsung,exynos5-sata"
->>> +- interrupts           : <interrupt mapping for SATA IRQ>
->>> +- reg                  : <registers mapping>
->>> +- samsung,sata-freq    : <frequency in MHz>
->>> +- phys                 : as mentioned in phy-bindings.txt
->>> +- phy-names            : as mentioned in phy-bindings.txt
->>>
->>>    Example:
->>> -        sata at ffe08000 {
->>> -                compatible = "samsung,exynos5-sata";
->>> -                reg = <0xffe08000 0x1000>;
->>> -                interrupts = <115>;
->>> -        };
->>> +       sata at 122f0000 {
->>> +               compatible = "snps,dwc-ahci";
->>> +               samsung,sata-freq = <66>;
->>> +               reg = <0x122f0000 0x1ff>;
->>> +               interrupts = <0 115 0>;
->>> +               clocks = <&clock 277>, <&clock 143>;
->>> +               clock-names = "sata", "sclk_sata";
->>> +               phys = <&sata_phy>;
->>> +               phy-names = "sata-phy";
->>> +       };
->>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>> b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>> index c0fccaa..a937f75 100644
->>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>> @@ -20,3 +20,39 @@ Required properties:
->>>    - compatible : should be "samsung,exynos5250-dp-video-phy";
->>>    - reg : offset and length of the Display Port PHY register set;
->>>    - #phy-cells : from the generic PHY bindings, must be 0;
->>> +
->>> +Samsung SATA PHY Controller
->>> +---------------------------
->>> +
->>> +SATA PHY nodes are defined to describe on-chip SATA Physical layer
->>> controllers.
->>> +Each SATA PHY controller should have its own node.
->>> +
->>> +Required properties:
->>> +- compatible        : compatible list, contains
->>> "samsung,exynos5250-sata-phy"
->>> +- reg : offset and length of the SATA PHY register set;
->>> +- #phy-cells : from the generic phy bindings;
->>> +
->>> +Example:
->>> +       sata_phy: sata-phy at 12170000 {
->>> +               compatible = "samsung,exynos5250-sata-phy";
->>> +               reg = <0x12170000 0x1ff>;
->>> +               clocks = <&clock 287>;
->>> +               clock-names = "sata_phyctrl";
->>> +               #phy-cells = <0>;
->>> +               samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
->>> +               samsung,syscon-phandle = <&pmu_syscon>;
+You are right, that was lazy of me. What about this version?
 
-The example lists properties that are not documented by the text above 
-(clocks, clock-names, samsung,exynos-sataphy-i2c-phandle, 
-samsung,syscon-phandle). Why is so?
+8<----------------------------------------------------
 
->>> +       };
->>> +
->>> +Device-Tree bindings for sataphy i2c client driver
->>> +--------------------------------------------------
->>> +
->>> +Required properties:
->>> +compatible: Should be "samsung,exynos-sataphy-i2c"
->>> +- reg: I2C address of the sataphy i2c device.
->>> +
->>> +Example:
->>> +
->>> +       sata_phy_i2c:sata-phy at 38 {
->>> +               compatible = "samsung,exynos-sataphy-i2c";
->>> +               reg = <0x38>;
->>> +       };
->>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts
->>> b/arch/arm/boot/dts/exynos5250-arndale.dts
->>> index 38b96a4..97eef40 100644
->>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->>> @@ -375,6 +375,27 @@
->>>                  };
->>>          };
->>>
->>> +       i2c at 121D0000 {
->>> +               status = "okay";
->>> +               samsung,i2c-sda-delay = <100>;
->>> +               samsung,i2c-max-bus-freq = <40000>;
->>> +               samsung,i2c-slave-addr = <0x38>;
->>> +
->>> +               sata_phy_i2c:sata-phy at 38 {
->>> +                       compatible = "samsung,exynos-sataphy-i2c";
->>> +                       reg = <0x38>;
->>> +               };
+>From acfd63b5c48b4a9066ab0b373633c5bb4feaadf5 Mon Sep 17 00:00:00 2001
+From: Liviu Dudau <Liviu.Dudau@arm.com>
+Date: Fri, 28 Feb 2014 12:40:46 +0000
+Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
 
-This node should be present in SoC-level dtsi file, as the address of 
-the PHY does not depend on particular board.
+The ranges property for a host bridge controller in DT describes
+the mapping between the PCI bus address and the CPU physical address.
+The resources framework however expects that the IO resources start
+at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+The conversion from pci ranges to resources failed to take that into account.
 
->>> +       };
->>> +
->>> +       sata at 122F0000 {
->>> +               status = "okay";
->>> +       };
->>> +
->>> +       sata-phy at 12170000 {
->>> +               status = "okay";
->>> +               samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
+In the process move the function into drivers/of/address.c as it now
+depends on pci_address_to_pio() code and make it return an error message.
 
-Same here. The value of samsung,exynos-sataphy-i2c-phandle property is 
-not board-specific and should be in higher level dtsi file.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+---
+ drivers/of/address.c       | 45 ++++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h | 13 ++---------
+ 2 files changed, 47 insertions(+), 11 deletions(-)
 
->>> +       };
->>> +
->>>          mmc_0: mmc at 12200000 {
->>>                  status = "okay";
->>>                  num-slots = <1>;
->>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> index f76946e..81782c1b 100644
->>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> @@ -242,16 +242,12 @@
->>>                  samsung,i2c-slave-addr = <0x38>;
->>>                  status = "okay";
->>>
->>> -               sata-phy {
->>> -                       compatible = "samsung,sata-phy";
->>> +               sata_phy_i2c:sata-phy at 38 {
->>> +                       compatible = "samsung,exynos-sataphy-i2c";
->>>                          reg = <0x38>;
->>>                  };
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index be958ed..673c050 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -728,3 +728,48 @@ void __iomem *of_iomap(struct device_node *np, int index)
+ 	return ioremap(res.start, resource_size(&res));
+ }
+ EXPORT_SYMBOL(of_iomap);
++
++/**
++ * of_pci_range_to_resource - Create a resource from an of_pci_range
++ * @range:	the PCI range that describes the resource
++ * @np:		device node where the range belongs to
++ * @res:	pointer to a valid resource that will be updated to
++ *              reflect the values contained in the range.
++ *
++ * Returns EINVAL if the range cannot be converted to resource.
++ *
++ * Note that if the range is an IO range, the resource will be converted
++ * using pci_address_to_pio() which can fail if it is called too early or
++ * if the range cannot be matched to any host bridge IO space (our case here).
++ * To guard against that we try to register the IO range first.
++ * If that fails we know that pci_address_to_pio() will do too.
++ */
++int of_pci_range_to_resource(struct of_pci_range *range,
++	struct device_node *np, struct resource *res)
++{
++	res->flags = range->flags;
++	res->parent = res->child = res->sibling = NULL;
++	res->name = np->full_name;
++
++	if (res->flags & IORESOURCE_IO) {
++		unsigned long port = -1;
++		int err = pci_register_io_range(range->cpu_addr, range->size);
++		if (err)
++			goto invalid_range;
++		port = pci_address_to_pio(range->cpu_addr);
++		if (port == (unsigned long)-1) {
++			err = -EINVAL;
++			goto invalid_range;
++		}
++		res->start = port;
++	} else {
++		res->start = range->cpu_addr;
++	}
++	res->end = res->start + range->size - 1;
++	return 0;
++
++invalid_range:
++	res->start = (resource_size_t)OF_BAD_ADDR;
++	res->end = (resource_size_t)OF_BAD_ADDR;
++	return err;
++}
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 40c418d..a4b400d 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -23,17 +23,8 @@ struct of_pci_range {
+ #define for_each_of_pci_range(parser, range) \
+ 	for (; of_pci_range_parser_one(parser, range);)
+ 
+-static inline void of_pci_range_to_resource(struct of_pci_range *range,
+-					    struct device_node *np,
+-					    struct resource *res)
+-{
+-	res->flags = range->flags;
+-	res->start = range->cpu_addr;
+-	res->end = range->cpu_addr + range->size - 1;
+-	res->parent = res->child = res->sibling = NULL;
+-	res->name = np->full_name;
+-}
+-
++extern int of_pci_range_to_resource(struct of_pci_range *range,
++		struct device_node *np, struct resource *res);
+ /* Translate a DMA address from device space to CPU space */
+ extern u64 of_translate_dma_address(struct device_node *dev,
+ 				    const __be32 *in_addr);
+-- 
+1.9.0
 
-Ditto.
-
->>>          };
->>>
->>> -       sata at 122F0000 {
->>> -               samsung,sata-freq = <66>;
->>> -       };
->>> -
->>>          i2c at 12C80000 {
->>>                  samsung,i2c-sda-delay = <100>;
->>>                  samsung,i2c-max-bus-freq = <66000>;
->>> @@ -274,6 +270,15 @@
->>>                  };
->>>          };
->>>
->>> +       sata at 122F0000 {
->>> +               status = "okay";
->>> +       };
->>> +
->>> +       sata-phy at 12170000 {
->>> +               status = "okay";
->>> +               samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
->>> +       };
-
-Ditto.
+>8--------------------------------------------------------
 
 Best regards,
-Tomasz
+Liviu
+
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
