@@ -1,46 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Mar 2014 18:22:09 +0100
-Subject: [PATCH] ata: ahci_platform: fix devm_ioremap_resource() return value
- checking
-Message-ID: <2139783.QvectlX5nq@amdc1032>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Mar 2014 18:23:04 +0100
+Subject: [PATCH] ARM: dts: exynos4210-trats: add max8997 IRQ
+In-Reply-To: <1394792001-7837-1-git-send-email-r.baldyga@samsung.com>
+References: <1394792001-7837-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <53233AF8.9020501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource() returns a pointer to the remapped memory or
-an ERR_PTR() encoded error code on failure.  Fix the check inside
-ahci_platform_get_resources() accordingly.
+Hi Robert,
 
-Also while at it remove a needless line break.
+On 14.03.2014 11:13, Robert Baldyga wrote:
+> This patch adds device tree node for IRQ used by max8997.
+>
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Compile tested only.
+Generally, this patch does not add just a node, but rather "IRQ line 
+specification for the MAX8997 PMIC chip and necessary pinctrl group to 
+configure pull-up and driver strength of the pin".
 
- drivers/ata/ahci_platform.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Also it would be nice to mention a reason for this change, e.g. what can 
+be achieved after applying this patch.
 
-Index: b/drivers/ata/ahci_platform.c
-===================================================================
---- a/drivers/ata/ahci_platform.c	2014-03-14 16:45:04.056724383 +0100
-+++ b/drivers/ata/ahci_platform.c	2014-03-14 17:54:12.504653647 +0100
-@@ -199,8 +199,7 @@ static void ahci_platform_put_resources(
-  * RETURNS:
-  * The allocated ahci_host_priv on success, otherwise an ERR_PTR value
-  */
--struct ahci_host_priv *ahci_platform_get_resources(
--	struct platform_device *pdev)
-+struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct ahci_host_priv *hpriv;
-@@ -219,8 +218,9 @@ struct ahci_host_priv *ahci_platform_get
- 
- 	hpriv->mmio = devm_ioremap_resource(dev,
- 			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
--	if (!hpriv->mmio) {
-+	if (IS_ERR(hpriv->mmio)) {
- 		dev_err(dev, "no mmio space\n");
-+		rc = PTR_ERR(hpriv->mmio);
- 		goto err_out;
- 	}
- 
+Otherwise looks good.
+
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+--
+Best regards,
+Tomasz
+
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4210-trats.dts |   13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+> index 1d18428..0e1fc19 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -148,6 +148,14 @@
+>   		};
+>   	};
+>
+> +	pinctrl at 11000000 {
+> +		max8997_irq: max8997-irq {
+> +			samsung,pins = "gpx0-7";
+> +			samsung,pin-pud = <3>;
+> +			samsung,pin-drv = <0>;
+> +		};
+> +	};
+> +
+>   	i2c at 13890000 {
+>   		samsung,i2c-sda-delay = <100>;
+>   		samsung,i2c-slave-addr = <0x10>;
+> @@ -179,6 +187,11 @@
+>   		max8997_pmic at 66 {
+>   			compatible = "maxim,max8997-pmic";
+>
+> +			pinctrl-0 = <&max8997_irq>;
+> +			pinctrl-names = "default";
+> +
+> +			interrupt-parent = <&gpx0>;
+> +			interrupts = <7 0>;
+>   			reg = <0x66>;
+>
+>   			max8997,pmic-buck1-uses-gpio-dvs;
+>
