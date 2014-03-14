@@ -1,21 +1,19 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Mar 2014 10:27:17 -0400
-Subject: [GIT PULL] clk: mvebu: Armada 3xx changes for v3.15 (incr. #2)
-Message-ID: <20140314142717.GC15608@titan.lakedaemon.net>
+Date: Fri, 14 Mar 2014 10:38:31 -0400
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (incr. #5)
+Message-ID: <20140314143831.GD15608@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Guys,
 
-This is a small pull request, and should be the last one for v3.15.  We
-have a small fix for the new driver we introduced in v3.15, and we're
-expanding the core divider to support another SoC.
+Well, I lied :)  I thought round #4 would be the last one, but we have
+one more.  This is a small set of changes, but it adds nand support for
+the brand new Armada 38x SoCs.  It'd be really nice to get it in for
+v3.15.
 
-Due to some great work by Ezequiel and others, this is a small and simple
-change to make.
-
-This pull request is an incremental pull from tags/clk-mvebu-3xx-3.15 up
-to tags/clk-mvebu-3xx-3.15-2 in the mvebu/clk-3xx branch.
+As usual, this is an incremental pull request from tags/mvebu-dt-3.15-4
+up to tags/mvebu-dt-3.15-5 in the mvebu/dt branch.
 
 Please pull.
 
@@ -24,33 +22,36 @@ thx,
 Jason.
 
 
-The following changes since commit e9646fe1169de0162d461472df7ed19e0c729b61:
+The following changes since commit df76299fecb3d921e4762ae540e33d8b9b1c3c1e:
 
-  dt: Update binding information for mvebu gating clocks with Armada 380/385 (2014-02-17 02:34:08 +0000)
+  ARM: dove: drop pinctrl PMU reg property (2014-03-06 20:20:33 +0000)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3xx-3.15-2
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15-5
 
-for you to fetch changes up to e69a8543ec7730c46225c886f74f0ea57e4656c5:
+for you to fetch changes up to 4de29e636946dbc97586de6136a3c496a55fd5e6:
 
-  clk: mvebu: Update binding documentation for the core divider clock (2014-03-13 23:24:23 +0000)
-
-----------------------------------------------------------------
-clock: mvebu new SoC changes for v3.15 (incremental pull #2)
-
- - mvebu (Armada 375)
-    - fix ratio register offest
-
- - mvebu (Armada 380)
-    - expand core divider clock driver to support 380 SoC (enables nand support)
+  ARM: mvebu: Enable NAND controller in Armada 385-DB (2014-03-13 23:37:17 +0000)
 
 ----------------------------------------------------------------
-Ezequiel Garcia (3):
-      clk: mvebu: Fix ratio register offset on A375 SoC
-      clk: mvebu: Support Armada 380 SoC on the core divider clock
-      clk: mvebu: Update binding documentation for the core divider clock
+mvebu dt changes for v3.15 (incremental #5)
 
- .../bindings/clock/mvebu-corediv-clock.txt         |  5 ++++-
- drivers/clk/mvebu/clk-corediv.c                    | 25 +++++++++++++++++++++-
- 2 files changed, 28 insertions(+), 2 deletions(-)
+ - mvebu
+
+    - 38x
+       - add 2GHz fixed clock, core divider clock, and nand controller
+
+    - 385
+       - add nand controller and partitions to 385-DB board
+
+----------------------------------------------------------------
+Ezequiel Garcia (4):
+      ARM: mvebu: Add a 2 GHz fixed-clock on Armada 38x SoCs
+      ARM: mvebu: Add the Core Divider clock to Armada 38x SoCs
+      ARM: mvebu: Add support for NAND controller in Armada 38x SoC
+      ARM: mvebu: Enable NAND controller in Armada 385-DB
+
+ arch/arm/boot/dts/armada-385-db.dts | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-38x.dtsi   | 25 +++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
