@@ -1,96 +1,222 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 14 Mar 2014 14:25:31 -0500
-Subject: [RFC 5/9] ARM: dts: AM4372: Add opp-modifier device entry and add
- higher OPPs
+Date: Fri, 14 Mar 2014 14:25:27 -0500
+Subject: [RFC 1/9] opp-modifier: Introduce OPP Modifier Framework
 In-Reply-To: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
 References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1394825135-60110-6-git-send-email-d-gerlach@ti.com>
+Message-ID: <1394825135-60110-2-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for opp_modifier which configures OPPs on AM4372. Within
-this, nodes are defined with the opp-modifier propety that are defined as
-a list of frequency, offset from base register, and efuse value.
-The CPU node passes a phandle to the appropriate child node to get the
-correct table.
+Introduce framework to allow an OPP modifier driver to selectively
+determine which possible OPPs for an SoC are available based on
+register values found in SoC through a common API.
 
-This patch also adds higher eFused OPPs for AM4372.
+Three functions are exported, a register and unregister function for
+the opp modifier drivers to notify the API of their existence, and
+opp_modify_dev_table which looks up the appropriate driver and
+DT information to use for a device and then uses enable/disable to
+change which previously loaded OPPs are available on the device.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi | 30 ++++++++++++++++++++++++++++++
- include/dt-bindings/opp/ti.h  |  6 ++++++
- 2 files changed, 36 insertions(+)
+ drivers/power/Makefile       |   2 +
+ drivers/power/opp/Makefile   |   1 +
+ drivers/power/opp/core.c     | 126 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/opp-modifier.h |  35 ++++++++++++
+ 4 files changed, 164 insertions(+)
+ create mode 100644 drivers/power/opp/Makefile
+ create mode 100644 drivers/power/opp/core.c
+ create mode 100644 include/linux/opp-modifier.h
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index c6bd4d9..dbaa2e3 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -9,6 +9,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/opp/ti.h>
- 
- #include "skeleton.dtsi"
- 
-@@ -33,6 +34,17 @@
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <0>;
+diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+index ee54a3e..ed379cf 100644
+--- a/drivers/power/Makefile
++++ b/drivers/power/Makefile
+@@ -58,3 +58,5 @@ obj-$(CONFIG_POWER_AVS)		+= avs/
+ obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
+ obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
+ obj-$(CONFIG_POWER_RESET)	+= reset/
 +
-+			operating-points = <
-+				/* kHz    uV */
-+				300000	950000
-+				600000	1100000
-+				720000	1200000
-+				800000	1260000
-+				1000000 1325000
-+			>;
++obj-y				+= opp/
+diff --git a/drivers/power/opp/Makefile b/drivers/power/opp/Makefile
+new file mode 100644
+index 0000000..820eb10
+--- /dev/null
++++ b/drivers/power/opp/Makefile
+@@ -0,0 +1 @@
++obj-y += core.o
+diff --git a/drivers/power/opp/core.c b/drivers/power/opp/core.c
+new file mode 100644
+index 0000000..403013b
+--- /dev/null
++++ b/drivers/power/opp/core.c
+@@ -0,0 +1,126 @@
++/*
++ * OPP Modifier framework
++ *
++ * Copyright (C) 2013 Texas Instruments Inc.
++ * Dave Gerlach <d-gerlach@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+			platform-opp-modifier = <&mpu_opp_modifier>;
- 		};
- 	};
- 
-@@ -662,6 +674,24 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		opp_modifier: opp_modifier at 0x44e10610 {
-+			compatible = "opp-modifier-reg-bit";
-+			reg = <0x44e10610 0x04>;
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/export.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include <linux/opp-modifier.h>
 +
-+			opp,reg-bit-enable-low;
++static DEFINE_MUTEX(opp_modifier_list_mutex);
++static LIST_HEAD(opp_modifier_list);
 +
-+			mpu_opp_modifier: mpu_opp_modifier {
-+				opp-modifier = <
-+				/* kHz	offset	value */
-+				1000000	0	AM43XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT
-+				800000	0	AM43XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT
-+				720000	0	AM43XX_EFUSE_SMA_OPP_120_720MHZ_BIT
-+				600000	0	AM43XX_EFUSE_SMA_OPP_100_600MHZ_BIT
-+				300000	0	AM43XX_EFUSE_SMA_OPP_50_300MHZ_BIT
-+				>;
-+			};
-+		};
++static int opp_modify_dev_opp_table(struct opp_modifier_dev *opp_dev,
++				    struct device *dev)
++{
++	if (opp_dev->ops->modify)
++		return opp_dev->ops->modify(dev);
 +
- 		mcasp0: mcasp at 48038000 {
- 			compatible = "ti,am33xx-mcasp-audio";
- 			ti,hwmods = "mcasp0";
-diff --git a/include/dt-bindings/opp/ti.h b/include/dt-bindings/opp/ti.h
-index 58436c1..d3717be 100644
---- a/include/dt-bindings/opp/ti.h
-+++ b/include/dt-bindings/opp/ti.h
-@@ -19,4 +19,10 @@
- #define AM33XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT		(1 << 8)
- #define AM33XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT             (1 << 9)
- 
-+#define AM43XX_EFUSE_SMA_OPP_50_300MHZ_BIT              (1 << 0)
-+#define AM43XX_EFUSE_SMA_OPP_100_600MHZ_BIT             (1 << 2)
-+#define AM43XX_EFUSE_SMA_OPP_120_720MHZ_BIT             (1 << 3)
-+#define AM43XX_EFUSE_SMA_OPP_TURBO_800MHZ_BIT		(1 << 4)
-+#define AM43XX_EFUSE_SMA_OPP_NITRO_1GHZ_BIT             (1 << 5)
++	return -EINVAL;
++}
 +
- #endif		/* __DT_BINDINGS_OPP_TI_H__ */
++static struct opp_modifier_dev *opp_modifier_get(struct device *dev)
++{
++	struct opp_modifier_dev *o, *opp_dev;
++	struct device_node *np;
++
++	if (!dev)
++		return ERR_PTR(-EINVAL);
++
++	np = of_parse_phandle(dev->of_node, "platform-opp-modifier", 0);
++
++	if (!np)
++		return ERR_PTR(-ENOSYS);
++
++	opp_dev = NULL;
++
++	mutex_lock(&opp_modifier_list_mutex);
++
++	list_for_each_entry(o, &opp_modifier_list, list) {
++		if (of_get_parent(np) == o->of_node) {
++			opp_dev = o;
++			break;
++		}
++	}
++
++	if (!opp_dev) {
++		mutex_unlock(&opp_modifier_list_mutex);
++		return ERR_PTR(-EINVAL);
++	}
++
++	of_node_put(np);
++
++	try_module_get(opp_dev->owner);
++	mutex_unlock(&opp_modifier_list_mutex);
++
++	return opp_dev;
++}
++
++static void opp_modifier_put(struct opp_modifier_dev *opp_dev)
++{
++	if (IS_ERR(opp_dev))
++		return;
++
++	module_put(opp_dev->owner);
++}
++
++int opp_modifier_register(struct opp_modifier_dev *opp_dev)
++{
++	mutex_lock(&opp_modifier_list_mutex);
++	list_add(&opp_dev->list, &opp_modifier_list);
++	mutex_unlock(&opp_modifier_list_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(opp_modifier_register);
++
++void opp_modifier_unregister(struct opp_modifier_dev *opp_dev)
++{
++	mutex_lock(&opp_modifier_list_mutex);
++	list_del(&opp_dev->list);
++	mutex_unlock(&opp_modifier_list_mutex);
++}
++EXPORT_SYMBOL_GPL(opp_modifier_unregister);
++
++int opp_modify_dev_table(struct device *dev)
++{
++	struct opp_modifier_dev *opp_dev;
++	int ret;
++
++	opp_dev = opp_modifier_get(dev);
++
++	/*
++	 * It is a valid case for a device to not implement
++	 * an OPP modifier table so return 0 if not present
++	 */
++
++	if (IS_ERR(opp_dev) && PTR_ERR(opp_dev) == -ENOSYS) {
++		dev_dbg(dev, "No platform-opp-modifier entry present\n");
++		return 0;
++	} else if (IS_ERR(opp_dev)) {
++		return PTR_ERR(opp_dev);
++	}
++
++	ret = opp_modify_dev_opp_table(opp_dev, dev);
++
++	opp_modifier_put(opp_dev);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(opp_modify_dev_table);
+diff --git a/include/linux/opp-modifier.h b/include/linux/opp-modifier.h
+new file mode 100644
+index 0000000..8d50851
+--- /dev/null
++++ b/include/linux/opp-modifier.h
+@@ -0,0 +1,35 @@
++/*
++ * TI OPP Modifier Core API
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ * Dave Gerlach <d-gerlach@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_OPP_MODIFIER_H__
++#define __LINUX_OPP_MODIFIER_H__
++
++struct opp_modifier_dev {
++	struct opp_modifier_ops *ops;
++	struct module *owner;
++	struct list_head list;
++	struct device_node *of_node;
++};
++
++struct opp_modifier_ops {
++	int (*modify)(struct device *dev);
++};
++
++int opp_modifier_register(struct opp_modifier_dev *opp_dev);
++void opp_modifier_unregister(struct opp_modifier_dev *opp_dev);
++int opp_modify_dev_table(struct device *dev);
++
++#endif          /* __LINUX_OPP_MODIFIER_H__ */
 -- 
 1.9.0
