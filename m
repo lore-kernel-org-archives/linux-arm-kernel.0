@@ -1,91 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Mar 2014 14:39:33 +0100
-Subject: [PATCH v11 13/27] iommu/exynos: support for device tree
-In-Reply-To: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
-References: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
-Message-ID: <53230695.9080606@samsung.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 14 Mar 2014 09:43:24 -0400
+Subject: [PATCH v3 0/5] Add Broadcom Kona PWM Support
+In-Reply-To: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20140314134324.GY25092@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+On Wed, Mar 12, 2014 at 01:15:41PM -0700, Tim Kryger wrote:
+> This series introduces the driver for the Kona PWM controller found in
+> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
+> defconfig to enable use of this hardware on the bcm28155 AP board.
+> 
+> Changes since v2:
+>   - SoC DTS file updated to use real clock's phandle + specifier
+>   - Toggle smooth mode off during apply so new settings take immediately
+> 
+> Changes since v1:
+>   - Fixed up macros to be clearer and more complete
+>   - Corrected spelling and punctuation mistakes
+>   - Added support for polarity
+>   - Made peripheral clock use more efficient
+>   - Made prescale and duty computation clearer
+>   - Moved Makefile addition to keep alphabetical
+>   - Split complex lines into multiple steps
+> 
+> Dependencies:
+> The "ARM: dts: Declare the PWM for bcm11351 (bcm281xx)" patch depends
+> upon "ARM: dts: bcm281xx: define real clocks" which is queued up in
+> for-next of arm-soc. See https://lkml.org/lkml/2014/2/14/451
+> 
+> Tim Kryger (5):
+>   Documentation: dt: Add Kona PWM binding
+>   pwm: kona: Introduce Kona PWM controller support
 
-On 14.03.2014 06:09, Cho KyongHo wrote:
-> This commit adds device tree support for System MMU.
->
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->   drivers/iommu/Kconfig        |    5 ++---
->   drivers/iommu/exynos-iommu.c |   21 +++++++++++++++++----
->   2 files changed, 19 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index df56e4c..22af807 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -178,16 +178,15 @@ config TEGRA_IOMMU_SMMU
->
->   config EXYNOS_IOMMU
->   	bool "Exynos IOMMU Support"
-> -	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
-> +	depends on ARCH_EXYNOS
->   	select IOMMU_API
-> +	default n
->   	help
->   	  Support for the IOMMU(System MMU) of Samsung Exynos application
+Thierry, are you planning to merge these first two for 3.15? If so, I
+will apply dts patches for my last mach-bcm 3.15 pull. I don't want to
+do so until the binding is accepted.
 
-nit: There should be a white space before the opening parenthesis.
+-Matt
 
->   	  processor family. This enables H/W multimedia accellerators to see
-
-typo: s/accellerators/accelerators/
-
->   	  non-linear physical memory chunks as a linear memory in their
->   	  address spaces
->
-> -	  If unsure, say N here.
-> -
->   config EXYNOS_IOMMU_DEBUG
->   	bool "Debugging log for Exynos IOMMU"
->   	depends on EXYNOS_IOMMU
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 33b424d..34feb04 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -26,6 +26,7 @@
->   #include <linux/list.h>
->   #include <linux/memblock.h>
->   #include <linux/export.h>
-> +#include <linux/of.h>
->
->   #include <asm/cacheflush.h>
->   #include <asm/pgtable.h>
-> @@ -497,7 +498,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
->   	read_unlock_irqrestore(&data->lock, flags);
->   }
->
-> -static int exynos_sysmmu_probe(struct platform_device *pdev)
-> +static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   {
->   	int irq, ret;
->   	struct device *dev = &pdev->dev;
-> @@ -557,11 +558,23 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -static struct platform_driver exynos_sysmmu_driver = {
-> -	.probe		= exynos_sysmmu_probe,
-> -	.driver		= {
-> +#ifdef CONFIG_OF
-> +static struct of_device_id sysmmu_of_match[] __initconst = {
-> +	{ .compatible	= "samsung,sysmmu-v1", },
-> +	{ .compatible	= "samsung,sysmmu-v2", },
-> +	{ .compatible	= "samsung,sysmmu-v3.1", },
-> +	{ .compatible	= "samsung,sysmmu-v3.2", },
-> +	{ .compatible	= "samsung,sysmmu-v3.3", },
-
-Do you need all these compatible strings? I mean, are there any 
-implementation differences that can't be identified by reading IP 
-registers, such as REG_MMU_VERSION?
-
-Best regards,
-Tomasz
+>   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+>   ARM: dts: Enable the PWM for bcm28155 AP board
+>   ARM: bcm_defconfig: Enable PWM and Backlight
