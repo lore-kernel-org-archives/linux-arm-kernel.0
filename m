@@ -1,26 +1,42 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 14 Mar 2014 16:53:35 +0100
-Subject: [PATCH 0/2] two more efm32 fixes
-Message-ID: <1394812417-22391-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri, 14 Mar 2014 16:53:36 +0100
+Subject: [PATCH 1/2] ARM: efm32: fix unit address part in USART2 device nodes'
+ names
+In-Reply-To: <1394812417-22391-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1394812417-22391-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1394812417-22391-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+While removing the 0x prefixes in the unit addresses in reply to a review
+comment, I must somehow have messed up these two. Uups.
 
-I intend to add these two patches on top of the efm32-next tag that is
-already in arm-soc. I already asked on irc, but in case the question
-goes missing there: Do you prefer incremental pull requests or should I
-recreate a new one on top of the old such that you only have one merge
-for efm32 in the history and still have the complete summary from the
-tag?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/dts/efm32gg.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Uwe Kleine-K?nig (2):
-  ARM: efm32: fix unit address part in USART2 device nodes' names
-  ARM: efm32: properly namespace i2c location property
-
- arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
- arch/arm/boot/dts/efm32gg.dtsi       | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
+index a342ab0e6e4f..106d505c5d3d 100644
+--- a/arch/arm/boot/dts/efm32gg.dtsi
++++ b/arch/arm/boot/dts/efm32gg.dtsi
+@@ -84,7 +84,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		spi2: spi at 40x4000c800 { /* USART2 */
++		spi2: spi at 4000c800 { /* USART2 */
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "efm32,spi";
+@@ -110,7 +110,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		uart2: uart at 40x4000c800 { /* USART2 */
++		uart2: uart at 4000c800 { /* USART2 */
+ 			compatible = "efm32,uart";
+ 			reg = <0x4000c800 0x400>;
+ 			interrupts = <18 19>;
 -- 
 1.9.0
