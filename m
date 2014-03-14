@@ -1,34 +1,31 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Mar 2014 18:33:13 +0100
-Subject: [PATCH] ata: pata_imx: fix devm_ioremap_resource() return value
- checking
-Message-ID: <2050303.yEm1sTq1hQ@amdc1032>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 18:38:08 +0100
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140314171457.GK18126@arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140314171457.GK18126@arm.com>
+Message-ID: <201403141838.08900.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource() returns a pointer to the remapped memory or
-an ERR_PTR() encoded error code on failure.  Fix the check inside
-pata_imx_probe() accordingly.
+On Friday 14 March 2014, Catalin Marinas wrote:
+> On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/pci.c
+> [...]
+> > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
+> [...]
+> > +unsigned long pci_address_to_pio(phys_addr_t address)
+> [...]
+> > +void pcibios_fixup_bus(struct pci_bus *bus)
+> [ actually most of this file ]
+> 
+> Maybe it was raised before already but can we have __weak generic
+> definitions of these functions? They don't seem to be arm64 specific in
+> any way.
+> 
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Compile tested only.
+I would definitely prefer that.
 
- drivers/ata/pata_imx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-Index: b/drivers/ata/pata_imx.c
-===================================================================
---- a/drivers/ata/pata_imx.c	2014-03-14 16:45:04.260724378 +0100
-+++ b/drivers/ata/pata_imx.c	2014-03-14 18:23:38.664623530 +0100
-@@ -133,8 +133,8 @@ static int pata_imx_probe(struct platfor
- 
- 	io_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	priv->host_regs = devm_ioremap_resource(&pdev->dev, io_res);
--	if (!priv->host_regs) {
--		ret = -EBUSY;
-+	if (IS_ERR(priv->host_regs)) {
-+		ret = PTR_ERR(priv->host_regs);
- 		goto err;
- 	}
- 
+	Arnd
