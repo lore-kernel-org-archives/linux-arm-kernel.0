@@ -1,58 +1,56 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 14 Mar 2014 14:18:06 +0000
-Subject: [PATCH] net: phy: fix uninitalized ethtool_wolinfo in phy_suspend
-In-Reply-To: <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20140313.153832.967564223480298567.davem@davemloft.net>
- <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1394806686.20857.31.camel@deadeye.wl.decadent.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 14 Mar 2014 10:27:17 -0400
+Subject: [GIT PULL] clk: mvebu: Armada 3xx changes for v3.15 (incr. #2)
+Message-ID: <20140314142717.GC15608@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-03-14 at 10:07 +0100, Sebastian Hesselbarth wrote:
-> Callers of phy_ethtool_get_wol are supposed to provide a properly
-> cleared struct ethtool_wolinfo. Therefore, fix phy_suspend to clear
-> it before passing it to phy_ethtool_get_wol.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Mike,
 
-Reviewed-by: Ben Hutchings <ben@decadent.org.uk>
+This is a small pull request, and should be the last one for v3.15.  We
+have a small fix for the new driver we introduced in v3.15, and we're
+expanding the core divider to support another SoC.
 
-> ---
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ben Hutchings <ben@decadent.org.uk>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/phy_device.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-> index 4b03e63639b7..7512e28866f1 100644
-> --- a/drivers/net/phy/phy_device.c
-> +++ b/drivers/net/phy/phy_device.c
-> @@ -683,10 +683,9 @@ EXPORT_SYMBOL(phy_detach);
->  int phy_suspend(struct phy_device *phydev)
->  {
->  	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
-> -	struct ethtool_wolinfo wol;
-> +	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
->  
->  	/* If the device has WOL enabled, we cannot suspend the PHY */
-> -	wol.cmd = ETHTOOL_GWOL;
->  	phy_ethtool_get_wol(phydev, &wol);
->  	if (wol.wolopts)
->  		return -EBUSY;
+Due to some great work by Ezequiel and others, this is a small and simple
+change to make.
 
--- 
-Ben Hutchings
-Experience is directly proportional to the value of equipment destroyed.
-                                                         - Carolyn Scheppner
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/41d4409e/attachment.sig>
+This pull request is an incremental pull from tags/clk-mvebu-3xx-3.15 up
+to tags/clk-mvebu-3xx-3.15-2 in the mvebu/clk-3xx branch.
+
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit e9646fe1169de0162d461472df7ed19e0c729b61:
+
+  dt: Update binding information for mvebu gating clocks with Armada 380/385 (2014-02-17 02:34:08 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3xx-3.15-2
+
+for you to fetch changes up to e69a8543ec7730c46225c886f74f0ea57e4656c5:
+
+  clk: mvebu: Update binding documentation for the core divider clock (2014-03-13 23:24:23 +0000)
+
+----------------------------------------------------------------
+clock: mvebu new SoC changes for v3.15 (incremental pull #2)
+
+ - mvebu (Armada 375)
+    - fix ratio register offest
+
+ - mvebu (Armada 380)
+    - expand core divider clock driver to support 380 SoC (enables nand support)
+
+----------------------------------------------------------------
+Ezequiel Garcia (3):
+      clk: mvebu: Fix ratio register offset on A375 SoC
+      clk: mvebu: Support Armada 380 SoC on the core divider clock
+      clk: mvebu: Update binding documentation for the core divider clock
+
+ .../bindings/clock/mvebu-corediv-clock.txt         |  5 ++++-
+ drivers/clk/mvebu/clk-corediv.c                    | 25 +++++++++++++++++++++-
+ 2 files changed, 28 insertions(+), 2 deletions(-)
