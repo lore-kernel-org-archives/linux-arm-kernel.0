@@ -1,51 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 11:34:29 +0100
-Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
-In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
-References: <cover.1393568715.git.mohit.kumar@st.com>
- <7430033.eK9aHCDe8b@wuerfel>
- <2CC2A0A4A178534D93D5159BF3BCB66189FD519B2E@EAPEX1MAIL1.st.com>
-Message-ID: <201403141134.30157.arnd@arndb.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 14 Mar 2014 16:08:06 +0530
+Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
+In-Reply-To: <1394197751-28984-8-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-8-git-send-email-rogerq@ti.com>
+Message-ID: <5322DC0E.1020600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 March 2014, Mohit KUMAR DCG wrote:
-> Hello Arnd,
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Friday, February 28, 2014 5:28 PM
-> > To: Mohit KUMAR DCG
-> > Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
-> > 
-> > On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
-> > > +                       interrupts = <0 68 0x4>;
-> > > +                       interrupt-map-mask = <0 0 0 0>;
-> > > +                       interrupt-map = <0x0 0 &gic 68>;
-> > >
-> > 
-> > From the discussion we just had on the imx version of this driver, I suspect
-> > what you want instead is to drop the interrupts property and fix the interrupt
-> > map to be
-> > 
-> > interrupt-map = <0x0 0 &gic 0 68 0x4>;
-> > 
-> 
-> - yes, I should have fix interrupt map. Pls let us know if any other point needs to be
-> Incorporated in this series.
-> 
+Hi Roger,
 
-I just noticed from your code that you use the 68 interrupt both for MSI and
-legacy interrupts. Is this what the hardware does? I was asking above that
-the 'interrupts' property be dropped, but I guess that won't work if it's
-also used for MSI.
+On Friday 07 March 2014 06:39 PM, Roger Quadros wrote:
+> Add nodes for the Super Speed USB controllers, omap-control-usb,
+> USB2 PHY and USB3 PHY devices.
+>
+> Remove ocp2scp1 address space from hwmod data as it is
+> now provided via device tree.
+>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
+>   2 files changed, 110 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 597979b..1e73900 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -811,6 +811,116 @@
+>   			clocks = <&sata_ref_clk>;
+>   			ti,hwmods = "sata";
+>   		};
+> +
+> +		omap_control_usb2phy1: control-phy at 4a002300 {
+> +			compatible = "ti,control-phy-usb2";
+> +			reg = <0x4a002300 0x4>;
+> +			reg-names = "power";
+> +		};
+> +
+> +		omap_control_usb3phy1: control-phy at 4a002370 {
+> +			compatible = "ti,control-phy-pipe3";
+> +			reg = <0x4a002370 0x4>;
+> +			reg-names = "power";
+> +		};
+> +
+> +		omap_control_usb2phy2: control-phy at 0x4a002e74 {
+> +			compatible = "ti,control-phy-usb2-dra7";
+> +			reg = <0x4a002e74 0x4>;
+> +			reg-names = "power";
+> +		};
+> +
+> +		/* OCP2SCP1 */
+> +		ocp2scp at 4a080000 {
+> +			compatible = "ti,omap-ocp2scp";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			reg = <0x4a080000 0x20>;
+> +			ti,hwmods = "ocp2scp1";
+> +
+> +			usb2_phy1: phy at 4a084000 {
+> +				compatible = "ti,omap-usb2";
+> +				reg = <0x4a084000 0x400>;
+> +				ctrl-module = <&omap_control_usb2phy1>;
+> +				clocks = <&usb_phy1_always_on_clk32k>,
+> +					 <&usb_otg_ss1_refclk960m>;
+> +				clock-names =	"wkupclk",
+> +						"refclk";
+> +				#phy-cells = <0>;
+> +			};
+> +
+> +			usb2_phy2: phy at 4a085000 {
+> +				compatible = "ti,omap-usb2";
+> +				reg = <0x4a085000 0x400>;
+> +				ctrl-module = <&omap_control_usb2phy2>;
+> +				clocks = <&usb_phy2_always_on_clk32k>,
+> +					 <&usb_otg_ss2_refclk960m>;
+> +				clock-names =	"wkupclk",
+> +						"refclk";
+> +				#phy-cells = <0>;
+> +			};
+> +
+> +			usb3_phy1: phy at 4a084400 {
+> +				compatible = "ti,omap-usb3";
+> +				reg = <0x4a084400 0x80>,
+> +				      <0x4a084800 0x64>,
+> +				      <0x4a084c00 0x40>;
+> +				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+> +				ctrl-module = <&omap_control_usb3phy1>;
+> +				clocks = <&usb_phy3_always_on_clk32k>,
+> +					 <&sys_clkin1>,
+> +					 <&usb_otg_ss1_refclk960m>,
+> +					 <&dpll_core_h13x2_ck>;
+> +				clock-names =	"wkupclk",
+> +						"sysclk",
+> +						"refclk",
+> +						"optclk";
 
-Please clarify.
+Do we use this 'optclk' in driver?
 
-Aside from this, all patches
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+-Kishon
