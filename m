@@ -1,70 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 22:06:36 +0100
-Subject: [PATCH v17 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <CAPw-ZT=1KWEowD_i=qoWwg372XdzC4p227rpNo7ov+NwOYFUDA@mail.gmail.com>
-References: <1394655573-32645-1-git-send-email-lho@apm.com>
- <201403142005.52991.arnd@arndb.de>
- <CAPw-ZT=1KWEowD_i=qoWwg372XdzC4p227rpNo7ov+NwOYFUDA@mail.gmail.com>
-Message-ID: <201403142206.36611.arnd@arndb.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 14 Mar 2014 14:09:50 -0700
+Subject: [RFC 3/5] ARM: OMAP2+: timer: Add clocksource initialization and
+ powerup support
+In-Reply-To: <532240F0.1030403@ti.com> (Joel Fernandes's message of "Thu, 13
+ Mar 2014 18:36:16 -0500")
+References: <1394742919-32163-1-git-send-email-joelf@ti.com>
+ <1394742919-32163-4-git-send-email-joelf@ti.com>
+ <CAL_JsqJVPVybd90WUv_nCqUJMUgR+Ep3yxrX2+psNYqic-WQ1Q@mail.gmail.com>
+ <532240F0.1030403@ti.com>
+Message-ID: <7h38ikij1d.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Loc Ho wrote:
-> Hi,
-> 
-> >> > gets called. Can you clarify what this register access does?
-> >> > If it's just setting a index into a mux output, would it make
-> >> > sense to have an optional DT property containing an integer with
-> >> > the mux setting you want to set? That way you wouldn't even
-> >> > have to have two compatible strings but just do
-> >> >
-> >> >         ret = of_property_read_u32(node, "apm,ahci-mux", &mux);
-> >> >         if (!ret)
-> >> >                 xgene_ahci_mux_select(ctx, mux);
-> >> >
-> >>
-> >> Given that fact that I will break up the resource. Let's just use the
-> >> resource for the MUX to handle this. For the IP that doesn't existed,
-> >> I will just not list it.
-> >
-> > Ah, that sounds good. It also means that if the firmware has set up
-> > the mux already, you don't have to touch it again. That would probably
-> > be the preferred case.
-> >
-> > I'm undecided about the value that you write in there. That could either
-> > be passed through DT as I suggested above for extra flexibility, or you
-> > can keep it hardcoded if you are absolutely sure that there will never
-> > need to be a case where you have to set it to something other than '1',
-> 
-> It is only a mux between two IP's. Writing 1 is fine. For ACPI, it can
-> be missing and handled by the firmware or can be handled just like the
-> DTS way.
+Joel Fernandes <joelf@ti.com> writes:
 
-Why can't you have it handled by the firmware in the DTS case?
+> On 03/13/2014 04:52 PM, Rob Herring wrote:
+>> On Thu, Mar 13, 2014 at 3:35 PM, Joel Fernandes <joelf@ti.com> wrote:
+>>> Introduce a generic omap timer initialization function that can
+>>> be used by all SoCs for which support is available in the clocksource
+>>> driver introduced in the series.
+>>>
+>>> The function will also be responsible for calling clock initialization
+>>> required for everything else to work.
+>>>
+>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/common.h |    1 +
+>>>  arch/arm/mach-omap2/timer.c  |   28 ++++++++++++++++++++++++++++
+>>>  2 files changed, 29 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+>>> index a6aae30..e58d9a4 100644
+>>> --- a/arch/arm/mach-omap2/common.h
+>>> +++ b/arch/arm/mach-omap2/common.h
+>>> @@ -92,6 +92,7 @@ extern void omap3_secure_sync32k_timer_init(void);
+>>>  extern void omap3_gptimer_timer_init(void);
+>>>  extern void omap4_local_timer_init(void);
+>>>  extern void omap5_realtime_timer_init(void);
+>>> +void omap_generic_timer_init(void);
+>>>
+>>>  void omap2420_init_early(void);
+>>>  void omap2430_init_early(void);
+>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>>> index 74044aa..08c73a0 100644
+>>> --- a/arch/arm/mach-omap2/timer.c
+>>> +++ b/arch/arm/mach-omap2/timer.c
+>>> @@ -324,6 +324,25 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>>>         return r;
+>>>  }
+>>>
+>>> +int __init omap_dmtimer_powerup(struct omap_dm_timer *timer,
+>>> +                                       struct device_node *np) {
+>> 
+>> This function seems unrelated to the commit message.
+>
+> Ok, I'll add it in the message.
+>
+>> 
+>>> +       struct omap_hwmod *oh;
+>>> +       const char *oh_name = NULL;
+>>> +
+>>> +       of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
+>>> +       if (!oh_name)
+>>> +               return -ENODEV;
+>>> +
+>>> +       oh = omap_hwmod_lookup(oh_name);
+>>> +       if (!oh)
+>>> +               return -ENODEV;
+>>> +
+>>> +       omap_hwmod_setup_one(oh_name);
+>>> +
+>>> +       omap_hwmod_enable(oh);
+>>> +       return 0;
+>>> +}
+>>> +
+>>>  static void __init omap2_gp_clockevent_init(int gptimer_id,
+>>>                                                 const char *fck_source,
+>>>                                                 const char *property)
+>>> @@ -615,6 +634,15 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+>>>                                2, "sys_clkin_ck", NULL);
+>>>  #endif
+>>>
+>>> +void omap_generic_timer_init(void)
+>>> +{
+>>> +       if (!of_have_populated_dt())
+>>> +               BUG_ON("Generic timer init should only be used for DT boot\n");
+>> 
+>> I thought omap2 is always DT boot now.
+>
+> That's right, sorry- I'll get rid of the check.
 
-I still think it's rather unlikely that we will actually see ACPI support
-on your platform, btw.
+Actually, mainline still supports legacy boot and has board files for
+OMAP3 platforms, and we shouldn't break legacy boot on purpose IMO.
 
-I'm willing to look at the patches you need for it, but I'm not very
-optimistic, in particular because of the kind of hacks you need
-for random bits of hardware.
-
-> > Is there also an IOMMU, or just the PIM? If there is no IOMMU,
-> > we will actually have to use the swiotlb code here, otherwise we
-> > can rely on the IOMMU to do the translation so we can pretend that
-> > there is always 64-bit DMA capability.
-> >
-> > In theory, the PIM could be dynamically reprogrammed for each
-> > DMA, as an extremely primitive IOMMU implementation, but I don't
-> > know what the impact on performance would be from doing that.
-> > It would also prevent you from starting multiple concurrent DMAs,
-> > although I suspect that is not an important case for SPI and SDIO.
-> 
-> This first generation don't support IOMMU and rely on swiotlb. In any
-> case, for SDIO, the solution is to reprogram the PIM and limit to SDMA
-> - single buffer - for each operation.
-
-Ok, interesting. In that case, I suppose the DMA mask is actually 64-bit.
-
-	Arnd
+Kevin
