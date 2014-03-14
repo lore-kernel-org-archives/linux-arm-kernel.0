@@ -1,66 +1,26 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 13 Mar 2014 18:49:09 -0500
-Subject: [RFC 4/5] clocksource: omap-timer: Introduce clocksource driver
- for OMAP SoCs
-In-Reply-To: <20140313204851.GB23432@atomide.com>
-References: <1394742919-32163-1-git-send-email-joelf@ti.com>
- <1394742919-32163-5-git-send-email-joelf@ti.com>
- <20140313204851.GB23432@atomide.com>
-Message-ID: <532243F5.4040609@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 14 Mar 2014 09:28:12 +0900
+Subject: [PATCH 0/2] ARM: shmobile: koelsch, lager: Annotate clk_names
+ with __initconst
+In-Reply-To: <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
+References: <1394692198-30715-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXpXDv8C6b1T+LyE8BSnhdD4dPq_HF6O3OY7Aev+EFfXA@mail.gmail.com>
+Message-ID: <20140314002811.GC28137@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 03:48 PM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@TI.com> [140313 13:43]:
->> We introduce functions to initialize clocksource and clockevent, use
->> CLOCKSOURCE_OF_DECLARE to declare the clocksource, and handle the clocksource
->> selection on a per-SoC basis (Currently only AM335x is supported). Powering up
->> of the timer will be done with the help of the mach-omap layer function that's
->> introduced earlier in the series.
->>
->> We make a local copy of dmtimer API for use by clocksource, the original
->> dmtimer API in plat-omap is kept as-is till the migration of all SoCs is
->> completed after which it can't be deleted.
->>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  drivers/clocksource/Makefile     |    1 +
->>  drivers/clocksource/omap-timer.c | 1157 ++++++++++++++++++++++++++++++++++++++
->>  drivers/clocksource/omap-timer.h |  422 ++++++++++++++
->>  3 files changed, 1580 insertions(+)
->>  create mode 100644 drivers/clocksource/omap-timer.c
->>  create mode 100644 drivers/clocksource/omap-timer.h
+On Thu, Mar 13, 2014 at 09:28:23AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Mar 13, 2014 at 7:29 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Add __initconst annotations to recently added clk_names.
+> >
+> > Depends on
+> > "[PATCH v2 00/03] ARM: shmobile: Break out and extend clock workaround V2"
+> >
+> > Simon Horman (2):
+> >   ARM: shmobile: koelsch: Annotate clk_names with __initconst
+> >   ARM: shmobile: lager: Annotate clk_names with __initconst
 > 
-> Hmm this leaves duplicate arch/arm/plat-omap/dmtimer.c code, please
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Sure, ofcourse- but how else can we make sure everything works while we do
-the migration in steps. We can get rid of the duplicate once everything is
-migrated.
-
-> sort out that issue too by allowing omap1 and omap3 still to use
-> the legacy timer init functions but with timer code under
-> drivers/clocksource/omap-timer.c.
-
-Sorry, I didn't follow. I didn't see OMAP3 using legacy timer stuff. To me
-it looks like OMAP3 migration should be straight forward along the same
-lines as this RFC patchset. Could you elaborate a bit more what the legacy
-functions you mentioned for OMAP1 are? I will just like to keep everything
-in drivers/clocksource/ private for now till we're done migrating most
-platforms. IMO once we get system timers working for omap2+, then we can
-look into omap1 :)
-
-> And not the that drivers/clocksource/omap-timer.h won't be needed at
-> all, those defines can stay private to the drivers/clocksource/omap-timer.c.
-
-Actually- I wanted it separate because omap-timer.c is already huge at 1157
-lines. Infact the largest among the clocksource drivers. Is that fair?
-
-> So this patch really should just be moving of the code to the new
-> location.
-
-To be honest, its not just a simple moving of code, there are new things
-such as selecting correct timer, new functions for clockevent and
-clocksource init, different handling of clocks etc.
-
-Thanks,
--Joel
+Thanks, I will queue these up.
