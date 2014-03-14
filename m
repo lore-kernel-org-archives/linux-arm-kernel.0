@@ -1,338 +1,140 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 14 Mar 2014 15:34:18 +0000
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
+Date: Fri, 14 Mar 2014 15:34:30 +0000
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic host bridge functions to provide support for
-PCI Express on arm64. There is no support for ISA memory.
+Make it easier to discover the domain number of a bus by storing
+the number in pci_host_bridge for the root bus. Several architectures
+have their own way of storing this information, so it makes sense
+to try to unify the code. While at this, add a new function that
+creates a root bus in a given domain and make pci_create_root_bus()
+a wrapper around this function.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- arch/arm64/Kconfig            |  19 +++-
- arch/arm64/include/asm/Kbuild |   1 +
- arch/arm64/include/asm/io.h   |   3 +-
- arch/arm64/include/asm/pci.h  |  51 ++++++++++
- arch/arm64/kernel/Makefile    |   1 +
- arch/arm64/kernel/pci.c       | 173 ++++++++++++++++++++++++++++++++
- 6 files changed, 246 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/pci.c
+ drivers/pci/probe.c | 41 +++++++++++++++++++++++++++++++++--------
+ include/linux/pci.h |  4 ++++
+ 2 files changed, 37 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc..d1c8568 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -62,7 +62,7 @@ config MMU
- 	def_bool y
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index fd11c12..172c615 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1714,8 +1714,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
+ }
  
- config NO_IOPORT
--	def_bool y
-+	def_bool y if !PCI
+-struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
++struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
++		int domain, int bus, struct pci_ops *ops, void *sysdata,
++		struct list_head *resources)
+ {
+ 	int error;
+ 	struct pci_host_bridge *bridge;
+@@ -1728,30 +1729,34 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
  
- config STACKTRACE_SUPPORT
- 	def_bool y
-@@ -134,6 +134,23 @@ menu "Bus support"
- config ARM_AMBA
- 	bool
+ 	bridge = pci_alloc_host_bridge();
+ 	if (!bridge)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
  
-+config PCI
-+	bool "PCI support"
-+	help
-+	  This feature enables support for PCIe bus system. If you say Y
-+	  here, the kernel will include drivers and infrastructure code
-+	  to support PCIe bus devices.
-+
-+config PCI_DOMAINS
-+	def_bool PCI
-+
-+config PCI_SYSCALL
-+	def_bool PCI
-+
-+source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
-+source "drivers/pci/hotplug/Kconfig"
-+
- endmenu
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
++	bridge->domain_nr = domain;
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error)
+ 		goto err_out;
  
- menu "Kernel Features"
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 71c53ec..46924bc 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -26,6 +26,7 @@ generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
- generic-y += pci.h
-+generic-y += pci-bridge.h
- generic-y += poll.h
- generic-y += posix_types.h
- generic-y += resource.h
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 7846a6b..67463a5 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -120,7 +120,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- /*
-  *  I/O port access primitives.
-  */
--#define IO_SPACE_LIMIT		0xffff
-+#define arch_has_dev_port()	(1)
-+#define IO_SPACE_LIMIT		0x1ffffff
- #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-new file mode 100644
-index 0000000..d93576f
---- /dev/null
-+++ b/arch/arm64/include/asm/pci.h
-@@ -0,0 +1,51 @@
-+#ifndef __ASM_PCI_H
-+#define __ASM_PCI_H
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/io.h>
-+#include <asm-generic/pci-bridge.h>
-+#include <asm-generic/pci-dma-compat.h>
-+
-+#define PCIBIOS_MIN_IO		0x1000
-+#define PCIBIOS_MIN_MEM		0
-+
-+struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
-+
-+/*
-+ * Set to 1 if the kernel should re-assign all PCI bus numbers
-+ */
-+#define pcibios_assign_all_busses() \
-+	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
-+
-+/*
-+ * PCI address space differs from physical memory address space
-+ */
-+#define PCI_DMA_BUS_IS_PHYS	(0)
-+
-+extern int isa_dma_bridge_buggy;
-+
-+#ifdef CONFIG_PCI
-+static inline int pci_domain_nr(struct pci_bus *bus)
-+{
-+	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-+
-+	if (bridge)
-+		return bridge->domain_nr;
-+
-+	return 0;
-+}
-+
-+static inline int pci_proc_domain(struct pci_bus *bus)
-+{
-+	return 1;
-+}
-+#endif
-+
-+extern unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr);
-+
-+#endif  /* __KERNEL__ */
-+#endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b..64fc479 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -20,6 +20,7 @@ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
-+arm64-obj-$(CONFIG_PCI)			+= pci.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-new file mode 100644
-index 0000000..9f29c9a
---- /dev/null
-+++ b/arch/arm64/kernel/pci.c
-@@ -0,0 +1,173 @@
-+/*
-+ * Code borrowed from powerpc/kernel/pci-common.c
-+ *
-+ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+
-+#include <asm/pci-bridge.h>
-+
-+struct ioresource {
-+	struct list_head list;
-+	phys_addr_t start;
-+	resource_size_t size;
-+};
-+
-+static LIST_HEAD(io_list);
-+
-+int pci_register_io_range(phys_addr_t address, resource_size_t size)
-+{
-+	struct ioresource *res;
-+	resource_size_t allocated_size = 0;
-+
-+	/* find if the range has not been already allocated */
-+	list_for_each_entry(res, &io_list, list) {
-+		if (address >= res->start &&
-+			address + size <= res->start + size)
-+			return 0;
-+		allocated_size += res->size;
+ 	b = pci_alloc_bus();
+-	if (!b)
++	if (!b) {
++		error = -ENOMEM;
+ 		goto err_out;
 +	}
-+
-+	/* range not already registered, check for space */
-+	if (allocated_size + size > IO_SPACE_LIMIT)
-+		return -E2BIG;
-+
-+	/* add the range in the list */
-+	res = kzalloc(sizeof(*res), GFP_KERNEL);
-+	if (!res)
-+		return -ENOMEM;
-+	res->start = address;
-+	res->size = size;
-+
-+	list_add_tail(&res->list, &io_list);
-+
-+	return 0;
+ 
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
+-	b2 = pci_find_bus(pci_domain_nr(b), bus);
++	b2 = pci_find_bus(bridge->domain_nr, bus);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+ 		dev_dbg(&b2->dev, "bus already known\n");
++		error = -EEXIST;
+ 		goto err_bus_out;
+ 	}
+ 
+ 	bridge->bus = b;
+-	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
+ 	error = device_register(&bridge->dev);
+ 	if (error) {
+ 		put_device(&bridge->dev);
+@@ -1766,7 +1771,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 
+ 	b->dev.class = &pcibus_class;
+ 	b->dev.parent = b->bridge;
+-	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
++	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
+ 	error = device_register(&b->dev);
+ 	if (error)
+ 		goto class_dev_reg_err;
+@@ -1816,7 +1821,27 @@ err_bus_out:
+ 	kfree(b);
+ err_out:
+ 	kfree(bridge);
+-	return NULL;
++	return ERR_PTR(error);
 +}
-+EXPORT_SYMBOL_GPL(pci_register_io_range);
 +
-+unsigned long pci_address_to_pio(phys_addr_t address)
++struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++		struct pci_ops *ops, void *sysdata, struct list_head *resources)
 +{
-+	struct ioresource *res;
++	int domain_nr;
++	struct pci_bus *b = pci_alloc_bus();
++	if (!b)
++		return NULL;
 +
-+	list_for_each_entry(res, &io_list, list) {
-+		if (address >= res->start &&
-+			address < res->start + res->size) {
-+			return res->start - address;
-+		}
-+	}
++	b->sysdata = sysdata;
++	domain_nr = pci_domain_nr(b);
++	kfree(b);
 +
-+	return (unsigned long)-1;
-+}
-+EXPORT_SYMBOL_GPL(pci_address_to_pio);
++	b = pci_create_root_bus_in_domain(parent, domain_nr, bus,
++				ops, sysdata, resources);
++	if (IS_ERR(b))
++		return NULL;
 +
-+/*
-+ * Called after each bus is probed, but before its children are examined
-+ */
-+void pcibios_fixup_bus(struct pci_bus *bus)
-+{
-+	struct pci_dev *dev;
-+	struct resource *res;
-+	int i;
-+
-+	if (!pci_is_root_bus(bus)) {
-+		pci_read_bridge_bases(bus);
-+
-+		pci_bus_for_each_resource(bus, res, i) {
-+			if (!res || !res->flags || res->parent)
-+				continue;
-+
-+			/*
-+			 * If we are going to reassign everything, we can
-+			 * shrink the P2P resource to have zero size to
-+			 * save space
-+			 */
-+			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
-+				res->flags |= IORESOURCE_UNSET;
-+				res->start = 0;
-+				res->end = -1;
-+				continue;
-+			}
-+		}
-+	}
-+
-+	list_for_each_entry(dev, &bus->devices, bus_list) {
-+		/* Ignore fully discovered devices */
-+		if (dev->is_added)
-+			continue;
-+
-+		set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
-+
-+		/* Read default IRQs and fixup if necessary */
-+		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+	}
-+}
-+EXPORT_SYMBOL(pcibios_fixup_bus);
-+
-+/*
-+ * We don't have to worry about legacy ISA devices, so nothing to do here
-+ */
-+resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-+				resource_size_t size, resource_size_t align)
-+{
-+	return res->start;
-+}
-+
-+int pcibios_enable_device(struct pci_dev *dev, int mask)
-+{
-+	return pci_enable_resources(dev, mask);
-+}
-+
-+#define IO_SPACE_PAGES	((IO_SPACE_LIMIT + 1) / PAGE_SIZE)
-+static DECLARE_BITMAP(pci_iospace, IO_SPACE_PAGES);
-+
-+unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
-+{
-+	unsigned long start, len, virt_start;
-+	int err;
-+
-+	if (res->end > IO_SPACE_LIMIT)
-+		return -EINVAL;
-+
-+	/*
-+	 * try finding free space for the whole size first,
-+	 * fall back to 64K if not available
-+	 */
-+	len = resource_size(res);
-+	start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-+				res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
-+	if (start == IO_SPACE_PAGES && len > SZ_64K) {
-+		len = SZ_64K;
-+		start = 0;
-+		start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
-+					start, len / PAGE_SIZE, 0);
-+	}
-+
-+	/* no 64K area found */
-+	if (start == IO_SPACE_PAGES)
-+		return -ENOMEM;
-+
-+	/* ioremap physical aperture to virtual aperture */
-+	virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
-+	err = ioremap_page_range(virt_start, virt_start + len,
-+				phys_addr, __pgprot(PROT_DEVICE_nGnRE));
-+	if (err)
-+		return err;
-+
-+	bitmap_set(pci_iospace, start, len / PAGE_SIZE);
-+
-+	/* return io_offset */
-+	return start * PAGE_SIZE - res->start;
-+}
++	return b;
+ }
+ 
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 33aa2ca..1eed009 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -394,6 +394,7 @@ struct pci_host_bridge_window {
+ struct pci_host_bridge {
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
++	int domain_nr;
+ 	struct list_head windows;	/* pci_host_bridge_windows */
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+@@ -747,6 +748,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
+ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 				    struct pci_ops *ops, void *sysdata,
+ 				    struct list_head *resources);
++struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
++			int domain, int bus, struct pci_ops *ops,
++			void *sysdata, struct list_head *resources);
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+ void pci_bus_release_busn_res(struct pci_bus *b);
 -- 
 1.9.0
