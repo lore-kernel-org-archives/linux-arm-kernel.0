@@ -1,138 +1,133 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 13:18:26 +0100
-Subject: [PATCH v4 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <1394085963-27553-2-git-send-email-tinamdar@apm.com>
-References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
- <1394085963-27553-2-git-send-email-tinamdar@apm.com>
-Message-ID: <201403141318.27183.arnd@arndb.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Mar 2014 13:20:23 +0100
+Subject: [PATCH v11 12/27] ARM: dts: Add description of System MMU of
+ Exynos SoCs
+In-Reply-To: <20140314140649.dc5958f420770af48e2376d9@samsung.com>
+References: <20140314140649.dc5958f420770af48e2376d9@samsung.com>
+Message-ID: <5322F407.208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 March 2014, Tanmay Inamdar wrote:
+Hi KyongHo,
 
-> +static inline void xgene_pcie_cfg_out16(void __iomem *addr, u16 val)
-> +{
-> +	u64 temp_addr = (u64)addr & ~0x3;
-
-Please use 'unsigned long' as the type for calculations like this one,
-to make the code more portable. You mentioned before that the same PCI
-host controller is used on some ppc4xx, and we may want to share the
-code later.
-
-> +static int xgene_pcie_read_config(struct pci_bus *bus, unsigned int devfn,
-> +				  int offset, int len, u32 *val)
-> +{
-> +	struct xgene_pcie_port *port = bus->sysdata;
-> +	void __iomem *addr;
-> +	u8 val8;
-> +	u16 val16;
+On 14.03.2014 06:06, Cho KyongHo wrote:
+> This patch adds dts entries for the System MMU devices found on
+> Exynos4 and Exynos5 SoC series and the System MMU binding
+> documentation.
+>
+> CC: Rob Herring <robherring2@gmail.com>
+> CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> ---
+>   .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |   86 +++++++
+>   arch/arm/boot/dts/exynos4.dtsi                     |  107 ++++++++
+>   arch/arm/boot/dts/exynos4210.dtsi                  |   23 +-
+>   arch/arm/boot/dts/exynos4x12.dtsi                  |   77 +++++-
+>   arch/arm/boot/dts/exynos5250.dtsi                  |  266 +++++++++++++++++++-
+>   arch/arm/boot/dts/exynos5420.dtsi                  |  205 ++++++++++++++-
+>   6 files changed, 758 insertions(+), 6 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+>
+> diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> new file mode 100644
+> index 0000000..e4417bb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
+> @@ -0,0 +1,86 @@
+> +Samsung Exynos IOMMU H/W, System MMU (System Memory Management Unit)
 > +
-> +	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +Samsung's Exynos architecture contains System MMUs that enables scattered
+> +physical memory chunks visible as a contiguous region to DMA-capable peripheral
+> +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
 > +
-> +	xgene_pcie_set_rtdid_reg(bus, devfn);
-> +	addr = xgene_pcie_get_cfg_base(bus);
-> +	switch (len) {
-> +	case 1:
-> +		xgene_pcie_cfg_in8(addr + offset, &val8);
-> +		*val = val8;
-> +		break;
-
-Actually it would be better to just pass both addr and offset
-down into the low-level accessors and then do the calculation
-on 'offset', which is already a scalar.
-
-> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port,
-> +				   u32 *lanes, u32 *speed)
-> +{
-> +	void __iomem *csr_base = port->csr_base;
-> +	u32 val32;
-> +	u64 start_time, time;
+> +System MMU is an IOMMU and supports identical translation table format to
+> +ARMv7 translation tables with minimum set of page properties including access
+> +permissions, shareability and security protection. In addition, System MMU has
+> +another capabilities like L2 TLB or block-fetch buffers to minimize translation
+> +latency.
 > +
-> +	/*
-> +	 * A component enters the LTSSM Detect state within
-> +	 * 20ms of the end of fundamental core reset.
-> +	 */
-> +	msleep(XGENE_LTSSM_DETECT_WAIT);
-> +	port->link_up = 0;
-> +	start_time = jiffies;
-> +	do {
-> +		val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
-> +		if (val32 & LINK_UP_MASK) {
-> +			port->link_up = 1;
-> +			*speed = PIPE_PHY_RATE_RD(val32);
-> +			val32 = readl(csr_base + BRIDGE_STATUS_0);
-> +			*lanes = val32 >> 26;
-> +			break;
-> +		}
-> +		msleep(1);
-> +		time = jiffies_to_msecs(jiffies - start_time);
-> +	} while (time <= XGENE_LTSSM_L0_WAIT);
-> +}
-
-This can be written ina simpler way using 'time_before()'.
-
-> +/* Return 0 on success */
-> +static int xgene_pcie_init_ecc(struct xgene_pcie_port *port)
-> +{
-> +	void __iomem *csr_base = port->csr_base;
-> +	u64 start_time, time = 0;
-> +	u32 val;
+> +System MMUs are in many to one relation with peripheral devices, i.e. single
+> +peripheral device might have multiple System MMUs (usually one for each bus
+> +master), but one System MMU can handle transactions from only one peripheral
+> +device. The relation between a System MMU and the peripheral device needs to be
+> +defined in device node of the peripheral device.
 > +
-> +	val = readl(csr_base + MEM_RAM_SHUTDOWN);
-> +	if (!val)
-> +		return 0;
-> +	writel(0x0, csr_base + MEM_RAM_SHUTDOWN);
-> +	start_time = jiffies;
-> +	do {
-> +		val = readl(csr_base + BLOCK_MEM_RDY);
-> +		if (val == BLOCK_MEM_RDY_VAL)
-> +			break;
-> +		msleep(1);
-> +		time = jiffies_to_msecs(jiffies - start_time);
-> +	} while (time < XGENE_PCIE_ECC_TIMEOUT);
-
-Same here.
-
-> +static int xgene_pcie_init_port(struct xgene_pcie_port *port)
-> +{
-> +	int rc;
+> +MFC in all Exynos SoCs and FIMD, M2M Scalers and G2D in Exynos5420 has 2 System
+> +MMUs.
+> +* MFC has one System MMU on its left and right bus.
+> +* FIMD in Exynos5420 has one System MMU for window 0 and 4, the other system MMU
+> +  for window 1, 2 and 3.
+> +* M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
+> +  the other System MMU on the write channel.
+> +The drivers must consider how to handle those System MMUs. One of the idea is
+> +to implement child devices or sub-devices which are the client devices of the
+> +System MMU.
 > +
-> +	port->clk = clk_get(port->dev, NULL);
-> +	if (IS_ERR_OR_NULL(port->clk)) {
-> +		dev_err(port->dev, "clock not available\n");
-> +		return -ENODEV;
-> +	}
-
-Practically every use of IS_ERR_OR_NULL() is a bug, don't do that.
-NULL is a valid return code from clk_get(), and should not be
-treated as an error.
-
-
-> +static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
-> +				 struct pci_host_bridge *bridge,
-> +				 u64 cfg_addr)
-> +{
-> +	struct device *dev = port->dev;
-> +	struct pci_host_bridge_window *window;
+> +Required properties:
+> +- compatible: Should be one of:
+> +		"samsung,sysmmu-v1"
+> +		"samsung,sysmmu-v2"
+> +		"samsung,sysmmu-v3.1"
+> +		"samsung,sysmmu-v3.2"
+> +		"samsung,sysmmu-v3.3"
 > +
-> +	list_for_each_entry(window, &bridge->windows, list) {
-> +		struct resource *res = window->res;
-> +		u64 restype = resource_type(res);
-> +		dev_dbg(port->dev, "0x%08lx 0x%016llx...0x%016llx\n",
-> +			res->flags, res->start, res->end);
+> +- reg: A tuple of base address and size of System MMU registers.
+> +- interrupt-parent: The phandle of the interrupt controller of System MMU
+> +- interrupts: An interrupt specifier for interrupt signal of System MMU,
+> +	      according to the format defined by a particular interrupt
+> +	      controller.
+> +- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
+> +               Please refer to the following documents:
+> +	       Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +	       Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> +	       Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> +	       Documentation/devicetree/bindings/clock/exynos5420-clock.txt
+> +	       Optional "master" if the clock to the System MMU is gated by
+> +	       another gate clock other than "sysmmu". The System MMU driver
+> +	       sets "master" the parent of "sysmmu".
+> +	       Exynos4 SoCs, there needs no "master" clockj.
+> +	       Exynos5 SoCs, some System MMUs must have "master" clocks.
+> +- clocks: Required if the System MMU is needed to gate its clock.
+> +	  Please refer to the documents listed above.
+> +- samsung,power-domain: Required if the System MMU is needed to gate its power.
+> +	  Please refer to the following document:
+> +	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +- mmu-masters: A phandle to device nodes representing the master for which
+> +               the System MMU can provide a translation. Any additional values
+> +	       after the phandle will be ignored because a System MMU never
+> +	       have two or more masters. "#stream-id-cells" specified in the
+> +	       master's node will be also ignored.
+> +	       If more than one phandle is specified, only the first phandle
+> +	       will be treated.
 > +
-> +		switch (restype) {
-> +		case IORESOURCE_IO:
-> +			xgene_pcie_setup_ob_reg(port, res, OMR2BARL,
-> +						bridge->io_base);
-> +			BUG_ON(pci_ioremap_io(res, bridge->io_base) < 0);
-> +			break;
+> +Examples:
+> +	gsc_0: gsc at 13e00000 {
+> +		compatible = "samsung,exynos5-gsc";
+> +		reg = <0x13e00000 0x1000>;
+> +		interrupts = <0 85 0>;
+> +		samsung,power-domain = <&pd_gsc>;
+> +		clocks = <&clock 256>;
+> +		clock-names = "gscl";
+> +	};
+> +
+> +	sysmmu_gsc0: sysmmu at 13E80000 {
+> +		compatible = "samsung,exynos4210-sysmmu";
+> +		reg = <0x13E80000 0x1000>;
+> +		interrupt-parent = <&combiner>;
+> +		interrupts = <2 0>;
+> +		clock-names = "sysmmu", "master";
+> +		clocks = <&clock 262>, <&clock 256>;
+> +		samsung,power-domain = <&pd_gsc>;
+> +		mmu-masters = <&gsc_0>;
+> +	};
 
-No need to BUG_ON() here, this is not a fatal condition, just
-don't register the I/O space resource if this fails.
+Binding documentation should be added in separate patch in front of the 
+series relying on such binding or with the patch adding binding 
+implementation to the driver, so DT maintainers can review the binding 
+and related code easily.
 
-I think as the PCI base support patch series evolves, you will actually
-not have to do this at all.
+Changes to dts(i) files should be posted in a separate patch, preferably 
+at the end of the series, when any prerequisites are already available.
 
-	Arnd
+Best regards,
+Tomasz
