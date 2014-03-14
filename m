@@ -1,32 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Mar 2014 18:05:28 +0100
-Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <1394811272-1547-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <201403141805.29204.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Mar 2014 17:05:50 +0000
+Subject: Will Deacon is away for a month
+Message-ID: <20140314170550.GA17852@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Liviu Dudau wrote:
-> +int of_pci_range_to_resource(struct of_pci_range *range,
-> +       struct device_node *np, struct resource *res)
-> +{
-> +       res->flags = range->flags;
-> +       if (res->flags & IORESOURCE_IO) {
-> +               unsigned long port = -1;
-> +               int err = pci_register_io_range(range->cpu_addr, range->size);
-> +               if (err)
-> +                       return err;
-> +               port = pci_address_to_pio(range->cpu_addr);
-> +               if (port == (unsigned long)-1) {
-> +                       res->start = (resource_size_t)OF_BAD_ADDR;
-> +                       res->end = (resource_size_t)OF_BAD_ADDR;
-> +                       return -EINVAL;
-> +               }
+Hi all,
 
-The error handling is inconsistent here: in one case you set the resource
-to OF_BAD_ADDR, in the other one you don't.
+Just to let you know that I will be without internet access (and probably
+electricity) for the next *month*. I hope to be back on 14 April, where I
+expect that I'll be forced to delete most of the email backlog in favour
+of being productive again. This is the last email I plan to send before
+then.
 
-	Arnd
+So, if you still think you should send me email during this time, it's
+worth considering whether to ask the following people instead:
+
+
+  ARM architecture stuff:
+    Catalin Marinas <catalin.marinas@arm.com>
+
+  drivers/iommu/arm-smmu.c
+    Marc Zyngier <marc.zyngier@arm.com>
+
+  perf:
+    Mark Rutland <mark.rutland@arm.com>
+
+
+Hopefully the 3.15 merge window will be smooth enough and you won't need
+to revert all my patches :)
+
+Cheers,
+
+Will
