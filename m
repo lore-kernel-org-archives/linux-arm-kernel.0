@@ -1,134 +1,121 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Mar 2014 22:39:37 -0700
-Subject: [PATCH] ARM: shmobile: Break out R-Car SYSC PM code
-In-Reply-To: <CANqRtoQTvnHBjM2eQccAJWCddN1LPgjNnd3Q6Gp=iUQkgM7tmQ@mail.gmail.com>
-References: <20140115074308.8471.64824.sendpatchset@w520>
- <CAOesGMjaTB-kBrm1av0uc8N-+4TRBZm5fxjJbsZLJe5OuqLu+g@mail.gmail.com>
- <CANqRtoRMkezRZvoH4Q1T3mwwhU9T=ZOFVGE5KN+sLBEqpXO=mg@mail.gmail.com>
- <CANqRtoQ2PDb5siknAndO3TgDghgTKPVa-ez-t2eQDcypDnsJTw@mail.gmail.com>
- <20140309052210.GB12854@quad.lixom.net>
- <CANqRtoQx16qgC-5wxi_SPDKMy+qztt-aTTa7TEY04+aT4a1=wA@mail.gmail.com>
- <CAOesGMg9Abd_JwLLjyDARmFzuN3Kh=HsZMmcS1mfncdEdOOUww@mail.gmail.com>
- <CANqRtoQTvnHBjM2eQccAJWCddN1LPgjNnd3Q6Gp=iUQkgM7tmQ@mail.gmail.com>
-Message-ID: <20140314053937.GA11610@quad.lixom.net>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Fri, 14 Mar 2014 11:13:29 +0530
+Subject: [PATCH v3 10/52] arm, kvm: Fix CPU hotplug callback registration
+In-Reply-To: <20140312232127.GC24808@cbox>
+References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
+ <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
+ <20140312232127.GC24808@cbox>
+Message-ID: <53229701.8050405@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:02:03AM +0900, Magnus Damm wrote:
-> On Thu, Mar 13, 2014 at 9:04 AM, Olof Johansson <olof@lixom.net> wrote:
-> > On Wed, Mar 12, 2014 at 3:26 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >> On Sun, Mar 9, 2014 at 2:22 PM, Olof Johansson <olof@lixom.net> wrote:
-> >>> On Tue, Feb 25, 2014 at 11:09:52AM +0900, Magnus Damm wrote:
-> >>>> Hi Olof,
-> >>>>
-> >>>> On Thu, Feb 20, 2014 at 6:45 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>>> > On Thu, Feb 20, 2014 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
-> >>>> >> I spotted this patch since it adds new include/mach contents, comment below:
-> >>>> >>
-> >>>> >> On Tue, Jan 14, 2014 at 11:43 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>>> >>
-> >>>> >>> --- /dev/null
-> >>>> >>> +++ work/arch/arm/mach-shmobile/include/mach/pm-rcar.h  2014-01-15 13:30:38.000000000 +0900
-> >>>> >>> @@ -0,0 +1,15 @@
-> >>>> >>> +#ifndef PM_RCAR_H
-> >>>> >>> +#define PM_RCAR_H
-> >>>> >>> +
-> >>>> >>> +struct rcar_sysc_ch {
-> >>>> >>> +       unsigned long chan_offs;
-> >>>> >>> +       unsigned int chan_bit;
-> >>>> >>> +       unsigned int isr_bit;
-> >>>> >>> +};
-> >>>> >>> +
-> >>>> >>> +int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch);
-> >>>> >>> +int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch);
-> >>>> >>> +bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch);
-> >>>> >>> +void __iomem *rcar_sysc_init(phys_addr_t base);
-> >>>> >>> +
-> >>>> >>> +#endif /* PM_RCAR_H */
-> >>>> >>
-> >>>> >>
-> >>>> >> These prototypes are only ever used by code in arch/arm/mach-shmobile,
-> >>>> >> right? There's no reason to expose it to the global include namespace,
-> >>>> >> and you'll just have to remove it when the platform is converted to
-> >>>> >> multiplatform.
-> >>>> >>
-> >>>> >> So, I suggest moving this to be at arch/arm/mach-shmobile/pm-rcar.h
-> >>>> >> instead (and included as "pm-rcar.h" instead of <mach/pm-rcar.h>).
-> >>>> >
-> >>>> > Thanks for your help with the patches! You are right that these are
-> >>>> > never used outside mach-shmobile, and moving headers out of "mach"
-> >>>> > certainly makes sense.
-> >>>>
-> >>>> FYI, the following series includes my attempt to address this issue:
-> >>>>
-> >>>> [PATCH 00/12] ARM: shmobile: Rework include path for SoC files
-> >>>> [PATCH 01/12] ARM: shmobile: Add temporary include workaround
-> >>>> [PATCH 02/12] ARM: shmobile: Rework include path for sh7372
-> >>>> [PATCH 03/12] ARM: shmobile: Rework include path for sh73a0
-> >>>> [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
-> >>>> [PATCH 05/12] ARM: shmobile: Rework include path for r8a7740
-> >>>> [PATCH 06/12] ARM: shmobile: Rework include path for r8a7778
-> >>>> [PATCH 07/12] ARM: shmobile: Rework include path for r8a7779
-> >>>> [PATCH 08/12] ARM: shmobile: Rework include path for r8a7790
-> >>>> [PATCH 09/12] ARM: shmobile: Rework include path for r8a7791
-> >>>> [PATCH 10/12] ARM: shmobile: Rework include path for r8a73a4
-> >>>> [PATCH 11/12] ARM: shmobile: Rework include path for r7s72100
-> >>>> [PATCH 12/12] ARM: shmobile: Rework include path for common bits
-> >>>>
-> >>>> If you would like me to rework the code somehow then please let me
-> >>>> know. I also intend to ask a different developer to convert the actual
-> >>>> boards once these changes have been merged by Simon, hope this is a
-> >>>> good way forward for you.
-> >>>
-> >>> It certainly looks like a good way forward, thanks for doing this.
-> >>
-> >> Ok, thanks. The list of patches above is the first step forward from my side.
-> >>
-> >> I'm afraid that I'm a bit confused by your comments in thread:
-> >> "Re: [PATCH v2] ARM: shmobile: Add temporary include workaround"
-> >>
-> >> The single v2 patch on the line above is just a bug fixed version of [01/12].
-> >>
-> >> Can you please clarify if you're ok with the series or if you want me
-> >> to rework it somehow?
-> >
-> > Oh, yeah, that's confusing -- my "looks good, please go ahead" was for
-> > patch 2-12, I don't think you actually need 1/12 at this time since
-> > you move the include file over and change the include statements in
-> > the same time in the other 11 patches?
+On 03/13/2014 04:51 AM, Christoffer Dall wrote:
+> On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
+>> Subsystems that want to register CPU hotplug callbacks, as well as perform
+>> initialization for the CPUs that are already online, often do it as shown
+>> below:
+>>
+>> 	get_online_cpus();
+>>
+>> 	for_each_online_cpu(cpu)
+>> 		init_cpu(cpu);
+>>
+>> 	register_cpu_notifier(&foobar_cpu_notifier);
+>>
+>> 	put_online_cpus();
+>>
+>> This is wrong, since it is prone to ABBA deadlocks involving the
+>> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+>> with CPU hotplug operations).
+>>
+>> Instead, the correct and race-free way of performing the callback
+>> registration is:
+>>
+>> 	cpu_notifier_register_begin();
+>>
+>> 	for_each_online_cpu(cpu)
+>> 		init_cpu(cpu);
+>>
+>> 	/* Note the use of the double underscored version of the API */
+>> 	__register_cpu_notifier(&foobar_cpu_notifier);
+>>
+>> 	cpu_notifier_register_done();
+>>
+>>
+>> Fix the kvm code in arm by using this latter form of callback registration.
+>>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Gleb Natapov <gleb@kernel.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Ingo Molnar <mingo@kernel.org>
+>> Cc: kvmarm at lists.cs.columbia.edu
+>> Cc: kvm at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+>> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+>> ---
+>>
+>>  arch/arm/kvm/arm.c |    7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index bd18bb8..f0e50a0 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
+>>  		}
+>>  	}
+>>  
+>> +	cpu_notifier_register_begin();
+>> +
+>>  	err = init_hyp_mode();
+>>  	if (err)
+>>  		goto out_err;
+>>  
+>> -	err = register_cpu_notifier(&hyp_init_cpu_nb);
+>> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+>>  	if (err) {
+>>  		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+>>  		goto out_err;
+>>  	}
+>>  
+>> +	cpu_notifier_register_done();
+>> +
+>>  	hyp_cpu_pm_init();
+>>  
+>>  	kvm_coproc_table_init();
+>>  	return 0;
+>>  out_err:
+>> +	cpu_notifier_register_done();
+>>  	return err;
+>>  }
+>>  
+>>
 > 
-> My current set of patches do not move the location of the include file
-> just yet. The reason for this is that this series targets SoC code
-> only, but both board files and SoC files use the same header files. So
-> until all files are converted the workaround is needed.
+> Just so we're clear, the existing code was simply racy as not prone to
+> deadlocks, right?
+> 
+> This makes it clear that the test above for compatible CPUs can be quite
+> easily evaded by using CPU hotplug, but we don't really have a good
+> solution for handling that yet...  Hmmm, grumble grumble, I guess if you
+> hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
+> 
 
-Oh, my bad. When I saw the change from <mach/file.h> to "file.h", I missed that
-there was no diff move that accompanied it.
+In this particular case, there was no deadlock possibility, rather the
+existing code had insufficient synchronization against CPU hotplug.
 
-> I'd be happy to adjust the patches to fit your recommendation and move
-> the header file in the same patch. But then I need to touch both SoC
-> code and board code in the same patch - which is fine - but I would
-> like to know what branch to target if so.
+init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
+using on_each_cpu(). If a CPU came online after this point and before calling
+register_cpu_notifier(), that CPU would remain uninitialized because this
+subsystem would miss the hot-online event. This patch fixes this bug and
+also uses the new synchronization method (instead of get/put_online_cpus())
+to ensure that we don't deadlock with CPU hotplug.
 
-We're still talking mostly about code under mach-shmobile though, right?
-I think most of these header files are only actually used underneath of there.
+> In any case:
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
 
-If so, then it's fine to just do it in one branch. The rules for how we sort
-our branches are guidelines, and where it doesn't make sense to follow them, we
-don't. :)
+Thanks a lot!
 
-> So how would you like to consume this cleanup? And when? =)
-
-For something like this, that has a build-time possibility to check for
-introduced breakage (i.e. no likelihood for some strange random regression at
-runtime), I'm OK with the patches coming in late. I.e. there's time for 3.15 if
-you want to try getting it in. If not, we can queue it up as a base branch for
-any other changes for 3.16.
-
-As far as how to consume it: send a branch with these patches on there, we'll
-merge it in. If it's relatively conflict-free we'll do it under next/clenaup
-for early merge, otherwise we'll save it for the end of our branches, etc. It'd
-be a great cleanup to get merged so we'll make it work somehow!
-
-
--Olof
+Regards,
+Srivatsa S. Bhat
