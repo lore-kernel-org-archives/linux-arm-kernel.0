@@ -1,57 +1,57 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 14 Mar 2014 22:10:00 +0200
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <530B8C00.8020001@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <52F9282B.5000702@ti.com> <530B8C00.8020001@ti.com>
-Message-ID: <CAK=WgbZp_RQPCeZJyMRkNTQxaJsnGZ3DnjhSkYYR_-PAE_Kp4g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Mar 2014 15:24:13 -0500
+Subject: [PATCHv2 2/3] arm64: Support DMA_ATTR_WRITE_COMBINE
+In-Reply-To: <1394826745-24191-2-git-send-email-lauraa@codeaurora.org>
+References: <1394732716-11507-2-git-send-email-lauraa@codeaurora.org>
+ <1394826745-24191-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAL_JsqKziSNiuN8VjXSv9Lm1vjn9Tc+OLxuVs5mDr3pnaEA4Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman, Mark,
+On Fri, Mar 14, 2014 at 2:52 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> DMA_ATTR_WRITE_COMBINE is currently ignored. Set the pgprot
+> appropriately for non coherent opperations.
+>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 0cdd2f6..608c343 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -29,6 +29,17 @@
+>  struct dma_map_ops *dma_ops;
+>  EXPORT_SYMBOL(dma_ops);
+>
+> +
+> +static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+> +                                       bool coherent)
+> +{
+> +       if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
+> +               return pgprot_writecombine(prot)
 
-On Mon, Feb 24, 2014 at 8:14 PM, Suman Anna <s-anna@ti.com> wrote:
-> Mark, Ohad,
-...
-> Gentle reminder, can you provide your acks/comments?
+Does this compile? Missing semicolon.
 
-Sorry for the late jump in.
+> +       else if (!coherent)
+> +               return pgprot_dmacoherent(prot);
+> +       return prot;
 
-I have a few comments:
+Isn't DMA_ATTR_WRITE_COMBINE supposed to be an optimization over plain
+non-cached? But coherent would be more optimal over just write
+combine, so we would want to continue to ignore DMA_ATTR_WRITE_COMBINE
+in the coherent case. Something like this:
 
-- Hardware spinlocks must have global and system-wide id numbers;
-these numbers cannot be maintained internally by the Linux Kernel.
-Think of an SoC with several asynchronous heterogeneous processors,
-each of which is running a different OS, and they all need to use a
-specific hardware spinlock in order to share some resource. For that
-to happen, every hwlock must have a predefined and deterministic id
-number which is global in the system. We can't have those id numbers
-be relative to an hwlock "controller", and we can't have two hwlock
-"controllers" share the same id numbers.
+      if (coherent)
+               return prot;
+      else if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
+               return pgprot_writecombine(prot);
+      return pgprot_dmacoherent(prot);
 
-- I suspect the simplest and most straight forward way to achieve this
-is by (a) bringing back the concept of the base_id property, and (b)
-letting the global hwlock id be the DT identifier (plus the base_id)
-and then providing it directly to the drivers when needed. The latter
-is required in order to support dynamically allocation of hwlocks, in
-which case Linux must know the global system-wide id number, and then
-share it with the other asynchronous OSes via some IPC.
 
-- If we feel there's no way any system is going to have more than a
-single hwlock controller, then we can live without a base_id property,
-but then this needs to be clearly documented and prohibited. Today
-both the hwlock DT representation, and the coupled kernel code,
-implicitly allow this anomaly to exist.
+But then this function is never used in the coherent case, so I'm
+confused by Catalin's comment. The original version seems sufficient
+to me.
 
-- Hwlock controller nodes should have a list of reserved locks (those
-locks for which other nodes have a phandle+identifier pointing at) to
-prevent those locks from being dynamically allocated by eager drivers.
-
-Most of these issues were discussed Arnd, Benoit and myself back then,
-please see below:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/064265.html
-
-Let's discuss,
-
-Thanks,
-Ohad.
+Rob
