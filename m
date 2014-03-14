@@ -1,79 +1,61 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 15 Mar 2014 01:51:51 +0900
-Subject: [PATCH v4 2/3] arm64: split syscall_trace() into separate
- functions for enter/exit
-In-Reply-To: <20140313184149.GL25472@mudshark.cambridge.arm.com>
-References: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
- <1394705491-12343-3-git-send-email-takahiro.akashi@linaro.org>
- <20140313184149.GL25472@mudshark.cambridge.arm.com>
-Message-ID: <532333A7.1000801@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 14 Mar 2014 22:27:59 +0530
+Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
+ gate clocks
+In-Reply-To: <5323078E.4060903@samsung.com>
+References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
+ <5323078E.4060903@samsung.com>
+Message-ID: <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 03:41 AM, Will Deacon wrote:
-> On Thu, Mar 13, 2014 at 10:11:30AM +0000, AKASHI Takahiro wrote:
->> As done in arm, this change makes it easy to confirm we invoke syscall
->> related hooks, including syscall tracepoint, audit and seccomp which would
->> be implemented later, in correct order. That is, undoing operations in the
->> opposite order on exit that they were done on entry.
+ Hi KyongHo,
+
+On 14 March 2014 19:13, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi KyongHo,
+>
+>
+> On 14.03.2014 06:09, Cho KyongHo wrote:
 >>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> exynos-iommu driver must care about master H/W's gate clock as well as
+>> System MMU's gate clock. To enhance readability of the source code,
+>> macros to gate/ungate those clocks are defined.
+>>
+>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 >> ---
->>   arch/arm64/kernel/entry.S  |   10 ++++-----
->>   arch/arm64/kernel/ptrace.c |   48 ++++++++++++++++++++++++++++++++++----------
->>   2 files changed, 41 insertions(+), 17 deletions(-)
->
-> [...]
->
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index 6a8928b..9993a8f 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -1058,29 +1058,27 @@ long arch_ptrace(struct task_struct *child, long request,
->>   	return ptrace_request(child, request, addr, data);
->>   }
+>>   drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
+>>   1 file changed, 22 insertions(+), 12 deletions(-)
 >>
->> -asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>   {
->>   	unsigned long saved_reg;
+>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>> index 71e77f1..cef62d0 100644
+>> --- a/drivers/iommu/exynos-iommu.c
+>> +++ b/drivers/iommu/exynos-iommu.c
+>> @@ -101,6 +101,16 @@
+>>   #define REG_PB1_SADDR         0x054
+>>   #define REG_PB1_EADDR         0x058
 >>
->>   	if (!test_thread_flag(TIF_SYSCALL_TRACE))
->>   		return regs->syscallno;
->>
->> +	/*
->> +	 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
->> +	 * used to denote syscall entry/exit:
->> +	 *   0 -> entry
->> +	 */
+>> +#define __clk_gate_ctrl(data, clk, en) do {            \
+>> +               if (data->clk)                          \
+>> +                       clk_##en##able(data->clk);      \
+>> +       } while (0)
+>> +
+>> +#define __sysmmu_clk_enable(data)      __clk_gate_ctrl(data, clk, en)
+>> +#define __sysmmu_clk_disable(data)     __clk_gate_ctrl(data, clk, dis)
+>> +#define __master_clk_enable(data)      __clk_gate_ctrl(data, clk_master,
+>> en)
+>> +#define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master,
+>> dis)
+>> +
 >
-> You could add an enum, like we have on ARM (ptrace_syscall_dir) for the two
-> directions.
 >
->>   	if (is_compat_task()) {
->> -		/* AArch32 uses ip (r12) for scratch */
->>   		saved_reg = regs->regs[12];
->> -		regs->regs[12] = dir;
->> +		regs->regs[12] = 0;
->>   	} else {
->> -		/*
->> -		 * Save X7. X7 is used to denote syscall entry/exit:
->> -		 *   X7 = 0 -> entry, = 1 -> exit
->> -		 */
->>   		saved_reg = regs->regs[7];
->> -		regs->regs[7] = dir;
->> +		regs->regs[7] = 0;
+> I'd say that such macros only obfuscate code, without any gains, as you can
+> see in diffstat - this patch adds more lines than it removes.
 >
-> This code could also be refactored so we calculated the register number
-> once, then avoid the if (is_compact_task()) check all over the place.
->
-> Similarly on the exit path.
+> Please drop this change.
 
-OK, I will implement tracehook_report_syscall() as in arm.
-
--Takahiro AKASHI
+ I agree with Tomasz here.
 
 
-> Will
->
+-- 
+With warm regards,
+Sachin
