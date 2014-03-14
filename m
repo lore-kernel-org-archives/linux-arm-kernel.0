@@ -1,109 +1,99 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 14 Mar 2014 15:34:29 +0000
-Subject: [PATCH v7 3/6] pci: Create pci_host_bridge before its associated bus
- in pci_create_root_bus.
-In-Reply-To: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1394811272-1547-4-git-send-email-Liviu.Dudau@arm.com>
+Date: Fri, 14 Mar 2014 15:34:26 +0000
+Subject: [PATCH v7 0/6] Support for creating generic host_bridge from device
+ tree
+Message-ID: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
-As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
-the creation order has been changed for no good reason. Revert the order of
-creation as we are going to depend on the pci_host_bridge structure to retrieve the
-domain number of the root bus.
+I'm dropping the RFC tag now as I have the feeling that we are starting to have something in
+a good shape that can be pushed for more testing in near future.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Grant Likely <grant.likely@linaro.org>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
----
- drivers/pci/probe.c | 36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+This is v7 of my attempt to add support for a generic pci_host_bridge controller created
+from a description passed in the device tree.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 6e34498..fd11c12 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -505,7 +505,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	kfree(bridge);
- }
- 
--static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-+static struct pci_host_bridge *pci_alloc_host_bridge(void)
- {
- 	struct pci_host_bridge *bridge;
- 
-@@ -514,7 +514,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&bridge->windows);
--	bridge->bus = b;
- 	return bridge;
- }
- 
-@@ -1727,9 +1726,19 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	char bus_addr[64];
- 	char *fmt;
- 
-+	bridge = pci_alloc_host_bridge();
-+	if (!bridge)
-+		return NULL;
-+
-+	bridge->dev.parent = parent;
-+	bridge->dev.release = pci_release_host_bridge_dev;
-+	error = pcibios_root_bridge_prepare(bridge);
-+	if (error)
-+		goto err_out;
-+
- 	b = pci_alloc_bus();
- 	if (!b)
--		return NULL;
-+		goto err_out;
- 
- 	b->sysdata = sysdata;
- 	b->ops = ops;
-@@ -1738,26 +1747,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 
--	bridge = pci_alloc_host_bridge(b);
--	if (!bridge)
--		goto err_out;
--
--	bridge->dev.parent = parent;
--	bridge->dev.release = pci_release_host_bridge_dev;
-+	bridge->bus = b;
- 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
--	error = pcibios_root_bridge_prepare(bridge);
--	if (error) {
--		kfree(bridge);
--		goto err_out;
--	}
--
- 	error = device_register(&bridge->dev);
- 	if (error) {
- 		put_device(&bridge->dev);
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
-@@ -1814,8 +1812,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- class_dev_reg_err:
- 	put_device(&bridge->dev);
- 	device_unregister(&bridge->dev);
--err_out:
-+err_bus_out:
- 	kfree(b);
-+err_out:
-+	kfree(bridge);
- 	return NULL;
- }
- 
+Changes from v6:
+  - Made pci_register_io_range() return an error if PCI_IOBASE is not defined. When the
+    cleanup of PCI_IOBASE use is going to happen, that will catch all those architectures
+    that don't use virtual mapping of I/O ranges (like x86) or don't support PCI at all.
+  - Improved the error handling in of_pci_range_to_resource() and made it propagate the
+    error as well.
+  - Bail out of the parsing of PCI ranges if of_pci_range_to_resource() fails.
+
+Changes from v5:
+  - Tested by Tanmay Inamdar, thanks Tanmay!
+  - dropped v5 5/7 pci: Use parent domain number when allocating child busses.
+  - Added weak implementation of pcibios_fixup_bridge_ranges() in drivers/pci/host-bridge.c
+    so that architectures that enable CONFIG_OF and CONFIG_PCI don't suddenly get compilation
+    errors. While at this, changed the signature of the function so that an error can be
+    returned.
+  - With the new error code in pcibios_fixup_bridge_ranges(), reworked the error handling
+    in pci_host_bridge_of_get_ranges() and of_create_pci_host_bridge().
+  - Add linux/slab.h to the #include list
+  - Revisit the error path in pci_create_root_bus[_in_domain]() and fixed the case where
+    failing to allocate the bus will not return an error.
+
+Changes from v4:
+  - Export pci_find_host_bridge() to be used by arch code. There is scope for
+    making the arch/arm64 version of pci_domain_nr the default weak implementation
+    but that would double the size of this series in order to handle all #define
+    versions of the pci_domain_nr() function, so I suggest keeping that for a separate
+    cleanup series.
+
+Changes from v3:
+  - Dynamically allocate bus_range resource in of_create_pci_host_bridge()
+  - Fix the domain number used when creating child busses.
+  - Changed domain number allocator to use atomic operations.
+  - Use ERR_PTR() to propagate the error out of pci_create_root_bus_in_domain()
+    and of_create_pci_host_bridge().
+
+Changes from v2:
+  - Use range->cpu_addr when calling pci_address_to_pio()
+  - Introduce pci_register_io_range() helper function in order to register
+    io ranges ahead of their conversion to PIO values. This is needed as no
+    information is being stored yet regarding the range mapping, making
+    pci_address_to_pio() fail. Default weak implementation does nothing,
+    to cover the default weak implementation of pci_address_to_pio() that
+    expects direct mapping of physical addresses into PIO values (x86 view).
+
+Changes from v1:
+  - Add patch to fix conversion of IO ranges into IO resources.
+  - Added a domain_nr member to pci_host_bridge structure, and a new function
+    to create a root bus in a given domain number. In order to facilitate that
+    I propose changing the order of initialisation between pci_host_bridge and
+    it's related bus in pci_create_root_bus() as sort of a rever of 7b5436635800.
+    This is done in patch 1/4 and 2/4.
+  - Added a simple allocator of domain numbers in drivers/pci/host-bridge.c. The
+    code will first try to get a domain id from of_alias_get_id(..., "pci-domain")
+    and if that fails assign the next unallocated domain id.
+  - Changed the name of the function that creates the generic host bridge from
+    pci_host_bridge_of_init to of_create_pci_host_bridge and exported as GPL symbol.
+
+v6 thread here: https://lkml.org/lkml/2014/3/5/179
+v5 thread here: https://lkml.org/lkml/2014/3/4/318
+v4 thread here: https://lkml.org/lkml/2014/3/3/301
+v3 thread here: https://lkml.org/lkml/2014/2/28/216
+v2 thread here: https://lkml.org/lkml/2014/2/27/245
+v1 thread here: https://lkml.org/lkml/2014/2/3/380
+
+Best regards,
+Liviu
+
+
+Liviu Dudau (6):
+  pci: Introduce pci_register_io_range() helper function.
+  pci: OF: Fix the conversion of IO ranges into IO resources.
+  pci: Create pci_host_bridge before its associated bus in pci_create_root_bus.
+  pci: Introduce a domain number for pci_host_bridge.
+  pci: Export find_pci_host_bridge() function.
+  pci: Add support for creating a generic host_bridge from device tree
+
+ drivers/of/address.c       |  49 +++++++++++
+ drivers/pci/host-bridge.c  | 161 ++++++++++++++++++++++++++++++++++-
+ drivers/pci/probe.c        |  73 ++++++++++------
+ include/linux/of_address.h |  14 +--
+ include/linux/pci.h        |  17 ++++
+ 5 files changed, 278 insertions(+), 36 deletions(-)
+
 -- 
 1.9.0
