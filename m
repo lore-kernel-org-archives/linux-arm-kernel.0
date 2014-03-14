@@ -1,109 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 14 Mar 2014 10:31:55 +0100
-Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
-In-Reply-To: <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
- <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5322CC8B.6010905@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 14 Mar 2014 11:38:58 +0200
+Subject: [PATCH 00/18] edma/ASoC: dmaengine PCM for AM335x and AM447x
+In-Reply-To: <20140313134601.GU366@sirena.org.uk>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+ <20140313134601.GU366@sirena.org.uk>
+Message-ID: <5322CE32.2000102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2014 03:06 PM, Antoine T?nart wrote:
-> Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
-> The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
-> timer, apb timers and uarts for now.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q.dtsi | 167 ++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 167 insertions(+)
->   create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> new file mode 100644
-> index 000000000000..1cb76031dfe6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-[...]
-> +	clocks {
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		smclk: sysmgr-clock {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <25000000>;
-> +		};
-> +
-> +		sysclk: system-clock {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <400000000>;
-> +		};
-> +	};
-> +
-> +	soc {
-[...]
-> +		local-timer at ad0600 {
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0xad0600 0x20>;
-> +			clocks = <&sysclk>;
+On 03/13/2014 03:46 PM, Mark Brown wrote:
+> On Thu, Mar 13, 2014 at 11:18:22AM +0200, Peter Ujfalusi wrote:
+> 
+>> With this series AM335x and AM447x will use the dmaengine PCM for audio. The
+>> daVinci devices will keep using the davinci-pcm for now since I do not have
+>> means to test them but the code is written in a way that they can be switched
+>> to use the edma-pcm easily (DA850/OMAP-L138 has been tested and audio was
+>> working fine).
+> 
+> Can you please not resend the ASoC portions of this series until the
+> EDMA portion is stable (and ideally committed)?  I'm not quite sure why
+> but every EDMA patch series seems to go through lots of iterations which
+> gets rather noisy - my initial reaction to seeing EDMA in a subject is
+> to just delete the thread.
 
-If I understand Jisheng correctly, this should be cpuclk/3. When
-removing the clocks {} container above, please also take care of
-it.
+Sure, I'm not planning to spam alsa-devel however the switch to dmaengine PCM
+for AM335x/AM447x needs the edma patches, otherwise it is not going to work.
+AFAIK I have not sent patch to edma as of now so I have no idea how long it
+takes to get stuff in (the good thing is that the edma part does not touch DT,
+which is alone can reduce the number of iterations).
+Anyway, what I can - and already did is:
+Reorder the ASoC patches and I can leave out the switch to dmaengine PCM patch
+for davinci-mcasp for now. The edma-pcm and the other patches for McASP can go
+in right away (I will not add the edma-pcm to the Makefile/Kconfig to avoid
+issues).
 
-You can do
+I will detach the edma stuff and follow it up outside of alsa-devel.
 
-cpuclk: cpu-clock {
-	compatible = "fixed-clock";
-	#clock-cells = <0>;
-	clock-frequency = <1200000000>; /* <- put correct freq here */
-};
+The only thing I'm afraid off is that it is going to take two release cycle to
+get this in: first cycle edma part, next cycle for the ASoC to switch to use
+the edma-pcm.
 
-sysclk: system-clock {
-	compatible = "fixed-factor-clock";
-	#clock-cells = <0>;
-	clocks = <&cpuclk>;
-	clock-multi = <1>;
-	clock-div = <3>;
-};
-
-Hopefully, we'll have proper clock drivers soon so we can just replace
-referenced "fixed-*" clocks.
-
-> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			status = "okay";
-
-As Mark Rutland mentioned, get rid of status = "okay" in dtsi.
-
-> +		};
-> +
-[...]
-> +		apb at e80000 {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			ranges = <0 0xe80000 0x10000>;
-> +			interrupt-parent = <&aic>;
-> +
-> +			timer0: timer at 2c00 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c00 0x14>;
-> +				interrupts = <8>;
-> +				clock-freq = <100000000>;
-> +				status = "okay";
-> +			};
-> +
-> +			timer1: timer at 2c14 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c14 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-
-Please also add the remaining 6 apb timers.
-
-Sebastian
+-- 
+P?ter
