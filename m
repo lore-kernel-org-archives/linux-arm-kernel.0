@@ -1,57 +1,64 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 14 Mar 2014 11:19:07 +0100
-Subject: [PATCH 3/3] spi: psdev: add passive serial driver
-In-Reply-To: <20140312163427.GV28112@sirena.org.uk>
-References: <1394639617-26917-1-git-send-email-m.grzeschik@pengutronix.de>
- <1394639617-26917-4-git-send-email-m.grzeschik@pengutronix.de>
- <20140312163427.GV28112@sirena.org.uk>
-Message-ID: <20140314101907.GF4234@pengutronix.de>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Fri, 14 Mar 2014 11:21:56 +0100
+Subject: i.MX53 suspend to RAM
+Message-ID: <5322D844.50203@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 04:34:27PM +0000, Mark Brown wrote:
-> On Wed, Mar 12, 2014 at 04:53:37PM +0100, Michael Grzeschik wrote:
-> 
-> > This patch introduces the psdev driver. It is used to communicate to an
-> > Altera passive serial connected FPGA by writing into an character
-> > device.
-> > 
-> > It simply initates the protocol on open and clocks the data into the
-> > FPGA by using the underlying SPI bus on write. The used SPI bus can also
-> > be an bitbang SPI bus. On close it will check for the response of the
-> > FPGA and tells if the write process was successful.
-> 
-> Having read the above I'm still not entirely sure what this is supposed
-> to do.  It sounds like it might be something to do with programming
-> FPGAs but that doesn't seem like something for the SPI subsystem, it
-> sounds like something for a FPGA handling subsystem.  People keep
-> talking about that, there's a bunch of other stuff to integrate with
-> there like loading DTs for the downloeaded bitstream.  I'm not sure what
-> the status is there.
+Hi Fabio,
 
-Ok, so first of all it needs better documentation, also for the
-bindings. I will add some.
+Do you know how extensively the i.MX53 suspend to RAM code has been tested?
 
-Second, the driver has "per se" nothing to do with SPI, beside it needs
-a clock and data line to transfer an image to the FPGA. (One way,
-therefor: passive). It needs to use some SPI controller to do that. Even
-the SPI Bitbang driver. Because of this, it depends on the SPI
-framework.
+Here I am observing (with 3.13) random resume failures (once every 5 - 
+50 resume cycles)
 
-Beside the SCLK and MOSI, the protocol needs to toggle and check some
-GPIOs for protocol start and end. For that I chose the posix open and
-close, so that in userland it can be used as simple as $(cat
-firmware.rbf > /dev/psdev0). This protocol also needs no SS line.
+This is on custom hardware not an evaluation board so I can't rule out a 
+hardware bug.
 
-It is actually not more than that. I took the spidev character device
-driver as reference implementation. Any Idea where to put this driver
-instead.
+If I toggle a GPIO each side of the call to cpu_idle() in 
+mx5_suspend_enter() I see that it doesn't come out of WFI.
+
+The power consumption however seems to indicate that the problem is 
+actually during the suspend.
+
+On a successful cycle it drops from 220mA to 120mA but in the failure 
+case it only drops to 150mA
+
+Changing the code in mx5_cpu_lp_set() to
+* not request the PMIC to reduce the voltage (MXC_CCM_CLPCR_VSTBY)
+* not request external clock stop (MXC_CCM_CLPCR_SBYOS)
+
+makes no difference.
+
+The WAIT mode (used in normal idle) works fine.
+
+Looking at the code I have a few questions too.
+
+1) My understanding of the reference manual (18.2.6.3.1 "Stop Mode is 
+Entered by the Following Procedure")
+is that the TZIC_DSMINT bit should also be set.
+This is done for WAIT mode in tzic_enable_wake() but is not done for 
+STOP mode.
+The Freescale kernel does this.
+Adding code to do that does not fix the problem however.
+
+2) I don't understand the code manipulating the 
+MXC_SRPG_EMPGC[0|1]_SRPGCR registers.
+These registers seem to be for the i.MX51 not the i.MX53
+The i.MX53 has something similar (SRPGCx_SRPGCR) but the addresses are 
+not the same.
+The Freescale 2.6.35 kernel code does not use these for i.MX53
+However removing the access to these registers does not fix the problem
+
+3) The Fresscale kernel code is much more complicated, involving 
+executing suspend code from IRAM that reprograms the PLLs
+I can't find anything in the reference manual or the errata justifying 
+this. I haven't (yet) attempted to boot the Freescale kernel
+to see if it works better.
+
+
+Any suggestions on how to debug this much appreciated.
 
 Regards,
-Michael
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Martin
