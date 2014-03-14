@@ -1,60 +1,93 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 14 Mar 2014 10:44:39 +0100
-Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value
- for number of delays
-In-Reply-To: <CACRpkda0Z15zC=d8xe+KyHqgmTCHbnUjL14fBmtscpR-2kHtFQ@mail.gmail.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>	<1394614210-15698-5-git-send-email-maxime.coquelin@st.com>	<1394634313.28839.57.camel@joe-AO722>
- <CACRpkda0Z15zC=d8xe+KyHqgmTCHbnUjL14fBmtscpR-2kHtFQ@mail.gmail.com>
-Message-ID: <5322CF87.5000301@st.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?B?QW50b2luZSBUw6luYXJ0?=)
+Date: Fri, 14 Mar 2014 10:48:57 +0100
+Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+In-Reply-To: <5322CC8B.6010905@gmail.com>
+References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+ <5322CC8B.6010905@gmail.com>
+Message-ID: <5322D089.7010605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sebastian,
 
-
-On 03/14/2014 10:20 AM, Linus Walleij wrote:
-> On Wed, Mar 12, 2014 at 3:25 PM, Joe Perches <joe@perches.com> wrote:
->> On Wed, 2014-03-12 at 09:50 +0100, Maxime COQUELIN wrote:
->>> This patch replaces the raw values with ARRAY_SIZE for assigning the
->>> ninput_delays and noutput_delays fields of STiH416's st_pctl_data struct.
->>
->> trivial note:
->>
->>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
->> []
->>> @@ -384,9 +384,9 @@ static unsigned int stih416_delays[] = {0, 300, 500, 750, 1000, 1250, 1500,
->>>   static const struct st_pctl_data  stih416_data = {
->>>        .rt_style       = st_retime_style_dedicated,
->>>        .input_delays   = stih416_delays,
->>> -     .ninput_delays  = 14,
->>> +     .ninput_delays  = ARRAY_SIZE(stih416_delays),
->>>        .output_delays  = stih416_delays,
->>> -     .noutput_delays = 14,
->>> +     .noutput_delays = ARRAY_SIZE(stih416_delays),
->>>        .alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
->>>   };
->>>
->>
->> drivers/pinctrl/pinctrl-st.c-   unsigned int    *input_delays;
->> drivers/pinctrl/pinctrl-st.c-   unsigned int    *output_delays;
->>
->> It may be better to change these to const unsigned int *
->> and change
->>
->> static unsigned int stih416_delays[] = {
->>
->> to static const
+On 14/03/2014 10:31, Sebastian Hesselbarth wrote:
+> On 03/13/2014 03:06 PM, Antoine T?nart wrote:
+>> +    clocks {
+>> +        #address-cells = <0>;
+>> +        #size-cells = <0>;
+>> +
+>> +        smclk: sysmgr-clock {
+>> +            compatible = "fixed-clock";
+>> +            #clock-cells = <0>;
+>> +            clock-frequency = <25000000>;
+>> +        };
+>> +
+>> +        sysclk: system-clock {
+>> +            compatible = "fixed-clock";
+>> +            #clock-cells = <0>;
+>> +            clock-frequency = <400000000>;
+>> +        };
+>> +    };
+>> +
+>> +    soc {
+> [...]
+>> +        local-timer at ad0600 {
+>> +            compatible = "arm,cortex-a9-twd-timer";
+>> +            reg = <0xad0600 0x20>;
+>> +            clocks = <&sysclk>;
 >
-> Good point. Patches accepted :-)
-
-Sorry Joe, I forgot to reply.
-
-I added this to my todo list.
-I will provide the change before end of next week.
-
-Thanks,
-Maxime
-
+> If I understand Jisheng correctly, this should be cpuclk/3. When
+> removing the clocks {} container above, please also take care of
+> it.
 >
-> Yours,
-> Linus Walleij
+> You can do
 >
+> cpuclk: cpu-clock {
+>      compatible = "fixed-clock";
+>      #clock-cells = <0>;
+>      clock-frequency = <1200000000>; /* <- put correct freq here */
+> };
+>
+> sysclk: system-clock {
+>      compatible = "fixed-factor-clock";
+>      #clock-cells = <0>;
+>      clocks = <&cpuclk>;
+>      clock-multi = <1>;
+>      clock-div = <3>;
+> };
+>
+> Hopefully, we'll have proper clock drivers soon so we can just replace
+> referenced "fixed-*" clocks.
+
+Sure, this is why I only kept one fixed clock in this patch.
+
+I'll add the cpuclk here then.
+
+>> +            timer0: timer at 2c00 {
+>> +                compatible = "snps,dw-apb-timer";
+>> +                reg = <0x2c00 0x14>;
+>> +                interrupts = <8>;
+>> +                clock-freq = <100000000>;
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            timer1: timer at 2c14 {
+>> +                compatible = "snps,dw-apb-timer";
+>> +                reg = <0x2c14 0x14>;
+>> +                clock-freq = <100000000>;
+>> +                status = "disabled";
+>> +            };
+>
+> Please also add the remaining 6 apb timers.
+
+I don't have any information about the remaining 6 apb timers. I'll ask 
+Jisheng.
+
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
