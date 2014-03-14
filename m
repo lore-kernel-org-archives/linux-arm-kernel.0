@@ -1,28 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Mar 2014 17:57:09 +0000
-Subject: [PATCH V2] arm64: mm: Route pmd thp functions through pte
- equivalents
-In-Reply-To: <1393322533-23725-1-git-send-email-steve.capper@linaro.org>
-References: <1393322533-23725-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140314175709.GM18126@arm.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 14 Mar 2014 13:00:38 -0500
+Subject: [PATCH v5 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <1394762863-12154-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1394762863-12154-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1394762863-12154-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140314180038.GT18529@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 10:02:13AM +0000, Steve Capper wrote:
-> Rather than have separate hugetlb and transparent huge page pmd
-> manipulation functions, re-wire our thp functions to simply call the
-> pte equivalents.
+On Thu, Mar 13, 2014 at 07:07:43PM -0700, Bjorn Andersson wrote:
+> This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
+> The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
+> engine with input/output FIFOs and an embedded i2c mini-core. The driver
+> supports FIFO mode (for low bandwidth applications) and block mode (interrupt
+> generated for each block-size data transfer).
 > 
-> This allows THP to take advantage of the new PTE_WRITE logic introduced
-> in:
->   c2c93e5 arm64: mm: Introduce PTE_WRITE
-> 
-> To represent splitting THPs we use the PTE_SPECIAL bit as this is not
-> used for pmds.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> +++ b/drivers/i2c/busses/i2c-qup.c
+[..]
+> +static int qup_i2c_xfer(struct i2c_adapter *adap,
+> +			struct i2c_msg msgs[],
+> +			int num)
+> +{
+> +	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
+> +	int ret, idx;
+> +
+> +	ret = pm_runtime_get_sync(qup->dev);
+> +	if (IS_ERR_VALUE(ret))
+> +		goto out;
 
-Applied. Thanks.
+General i2c question: is there a reason why the core isn't responsible
+for ensuring a device is not suspended before invoking ->master_xfer
+(and smbus_xfer)?
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
