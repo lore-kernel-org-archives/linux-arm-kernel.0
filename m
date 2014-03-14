@@ -1,104 +1,94 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 14 Mar 2014 20:05:31 +0100
-Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
- disabling
-Message-ID: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 20:05:52 +0100
+Subject: [PATCH v17 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
+ driver
+In-Reply-To: <CAPw-ZTnVE0B+hJKGX=EPP5mjoA7-diTvi9hxNhBuAFL2hANz+Q@mail.gmail.com>
+References: <1394655573-32645-1-git-send-email-lho@apm.com>
+ <201403141241.16599.arnd@arndb.de>
+ <CAPw-ZTnVE0B+hJKGX=EPP5mjoA7-diTvi9hxNhBuAFL2hANz+Q@mail.gmail.com>
+Message-ID: <201403142005.52991.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm-leds calls .config() and .disable() in a row. This exhibits that it may
-happen that the channel gets disabled before CDTY has been updated with CUPD.
-The issue gets quite worse with long periods.
-So, ensure by reading ISR that at least one period has past before disabling the
-channel.
+On Friday 14 March 2014, Loc Ho wrote:
+> > On Wednesday 12 March 2014, Loc Ho wrote:
 
-The other issue is that it may happen that CUPD is not flushed before enabling
-the channel so it will update CDTY/CPRD just after one period. So we always set
-CUPD, even when the channel is not enabled.
+> > gets called. Can you clarify what this register access does?
+> > If it's just setting a index into a mux output, would it make
+> > sense to have an optional DT property containing an integer with
+> > the mux setting you want to set? That way you wouldn't even
+> > have to have two compatible strings but just do
+> >
+> >         ret = of_property_read_u32(node, "apm,ahci-mux", &mux);
+> >         if (!ret)
+> >                 xgene_ahci_mux_select(ctx, mux);
+> >
+> 
+> Given that fact that I will break up the resource. Let's just use the
+> resource for the MUX to handle this. For the IP that doesn't existed,
+> I will just not list it.
 
-Tested on at91sam9g45 and sama5d31ek.
+Ah, that sounds good. It also means that if the firmware has set up
+the mux already, you don't have to touch it again. That would probably
+be the preferred case.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
- 1 file changed, 29 insertions(+), 17 deletions(-)
+I'm undecided about the value that you write in there. That could either
+be passed through DT as I suggested above for extra flexibility, or you
+can keep it hardcoded if you are absolutely sure that there will never
+need to be a case where you have to set it to something other than '1',
 
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 0adc952cc4ef..0e589594b1cb 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -16,11 +16,13 @@
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/slab.h>
-+#include <linux/delay.h>
- 
- /* The following is global registers for PWM controller */
- #define PWM_ENA			0x04
- #define PWM_DIS			0x08
- #define PWM_SR			0x0C
-+#define PWM_ISR			0x1C
- /* Bit field in SR */
- #define PWM_SR_ALL_CH_ON	0x0F
- 
-@@ -157,24 +159,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 	unsigned int val;
- 
--	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
--		/*
--		 * If the PWM channel is enabled, using the update register,
--		 * it needs to set bit 10 of CMR to 0
--		 */
--		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
- 
--		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
--		val &= ~PWM_CMR_UPD_CDTY;
--		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
--	} else {
--		/*
--		 * If the PWM channel is disabled, write value to duty and
--		 * period registers directly.
--		 */
--		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
--		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
--	}
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
-+
-+	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-+	val &= ~PWM_CMR_UPD_CDTY;
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+
-+	/*
-+	 * If the PWM channel is enabled, only update CDTY by using the update
-+	 * register, it needs to set bit 10 of CMR to 0
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags))
-+		return;
-+	/*
-+	 * If the PWM channel is disabled, write value to duty and period
-+	 * registers directly.
-+	 */
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
- }
- 
- static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-@@ -245,6 +248,15 @@ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 
-+	/*
-+	 * Wait for at least a complete period to have passed before disabling a
-+	 * channel to be sure that CDTY has been updated
-+	 */
-+	atmel_pwm_readl(atmel_pwm, PWM_ISR);
-+
-+	while (!(atmel_pwm_readl(atmel_pwm, PWM_ISR) & (1 << pwm->hwpwm)))
-+		usleep_range(10, 100);
-+
- 	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
- 
- 	clk_disable(atmel_pwm->clk);
--- 
-1.8.3.2
+> > > +     /*
+> > > +      * Can't use devm_ioremap_resource due to overlapping region.
+> > > +      * 0xYYYY.0000 - host core
+> > > +      * 0xYYYY.7000 - Mux (if applicable)
+> > > +      * 0xYYYY.A000 - PHY indirect access
+> > > +      * 0xYYYY.C000 - Clock
+> > > +      * 0xYYYY.D000 - RAM shutdown removal
+> > > +      * As we map the entire region as one, it overlaps with the PHY driver.
+> > > +      */
+> > > +     ctx->csr_base = devm_ioremap(dev, res->start, resource_size(res));
+> > > +     if (!ctx->csr_base) {
+> > > +             dev_err(dev, "can't map %pR\n", res);
+> > > +             return -ENOMEM;
+> > > +     }
+> >
+> > I still think we should try not to have overlapping memory areas here.
+> > Could you split up the registers into another range in the reg property
+> > to leave the PHY registers out?
+> 
+> Let me do this:
+> 
+> 1. One resource for the RAM shutdown
+> 2. One resource for the host controller
+> 3. One optional resource for the MUX if needed.
+> 
+> With #3, this also solved the MUX detection and avoid having another
+> node "apm,ahci-mux".
+
+My suggestion was not to have another device node, just a property that
+contains a value to be written into the mux register if present.
+
+> > Also, please read the thread named "[PATCH 0/7] of: setup dma
+> > parameters using dma-ranges and dma-coherent" and comment there
+> > about what you think we should do here. I assume we will have to
+> > add "dma-ranges" properties in a number of places to get this
+> > all to work fine any 64-bit SoC. Do you know if you have any
+> > DMA master devices in x-gene that are not 64-bit capable?
+> >
+> 
+> I will read and follow later. We do have non-64-bit devices such as
+> SDIO and SPI. But these IP's have translation in the bus similar to
+> PCIe PIM.
+
+Is there also an IOMMU, or just the PIM? If there is no IOMMU,
+we will actually have to use the swiotlb code here, otherwise we
+can rely on the IOMMU to do the translation so we can pretend that
+there is always 64-bit DMA capability.
+
+In theory, the PIM could be dynamically reprogrammed for each
+DMA, as an extremely primitive IOMMU implementation, but I don't
+know what the impact on performance would be from doing that.
+It would also prevent you from starting multiple concurrent DMAs,
+although I suspect that is not an important case for SPI and SDIO.
+
+	Arnd
