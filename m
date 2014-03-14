@@ -1,136 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 14 Mar 2014 14:48:25 -0500
-Subject: [PATCH 7/8] ARM: dts: dra7: Add USB related nodes
-In-Reply-To: <53232185.6090305@ti.com>
-References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
- <1394197751-28984-8-git-send-email-rogerq@ti.com>
- <5322DC0E.1020600@ti.com> <5322F20C.50600@ti.com>
- <53231829.3060602@ti.com> <53232185.6090305@ti.com>
-Message-ID: <20140314194825.GA21808@saruman.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 20:52:13 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <53234B68.5090300@ahsoftware.de>
+References: <5316FFCE.1060603@ti.com>
+ <1394018461-757-1-git-send-email-holler@ahsoftware.de>
+ <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
+ <5322D529.4070904@ahsoftware.de>
+ <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
+ <5322F82A.9000507@ahsoftware.de>
+ <CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>
+ <53234B68.5090300@ahsoftware.de>
+Message-ID: <CACRpkdZ2+kfOim1OEWbYR_Tj36i+8HmYXh+nqO9h1Em8gqy=3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 05:34:29PM +0200, Roger Quadros wrote:
-> On 03/14/2014 04:54 PM, Kishon Vijay Abraham I wrote:
-> > 
-> > 
-> > On Friday 14 March 2014 05:41 PM, Roger Quadros wrote:
-> >> On 03/14/2014 12:38 PM, Kishon Vijay Abraham I wrote:
-> >>> Hi Roger,
-> >>>
-> >>> On Friday 07 March 2014 06:39 PM, Roger Quadros wrote:
-> >>>> Add nodes for the Super Speed USB controllers, omap-control-usb,
-> >>>> USB2 PHY and USB3 PHY devices.
-> >>>>
-> >>>> Remove ocp2scp1 address space from hwmod data as it is
-> >>>> now provided via device tree.
-> >>>>
-> >>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> >>>> ---
-> >>>>    arch/arm/boot/dts/dra7.dtsi               | 110 ++++++++++++++++++++++++++++++
-> >>>>    arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  10 ---
-> >>>>    2 files changed, 110 insertions(+), 10 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> >>>> index 597979b..1e73900 100644
-> >>>> --- a/arch/arm/boot/dts/dra7.dtsi
-> >>>> +++ b/arch/arm/boot/dts/dra7.dtsi
-> >>>> @@ -811,6 +811,116 @@
-> >>>>                clocks = <&sata_ref_clk>;
-> >>>>                ti,hwmods = "sata";
-> >>>>            };
-> >>>> +
-> >>>> +        omap_control_usb2phy1: control-phy at 4a002300 {
-> >>>> +            compatible = "ti,control-phy-usb2";
-> >>>> +            reg = <0x4a002300 0x4>;
-> >>>> +            reg-names = "power";
-> >>>> +        };
-> >>>> +
-> >>>> +        omap_control_usb3phy1: control-phy at 4a002370 {
-> >>>> +            compatible = "ti,control-phy-pipe3";
-> >>>> +            reg = <0x4a002370 0x4>;
-> >>>> +            reg-names = "power";
-> >>>> +        };
-> >>>> +
-> >>>> +        omap_control_usb2phy2: control-phy at 0x4a002e74 {
-> >>>> +            compatible = "ti,control-phy-usb2-dra7";
-> >>>> +            reg = <0x4a002e74 0x4>;
-> >>>> +            reg-names = "power";
-> >>>> +        };
-> >>>> +
-> >>>> +        /* OCP2SCP1 */
-> >>>> +        ocp2scp at 4a080000 {
-> >>>> +            compatible = "ti,omap-ocp2scp";
-> >>>> +            #address-cells = <1>;
-> >>>> +            #size-cells = <1>;
-> >>>> +            ranges;
-> >>>> +            reg = <0x4a080000 0x20>;
-> >>>> +            ti,hwmods = "ocp2scp1";
-> >>>> +
-> >>>> +            usb2_phy1: phy at 4a084000 {
-> >>>> +                compatible = "ti,omap-usb2";
-> >>>> +                reg = <0x4a084000 0x400>;
-> >>>> +                ctrl-module = <&omap_control_usb2phy1>;
-> >>>> +                clocks = <&usb_phy1_always_on_clk32k>,
-> >>>> +                     <&usb_otg_ss1_refclk960m>;
-> >>>> +                clock-names =    "wkupclk",
-> >>>> +                        "refclk";
-> >>>> +                #phy-cells = <0>;
-> >>>> +            };
-> >>>> +
-> >>>> +            usb2_phy2: phy at 4a085000 {
-> >>>> +                compatible = "ti,omap-usb2";
-> >>>> +                reg = <0x4a085000 0x400>;
-> >>>> +                ctrl-module = <&omap_control_usb2phy2>;
-> >>>> +                clocks = <&usb_phy2_always_on_clk32k>,
-> >>>> +                     <&usb_otg_ss2_refclk960m>;
-> >>>> +                clock-names =    "wkupclk",
-> >>>> +                        "refclk";
-> >>>> +                #phy-cells = <0>;
-> >>>> +            };
-> >>>> +
-> >>>> +            usb3_phy1: phy at 4a084400 {
-> >>>> +                compatible = "ti,omap-usb3";
-> >>>> +                reg = <0x4a084400 0x80>,
-> >>>> +                      <0x4a084800 0x64>,
-> >>>> +                      <0x4a084c00 0x40>;
-> >>>> +                reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-> >>>> +                ctrl-module = <&omap_control_usb3phy1>;
-> >>>> +                clocks = <&usb_phy3_always_on_clk32k>,
-> >>>> +                     <&sys_clkin1>,
-> >>>> +                     <&usb_otg_ss1_refclk960m>,
-> >>>> +                     <&dpll_core_h13x2_ck>;
-> >>>> +                clock-names =    "wkupclk",
-> >>>> +                        "sysclk",
-> >>>> +                        "refclk",
-> >>>> +                        "optclk";
-> >>>
-> >>> Do we use this 'optclk' in driver?
-> >>
-> >> No we don't. Still the device seems to work without it.
-> >> This is supposed to be USB_LFPS_TX_GFCLK or USB3PHY_REF_CLK.
-> > 
-> > I think it should be enabled. Did you check the status of this clock
-> > in CM_L3INIT_CLKSTCTRL? Moreover USB_LFPS_TX_GFCLK is an interface
-> > clock, so IIUC setting the module mode will enable it.
-> > 
-> > Btw how did you tell dpll_core_h13x2_ck enables USB_LFPS_TX_GFCLK?
-> > 
-> 
-> From the clock tree tool. It looks like the clock is gated
-> automatically with the module mode as you suggested. I'll get rid of
-> this clock reference then.
+On Fri, Mar 14, 2014 at 7:33 PM, Alexander Holler <holler@ahsoftware.de> wrote:
+> Am 14.03.2014 14:54, schrieb Linus Walleij:
+>
+>> On Fri, Mar 14, 2014 at 1:38 PM, Alexander Holler <holler@ahsoftware.de>
+>> wrote:
+>>
+>>>> In that case it is hardly a fix that we need to rush out to the entire
+>>>> world.
+>>>
+>>>
+>>> And I thought the reason for -rc is actually to fix bugs. But I never
+>>> understood the magical ways and timings patches make their way into
+>>> mainline. ;)
+>>
+>>
+>> OK so it works like this: early in the -rc cycle we fix any bugs,
+>> documentation
+>> or whatever. At this point it's *regressions* so the fix need to fix
+>> something
+>> that broke in the merge window (or an earlier merge window).
+>
+>
+> Sorry, but I don't believe that. It's always time to fix regressions and
+> bugs.
 
-note that we can change the input clock of some parts of dwc3, maybe
-that's why it works without, we're probably using another clock as
-input.
+This thing is not binary. Please consult
+Documentation/development-process/2.Process
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/68229111/attachment-0001.sig>
+In this case we are very late in the release cycle, the patch is not
+a simple oneliner and I need some more backing proof to know it
+is a reasonable fix to push at this time and will not cause new
+problems.
+
+So a few Tested-by's from the people using this driver would for
+example convince me that it is solving a real problem for them
+and it needs to go into fixes.
+
+Yours,
+Linus Walleij
