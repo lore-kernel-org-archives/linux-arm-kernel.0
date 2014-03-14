@@ -1,42 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Mar 2014 15:21:59 +0400
-Subject: [PATCH v3][ 3/9] usb: chipidea: Use standard usb-phy property.
-In-Reply-To: <171967ece1414f9ba0e80664777892cb@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <1394618518-13803-1-git-send-email-denis@eukrea.com>
- <1394618518-13803-3-git-send-email-denis@eukrea.com>
- <edb50dd0d88541c39fc4b5def88b7f58@BL2PR03MB226.namprd03.prod.outlook.com>
- <5321CF4B.9000308@cogentembedded.com>
- <171967ece1414f9ba0e80664777892cb@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <5322E657.8030905@cogentembedded.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 14 Mar 2014 12:32:02 +0100
+Subject: [PATCH v2 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+In-Reply-To: <5322CC8B.6010905@gmail.com>
+References: <1394719607-25018-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1394719607-25018-2-git-send-email-antoine.tenart@free-electrons.com>
+ <5322CC8B.6010905@gmail.com>
+Message-ID: <20140314113202.GB3106@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 14/03/2014 at 10:31:55 +0100, Sebastian Hesselbarth wrote :
+> On 03/13/2014 03:06 PM, Antoine T?nart wrote:
+> >+		local-timer at ad0600 {
+> >+			compatible = "arm,cortex-a9-twd-timer";
+> >+			reg = <0xad0600 0x20>;
+> >+			clocks = <&sysclk>;
+> 
+> If I understand Jisheng correctly, this should be cpuclk/3. When
+> removing the clocks {} container above, please also take care of
+> it.
+> 
 
-On 14-03-2014 5:57, Peter Chen wrote:
+You understood correctly
 
->>> According to Power_ePAPR_APPROVED_v1.1.pdf "ethernet-phy" is the node
->>> name, it is the same with Sergei's suggestion.
+> You can do
+> 
+> cpuclk: cpu-clock {
+> 	compatible = "fixed-clock";
+> 	#clock-cells = <0>;
+> 	clock-frequency = <1200000000>; /* <- put correct freq here */
+> };
+> 
+> sysclk: system-clock {
+> 	compatible = "fixed-factor-clock";
+> 	#clock-cells = <0>;
+> 	clocks = <&cpuclk>;
+> 	clock-multi = <1>;
+> 	clock-div = <3>;
+> };
+> 
+> Hopefully, we'll have proper clock drivers soon so we can just replace
+> referenced "fixed-*" clocks.
+> 
 
->>      Nobody's talking about "ehternet-phy" here.
+I'm working on that, do you have some code that you can share right now ?
 
-> Hmm, you take "ethernet-phy" as an example, and suggest changing to "usb-phy" at last email.
-
-    Then it's a wrong mail. I'm not mixing nodes and properties.
-
->>> But you have changed the property name at this patch, in fact,
->> "fsl,usbphy"
->>> is ok for property name, "fsl,usb-phy" may be better, but not worth a
->>> patch to change it.
-
->>      No, it's not better and both are not OK because they're still
->> Freescale specific while the de-facto standard property "usb-phy" is
->> already used by other USB drivers for the same purpose.
-
-> Am I missing something, property name should be the same for all platforms?
-
-    If they're doing the same standard thing, yes.
-
-> Peter
-
-WBR, Sergei
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
