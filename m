@@ -1,63 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Mar 2014 16:00:06 -0500
-Subject: [RFC 2/9] opp-modifier: Add opp-modifier-reg driver
-In-Reply-To: <1394825135-60110-3-git-send-email-d-gerlach@ti.com>
-References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
- <1394825135-60110-3-git-send-email-d-gerlach@ti.com>
-Message-ID: <CAL_Jsq+BzJeaiPwJsH5bFmtsxCPOspEjnmMLdAVyLAriQTF+kw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 22:06:36 +0100
+Subject: [PATCH v17 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
+ driver
+In-Reply-To: <CAPw-ZT=1KWEowD_i=qoWwg372XdzC4p227rpNo7ov+NwOYFUDA@mail.gmail.com>
+References: <1394655573-32645-1-git-send-email-lho@apm.com>
+ <201403142005.52991.arnd@arndb.de>
+ <CAPw-ZT=1KWEowD_i=qoWwg372XdzC4p227rpNo7ov+NwOYFUDA@mail.gmail.com>
+Message-ID: <201403142206.36611.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 2:25 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> Driver to read from a register and depending on either set bits or
-> a specific known selectively enable or disable OPPs based on DT node.
->
-> Can support opp-modifier-reg-bit where single bits within the register
-> determine the availability of an OPP or opp-modifier-reg-val where a
-> certain value inside the register or a portion of it determine what the
-> maximum allowed OPP is.
->
-> The driver expects a device that has already has its OPPs loaded
-> and then will disable the OPPs not matching the criteria specified in
-> the opp-modifier table.
->
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  .../devicetree/bindings/power/opp-modifier.txt     | 111 +++++++++
->  drivers/power/opp/Makefile                         |   1 +
->  drivers/power/opp/opp-modifier-reg.c               | 259 +++++++++++++++++++++
->  3 files changed, 371 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/opp-modifier.txt
->  create mode 100644 drivers/power/opp/opp-modifier-reg.c
->
-> diff --git a/Documentation/devicetree/bindings/power/opp-modifier.txt b/Documentation/devicetree/bindings/power/opp-modifier.txt
-> new file mode 100644
-> index 0000000..af8a2e9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/opp-modifier.txt
-> @@ -0,0 +1,111 @@
-> +* OPP-Modifier - opp modifier to selectively enable operating points
-> +
-> +Many SoCs that have selectively modifiable OPPs can specify
-> +all available OPPs in their operating-points listing and then define
-> +opp_modifiers to enable or disable the OPPs that are actually available
-> +on the specific hardware.
-> +
-> +* OPP Modifier Provider
+On Friday 14 March 2014, Loc Ho wrote:
+> Hi,
+> 
+> >> > gets called. Can you clarify what this register access does?
+> >> > If it's just setting a index into a mux output, would it make
+> >> > sense to have an optional DT property containing an integer with
+> >> > the mux setting you want to set? That way you wouldn't even
+> >> > have to have two compatible strings but just do
+> >> >
+> >> >         ret = of_property_read_u32(node, "apm,ahci-mux", &mux);
+> >> >         if (!ret)
+> >> >                 xgene_ahci_mux_select(ctx, mux);
+> >> >
+> >>
+> >> Given that fact that I will break up the resource. Let's just use the
+> >> resource for the MUX to handle this. For the IP that doesn't existed,
+> >> I will just not list it.
+> >
+> > Ah, that sounds good. It also means that if the firmware has set up
+> > the mux already, you don't have to touch it again. That would probably
+> > be the preferred case.
+> >
+> > I'm undecided about the value that you write in there. That could either
+> > be passed through DT as I suggested above for extra flexibility, or you
+> > can keep it hardcoded if you are absolutely sure that there will never
+> > need to be a case where you have to set it to something other than '1',
+> 
+> It is only a mux between two IP's. Writing 1 is fine. For ACPI, it can
+> be missing and handled by the firmware or can be handled just like the
+> DTS way.
 
-Uggg. Please stop designing around the current OPP binding which has
-the problem that the OPP table is not extensible to add more data.
-Define a new OPP binding that solves these problems. This is at least
-the 3rd OPP related binding addition I've seen recently. But I
-wouldn't spend a lot of effort on a new OPP binding just to add the
-functionality you are adding here because I don't like the whole
-concept in general. This might be a common way to determine valid OPPs
-on TI chips, but I think it is too low level and I don't want to see
-bindings for every different possible way. Just add platform code to
-do the OPP setup you need.
+Why can't you have it handled by the firmware in the DTS case?
 
-Frankly, I prefer the bootloader/firmware fixup the OPP table approach
-mentioned in the cpufreq-cpu0 thread. Somewhat less desirable, but the
-kernel could do the fixups as well (via of_update_property).
+I still think it's rather unlikely that we will actually see ACPI support
+on your platform, btw.
 
-Rob
+I'm willing to look at the patches you need for it, but I'm not very
+optimistic, in particular because of the kind of hacks you need
+for random bits of hardware.
+
+> > Is there also an IOMMU, or just the PIM? If there is no IOMMU,
+> > we will actually have to use the swiotlb code here, otherwise we
+> > can rely on the IOMMU to do the translation so we can pretend that
+> > there is always 64-bit DMA capability.
+> >
+> > In theory, the PIM could be dynamically reprogrammed for each
+> > DMA, as an extremely primitive IOMMU implementation, but I don't
+> > know what the impact on performance would be from doing that.
+> > It would also prevent you from starting multiple concurrent DMAs,
+> > although I suspect that is not an important case for SPI and SDIO.
+> 
+> This first generation don't support IOMMU and rely on swiotlb. In any
+> case, for SDIO, the solution is to reprogram the PIM and limit to SDMA
+> - single buffer - for each operation.
+
+Ok, interesting. In that case, I suppose the DMA mask is actually 64-bit.
+
+	Arnd
