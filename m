@@ -1,75 +1,99 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 14 Mar 2014 09:34:18 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791: Fix SCIFA3-5 clocks
-In-Reply-To: <cover.1394757110.git.horms+renesas@verge.net.au>
-References: <cover.1394757110.git.horms+renesas@verge.net.au>
-Message-ID: <a51a9d67ba061c1263d078c27e8a3020d61fe236.1394757110.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 14 Mar 2014 09:38:09 +0900
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <28465199.RhyHDRhTSc@avalon>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <3299454.uLzSWehPDg@avalon> <20140313022246.GA8802@verge.net.au>
+ <28465199.RhyHDRhTSc@avalon>
+Message-ID: <20140314003808.GD28137@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Thu, Mar 13, 2014 at 10:07:45AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Thursday 13 March 2014 11:22:47 Simon Horman wrote:
+> > On Wed, Mar 12, 2014 at 11:12:02AM +0100, Laurent Pinchart wrote:
+> > > On Wednesday 12 March 2014 16:55:23 Simon Horman wrote:
+> > > > On Wed, Feb 26, 2014 at 02:02:37PM +0100, Laurent Pinchart wrote:
+> > >  > On Wednesday 26 February 2014 13:53:17 Laurent Pinchart wrote:
+> > > > > > On Wednesday 26 February 2014 16:33:17 Simon Horman wrote:
+> > > > > > > The R8A7779 SoC has several clocks that are too custom to be
+> > > > > > > supported in a generic driver. Those clocks can be divided in two
+> > > > > > > categories:
+> > > > > > > 
+> > > > > > > - Fixed rate clocks with multiplier and divisor set according to
+> > > > > > >   boot mode configuration
+> > > > > > > 
+> > > > > > > - Custom divider clocks with SoC-specific divider values
+> > > > > > > 
+> > > > > > > This driver supports both.
+> > > > > > 
+> > > > > > Looking at the R8A7779 datasheet it looks like we only have fixed
+> > > > > > rate clocks, without any configurable divider clock. Did I miss
+> > > > > > something ?
+> > > > 
+> > > > Sorry, its a cut-and past error on my part.
+> > > > I will revise the changelog.
+> > > > 
+> > > > > > > Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
+> > > > > > > 
+> > > > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > > > > 
+> > > > > > > ---
+> > > > > > > v3
+> > > > > > > * As suggested by Laurent Pinchart
+> > > > > > > 
+> > > > > > >   - Added external clock input
+> > > > > > >   - Use PLLA ratio set bu MD11 and MD12
+> > > > > > >   - Add _div suffixes of fields of struct cpt_clk_config
+> > > > > > >   - Register PLLA as a fixed factor clock
+> > > > > > >   - Use sizeof() instead of sizeof
+> > > > > > >   - Use num_clks instead of CPG_NUM_CLOCKS in
+> > > > > > >   r8a7779_cpg_clocks_init()
+> > > > > > >   
+> > > > > > >   - I kept this as r8a7779 binding rather than moving to a R-Car
+> > > > > > >   Gen1 binding which could be shared with other SoCs as I do not
+> > > > > > >   believe that the SoCs is are sufficiently similar.
+> > > > > > 
+> > > > > > I had a look at the M1 datasheet and I still find its CPG very
+> > > > > > similar with the H1 CPG. The PLLA multiplier and divider are
+> > > > > > different, but if you look closely, they're both exactly twice the
+> > > > > > value compared to H1, so there's no difference in practice.
+> > > > > > 
+> > > > > > What differences do you see that would make it impractical to share
+> > > > > > a single driver for both ?
+> > > > 
+> > > > Thanks for pointing that out. Looking over the M1 datasheet again I
+> > > > agree with you that there does seem to be rather a lot of similarities
+> > > > with the H1. And I agree that it is likely that the driver could be
+> > > > shared.
+> > > > 
+> > > > However, I'd like to leave that as future work at this time.
+> > > > 
+> > > > The reason for this is that on the one hand I believe such work sould be
+> > > > done in conjunctin with integrating the driver on the bockw board.
+> > > > And that seems to be non-trivial to me.
+> > > 
+> > > We can always rename the driver later, that's not a big issue, but we
+> > > can't change compatibility strings. I would thus like to see
+> > > "renesas,rcar-gen1-cpg-clocks" listed in the DT bindings.
+> > 
+> > I know that we have done such things in the past but these days I feel that
+> > it is a bit contentious as it is a binding for a software abstraction
+> > rather than the hardware. And as far as I know bindings are supposed to
+> > describe the hardware.
+> 
+> Sure, and I consider rcar-gen1-cpf is a hardware description. We have two 
+> generations of SoCs in the R-Car series so far, the first generation (H1 and 
+> M1) and the second generation (H2 and M2). The second generation is even 
+> explictly named as such in the M2 datasheet. SoCs within a generation share 
+> hardware characteristics, and it makes sense to reflect that in compatible 
+> strings.
 
-The MSTP clocks for SCIFA3-5 are MSTP1106-1108, not MSTP1105-1107
+I think that if it is documented, as it is for R-Car Gen 2, then
+this is entirely reasonable and I agree that it describes the hardware.
 
-Also reinsert them at the correct position to preserve sort order.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7791.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index 605fc77..701383f 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -170,6 +170,7 @@ static struct clk div6_clks[DIV6_NR] = {
- 
- /* MSTP */
- enum {
-+	MSTP1108, MSTP1107, MSTP1106,
- 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
- 	MSTP917,
- 	MSTP815, MSTP814,
-@@ -180,12 +181,15 @@ enum {
- 	MSTP522,
- 	MSTP314, MSTP312, MSTP311,
- 	MSTP216, MSTP207, MSTP206,
--	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-+	MSTP204, MSTP203, MSTP202,
- 	MSTP124,
- 	MSTP_NR
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP1108] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 8, MSTPSR11, 0), /* SCIFA5 */
-+	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA4 */
-+	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA3 */
- 	[MSTP931] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
- 	[MSTP930] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
- 	[MSTP929] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
-@@ -218,9 +222,6 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
- 	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
- 	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
--	[MSTP1105] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 5, MSTPSR11, 0), /* SCIFA3 */
--	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA4 */
--	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA5 */
- 	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
- };
- 
-@@ -259,9 +260,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
- 	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
- 	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
--	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
--	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
--	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1106]), /* SCIFA3 */
-+	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1107]), /* SCIFA4 */
-+	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1108]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
--- 
-1.8.5.2
+However, if it is not documented I don't think that we can make assumptions
+and thus I don't think it is appropriate for R-Car Gen 1.
