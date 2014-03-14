@@ -1,44 +1,48 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 14 Mar 2014 09:43:24 -0400
-Subject: [PATCH v3 0/5] Add Broadcom Kona PWM Support
-In-Reply-To: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20140314134324.GY25092@beef>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Mar 2014 14:43:42 +0100
+Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
+ gate clocks
+In-Reply-To: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
+References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
+Message-ID: <5323078E.4060903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 01:15:41PM -0700, Tim Kryger wrote:
-> This series introduces the driver for the Kona PWM controller found in
-> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
-> defconfig to enable use of this hardware on the bcm28155 AP board.
-> 
-> Changes since v2:
->   - SoC DTS file updated to use real clock's phandle + specifier
->   - Toggle smooth mode off during apply so new settings take immediately
-> 
-> Changes since v1:
->   - Fixed up macros to be clearer and more complete
->   - Corrected spelling and punctuation mistakes
->   - Added support for polarity
->   - Made peripheral clock use more efficient
->   - Made prescale and duty computation clearer
->   - Moved Makefile addition to keep alphabetical
->   - Split complex lines into multiple steps
-> 
-> Dependencies:
-> The "ARM: dts: Declare the PWM for bcm11351 (bcm281xx)" patch depends
-> upon "ARM: dts: bcm281xx: define real clocks" which is queued up in
-> for-next of arm-soc. See https://lkml.org/lkml/2014/2/14/451
-> 
-> Tim Kryger (5):
->   Documentation: dt: Add Kona PWM binding
->   pwm: kona: Introduce Kona PWM controller support
+Hi KyongHo,
 
-Thierry, are you planning to merge these first two for 3.15? If so, I
-will apply dts patches for my last mach-bcm 3.15 pull. I don't want to
-do so until the binding is accepted.
+On 14.03.2014 06:09, Cho KyongHo wrote:
+> exynos-iommu driver must care about master H/W's gate clock as well as
+> System MMU's gate clock. To enhance readability of the source code,
+> macros to gate/ungate those clocks are defined.
+>
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> ---
+>   drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
+>   1 file changed, 22 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 71e77f1..cef62d0 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -101,6 +101,16 @@
+>   #define REG_PB1_SADDR		0x054
+>   #define REG_PB1_EADDR		0x058
+>
+> +#define __clk_gate_ctrl(data, clk, en)	do {		\
+> +		if (data->clk)				\
+> +			clk_##en##able(data->clk);	\
+> +	} while (0)
+> +
+> +#define __sysmmu_clk_enable(data)	__clk_gate_ctrl(data, clk, en)
+> +#define __sysmmu_clk_disable(data)	__clk_gate_ctrl(data, clk, dis)
+> +#define __master_clk_enable(data)	__clk_gate_ctrl(data, clk_master, en)
+> +#define __master_clk_disable(data)	__clk_gate_ctrl(data, clk_master, dis)
+> +
 
--Matt
+I'd say that such macros only obfuscate code, without any gains, as you 
+can see in diffstat - this patch adds more lines than it removes.
 
->   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
->   ARM: dts: Enable the PWM for bcm28155 AP board
->   ARM: bcm_defconfig: Enable PWM and Backlight
+Please drop this change.
+
+Best regards,
+Tomasz
