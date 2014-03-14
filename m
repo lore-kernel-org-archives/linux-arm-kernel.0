@@ -1,52 +1,39 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Fri, 14 Mar 2014 21:11:07 +0100
-Subject: mxs-auart gives data from previous run after close and reopen
-Message-ID: <5323625B.4010203@meduna.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 14 Mar 2014 21:57:18 +0100
+Subject: [GIT PULL] ARM: efm32: 2nd batch for 3.15-rc1
+Message-ID: <20140314205718.GA31517@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-following scenario:
+the following changes since commit d5d5ce952a66c32abf36a6fdf2a1ba6cb8da9b93:
 
-- a Freescale i.MX28 machine
-- RS232 AUART looped back Rx - Tx or two different ports cross-connected
-- a test program sending data in one thread and receiving in the other:
-  thread A periodically sends "Quick brown fox jumps over the lazy dog",
-  thread B receives
-- stop the program using ctrl-C
-- restart
+  ARM: efm32: drop unused file <mach/timex.h> (2014-02-24 10:07:27 +0100)
 
-=> sometimes the receiving thread gets "dogQuick", receiving
-   characters from the previous transmission
+that you already pulled from me are available in the git repository at:
 
-The extra characters definitely come from the receiver - the transmission
-is OK. This was verified by a scope.
+  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
 
-My theory is that this behaviour is caused by mxs_auart_shutdown
-function gating and mxs_auart_startup reenabling the clock instead
-of doing a soft reset. If the clock is gated while the AUART already
-has something in the FIFO, but did not generate the interrupt yet,
-the internal state machine is frozen in this state. As soon as it
-is reenabled, the characters are delivered to a new user.
+for you to fetch changes up to 35c3a9c8074efa2e763ef1da31e6a9e419884a81:
 
-I am using a 3.4.77 kernel, but the relevant code looks the same in
-the recent kernels (when not using DMA). I also backported patches
-waiting for the transmission FIFO to clear at mxs_auart_shutdown.
+  ARM: efm32: properly namespace i2c location property (2014-03-14 16:04:30 +0100)
 
-I did not find any possibility to fully clear the receiver - even
-if one disables the AUART and reads everything from the FIFO,
-the character currently in transmit might be still somewhere (the
-reference manual states that disabling is effective after the
-current character is received). Which might be 1 ms at 9600 and one
-has no clue whether it is the case.
+----------------------------------------------------------------
+Two more dt related efm32 fixes
 
-Also note that the function mxs_auart_reset is in fact not doing
-a reset - it just makes sure that the AUART comes out of one after
-the initialization. Maybe a full reset at startup is the solution...
+----------------------------------------------------------------
+Uwe Kleine-K?nig (2):
+      ARM: efm32: fix unit address part in USART2 device nodes' names
+      ARM: efm32: properly namespace i2c location property
 
-Pleas Cc: me when answering.
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
+ arch/arm/boot/dts/efm32gg.dtsi       | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Regards
+Thanks
+Uwe
+
 -- 
-                                Stano
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
