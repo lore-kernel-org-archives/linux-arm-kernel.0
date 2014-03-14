@@ -1,47 +1,25 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 14 Mar 2014 11:13:21 +0100
-Subject: [PATCH] ARM: dts: exynos4210-trats: add max8997 IRQ
-Message-ID: <1394792001-7837-1-git-send-email-r.baldyga@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 14 Mar 2014 10:13:38 +0000
+Subject: [PATCH 00/18] edma/ASoC: dmaengine PCM for AM335x and AM447x
+In-Reply-To: <5322CE32.2000102@ti.com>
+References: <1394702320-21743-1-git-send-email-peter.ujfalusi@ti.com>
+ <20140313134601.GU366@sirena.org.uk> <5322CE32.2000102@ti.com>
+Message-ID: <20140314101338.GP366@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree node for IRQ used by max8997.
+On Fri, Mar 14, 2014 at 11:38:58AM +0200, Peter Ujfalusi wrote:
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- arch/arm/boot/dts/exynos4210-trats.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> The only thing I'm afraid off is that it is going to take two release cycle to
+> get this in: first cycle edma part, next cycle for the ASoC to switch to use
+> the edma-pcm.
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 1d18428..0e1fc19 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -148,6 +148,14 @@
- 		};
- 	};
- 
-+	pinctrl at 11000000 {
-+		max8997_irq: max8997-irq {
-+			samsung,pins = "gpx0-7";
-+			samsung,pin-pud = <3>;
-+			samsung,pin-drv = <0>;
-+		};
-+	};
-+
- 	i2c at 13890000 {
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-slave-addr = <0x10>;
-@@ -179,6 +187,11 @@
- 		max8997_pmic at 66 {
- 			compatible = "maxim,max8997-pmic";
- 
-+			pinctrl-0 = <&max8997_irq>;
-+			pinctrl-names = "default";
-+
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <7 0>;
- 			reg = <0x66>;
- 
- 			max8997,pmic-buck1-uses-gpio-dvs;
--- 
-1.7.9.5
+We can do a cross tree merge, or the EDMA code can be applied to ASoC
+directly if that's what people want.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/4fdb0760/attachment-0001.sig>
