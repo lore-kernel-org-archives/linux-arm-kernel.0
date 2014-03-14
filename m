@@ -1,89 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Mar 2014 09:15:57 -0500
-Subject: [PATCH v5 1/2] i2c: qup: Add device tree bindings information
-In-Reply-To: <1394762863-12154-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1394762863-12154-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1394762863-12154-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAL_JsqJNp2XZ_EkTFqcsG5RZK0Nm7iquVTb=QX59pa1Z-ODAAQ@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 14 Mar 2014 14:18:06 +0000
+Subject: [PATCH] net: phy: fix uninitalized ethtool_wolinfo in phy_suspend
+In-Reply-To: <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20140313.153832.967564223480298567.davem@davemloft.net>
+ <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1394806686.20857.31.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On March 13, 2014 9:07:42 PM CDT, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
->From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
->
->The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
->provide input and output FIFO's for it. I2C controller can operate
->as master with supported bus speeds of 100Kbps and 400Kbps.
->
->Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
->[bjorn: reformulated part of binding description
->        added version to compatible
->        cleaned up example]
->Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On Fri, 2014-03-14 at 10:07 +0100, Sebastian Hesselbarth wrote:
+> Callers of phy_ethtool_get_wol are supposed to provide a properly
+> cleared struct ethtool_wolinfo. Therefore, fix phy_suspend to clear
+> it before passing it to phy_ethtool_get_wol.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Ben Hutchings <ben@decadent.org.uk>
 
->---
->.../devicetree/bindings/i2c/qcom,i2c-qup.txt       |   46
->++++++++++++++++++++
-> 1 file changed, 46 insertions(+)
->create mode 100644
->Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->
->diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->new file mode 100644
->index 0000000..32ef64e
->--- /dev/null
->+++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->@@ -0,0 +1,46 @@
->+Qualcomm Universal Peripheral (QUP) I2C controller
->+
->+Required properties:
->+ - compatible: Should be:
->+   * "qcom,i2c-qup-v1.1.1" for 8660, 8960 and 8064.
->+   * "qcom,i2c-qup-v2.1.1" for 8974 v1.
->+   * "qcom,i2c-qup-v2.2.1" for 8974 v2 and later.
->+ - reg: Should contain QUP register address and length.
->+ - interrupts: Should contain I2C interrupt.
->+
->+ - clocks: A list of phandles + clock-specifiers, one for each entry
->in
->+   clock-names.
->+ - clock-names: Should contain:
->+   * "core" for the core clock
->+   * "iface" for the AHB clock
->+
->+ - #address-cells: Should be <1> Address cells for i2c device address
->+ - #size-cells: Should be <0> as i2c addresses have no size component
->+
->+Optional properties:
->+ - clock-frequency: Should specify the desired i2c bus clock frequency
->in Hz,
->+                    defaults to 100kHz if omitted.
->+
->+Child nodes should conform to i2c bus binding.
->+
->+Example:
->+
->+ i2c at f9924000 {
->+ compatible = "qcom,i2c-qup-v2.2.1";
->+ reg = <0xf9924000 0x1000>;
->+ interrupts = <0 96 0>;
->+
->+ clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc
->GCC_BLSP1_AHB_CLK>;
->+ clock-names = "core", "iface";
->+
->+ clock-frequency = <355000>;
->+
->+ #address-cells = <1>;
->+ #size-cells = <0>;
->+
->+ dummy at 60 {
->+ compatible = "dummy";
->+ reg = <0x60>;
->+ };
->+ };
->+
+> ---
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ben Hutchings <ben@decadent.org.uk>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/phy/phy_device.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+> index 4b03e63639b7..7512e28866f1 100644
+> --- a/drivers/net/phy/phy_device.c
+> +++ b/drivers/net/phy/phy_device.c
+> @@ -683,10 +683,9 @@ EXPORT_SYMBOL(phy_detach);
+>  int phy_suspend(struct phy_device *phydev)
+>  {
+>  	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
+> -	struct ethtool_wolinfo wol;
+> +	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
+>  
+>  	/* If the device has WOL enabled, we cannot suspend the PHY */
+> -	wol.cmd = ETHTOOL_GWOL;
+>  	phy_ethtool_get_wol(phydev, &wol);
+>  	if (wol.wolopts)
+>  		return -EBUSY;
+
+-- 
+Ben Hutchings
+Experience is directly proportional to the value of equipment destroyed.
+                                                         - Carolyn Scheppner
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140314/41d4409e/attachment.sig>
