@@ -1,137 +1,37 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 14 Mar 2014 14:51:25 +0800
-Subject: [PATCH v4][ 3/8] usb: chipidea: usbmisc: Add USB support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <1394702326-25558-3-git-send-email-denis@eukrea.com>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
- <1394702326-25558-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140314065124.GB23870@shlinux1.ap.freescale.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 14 Mar 2014 08:27:17 +0100
+Subject: [PATCH] ARM: mach-ux500|nomadik|u300: Align to common DT bindings
+ for mmci
+In-Reply-To: <20140313174703.GO21483@n2100.arm.linux.org.uk>
+References: <1394713963-18300-1-git-send-email-ulf.hansson@linaro.org>
+ <20140313174703.GO21483@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFrw092mbirDBffF6TraUoXDLh5movp_sf9PYERG88P-Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:18:41AM +0100, Denis Carikli wrote:
-> This adds the i.MX25 and the i.MX35 support in the
-> ChipIdea usbmisc driver.
-> 
-> The i.MX25 and i.MX35 usb controllers are similar enough to be
-> able to use the same code.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> Changelog v3->v4:
-> - The MXC_EHCI_INTERFACE_* were renamed in MX25_EHCI_INTERFACE_*
-> - Since the peripheral mode also works with USB OTG,
->   the commit summary was updated to reflect that.
-> 
-> Changelog v2->v3:
-> - Add a commit log
-> 
-> Changelog v1->v2:
-> - converted two remaining defines to BIT()
-> - Removed a variable declaration that was not used in usbmisc_imx25_init
-> ---
->  drivers/usb/chipidea/usbmisc_imx.c |   58 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
-> 
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index cd061ab..419b895 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -21,6 +21,26 @@
->  #define MX25_USB_PHY_CTRL_OFFSET	0x08
->  #define MX25_BM_EXTERNAL_VBUS_DIVIDER	BIT(23)
->  
-> +#define MX25_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
-> +#define MX25_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
-> +#define MX25_EHCI_INTERFACE_MASK	(0xf)
-> +
-> +#define MX25_OTG_SIC_SHIFT		29
-> +#define MX25_OTG_SIC_MASK		(0x3 << MX25_OTG_SIC_SHIFT)
-> +#define MX25_OTG_PM_BIT			BIT(24)
-> +#define MX25_OTG_PP_BIT			BIT(11)
-> +#define MX25_OTG_OCPOL_BIT		BIT(3)
-> +
-> +#define MX25_H1_SIC_SHIFT		21
-> +#define MX25_H1_SIC_MASK		(0x3 << MX25_H1_SIC_SHIFT)
-> +#define MX25_H1_PP_BIT			BIT(18)
-> +#define MX25_H1_PM_BIT			BIT(16)
-> +#define MX25_H1_IPPUE_UP_BIT		BIT(7)
-> +#define MX25_H1_IPPUE_DOWN_BIT		BIT(6)
-> +#define MX25_H1_TLL_BIT			BIT(5)
-> +#define MX25_H1_USBTE_BIT		BIT(4)
-> +#define MX25_H1_OCPOL_BIT		BIT(2)
-> +
->  #define MX27_H1_PM_BIT			BIT(8)
->  #define MX27_H2_PM_BIT			BIT(16)
->  #define MX27_OTG_PM_BIT			BIT(24)
-> @@ -50,6 +70,39 @@ struct imx_usbmisc {
->  
->  static struct imx_usbmisc *usbmisc;
->  
-> +static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
-> +{
-> +	unsigned long flags;
-> +	u32 val = 0;
-> +
-> +	if (data->index > 1)
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&usbmisc->lock, flags);
-> +	switch (data->index) {
-> +	case 0:
-> +		val = readl(usbmisc->base);
-> +		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
-> +		val |= (MX25_EHCI_INTERFACE_DIFF_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-> +		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
-> +		writel(val, usbmisc->base);
-> +		break;
-> +	case 1:
-> +		val = readl(usbmisc->base);
-> +		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
-> +		val |= (MX25_EHCI_INTERFACE_SINGLE_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
-> +		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
-> +			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
-> +
-> +		writel(val, usbmisc->base);
-> +
-> +		break;
-> +	}
-> +	spin_unlock_irqrestore(&usbmisc->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
->  static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
->  {
->  	void __iomem *reg;
-> @@ -159,6 +212,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
->  }
->  
->  static const struct usbmisc_ops imx25_usbmisc_ops = {
-> +	.init = usbmisc_imx25_init,
->  	.post = usbmisc_imx25_post,
->  };
->  
-> @@ -200,6 +254,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
->  		.data = &imx25_usbmisc_ops,
->  	},
->  	{
-> +		.compatible = "fsl,imx35-usbmisc",
-> +		.data = &imx25_usbmisc_ops,
-> +	},
-> +	{
->  		.compatible = "fsl,imx27-usbmisc",
->  		.data = &imx27_usbmisc_ops,
->  	},
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+On 13 March 2014 18:47, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Mar 13, 2014 at 01:32:43PM +0100, Ulf Hansson wrote:
+>> As the first step in preparing the mmci driver for converting to the
+>> mmc_of_parse API, let's align to the common names of DT bindings for
+>> the mmc/sd highspeed modes.
+>
+> NAK.  These bindings have been documented as being there since March
+> 14th 2012, and therefore need to be supported for ever by the driver.
+> You can _augment_ the bindings with the generic ones, and change the
+> DT files, but you can't remove the parsing of the old property names.
 
-Applied, thanks.
+I was kind of expecting this response. :-)
 
--- 
+So, since we made a mistake about adding these DT bindings we are now
+unable to remove them, is there really no way back?
 
-Best Regards,
-Peter Chen
+In this particular case, I am confident that it should be safe to
+remove them, but I guess this is more matter of principle, right?
+
+Kind regards
+Ulf Hansson
+
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
