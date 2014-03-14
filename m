@@ -1,66 +1,32 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 14 Mar 2014 12:01:39 -0500
-Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
-In-Reply-To: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
-References: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1394816499.25786.1.camel@linux-builds1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Mar 2014 18:05:28 +0100
+Subject: [PATCH v7 2/6] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <1394811272-1547-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <201403141805.29204.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-18 at 18:34 +0100, Sebastian Andrzej Siewior wrote:
-> The SMP bringup code copies trampline code to the physical location 0x0.
-> If somebody allocated memory from this location then it will be
-> overwritten.
-> This patch reserves the few bytes so that it won't be used by the memory
-> allocator.
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  arch/arm/mach-socfpga/socfpga.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index a9050e6..2ba992a 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -26,6 +26,7 @@
->  #include <linux/phy.h>
->  #include <linux/micrel_phy.h>
->  #include <linux/sys_soc.h>
-> +#include <linux/memblock.h>
->  
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
-> @@ -315,6 +316,17 @@ static void __init socfpga_cyclone5_init(void)
->  	socfpga_soc_device_init();
->  }
->  
-> +static void __init socfmpga_smp_reserve(void)
-
-s/socfmpga/socfpga
+On Friday 14 March 2014, Liviu Dudau wrote:
+> +int of_pci_range_to_resource(struct of_pci_range *range,
+> +       struct device_node *np, struct resource *res)
 > +{
-> +#ifdef CONFIG_SMP
-> +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> +	int ret;
-> +
-> +	ret = memblock_reserve(0, trampoline_size);
-> +	WARN_ON(ret);
-> +#endif
-> +}
-> +
->  static const char *altera_dt_match[] = {
->  	"altr,socfpga",
->  	NULL
-> @@ -327,4 +339,5 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->  	.init_machine	= socfpga_cyclone5_init,
->  	.restart	= socfpga_cyclone5_restart,
->  	.dt_compat	= altera_dt_match,
-> +	.reserve	= socfmpga_smp_reserve,
+> +       res->flags = range->flags;
+> +       if (res->flags & IORESOURCE_IO) {
+> +               unsigned long port = -1;
+> +               int err = pci_register_io_range(range->cpu_addr, range->size);
+> +               if (err)
+> +                       return err;
+> +               port = pci_address_to_pio(range->cpu_addr);
+> +               if (port == (unsigned long)-1) {
+> +                       res->start = (resource_size_t)OF_BAD_ADDR;
+> +                       res->end = (resource_size_t)OF_BAD_ADDR;
+> +                       return -EINVAL;
+> +               }
 
-same..
+The error handling is inconsistent here: in one case you set the resource
+to OF_BAD_ADDR, in the other one you don't.
 
-I've applied this patch with the above edits.
-
-Thanks,
-Dinh
->  MACHINE_END
+	Arnd
