@@ -1,36 +1,46 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Fri, 14 Mar 2014 09:46:49 +0000
-Subject: [PATCH v4 4/6] pinctrl: st: Use ARRAY_SIZE instead of raw value
- for number of delays
-In-Reply-To: <5322CF87.5000301@st.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>	<1394614210-15698-5-git-send-email-maxime.coquelin@st.com>	<1394634313.28839.57.camel@joe-AO722>
- <CACRpkda0Z15zC=d8xe+KyHqgmTCHbnUjL14fBmtscpR-2kHtFQ@mail.gmail.com>
- <5322CF87.5000301@st.com>
-Message-ID: <5322D009.3090000@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Mar 2014 10:55:24 +0100
+Subject: [PATCH 2/3] ARM/leds: move ARM Versatile LED driver to leds
+ subsystem
+In-Reply-To: <1394540634.21334.27.camel@hornet>
+References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+ <1393509500-26002-2-git-send-email-linus.walleij@linaro.org>
+ <1393510075.460580224@f137.i.mail.ru>
+ <CACRpkdb+nLnjM7PUtkzmSJLjEC7FOH65sgOB6m-BUPB8YMzxiA@mail.gmail.com>
+ <1394540634.21334.27.camel@hornet>
+Message-ID: <CACRpkdYhFO+ur-RpwC6geBpuzMa-nghc86oWdCiVMiB2-BsrmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/14 09:44, Maxime Coquelin wrote:
->>>
->>> drivers/pinctrl/pinctrl-st.c-   unsigned int    *input_delays;
->>> drivers/pinctrl/pinctrl-st.c-   unsigned int    *output_delays;
->>>
->>> It may be better to change these to const unsigned int *
->>> and change
->>>
->>> static unsigned int stih416_delays[] = {
->>>
->>> to static const
->>
->> Good point. Patches accepted :-)
-> 
-> Sorry Joe, I forgot to reply.
-> 
-> I added this to my todo list.
-> I will provide the change before end of next week.
-> 
-Thanks Maxime for taking care of this...
+On Tue, Mar 11, 2014 at 1:23 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Tue, 2014-03-11 at 12:18 +0000, Linus Walleij wrote:
 
---srini
-> Thanks,
-> Maxime
+>> On some systems without "real" GPIO the above would lead to
+>> compiling in the entire gpiolib (149 KB) just to do this.
+>>
+>> I would agree more with inventing something like leds-mmio as a
+>> separate refactoring after this, i.e. a driver for any memory-mapped
+>> LED, which should cover a few cases. What do you think about this
+>> idea?
+>
+> Something like this?
+> http://thread.gmane.org/gmane.linux.kernel/1387110 ;-)
+
+Yes.
+
+The current GPIO maintainer is not aligned with the statements
+that this is "some kind of GPIO".
+
+Also the fact that this adds some hundred KB of code just to do
+this simple thing wasn't brought up.
+
+> But seriously speaking, I did exactly what Alexander mentioned on VE,
+> considering the SYS_LED & alikes as "pseudo-gpios".
+
+I just don't agree with that. They aren't GPIO's until used as
+such, and push in a huge abstraction layer inbetween the driver
+and its hardware for no good reason whatsoever I think.
+This is not keeping things simple, it is making things obscure.
+
+Yours,
+Linus Walleij
