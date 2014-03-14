@@ -1,44 +1,76 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 14 Mar 2014 10:58:45 +0200
-Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
-In-Reply-To: <53160F8F.9060405@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-5-git-send-email-s-anna@ti.com>
- <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
- <52F92524.3080402@ti.com>
- <CAK=WgbY0wDtGCm71E8VXi2g5+VcGogHEy8jdekTRg8xtp6-3rQ@mail.gmail.com>
- <CAJAp7Ohf43hbKatCwS5Y1+OfEkJYWOkuhZhW-E_=t_9mfM+UaA@mail.gmail.com>
- <53160F8F.9060405@ti.com>
-Message-ID: <CAK=WgbbaF+=3euYNBd6FbKW62mCBs_fbDnRxkSNR9QknGZnwSw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 14 Mar 2014 10:06:58 +0100
+Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <20140313.153832.967564223480298567.davem@davemloft.net>
+References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140313.153832.967564223480298567.davem@davemloft.net>
+Message-ID: <5322C6B2.6040905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-On Tue, Mar 4, 2014 at 7:38 PM, Suman Anna <s-anna@ti.com> wrote:
->>>> Do you have any objections to the return code convention change?
->>>
->>> Unless strictly needed, I prefer we don't switch to the ERR_PTR code
->>> convention, as it reduces code readability and increases chances of
->>> user bugs.
->>>
->>> In our case, switching to ERR_PTR and friends seems only to optimize a
->>> few error paths, and I'm not sure it's a big win over simplicity.
->>
->>
->> When introducing the ability to reference a hwspin lock via a phandle
->> in device tree it makes a big difference to be able to differ between
->> the case of "initialization failed" or "device not yet probed"; so
->> that the client knows if it should fail or retry later.
->>
+On 03/13/2014 08:38 PM, David Miller wrote:
+> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Date: Wed, 12 Mar 2014 00:02:55 +0100
 >
-> Can you confirm the changes you want me to make, so that I can refresh and
-> post a v5 for 3.15?
+>> phy_ethtool_get_wol is a helper to get current WOL settings from
+>> a phy device. When using this helper on a PHY without .get_wol
+>> callback, struct ethtool_wolinfo is never set-up correctly and
+>> may contain misleading information about WOL status.
+>>
+>> To fix this, always zero relevant fields of struct ethtool_wolinfo
+>> regardless of .get_wol callback availability.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+>
+> I'm starting to see this situation more clearly now, especially with
+> Ben's most recent commentary.
+>
+> The basic notion is that one must do ethtool ops are designed such that
+> the top-level execution context in net/core/ethtool.c takes care of
+> initializing the structure.
+>
+> In this case, we're referring specifically to ethtool_get_wol(), which
+> runs any time ETHTOOL_GWOL is requested.
+>
+> Therefore no ethtool_ops->get_wol() implementation should duplicate
+> this work, that goes for all of such cases which invoke the function
+> we are talking about here, phy_ethtool_get_wol().
+>
+> So the first change is definitely to remove:
+>
+> 	wol->supported = 0;
+> 	wol->wolopts = 0;
+>
+> from:
+>
+> drivers/net/ethernet/marvell/mv643xx_eth.c:mv643xx_eth_get_wol()
+> drivers/net/ethernet/ti/cpsw.c:cpsw_get_wol()
+>
+> Next, I think phy_suspend() must create the same environment the
+> call sites above guarentee for phy_ethtool_get_wol(), namely
+> by changing the declaration of 'wol' to:
+>
+> 	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
+>
+> which will cause the compiler to clear out the rest of the structure
+> for us, as the same declaration does in ethtool_get_wol().
+>
+> Finally, purge the spurious clears in phydev_ops->get_wol(), namely
+> in at803x_get_wol() and m88e1318_get_wol().
+>
+> So, to reiterate, OPS never have to be mindful of initializing the
+> ethtool result with zeros.  However, anyone who calls into OPS
+> directly must provide said expected state.
+>
+> Are we all on the same page now?
 
-Sorry, I missed your replies for some reason.
+Yes, we are. I'll send a fix for phy_suspend in a minute - still based
+on v3.14-rc1 in case there will be another -rc.
 
-I prefer we stick with the current error handling code because I find
-the alternative inferior (as long as it's not strictly needed).
+If not, I'll rebase that fix on net-next together with patches for the
+four offending drivers you named above.
 
-Thanks,
-Ohad.
+Sebastian
