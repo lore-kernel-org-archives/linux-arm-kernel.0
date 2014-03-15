@@ -1,43 +1,53 @@
-From: shiraz.linux.kernel@gmail.com (Shiraz Hashim)
-Date: Sat, 15 Mar 2014 18:37:05 +0530
-Subject: Possible mistake in defining TTBR cache-able attributes for v7-2
- level ?
-In-Reply-To: <20140314155359.GH18126@arm.com>
-References: <CAPub149amJ0Aa7Y8DLkHbkQzcKFfr--d8oiuFsw7MMokAia4xw@mail.gmail.com>
- <20140314155359.GH18126@arm.com>
-Message-ID: <CAPub14-48TVcLYHznCcYm+CaXZD_BBOz4Ah1WWuBujFRUM_sqw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 15 Mar 2014 13:07:49 +0000
+Subject: [PATCH v5 09/11] arm: add support for reserved memory defined by
+ device tree
+In-Reply-To: <7h8usdlqbn.fsf@paris.lan>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com> <
+ 1392985527-6260-10-git-send-email-m.szyprowski@samsung.com> <
+ CAGa+x856+YyJ-vyfGoFAKmsqwKD+=Wh0-TT_mAaPStOXjd8eSQ@mail.gmail.com> <
+ 20140313213636.GR18529@joshc.qualcomm.com> <7h8usdlqbn.fsf@paris.lan>
+Message-ID: <20140315130749.2A38AC40A1B@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 9:23 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
->
-> On Fri, Mar 14, 2014 at 01:46:27PM +0000, Shiraz Hashim wrote:
-> > TTB_IRGN_WBWA macro defined in arch/arm/mm/proc-v7-2level.S, seems incorrect
+On Thu, 13 Mar 2014 14:51:56 -0700, Kevin Hilman <khilman@linaro.org> wrote:
+> Josh Cartwright <joshc@codeaurora.org> writes:
+> 
+> > On Thu, Mar 13, 2014 at 01:46:50PM -0700, Kevin Hilman wrote:
+> >> On Fri, Feb 21, 2014 at 4:25 AM, Marek Szyprowski
+> >> <m.szyprowski@samsung.com> wrote:
+> >> > Enable reserved memory initialization from device tree.
+> >> >
+> >> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> 
+> >> This patch has hit -next and several legacy (non-DT) boot failures
+> >> were detected and bisected down to this patch.  A quick scan looks
+> >> like there needs to be some sanity checking whether a DT is even
+> >> present.
 > >
-> > #define TTB_IRGN_WBWA   ((0 << 0) | (1 << 6))
+> > Hmm.  Yes, the code unconditionally calls of_flat_dt_scan(), which will
+> > gladly touch initial_boot_params, even though it may be uninitialized.
+> > The below patch should allow these boards to boot...
 > >
-> > Its intention seems to program as write back and write allocate whereas it
-> > actually
-> > programs it  write-through,
+> > However, I'm wondering if there is a good reason why we don't parse the
+> > /reserved-memory nodes at the right after we parse the /memory nodes as
+> > part of early_init_dt_scan()...
 > >
-> > From ARM TRM
+> > Thanks,
+> >   Josh
 > >
-> > The possible values of IRGN[1:0] are:
-> >   0b00 Normal memory, Inner Non-cacheable.
-> >   0b01 Normal memory, Inner Write-Back Write-Allocate Cacheable.
-> >   0b10 Normal memory, Inner Write-Through Cacheable.
-> >   0b11 Normal memory, Inner Write-Back no Write-Allocate Cacheable.
+> > --8<--
+> > Subject: [PATCH] drivers: of: only scan for reserved mem when fdt present
 > >
-> > --IRGN[0] is b'0 and IRGN[1] is b'6
->
-> In the ARMv7 ARM, IRGN[0] is bit 6 and IRGN[1] is bit 0. Which TRM is
-> this?
->
+> > Reported-by: Kevin Hilman <khilman@linaro.org>
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> 
+> This gets legacy boot working again.  Thanks.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-I am referring to Cortex A53 TRM, here
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0500d/CIHIDJFJ.html
+Applied and confirmed on non-DT qemu boot. Thanks. It will be pushed out
+shortly.
 
--- 
-regards
-Shiraz Hashim
+g.
