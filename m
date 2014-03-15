@@ -1,25 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 15 Mar 2014 11:17:02 -0300
-Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
-In-Reply-To: <1394860469.248733133@f140.i.mail.ru>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 15 Mar 2014 18:27:54 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxNF1bIDQvNF0gQVJNOiBkdHM6IGlteDI1OiBtYmlteHNk?=
+ =?UTF-8?B?MjU6IEFkZCBkaXNwbGF5cyBzdXBwb3J0Lg==?=
+In-Reply-To: <CAOMZO5BphV5jgU421xyG7=-8C_7Hh3kBFYsTkd1zHurPHQcJgw@mail.gmail.com>
 References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
- <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
- <1394684743.193831485@f438.i.mail.ru>
  <1394860469.248733133@f140.i.mail.ru>
-Message-ID: <CAOMZO5BphV5jgU421xyG7=-8C_7Hh3kBFYsTkd1zHurPHQcJgw@mail.gmail.com>
+ <CAOMZO5BphV5jgU421xyG7=-8C_7Hh3kBFYsTkd1zHurPHQcJgw@mail.gmail.com>
+Message-ID: <1394893674.720310941@f331.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 2:14 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-> I acknowledge that the (linux-next-20140314) framebuffer driver works fine.
-> Today I checked it on Phytec-PCM970 board with i.MX27 (DT).
+???????, 15 ????? 2014, 11:17 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
+> On Sat, Mar 15, 2014 at 2:14 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> 
+> > I acknowledge that the (linux-next-20140314) framebuffer driver works fine.
+> > Today I checked it on Phytec-PCM970 board with i.MX27 (DT).
+> 
+> Thanks for confirming imxfb is functional, Alexander.
+> 
+> Just tried linux-next-20140314 and still do not get LCD functional, so
+> it looks like a mx25pdk specific issue then.
 
-Thanks for confirming imxfb is functional, Alexander.
+Fabio, I use settings, which sent in the patch. Look, maybe it will help ...
+http://www.spinics.net/lists/arm-kernel/msg315707.html
 
-Just tried linux-next-20140314 and still do not get LCD functional, so
-it looks like a mx25pdk specific issue then.
-
-Regards,
-
-Fabio Estevam
+---
