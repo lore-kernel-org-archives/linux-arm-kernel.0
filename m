@@ -1,64 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Mar 2014 21:13:13 -0400
-Subject: [ARM ATTEND] devicetree repo, early testing
-Message-ID: <20140315011313.GE15608@titan.lakedaemon.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 14 Mar 2014 21:21:00 -0500
+Subject: [PATCH 3/3] ARM: OMAP2+: Add machine entry for dra72x devices
+In-Reply-To: <1394788841-15112-4-git-send-email-rnayak@ti.com>
+References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
+ <1394788841-15112-4-git-send-email-rnayak@ti.com>
+Message-ID: <5323B90C.80803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Hi Rajendra,
 
-I would like to attend this years ARM mini-summit to be held in
-conjunction with the Embedded Linux Conference on April 28th.  There are
-two topics I would like to discuss.
+On 03/14/2014 04:20 AM, Nayak, Rajendra wrote:
+> The only difference from the dra75x devices is the missing .smp entry.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>   arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 8e3daa1..d803d99 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -253,4 +253,22 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+>   	.dt_compat	= dra7xx_boards_compat,
+>   	.restart	= omap44xx_restart,
+>   MACHINE_END
+> +
+> +static const char *dra72_boards_compat[] __initdata = {
 
-- devicetree repo -
+How about using dra72x_ instead of dra72_ and keeping it consistent
+at the other places as well?
 
-I recently sent out an email regarding moving the devicetree binding
-docs and dts{i} files to their own repo.
+regards
+Suman
 
-  https://lkml.kernel.org/r/20140217180544.GU7862 at titan.lakedaemon.net
-
-This started a rather long thread that distilled down to two main
-topics:  Short term syncing of the devicetree for other projects, and
-long-term, how do we migrate to separate repository?
-
-The short term appears to be solved with Ian Campbell's work on
-extracting the history from the Linux Kernel history.  He has a
-continuously updated tree available that is easy for other projects to
-merge in as a submodule or any other way they see fit.
-
-The fun part is the long term transition.  Ideally, Olof would like to
-see this happen on a per-sub-arch basis as they are ready.  Ian
-indicated there may be difficulties in implementing this.  This is what
-I would like to hammer out.
-
-  1) what migration approach would actually work?
-
-  2) what are the criteria for "this sub-arch is ready"?
-
-  3) does Ian need to move the repo to a more neutral location?  iow, do
-     the interested parties (busybox, u-boot, *bsd) care about it being
-     hosted on a Linux-y site?
-
-So, I'd like the opportunity to take what we've collected from the
-mailinglist so far, hammer it out; and after the summit, be able to post
-a proposal/plan.
-
-- early testing of new patches -
-
-I'd like to take the opportunity to sit down with other ARM folks and
-share what mvebu has been doing since the 2013 KS wrt topic branches,
-merging, and the early testing this process has enabled.  I'd also like
-to cover some lessons learned and also some tips and tricks.
-
-Our process has allowed us to smoothly merge in support for three new
-SoCs (Armada 375/380/385), with drivers, in one merge cycle.  We've also
-migrated DT support from two legacy SoCs (dove, kirkwood) into
-mach-mvebu this cycle as well.
-
-This would also be a great opportunity for others to chime in with their
-experiences, tips and tricks.
-
-thx,
-
-Jason.
+> +	"ti,dra72x",
+> +	"ti,dra7",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(DRA72_DT, "Generic DRA72 (Flattened Device Tree)")
+> +	.reserve	= omap_reserve,
+> +	.map_io		= omap5_map_io,
+> +	.init_early	= dra7xx_init_early,
+> +	.init_late	= dra7xx_init_late,
+> +	.init_irq	= omap_gic_of_init,
+> +	.init_machine	= omap_generic_init,
+> +	.init_time	= omap5_realtime_timer_init,
+> +	.dt_compat	= dra72_boards_compat,
+> +	.restart	= omap44xx_restart,
+> +MACHINE_END
+>   #endif
+>
