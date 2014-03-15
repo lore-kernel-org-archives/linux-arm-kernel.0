@@ -1,115 +1,134 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 15 Mar 2014 14:39:08 +0900
-Subject: [PATCH v5 4/4] arm64: is_compat_task is defined both in asm/compat.h
- and linux/compat.h
-In-Reply-To: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
- <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1394861948-28712-5-git-send-email-takahiro.akashi@linaro.org>
+Date: Sat, 15 Mar 2014 14:40:41 +0900
+Subject: [PATCH v7 0/7] arm64: Add ftrace support
+In-Reply-To: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some kernel files may include both linux/compat.h and asm/compat.h directly
-or indirectly. Since both header files contain is_compat_task() under
-!CONFIG_COMPAT, compiling them with !CONFIG_COMPAT will eventually fail.
-Such files include kernel/auditsc.c, kernel/seccomp.c and init/do_mountfs.c
-(do_mountfs.c may read asm/compat.h via asm/ftrace.h once ftrace is
-implemented).
+This patchset implements a function tracer on arm64.
+There was another implementation from Cavium network, but both of us agreed
+to use my patchset as future base. He is supposed to review this code, too.
 
-So this patch proactively
-1) removes is_compat_task() under !CONFIG_COMPAT from asm/compat.h
-2) replaces asm/compat.h to linux/compat.h in kernel/*.c,
-   but asm/compat.h is still necessary in ptrace.c and process.c because
-   they use is_compat_thread().
+The only issue that I had some concern on was "fault protection" code
+in prepare_ftrace_return(). With discussions with Steven and Tim (as author
+of arm ftrace), I removed that code since I'm not quite sure about possibility
+of "fault" occurrences in this function.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/compat.h   | 5 -----
- arch/arm64/kernel/hw_breakpoint.c | 2 +-
- arch/arm64/kernel/process.c       | 1 +
- arch/arm64/kernel/ptrace.c        | 1 +
- arch/arm64/kernel/signal.c        | 2 +-
- 5 files changed, 4 insertions(+), 7 deletions(-)
+The code is tested on ARMv8 Fast Model with the following tracers & events:
+     function tracer with dynamic ftrace
+     function graph tracer with dynamic ftrace
+     syscall tracepoint (but only for AArch64 tasks)
+     irqsoff & preemptirqsoff (which use CALLER_ADDRx)
+and also verified with in-kernel tests, FTRACE_SELFTEST, FTRACE_STARTUP_TEST
+and EVENT_TRACE_TEST_SYSCALLS.
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index fda2704..3b334f9 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -305,11 +305,6 @@ static inline int is_compat_thread(struct thread_info *thread)
- 
- #else /* !CONFIG_COMPAT */
- 
--static inline int is_compat_task(void)
--{
--	return 0;
--}
--
- static inline int is_compat_thread(struct thread_info *thread)
- {
- 	return 0;
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index f17f581..a45e2db 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -20,6 +20,7 @@
- 
- #define pr_fmt(fmt) "hw-breakpoint: " fmt
- 
-+#include <linux/compat.h>
- #include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/hw_breakpoint.h>
-@@ -27,7 +28,6 @@
- #include <linux/ptrace.h>
- #include <linux/smp.h>
- 
--#include <asm/compat.h>
- #include <asm/current.h>
- #include <asm/debug-monitors.h>
- #include <asm/hw_breakpoint.h>
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 1c0a9be..fc8a387 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -20,6 +20,7 @@
- 
- #include <stdarg.h>
- 
-+#include <linux/compat.h>
- #include <linux/export.h>
- #include <linux/sched.h>
- #include <linux/kernel.h>
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index f606276..c47a3ed 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/compat.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 890a591..4a09989 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/compat.h>
- #include <linux/errno.h>
- #include <linux/signal.h>
- #include <linux/personality.h>
-@@ -25,7 +26,6 @@
- #include <linux/tracehook.h>
- #include <linux/ratelimit.h>
- 
--#include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/elf.h>
- #include <asm/cacheflush.h>
+Prerequisites are:
+ * "arm64: make a single hook to syscall_trace() for all syscall features" patch
+ * "arm64: split syscall_trace() into separate functions for enter/exit" patch
+ * "arm64: Add regs_return_value() in syscall.h" patch
+ * "arm64: is_compat_task is defined both in asm/compat.h and
+    linux/compat.h" patch
+
+Please be careful:
+* Patch [3/7] gets warnings from checkpatch, but they are based on the
+  original's coding style.
+* Patch [7/7] may conflict with my audit patch because both changes the same
+  location in syscall_trace_enter/exit(). I expect the functions are called
+  in this order:
+  On entry,
+     * tracehook_report_syscall(ENTER)
+     * trace_sys_enter()
+     * audit_syscall_entry()
+  On exit,
+     * audit_sysscall_exit()
+     * trace_sys_exit()
+     * tracehook_report_syscall(EXIT) 
+
+Changes from v6 to v7:
+* changed to use gpfx variable instead of defining altmcount in recordmcount.c
+  [3/7]
+* declared return_to_handler using ENTRY/END macros [4/7]
+* changed to use u32 instead of int as instruction words, and simplified
+  ftrace_modify_graph_caller() [5/7]
+* simplified arch_trace_is_compat_call() for readability [7/7]
+* added the following patch to prerequisite list,
+  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+  and changed to use linux/compat.h instead of asm/compat.h in asm/ftrace.h
+  to avoid compile errors against some files (ie. do_mounts.c and etc) if
+  FTRACE & !COMPAT. [7/7]
+
+Changes from v5 to v6:
+* changed the order of patches to avoid any bisect error (I have not tried
+  though)
+* added EM_AARCH64 and R_AARCH64_ABS64 definitions in scripts/recordmcount.c
+  just in case elf.h on host machine doesn't have them. [3/7]
+* updated a frame pointer (x29) in _mcount() to make it look like a normal
+  function [4/7]
+* aligned with the patch, "arm64: split syscall_trace() into separate
+  functions for enter/exit" [7/7]
+* defined ARCH_TRACE_IGNORE_COMPAT_SYSCALLS in order not to trace compat
+  syscalls [7/7]
+
+Chnages from v4 to v5:
+* improved the description of stack layout [1/7]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v3 [5/7]
+
+Changes from v3 to v4:
+* removed unnecessary "#ifdef" [1,2/7]
+* changed stack depth from 48B to 16B in mcount()/ftrace_caller() (a bug) [1/7]
+* changed MCOUNT_INSN_SIZE to AARCH64_INSN_SIZE [1,7/7]
+* added a guard againt TIF_SYSCALL_TRACEPOINT [5/7]
+* corrected the second argument passed to trace_sys_exit() (a bug) [5/7]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [5/7]
+
+Changes from v2 to v3:
+* optimized register usages in asm (by not saving x0, x1, and x2)
+* removed "fault protection" code in prepare_ftrace_return()
+* rewrote ftrace_modify_code() using "hotpatch" interfaces
+* revised descriptions in comments
+
+Changes from v1 to v2:
+* splitted one patch into some pieces for easier review
+  (especially function tracer + dynamic ftrace + CALLER_ADDRx)
+* put return_address() in a separate file
+* renamed __mcount to _mcount (it was my mistake)
+* changed stackframe handling to get parent's frame pointer
+* removed ARCH_SUPPORTS_FTRACE_OPS
+* switched to "hotpatch" interfaces from Huawai
+* revised descriptions in comments
+
+AKASHI Takahiro (7):
+  arm64: add __ASSEMBLY__ in asm/insn.h
+  arm64: Add 'notrace' attribute to unwind_frame() for ftrace
+  ftrace: Add arm64 support to recordmcount
+  arm64: Add ftrace support
+  arm64: ftrace: Add dynamic ftrace support
+  arm64: ftrace: Add CALLER_ADDRx macros
+  arm64: ftrace: Add system call tracepoint
+
+ arch/arm64/Kconfig                 |   6 +
+ arch/arm64/include/asm/ftrace.h    |  67 ++++++++++++
+ arch/arm64/include/asm/insn.h      |   2 +
+ arch/arm64/include/asm/syscall.h   |   1 +
+ arch/arm64/include/asm/unistd.h    |   2 +
+ arch/arm64/kernel/Makefile         |   7 +-
+ arch/arm64/kernel/arm64ksyms.c     |   4 +
+ arch/arm64/kernel/entry-ftrace.S   | 218 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ftrace.c         | 178 ++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ptrace.c         |   9 ++
+ arch/arm64/kernel/return_address.c |  55 ++++++++++
+ arch/arm64/kernel/stacktrace.c     |   2 +-
+ scripts/recordmcount.c             |   7 ++
+ scripts/recordmcount.pl            |   5 +
+ 14 files changed, 561 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ftrace.h
+ create mode 100644 arch/arm64/kernel/entry-ftrace.S
+ create mode 100644 arch/arm64/kernel/ftrace.c
+ create mode 100644 arch/arm64/kernel/return_address.c
+
 -- 
 1.8.3.2
