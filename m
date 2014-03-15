@@ -1,54 +1,22 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Fri, 14 Mar 2014 23:35:59 -0700
-Subject: [PATCH v11 02/27] iommu/exynos: add missing cache flush for
- removed page table entries
-In-Reply-To: <20140314140234.c972b52a96a4fe39acd09fe0@samsung.com>
-References: <20140314140234.c972b52a96a4fe39acd09fe0@samsung.com>
-Message-ID: <CANEJEGvkoUEWoJ4Y5sXwAr2KHW0MESj-1cHQ31AVRasG0P8pzg@mail.gmail.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Sat, 15 Mar 2014 08:37:11 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <CACRpkdZ2+kfOim1OEWbYR_Tj36i+8HmYXh+nqO9h1Em8gqy=3Q@mail.gmail.com>
+References: <5316FFCE.1060603@ti.com>	<1394018461-757-1-git-send-email-holler@ahsoftware.de>	<CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>	<5322D529.4070904@ahsoftware.de>	<CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>	<5322F82A.9000507@ahsoftware.de>	<CACRpkdZscprsy7kyqHPUMEMYJ_TKgG2bYR7mdrG4hTDp1w1nDg@mail.gmail.com>	<53234B68.5090300@ahsoftware.de>
+ <CACRpkdZ2+kfOim1OEWbYR_Tj36i+8HmYXh+nqO9h1Em8gqy=3Q@mail.gmail.com>
+Message-ID: <53240327.8070507@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please apply this. It's way overdue.  It fixes customer kernel crashes
-we've seen in the field.
+Am 14.03.2014 20:52, schrieb Linus Walleij:
 
-I'd also advocate for seeing this be applied to stable kernels.
+> So a few Tested-by's from the people using this driver would for
+> example convince me that it is solving a real problem for them
+> and it needs to go into fixes.
 
-thanks,
-grant
+2001: a space odyssey is fast action movie compared with the movie 
+kernel bug fixing. And 2001 is a masterpiece of slowness.
 
-On Thu, Mar 13, 2014 at 10:02 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> This commit adds cache flush for removed small and large page entries
-> in exynos_iommu_unmap(). Missing cache flush of removed page table
-> entries can cause missing page fault interrupt when a master IP
-> accesses an unmapped area.
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Tested-by: Grant Grundler <grundler@chromium.org>
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 4876d35..1c3a397 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -958,6 +958,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->         if (lv2ent_small(ent)) {
->                 *ent = 0;
->                 size = SPAGE_SIZE;
-> +               pgtable_flush(ent, ent + 1);
->                 priv->lv2entcnt[lv1ent_offset(iova)] += 1;
->                 goto done;
->         }
-> @@ -966,6 +967,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
->         BUG_ON(size < LPAGE_SIZE);
->
->         memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
-> +       pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
->
->         size = LPAGE_SIZE;
->         priv->lv2entcnt[lv1ent_offset(iova)] += SPAGES_PER_LPAGE;
-> --
-> 1.7.9.5
->
+Regards,
+
+Alexander Holler
