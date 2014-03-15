@@ -1,90 +1,46 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 15 Mar 2014 14:07:43 +0100
-Subject: [PATCH v2 4/5] net: cpsw: Use cpsw-ctrl-macid driver
-In-Reply-To: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
-References: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1394888864-11007-5-git-send-email-mpa@pengutronix.de>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 15 Mar 2014 14:40:58 +0100
+Subject: [PATCH v6 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
+ controller
+Message-ID: <1394890861-18347-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ctrl-macid driver to obtain the macids stored in the processor. This
-is only done when defined in DT.
+Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
+Three register are present to (un)mask, control and acknowledge NMI.
+These two patches add a new irqchip driver in cascade with GIC.
 
-The internal macid is not used if mac-address is given explicitly. So it
-does not change the behavior if the bootloader provides a mac address
-through the mac-address property
+Changes since v1:
+	- added binding document
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- Documentation/devicetree/bindings/net/cpsw.txt |  6 ++++++
- drivers/net/ethernet/ti/cpsw.c                 | 16 +++++++++++++---
- drivers/net/ethernet/ti/cpsw.h                 |  2 ++
- 3 files changed, 21 insertions(+), 3 deletions(-)
+Changes since v2:
+	- fixed trigger type in DTS
+	- new explanations in binding documentation
+	- added support for A31 (sun6i)
 
-diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index c39f077..b997b96 100644
---- a/Documentation/devicetree/bindings/net/cpsw.txt
-+++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -34,6 +34,12 @@ Required properties:
- Optional properties:
- - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
- - mac-address		: Specifies slave MAC address
-+- ti,mac-address-ctrl	: When cpsw-ctrl-macid support is compiled-in, this can
-+			  be set to a phandle with one argument, see
-+			  cpsw-ctrl-macid.txt. If this method fails, cpsw falls
-+			  back to a random mac-address. An explicit mac-address
-+			  property takes precedence.
-+
- 
- Note: "ti,hwmods" field is used to fetch the base address and irq
- resources from TI, omap hwmod data base during device registration.
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 651087b..05f4948 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1892,8 +1892,15 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 		}
- 
- 		mac_addr = of_get_mac_address(slave_node);
--		if (mac_addr)
--			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
-+		if (mac_addr) {
-+			memcpy(slave_data->mac_addr, mac_addr,
-+					ETH_ALEN);
-+		} else {
-+			ret = cpsw_ctrl_macid_read(slave_node,
-+					slave_data->mac_addr);
-+			if (ret == -EPROBE_DEFER)
-+				return ret;
-+		}
- 
- 		slave_data->phy_if = of_get_phy_mode(slave_node);
- 		if (slave_data->phy_if < 0) {
-@@ -2038,10 +2045,13 @@ static int cpsw_probe(struct platform_device *pdev)
- 	/* Select default pin state */
- 	pinctrl_pm_select_default_state(&pdev->dev);
- 
--	if (cpsw_probe_dt(&priv->data, pdev)) {
-+	ret = cpsw_probe_dt(&priv->data, pdev);
-+	if (ret == -EINVAL) {
- 		pr_err("cpsw: platform data missing\n");
- 		ret = -ENODEV;
- 		goto clean_runtime_disable_ret;
-+	} else if (ret) {
-+		goto clean_runtime_disable_ret;
- 	}
- 	data = &priv->data;
- 
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index 1b71067..222eebe 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -42,4 +42,6 @@ struct cpsw_platform_data {
- 
- void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave);
- 
-+int cpsw_ctrl_macid_read(struct device_node *np, u8 *mac_addr);
-+
- #endif /* __CPSW_H__ */
+Changes since v3:
+	- changed compatibles
+
+Changes since v4:
+	- fixed binding documentation
+
+Changes since v5:
+	- switched to handle_fasteoi_irq handler to avoid the double
+	  interrupts issue
+
+Carlo Caione (3):
+  ARM: sun7i/sun6i: irqchip: Add irqchip driver for NMI controller
+  ARM: sun7i/sun6i: dts: Add NMI irqchip support
+  ARM: sun7i/sun6i: irqchip: Update the documentation
+
+ .../allwinner,sun67i-sc-nmi.txt                    |  27 +++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   9 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   9 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-sunxi-nmi.c                    | 208 +++++++++++++++++++++
+ 5 files changed, 254 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ create mode 100644 drivers/irqchip/irq-sunxi-nmi.c
+
 -- 
-1.9.0
+1.8.3.2
