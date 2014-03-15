@@ -1,145 +1,43 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Fri, 14 Mar 2014 20:29:13 -0700
-Subject: [PATCH v4 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <201403141318.27183.arnd@arndb.de>
-References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
- <1394085963-27553-2-git-send-email-tinamdar@apm.com>
- <201403141318.27183.arnd@arndb.de>
-Message-ID: <CACoXjcm8TugNdPd=gUB7cFpFgraPa=B1eR5Pxmf=y1-2aTzGvw@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 15 Mar 2014 09:14:29 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHYxNF1bIDQvNF0gQVJNOiBkdHM6IGlteDI1OiBtYmlteHNk?=
+ =?UTF-8?B?MjU6IEFkZCBkaXNwbGF5cyBzdXBwb3J0Lg==?=
+In-Reply-To: <1394684743.193831485@f438.i.mail.ru>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
+ <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
+ <1394684743.193831485@f438.i.mail.ru>
+Message-ID: <1394860469.248733133@f140.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review and comments. I will incorporate the comments
-from you and Jingoo Han in next version.
++CC: Tomi Valkeinen
 
--Tanmay
+???????, 13 ????? 2014, 8:25 +04:00 ?? Alexander Shiyan <shc_work@mail.ru>:
+> ?????, 12 ????? 2014, 18:16 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
+> > Hi Eric,
+> > 
+> > On Wed, Mar 12, 2014 at 6:07 PM, Eric B?nard <eric@eukrea.com> wrote:
+> > 
+> > > if you have an oscilloscope, can you probe PIXCLK, HSYNC, VSYNC and DE
+> > > to check the signals are properly configured vs the datasheet of your
+> > > display.
+> > 
+> > Yes, I have measured VSYNC and there is no activity on this line.
+> > 
+> > Also tried 3.13 with a non-dt kernel and the same issue is seen.
+> > 
+> > Running FSL 2.6.31 I can see VSYNC at 57Hz and Tux on the display, so
+> > the hardware is good.
+> > 
+> > At least for me imxfb seems to be broken even for the non-dt case.
+> 
+> I will check the latest changes on the weekends for i.MX27.
 
-On Fri, Mar 14, 2014 at 5:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 06 March 2014, Tanmay Inamdar wrote:
->
->> +static inline void xgene_pcie_cfg_out16(void __iomem *addr, u16 val)
->> +{
->> +     u64 temp_addr = (u64)addr & ~0x3;
->
-> Please use 'unsigned long' as the type for calculations like this one,
-> to make the code more portable. You mentioned before that the same PCI
-> host controller is used on some ppc4xx, and we may want to share the
-> code later.
->
->> +static int xgene_pcie_read_config(struct pci_bus *bus, unsigned int devfn,
->> +                               int offset, int len, u32 *val)
->> +{
->> +     struct xgene_pcie_port *port = bus->sysdata;
->> +     void __iomem *addr;
->> +     u8 val8;
->> +     u16 val16;
->> +
->> +     if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up)
->> +             return PCIBIOS_DEVICE_NOT_FOUND;
->> +
->> +     xgene_pcie_set_rtdid_reg(bus, devfn);
->> +     addr = xgene_pcie_get_cfg_base(bus);
->> +     switch (len) {
->> +     case 1:
->> +             xgene_pcie_cfg_in8(addr + offset, &val8);
->> +             *val = val8;
->> +             break;
->
-> Actually it would be better to just pass both addr and offset
-> down into the low-level accessors and then do the calculation
-> on 'offset', which is already a scalar.
->
->> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port,
->> +                                u32 *lanes, u32 *speed)
->> +{
->> +     void __iomem *csr_base = port->csr_base;
->> +     u32 val32;
->> +     u64 start_time, time;
->> +
->> +     /*
->> +      * A component enters the LTSSM Detect state within
->> +      * 20ms of the end of fundamental core reset.
->> +      */
->> +     msleep(XGENE_LTSSM_DETECT_WAIT);
->> +     port->link_up = 0;
->> +     start_time = jiffies;
->> +     do {
->> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
->> +             if (val32 & LINK_UP_MASK) {
->> +                     port->link_up = 1;
->> +                     *speed = PIPE_PHY_RATE_RD(val32);
->> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
->> +                     *lanes = val32 >> 26;
->> +                     break;
->> +             }
->> +             msleep(1);
->> +             time = jiffies_to_msecs(jiffies - start_time);
->> +     } while (time <= XGENE_LTSSM_L0_WAIT);
->> +}
->
-> This can be written ina simpler way using 'time_before()'.
->
->> +/* Return 0 on success */
->> +static int xgene_pcie_init_ecc(struct xgene_pcie_port *port)
->> +{
->> +     void __iomem *csr_base = port->csr_base;
->> +     u64 start_time, time = 0;
->> +     u32 val;
->> +
->> +     val = readl(csr_base + MEM_RAM_SHUTDOWN);
->> +     if (!val)
->> +             return 0;
->> +     writel(0x0, csr_base + MEM_RAM_SHUTDOWN);
->> +     start_time = jiffies;
->> +     do {
->> +             val = readl(csr_base + BLOCK_MEM_RDY);
->> +             if (val == BLOCK_MEM_RDY_VAL)
->> +                     break;
->> +             msleep(1);
->> +             time = jiffies_to_msecs(jiffies - start_time);
->> +     } while (time < XGENE_PCIE_ECC_TIMEOUT);
->
-> Same here.
->
->> +static int xgene_pcie_init_port(struct xgene_pcie_port *port)
->> +{
->> +     int rc;
->> +
->> +     port->clk = clk_get(port->dev, NULL);
->> +     if (IS_ERR_OR_NULL(port->clk)) {
->> +             dev_err(port->dev, "clock not available\n");
->> +             return -ENODEV;
->> +     }
->
-> Practically every use of IS_ERR_OR_NULL() is a bug, don't do that.
-> NULL is a valid return code from clk_get(), and should not be
-> treated as an error.
->
->
->> +static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
->> +                              struct pci_host_bridge *bridge,
->> +                              u64 cfg_addr)
->> +{
->> +     struct device *dev = port->dev;
->> +     struct pci_host_bridge_window *window;
->> +
->> +     list_for_each_entry(window, &bridge->windows, list) {
->> +             struct resource *res = window->res;
->> +             u64 restype = resource_type(res);
->> +             dev_dbg(port->dev, "0x%08lx 0x%016llx...0x%016llx\n",
->> +                     res->flags, res->start, res->end);
->> +
->> +             switch (restype) {
->> +             case IORESOURCE_IO:
->> +                     xgene_pcie_setup_ob_reg(port, res, OMR2BARL,
->> +                                             bridge->io_base);
->> +                     BUG_ON(pci_ioremap_io(res, bridge->io_base) < 0);
->> +                     break;
->
-> No need to BUG_ON() here, this is not a fatal condition, just
-> don't register the I/O space resource if this fails.
->
-> I think as the PCI base support patch series evolves, you will actually
-> not have to do this at all.
->
->         Arnd
+I acknowledge that the (linux-next-20140314) framebuffer driver works fine.
+Today I checked it on Phytec-PCM970 board with i.MX27 (DT).
+
+Nevertheless, I ask Tomi to apply at least two patches for this driver:
+http://www.spinics.net/lists/arm-kernel/msg315522.html
+http://www.spinics.net/lists/arm-kernel/msg315523.html
+
+---
