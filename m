@@ -1,32 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Mar 2014 10:33:36 +0100
-Subject: [PATCH] pinctrl: msm: fix build bug
-Message-ID: <201403151033.36878.arnd@arndb.de>
+Date: Sat, 15 Mar 2014 10:37:12 +0100
+Subject: [PATCH] PHY: Exynos: fix SATA phy license typo
+Message-ID: <201403151037.12694.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 051a58b4622 "pinctrl: msm: Simplify msm_config_reg()
-and callers" rearranged code in the msm_config_reg function, but
-apparantly missed one line that was added in ed118a5fd9
-"pinctrl-msm: Support output-{high,low} configuration".
-
-This (untested) patch does the same respective change to
-resolve the conflict.
+If the license string doesn't match exactly, the module refuses to load.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
 
-diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index 19d2feb..343f421 100644
---- a/drivers/pinctrl/pinctrl-msm.c
-+++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -215,7 +215,6 @@ static int msm_config_reg(struct msm_pinctrl *pctrl,
- 		*mask = 7;
- 		break;
- 	case PIN_CONFIG_OUTPUT:
--		*reg = g->ctl_reg;
- 		*bit = g->oe_bit;
- 		*mask = 1;
- 		break;
+diff --git a/drivers/phy/phy-exynos5250-sata.c b/drivers/phy/phy-exynos5250-sata.c
+index c9361b7..0568945 100644
+--- a/drivers/phy/phy-exynos5250-sata.c
++++ b/drivers/phy/phy-exynos5250-sata.c
+@@ -246,6 +246,6 @@ static struct platform_driver exynos_sata_phy_driver = {
+ module_platform_driver(exynos_sata_phy_driver);
+ 
+ MODULE_DESCRIPTION("Samsung SerDes PHY driver");
+-MODULE_LICENSE("GPL V2");
++MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Girish K S <ks.giri@samsung.com>");
+ MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
