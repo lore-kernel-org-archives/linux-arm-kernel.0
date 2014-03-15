@@ -1,52 +1,25 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 15 Mar 2014 14:41:01 +0100
-Subject: [PATCH v6 3/3] ARM: sun7i/sun6i: irqchip: Update the documentation
-In-Reply-To: <1394890861-18347-1-git-send-email-carlo@caione.org>
-References: <1394890861-18347-1-git-send-email-carlo@caione.org>
-Message-ID: <1394890861-18347-4-git-send-email-carlo@caione.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 15 Mar 2014 11:17:02 -0300
+Subject: [PATCHv14][ 4/4] ARM: dts: imx25: mbimxsd25: Add displays support.
+In-Reply-To: <1394860469.248733133@f140.i.mail.ru>
+References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
+ <CAOMZO5Cxvc3-brgKNCq8RXsjcj==7Ne+avgT_EVXrAAFSVDmUg@mail.gmail.com>
+ <1394684743.193831485@f438.i.mail.ru>
+ <1394860469.248733133@f140.i.mail.ru>
+Message-ID: <CAOMZO5BphV5jgU421xyG7=-8C_7Hh3kBFYsTkd1zHurPHQcJgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added documentation for NMI irqchip.
+On Sat, Mar 15, 2014 at 2:14 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+> I acknowledge that the (linux-next-20140314) framebuffer driver works fine.
+> Today I checked it on Phytec-PCM970 board with i.MX27 (DT).
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-new file mode 100644
-index 0000000..d1c5cda
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-@@ -0,0 +1,27 @@
-+Allwinner Sunxi NMI Controller
-+==============================
-+
-+Required properties:
-+
-+- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
-+  "allwinner,sun6i-a31-sc-nmi"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2. The first cell is the IRQ number, the
-+  second cell the trigger type as defined in interrupt.txt in this directory.
-+- interrupt-parent: Specifies the parent interrupt controller.
-+- interrupts: Specifies the interrupt line (NMI) which is handled by
-+  the interrupt controller in the parent controller's notation. This value
-+  shall be the NMI.
-+
-+Example:
-+
-+sc-nmi-intc at 01c00030 {
-+	compatible = "allwinner,sun7i-a20-sc-nmi";
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	reg = <0x01c00030 0x0c>;
-+	interrupt-parent = <&gic>;
-+	interrupts = <0 0 4>;
-+};
--- 
-1.8.3.2
+Thanks for confirming imxfb is functional, Alexander.
+
+Just tried linux-next-20140314 and still do not get LCD functional, so
+it looks like a mx25pdk specific issue then.
+
+Regards,
+
+Fabio Estevam
