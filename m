@@ -1,230 +1,591 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 15 Mar 2014 13:44:16 +0100
-Subject: [PATCH v2 08/16] ASoC: fsl-ssi: Cleanup probe function
+Date: Sat, 15 Mar 2014 13:44:11 +0100
+Subject: [PATCH v2 03/16] ASoC: fsl-ssi: Move debugging to seperate file
 In-Reply-To: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
 References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1394887464-969-9-git-send-email-mpa@pengutronix.de>
+Message-ID: <1394887464-969-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder the probe function to be able to move the second imx-specific
-block to the seperate imx probe function. The patch also removes some
-comments/variables/code that are not used anymore or could be simply
-replaced by other variables.
+Move all code that is only used for debugging to a seperate file. This
+makes it easier to see what functions are used for debugging only.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 109 ++++++++++++++++++++++--------------------------
- 1 file changed, 49 insertions(+), 60 deletions(-)
+ sound/soc/fsl/Makefile      |   2 +
+ sound/soc/fsl/fsl_ssi.c     | 241 ++------------------------------------------
+ sound/soc/fsl/fsl_ssi.h     |  61 ++++++++++-
+ sound/soc/fsl/fsl_ssi_dbg.c | 163 ++++++++++++++++++++++++++++++
+ 4 files changed, 232 insertions(+), 235 deletions(-)
+ create mode 100644 sound/soc/fsl/fsl_ssi_dbg.c
 
+diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
+index b12ad4b..02a2e2e 100644
+--- a/sound/soc/fsl/Makefile
++++ b/sound/soc/fsl/Makefile
+@@ -13,12 +13,14 @@ obj-$(CONFIG_SND_SOC_P1022_RDK) += snd-soc-p1022-rdk.o
+ # Freescale SSI/DMA/SAI/SPDIF Support
+ snd-soc-fsl-sai-objs := fsl_sai.o
+ snd-soc-fsl-ssi-objs := fsl_ssi.o
++snd-soc-fsl-ssi-dbg-objs := fsl_ssi_dbg.o
+ snd-soc-fsl-spdif-objs := fsl_spdif.o
+ snd-soc-fsl-esai-objs := fsl_esai.o
+ snd-soc-fsl-utils-objs := fsl_utils.o
+ snd-soc-fsl-dma-objs := fsl_dma.o
+ obj-$(CONFIG_SND_SOC_FSL_SAI) += snd-soc-fsl-sai.o
+ obj-$(CONFIG_SND_SOC_FSL_SSI) += snd-soc-fsl-ssi.o
++obj-$(CONFIG_DEBUG_FS) += snd-soc-fsl-ssi-dbg.o
+ obj-$(CONFIG_SND_SOC_FSL_SPDIF) += snd-soc-fsl-spdif.o
+ obj-$(CONFIG_SND_SOC_FSL_ESAI) += snd-soc-fsl-esai.o
+ obj-$(CONFIG_SND_SOC_FSL_UTILS) += snd-soc-fsl-utils.o
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 663ac8b..b0c04ef 100644
+index fdb123d..6b198f3 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -159,7 +159,6 @@ struct fsl_ssi_private {
- 	bool imx_ac97;
- 	bool use_dma;
- 	bool baudclk_locked;
--	bool irq_stats;
- 	bool offline_config;
- 	bool use_dual_fifo;
- 	u8 i2s_mode;
-@@ -961,7 +960,7 @@ static void make_lowercase(char *s)
+@@ -35,7 +35,6 @@
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/clk.h>
+-#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+@@ -113,8 +112,6 @@ static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+ #define FSLSSI_SIER_DBG_TX_FLAGS (CCSR_SSI_SIER_TFE0_EN | \
+ 		CCSR_SSI_SIER_TLS_EN | CCSR_SSI_SIER_TFS_EN | \
+ 		CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TFRC_EN)
+-#define FSLSSI_SISR_MASK (FSLSSI_SIER_DBG_RX_FLAGS | FSLSSI_SIER_DBG_TX_FLAGS)
+-
+ 
+ enum fsl_ssi_type {
+ 	FSL_SSI_MCP8610,
+@@ -177,31 +174,7 @@ struct fsl_ssi_private {
+ 	/* Register values for rx/tx configuration */
+ 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
+ 
+-	struct {
+-		unsigned int rfrc;
+-		unsigned int tfrc;
+-		unsigned int cmdau;
+-		unsigned int cmddu;
+-		unsigned int rxt;
+-		unsigned int rdr1;
+-		unsigned int rdr0;
+-		unsigned int tde1;
+-		unsigned int tde0;
+-		unsigned int roe1;
+-		unsigned int roe0;
+-		unsigned int tue1;
+-		unsigned int tue0;
+-		unsigned int tfs;
+-		unsigned int rfs;
+-		unsigned int tls;
+-		unsigned int rls;
+-		unsigned int rff1;
+-		unsigned int rff0;
+-		unsigned int tfe1;
+-		unsigned int tfe0;
+-	} stats;
+-	struct dentry *dbg_dir;
+-	struct dentry *dbg_stats;
++	struct fsl_ssi_dbg dbg_stats;
+ 
+ 	char name[1];
+ };
+@@ -231,7 +204,6 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ {
+ 	struct fsl_ssi_private *ssi_private = dev_id;
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+-	irqreturn_t ret = IRQ_NONE;
+ 	__be32 sisr;
+ 	__be32 sisr2;
+ 	__be32 sisr_write_mask = 0;
+@@ -258,217 +230,18 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	   were interrupted for.  We mask it with the Interrupt Enable register
+ 	   so that we only check for events that we're interested in.
+ 	 */
+-	sisr = read_ssi(&ssi->sisr) & FSLSSI_SISR_MASK;
+-
+-	if (sisr & CCSR_SSI_SISR_RFRC) {
+-		ssi_private->stats.rfrc++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TFRC) {
+-		ssi_private->stats.tfrc++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_CMDAU) {
+-		ssi_private->stats.cmdau++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_CMDDU) {
+-		ssi_private->stats.cmddu++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RXT) {
+-		ssi_private->stats.rxt++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RDR1) {
+-		ssi_private->stats.rdr1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RDR0) {
+-		ssi_private->stats.rdr0++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TDE1) {
+-		ssi_private->stats.tde1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TDE0) {
+-		ssi_private->stats.tde0++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_ROE1) {
+-		ssi_private->stats.roe1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_ROE0) {
+-		ssi_private->stats.roe0++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TUE1) {
+-		ssi_private->stats.tue1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TUE0) {
+-		ssi_private->stats.tue0++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TFS) {
+-		ssi_private->stats.tfs++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RFS) {
+-		ssi_private->stats.rfs++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TLS) {
+-		ssi_private->stats.tls++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RLS) {
+-		ssi_private->stats.rls++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RFF1) {
+-		ssi_private->stats.rff1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_RFF0) {
+-		ssi_private->stats.rff0++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TFE1) {
+-		ssi_private->stats.tfe1++;
+-		ret = IRQ_HANDLED;
+-	}
+-
+-	if (sisr & CCSR_SSI_SISR_TFE0) {
+-		ssi_private->stats.tfe0++;
+-		ret = IRQ_HANDLED;
+-	}
++	sisr = read_ssi(&ssi->sisr);
+ 
+ 	sisr2 = sisr & sisr_write_mask;
+ 	/* Clear the bits that we set */
+ 	if (sisr2)
+ 		write_ssi(sisr2, &ssi->sisr);
+ 
+-	return ret;
+-}
+-
+-#if IS_ENABLED(CONFIG_DEBUG_FS)
+-/* Show the statistics of a flag only if its interrupt is enabled.  The
+- * compiler will optimze this code to a no-op if the interrupt is not
+- * enabled.
+- */
+-#define SIER_SHOW(flag, name) \
+-	do { \
+-		if (FSLSSI_SISR_MASK & CCSR_SSI_SIER_##flag) \
+-			seq_printf(s, #name "=%u\n", ssi_private->stats.name); \
+-	} while (0)
+-
+-
+-/**
+- * fsl_sysfs_ssi_show: display SSI statistics
+- *
+- * Display the statistics for the current SSI device.  To avoid confusion,
+- * we only show those counts that are enabled.
+- */
+-static int fsl_ssi_stats_show(struct seq_file *s, void *unused)
+-{
+-	struct fsl_ssi_private *ssi_private = s->private;
+-
+-	SIER_SHOW(RFRC_EN, rfrc);
+-	SIER_SHOW(TFRC_EN, tfrc);
+-	SIER_SHOW(CMDAU_EN, cmdau);
+-	SIER_SHOW(CMDDU_EN, cmddu);
+-	SIER_SHOW(RXT_EN, rxt);
+-	SIER_SHOW(RDR1_EN, rdr1);
+-	SIER_SHOW(RDR0_EN, rdr0);
+-	SIER_SHOW(TDE1_EN, tde1);
+-	SIER_SHOW(TDE0_EN, tde0);
+-	SIER_SHOW(ROE1_EN, roe1);
+-	SIER_SHOW(ROE0_EN, roe0);
+-	SIER_SHOW(TUE1_EN, tue1);
+-	SIER_SHOW(TUE0_EN, tue0);
+-	SIER_SHOW(TFS_EN, tfs);
+-	SIER_SHOW(RFS_EN, rfs);
+-	SIER_SHOW(TLS_EN, tls);
+-	SIER_SHOW(RLS_EN, rls);
+-	SIER_SHOW(RFF1_EN, rff1);
+-	SIER_SHOW(RFF0_EN, rff0);
+-	SIER_SHOW(TFE1_EN, tfe1);
+-	SIER_SHOW(TFE0_EN, tfe0);
+-
+-	return 0;
+-}
+-
+-static int fsl_ssi_stats_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, fsl_ssi_stats_show, inode->i_private);
+-}
+-
+-static const struct file_operations fsl_ssi_stats_ops = {
+-	.open = fsl_ssi_stats_open,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-};
+-
+-static int fsl_ssi_debugfs_create(struct fsl_ssi_private *ssi_private,
+-		struct device *dev)
+-{
+-	ssi_private->dbg_dir = debugfs_create_dir(dev_name(dev), NULL);
+-	if (!ssi_private->dbg_dir)
+-		return -ENOMEM;
+-
+-	ssi_private->dbg_stats = debugfs_create_file("stats", S_IRUGO,
+-			ssi_private->dbg_dir, ssi_private, &fsl_ssi_stats_ops);
+-	if (!ssi_private->dbg_stats) {
+-		debugfs_remove(ssi_private->dbg_dir);
+-		return -ENOMEM;
+-	}
+-
+-	return 0;
+-}
+-
+-static void fsl_ssi_debugfs_remove(struct fsl_ssi_private *ssi_private)
+-{
+-	debugfs_remove(ssi_private->dbg_stats);
+-	debugfs_remove(ssi_private->dbg_dir);
+-}
+-
+-#else
+-
+-static int fsl_ssi_debugfs_create(struct fsl_ssi_private *ssi_private,
+-		struct device *dev)
+-{
+-	return 0;
+-}
++	fsl_ssi_dbg_isr(&ssi_private->dbg_stats, sisr);
+ 
+-static void fsl_ssi_debugfs_remove(struct fsl_ssi_private *ssi_private)
+-{
++	return IRQ_HANDLED;
  }
  
- static int fsl_ssi_imx_probe(struct platform_device *pdev,
--		struct fsl_ssi_private *ssi_private)
-+		struct fsl_ssi_private *ssi_private, void __iomem *iomem)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	u32 dmas[4];
-@@ -1019,8 +1018,37 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 		ssi_private->dma_params_rx.maxburst &= ~0x1;
- 	}
- 
-+	if (!ssi_private->use_dma) {
-+
-+		/*
-+		 * Some boards use an incompatible codec. To get it
-+		 * working, we are using imx-fiq-pcm-audio, that
-+		 * can handle those codecs. DMA is not possible in this
-+		 * situation.
-+		 */
-+
-+		ssi_private->fiq_params.irq = ssi_private->irq;
-+		ssi_private->fiq_params.base = iomem;
-+		ssi_private->fiq_params.dma_params_rx =
-+			&ssi_private->dma_params_rx;
-+		ssi_private->fiq_params.dma_params_tx =
-+			&ssi_private->dma_params_tx;
-+
-+		ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
-+		if (ret)
-+			goto error_pcm;
-+	} else {
-+		ret = imx_pcm_dma_init(pdev);
-+		if (ret)
-+			goto error_pcm;
-+	}
-+
- 	return 0;
- 
-+error_pcm:
-+	if (!IS_ERR(ssi_private->baudclk))
-+		clk_disable_unprepare(ssi_private->baudclk);
-+
- error_baud_clk:
- 	clk_disable_unprepare(ssi_private->clk);
- 
-@@ -1030,6 +1058,8 @@ error_baud_clk:
- static void fsl_ssi_imx_clean(struct platform_device *pdev,
- 		struct fsl_ssi_private *ssi_private)
- {
-+	if (!ssi_private->use_dma)
-+		imx_pcm_fiq_exit(pdev);
- 	if (!IS_ERR(ssi_private->baudclk))
- 		clk_disable_unprepare(ssi_private->baudclk);
- 	clk_disable_unprepare(ssi_private->clk);
-@@ -1039,7 +1069,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- {
- 	struct fsl_ssi_private *ssi_private;
- 	int ret = 0;
--	struct device_attribute *dev_attr = NULL;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
- 	enum fsl_ssi_type hw_type;
-@@ -1132,6 +1161,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	ssi_private->baudclk_locked = false;
- 	spin_lock_init(&ssi_private->baudclk_lock);
- 
-+	dev_set_drvdata(&pdev->dev, ssi_private);
-+
- 	/*
- 	 * imx51 and later SoCs have a slightly different IP that allows the
- 	 * SSI configuration while the SSI unit is running.
-@@ -1162,20 +1193,22 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			hw_type == FSL_SSI_MX35) {
- 		ssi_private->ssi_on_imx = true;
- 
--		ret = fsl_ssi_imx_probe(pdev, ssi_private);
-+		ret = fsl_ssi_imx_probe(pdev, ssi_private, ssi_private->ssi);
- 		if (ret)
- 			goto error_irqmap;
- 	}
- 
--	/*
--	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
--	 * different writeable interrupt status registers.
--	 */
-+	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
-+					 &ssi_private->cpu_dai_drv, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
-+		goto error_asoc_register;
-+	}
-+
- 	if (ssi_private->use_dma) {
- 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
- 					fsl_ssi_isr, 0, ssi_private->name,
- 					ssi_private);
--		ssi_private->irq_stats = true;
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "could not claim irq %u\n",
- 					ssi_private->irq);
-@@ -1183,46 +1216,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	/* Register with ASoC */
--	dev_set_drvdata(&pdev->dev, ssi_private);
+-#endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
 -
--	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
--					 &ssi_private->cpu_dai_drv, 1);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
--		goto error_dev;
--	}
--
- 	ret = fsl_ssi_debugfs_create(&ssi_private->dbg_stats, &pdev->dev);
+ /*
+  * Enable/Disable all rx/tx config flags at once.
+  */
+@@ -1422,7 +1195,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		goto error_dev;
+ 	}
+ 
+-	ret = fsl_ssi_debugfs_create(ssi_private, &pdev->dev);
++	ret = fsl_ssi_debugfs_create(&ssi_private->dbg_stats, &pdev->dev);
  	if (ret)
--		goto error_dbgfs;
--
--	if (ssi_private->ssi_on_imx) {
--		if (!ssi_private->use_dma) {
--
--			/*
--			 * Some boards use an incompatible codec. To get it
--			 * working, we are using imx-fiq-pcm-audio, that
--			 * can handle those codecs. DMA is not possible in this
--			 * situation.
--			 */
--
--			ssi_private->fiq_params.irq = ssi_private->irq;
--			ssi_private->fiq_params.base = ssi_private->ssi;
--			ssi_private->fiq_params.dma_params_rx =
--				&ssi_private->dma_params_rx;
--			ssi_private->fiq_params.dma_params_tx =
--				&ssi_private->dma_params_tx;
--
--			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
--			if (ret)
--				goto error_pcm;
--		} else {
--			ret = imx_pcm_dma_init(pdev);
--			if (ret)
--				goto error_pcm;
--		}
--	}
-+		goto error_asoc_register;
+ 		goto error_dbgfs;
  
- 	/*
- 	 * If codec-handle property is missing from SSI node, we assume
-@@ -1252,32 +1248,25 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	if (IS_ERR(ssi_private->pdev)) {
- 		ret = PTR_ERR(ssi_private->pdev);
- 		dev_err(&pdev->dev, "failed to register platform: %d\n", ret);
--		goto error_dai;
-+		goto error_sound_card;
- 	}
+@@ -1492,7 +1265,7 @@ error_dai:
+ 		imx_pcm_fiq_exit(pdev);
  
- done:
- 	return 0;
+ error_pcm:
+-	fsl_ssi_debugfs_remove(ssi_private);
++	fsl_ssi_debugfs_remove(&ssi_private->dbg_stats);
  
--error_dai:
--	if (ssi_private->ssi_on_imx && !ssi_private->use_dma)
--		imx_pcm_fiq_exit(pdev);
--
--error_pcm:
-+error_sound_card:
- 	fsl_ssi_debugfs_remove(&ssi_private->dbg_stats);
- 
--error_dbgfs:
-+error_irq:
+ error_dbgfs:
  	snd_soc_unregister_component(&pdev->dev);
+@@ -1518,7 +1291,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ {
+ 	struct fsl_ssi_private *ssi_private = dev_get_drvdata(&pdev->dev);
  
--error_dev:
--	device_remove_file(&pdev->dev, dev_attr);
--
--error_irq:
-+error_asoc_register:
- 	if (ssi_private->ssi_on_imx) {
- 		fsl_ssi_imx_clean(pdev, ssi_private);
- 	}
+-	fsl_ssi_debugfs_remove(ssi_private);
++	fsl_ssi_debugfs_remove(&ssi_private->dbg_stats);
  
- error_irqmap:
--	if (ssi_private->irq_stats)
-+	if (ssi_private->use_dma)
- 		irq_dispose_mapping(ssi_private->irq);
+ 	if (!ssi_private->new_binding)
+ 		platform_device_unregister(ssi_private->pdev);
+diff --git a/sound/soc/fsl/fsl_ssi.h b/sound/soc/fsl/fsl_ssi.h
+index e6b6324..2e95dd7 100644
+--- a/sound/soc/fsl/fsl_ssi.h
++++ b/sound/soc/fsl/fsl_ssi.h
+@@ -206,5 +206,64 @@ struct ccsr_ssi {
+ #define CCSR_SSI_SACNT_FV		0x00000002
+ #define CCSR_SSI_SACNT_AC97EN		0x00000001
  
- 	return ret;
-@@ -1296,7 +1285,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	if (ssi_private->ssi_on_imx)
- 		fsl_ssi_imx_clean(pdev, ssi_private);
+-#endif
  
--	if (ssi_private->irq_stats)
-+	if (ssi_private->use_dma)
- 		irq_dispose_mapping(ssi_private->irq);
- 
- 	return 0;
++struct device;
++
++#if IS_ENABLED(CONFIG_DEBUG_FS)
++
++struct fsl_ssi_dbg {
++	struct dentry *dbg_dir;
++	struct dentry *dbg_stats;
++
++	struct {
++		unsigned int rfrc;
++		unsigned int tfrc;
++		unsigned int cmdau;
++		unsigned int cmddu;
++		unsigned int rxt;
++		unsigned int rdr1;
++		unsigned int rdr0;
++		unsigned int tde1;
++		unsigned int tde0;
++		unsigned int roe1;
++		unsigned int roe0;
++		unsigned int tue1;
++		unsigned int tue0;
++		unsigned int tfs;
++		unsigned int rfs;
++		unsigned int tls;
++		unsigned int rls;
++		unsigned int rff1;
++		unsigned int rff0;
++		unsigned int tfe1;
++		unsigned int tfe0;
++	} stats;
++};
++
++void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *ssi_dbg, u32 sisr);
++
++int fsl_ssi_debugfs_create(struct fsl_ssi_dbg *ssi_dbg, struct device *dev);
++
++void fsl_ssi_debugfs_remove(struct fsl_ssi_dbg *ssi_dbg);
++
++#else
++
++struct fsl_ssi_dbg {
++};
++
++static inline void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *stats, u32 sisr)
++{
++}
++
++static inline int fsl_ssi_debugfs_create(struct fsl_ssi_dbg *ssi_dbg,
++		struct device *dev)
++{
++	return 0;
++}
++
++static inline void fsl_ssi_debugfs_remove(struct fsl_ssi_dbg *ssi_dbg)
++{
++}
++#endif  /* ! IS_ENABLED(CONFIG_DEBUG_FS) */
++
++#endif
+diff --git a/sound/soc/fsl/fsl_ssi_dbg.c b/sound/soc/fsl/fsl_ssi_dbg.c
+new file mode 100644
+index 0000000..5469ffb
+--- /dev/null
++++ b/sound/soc/fsl/fsl_ssi_dbg.c
+@@ -0,0 +1,163 @@
++/*
++ * Freescale SSI ALSA SoC Digital Audio Interface (DAI) debugging functions
++ *
++ * Copyright 2014 Markus Pargmann <mpa@pengutronix.de>, Pengutronix
++ *
++ * Splitted from fsl_ssi.c
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <linux/debugfs.h>
++#include <linux/device.h>
++#include <linux/kernel.h>
++
++#include "fsl_ssi.h"
++
++void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *dbg, u32 sisr)
++{
++	if (sisr & CCSR_SSI_SISR_RFRC)
++		dbg->stats.rfrc++;
++
++	if (sisr & CCSR_SSI_SISR_TFRC)
++		dbg->stats.tfrc++;
++
++	if (sisr & CCSR_SSI_SISR_CMDAU)
++		dbg->stats.cmdau++;
++
++	if (sisr & CCSR_SSI_SISR_CMDDU)
++		dbg->stats.cmddu++;
++
++	if (sisr & CCSR_SSI_SISR_RXT)
++		dbg->stats.rxt++;
++
++	if (sisr & CCSR_SSI_SISR_RDR1)
++		dbg->stats.rdr1++;
++
++	if (sisr & CCSR_SSI_SISR_RDR0)
++		dbg->stats.rdr0++;
++
++	if (sisr & CCSR_SSI_SISR_TDE1)
++		dbg->stats.tde1++;
++
++	if (sisr & CCSR_SSI_SISR_TDE0)
++		dbg->stats.tde0++;
++
++	if (sisr & CCSR_SSI_SISR_ROE1)
++		dbg->stats.roe1++;
++
++	if (sisr & CCSR_SSI_SISR_ROE0)
++		dbg->stats.roe0++;
++
++	if (sisr & CCSR_SSI_SISR_TUE1)
++		dbg->stats.tue1++;
++
++	if (sisr & CCSR_SSI_SISR_TUE0)
++		dbg->stats.tue0++;
++
++	if (sisr & CCSR_SSI_SISR_TFS)
++		dbg->stats.tfs++;
++
++	if (sisr & CCSR_SSI_SISR_RFS)
++		dbg->stats.rfs++;
++
++	if (sisr & CCSR_SSI_SISR_TLS)
++		dbg->stats.tls++;
++
++	if (sisr & CCSR_SSI_SISR_RLS)
++		dbg->stats.rls++;
++
++	if (sisr & CCSR_SSI_SISR_RFF1)
++		dbg->stats.rff1++;
++
++	if (sisr & CCSR_SSI_SISR_RFF0)
++		dbg->stats.rff0++;
++
++	if (sisr & CCSR_SSI_SISR_TFE1)
++		dbg->stats.tfe1++;
++
++	if (sisr & CCSR_SSI_SISR_TFE0)
++		dbg->stats.tfe0++;
++}
++
++/* Show the statistics of a flag only if its interrupt is enabled.  The
++ * compiler will optimze this code to a no-op if the interrupt is not
++ * enabled.
++ */
++#define SIER_SHOW(flag, name) \
++	do { \
++		if (CCSR_SSI_SIER_##flag) \
++			seq_printf(s, #name "=%u\n", ssi_dbg->stats.name); \
++	} while (0)
++
++
++/**
++ * fsl_sysfs_ssi_show: display SSI statistics
++ *
++ * Display the statistics for the current SSI device.  To avoid confusion,
++ * we only show those counts that are enabled.
++ */
++static int fsl_ssi_stats_show(struct seq_file *s, void *unused)
++{
++	struct fsl_ssi_dbg *ssi_dbg = s->private;
++
++	SIER_SHOW(RFRC_EN, rfrc);
++	SIER_SHOW(TFRC_EN, tfrc);
++	SIER_SHOW(CMDAU_EN, cmdau);
++	SIER_SHOW(CMDDU_EN, cmddu);
++	SIER_SHOW(RXT_EN, rxt);
++	SIER_SHOW(RDR1_EN, rdr1);
++	SIER_SHOW(RDR0_EN, rdr0);
++	SIER_SHOW(TDE1_EN, tde1);
++	SIER_SHOW(TDE0_EN, tde0);
++	SIER_SHOW(ROE1_EN, roe1);
++	SIER_SHOW(ROE0_EN, roe0);
++	SIER_SHOW(TUE1_EN, tue1);
++	SIER_SHOW(TUE0_EN, tue0);
++	SIER_SHOW(TFS_EN, tfs);
++	SIER_SHOW(RFS_EN, rfs);
++	SIER_SHOW(TLS_EN, tls);
++	SIER_SHOW(RLS_EN, rls);
++	SIER_SHOW(RFF1_EN, rff1);
++	SIER_SHOW(RFF0_EN, rff0);
++	SIER_SHOW(TFE1_EN, tfe1);
++	SIER_SHOW(TFE0_EN, tfe0);
++
++	return 0;
++}
++
++static int fsl_ssi_stats_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, fsl_ssi_stats_show, inode->i_private);
++}
++
++static const struct file_operations fsl_ssi_stats_ops = {
++	.open = fsl_ssi_stats_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++int fsl_ssi_debugfs_create(struct fsl_ssi_dbg *ssi_dbg, struct device *dev)
++{
++	ssi_dbg->dbg_dir = debugfs_create_dir(dev_name(dev), NULL);
++	if (!ssi_dbg->dbg_dir)
++		return -ENOMEM;
++
++	ssi_dbg->dbg_stats = debugfs_create_file("stats", S_IRUGO,
++			ssi_dbg->dbg_dir, ssi_dbg, &fsl_ssi_stats_ops);
++	if (!ssi_dbg->dbg_stats) {
++		debugfs_remove(ssi_dbg->dbg_dir);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++void fsl_ssi_debugfs_remove(struct fsl_ssi_dbg *ssi_dbg)
++{
++	debugfs_remove(ssi_dbg->dbg_stats);
++	debugfs_remove(ssi_dbg->dbg_dir);
++}
 -- 
 1.9.0
