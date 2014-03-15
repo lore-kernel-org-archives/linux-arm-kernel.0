@@ -1,20 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 14 Mar 2014 22:39:25 -0400 (EDT)
-Subject: [PATCH] net: phy: fix uninitalized ethtool_wolinfo in phy_suspend
-In-Reply-To: <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20140313.153832.967564223480298567.davem@davemloft.net>
- <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140314.223925.1612925351139021751.davem@davemloft.net>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Fri, 14 Mar 2014 20:27:12 -0700
+Subject: [PATCH v4 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <201403141307.23286.arnd@arndb.de>
+References: <1394085963-27553-1-git-send-email-tinamdar@apm.com>
+ <1394085963-27553-3-git-send-email-tinamdar@apm.com>
+ <201403141307.23286.arnd@arndb.de>
+Message-ID: <CACoXjc=t1SuyE5jzHjGk7eNUjVCNW9_iqOTru8PQ191h=pP1sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Fri, 14 Mar 2014 10:07:44 +0100
+On Fri, Mar 14, 2014 at 5:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 06 March 2014, Tanmay Inamdar wrote:
+>> +             pcie0: pcie at 1f2b0000 {
+>> +                     status = "disabled";
+>> +                     device_type = "pci";
+>> +                     compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+>> +                     #interrupt-cells = <1>;
+>> +                     #size-cells = <2>;
+>> +                     #address-cells = <3>;
+>> +                     reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+>> +                             0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+>> +                     reg-names = "csr", "cfg";
+>> +                     ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+>> +                               0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
+>> +                     dma-ranges = <0x42000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000>;
+>> +                     interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+>> +                     interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1
+>> +                                      0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x1
+>> +                                      0x0 0x0 0x0 0x3 &gic 0x0 0xc4 0x1
+>> +                                      0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
+>> +                     clocks = <&pcie0clk 0>;
+>> +             };
+>
+> Is 0x40.0x00000000 the start of your RAM? I had expected RAM to start at 0.0,
+> and in that case the dma-ranges property would be wrong.
 
-> Callers of phy_ethtool_get_wol are supposed to provide a properly
-> cleared struct ethtool_wolinfo. Therefore, fix phy_suspend to clear
-> it before passing it to phy_ethtool_get_wol.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+RAM starting address is 0x40_00000000.
 
-Applied, thanks.
+>
+>         Arnd
+> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
+> is for the sole use of the intended recipient(s) and contains information
+> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
+> It is to be used solely for the purpose of furthering the parties' business relationship.
+> All unauthorized review, use, disclosure or distribution is prohibited.
+> If you are not the intended recipient, please contact the sender by reply e-mail
+> and destroy all copies of the original message.
+>
