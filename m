@@ -1,49 +1,74 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 15 Mar 2014 16:04:54 +0100
-Subject: [PATCH v2 2/2] irqchip: sun4i: simplify sun4i_irq_ack
+Date: Sat, 15 Mar 2014 16:04:53 +0100
+Subject: [PATCH v2 1/2] irqchip: sun4i: Use handle_fasteoi_irq for all
+ interrupts
 In-Reply-To: <1394895894-8891-1-git-send-email-hdegoede@redhat.com>
 References: <1394895894-8891-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1394895894-8891-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1394895894-8891-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we only ack irq 0 the code can be simplified a lot.
+Since the sun4i irq chip does not require any action and clears the interrupt
+when the level goes back to inactive, we don't need to mask / unmask for
+non oneshot IRQs, to achieve this we make sun4i_irq_ack a nop for all irqs
+except irq 0 and use handle_fasteoi_irq for all interrupts.
 
-Also switch from read / modify / write to a simple write clear:
-1) This is what the android code does (it has a hack for acking irq 0
-  in its unmask code doing this)
-2) read / modify / write simply does not make sense for an irq status
-  register like this, if the other bits are writeable (and the data sheet says
-  they are not) they should be write 1 to clear, since otherwise a read /
-  modify / write can race with a device raising an interrupt and then clear
-  the pending bit unintentionally
+Now there might be a case when the device reactivates the interrupt
+before the RETI. But that does not matter as we run the primary
+interrupt handlers with interrupts disabled.
+
+This also allows us to get rid of needing to use 2 irq_chip structs, this
+means that the IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED will now influence
+all interrupts rather then just irq 0, but that does not matter as the eoi
+is now a nop anyways for all interrupts but irq 0.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/irqchip/irq-sun4i.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/irqchip/irq-sun4i.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index 6a8c88d..75615b5 100644
+index a0ed1ea..6a8c88d 100644
 --- a/drivers/irqchip/irq-sun4i.c
 +++ b/drivers/irqchip/irq-sun4i.c
-@@ -41,16 +41,11 @@ static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *re
- static void sun4i_irq_ack(struct irq_data *irqd)
+@@ -45,6 +45,9 @@ static void sun4i_irq_ack(struct irq_data *irqd)
+ 	int reg = irq / 32;
+ 	u32 val;
+ 
++	if (irq != 0)
++		return; /* Only IRQ 0 / the ENMI needs to be acked */
++
+ 	val = readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
+ 	writel(val | (1 << irq_off),
+ 	       sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
+@@ -76,13 +79,6 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+ 
+ static struct irq_chip sun4i_irq_chip = {
+ 	.name		= "sun4i_irq",
+-	.irq_mask	= sun4i_irq_mask,
+-	.irq_unmask	= sun4i_irq_unmask,
+-};
+-
+-/* IRQ 0 / the ENMI needs a late eoi call */
+-static struct irq_chip sun4i_irq_chip_enmi = {
+-	.name		= "sun4i_irq",
+ 	.irq_eoi	= sun4i_irq_ack,
+ 	.irq_mask	= sun4i_irq_mask,
+ 	.irq_unmask	= sun4i_irq_unmask,
+@@ -92,13 +88,7 @@ static struct irq_chip sun4i_irq_chip_enmi = {
+ static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
+ 			 irq_hw_number_t hw)
  {
- 	unsigned int irq = irqd_to_hwirq(irqd);
--	unsigned int irq_off = irq % 32;
--	int reg = irq / 32;
--	u32 val;
+-	if (hw == 0)
+-		irq_set_chip_and_handler(virq, &sun4i_irq_chip_enmi,
+-					 handle_fasteoi_irq);
+-	else
+-		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
+-					 handle_level_irq);
+-
++	irq_set_chip_and_handler(virq, &sun4i_irq_chip, handle_fasteoi_irq);
+ 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
  
- 	if (irq != 0)
- 		return; /* Only IRQ 0 / the ENMI needs to be acked */
- 
--	val = readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
--	writel(val | (1 << irq_off),
--	       sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-+	writel(BIT(0), sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0));
- }
- 
- static void sun4i_irq_mask(struct irq_data *irqd)
+ 	return 0;
 -- 
 1.9.0
