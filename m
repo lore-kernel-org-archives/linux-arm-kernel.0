@@ -1,106 +1,62 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 15 Mar 2014 09:22:40 +0400
-Subject: [PATCH] ARM: dts: imx27-phytec-phycore-rdk: Add display support
-Message-ID: <1394860960-3643-1-git-send-email-shc_work@mail.ru>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Sat, 15 Mar 2014 14:39:04 +0900
+Subject: [PATCH v5 0/4] arm64: prerequisites for audit and ftrace
+In-Reply-To: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds FB, Sharp-LQ035Q7 display (add-on module) and
-corresponded pinctrl devicetree nodes to the Phytec PCM970 RDK.
+This patchset contains some patches commonly applied for audit and ftrace.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 64 ++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+Patch [1/4] defines syscall trace related TIF_* flags in order to add hooks,
+including ftrace, audit and seccomp, later on.  Those features will be
+implemented in separate patchsets, but it's safe to check for all TIF_*
+now because they can not be turned on anyway.
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 86510ed..2e670c5 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -12,6 +12,27 @@
- / {
- 	model = "Phytec pcm970";
- 	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
-+
-+	display0: LQ035Q7 {
-+		model = "Sharp-LQ035Q7";
-+		native-mode = <&timing0>;
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xf00080c0>;
-+
-+		display-timings {
-+			timing0: 240x320 {
-+				clock-frequency = <5500000>;
-+				hactive = <240>;
-+				vactive = <320>;
-+				hback-porch = <5>;
-+				hsync-len = <7>;
-+				hfront-porch = <16>;
-+				vback-porch = <7>;
-+				vsync-len = <1>;
-+				vfront-porch = <9>;
-+			};
-+		};
-+	};
- };
- 
- &cspi1 {
-@@ -21,6 +42,17 @@
- 		   <&gpio4 27 GPIO_ACTIVE_LOW>;
- };
- 
-+&fb {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_imxfb1>;
-+	display = <&display0>;
-+	lcd-supply = <&reg_5v0>;
-+	fsl,dmacr = <0x00020010>;
-+	fsl,lscr1 = <0x00120300>;
-+	fsl,lpccr = <0x00a903ff>;
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <400000>;
- 	pinctrl-names = "default";
-@@ -43,6 +75,38 @@
- 			>;
- 		};
- 
-+		pinctrl_imxfb1: imxfbgrp {
-+			fsl,pins = <
-+				MX27_PAD_LD0__LD0 0x0
-+				MX27_PAD_LD1__LD1 0x0
-+				MX27_PAD_LD2__LD2 0x0
-+				MX27_PAD_LD3__LD3 0x0
-+				MX27_PAD_LD4__LD4 0x0
-+				MX27_PAD_LD5__LD5 0x0
-+				MX27_PAD_LD6__LD6 0x0
-+				MX27_PAD_LD7__LD7 0x0
-+				MX27_PAD_LD8__LD8 0x0
-+				MX27_PAD_LD9__LD9 0x0
-+				MX27_PAD_LD10__LD10 0x0
-+				MX27_PAD_LD11__LD11 0x0
-+				MX27_PAD_LD12__LD12 0x0
-+				MX27_PAD_LD13__LD13 0x0
-+				MX27_PAD_LD14__LD14 0x0
-+				MX27_PAD_LD15__LD15 0x0
-+				MX27_PAD_LD16__LD16 0x0
-+				MX27_PAD_LD17__LD17 0x0
-+				MX27_PAD_CLS__CLS 0x0
-+				MX27_PAD_CONTRAST__CONTRAST 0x0
-+				MX27_PAD_LSCLK__LSCLK 0x0
-+				MX27_PAD_OE_ACD__OE_ACD 0x0
-+				MX27_PAD_PS__PS 0x0
-+				MX27_PAD_REV__REV 0x0
-+				MX27_PAD_SPL_SPR__SPL_SPR 0x0
-+				MX27_PAD_HSYNC__HSYNC 0x0
-+				MX27_PAD_VSYNC__VSYNC 0x0
-+			>;
-+		};
-+
- 		pinctrl_i2c1: i2c1grp {
- 			/* Add pullup to DATA line */
- 			fsl,pins = <
+Patch [2/4] doesn't change a behavior but make it easy and manageable to
+confirm we invoke those hooks in correct order by splitting syscall_trace().
+
+Patch [3/4] adds a commonly used function, which returns a return value of
+system call.
+
+Patch [4/4] removes is_compat_task from asm/compat.h to avoid conflicted
+definitions.
+
+Changes v4 -> v5:
+* added the following patch from my seccomp patch since it is required for
+  audit and ftrace in case of !COMPAT, too. [4/4]
+  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+
+Changes v3 -> v4:
+* added "arm64: split syscall_trace() into separate functions for enter/
+  exit", which is just a preparation for adding syscall trace hooks later.
+
+Changes v2 -> v3:
+* reverted a change in syscall_trace() in v1 [1/2]
+* added "arm64: Add regs_return_value() in syscall.h" patch which was
+  previously included in audit patch [2/2]
+
+Changes v1 -> v2:
+* added a guard against TIF_SYSCALL_TRACE at tracehook_report_syscall_*()
+* renamed _TIF_WORK_SYSCALL to _TIF_SYSCALL_WORK
+
+AKASHI Takahiro (4):
+  arm64: make a single hook to syscall_trace() for all syscall features
+  arm64: split syscall_trace() into separate functions for enter/exit
+  arm64: Add regs_return_value() in syscall.h
+  arm64: is_compat_task is defined both in asm/compat.h and
+    linux/compat.h
+
+ arch/arm64/include/asm/compat.h      |  5 ----
+ arch/arm64/include/asm/ptrace.h      |  5 ++++
+ arch/arm64/include/asm/thread_info.h | 13 +++++++++
+ arch/arm64/kernel/entry.S            | 15 +++++------
+ arch/arm64/kernel/hw_breakpoint.c    |  2 +-
+ arch/arm64/kernel/process.c          |  1 +
+ arch/arm64/kernel/ptrace.c           | 51 +++++++++++++++++++++---------------
+ arch/arm64/kernel/signal.c           |  2 +-
+ 8 files changed, 58 insertions(+), 36 deletions(-)
+
 -- 
 1.8.3.2
