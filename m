@@ -1,87 +1,89 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sat, 15 Mar 2014 16:43:43 +0100
-Subject: [PATCH v2 6/8] ARM: sunxi: dt: Add x-powers-axp209.dtsi file
+Date: Sat, 15 Mar 2014 16:43:44 +0100
+Subject: [PATCH v2 7/8] ARM: sun7i: dt: Add AXP209 support to various boards
 In-Reply-To: <1394898225-28452-1-git-send-email-carlo@caione.org>
 References: <1394898225-28452-1-git-send-email-carlo@caione.org>
-Message-ID: <1394898225-28452-7-git-send-email-carlo@caione.org>
+Message-ID: <1394898225-28452-8-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This dtsi describes the axp209 PMIC, and is to be included from inside
-the i2c controller node to which the axp209 is connected.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/boot/dts/x-powers-axp209.dtsi | 60 ++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 arch/arm/boot/dts/x-powers-axp209.dtsi
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 12 ++++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 13 +++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 12 ++++++++++++
+ 3 files changed, 37 insertions(+)
 
-diff --git a/arch/arm/boot/dts/x-powers-axp209.dtsi b/arch/arm/boot/dts/x-powers-axp209.dtsi
-new file mode 100644
-index 0000000..d272e67
---- /dev/null
-+++ b/arch/arm/boot/dts/x-powers-axp209.dtsi
-@@ -0,0 +1,60 @@
-+/*
-+ * x-powers,axp209 common code to be include from inside the axp209 node
-+ *
-+ * Copyright 2014 - Carlo Caione <carlo@caione.org>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 5c51cb8..9ad7da5 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -53,6 +53,18 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+	compatible = "x-powers,axp209";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
++			axp: axp20x at 34 {
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+	regulators {
-+		dcdc-freq = "1500";
++				axp,system-power-controller;
 +
-+		axp_dcdc2: dcdc2 {
-+			regulator-min-microvolt = <700000>;
-+			regulator-max-microvolt = <2275000>;
-+			dcdc-workmode = <0>;
-+			regulator-always-on;
-+		};
++				/include/ "x-powers-axp209.dtsi"
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index f9dcb61..aab77f9 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -38,6 +38,19 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+		axp_dcdc3: dcdc3 {
-+			regulator-min-microvolt = <700000>;
-+			regulator-max-microvolt = <3500000>;
-+			dcdc-workmode = <0>;
-+			regulator-always-on;
-+		};
++			axp: axp20x at 34 {
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+		axp_ldo1: ldo1 {
-+			regulator-min-microvolt = <1300000>;
-+			regulator-max-microvolt = <1300000>;
-+		};
++				axp,system-power-controller;
 +
-+		axp_ldo2: ldo2 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
++				/include/ "x-powers-axp209.dtsi"
++			};
 +
-+		axp_ldo3: ldo3 {
-+			regulator-min-microvolt = <700000>;
-+			regulator-max-microvolt = <3500000>;
-+		};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index ead3013..a5fe5d0 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -65,6 +65,18 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+		axp_ldo4: ldo4 {
-+			regulator-min-microvolt = <1250000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
++			axp: axp20x at 34 {
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+		axp_ldo5: ldo5 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
++				axp,system-power-controller;
++
++				/include/ "x-powers-axp209.dtsi"
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
 -- 
 1.8.3.2
