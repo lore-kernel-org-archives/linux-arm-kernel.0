@@ -1,55 +1,20 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 14 Mar 2014 21:21:00 -0500
-Subject: [PATCH 3/3] ARM: OMAP2+: Add machine entry for dra72x devices
-In-Reply-To: <1394788841-15112-4-git-send-email-rnayak@ti.com>
-References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
- <1394788841-15112-4-git-send-email-rnayak@ti.com>
-Message-ID: <5323B90C.80803@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 14 Mar 2014 22:39:25 -0400 (EDT)
+Subject: [PATCH] net: phy: fix uninitalized ethtool_wolinfo in phy_suspend
+In-Reply-To: <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20140313.153832.967564223480298567.davem@davemloft.net>
+ <1394788064-6832-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140314.223925.1612925351139021751.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Fri, 14 Mar 2014 10:07:44 +0100
 
-On 03/14/2014 04:20 AM, Nayak, Rajendra wrote:
-> The only difference from the dra75x devices is the missing .smp entry.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 8e3daa1..d803d99 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -253,4 +253,22 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
->   	.dt_compat	= dra7xx_boards_compat,
->   	.restart	= omap44xx_restart,
->   MACHINE_END
-> +
-> +static const char *dra72_boards_compat[] __initdata = {
+> Callers of phy_ethtool_get_wol are supposed to provide a properly
+> cleared struct ethtool_wolinfo. Therefore, fix phy_suspend to clear
+> it before passing it to phy_ethtool_get_wol.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-How about using dra72x_ instead of dra72_ and keeping it consistent
-at the other places as well?
-
-regards
-Suman
-
-> +	"ti,dra72x",
-> +	"ti,dra7",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(DRA72_DT, "Generic DRA72 (Flattened Device Tree)")
-> +	.reserve	= omap_reserve,
-> +	.map_io		= omap5_map_io,
-> +	.init_early	= dra7xx_init_early,
-> +	.init_late	= dra7xx_init_late,
-> +	.init_irq	= omap_gic_of_init,
-> +	.init_machine	= omap_generic_init,
-> +	.init_time	= omap5_realtime_timer_init,
-> +	.dt_compat	= dra72_boards_compat,
-> +	.restart	= omap44xx_restart,
-> +MACHINE_END
->   #endif
->
+Applied, thanks.
