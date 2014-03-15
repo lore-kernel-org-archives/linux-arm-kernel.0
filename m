@@ -1,52 +1,45 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 15 Mar 2014 14:07:44 +0100
-Subject: [PATCH v2 5/5] arm: dts: am33xx, Add device node for cpsw-ctrl-macid
-In-Reply-To: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
-References: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1394888864-11007-6-git-send-email-mpa@pengutronix.de>
+Date: Sat, 15 Mar 2014 14:07:39 +0100
+Subject: [PATCH v2 0/5] net: cpsw: Support for am335x chip MACIDs
+Message-ID: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpsw-ctrl-macid to the am33xx dtsi file. It does not change the
-behaviour of boards with a provided mac-address, so it is safe to add it
-for all boards with this CPU.
+Hi,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/am33xx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+This series introduces a driver to read and use the MACIDs stored in the am335x
+control module. These are read-only registers for a unique MACID. At the moment
+the MACIDs are generated randomly when the mac-address property is not a valid
+mac address.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 6d95d3d..5aff257 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -690,11 +690,13 @@
- 			cpsw_emac0: slave at 4a100200 {
- 				/* Filled in by U-Boot */
- 				mac-address = [ 00 00 00 00 00 00 ];
-+				ti,mac-address-ctrl = <&cpsw_ctrl_macid 0>;
- 			};
- 
- 			cpsw_emac1: slave at 4a100300 {
- 				/* Filled in by U-Boot */
- 				mac-address = [ 00 00 00 00 00 00 ];
-+				ti,mac-address-ctrl = <&cpsw_ctrl_macid 1>;
- 			};
- 
- 			phy_sel: cpsw-phy-sel at 44e10650 {
-@@ -702,6 +704,13 @@
- 				reg= <0x44e10650 0x4>;
- 				reg-names = "gmii-sel";
- 			};
-+
-+			cpsw_ctrl_macid: cpsw-ctrl-macid at 44e10630 {
-+				compatible = "ti,am3352-cpsw-ctrl-macid";
-+				#ti,mac-address-ctrl-cells = <1>;
-+				reg = <0x44e10630 0x10>;
-+				reg-names = "ctrl-macid";
-+			};
- 		};
- 
- 		ocmcram: ocmcram at 40300000 {
+In v2 I changed the precedence of mac-address and this driver. This driver is
+only used when no mac-address was set by the bootloader. This way we can avoid
+using random MAC addresses.  There are other minor style and documentation
+fixes in v2.
+
+Best regards,
+
+Markus
+
+
+Markus Pargmann (5):
+  net: cpsw: document mac-address being optional
+  net: cpsw: make cpsw.h self-contained
+  net: cpsw: Add control-module macid driver
+  net: cpsw: Use cpsw-ctrl-macid driver
+  arm: dts: am33xx, Add device node for cpsw-ctrl-macid
+
+ .../devicetree/bindings/net/cpsw-ctrl-macid.txt    |  32 +++++
+ Documentation/devicetree/bindings/net/cpsw.txt     |   8 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |   9 ++
+ drivers/net/ethernet/ti/Kconfig                    |   1 +
+ drivers/net/ethernet/ti/Makefile                   |   2 +-
+ drivers/net/ethernet/ti/cpsw-ctrl-macid.c          | 138 +++++++++++++++++++++
+ drivers/net/ethernet/ti/cpsw.c                     |  16 ++-
+ drivers/net/ethernet/ti/cpsw.h                     |   3 +
+ 8 files changed, 204 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/cpsw-ctrl-macid.txt
+ create mode 100644 drivers/net/ethernet/ti/cpsw-ctrl-macid.c
+
 -- 
 1.9.0
