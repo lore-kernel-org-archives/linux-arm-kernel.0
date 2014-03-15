@@ -1,42 +1,102 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 15 Mar 2014 16:43:45 +0100
-Subject: [PATCH v2 8/8] ARM: sunxi: Add AXP20x support in defconfig
-In-Reply-To: <1394898225-28452-1-git-send-email-carlo@caione.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 15 Mar 2014 16:45:08 +0100
+Subject: [PATCH v2 7/8] ARM: sun7i: dt: Add AXP209 support to various
+ boards
+In-Reply-To: <1394898225-28452-8-git-send-email-carlo@caione.org>
 References: <1394898225-28452-1-git-send-email-carlo@caione.org>
-Message-ID: <1394898225-28452-9-git-send-email-carlo@caione.org>
+ <1394898225-28452-8-git-send-email-carlo@caione.org>
+Message-ID: <53247584.8060701@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/configs/sunxi_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi,
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 3e2259b..0cef101 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -39,6 +39,8 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_AXP20X_PEK=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=8
-@@ -52,6 +54,7 @@ CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
-+CONFIG_MFD_AXP20X=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -66,3 +69,4 @@ CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_REGULATOR_AXP20X=y
--- 
-1.8.3.2
+Thanks for your continued work on this.
+
+On 03/15/2014 04:43 PM, Carlo Caione wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 12 ++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 13 +++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 12 ++++++++++++
+>  3 files changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> index 5c51cb8..9ad7da5 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> @@ -53,6 +53,18 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&i2c0_pins_a>;
+>  			status = "okay";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			axp: axp20x at 34 {
+> +				reg = <0x34>;
+> +				interrupt-parent = <&nmi_intc>;
+> +				interrupts = <0 8>;
+> +
+> +				axp,system-power-controller;
+
+Shouldn't this be dropped now (all 3 of them) ?
+
+Regards,
+
+Hans
+
+> +
+> +				/include/ "x-powers-axp209.dtsi"
+> +			};
+>  		};
+>  
+>  		i2c1: i2c at 01c2b000 {
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index f9dcb61..aab77f9 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -38,6 +38,19 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&i2c0_pins_a>;
+>  			status = "okay";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			axp: axp20x at 34 {
+> +				reg = <0x34>;
+> +				interrupt-parent = <&nmi_intc>;
+> +				interrupts = <0 8>;
+> +
+> +				axp,system-power-controller;
+> +
+> +				/include/ "x-powers-axp209.dtsi"
+> +			};
+> +
+>  		};
+>  
+>  		i2c1: i2c at 01c2b000 {
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> index ead3013..a5fe5d0 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> @@ -65,6 +65,18 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&i2c0_pins_a>;
+>  			status = "okay";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			axp: axp20x at 34 {
+> +				reg = <0x34>;
+> +				interrupt-parent = <&nmi_intc>;
+> +				interrupts = <0 8>;
+> +
+> +				axp,system-power-controller;
+> +
+> +				/include/ "x-powers-axp209.dtsi"
+> +			};
+>  		};
+>  
+>  		i2c1: i2c at 01c2b000 {
+> 
