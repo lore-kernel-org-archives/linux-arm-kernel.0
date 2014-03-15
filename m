@@ -1,23 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Mar 2014 10:37:12 +0100
-Subject: [PATCH] PHY: Exynos: fix SATA phy license typo
-Message-ID: <201403151037.12694.arnd@arndb.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 15 Mar 2014 11:01:10 +0100
+Subject: [PATCH v3] net: phy: fix uninitalized WOL parameters in
+ phy_ethtool_get_wol
+In-Reply-To: <20140313.153832.967564223480298567.davem@davemloft.net>
+References: <1394484661-4554-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1394578975-12588-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140313.153832.967564223480298567.davem@davemloft.net>
+Message-ID: <532424E6.3000706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the license string doesn't match exactly, the module refuses to load.
+On 03/13/2014 08:38 PM, David Miller wrote:
+> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Date: Wed, 12 Mar 2014 00:02:55 +0100
+[...]
+>> To fix this, always zero relevant fields of struct ethtool_wolinfo
+>> regardless of .get_wol callback availability.
+[...]
+> I'm starting to see this situation more clearly now, especially with
+> Ben's most recent commentary.
+>
+> The basic notion is that one must do ethtool ops are designed such that
+> the top-level execution context in net/core/ethtool.c takes care of
+> initializing the structure.
+>
+> In this case, we're referring specifically to ethtool_get_wol(), which
+> runs any time ETHTOOL_GWOL is requested.
+>
+> Therefore no ethtool_ops->get_wol() implementation should duplicate
+> this work, that goes for all of such cases which invoke the function
+> we are talking about here, phy_ethtool_get_wol().
+>
+> So the first change is definitely to remove:
+>
+> 	wol->supported = 0;
+> 	wol->wolopts = 0;
+>
+> from:
+>
+> drivers/net/ethernet/marvell/mv643xx_eth.c:mv643xx_eth_get_wol()
+> drivers/net/ethernet/ti/cpsw.c:cpsw_get_wol()
+>
+[...]
+>
+> Finally, purge the spurious clears in phydev_ops->get_wol(), namely
+> in at803x_get_wol() and m88e1318_get_wol().
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+David,
 
-diff --git a/drivers/phy/phy-exynos5250-sata.c b/drivers/phy/phy-exynos5250-sata.c
-index c9361b7..0568945 100644
---- a/drivers/phy/phy-exynos5250-sata.c
-+++ b/drivers/phy/phy-exynos5250-sata.c
-@@ -246,6 +246,6 @@ static struct platform_driver exynos_sata_phy_driver = {
- module_platform_driver(exynos_sata_phy_driver);
- 
- MODULE_DESCRIPTION("Samsung SerDes PHY driver");
--MODULE_LICENSE("GPL V2");
-+MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Girish K S <ks.giri@samsung.com>");
- MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
+I was preparing cleanups for mv643xx_eth, cpsw, at803x, and mv88e1318.
+
+Out of curiosity, I did a
+
+git grep "wol->" drivers/net/ | grep "= 0" | wc -l
+29
+
+and found some other "spurious clears" ;)
+
+I can go that road and remove/rework all those clears. Some are really
+easy, some would require some more rework (e.g. e1000).
+
+Of course, a lot of those drivers then will need a Tested-by, as I
+don't have the HW available.
+
+> So, to reiterate, OPS never have to be mindful of initializing the
+> ethtool result with zeros.  However, anyone who calls into OPS
+> directly must provide said expected state.
+
+Sebastian
