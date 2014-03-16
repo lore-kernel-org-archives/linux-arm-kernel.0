@@ -1,88 +1,45 @@
-From: lho@apm.com (Loc Ho)
-Date: Sat, 15 Mar 2014 23:17:59 -0700
-Subject: [PATCH v18 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <201403151019.49316.arnd@arndb.de>
-References: <1394841201-29495-1-git-send-email-lho@apm.com>
- <1394841201-29495-3-git-send-email-lho@apm.com>
- <1394841201-29495-4-git-send-email-lho@apm.com>
- <201403151019.49316.arnd@arndb.de>
-Message-ID: <CAPw-ZTksg3z8GY55jb7-yP1wfq2BF6apB9KBgbokpshKbiiAaw@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 16 Mar 2014 17:22:26 +1100
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <201403142010.39886.arnd@arndb.de>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <201403141838.08900.arnd@arndb.de>
+ <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
+ <201403142010.39886.arnd@arndb.de>
+Message-ID: <1394950946.15098.111.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2014-03-14 at 20:10 +0100, Arnd Bergmann wrote:
+> > As for the other two functions, I've no special attachment to where they are present
+> > and I'm happy to move them into drivers/pci on the condition that the patchset doesn't
+> > double in size. The reason why I'm weary of touching other architectures in a significant
+> > way is the current lack of engineering bandwidth and way of testing all the architectures.
+> > My low friction approach has been to introduce them in arm64 and then slowly move them
+> > into core (and yes, I know about good intentions and the road to hell.)
+> 
+> I think everyone working on PCI is fed up with having arch-specific implementations
+> of all these, and Bjorn has been very supportive of generic infrastructure in the
+> past. Even just adding a generic infrastructure in a common place that is used
+> only by one architecture in my mind would be a significant improvement.
 
->> This patch adds support for the APM X-Gene SoC AHCI SATA host controller
->> driver. It requires the corresponding APM X-Gene SoC PHY driver. This
->> initial version only supports Gen3 speed.
->
-> This version seems workable, thanks for the quick follow-up.
->
-> The comment about Gen3 speed above reminds me that you took some
-> shortcuts to get here and you removed support for some features
-> as well as some bug workarounds in the process. I'm guessing some
-> of them won't be necessary because they are only for prototype
-> hardware or for early boot loader versions that don't yet set up
-> the hardware right, but others actually need to come back.
->
-> That is usually a good approach, but I'd also like to make sure we can
-> deal with them nicely when you have to add them back later, and don't
-> have to add ugly extensions to the DT binding to support the old dtb
-> files.
->
-> Can you list (also in the changelog) the parts of the driver that you
-> have taken out for now and that you expect to add back at later
-> stage? I think that would be helpful for perspective.
->
+I agree, it's a reasonable approach and microblaze which is simple and just "copied"
+powerpc originally would be a good one to move over as well.
 
-Here is an list of patches that we will be preparing for once the
-basic driver is completed. Do you want me to re-generate the patch
-change log with this info?
+powerpc itself has many historical quirks and while I'm interested in a common
+implementation, it will take me a bit of spare time to get through things and
+figure out what can be done there and what "hooks" might still be necessary.
 
-1. Support for Gen1/Gen2/Gen3
-Solution: The simplest solution is to have the PHY framework support
-setting the desire speed. I had argued with the TI folks but they are
-reluctant to add this function to the framework. They argued that this
-is still not generic enough. I will start the discussion again later
-on. The other possibility (but not sure if this is doable) is to have
-the PHY init function to be smarter and do the necessary operation
-assuming the underlying PHY is capable in detecting the link up speed.
-I will need to check the spec of this.
+At this point, it's mostly a matter of:
 
-2. Retry COMRESET (hardreset) if failed first time
-Solution: This code is purely in the host driver hardreset function.
-It isn't for sure that we will need this. Given our current initial
-board design, this seems to required 1 out of many, many power cycle
-boot.
+ - I'm the one who knows the most about the powerpc PCI code as I wrote large
+chunks of it
 
-3. Cleaning the receiver line when SER_DISPARITY/SER_10B_8B error
-during COMRESET (hardreset function call)
-Solution: It is observed that during COMRESET, the receiver line can
-report these errors and an clean up is required. For this, the code
-will be with in the host driver and an call into the PHY layer. The
-solution is the similar to #1 above.
+ - I'm very very very busy with some other things at the moment
 
-4. IO flush before servicing completed operations (mostly read operations)
-Solution: The read IO operations require an flush from the host
-controller hardware side. For this, we will need to change the libahci
-to call an function that is provided by the host driver if non-NULL.
+So don't take my silence on these matters as a lack of interest, I think it's
+definitely all going in the right direction, I just don't have much bandwidth
+to consider the move of powerpc over just yet.
 
-5. PM (power management) support
-Solution: Due to an errata in the host controller, stopping the
-controller requires an slightly modified version in the way it detects
-the host port completed the requested operation. For this we will have
-to introduce an AHCI_HFLAG_XXX to detect the completion of FIS_RX
-stopped by the CI register instead the PORT_CMD register or just delay
-for 500ms.
-
-> Regarding the support for multiple link speeds, how do you think
-> it will be done?
-> Can you have a driver-side link speed autoconfiguration,
-> or do you have to add DT properties and let the driver know about
-> the attached device?
->
-
-See above #1.
-
--Loc
+Cheers,
+Ben.
