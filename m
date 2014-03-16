@@ -1,10 +1,10 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 16 Mar 2014 17:49:02 +0000
-Subject: [PATCH 01/15] ARM: at91: sam9g45: remove unused platform_data
-In-Reply-To: <1394040940-18246-2-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Sun, 16 Mar 2014 17:49:30 +0000
+Subject: [PATCH 02/15] ARM: at91: sam9260: remove unused platform_data
+In-Reply-To: <1394040940-18246-3-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1394040940-18246-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5325E40E.7050501@kernel.org>
+ <1394040940-18246-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5325E42A.5000401@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,44 +16,43 @@ On 05/03/14 17:35, Alexandre Belloni wrote:
 >
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Jonathan Cameron <jic23@kernel.org>
-
 > ---
->   arch/arm/mach-at91/at91sam9g45_devices.c | 10 ----------
+>   arch/arm/mach-at91/at91sam9260_devices.c | 10 ----------
 >   1 file changed, 10 deletions(-)
 >
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 88554024eb2d..cd36009c3511 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -25,7 +25,6 @@
->   #include <linux/fb.h>
->   #include <video/atmel_lcdc.h>
->
-> -#include <mach/at91_adc.h>
->   #include <mach/at91sam9g45.h>
->   #include <mach/at91sam9g45_matrix.h>
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 0a0315920963..a299c50512f0 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -24,7 +24,6 @@
+>   #include <mach/at91sam9260_matrix.h>
 >   #include <mach/at91_matrix.h>
-> @@ -1235,13 +1234,6 @@ static struct at91_adc_trigger at91_adc_triggers[] = {
+>   #include <mach/at91sam9_smc.h>
+> -#include <mach/at91_adc.h>
+>
+>   #include "board.h"
+>   #include "generic.h"
+> @@ -1321,13 +1320,6 @@ static struct at91_adc_trigger at91_adc_triggers[] = {
 >   	},
 >   };
 >
-> -static struct at91_adc_reg_desc at91_adc_register_g45 = {
+> -static struct at91_adc_reg_desc at91_adc_register_g20 = {
 > -	.channel_base = AT91_ADC_CHR(0),
 > -	.drdy_mask = AT91_ADC_DRDY,
 > -	.status_register = AT91_ADC_SR,
-> -	.trigger_register = 0x08,
+> -	.trigger_register = AT91_ADC_MR,
 > -};
 > -
 >   void __init at91_add_device_adc(struct at91_adc_data *data)
 >   {
 >   	if (!data)
-> @@ -1267,9 +1259,7 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
+> @@ -1345,9 +1337,7 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
 >   	if (data->use_external_triggers)
->   		at91_set_A_periph(AT91_PIN_PD28, 0);
+>   		at91_set_A_periph(AT91_PIN_PA22, 0);
 >
-> -	data->num_channels = 8;
->   	data->startup_time = 40;
-> -	data->registers = &at91_adc_register_g45;
+> -	data->num_channels = 4;
+>   	data->startup_time = 10;
+> -	data->registers = &at91_adc_register_g20;
 >   	data->trigger_number = 4;
 >   	data->trigger_list = at91_adc_triggers;
 >
