@@ -1,47 +1,60 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Sun, 16 Mar 2014 18:28:29 +0100
-Subject: leds-atmel-pwm and atmel-pwm-bl removal
-In-Reply-To: <20140314194930.GF3106@piout.net>
-References: <20140314194930.GF3106@piout.net>
-Message-ID: <20140316172829.GA26439@samfundet.no>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 16 Mar 2014 17:49:02 +0000
+Subject: [PATCH 01/15] ARM: at91: sam9g45: remove unused platform_data
+In-Reply-To: <1394040940-18246-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394040940-18246-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5325E40E.7050501@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Fri 14 Mar 2014 20:49:30 +0100 or thereabout, Alexandre Belloni wrote:
-> Hi,
-> 
-> With the new generic pwm framework and the pwm-atmel driver using it, we
-> don't need leds-atmel-pwm or atmel-pwm-bl anymore. However, a few boards
-> are still using those:
-> 
-> arch/arm/mach-at91/board-sam9263ek.c
-> arch/arm/mach-at91/board-sam9m10g45ek.c
-> arch/avr32/boards/atngw100/mrmt.c
-> arch/avr32/boards/merisc/setup.c
-> arch/avr32/boards/favr-32/setup.c
-> 
-> Some other avr32 boards are compiling it as a module but don't seem to
-> make any use of it.
-> 
-> I will take care of the mach-at91 boards and I can test on those. I can
-> do the same for the avr32 boards but I won't be able to test (only
-> to compile). Is anyone of you interested in testing those changes ?
+On 05/03/14 17:35, Alexandre Belloni wrote:
+> num_channels and registers are not used anymore since they are defined inside
+> the at91_adc driver and assigned by matching the id_table.
+>
+> Also, remove the mach/at91_adc.h include that is not necessary anymore.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-mrmt.c is an addon board for NGW100 IIRC, I do not have one.
-
-favr-32 is a board I do not really recall where originated from, I do not
-have one either.
-
-> I couldn't reach the initial authors of those files...
-> 
-> Could we simply remove the driver from the avr32 boards ? I'm under the
-> impression that they don't get much interest anyway, since april 2009,
-> I only see tree wide changes and I can't believe they didn't get broken
-> a way or another.
-
-I'll be happy to accept a patch that removes the use of the non-generic
-driver, preferably compile tested.
-
--- 
-mvh
-Hans-Christian Egtvedt
+> ---
+>   arch/arm/mach-at91/at91sam9g45_devices.c | 10 ----------
+>   1 file changed, 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 88554024eb2d..cd36009c3511 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -25,7 +25,6 @@
+>   #include <linux/fb.h>
+>   #include <video/atmel_lcdc.h>
+>
+> -#include <mach/at91_adc.h>
+>   #include <mach/at91sam9g45.h>
+>   #include <mach/at91sam9g45_matrix.h>
+>   #include <mach/at91_matrix.h>
+> @@ -1235,13 +1234,6 @@ static struct at91_adc_trigger at91_adc_triggers[] = {
+>   	},
+>   };
+>
+> -static struct at91_adc_reg_desc at91_adc_register_g45 = {
+> -	.channel_base = AT91_ADC_CHR(0),
+> -	.drdy_mask = AT91_ADC_DRDY,
+> -	.status_register = AT91_ADC_SR,
+> -	.trigger_register = 0x08,
+> -};
+> -
+>   void __init at91_add_device_adc(struct at91_adc_data *data)
+>   {
+>   	if (!data)
+> @@ -1267,9 +1259,7 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
+>   	if (data->use_external_triggers)
+>   		at91_set_A_periph(AT91_PIN_PD28, 0);
+>
+> -	data->num_channels = 8;
+>   	data->startup_time = 40;
+> -	data->registers = &at91_adc_register_g45;
+>   	data->trigger_number = 4;
+>   	data->trigger_list = at91_adc_triggers;
+>
+>
