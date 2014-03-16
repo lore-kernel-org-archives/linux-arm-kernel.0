@@ -1,40 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sun, 16 Mar 2014 16:32:34 +0000
-Subject: [PATCH] xen/grant-table: Refactor gnttab_[un]map_refs to avoid
- m2p_override
-In-Reply-To: <531DF7FE.1000708@citrix.com>
-References: <1393516530-9145-1-git-send-email-zoltan.kiss@citrix.com>
- <531DF7FE.1000708@citrix.com>
-Message-ID: <alpine.DEB.2.02.1403161631580.30819@kaball.uk.xensource.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Sun, 16 Mar 2014 18:28:29 +0100
+Subject: leds-atmel-pwm and atmel-pwm-bl removal
+In-Reply-To: <20140314194930.GF3106@piout.net>
+References: <20140314194930.GF3106@piout.net>
+Message-ID: <20140316172829.GA26439@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Mar 2014, David Vrabel wrote:
-> On 27/02/14 15:55, Zoltan Kiss wrote:
-> > (This is a continuation of "[PATCH v9] xen/grant-table: Avoid m2p_override
-> > during mapping")
-> > 
-> > The grant mapping API does m2p_override unnecessarily: only gntdev needs it,
-> > for blkback and future netback patches it just cause a lock contention, as
-> > those pages never go to userspace. Therefore this series does the following:
-> > - the bulk of the original function (everything after the mapping hypercall)
-> >   is moved to arch-dependent set/clear_foreign_p2m_mapping
-> > - the "if (xen_feature(XENFEAT_auto_translated_physmap))" brach goes to ARM
-> > - therefore the ARM function could be much smaller, the m2p_override stubs
-> >   could be also removed
-> > - on x86 the set_phys_to_machine calls were moved up to this new funcion
-> >   from m2p_override functions
-> > - and m2p_override functions are only called when there is a kmap_ops param
-> > 
-> > It also removes a stray space from arch/x86/include/asm/xen/page.h.
+Around Fri 14 Mar 2014 20:49:30 +0100 or thereabout, Alexandre Belloni wrote:
+> Hi,
 > 
-> Applied to devel/for-linus-3.15.
+> With the new generic pwm framework and the pwm-atmel driver using it, we
+> don't need leds-atmel-pwm or atmel-pwm-bl anymore. However, a few boards
+> are still using those:
+> 
+> arch/arm/mach-at91/board-sam9263ek.c
+> arch/arm/mach-at91/board-sam9m10g45ek.c
+> arch/avr32/boards/atngw100/mrmt.c
+> arch/avr32/boards/merisc/setup.c
+> arch/avr32/boards/favr-32/setup.c
+> 
+> Some other avr32 boards are compiling it as a module but don't seem to
+> make any use of it.
+> 
+> I will take care of the mach-at91 boards and I can test on those. I can
+> do the same for the avr32 boards but I won't be able to test (only
+> to compile). Is anyone of you interested in testing those changes ?
 
-The patch breaks the ARM build:
+mrmt.c is an addon board for NGW100 IIRC, I do not have one.
 
-arch/arm/xen/p2m.c:152:1: error: expected identifier or '(' before '{' token
- {
- ^
-arch/arm/xen/p2m.c:169:1: error: expected identifier or '(' before '{' token
- {
- ^
+favr-32 is a board I do not really recall where originated from, I do not
+have one either.
+
+> I couldn't reach the initial authors of those files...
+> 
+> Could we simply remove the driver from the avr32 boards ? I'm under the
+> impression that they don't get much interest anyway, since april 2009,
+> I only see tree wide changes and I can't believe they didn't get broken
+> a way or another.
+
+I'll be happy to accept a patch that removes the use of the non-generic
+driver, preferably compile tested.
+
+-- 
+mvh
+Hans-Christian Egtvedt
