@@ -1,49 +1,140 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 16 Mar 2014 20:29:02 +0100
-Subject: [PATCH 00/15] iio: adc: at91 cleanups and atmel_tsadcc removal
-In-Reply-To: <5325EDAF.4060003@kernel.org>
-References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5325EDAF.4060003@kernel.org>
-Message-ID: <20140316192901.GK3106@piout.net>
+From: rgb@redhat.com (Richard Guy Briggs)
+Date: Sun, 16 Mar 2014 15:46:35 -0400
+Subject: [PATCH v5 2/4] arm64: split syscall_trace() into separate
+ functions for enter/exit
+In-Reply-To: <1394861948-28712-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394861948-28712-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140316194635.GO27244@madcap2.tricolour.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 16/03/2014 at 18:30:07 +0000, Jonathan Cameron wrote :
-> On 05/03/14 17:35, Alexandre Belloni wrote:
-> >This patch set is a followup of my previous series: iio: adc: at91 fixes
-> >
-> >I'm sorry it is so long, I made sure this is bissectable.
-> It's a nice series, don't apologise for doing things right!
+On 14/03/15, AKASHI Takahiro wrote:
+> As done in arm, this change makes it easy to confirm we invoke syscall
+> related hooks, including syscall tracepoint, audit and seccomp which would
+> be implemented later, in correct order. That is, undoing operations in the
+> opposite order on exit that they were done on entry.
 > 
-> Clearly there are a few outstanding snippets from the reviews so far, but we
-> are getting to the point where we need to agree on a path for this.  I'm
-> happy to take the whole series through the IIO tree if Dmitry and the at91
-> maintainers are happy with that.  If it is considered two invasive form the
-> atmel side then I'm perfectly happy with someone to take it through the relevant
-> platform tree instead.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+
+Minor variable mis-spelling of "scratch" noted below, but other than
+that:
+
+Acked-by: Richard Guy Briggs <rgb@redhat.com>
+
+> ---
+>  arch/arm64/kernel/entry.S  | 10 ++++------
+>  arch/arm64/kernel/ptrace.c | 50 +++++++++++++++++++++++++++-------------------
+>  2 files changed, 33 insertions(+), 27 deletions(-)
 > 
-> I'm obviously not going to pick it up at all until it has a complete set
-> of at91 maintainer acks though!
-> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f9f2cae..00d6eb9 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -649,9 +649,8 @@ ENDPROC(el0_svc)
+>  	 * switches, and waiting for our parent to respond.
+>  	 */
+>  __sys_trace:
+> -	mov	x1, sp
+> -	mov	w0, #0				// trace entry
+> -	bl	syscall_trace
+> +	mov	x0, sp
+> +	bl	syscall_trace_enter
+>  	adr	lr, __sys_trace_return		// return address
+>  	uxtw	scno, w0			// syscall number (possibly new)
+>  	mov	x1, sp				// pointer to regs
+> @@ -666,9 +665,8 @@ __sys_trace:
+>  
+>  __sys_trace_return:
+>  	str	x0, [sp]			// save returned x0
+> -	mov	x1, sp
+> -	mov	w0, #1				// trace exit
+> -	bl	syscall_trace
+> +	mov	x0, sp
+> +	bl	syscall_trace_exit
+>  	b	ret_to_user
+>  
+>  /*
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 6a8928b..f606276 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1058,35 +1058,43 @@ long arch_ptrace(struct task_struct *child, long request,
+>  	return ptrace_request(child, request, addr, data);
+>  }
+>  
+> -asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+> +enum ptrace_syscall_dir {
+> +	PTRACE_SYSCALL_ENTER = 0,
+> +	PTRACE_SYSCALL_EXIT,
+> +};
+> +
+> +static void tracehook_report_syscall(struct pt_regs *regs,
+> +				     enum ptrace_syscall_dir dir)
+>  {
+> +	int scrach;
 
-Thank you for your review.
+"scratch"
 
-I already have a v2 ready addressing the received comments. I was mostly
-waiting on your feedback and you seem happy with it. I'll send an update
-on monday with the collected acks.
+>  	unsigned long saved_reg;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> -		return regs->syscallno;
+> -
+> -	if (is_compat_task()) {
+> -		/* AArch32 uses ip (r12) for scratch */
+> -		saved_reg = regs->regs[12];
+> -		regs->regs[12] = dir;
+> -	} else {
+> -		/*
+> -		 * Save X7. X7 is used to denote syscall entry/exit:
+> -		 *   X7 = 0 -> entry, = 1 -> exit
+> -		 */
+> -		saved_reg = regs->regs[7];
+> -		regs->regs[7] = dir;
+> -	}
+> +	/*
+> +	 * A scrach register (ip(r12) on AArch32, x7 on AArch64) is
+> +	 * used to denote syscall entry/exit:
+> +	 */
+> +	scrach = (is_compat_task() ? 12 : 7);
+> +	saved_reg = regs->regs[scrach];
+> +	regs->regs[scrach] = dir;
+>  
+> -	if (dir)
+> +	if (dir == PTRACE_SYSCALL_EXIT)
+>  		tracehook_report_syscall_exit(regs, 0);
+>  	else if (tracehook_report_syscall_entry(regs))
+>  		regs->syscallno = ~0UL;
+>  
+> -	if (is_compat_task())
+> -		regs->regs[12] = saved_reg;
+> -	else
+> -		regs->regs[7] = saved_reg;
+> +	regs->regs[scrach] = saved_reg;
+> +}
+> +
+> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+> +{
+> +	if (test_thread_flag(TIF_SYSCALL_TRACE))
+> +		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>  
+>  	return regs->syscallno;
+>  }
+> +
+> +asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+> +{
+> +	if (test_thread_flag(TIF_SYSCALL_TRACE))
+> +		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
+> +}
+> -- 
+> 1.8.3.2
 
-I'll let the at91 maintainer ack it and decide on the path.
+- RGB
 
-> Realistically it's missed the coming merge window anyway, so we have a fair
-> bit of time.
-> 
-
-That's why I've separated that series from the other fixes, this was not
-as urgent.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+--
+Richard Guy Briggs <rbriggs@redhat.com>
+Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+Remote, Ottawa, Canada
+Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
