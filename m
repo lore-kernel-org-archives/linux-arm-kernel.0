@@ -1,45 +1,43 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 16 Mar 2014 17:22:26 +1100
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <201403142010.39886.arnd@arndb.de>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <201403141838.08900.arnd@arndb.de>
- <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
- <201403142010.39886.arnd@arndb.de>
-Message-ID: <1394950946.15098.111.camel@pasglop>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sun, 16 Mar 2014 04:09:17 -0300
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <20140316070917.GA3094@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-03-14 at 20:10 +0100, Arnd Bergmann wrote:
-> > As for the other two functions, I've no special attachment to where they are present
-> > and I'm happy to move them into drivers/pci on the condition that the patchset doesn't
-> > double in size. The reason why I'm weary of touching other architectures in a significant
-> > way is the current lack of engineering bandwidth and way of testing all the architectures.
-> > My low friction approach has been to introduce them in arm64 and then slowly move them
-> > into core (and yes, I know about good intentions and the road to hell.)
-> 
-> I think everyone working on PCI is fed up with having arch-specific implementations
-> of all these, and Bjorn has been very supportive of generic infrastructure in the
-> past. Even just adding a generic infrastructure in a common place that is used
-> only by one architecture in my mind would be a significant improvement.
+On Mar 05, Sebastian Capella wrote:
+[..]
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 1f8fed9..83707702 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
+>  config IO_36
+>  	bool
+>  
+> +config ARCH_HIBERNATION_POSSIBLE
+> +	bool
+> +	depends on MMU
+> +	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
+> +
+>  comment "Processor Features"
+>  
 
-I agree, it's a reasonable approach and microblaze which is simple and just "copied"
-powerpc originally would be a good one to move over as well.
+Is there any reason why CPU_FEROCEON is not listed here? FWIW, I've just built
+(but not really tested) a Kirkwood kernel with CONFIG_HIBERNATION=y.
 
-powerpc itself has many historical quirks and while I'm interested in a common
-implementation, it will take me a bit of spare time to get through things and
-figure out what can be done there and what "hooks" might still be necessary.
+And is there any reason to put this config in arch/arm/mm/Kconfig, instead of
+in arch/arm/Kconfig, below ARCH_SUSPEND_POSSIBLE? 
 
-At this point, it's mostly a matter of:
+I'm also puzzled about having two separate options for suspend and hibernate,
+maybe someone can explain me why a given CPU would support the former but not
+the latter?
 
- - I'm the one who knows the most about the powerpc PCI code as I wrote large
-chunks of it
-
- - I'm very very very busy with some other things at the moment
-
-So don't take my silence on these matters as a lack of interest, I think it's
-definitely all going in the right direction, I just don't have much bandwidth
-to consider the move of powerpc over just yet.
-
-Cheers,
-Ben.
+Thanks!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
