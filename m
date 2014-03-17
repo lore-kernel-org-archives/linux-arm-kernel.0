@@ -1,21 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 11:11:51 +0100
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (incr. #4)
-In-Reply-To: <20140307175616.GH18707@titan.lakedaemon.net>
-References: <20140307175616.GH18707@titan.lakedaemon.net>
-Message-ID: <201403171111.52309.arnd@arndb.de>
+Date: Mon, 17 Mar 2014 11:12:08 +0100
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (incr. #5)
+In-Reply-To: <20140314143831.GD15608@titan.lakedaemon.net>
+References: <20140314143831.GD15608@titan.lakedaemon.net>
+Message-ID: <201403171112.08876.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 March 2014, Jason Cooper wrote:
+On Friday 14 March 2014, Jason Cooper wrote:
 > Guys,
 > 
-> Here's the last pull request for mvebu/dt for v3.15.  This is an
-> incremental pull request from tags/mvebu-dt-3.15-3 in the mvebu/dt
-> branch up to tags/mvebu-dt-3.15-4.
+> Well, I lied :)  I thought round #4 would be the last one, but we have
+> one more.  This is a small set of changes, but it adds nand support for
+> the brand new Armada 38x SoCs.  It'd be really nice to get it in for
+> v3.15.
+> 
+> As usual, this is an incremental pull request from tags/mvebu-dt-3.15-4
+> up to tags/mvebu-dt-3.15-5 in the mvebu/dt branch.
 > 
 > Please pull.
 
-Pulled into next/dt.
+Pulled into next/dt
 
 	Arnd
