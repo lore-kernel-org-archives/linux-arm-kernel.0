@@ -1,37 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Mar 2014 17:22:43 +0100
-Subject: [PATCH v2 0/3] watchdog: sunxi: Change compatible patterns
-In-Reply-To: <20140315083711.GA11070@spo001.leaseweb.com>
-References: <1391808566-31008-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140303104042.GU607@lukather>
- <20140311205405.GA10228@spo001.leaseweb.com>
- <20140312091649.GU2815@lukather>
- <20140312180751.GC1484@spo001.leaseweb.com>
- <20140313111558.GH2815@lukather>
- <20140315083711.GA11070@spo001.leaseweb.com>
-Message-ID: <20140317162243.GP27873@lukather>
+Date: Mon, 17 Mar 2014 17:29:57 +0100
+Subject: [GIT PULL] Allwinner core additions for 3.15
+In-Reply-To: <201403171443.47557.arnd@arndb.de>
+References: <20140313164327.GA13229@lukather>
+ <201403171443.47557.arnd@arndb.de>
+Message-ID: <20140317162957.GQ27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 09:37:11AM +0100, Wim Van Sebroeck wrote:
-> Hi Maxime,
-> 
+On Mon, Mar 17, 2014 at 02:43:47PM +0100, Arnd Bergmann wrote:
+> On Thursday 13 March 2014, Maxime Ripard wrote:
+> > The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > > 
-> > On Wed, Mar 12, 2014 at 07:07:51PM +0100, Wim Van Sebroeck wrote:
-> > > > > I'm OK with the patches, but what is the preferred way to get them upstream?
-> > > > > via watchdog tree or via arch/soc tree?
-> > > > 
-> > > > Since it touches the machine restart code, I'd prefer to merge it
-> > > > myself if it's ok?
-> > > 
-> > > No Problem. You have my Acked-by.
+> >   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > > 
-> > Actually, I only have to keep together patches 2 and 3. Could you
-> > merge the first one? I'll handle the two others.
+> > are available in the git repository at:
+> > 
+> >   https://github.com/mripard/linux.git tags/sunxi-core-for-3.15
+> > 
+> > for you to fetch changes up to 8db21ad469fda194913db2c5b11635bcc21345fc:
+> > 
+> >   ARM: sunxi: Add the new watchog compatibles to the reboot code (2014-03-13 11:46:20 +0100)
+> > 
 > 
-> First one added to linux-watchdog-next.
+> Merged into next/soc, thanks!
+> 
+> Just for confirmation, I noticed that you are removing the previous "compatible"
+> strings from sunxi_restart_ids. Is that intentional? It seems like you risk
+> breaking backwards compatibility.
 
-Thanks!
+Yes. Since we are adding new devices at a relatively high rate these
+days, users will upgrade their DT anyway. Obviously, it will be the
+last time we're doing such a change.
 
 -- 
 Maxime Ripard, Free Electrons
@@ -43,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/76ed589e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/99379e0d/attachment.sig>
