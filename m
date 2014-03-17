@@ -1,66 +1,111 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:13:46 +0000
-Subject: [PATCH 03/44] ARM: l2c: avoid calling outer_flush_all() unnecessarily
- (Spear)
+Date: Mon, 17 Mar 2014 00:13:35 +0000
+Subject: [PATCH 01/44] ARM: l2c: remove outer_inv_all() method
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLBa-0002bv-64@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLBP-0002bl-Ub@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spear calls outer_flush_all() from it's SMP bringup function.  This
-is potentially dangerous as the L2C set/way operations which implement
-this don't take kindly to concurrent operations.  Besides, there's
-better solutions to this, as implemented on other platforms.
+No one ever calls this function anywhere in the kernel, so let's
+completely remove it from the outer cache API and turn it into an
+internal-only thing.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-spear/platsmp.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/outercache.h | 8 --------
+ arch/arm/mm/cache-feroceon-l2.c   | 1 -
+ arch/arm/mm/cache-l2x0.c          | 5 -----
+ 3 files changed, 14 deletions(-)
 
-diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index 5c4a19887b2b..eb9f2ef1e974 100644
---- a/arch/arm/mach-spear/platsmp.c
-+++ b/arch/arm/mach-spear/platsmp.c
-@@ -20,6 +20,18 @@
- #include <mach/spear.h>
- #include "generic.h"
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index f94784f0e3a6..0e4420858990 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -28,7 +28,6 @@ struct outer_cache_fns {
+ 	void (*clean_range)(unsigned long, unsigned long);
+ 	void (*flush_range)(unsigned long, unsigned long);
+ 	void (*flush_all)(void);
+-	void (*inv_all)(void);
+ 	void (*disable)(void);
+ #ifdef CONFIG_OUTER_CACHE_SYNC
+ 	void (*sync)(void);
+@@ -63,12 +62,6 @@ static inline void outer_flush_all(void)
+ 		outer_cache.flush_all();
+ }
  
-+/*
-+ * Write pen_release in a way that is guaranteed to be visible to all
-+ * observers, irrespective of whether they're taking part in coherency
-+ * or not.  This is necessary for the hotplug code to work reliably.
-+ */
-+static void write_pen_release(int val)
-+{
-+	pen_release = val;
-+	smp_wmb();
-+	sync_cache_w(&pen_release);
-+}
-+
- static DEFINE_SPINLOCK(boot_lock);
+-static inline void outer_inv_all(void)
+-{
+-	if (outer_cache.inv_all)
+-		outer_cache.inv_all();
+-}
+-
+ static inline void outer_disable(void)
+ {
+ 	if (outer_cache.disable)
+@@ -90,7 +83,6 @@ static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
+ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+ { }
+ static inline void outer_flush_all(void) { }
+-static inline void outer_inv_all(void) { }
+ static inline void outer_disable(void) { }
+ static inline void outer_resume(void) { }
  
- static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
-@@ -30,8 +42,7 @@ static void spear13xx_secondary_init(unsigned int cpu)
- 	 * let the primary processor know we're out of the
- 	 * pen, then head off into the C entry point
- 	 */
--	pen_release = -1;
--	smp_wmb();
-+	write_pen_release(-1);
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index aae891820f8f..901a0f7280dc 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -345,7 +345,6 @@ void __init feroceon_l2_init(int __l2_wt_override)
+ 	outer_cache.inv_range = feroceon_l2_inv_range;
+ 	outer_cache.clean_range = feroceon_l2_clean_range;
+ 	outer_cache.flush_range = feroceon_l2_flush_range;
+-	outer_cache.inv_all = l2_inv_all;
  
- 	/*
- 	 * Synchronise with the boot thread.
-@@ -58,9 +69,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * Note that "pen_release" is the hardware CPU ID, whereas
- 	 * "cpu" is Linux's internal ID.
- 	 */
--	pen_release = cpu;
--	flush_cache_all();
--	outer_flush_all();
-+	write_pen_release(cpu);
+ 	enable_l2();
  
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 7abde2ce8973..f9985e5a208c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -414,7 +414,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		outer_cache.flush_range = l2x0_flush_range;
+ 		outer_cache.sync = l2x0_cache_sync;
+ 		outer_cache.flush_all = l2x0_flush_all;
+-		outer_cache.inv_all = l2x0_inv_all;
+ 		outer_cache.disable = l2x0_disable;
+ 	}
+ 
+@@ -884,7 +883,6 @@ static const struct l2x0_of_data pl310_data = {
+ 		.flush_range = l2x0_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -899,7 +897,6 @@ static const struct l2x0_of_data l2x0_data = {
+ 		.flush_range = l2x0_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -914,7 +911,6 @@ static const struct l2x0_of_data aurora_with_outer_data = {
+ 		.flush_range = aurora_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -946,7 +942,6 @@ static const struct l2x0_of_data bcm_l2x0_data = {
+ 		.flush_range = bcm_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
 -- 
 1.8.3.1
