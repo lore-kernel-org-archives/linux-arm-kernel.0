@@ -1,99 +1,86 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 16 Mar 2014 20:40:54 -0700
-Subject: [PATCH v4 06/10] ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF
- and SYSTEM_RESET
-In-Reply-To: <1391686302-19451-7-git-send-email-anup.patel@linaro.org>
+Date: Sun, 16 Mar 2014 20:41:11 -0700
+Subject: [PATCH v4 08/10] ARM/ARM64: KVM: Emulate PSCI v0.2
+ MIGRATE_INFO_TYPE and related functions
+In-Reply-To: <1391686302-19451-9-git-send-email-anup.patel@linaro.org>
 References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
- <1391686302-19451-7-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140317034054.GG20648@cbox>
+ <1391686302-19451-9-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140317034111.GI20648@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 05:01:38PM +0530, Anup Patel wrote:
-> The PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET functions are system-level
-> functions hence cannot be fully emulated by in-kernel PSCI emulation code.
+On Thu, Feb 06, 2014 at 05:01:40PM +0530, Anup Patel wrote:
+> This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
+> MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
 > 
-> To tackle this, we forward PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET function
-> calls from vcpu to user space (i.e. QEMU or KVMTOOL) via kvm_run structure
-> using KVM_EXIT_SYSTEM_EVENT exit reasons.
+> KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
+> this functions hence we emulate these functions in following way:
+> 1. MIGRATE - Returns "Not Supported"
+> 2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is either not present
+>    or does not require migration
+> 3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
 > 
 > Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->  arch/arm/kvm/psci.c |   32 +++++++++++++++++++++++++++++---
->  1 file changed, 29 insertions(+), 3 deletions(-)
+>  arch/arm/kvm/psci.c |   23 +++++++++++++++++------
+>  1 file changed, 17 insertions(+), 6 deletions(-)
 > 
 > diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 252acd0..1f1720a 100644
+> index 9890710..75447a3 100644
 > --- a/arch/arm/kvm/psci.c
 > +++ b/arch/arm/kvm/psci.c
-> @@ -85,6 +85,23 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  	return KVM_PSCI_RET_SUCCESS;
->  }
+> @@ -120,7 +120,8 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+>  	/* Ignore other bits of target affinity */
+>  	target_affinity &= target_affinity_mask;
 >  
-> +static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
-> +{
-> +	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
-> +	vcpu->run->system_event.type = type;
-> +	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
-> +}
-> +
-> +static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
-> +{
-> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_SHUTDOWN);
-> +}
-> +
-> +static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
-> +{
-> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
-> +}
-> +
->  int kvm_psci_version(struct kvm_vcpu *vcpu)
->  {
->  	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-> @@ -95,6 +112,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
->  
->  static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  {
-> +	int ret = 1;
->  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->  	unsigned long val;
->  
-> @@ -114,13 +132,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  	case KVM_PSCI_0_2_FN64_CPU_ON:
->  		val = kvm_psci_vcpu_on(vcpu);
->  		break;
-> +	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
-> +		kvm_psci_system_off(vcpu);
-> +		val = KVM_PSCI_RET_SUCCESS;
-> +		ret = 0;
-> +		break;
-> +	case KVM_PSCI_0_2_FN_SYSTEM_RESET:
-> +		kvm_psci_system_reset(vcpu);
-> +		val = KVM_PSCI_RET_SUCCESS;
-> +		ret = 0;
-> +		break;
->  	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->  	case KVM_PSCI_0_2_FN_AFFINITY_INFO:
->  	case KVM_PSCI_0_2_FN_MIGRATE:
->  	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
->  	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
-> -	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
-> -	case KVM_PSCI_0_2_FN_SYSTEM_RESET:
->  	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+> -	/* If one or more VCPU matching target affinity are running
+> +	/*
+> +	 * If one or more VCPU matching target affinity are running
+
+ah, you fixed it here, please move change to previous patch, thanks.
+
+>  	 * then return 0 (ON) else return 1 (OFF)
+>  	 */
+>  	kvm_for_each_vcpu(i, tmp, kvm) {
+> @@ -185,6 +186,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
 >  	case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
->  	case KVM_PSCI_0_2_FN64_MIGRATE:
-> @@ -132,7 +158,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  	}
->  
->  	*vcpu_reg(vcpu, 0) = val;
-> -	return 1;
-> +	return ret;
->  }
->  
->  static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>  		val = kvm_psci_vcpu_affinity_info(vcpu);
+>  		break;
+> +	case KVM_PSCI_0_2_FN_MIGRATE:
+> +	case KVM_PSCI_0_2_FN64_MIGRATE:
+> +		val = KVM_PSCI_RET_NI;
+> +		break;
+> +	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> +		/*
+> +		 * Trusted OS is either not present or
+> +		 * does not require migration
+> +		 */
+> +		val = 2;
+> +		break;
+> +	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> +	case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+> +		val = KVM_PSCI_RET_NI;
+> +		break;
+>  	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+>  		kvm_psci_system_off(vcpu);
+>  		val = KVM_PSCI_RET_SUCCESS;
+> @@ -196,12 +212,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		ret = 0;
+>  		break;
+>  	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
+> -	case KVM_PSCI_0_2_FN_MIGRATE:
+> -	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> -	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+>  	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+> -	case KVM_PSCI_0_2_FN64_MIGRATE:
+> -	case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+>  		val = KVM_PSCI_RET_NI;
+>  		break;
+>  	default:
 > -- 
 > 1.7.9.5
 > 
 
+Otherwise:
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
