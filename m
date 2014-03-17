@@ -1,18 +1,23 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 17 Mar 2014 10:48:28 -0400
-Subject: [PATCH] ata: ahci_sunxi: fix code formatting
-In-Reply-To: <10509185.3UEOEZKTc5@amdc1032>
-References: <10509185.3UEOEZKTc5@amdc1032>
-Message-ID: <20140317144828.GC13749@htj.dyndns.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 15:47:45 +0100
+Subject: [GIT PULL] at91: cleanup for 3.15 #1
+In-Reply-To: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201403171547.45327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 02:08:12PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On Wednesday 12 March 2014, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
+> 
+> This is the first AT91 pull-request for 3.15, and a cleanup one. The most of it
+> is the conversion of two more Atmel SoCs to Device Tree. These are older that
+> the ones already converted. Moreover, they already use the CCF so there is no
+> need to come back on this later (maybe to remove some code when the other
+> non-DT boards are converted as well).
+> The defconfig update was needed because they were pretty old and some
+> interesting options were missing.
 
-Applied to libata/for-3.15.
+Pulled into next/cleanup, thanks!
 
-Thanks.
-
--- 
-tejun
+	Arnd
