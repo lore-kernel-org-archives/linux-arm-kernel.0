@@ -1,71 +1,46 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 17 Mar 2014 16:06:28 +0100
-Subject: [PATCH v3 3/3] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device
- tree
+Date: Mon, 17 Mar 2014 16:06:27 +0100
+Subject: [PATCH v3 2/3] ARM: berlin2q: add the Marvell Armada 1500 pro in the
+ documentation
 In-Reply-To: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1395068788-19786-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1395068788-19786-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds initial support for the Marvell BG2-Q DMP. The board has 2GB of
-memory, an uart activated and what's initially supported by the Marvell
-Armada 1500 pro dtsi.
-
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile                 |  3 ++-
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 28 ++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+ Documentation/arm/Marvell/README                         | 5 +++++
+ Documentation/devicetree/bindings/arm/marvell,berlin.txt | 1 +
+ 2 files changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 032030361bef..4a1c0cf01b93 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2-sony-nsz-gs7.dtb	\
--	berlin2cd-google-chromecast.dtb
-+	berlin2cd-google-chromecast.dtb	\
-+	berlin2q-marvell-dmp.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-new file mode 100644
-index 000000000000..2da9c41e29d8
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "berlin2q.dtsi"
-+
-+/ {
-+	model = "Marvell BG2-Q DMP";
-+	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000>;
-+	};
-+
-+	choosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index 5a930c1528ad..eb6f212625f9 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -224,6 +224,11 @@ Berlin family (Digital Entertainment)
+ 		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+ 		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500/
+ 		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
++	88DE3114, Armada 1500 Pro
++		Design name:	BG2-Q
++		Core:		Quad Core ARM Cortex-A9, PL310 L2CC
++		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500-pro/
++		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500-pro/assets/Marvell_ARMADA_1500_PRO-01_product_brief.pdf
+ 	88DE????
+ 		Design name:	BG3
+ 		Core:		ARM Cortex-A15, CA15 integrated L2CC
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 737afa5f8148..86b7f60c74fc 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -11,6 +11,7 @@ In addition, the above compatible shall be extended with the specific
+ SoC and board used. Currently known SoC compatibles are:
+     "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
+     "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
++    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q, 88DE3114)
+     "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
+     "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
+ 
 -- 
 1.8.3.2
