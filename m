@@ -1,64 +1,86 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 17 Mar 2014 15:13:25 +0100
-Subject: [linux-sunxi] Re: [PATCH v6 2/3] ARM: sun7i/sun6i: dts: Add NMI
- irqchip support
-In-Reply-To: <20140317133057.GK27873@lukather>
-References: <1394890861-18347-1-git-send-email-carlo@caione.org>
- <1394890861-18347-3-git-send-email-carlo@caione.org>
- <20140317133057.GK27873@lukather>
-Message-ID: <CAOQ7t2b5w7P_pNPJPkfSfx-N8adSqe_bv1xPRLh0pEUg1P=68w@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Mar 2014 15:19:32 +0100
+Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI
+ Panel
+In-Reply-To: <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <3721050.m43feCICLQ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 2:30 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Mar 15, 2014 at 02:41:00PM +0100, Carlo Caione wrote:
->> This patch adds DTS entries for NMI controller as child of GIC.
->>
->> Signed-off-by: Carlo Caione <carlo@caione.org>
->> ---
->>  arch/arm/boot/dts/sun6i-a31.dtsi | 9 +++++++++
->>  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
->> index 5256ad9..4a5050c 100644
->> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
->> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
->> @@ -190,6 +190,15 @@
->>               #size-cells = <1>;
->>               ranges;
->>
->> +             nmi_intc: sc-nmi-intc at 01f00c0c {
->
-> It should be interrupt-controller at 01f00c0c, according to the ePAPR.
+Hi Tomi,
 
-Ok
+Thank you for the patch.
 
->> +                     compatible = "allwinner,sun6i-a31-sc-nmi";
->
-> I'm curious, what is the "sc" for?
+On Friday 28 February 2014 14:20:12 Tomi Valkeinen wrote:
+> Add DT binding documentation for MIPI DPI Panel.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/panel-dpi.txt        | 43 +++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/panel-dpi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/panel-dpi.txt
+> b/Documentation/devicetree/bindings/video/panel-dpi.txt new file mode
+> 100644
+> index 000000000000..72636c6f1c67
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/panel-dpi.txt
+> @@ -0,0 +1,43 @@
+> +Generic MIPI DPI Panel
+> +======================
+> +
+> +Required properties:
+> +- compatible: "panel-dpi"
+> +
+> +Optional properties:
+> +- label: a symbolic name for the panel
+> +- gpios: panel enable gpio and backlight enable gpio
 
-It stands for System Control (in the datasheet the NMI controller is
-included in a block named System Controller)
+While integrated in the panel module, the backlight is a separate piece of 
+hardware, which could be controlled through other means (I2C for instance). 
+Wouldn't it be better to add an explicit DT node for the backlight device and 
+reference that node from the panel node ?
 
->> +                     interrupt-controller;
->> +                     #interrupt-cells = <2>;
->> +                     reg = <0x01f00c0c 0x38>;
->> +                     interrupt-parent = <&gic>;
->
-> This is actually the default.
-
-I'll delete it.
-
->> +                     interrupts = <0 0 4>;
->> +             };
->> +
->
-> Thanks!
-> Maxime
-
-Thank you,
+> +
+> +Required nodes:
+> +- "panel-timing" containing video timings
+> +  (Documentation/devicetree/bindings/video/display-timing.txt)
+> +- Video port for DPI input
+> +
+> +Example
+> +-------
+> +
+> +lcd0: display at 0 {
+> +        compatible = "samsung,lte430wq-f0c", "panel-dpi";
+> +        label = "lcd";
+> +
+> +        lcd_in: endpoint {
+> +                remote-endpoint = <&dpi_out>;
+> +        };
+> +
+> +        panel-timing {
+> +                clock-frequency = <9200000>;
+> +                hactive = <480>;
+> +                vactive = <272>;
+> +                hfront-porch = <8>;
+> +                hback-porch = <4>;
+> +                hsync-len = <41>;
+> +                vback-porch = <2>;
+> +                vfront-porch = <4>;
+> +                vsync-len = <10>;
+> +
+> +                hsync-active = <0>;
+> +                vsync-active = <0>;
+> +                de-active = <1>;
+> +                pixelclk-active = <1>;
+> +        };
+> +};
 
 -- 
-Carlo Caione
+Regards,
+
+Laurent Pinchart
