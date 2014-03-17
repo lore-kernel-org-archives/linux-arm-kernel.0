@@ -1,109 +1,71 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 17 Mar 2014 09:52:29 +0100
-Subject: [PATCH RFC 5/5] ARM: AM33XX: dts: Change the tda998x description
-In-Reply-To: <cover.1395049204.git.moinejf@free.fr>
-References: <cover.1395049204.git.moinejf@free.fr>
-Message-ID: <11bf968ac586e4a06d56c97d150ecf2c4afd8f27.1395049204.git.moinejf@free.fr>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Mon, 17 Mar 2014 10:56:59 +0100
+Subject: [PATCH RESEND 1/2] ARM: ixp4xx: Make dma_set_coherent_mask common,
+ correct implementation
+In-Reply-To: <20140317105448.14bcb617@marrow.netinsight.se>
+References: <20140317105448.14bcb617@marrow.netinsight.se>
+Message-ID: <20140317105659.449505d8@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tda998x being moved from a 'slave encoder' to a normal DRM
-encoder/connector and the tilcdc_slave glue being removed, the
-declaration of the HDMI transmitter description must be changed in
-the associated DTs.
+Non-PCI devices can use the entire 32-bit range, PCI dittos are
+limited to the first 64MiB.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+Also actually setup coherent_dma_mask.
+
+Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
 ---
- arch/arm/boot/dts/am335x-base0033.dts  | 28 +++++++++++++++++++---------
- arch/arm/boot/dts/am335x-boneblack.dts | 21 ++++++++++++++++-----
- 2 files changed, 35 insertions(+), 14 deletions(-)
+ arch/arm/mach-ixp4xx/common-pci.c |    8 --------
+ arch/arm/mach-ixp4xx/common.c     |   11 +++++++++++
+ 2 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
-index 72a9b3f..93cd40b 100644
---- a/arch/arm/boot/dts/am335x-base0033.dts
-+++ b/arch/arm/boot/dts/am335x-base0033.dts
-@@ -14,15 +14,6 @@
- 	model = "IGEP COM AM335x on AQUILA Expansion";
- 	compatible = "isee,am335x-base0033", "isee,am335x-igep0033", "ti,am33xx";
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index 200970d..b02c764 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -481,14 +481,6 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
  
--	hdmi {
--		compatible = "ti,tilcdc,slave";
--		i2c = <&i2c0>;
--		pinctrl-names = "default", "off";
--		pinctrl-0 = <&nxp_hdmi_pins>;
--		pinctrl-1 = <&nxp_hdmi_off_pins>;
--		status = "okay";
--	};
+-int dma_set_coherent_mask(struct device *dev, u64 mask)
+-{
+-	if (mask >= SZ_64M - 1)
+-		return 0;
 -
- 	leds_base {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&leds_base_pins>;
-@@ -85,6 +76,11 @@
+-	return -EIO;
+-}
+-
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+ EXPORT_SYMBOL(dma_set_coherent_mask);
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 6d68aed..b221c78 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -31,6 +31,7 @@
+ #include <linux/gpio.h>
+ #include <linux/cpu.h>
+ #include <linux/sched_clock.h>
++#include <linux/pci.h>
  
- &lcdc {
- 	status = "okay";
-+	port {
-+		lcd_0: endpoint at 0 {
-+			remote-endpoint = <&tda998x_0>;
-+		};
-+	};
- };
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+@@ -578,6 +579,16 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
+ 	}
+ }
  
- &i2c0 {
-@@ -92,4 +88,18 @@
- 		compatible = "at,24c256";
- 		reg = <0x50>;
- 	};
-+	tda998x: hdmi-encoder {
-+		compatible = "nxp,tda998x";
-+		reg = <0x70>;
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (dev_is_pci(dev) && mask >= SZ_64M)
++		return -EIO;
 +
-+		pinctrl-names = "default", "off";
-+		pinctrl-0 = <&nxp_hdmi_pins>;
-+		pinctrl-1 = <&nxp_hdmi_off_pins>;
++	dev->coherent_dma_mask = mask;
 +
-+		port {
-+			tda998x_0: endpoint at 0 {
-+				remote-endpoint = <&lcd_0>;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 6b71ad9..a530bcb 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -64,15 +64,26 @@
- 
- &lcdc {
- 	status = "okay";
-+	port {
-+		lcd_0: endpoint at 0 {
-+			remote-endpoint = <&tda998x_0>;
-+		};
-+	};
- };
- 
--/ {
--	hdmi {
--		compatible = "ti,tilcdc,slave";
--		i2c = <&i2c0>;
-+&i2c0 {
-+	tda998x: hdmi-encoder {
-+		compatible = "nxp,tda998x";
-+		reg = <0x70>;
++	return 0;
++}
 +
- 		pinctrl-names = "default", "off";
- 		pinctrl-0 = <&nxp_hdmi_bonelt_pins>;
- 		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
--		status = "okay";
-+
-+		port {
-+			tda998x_0: endpoint at 0 {
-+				remote-endpoint = <&lcd_0>;
-+			};
-+		};
- 	};
- };
+ #ifdef CONFIG_IXP4XX_INDIRECT_PCI
+ /*
+  * In the case of using indirect PCI, we simply return the actual PCI
 -- 
-1.9.0
+1.7.9.6
