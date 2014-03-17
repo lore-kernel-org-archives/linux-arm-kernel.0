@@ -1,58 +1,76 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 17 Mar 2014 14:56:54 +0100
-Subject: [PATCH v2 01/15] ARM: at91: sam9g45: remove unused platform_data
-In-Reply-To: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395064628-644-2-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 17 Mar 2014 14:56:53 +0100
+Subject: [PATCH v2 00/15] iio: adc: at91 cleanups and atmel_tsadcc removal
+Message-ID: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-num_channels and registers are not used anymore since they are defined inside
-the at91_adc driver and assigned by matching the id_table.
+This patch set is a followup of my previous series: iio: adc: at91 fixes
 
-Also, remove the mach/at91_adc.h include that is not necessary anymore.
+1-3) The first 3 patches are cleaning up the patform_data used for at91_adc.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
----
- arch/arm/mach-at91/at91sam9g45_devices.c | 10 ----------
- 1 file changed, 10 deletions(-)
+4-5) Then touchscreen support for older ADCs is added, this allows to use that
+     for the sam9m10g45ek.
 
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 88554024eb2d..cd36009c3511 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -25,7 +25,6 @@
- #include <linux/fb.h>
- #include <video/atmel_lcdc.h>
- 
--#include <mach/at91_adc.h>
- #include <mach/at91sam9g45.h>
- #include <mach/at91sam9g45_matrix.h>
- #include <mach/at91_matrix.h>
-@@ -1235,13 +1234,6 @@ static struct at91_adc_trigger at91_adc_triggers[] = {
- 	},
- };
- 
--static struct at91_adc_reg_desc at91_adc_register_g45 = {
--	.channel_base = AT91_ADC_CHR(0),
--	.drdy_mask = AT91_ADC_DRDY,
--	.status_register = AT91_ADC_SR,
--	.trigger_register = 0x08,
--};
--
- void __init at91_add_device_adc(struct at91_adc_data *data)
- {
- 	if (!data)
-@@ -1267,9 +1259,7 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
- 	if (data->use_external_triggers)
- 		at91_set_A_periph(AT91_PIN_PD28, 0);
- 
--	data->num_channels = 8;
- 	data->startup_time = 40;
--	data->registers = &at91_adc_register_g45;
- 	data->trigger_number = 4;
- 	data->trigger_list = at91_adc_triggers;
- 
+6) Following those modifications, the mach/at91_adc.h is not used anywhere but
+   in the at91_adc driver so it is remove and its content (register definitions)
+   placed directly in the driver.
+
+7-9) at91sam9rl support is added to at91_adc and is used for the at91sam9rl
+     based boards.
+
+10-11) Prepare the atmel_tsadcc removal by switching sam9rl and sam9g45 to use
+       only at91_adc instead of atmel_tsadcc.
+
+12-15) atmel_tsadcc removal
+
+
+Changes in v2:
+ - reworked the IRQ handlers in patch 4 as suggested by Dmitry and Thomas
+ - ts_bufferedmeasure is now a bool
+ - the multiline comment is now correctly formatted
+ - improved commit log for patch 5
+
+Alexandre Belloni (15):
+  ARM: at91: sam9g45: remove unused platform_data
+  ARM: at91: sam9260: remove unused platform_data
+  iio: adc: at91: cleanup platform_data
+  iio: adc: at91_adc: Add support for touchscreens without TSMR
+  ARM: at91: sam9m10g45ek: Add touchscreen support through at91_adc
+  iio: adc: at91: remove unused include from include/mach
+  iio: adc: at91: add sam9rl support
+  ARM: at91: sam9rl: add at91_adc to support adc and touchscreen
+  ARM: at91: sam9rlek add touchscreen support through at91_adc
+  ARM: at91: sam9g45: switch from atmel_tsadcc to at91_adc
+  ARM: at91: sam9rl: switch from atmel_tsadcc to at91_adc
+  ARM: at91: remove atmel_tsadcc platform_data
+  ARM: at91: remove atmel_tsadcc from sama5_defconfig
+  Input: atmel_tsadcc: remove driver
+  ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node
+
+ MAINTAINERS                                |   6 -
+ arch/arm/boot/dts/at91-cosino_mega2560.dts |   5 -
+ arch/arm/configs/at91sam9g45_defconfig     |   3 +-
+ arch/arm/configs/at91sam9rl_defconfig      |   3 +-
+ arch/arm/configs/sama5_defconfig           |   1 -
+ arch/arm/mach-at91/at91sam9260_devices.c   |  10 -
+ arch/arm/mach-at91/at91sam9g45.c           |   2 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c   |  63 +----
+ arch/arm/mach-at91/at91sam9rl.c            |   7 +
+ arch/arm/mach-at91/at91sam9rl_devices.c    |  83 +++++--
+ arch/arm/mach-at91/board-sam9m10g45ek.c    |  16 +-
+ arch/arm/mach-at91/board-sam9rlek.c        |  16 +-
+ arch/arm/mach-at91/board.h                 |   3 -
+ arch/arm/mach-at91/include/mach/at91_adc.h | 107 ---------
+ drivers/iio/adc/at91_adc.c                 | 340 +++++++++++++++++++++++----
+ drivers/input/touchscreen/Kconfig          |  12 -
+ drivers/input/touchscreen/Makefile         |   1 -
+ drivers/input/touchscreen/atmel_tsadcc.c   | 358 -----------------------------
+ include/linux/platform_data/at91_adc.h     |  27 +--
+ include/linux/platform_data/atmel.h        |   7 -
+ 20 files changed, 382 insertions(+), 688 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_adc.h
+ delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
+
 -- 
 1.8.3.2
