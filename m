@@ -1,51 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 17 Mar 2014 18:59:41 +0530
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
-References: <5316FFCE.1060603@ti.com>	<1394018461-757-1-git-send-email-holler@ahsoftware.de>	<CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>	<5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
-Message-ID: <5326F8C5.5090406@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 14:31:05 +0100
+Subject: [GIT PULL v2] SOCFPGA updates for 3.15, version 2
+In-Reply-To: <864n2xx9c7.fsf@void.printf.net>
+References: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
+ <201403171038.16362.arnd@arndb.de> <864n2xx9c7.fsf@void.printf.net>
+Message-ID: <201403171431.05666.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014 04:32 PM, Linus Walleij wrote:
-> On Fri, Mar 14, 2014 at 11:08 AM, Alexander Holler <holler@ahsoftware.de> wrote:
->> Am 11.03.2014 11:15, schrieb Linus Walleij:
->>> On Wed, Mar 5, 2014 at 12:21 PM, Alexander Holler <holler@ahsoftware.de> wrote:
->>>
->>>> The driver missed an of_xlate function to translate gpio numbers
->>>> as found in the DT to the correct chip and number.
->>>>
->>>> While there I've set #gpio_cells to a fixed value of 2.
->>>>
->>>> I've used gpio-pxa.c as template for those changes and tested my changes
->>>> successfully on a da850 board using entries for gpio-leds in a DT. So I didn't
->>>> reinvent the wheel but just copied and tested stuff.
->>>>
->>>> Thanks to Grygorii Strashko for the hint to the existing code in gpio-pxa.
->>>>
->>>> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>
->>> This v2 version applied, thanks!
->>
->> Thanks, but actually that should have been a fix for 3.14 with which the
->> OF functionality for davinci gpio gets introduced. I assum with the
->> patch in for-next, 3.14 will appear with that functionality broken and
->> it will become a candidate for -stable.
+On Monday 17 March 2014, Chris Ball wrote:
+> On Mon, Mar 17 2014, Arnd Bergmann wrote:
+> > Chris, it would be nice if you could revert d9c3f5df539a "dts: socfpga: Add
+> > support for SD/MMC on the SOCFPGA platform" in your mmc tree now. The
+> > commit is now also present in arm-soc where it belongs, and we will get
+> > a merge conflict if we both carry it, due to the screwup on the
+> > sysmgr node.
 > 
-> I just get the impression that DT support for DaVinci in v3.14 is so risky
-> and unstable that noone except those implementing it (i.e. you) is really
-> using it, is that correct?
+> I see, sorry about this.  I've pushed the revert to mmc-next now.
 > 
-> In that case it is hardly a fix that we need to rush out to the entire world.
 
-One thing to note is that this driver is used by keystone too and all
-its users are DT-only. Although I do not see any in-kernel DT GPIO users
-even there.
+Ok, thanks!
 
-I can confirm the patch does not break my gpiolib based test module
-(test with and without DT), but then it did not have an issue even before.
-
-Thanks,
-Sekhar
+	Arnd
