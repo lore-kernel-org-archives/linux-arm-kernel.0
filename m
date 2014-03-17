@@ -1,67 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Mar 2014 11:44:21 +0000
-Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <CAPrCYkfxGVey_fQ47RO=XNnWYNM0qckdj9gMUZtZHkz6hR85xQ@mail.gmail.com>
-References: <1395048095-32745-1-git-send-email-vkale@apm.com>
- <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
- <CAPrCYkfxGVey_fQ47RO=XNnWYNM0qckdj9gMUZtZHkz6hR85xQ@mail.gmail.com>
-Message-ID: <20140317114421.GH8070@e106331-lin.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 17 Mar 2014 12:48:41 +0100
+Subject: [PATCH v5 4/9] at91: dt: Add at91sam9261 dt SoC support
+In-Reply-To: <20140317114018.GE9558@ns203013.ovh.net>
+References: <1393841162-25339-1-git-send-email-jjhiblot@traphandler.com>
+ <1393841162-25339-5-git-send-email-jjhiblot@traphandler.com>
+ <20140317114018.GE9558@ns203013.ovh.net>
+Message-ID: <20140317114840.GD12021@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 11:22:55AM +0000, Vinayak Kale wrote:
-> On Mon, Mar 17, 2014 at 4:03 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Mar 17, 2014 at 09:21:35AM +0000, Vinayak Kale wrote:
-> >> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
-> >>
-> >> Please note that this patch has dependancy on a GIC driver patch [1] which is
-> >> yet to be approved by maintainers.
-> >>
-> >> [1]- https://lkml.org/lkml/2014/2/27/605
-> >> (irqchip:gic: change access of gicc_ctrl register to read modify write)
-> >>
-> >> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> >> ---
-> >>  arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> >> index d37d736..587348d 100644
-> >> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> >> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> >> @@ -97,6 +97,11 @@
-> >>               clock-frequency = <50000000>;
-> >>       };
-> >>
-> >> +     pmu {
-> >> +             compatible = "arm,armv8-pmuv3";
-> >> +             interrupts = <1 12 0xff04>;
-> >> +     };
-> >
-> > Do Potenza CPUs only have the PMUv3 events, and nothing
-> > Potenza-specific?
-> On top of PMUv3 events, Potenza CPU do have few implementation defined events.
+Hi Jean-Christophe,
 
-Ok. So Potenza is compatible with PMUv3 (and can have it in the list),
-but also has additional features for which there should be a string.
+I think you are a bit late and the series got taken by Nicolas. Anyway, most of
+your comments have been taken care of.
 
-> >
-> > I would have expected something like:
-> >
-> > compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-> PMUv3 allows to have implementation defined events. And as such the
-> driver doesn't have any dependency on such events. Do you still think
-> we need additional compatible string for Potenza CPU?
+On 17/03/2014 at 12:40:18 +0100, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> On 11:05 Mon 03 Mar     , Jean-Jacques Hiblot wrote:
+> > +		usb0: ohci at 00500000 {
+> > +			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> > +			reg = <0x00500000 0x100000>;
+> > +			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+> 
+> for 5th time NACK
+> 
+> stop using interrupts une interrupts-extended
 
-I do. This is precisely the reason for the compatible list. Being as
-explicit as possible with the compatible list entries and having a
-series of fallbacks is the sensible thing to do.
+As there is only one interrupt controller, I don't see why we would
+absolutely need to specify the interrupt controller here.
 
-Having the additional string allows things to work now with the standard
-events, and possibly later with the full set of events, without
-requiring every single DTB to be updated. It also allows us to target
-workarounds more precisely, for any issues we might not currently be
-aware of.
+> > +			clocks = <&usb>, <&ohci_clk>, <&hclk0>, <&uhpck>;
+> > +			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+> > +			status = "disabled";
+> > +		};
+> > diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> > index 6276b4c..5c90581 100644
+> > --- a/arch/arm/mach-at91/at91sam9261.c
+> > +++ b/arch/arm/mach-at91/at91sam9261.c
+> > @@ -189,6 +189,23 @@ static struct clk_lookup periph_clocks_lookups[] = {
+> >  	CLKDEV_CON_ID("pioA", &pioA_clk),
+> >  	CLKDEV_CON_ID("pioB", &pioB_clk),
+> >  	CLKDEV_CON_ID("pioC", &pioC_clk),
+> > +	/* more lookup table for DT entries */
+> > +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+> > +	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+> > +	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
+> > +	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
+> > +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+> > +	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
+> > +	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
+> > +	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &hck0),
+> > +	CLKDEV_CON_DEV_ID("hclk", "600000.fb", &hck1),
+> > +	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+> > +	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+> > +	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+> 
+> do we really need this?
 
-Cheers,
-Mark.
+Yes, until all the SoCs are switch to the CCF, we may build kernel
+supporting multiple sam9 SoCs without CCF.
+
+Best regards,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
