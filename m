@@ -1,84 +1,97 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 16 Mar 2014 20:40:42 -0700
-Subject: [PATCH v4 05/10] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space
- API header
-In-Reply-To: <1391686302-19451-6-git-send-email-anup.patel@linaro.org>
+Date: Sun, 16 Mar 2014 20:40:54 -0700
+Subject: [PATCH v4 06/10] ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF
+ and SYSTEM_RESET
+In-Reply-To: <1391686302-19451-7-git-send-email-anup.patel@linaro.org>
 References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
- <1391686302-19451-6-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140317034042.GF20648@cbox>
+ <1391686302-19451-7-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140317034054.GG20648@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 05:01:37PM +0530, Anup Patel wrote:
-> Currently, we don't have an exit reason to notify user space about
-> a system-level event (for e.g. system reset or shutdown) triggered
-> by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
-> this purpose. We can also inform user space about the 'type' and
-> architecture specific 'flags' of a system-level event using the
-> kvm_run structure.
+On Thu, Feb 06, 2014 at 05:01:38PM +0530, Anup Patel wrote:
+> The PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET functions are system-level
+> functions hence cannot be fully emulated by in-kernel PSCI emulation code.
 > 
-> This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
-> in-kernel PSCI v0.2 support to reset/shutdown VMs.
+> To tackle this, we forward PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET function
+> calls from vcpu to user space (i.e. QEMU or KVMTOOL) via kvm_run structure
+> using KVM_EXIT_SYSTEM_EVENT exit reasons.
 > 
 > Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->  Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
->  include/uapi/linux/kvm.h          |    8 ++++++++
->  2 files changed, 23 insertions(+)
+>  arch/arm/kvm/psci.c |   32 +++++++++++++++++++++++++++++---
+>  1 file changed, 29 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 73cb211..0f70625 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2707,6 +2707,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
->  external interrupt has just been delivered into the guest. User space
->  should put the acknowledged interrupt vector into the 'epr' field.
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 252acd0..1f1720a 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -85,6 +85,23 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	return KVM_PSCI_RET_SUCCESS;
+>  }
 >  
-> +		/* KVM_EXIT_SYSTEM_EVENT */
-> +		struct {
-> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-> +#define KVM_SYSTEM_EVENT_RESET          2
-> +			__u32 type;
-> +			__u64 flags;
-> +		} system_event;
+> +static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+> +{
+> +	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+> +	vcpu->run->system_event.type = type;
+> +	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
+> +}
 > +
-> +If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
-> +a system-level event using some architecture specific mechanism (hypercall
-> +or some special instruction). In case of ARM/ARM64, this is triggered using
-> +HVC instruction based PSCI call from the vcpu. The 'type' field describes
-> +the system-level event type. The 'flags' field describes architecture
-> +specific flags for the system-level event.
+> +static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_SHUTDOWN);
+> +}
 > +
->  		/* Fix the size of the union. */
->  		char padding[256];
->  	};
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index fb3c3f3..0723853 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->  #define KVM_EXIT_WATCHDOG         21
->  #define KVM_EXIT_S390_TSCH        22
->  #define KVM_EXIT_EPR              23
-> +#define KVM_EXIT_SYSTEM_EVENT     24
+> +static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
+> +}
+> +
+>  int kvm_psci_version(struct kvm_vcpu *vcpu)
+>  {
+>  	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> @@ -95,6 +112,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
 >  
->  /* For KVM_EXIT_INTERNAL_ERROR */
->  /* Emulate instruction failed. */
-> @@ -301,6 +302,13 @@ struct kvm_run {
->  		struct {
->  			__u32 epr;
->  		} epr;
-> +		/* KVM_EXIT_SYSTEM_EVENT */
-> +		struct {
-> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-> +#define KVM_SYSTEM_EVENT_RESET          2
-> +			__u32 type;
-> +			__u64 flags;
-> +		} system_event;
->  		/* Fix the size of the union. */
->  		char padding[256];
->  	};
+>  static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  {
+> +	int ret = 1;
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+>  
+> @@ -114,13 +132,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  	case KVM_PSCI_0_2_FN64_CPU_ON:
+>  		val = kvm_psci_vcpu_on(vcpu);
+>  		break;
+> +	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+> +		kvm_psci_system_off(vcpu);
+> +		val = KVM_PSCI_RET_SUCCESS;
+> +		ret = 0;
+> +		break;
+> +	case KVM_PSCI_0_2_FN_SYSTEM_RESET:
+> +		kvm_psci_system_reset(vcpu);
+> +		val = KVM_PSCI_RET_SUCCESS;
+> +		ret = 0;
+> +		break;
+>  	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
+>  	case KVM_PSCI_0_2_FN_AFFINITY_INFO:
+>  	case KVM_PSCI_0_2_FN_MIGRATE:
+>  	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+>  	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> -	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+> -	case KVM_PSCI_0_2_FN_SYSTEM_RESET:
+>  	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+>  	case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
+>  	case KVM_PSCI_0_2_FN64_MIGRATE:
+> @@ -132,7 +158,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> -	return 1;
+> +	return ret;
+>  }
+>  
+>  static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
 > -- 
 > 1.7.9.5
 > 
