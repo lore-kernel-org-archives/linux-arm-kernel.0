@@ -1,91 +1,95 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 17 Mar 2014 15:37:47 -0400
-Subject: [PATCH] dma: Add Keystone Packet DMA Engine driver
-In-Reply-To: <20140317044223.GA1976@intel.com>
-References: <1393628200-12317-1-git-send-email-santosh.shilimkar@ti.com>
- <20140311102357.GR1976@intel.com> <531F6908.4010104@ti.com>
- <20140312160017.GY1976@intel.com> <5320CEC4.1060306@ti.com>
- <20140317044223.GA1976@intel.com>
-Message-ID: <53274F0B.5070201@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Mar 2014 19:44:40 +0000
+Subject: PL310 errata workarounds
+In-Reply-To: <20140317172943.GI24070@arm.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140314150110.GQ21483@n2100.arm.linux.org.uk>
+ <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
+ <20140316115207.GW21483@n2100.arm.linux.org.uk>
+ <CAL_Jsq+9Dm9S6rhQAt_umOM6T_x21O=Y_PPg0QyCH1zR_=yWoA@mail.gmail.com>
+ <20140317153738.GB21483@n2100.arm.linux.org.uk>
+ <20140317172943.GI24070@arm.com>
+Message-ID: <20140317194440.GG21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 March 2014 12:42 AM, Vinod Koul wrote:
-> On Thu, Mar 13, 2014 at 05:16:52AM +0800, Santosh Shilimkar wrote:
->> On Thursday 13 March 2014 12:00 AM, Vinod Koul wrote:
->>> On Wed, Mar 12, 2014 at 03:50:32AM +0800, Santosh Shilimkar wrote:
->>>> On Tuesday 11 March 2014 06:23 PM, Vinod Koul wrote:
->>>>> On Fri, Feb 28, 2014 at 05:56:40PM -0500, Santosh Shilimkar wrote:
->>>>>> From: Sandeep Nair <sandeep_n@ti.com>
->>>>>>
->>>>>> The Packet DMA driver sets up the dma channels and flows for the
->>>>>> QMSS(Queue Manager SubSystem) who triggers the actual data movements
->>>>>> across clients using destination queues. Every client modules like
->>>>>> NETCP(Network Coprocessor), SRIO(Serial Rapid IO) and CRYPTO
->>>>>> Engines has its own instance of packet dma hardware. QMSS has also
->>>>>> an internal packet DMA module which is used as an infrastructure
->>>>>> DMA with zero copy.
->>>>>>
->>>>>> Patch adds DMAEngine driver for Keystone Packet DMA hardware.
->>>>>> The specifics on the device tree bindings for Packet DMA can be
->>>>>> found in:
->>>>>> 	Documentation/devicetree/bindings/dma/keystone-pktdma.txt
->>>>>>
->>>>>> The driver implements the configuration functions using standard DMAEngine
->>>>>> apis. The data movement is managed by QMSS device driver.
->>>>> Pls use subsystem appropriate name so here would have been dmaengine: ...
->>>>>
->>>>> So i am still missing stuff like prepare calls, irq, descriptor management to
->>>>> call this a dmaengine driver.
->>>>>
->>>>> I guess you need to explain a bit more why the data movement is handled by some
->>>>> other driver and not by this one
->>>>>
->>>> To expand above statement, Packet DMA hardware blocks on Keystone SOCs
->>>> are DMAEngines. QMSS is centralised subsystem manages multiple functionalities
->>>> including triggering dma transfers, descriptor management and completion
->>>> irqs. There are separate instance of packet DMA hardware block per client
->>>> device. We program the DMA hardware to allocate channels and flows. So
->>>> the packet DMA resouces like dma channels and dma flows are configured
->>>> and managed through the DMAEngine driver. Thats why we implement only
->>>> device_alloc_chan_resources, device_free_chan_resources and device_control
->>>> DMAEngine APIs.
->>> Sorry am bit lost. If its a dmaengine then you still need to program the
->>> transfers, how does that part work?
->>>
->> To simplify this bit more, you can think of this as DMA channels, flows
->> are allocated and DMA channels are enabled by DMA engine and they remains
->> enabled always as long as the channel in use. Enablling dma channel
->> actually don't start the DMA transfer but just sets up the connection/pipe
->> with peripheral and memory and vice a versa.
->>
->> All the descriptor management, triggering, sending completion interrupt or
->> hardware signal to DMAEngine all managed by centralised QMSS.
->>
->> Actual copy of data is still done by DMA hardware but its completely
->> transparent to software. DMAEngine hardware takes care of that in the
->> backyard.
-> So you will use the dmaengine just for setting up the controller. Not for actual
-> transfers. Those would be governed by the QMSS, right?
->
-Correct.
- 
-> This means that someone expecting to use dmaengine API will get confused about
-> this and doing part (alloc) thru dmaengine and rest (transfers) using some other
-> API. This brings to me the design approach, does it really make sense creating
-> dmaengine driver for this when we are not fully complying to the API
+On Mon, Mar 17, 2014 at 05:29:44PM +0000, Catalin Marinas wrote:
+> On Mon, Mar 17, 2014 at 03:37:38PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Mar 17, 2014 at 10:04:20AM -0500, Rob Herring wrote:
+> > > On Sun, Mar 16, 2014 at 6:52 AM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > >    The MCPM stuff is another issue: what the conditions are there I've
+> > > >    no idea, but it looks like other CPUs will be running when it calls
+> > > >    outer_cache_flush().  MCPM commentry claims that this will be
+> > > >    "harmless" and I just had to laugh at that - even with this workaround
+> > > >    enabled, it doesn't fix the problem on L2C-310 R2P0 as the workaround
+> > > >    implementation only works on R3P0!
+> > > 
+> > > For MCPM, is there even a platform that has a PL310 used as an L3? I
+> > > suppose architecturally it is possible, but in reality it is probably
+> > > not something that's ever been tested.
+> > 
+> > I have no idea about MCPM
 > 
-Thats fair. The rationale behind usage of DMEngine was that its the closest
-available subsystem which can be leveraged for this hardware. We can
-pretty much use all the standard DMAEngine device tree parsing as well as
-the config API to setup DMAs. 
+> I assume that the MCPM comment about outer_cache_flush() being harmless
+> is because it is assumed to be a no-op. In the mach-vexpress/dcscb.c
+> file, there is a v7_exit_coherency_flush() prior to outer_flush_all().
+> While it looks like the right way, the comment for
+> v7_exit_coherency_flush() states that ldrex/strex no longer work after
+> the call.
+> 
+> You could do with a lock-less outer_flush_all(), even though it is a
+> background operation assuming there is no race (single CPU running). I
+> think your big clean-up series is already hiding outer_flush_all() under
+> the L2 disable function.
 
-I think you made your stand clear, just to confirm, you don't prefer this
-driver to be a DMAEngine driver considering it doesn't fully complying to
-the APIs. We could document the deviation of 'transfer' handling to avoid
-any confusion.
+Almost but not quite - here's the last matches by git grep:
 
-Let me know your final thoughts and thanks a lot for the review.
+$ git grep outer_flush_all
+arch/arm/include/asm/outercache.h: * outer_flush_all: clean and invalidate all c
+arch/arm/include/asm/outercache.h:static inline void outer_flush_all(void)
+arch/arm/include/asm/outercache.h: * conditions above concerning outer_flush_all
+arch/arm/include/asm/outercache.h:static inline void outer_flush_all(void) { }
+arch/arm/mach-exynos/pm.c:      outer_flush_all();
+arch/arm/mach-vexpress/dcscb.c:         outer_flush_all();
 
-Regards,
-Santosh
+My worry about MCPM is that it talks about the function containing the
+outer_flush_all() potentially racing with a different CPU coming online.
+It's not clear to me whether that other CPU would be using the same L2
+controller or not:
+
+/*
+ * We can't use regular spinlocks. In the switcher case, it is possible
+ * for an outbound CPU to call power_down() while its inbound counterpart
+ * is already live using the same logical CPU number which trips lockdep
+ * debugging.
+ */
+
+Since this is Nicocode, I think Nicolas has to be the one to sort this
+out.  (Added Nico.)
+
+> But between the secure OS check and the actual operation, Linux could
+> start a background one (the SMP case). If this happens, the hardware
+> generates an error signal, I guess this translates to an external abort
+> (I haven't tried it but it doesn't look to safe for the secure world).
+
+Yes, that's true.  However, the only way to be safe from that would be
+for the non-secure world to totally avoid the background operations
+altogether.  In the case of PL310, that means flushing by set/way or
+by PA line, which can get very expensive if you need to flush the
+entire cache (eg, because it's going to be powered down.)
+
+The more I think about it, the more I come to the conclusion that the
+maintainence side of the L2 cache hasn't been properly thought out in
+trustzone context at hardware design stage.
+
+Even so, we've been performing these background operations for years
+from Linux already, so I'm not about to try and "fix" this problem
+when we haven't had any reports of issues.  Yes, it makes sense to
+drop it from the invalidate/clean functions, because these will only
+ever be used with the streaming DMA APIs, but the flush function can
+be called on some very big areas.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
