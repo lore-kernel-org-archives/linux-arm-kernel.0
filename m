@@ -1,7 +1,7 @@
 From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 17 Mar 2014 11:28:06 +0800
+Date: Mon, 17 Mar 2014 11:28:39 +0800
 Subject: [PATCH] drm/exynos: Fix (more) freeing issues in exynos_drm_drv.c
-Message-ID: <1395026886-14325-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <1395026919-14467-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,9 +11,11 @@ in the error path.
 [0] commit 6ca605f7c70895a35737435f17ae9cc5e36f1466
 drm/exynos: Fix freeing issues in exynos_drm_drv.c
 
-Change-Id: I452e944bf090fb11434d9e34213c890c41c15d73
 Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
 ---
+Hi, I noticed this when reviewing some recent patches.
+I am only able to compile test this patch.
+
  drivers/gpu/drm/exynos/exynos_drm_drv.c | 10 +++++++---
  1 file changed, 7 insertions(+), 3 deletions(-)
 
