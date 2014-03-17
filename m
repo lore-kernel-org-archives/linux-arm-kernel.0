@@ -1,41 +1,21 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Mar 2014 07:20:56 +0900
-Subject: [PATCH 2/2] dt-bindings: clock: Move exynos-audss-clk.h to
- dt-bindings/clock
-In-Reply-To: <531D054E.70008@gmail.com>
-References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
- <1394085884-13081-3-git-send-email-tushar.behera@linaro.org>
- <531D054E.70008@gmail.com>
-Message-ID: <53277548.60300@samsung.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 17 Mar 2014 22:24:48 +0000
+Subject: [PATCH v2 00/14] UEFI support for arm(64)
+In-Reply-To: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20140317222448.GA2815@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/14 09:20, Tomasz Figa wrote:
-> On 06.03.2014 07:04, Tushar Behera wrote:
->> Most of the clock related dt-binding header files are located in
->> dt-bindings/clock folder. It would be good to keep all the similar
->> header files at a single location.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> CC: Kukjin Kim <kgene.kim@samsung.com>
+On Thu, 13 Mar, at 10:46:53PM, Leif Lindholm wrote:
+> Since all prerequisites are not ready for the (32-bit) arm patches to
+> go in, I have broken these out of this set and will be resubmitting
+> them separately.
+> 
+> This set now provides arm64 support only - but includes the code that
+> is common between the ARM ports.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+This series looks OK to me.
 
-Or shall I take this into samsung tree?
-
-Thanks,
-Kukjin
-
->> CC: Tomasz Figa <t.figa@samsung.com>
->> ---
->> arch/arm/boot/dts/exynos5250.dtsi | 2 +-
->> arch/arm/boot/dts/exynos5420.dtsi | 2 +-
->> drivers/clk/samsung/clk-exynos-audss.c | 2 +-
->> .../dt-bindings/{clk => clock}/exynos-audss-clk.h | 0
->> 4 files changed, 3 insertions(+), 3 deletions(-)
->> rename include/dt-bindings/{clk => clock}/exynos-audss-clk.h (100%)
->
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
->
-> Best regards,
-> Tomasz
+-- 
+Matt Fleming, Intel Open Source Technology Center
