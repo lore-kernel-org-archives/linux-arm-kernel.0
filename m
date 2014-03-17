@@ -1,187 +1,85 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 17 Mar 2014 16:28:46 +0100
-Subject: [PATCH v3 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
-In-Reply-To: <1395068788-19786-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
- <1395068788-19786-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <532714AE.2040206@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 17 Mar 2014 16:20:50 +0100
+Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
+In-Reply-To: <20140317044453.GA18210@quad.lixom.net>
+References: <53061EBA.1080002@monstr.eu> <531D746A.4020903@monstr.eu>
+ <20140311213331.GA6429@quad.lixom.net> <53204D22.2000703@monstr.eu>
+ <20140317044453.GA18210@quad.lixom.net>
+Message-ID: <532712D2.4020004@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2014 04:06 PM, Antoine T?nart wrote:
-> Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin family).
-> The SoC has nodes for cpu, l2 cache controller, interrupt controllers, local
-> timer, apb timers and uarts for now.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q.dtsi | 210 ++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 210 insertions(+)
->   create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> new file mode 100644
-> index 000000000000..7a50267b1044
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-[...]
-> +
-> +	smclk: sysmgr-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +	};
-> +
+Hi,
 
-Antoine,
+please pull these changes to your arm-soc tree. This branch is based
+on zynq/dt branch.
+Based on my discussion with Olof I have removed zynq-ocm driver
+from this pull request and we will investigate different solution
 
-sorry I missed it the first time. Please add:
+Changes in v3: Remove OCM driver from pull request
+Changes in v2: Fix incorrect git repo url
 
-+	cfgclk: config-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+	};
-+
+Thanks,
+Michal
 
-> +	cpuclk: cpu-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1200000000>;
-> +	};
-> +
-> +	sysclk: system-clock {
-> +		compatible = "fixed-factor-clock";
-> +		#clock-cells = <0>;
-> +		clocks = <&cpuclk>;
-> +		clock-multi = <1>;
-> +		clock-div = <3>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		ranges = <0 0xf7000000 0x1000000>;
-> +		interrupt-parent = <&gic>;
-> +
-> +		l2: l2-cache-controller at ac0000 {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0xac0000 0x1000>;
-> +			cache-level = <2>;
-> +		};
-> +
-> +		local-timer at ad0600 {
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0xad0600 0x20>;
-> +			clocks = <&sysclk>;
-> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		gic: interrupt-controller at ad1000 {
-> +			compatible = "arm,cortex-a9-gic";
-> +			reg = <0xad1000 0x1000>, <0xad0100 0x100>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +		};
-> +
-> +		apb at e80000 {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			ranges = <0 0xe80000 0x10000>;
-> +			interrupt-parent = <&aic>;
-> +
-> +			timer0: timer at 2c00 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c00 0x14>;
-> +				interrupts = <8>;
-> +				clock-freq = <100000000>;
 
-replace this and all below with:
+The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
 
-clocks = <&cfgclk>;
+  arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
 
-> +			};
-> +
-> +			timer1: timer at 2c14 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c14 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer2: timer at 2c28 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c28 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer3: timer at 2c3c {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c3c 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer4: timer at 2c50 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c50 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer5: timer at 2c64 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c64 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer6: timer at 2c78 {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c78 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer7: timer at 2c8c {
-> +				compatible = "snps,dw-apb-timer";
-> +				reg = <0x2c8c 0x14>;
-> +				clock-freq = <100000000>;
-> +				status = "disabled";
-> +			};
-> +
-[...]
-> +
-> +			uart0: uart at 9000 {
-> +				compatible = "snps,dw-apb-uart";
-> +				reg = <0x9000 0x100>;
-> +				interrupt-parent = <&sic>;
-> +				interrupts = <8>;
-> +				clock-frequency = <25000000>;
+are available in the git repository at:
 
-and clocks = <&smclk> here and below.
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.15-v2
 
-> +				reg-shift = <2>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart1: uart at a000 {
-> +				compatible = "snps,dw-apb-uart";
-> +				reg = <0xa000 0x100>;
-> +				interrupt-parent = <&sic>;
-> +				interrupts = <9>;
-> +				clock-frequency = <25000000>;
-> +				reg-shift = <2>;
-> +				status = "disabled";
-> +			};
+for you to fetch changes up to bffc3b8d2197f5e0622a6f0afb30bffeb326f942:
 
-Apart from it, this really looks good and I'll pick it up
-as soon as I have setup git branches.
+  ARM: zynq: Add support for SOC_BUS (2014-03-17 15:13:25 +0100)
 
-Sebastian
+----------------------------------------------------------------
+arm: Xilinx Zynq cleanup patches for v3.15
+
+- Redesign SLCR initialization to enable
+  driver developing which targets SLCR space
+- Add SOC_BUS support
+
+----------------------------------------------------------------
+Michal Simek (7):
+      ARM: zynq: Split slcr in two parts
+      ARM: zynq: Map I/O memory on clkc init
+      ARM: zynq: Add and use zynq_slcr_read/write() helper functions
+      ARM: zynq: Introduce zynq_slcr_unlock()
+      ARM: zynq: Move of_clk_init from clock driver
+      ARM: zynq: Add waituart implementation
+      ARM: zynq: Add support for SOC_BUS
+
+Steffen Trumtrar (3):
+      ARM: zynq: Move clock_init from slcr to common
+      ARM: zynq: Hang iomapped slcr address on device_node
+      ARM: zynq: Make zynq_slcr_base static
+
+ Documentation/devicetree/bindings/clock/zynq-7000.txt |   4 ++-
+ arch/arm/boot/dts/zynq-7000.dtsi                      |  49 ++++++++++++++-------------
+ arch/arm/include/debug/zynq.S                         |   3 ++
+ arch/arm/mach-zynq/Kconfig                            |   2 ++
+ arch/arm/mach-zynq/common.c                           |  80 ++++++++++++++++++++++++++++++++++++++++++--
+ arch/arm/mach-zynq/common.h                           |   3 +-
+ arch/arm/mach-zynq/slcr.c                             | 123 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
+ drivers/clk/zynq/clkc.c                               |  89 ++++++++++++++++++++++++++++++++++---------------
+ include/linux/clk/zynq.h                              |   2 +-
+ 9 files changed, 285 insertions(+), 70 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/774400d2/attachment.sig>
