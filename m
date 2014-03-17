@@ -1,53 +1,49 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 17 Mar 2014 19:53:10 +0530
-Subject: [PATCH v2 1/3] ARM: EXYNOS: Map PMU address through DT
-In-Reply-To: <1395061795-17777-2-git-send-email-vikas.sajjan@samsung.com>
-References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
- <1395061795-17777-2-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAK9yfHyF9t0fsO86cqHvAzaWKa17=2MkFq6mhoL0-mwjw6OXQQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Mar 2014 10:23:30 -0400
+Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
+In-Reply-To: <201403171111.30596.arnd@arndb.de>
+References: <20140301052536.GS1872@titan.lakedaemon.net>
+ <20140304025559.GY1872@titan.lakedaemon.net>
+ <201403171111.30596.arnd@arndb.de>
+Message-ID: <20140317142330.GG15608@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+On Mon, Mar 17, 2014 at 11:11:30AM +0100, Arnd Bergmann wrote:
+> On Tuesday 04 March 2014, Jason Cooper wrote:
+> > V2: removed the dove PMU interrupt node (er, undid the re-addition of
+> > the node.  ie: let the revert stand).  So, commit id's for this pull
+> > only are changed.  No previous pulls or tags affected.  Confirmed the
+> > change with a diff between the old branch and the new branch.  And did a
+> > run of building dtbs.  No problems.  Sorry for the confusion.
+> > 
+> > Russell just raised a very valid point today regarding the overall
+> > design of an eventual PMU driver that would cover several tasks we
+> > hadn't considered with the original binding.  Better to pull it now than
+> > have to support it indefinitely.  Revert of the driver in the works.
+> > 
+> > --- original text ---
+> > 
+> > Here's another rather large round of DT changes for mvebu.  It's all
+> > summed up below and has been in -next for a while now.
+> > 
+> > This is an incremental pull from tags/mvebu-dt-3.15-2 in the mvebu/dt
+> > branch up to tags/mvebu-dt-3.15-3.
+> > 
+> 
+> Pulled into next/dt now, along with the #4 and #5. I got a trivial
+> merge conflict against the dts Makefile change from mach-qcom and
+> noticed that splitting up the dtb section into per-soc breaks
+> alphabetical ordering, which I changed in the merge by moving
+> it down to the end of the list.
 
-On 17 March 2014 18:39, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Instead of hardcoding the PMU details for each SoC, pass this information
-> through device tree (DT).
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->  .../devicetree/bindings/arm/samsung/pmu.txt        |    5 +-
->  arch/arm/boot/dts/exynos4.dtsi                     |    5 ++
->  arch/arm/boot/dts/exynos5260.dtsi                  |    5 ++
->  arch/arm/mach-exynos/common.c                      |   51 +++++++++++++-------
->  arch/arm/mach-exynos/include/mach/map.h            |    3 --
->  5 files changed, 47 insertions(+), 22 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> index f1f1552..667a7f0 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> @@ -2,14 +2,15 @@ SAMSUNG Exynos SoC series PMU Registers
->
->  Properties:
->   - compatible : should contain two values. First value must be one from following list:
-> +                  - "samsung,exynos4210-pmu" - for Exynos4210 and Exynos4x12 SoC,
->                    - "samsung,exynos5250-pmu" - for Exynos5250 SoC,
-> -                  - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
-> +                  - "samsung,exynos5420-pmu" - for Exynos5420 and Exynos5260 SoC.
->                 second value must be always "syscon".
->
->   - reg : offset and length of the register set.
->
->  Example :
->  pmu_system_controller: system-controller at 10040000 {
-> -       compatible = "samsung,exynos5250-pmu", "syscon";
-> +       compatible = "samsung,exynos5250-pmu";
+Ok, I was trying to reduce conflicts by leaving things in place, then
+do a fixes-non-critical patch to put things back in alphabetical order
+after the dust had settled.
 
-If you have removed "syscon" deliberately above, then you should also
-remove the same in the
-binding description which says "second value must be always "syscon".".
+Stephen will probably want me to drop my resolution in mvebu's for-next
+so that we don't conflict.
 
--- 
-With warm regards,
-Sachin
+thx,
+
+Jason.
