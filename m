@@ -1,41 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Mar 2014 21:14:55 +0000
-Subject: PL310 errata workarounds
-In-Reply-To: <alpine.LFD.2.11.1403171651440.1291@knanqh.ubzr>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140314150110.GQ21483@n2100.arm.linux.org.uk>
- <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
- <20140316115207.GW21483@n2100.arm.linux.org.uk>
- <CAL_Jsq+9Dm9S6rhQAt_umOM6T_x21O=Y_PPg0QyCH1zR_=yWoA@mail.gmail.com>
- <20140317153738.GB21483@n2100.arm.linux.org.uk>
- <20140317172943.GI24070@arm.com>
- <20140317194440.GG21483@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1403171651440.1291@knanqh.ubzr>
-Message-ID: <20140317211455.GM21483@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Mar 2014 14:17:44 -0700
+Subject: [PATCH v5 0/9] Use regmap+devm+DT in pm8xxx input drivers
+In-Reply-To: <531F4CC8.5010202@codeaurora.org>
+References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
+ <531F4CC8.5010202@codeaurora.org>
+Message-ID: <53276678.6060000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 05:09:46PM -0400, Nicolas Pitre wrote:
-> L2 is normally a per cluster resource.  It is flushed by the last man 
-> standing when no other CPUs might contend for the L2 controller.  And if 
-> the outer cache is shared by multiple clusters then some additional 
-> handling (such as "last cluster standing") would need to be implemented.
-> 
-> Clearly this outer_cache_flush() call is just a hint if someone were to 
-> copy that file to write their own backend.  If it is causing problems 
-> then it should just be removed altogether.  No platforms with MCPM that 
-> I know of have an actual outer cache at the moment.  And certainly not 
-> the platform where dcscb.c is used.
+ping?
 
-This sounds to me like an invitation to kill it :)  Killing it off
-would be good, though maybe a comment should be left behind at this
-site?
+On 03/11/14 10:50, Stephen Boyd wrote:
+> ping?
+>
+> On 03/04/14 10:34, Stephen Boyd wrote:
+>> These patches move the pm8xxx input drivers over to use devm_* APIs
+>> and regmap. This breaks the dependency of these drivers on the pm8xxx
+>> specific read/write calls and also simplifies the probe code a bit.
+>> Finally we add devicetree support to these drivers so they can be probed
+>> on the platforms that are supported upstream.
+>>
+>> Changes since v4:
+>>  * Added reg property to bindings
+>>  * Added linux,* properties to keypad binding
+>>
+>> Changes since v3:
+>>  * Dropped devm conversion patch for pwrkey
+>>  * Fixed compilation of keypad
+>>
+>> Changes since v2:
+>>  * Rebased to v3.14-rc3
+>>
+>> Changes since v1:
+>>  * Picked up Dmitry's version of devm for pwrkey
+>>  * Added DT bindings and parsing patches
+>>  * Dropped patches picked up by Dmitry
+>>
+>> Stephen Boyd (9):
+>>   Input: pmic8xxx-keypad - Fix build by removing gpio configuration
+>>   Input: pmic8xxx-keypad - Migrate to devm_* APIs
+>>   Input: pmic8xxx-keypad - Migrate to regmap APIs
+>>   Input: pmic8xxx-keypad - Migrate to DT
+>>   Input: pmic8xxx-pwrkey - Migrate to DT
+>>   Input: pm8xxx-vibrator - Add DT match table
+>>   devicetree: bindings: Document PM8921/8058 keypads
+>>   devicetree: bindings: Document PM8921/8058 power keys
+>>   devicetree: bindings: Document PM8921/8058 vibrators
+>>
+>>  .../bindings/input/qcom,pm8xxx-keypad.txt          |  89 ++++++
+>>  .../bindings/input/qcom,pm8xxx-pwrkey.txt          |  46 +++
+>>  .../devicetree/bindings/input/qcom,pm8xxx-vib.txt  |  22 ++
+>>  drivers/input/keyboard/pmic8xxx-keypad.c           | 348 ++++++++-------------
+>>  drivers/input/misc/pm8xxx-vibrator.c               |   8 +
+>>  drivers/input/misc/pmic8xxx-pwrkey.c               |  33 +-
+>>  include/linux/input/pmic8xxx-keypad.h              |  52 ---
+>>  include/linux/input/pmic8xxx-pwrkey.h              |  31 --
+>>  8 files changed, 316 insertions(+), 313 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-keypad.txt
+>>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
+>>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-vib.txt
+>>  delete mode 100644 include/linux/input/pmic8xxx-keypad.h
+>>  delete mode 100644 include/linux/input/pmic8xxx-pwrkey.h
+>>
+>
 
-As you're the most familiar with this code, I'd prefer to commit a
-patch from you rather than just deleting the reference myself.
-
-Thanks.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
