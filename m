@@ -1,106 +1,52 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 17 Mar 2014 18:46:24 -0500
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <CAK=WgbYjtw+cxy5wX6pjK=Rpj6wOk6Cu+GrPuFN+sqtgDAY=_Q@mail.gmail.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <52F9282B.5000702@ti.com> <530B8C00.8020001@ti.com>
- <CAK=WgbZp_RQPCeZJyMRkNTQxaJsnGZ3DnjhSkYYR_-PAE_Kp4g@mail.gmail.com>
- <53239789.40600@ti.com>
- <CAK=WgbZCzA7JovSxnysHCQRZZWc3Z2j3AS8ekpM9fOZ160rmCA@mail.gmail.com>
- <532748B7.1080606@ti.com>
- <CAK=WgbYjtw+cxy5wX6pjK=Rpj6wOk6Cu+GrPuFN+sqtgDAY=_Q@mail.gmail.com>
-Message-ID: <53278950.5030905@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Mar 2014 23:52:29 +0000
+Subject: [GIT PULL] uprobes: Add uprobes support for ARM
+In-Reply-To: <531F5799.2070302@linaro.org>
+References: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
+ <531F5799.2070302@linaro.org>
+Message-ID: <20140317235229.GQ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On 03/17/2014 02:47 PM, Ohad Ben-Cohen wrote:
-> Hi Suman,
+On Tue, Mar 11, 2014 at 02:36:09PM -0400, David Long wrote:
+>   git://git.linaro.org/people/dave.long/linux.git uprobes-v7
 > 
-> On Mon, Mar 17, 2014 at 9:10 PM, Suman Anna <s-anna@ti.com> wrote:
->> base_id would be a property (if added) of the hwspinlock controller node,
->> and from DT perspective, we will be using the phandle for the controller
->> anyway. So, using a base_id+specifier seems redundant, as the specifier is
->> already w.r.t a hwspinlock controller node.  It is best to leave the base_id
->> out, just use the specifier. This is pretty much the standard practice
->> (GPIOs, DMAs, etc all follow this).
+> for you to fetch changes up to e55c35236b8adf79453a998506ec6081833b9484:
 > 
-> Do you mean hwspin_lock_get_id() will return just the specifier
-> instead of base_id+specifier? This is problematic, because Linux will
-> not be able to communicate this lock id outside to a different core
-> running a different OS: that OS will have no idea what hwlock
-> controller this is relative to.
+>   ARM: add uprobes support (2014-03-11 11:40:29 -0400)
 
-The behavior of hwspin_lock_get_id() is unchanged, so you will still get
-the global lock id back. The hwspin_lock_request_specific() (note: not
-the OF one) will also still be operating on the global lock id.
+I pulled this a week ago into my devel-testing (which is unpublished),
+and while it hasn't shown any signs of functional problems, I was just
+about to merge it into devel-stable when I noticed the history.
 
-> 
->> Please see the comments from Mark regarding the same on an earlier version.
-> 
-> I think I understand and agree with Mark generally, but in this case,
-> the hwlock id is not an implementation detail. Unlike GPIOs/DMAs, this
-> id number is global and system-wide (Linux is just one component in
-> the system, and must use the same predefined id numbers all other
-> cores use, otherwise it will be impossible to use those hwlocks for
-> multi-core synchronization).
-> 
->> Yes, I agree this is an issue if we have to have the base_ids fixed per
->> controller.
-> 
-> Do you see any other way this could work if the base_ids were not
-> predefined? Linux and some other core running a different OS must
-> agree on the id numbers of the hardware locks we have in the system.
+This is based upon:
 
-So far, we have not come across multiple controllers. I see your point,
-and I think this also depends on the semantics of how you exchange the
-lock id number. The agreement at the moment is on base_ids across
-multiple SoC components. If the semantics involve exchanging the
-controller instance, for example, then we might get away with it. But
-that probably involves adding additional helpers to retrieve controller
-instance in addition to lock number, or some other similar functions.
-I can add back the hwlock-base-id binding to the controller node.
+Merge branch 'for-next' of git://git.samba.org/sfrench/cifs-2.6
++ Linux 3.11
++ Merge branch 'perf-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
++ Linux 3.12-rc5
++ Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
++ Linux 3.13-rc3
++ Linux 3.13-rc4
++ Linux 3.13-rc8
++ Linux 3.14-rc2
++ Linux 3.14-rc4
++ Linux 3.14-rc5
+|
+[your uprobes patches]
 
-Mark, Kumar,
-Do you have any issues adding back this element for registration purposes?
+where each + is a merge of the named commit into the previous.  This is
+the kind of thing which will make Linus quite unhappy: please base
+patches off a plain -rc release, not off a merge commit.
 
-> 
->>> Before DT came along, early board code could have reserved specific
->>> hwspinlocks if needed. Now with DT, we should add the list of reserved
->>> locks to the controller node, in order to prevent them from being
->>> dynamically allocated by others.
->>
->>
->> But that strictly relied on the order of requests without any core changes
->> in the hwspinlock core, right.
-> 
-> I don't think so, you could request a specific lock by id number.
+I'm sure there's others on the mailing list who can guide you on this
+point, but I do need to ask you to re-spin without those merges.  I'm
+happy to take a respin of it provided it's based on 3.14-rc5 (so I can
+more easily confirm that there aren't any changes which I haven't
+already tested.)
 
-Sorry, I should have rephrased it better - by order, I meant the
-inherent order between board early code and other drivers. With DT, we
-cannot guarantee that right, as specific locks are requested from drivers.
+Thanks, and sorry about the lateness of this email.
 
-> 
->> With DT, the early board code is much simplified. Looking at the same
->> scenario from DT case, it seems kinda redundant to specify a set of reserved
->> locks both in the controller node, as well as the respective client drivers,
->> as there is almost no platform data with DT. The only use case for DT client
->> nodes would be for requesting specific locks. I agree with the problem you
->> described, and I think it will require a different set of changes to the
->> core.
-> 
-> Exactly. The platform-specific hwspinlock driver will have to inform
-> the core, upon registration, which of the locks are already reserved.
-> In turn, the core will never provide them to clients that dynamically
-> allocate an hwlock: they will be provided only to clients that ask for
-> them specifically (using phandle+specifier).
-
-Understood. And we may have to assign the client association with a lock
-as well. These are core changes that were actually not needed in the
-non-DT case due to the inherent order as stated above. So, are you
-suggesting that we add one more property to the controller node to mark
-which are reserved, or rely on constructing this through DT tree parsing?
-
-regards
-Suman
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
