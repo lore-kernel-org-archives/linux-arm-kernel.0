@@ -1,25 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 11:22:41 +0100
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15 (incr. #2)
-In-Reply-To: <20140307165545.GF18707@titan.lakedaemon.net>
-References: <20140307165545.GF18707@titan.lakedaemon.net>
-Message-ID: <201403171122.41737.arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 17 Mar 2014 12:24:05 +0200
+Subject: [PATCH v15][ 1/3] video: Kconfig: fbdev: restore the broader
+ selection of FB_IMX
+In-Reply-To: <1394794553-14719-1-git-send-email-denis@eukrea.com>
+References: <1394794553-14719-1-git-send-email-denis@eukrea.com>
+Message-ID: <5326CD45.2010506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 March 2014, Jason Cooper wrote:
-> Guys,
+On 14/03/14 12:55, Denis Carikli wrote:
+> The following patch:
+>   b359bb0 video: Kconfig: Allow more broad selection of the imxfb framebuffer driver.
+> Was accidentally reverted by this one:
+>   ed3b5f2 Merge branch '3.15/fb-reorder' into for-next
 > 
-> Nothing big here.  This is the last pull for mvebu/drivers for v3.15.
-> As usual, this is an incremental pull request from
-> tags/mvebu-drivers-3.15 in the mvebu/drivers branch up to
-> tags/mvebu-drivers-3.15-2.
-> 
-> After a week of silence, I let the power maintainers know that I'd like
-> to take this and to speak up if that wasn't ok.  It's been a week since.
-> This is also very isolated, so there shouldn't be any merge conflicts.
->
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-Pulled into next/drivers, thanks!
+Thanks. I've fixed it.
 
-	Arnd
+It was my merge mistake.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/52c7e205/attachment.sig>
