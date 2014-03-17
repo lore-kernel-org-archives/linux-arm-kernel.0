@@ -1,85 +1,166 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:16:30 +0000
-Subject: [PATCH 35/44] ARM: outer cache: add WARN_ON() to outer_disable()
+Date: Mon, 17 Mar 2014 00:16:35 +0000
+Subject: [PATCH 36/44] ARM: l2c: move errata configuration options to
+ arch/arm/mm/Kconfig
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLEE-0002eD-3f@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEJ-0002eH-7H@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add WARN_ON() conditions to outer_disable() to ensure that its
-requirements aren't violated.
+Move the L2C-310 errata configuration options to arch/arm/mm/Kconfig
+along side the option which enables support for this device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/outercache.h |  7 ++-----
- arch/arm/mm/Makefile              |  1 +
- arch/arm/mm/l2c-common.c          | 20 ++++++++++++++++++++
- 3 files changed, 23 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mm/l2c-common.c
+ arch/arm/Kconfig    | 51 ---------------------------------------------------
+ arch/arm/mm/Kconfig | 51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index bd80540fe8b9..1ee2cf23fae1 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -21,6 +21,7 @@
- #ifndef __ASM_OUTERCACHE_H
- #define __ASM_OUTERCACHE_H
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 50ccc1fdb0cb..3a0b24e4ffe9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1230,19 +1230,6 @@ config ARM_ERRATA_742231
+ 	  register of the Cortex-A9 which reduces the linefill issuing
+ 	  capabilities of the processor.
  
-+#include <linux/bug.h>
- #include <linux/types.h>
+-config PL310_ERRATA_588369
+-	bool "PL310 errata: Clean & Invalidate maintenance operations do not invalidate clean lines"
+-	depends on CACHE_L2X0
+-	help
+-	   The PL310 L2 cache controller implements three types of Clean &
+-	   Invalidate maintenance operations: by Physical Address
+-	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
+-	   They are architecturally defined to behave as the execution of a
+-	   clean operation followed immediately by an invalidate operation,
+-	   both performing to the same memory location. This functionality
+-	   is not correctly implemented in PL310 as clean lines are not
+-	   invalidated as a result of these operations.
+-
+ config ARM_ERRATA_643719
+ 	bool "ARM errata: LoUIS bit field in CLIDR register is incorrect"
+ 	depends on CPU_V7 && SMP
+@@ -1265,17 +1252,6 @@ config ARM_ERRATA_720789
+ 	  tables. The workaround changes the TLB flushing routines to invalidate
+ 	  entries regardless of the ASID.
  
- struct outer_cache_fns {
-@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
-  * cache is pushed out to lower levels of system memory.  The note and
-  * conditions above concerning outer_flush_all() applies here.
-  */
--static inline void outer_disable(void)
--{
--	if (outer_cache.disable)
--		outer_cache.disable();
--}
-+extern void outer_disable(void);
+-config PL310_ERRATA_727915
+-	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
+-	depends on CACHE_L2X0
+-	help
+-	  PL310 implements the Clean & Invalidate by Way L2 cache maintenance
+-	  operation (offset 0x7FC). This operation runs in background so that
+-	  PL310 can handle normal accesses while it is in progress. Under very
+-	  rare circumstances, due to this erratum, write data can be lost when
+-	  PL310 treats a cacheable write transaction during a Clean &
+-	  Invalidate by Way operation.
+-
+ config ARM_ERRATA_743622
+ 	bool "ARM errata: Faulty hazard checking in the Store Buffer may lead to data corruption"
+ 	depends on CPU_V7
+@@ -1301,21 +1277,6 @@ config ARM_ERRATA_751472
+ 	  operation is received by a CPU before the ICIALLUIS has completed,
+ 	  potentially leading to corrupted entries in the cache or TLB.
  
- /**
-  * outer_resume: restore the cache configuration and re-enable outer cache
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 7f39ce2f841f..de5a6a27081b 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
- AFLAGS_proc-v6.o	:=-Wa,-march=armv6
- AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
+-config PL310_ERRATA_753970
+-	bool "PL310 errata: cache sync operation may be faulty"
+-	depends on CACHE_PL310
+-	help
+-	  This option enables the workaround for the 753970 PL310 (r3p0) erratum.
+-
+-	  Under some condition the effect of cache sync operation on
+-	  the store buffer still remains when the operation completes.
+-	  This means that the store buffer is always asked to drain and
+-	  this prevents it from merging any further writes. The workaround
+-	  is to replace the normal offset of cache sync operation (0x730)
+-	  by another offset targeting an unmapped PL310 register 0x740.
+-	  This has the same effect as the cache sync operation: store buffer
+-	  drain and waiting for all buffers empty.
+-
+ config ARM_ERRATA_754322
+ 	bool "ARM errata: possible faulty MMU translations following an ASID switch"
+ 	depends on CPU_V7
+@@ -1364,18 +1325,6 @@ config ARM_ERRATA_764369
+ 	  relevant cache maintenance functions and sets a specific bit
+ 	  in the diagnostic control register of the SCU.
  
-+obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
- obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
-diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
-new file mode 100644
-index 000000000000..10a3cf28c362
---- /dev/null
-+++ b/arch/arm/mm/l2c-common.c
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) 2010 ARM Ltd.
-+ * Written by Catalin Marinas <catalin.marinas@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/bug.h>
-+#include <linux/smp.h>
-+#include <asm/outercache.h>
+-config PL310_ERRATA_769419
+-	bool "PL310 errata: no automatic Store Buffer drain"
+-	depends on CACHE_L2X0
+-	help
+-	  On revisions of the PL310 prior to r3p2, the Store Buffer does
+-	  not automatically drain. This can cause normal, non-cacheable
+-	  writes to be retained when the memory system is idle, leading
+-	  to suboptimal I/O performance for drivers using coherent DMA.
+-	  This option adds a write barrier to the cpu_idle loop so that,
+-	  on systems with an outer cache, the store buffer is drained
+-	  explicitly.
+-
+ config ARM_ERRATA_775420
+        bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
+        depends on CPU_V7
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index ca8ecdee47d8..118d691e70f5 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -897,6 +897,57 @@ config CACHE_PL310
+ 	  This option enables optimisations for the PL310 cache
+ 	  controller.
+ 
++config PL310_ERRATA_588369
++	bool "PL310 errata: Clean & Invalidate maintenance operations do not invalidate clean lines"
++	depends on CACHE_L2X0
++	help
++	   The PL310 L2 cache controller implements three types of Clean &
++	   Invalidate maintenance operations: by Physical Address
++	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
++	   They are architecturally defined to behave as the execution of a
++	   clean operation followed immediately by an invalidate operation,
++	   both performing to the same memory location. This functionality
++	   is not correctly implemented in PL310 as clean lines are not
++	   invalidated as a result of these operations.
 +
-+void outer_disable(void)
-+{
-+	WARN_ON(!irqs_disabled());
-+	WARN_ON(num_online_cpus() > 1);
++config PL310_ERRATA_727915
++	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
++	depends on CACHE_L2X0
++	help
++	  PL310 implements the Clean & Invalidate by Way L2 cache maintenance
++	  operation (offset 0x7FC). This operation runs in background so that
++	  PL310 can handle normal accesses while it is in progress. Under very
++	  rare circumstances, due to this erratum, write data can be lost when
++	  PL310 treats a cacheable write transaction during a Clean &
++	  Invalidate by Way operation.
 +
-+	if (outer_cache.disable)
-+		outer_cache.disable();
-+}
++config PL310_ERRATA_753970
++	bool "PL310 errata: cache sync operation may be faulty"
++	depends on CACHE_PL310
++	help
++	  This option enables the workaround for the 753970 PL310 (r3p0) erratum.
++
++	  Under some condition the effect of cache sync operation on
++	  the store buffer still remains when the operation completes.
++	  This means that the store buffer is always asked to drain and
++	  this prevents it from merging any further writes. The workaround
++	  is to replace the normal offset of cache sync operation (0x730)
++	  by another offset targeting an unmapped PL310 register 0x740.
++	  This has the same effect as the cache sync operation: store buffer
++	  drain and waiting for all buffers empty.
++
++config PL310_ERRATA_769419
++	bool "PL310 errata: no automatic Store Buffer drain"
++	depends on CACHE_L2X0
++	help
++	  On revisions of the PL310 prior to r3p2, the Store Buffer does
++	  not automatically drain. This can cause normal, non-cacheable
++	  writes to be retained when the memory system is idle, leading
++	  to suboptimal I/O performance for drivers using coherent DMA.
++	  This option adds a write barrier to the cpu_idle loop so that,
++	  on systems with an outer cache, the store buffer is drained
++	  explicitly.
++
+ config CACHE_TAUROS2
+ 	bool "Enable the Tauros2 L2 cache controller"
+ 	depends on (ARCH_DOVE || ARCH_MMP || CPU_PJ4)
 -- 
 1.8.3.1
