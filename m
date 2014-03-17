@@ -1,79 +1,152 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Mar 2014 12:04:47 +0000
-Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <CAPrCYkeFwRVNUtP4mbv=Atejb8F9kR=OBrCZ7GGvVrwqnmH6jA@mail.gmail.com>
-References: <1395048095-32745-1-git-send-email-vkale@apm.com>
- <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
- <CAPrCYkfxGVey_fQ47RO=XNnWYNM0qckdj9gMUZtZHkz6hR85xQ@mail.gmail.com>
- <20140317114421.GH8070@e106331-lin.cambridge.arm.com>
- <CAPrCYkeFwRVNUtP4mbv=Atejb8F9kR=OBrCZ7GGvVrwqnmH6jA@mail.gmail.com>
-Message-ID: <20140317120447.GI8070@e106331-lin.cambridge.arm.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Mon, 17 Mar 2014 17:38:58 +0530
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+Message-ID: <CAKrE-KdsPD8Q+UWaqJMMgskvhZ0oTeCyO2AQ9-mBDZR76KzSjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 12:01:56PM +0000, Vinayak Kale wrote:
-> On Mon, Mar 17, 2014 at 5:14 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Mar 17, 2014 at 11:22:55AM +0000, Vinayak Kale wrote:
-> >> On Mon, Mar 17, 2014 at 4:03 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Mon, Mar 17, 2014 at 09:21:35AM +0000, Vinayak Kale wrote:
-> >> >> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
-> >> >>
-> >> >> Please note that this patch has dependancy on a GIC driver patch [1] which is
-> >> >> yet to be approved by maintainers.
-> >> >>
-> >> >> [1]- https://lkml.org/lkml/2014/2/27/605
-> >> >> (irqchip:gic: change access of gicc_ctrl register to read modify write)
-> >> >>
-> >> >> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> >> >> ---
-> >> >>  arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
-> >> >>  1 file changed, 5 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> >> >> index d37d736..587348d 100644
-> >> >> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> >> >> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> >> >> @@ -97,6 +97,11 @@
-> >> >>               clock-frequency = <50000000>;
-> >> >>       };
-> >> >>
-> >> >> +     pmu {
-> >> >> +             compatible = "arm,armv8-pmuv3";
-> >> >> +             interrupts = <1 12 0xff04>;
-> >> >> +     };
-> >> >
-> >> > Do Potenza CPUs only have the PMUv3 events, and nothing
-> >> > Potenza-specific?
-> >> On top of PMUv3 events, Potenza CPU do have few implementation defined events.
-> >
-> > Ok. So Potenza is compatible with PMUv3 (and can have it in the list),
-> > but also has additional features for which there should be a string.
-> >
-> >> >
-> >> > I would have expected something like:
-> >> >
-> >> > compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-> >> PMUv3 allows to have implementation defined events. And as such the
-> >> driver doesn't have any dependency on such events. Do you still think
-> >> we need additional compatible string for Potenza CPU?
-> >
-> > I do. This is precisely the reason for the compatible list. Being as
-> > explicit as possible with the compatible list entries and having a
-> > series of fallbacks is the sensible thing to do.
-> >
-> > Having the additional string allows things to work now with the standard
-> > events, and possibly later with the full set of events, without
-> > requiring every single DTB to be updated. It also allows us to target
-> > workarounds more precisely, for any issues we might not currently be
-> > aware of.
-> 
-> Okay, will add the new string in next version.
-> 
-> For documentation of bindings for "apm,potenza-pmu", can I insert it
-> in existing arm-pmu bindings file
-> (i.e.Documentation/devicetree/bindings/arm/pmu.txt) or shall I create
-> new file?
+On Mon, Mar 17, 2014 at 5:33 PM, Girish K S <ks.giri@samsung.com> wrote:
+> This patch adds the dt node for the mailbox IP
+>
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>
+> Change-Id: I35e45e9a62592887a84a909aee54f259a2f731fa
 
-Drop it in the existing file.
+Sorry for this. will modify in the v2 with other comments
 
-Mark.
+> ---
+>  .../bindings/mailbox/samsung-mailbox.txt           |   24 +++++++
+>  arch/arm64/boot/dts/samsung-gh7.dtsi               |   66 ++++++++++++++++++++
+>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts           |    3 +
+>  3 files changed, 93 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+> new file mode 100644
+> index 0000000..1908d71
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+> @@ -0,0 +1,24 @@
+> +
+> +Samsung Mailbox Driver
+> +
+> +Required properties:
+> +- compatible:          Should be one of the following,
+> +                           "samsung,gh7-mailbox" for
+> +                               Samsung GH7 SoC series
+> +                           "samsung,exynos-mailbox" for
+> +                               exynosx SoC series
+> +- reg:                 Contains the mailbox register address range (base address
+> +                       and length)
+> +- interrupts:          Contains the interrupt information for the mailbox
+> +                       device.
+> +- samsung,mbox-names:  Array of the names of the mailboxes
+> +
+> +Example:
+> +
+> +/* Samsung GH7 SoC */
+> +mailbox at 100a0000 {
+> +       compatible = "samsung,gh7-mailbox";
+> +       reg = <0x0 0x100a0000 0x0 0x1000>;
+> +       interrupts = <0 310 0>;
+> +       samsung,mbox-names = "a7q-scp";
+> +};
+> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> index c3610bd..be4cce9 100644
+> --- a/arch/arm64/boot/dts/samsung-gh7.dtsi
+> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> @@ -107,5 +107,71 @@
+>                         interrupts = <0 420 0>;
+>                         arm,primecell-periphid = <0x341011>; /* HACK */
+>                 };
+> +
+> +       };
+> +
+> +       mailbox at 100a0000 {
+> +               compatible = "samsung,gh7-mailbox";
+> +               reg = <0x0 0x100a0000 0x0 0x1000>;
+> +               interrupts = <0 310 0>;
+> +               samsung,mbox-names = "a7q-scp";
+> +               status = "disabled";
+> +       };
+> +
+> +       mailbox at 24100000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   < 0x0 0x24100000 0x0 0x10000>;
+> +               interrupts = <0 251 0>;
+> +               samsung,mbox-names = "ncp-a7q-0";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24110000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24110000 0x0 0x10000>;
+> +               interrupts = <0 252 0>;
+> +               samsung,mbox-names = "ncp-a7q-1";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24120000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24120000 0x0 0x10000>;
+> +               interrupts = <0 253 0>;
+> +               samsung,mbox-names = "ncp-a7q-2";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24130000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24130000 0x0 0x10000>;
+> +               interrupts = <0 254 0>;
+> +               samsung,mbox-names = "ncp-a7q-3";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24140000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24140000 0x0 0x10000>;
+> +               interrupts = <0 255 0>;
+> +               samsung,mbox-names = "ncp-a7q-4";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24150000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24150000 0x0 0x10000>;
+> +               interrupts = <0 256 0>;
+> +               samsung,mbox-names = "ncp-a7q-5";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24160000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24160000 0x0 0x10000>;
+> +               interrupts = <0 257 0>;
+> +               samsung,mbox-names = "ncp-a7q-6";
+> +               status = "disabled";
+> +       };
+> +       mailbox at 24170000 {
+> +               compatible = "samsung,exynos-mailbox";
+> +               reg =   <0x0 0x24170000 0x0 0x10000>;
+> +               interrupts = <0 258 0>;
+> +               samsung,mbox-names = "ncp-a7q-7";
+> +               status = "disabled";
+>         };
+>  };
+> diff --git a/arch/arm64/boot/dts/samsung-ssdk-gh7.dts b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> index 4ce7d67..bfe5455 100644
+> --- a/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> +++ b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> @@ -23,4 +23,7 @@
+>                 device_type = "memory";
+>                 reg = <0x00000000 0x80000000 0 0x20000000>;
+>         };
+> +       mailbox at 100a0000 {
+> +               status = "okay";
+> +       };
+>  };
+> --
+> 1.7.10.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
