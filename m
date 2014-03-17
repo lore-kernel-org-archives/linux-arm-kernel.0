@@ -1,79 +1,39 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 17 Mar 2014 10:43:33 +0100
-Subject: BUG_ON for DMA-bounce and bidirectional mappings (e100 on IXP4xx)
-In-Reply-To: <20140304123714.7e1fe704@marrow.netinsight.se>
-References: <20140304112459.354f0980@marrow.netinsight.se>
- <20140304104528.GQ21483@n2100.arm.linux.org.uk>
- <20140304123714.7e1fe704@marrow.netinsight.se>
-Message-ID: <20140317104333.31e75981@marrow.netinsight.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 10:53:18 +0100
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. pull #2)
+In-Reply-To: <20140301041947.GR1872@titan.lakedaemon.net>
+References: <20140301041947.GR1872@titan.lakedaemon.net>
+Message-ID: <201403171053.18567.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again!
-
-On Tue, 4 Mar 2014 12:37:14 +0100
-Simon K?gstr?m <simon.kagstrom@netinsight.net> wrote:
-
-> On Tue, 4 Mar 2014 10:45:28 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Saturday 01 March 2014, Jason Cooper wrote:
+> All,
 > 
-> > On Tue, Mar 04, 2014 at 11:24:59AM +0100, Simon K?gstr?m wrote:
-> > > We have a IXP4xx-based board which has an e100 NIC. During bootup, we
-> > > trigger a BUG_ON in dmabounce.c because the mapped direction doesn't
-> > > match the synced one. e100.c maps buffers bidirectional, but the sync
-> > > is done fromdevice.
-> > [...]
-> [...]
-> And the dma_debug code explicitly skips the check if the direction is
-> DMA_BIDIRECTIONAL:
->
->   static void check_sync(struct device *dev,
-> 		       struct dma_debug_entry *ref,
-> 		       bool to_cpu)
->   {
-> 	[...]
-> 	if (entry->direction == DMA_BIDIRECTIONAL)
-> 		goto out;
+> This is a big one for us :)  You've already pulled part of this as
+> mvebu/soc-3xx.  I merged that branch and mvebu/soc-kw back into
+> mvebu/soc.  This whole lot has been in -next all week.  Two minor issues
+> were discovered and patches added to correct them.
 > 
-> 	if (ref->direction != entry->direction) {
-> 		err_printk(dev, entry, "DMA-API: device driver syncs "
-> 				"DMA memory with different direction "
-> 				"[device address=0x%016llx] [size=%llu bytes] "
-> 				"[mapped with %s] [synced with %s]\n",
-> 				(unsigned long long)ref->dev_addr, entry->size,
-> 				dir2name[entry->direction],
-> 				dir2name[ref->direction]);
-> 	}
-> 	[...]
->   }
+> At this point I think the kirkwood and armada changes have been shaken
+> out enough that they no longer need their own branches.  If you don't
+> agree, just let me know and I'll send separate pull requests for the
+> per-SoC branches.
 > 
-> Krzysztofs patch does the same for dmabounce.c, from the dma-debug code
-> it seems to me that it would make sense there as well?
+> This is an incremental pull request from tags/mvebu-soc-3.15 in the
+> mvebu/soc branch up to tags/mvebu-soc-3.15-2.
+> 
+> There will be a small conflict between this branch and mvebu/dt.  This
+> is due to the kirkwood migration and maintaining bisectability.  I'll
+> detail the conflict in the mvebu/dt pull request.
+> 
+> Please pull.
+> 
 
-I'd like to bring this issue up again. To me it seems Krzysztofs patch
-(pasted below again) would align the ARM dmabounce behaviour with the
-DMA API verifier code. Seems to make sense for my part at least.
-Comments?
+Pulled into next/soc, sorry for the delay.
 
-// Simon
+I noticed that the shortlog in the pull request listed the parts
+from mvebu/soc-3xx again, which confused me a bit because they
+didn't show up in the merge, but I checked that it's all good.
 
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -375,7 +375,7 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
-@@ -415,7 +415,7 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+	Arnd
