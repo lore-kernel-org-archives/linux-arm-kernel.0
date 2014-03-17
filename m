@@ -1,67 +1,50 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 17 Mar 2014 14:08:12 +0100
-Subject: [PATCH] ata: ahci_sunxi: fix code formatting
-Message-ID: <10509185.3UEOEZKTc5@amdc1032>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Mon, 17 Mar 2014 18:39:52 +0530
+Subject: [PATCH v2 0/3] Add initial support of PMU for exynos5260
+Message-ID: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- drivers/ata/ahci_sunxi.c |   44 ++++++++++++++++++++++----------------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
+From: Vikas Sajjan <vikas.sajjan@linaro.org>
 
-Index: b/drivers/ata/ahci_sunxi.c
-===================================================================
---- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:06.220474478 +0100
-+++ b/drivers/ata/ahci_sunxi.c	2014-03-17 14:00:48.720472730 +0100
-@@ -27,28 +27,28 @@
- #include <linux/regulator/consumer.h>
- #include "ahci.h"
- 
--#define AHCI_BISTAFR 0x00a0
--#define AHCI_BISTCR 0x00a4
--#define AHCI_BISTFCTR 0x00a8
--#define AHCI_BISTSR 0x00ac
--#define AHCI_BISTDECR 0x00b0
--#define AHCI_DIAGNR0 0x00b4
--#define AHCI_DIAGNR1 0x00b8
--#define AHCI_OOBR 0x00bc
--#define AHCI_PHYCS0R 0x00c0
--#define AHCI_PHYCS1R 0x00c4
--#define AHCI_PHYCS2R 0x00c8
--#define AHCI_TIMER1MS 0x00e0
--#define AHCI_GPARAM1R 0x00e8
--#define AHCI_GPARAM2R 0x00ec
--#define AHCI_PPARAMR 0x00f0
--#define AHCI_TESTR 0x00f4
--#define AHCI_VERSIONR 0x00f8
--#define AHCI_IDR 0x00fc
--#define AHCI_RWCR 0x00fc
--#define AHCI_P0DMACR 0x0170
--#define AHCI_P0PHYCR 0x0178
--#define AHCI_P0PHYSR 0x017c
-+#define AHCI_BISTAFR	0x00a0
-+#define AHCI_BISTCR	0x00a4
-+#define AHCI_BISTFCTR	0x00a8
-+#define AHCI_BISTSR	0x00ac
-+#define AHCI_BISTDECR	0x00b0
-+#define AHCI_DIAGNR0	0x00b4
-+#define AHCI_DIAGNR1	0x00b8
-+#define AHCI_OOBR	0x00bc
-+#define AHCI_PHYCS0R	0x00c0
-+#define AHCI_PHYCS1R	0x00c4
-+#define AHCI_PHYCS2R	0x00c8
-+#define AHCI_TIMER1MS	0x00e0
-+#define AHCI_GPARAM1R	0x00e8
-+#define AHCI_GPARAM2R	0x00ec
-+#define AHCI_PPARAMR	0x00f0
-+#define AHCI_TESTR	0x00f4
-+#define AHCI_VERSIONR	0x00f8
-+#define AHCI_IDR	0x00fc
-+#define AHCI_RWCR	0x00fc
-+#define AHCI_P0DMACR	0x0170
-+#define AHCI_P0PHYCR	0x0178
-+#define AHCI_P0PHYSR	0x017c
- 
- static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
- {
+1) Added initial PMU support for exynos5260
+
+2) Added S2R(single CPU) support on exynos5260
+
+3) Added PMU mapping via DT.
+
+rebased on
+1) kgene tree for-next branch
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+2) Rahul's patches for basic support of exynos5260
+http://www.spinics.net/lists/linux-samsung-soc/msg27282.html
+
+3) Rahul's clk patches http://www.spinics.net/lists/linux-samsung-soc/msg27275.html
+
+4) Tomasz Figa's http://permalink.gmane.org/gmane.linux.ports.arm.kernel/299340
+
+Changes since v1:
+	       -- Addressed Tomasz Figa's comments.
+	       -- removed CMU patch
+	       -- Added PMU mapping via DT
+
+Vikas Sajjan (3):
+  ARM: EXYNOS: Map PMU address through DT
+  ARM: EXYNOS: Add initial support of PMU for Exynos5260
+  arm: exynos5260: add support for S2R
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    5 +-
+ arch/arm/boot/dts/exynos4.dtsi                     |    5 +
+ arch/arm/boot/dts/exynos5260.dtsi                  |    5 +
+ arch/arm/mach-exynos/common.c                      |   51 ++--
+ arch/arm/mach-exynos/common.h                      |   26 +++
+ arch/arm/mach-exynos/include/mach/map.h            |    3 -
+ arch/arm/mach-exynos/pm.c                          |   96 ++++++--
+ arch/arm/mach-exynos/pmu.c                         |  238 +++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h                    |  244 ++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+ 10 files changed, 637 insertions(+), 44 deletions(-)
+
+-- 
+1.7.9.5
