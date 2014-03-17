@@ -1,51 +1,36 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Mon, 17 Mar 2014 15:07:51 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140316094650.GV21483@n2100.arm.linux.org.uk>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140307044251.GD9985@codeaurora.org>
- <CADHgK6s4K+K+OZuUZVbHKNzbFiHzm82Ss0WpSfkUdQgP+E3j=w@mail.gmail.com>
- <20140316094650.GV21483@n2100.arm.linux.org.uk>
-Message-ID: <CADHgK6u7caDEZbt6Kj6VpzwADKytpk1068u_wQFFMvd3r1v1gw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Mar 2014 07:14:34 +0900
+Subject: [PATCH v3 0/3] arm64: add new support Samsung GH7 SoC and SSDK board
+Message-ID: <1395094477-8921-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Russell!
+This adds support for Samsung ARMv8 core based GH7 SoC and its evaluation SSDK
+board.
 
-On 16 March 2014 02:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 10, 2014 at 11:32:17AM -0700, Sebastian Capella wrote:
-...
-> Let's look at the implementations...
->
-> #define __pa(x)                 __virt_to_phys((unsigned long)(x))
-> static inline phys_addr_t __virt_to_phys(unsigned long x)
-> {
->         return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
-> }
->
-> So, __pa() returns a phys_addr_t (which may be either 32-bit or 64-bit).
->
-> #define virt_to_pfn(kaddr)  (__pa(kaddr) >> PAGE_SHIFT)
->
-> And that will do an appropriate shift to convert the phys_addr_t to a PFN,
-> which will be fine to assign to an unsigned long variable.
->
-> #define __phys_to_pfn(paddr)    ((unsigned long)((paddr) >> PAGE_SHIFT))
->
-> This does the same thing, but has an explicit cast.
->
-> So, the only difference between the two suggestions is that additional
-> cast, which has no effect here.
+Changes since v2:
+- add comment about reserved memory
+- reduced size of reserved memory
+- add 4 more cores
+- add specific compatible string for pmu
+- change model strin for SSDK-GH7 board
+- add DT ml in Cc
 
-Sounds good, thanks!
+Note, still missing clocks for serial and it will be added later.
 
-I was a little unsure about the page sizes that could affect all of
-the implementations.
+Changes since v1:
+- remove model and compatible in dtsi
+- remove inclusion /dts-v1/ in dtsi
+- add aliase for serial0
+- remove compatible cortex-a9-gic for gic
+- remove clock-frequncy for timer
+- change number of address-cells and size-cells to 2
+- enable ARCH_GH7 in single defconfig for arm64
 
-I'll make this change and repost, basically using virt_to_pfn in place
-of the previous __pa_symbol, and remove unused declarations.
+There were many comments for SoC vendor's Kconfig entry but now I have no
+choice except adding ARCH_GH7 and enabling it in current single defconfig
+for arm64 by default.
 
-Thanks again!
-
-Sebastian
+[PATCH v3 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and SSDK-GH7 board
+[PATCH v3 2/3] arm64: defconfig: Enable ARCH_GH7 by default
+[PATCH v3 3/3] Documentation: DT: add new entry for Samsung GH7 SoC and SSDK board
