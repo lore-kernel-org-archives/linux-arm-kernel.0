@@ -1,36 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 12:29:38 +0100
-Subject: [PATCH RESEND 1/2] ARM: ixp4xx: Make dma_set_coherent_mask common,
- correct implementation
-In-Reply-To: <20140317105659.449505d8@marrow.netinsight.se>
-References: <20140317105448.14bcb617@marrow.netinsight.se>
- <20140317105659.449505d8@marrow.netinsight.se>
-Message-ID: <201403171229.39021.arnd@arndb.de>
+From: vkale@apm.com (Vinayak Kale)
+Date: Mon, 17 Mar 2014 17:03:22 +0530
+Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
+In-Reply-To: <1395048095-32745-1-git-send-email-vkale@apm.com>
+References: <1395048095-32745-1-git-send-email-vkale@apm.com>
+Message-ID: <CAPrCYkfDTrGO0oxXzqE3KwV0n85K4n6vtK2bh8Qhu=2MShBYqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 March 2014, Simon K?gstr?m wrote:
-> diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-> index 200970d..b02c764 100644
-> --- a/arch/arm/mach-ixp4xx/common-pci.c
-> +++ b/arch/arm/mach-ixp4xx/common-pci.c
-> @@ -481,14 +481,6 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
->         return 1;
->  }
->  
-> -int dma_set_coherent_mask(struct device *dev, u64 mask)
-> -{
-> -       if (mask >= SZ_64M - 1)
-> -               return 0;
-> -
-> -       return -EIO;
-> -}
-> -
->  EXPORT_SYMBOL(ixp4xx_pci_read);
->  EXPORT_SYMBOL(ixp4xx_pci_write);
->  EXPORT_SYMBOL(dma_set_coherent_mask);
+Somehow the "[PATCH]" string in the subject is missing, I'll see
+what's wrong and correct the same in next version.
 
-When you move this function, you should really move the
-'EXPORT_SYMBOL' along with it.
+Thanks
+-Vinayak
 
-	Arnd
+On Mon, Mar 17, 2014 at 2:51 PM, Vinayak Kale <vkale@apm.com> wrote:
+> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+>
+> Please note that this patch has dependancy on a GIC driver patch [1] which is
+> yet to be approved by maintainers.
+>
+> [1]- https://lkml.org/lkml/2014/2/27/605
+> (irqchip:gic: change access of gicc_ctrl register to read modify write)
+>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index d37d736..587348d 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -97,6 +97,11 @@
+>                 clock-frequency = <50000000>;
+>         };
+>
+> +       pmu {
+> +               compatible = "arm,armv8-pmuv3";
+> +               interrupts = <1 12 0xff04>;
+> +       };
+> +
+>         soc {
+>                 compatible = "simple-bus";
+>                 #address-cells = <2>;
+> --
+> 1.8.2.1
+>
