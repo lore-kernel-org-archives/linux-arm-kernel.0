@@ -1,42 +1,24 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 17 Mar 2014 10:57:03 +0100
-Subject: [PATCH RESEND 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <20140317105448.14bcb617@marrow.netinsight.se>
-References: <20140317105448.14bcb617@marrow.netinsight.se>
-Message-ID: <20140317105703.090c258d@marrow.netinsight.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 10:58:34 +0100
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. #3)
+In-Reply-To: <20140307171027.GG18707@titan.lakedaemon.net>
+References: <20140307171027.GG18707@titan.lakedaemon.net>
+Message-ID: <201403171058.35055.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver has been broken since commit 1a4901177574083c35fafc24c4d151c2a7c7647c
+On Friday 07 March 2014, Jason Cooper wrote:
+> This should be the last pull request for mvebu/soc for v3.15.  It's a
+> small change and a big one all rolled into one :-P
+> 
+> With the dove pinctrl changes going through LinusW's tree, this patch is
+> all that's really necessary for the move.
+> 
+> As usual, this is an incremental pull request from tags/mvebu-soc-3.15-2
+> in the mvebu/soc branch up to tags/mvebu-soc-3.15-3.
 
-  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+Pulled into next/soc as well, I'm very happy to see this get done.
 
-in 3.7 and would fail with
+Thanks,
 
-[   33.055473] net eth1: coherent DMA mask is unset
-[   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
-
-Fix by setting up the DMA mask to the entire 32-bit range.
-
-Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
----
- drivers/net/ethernet/xscale/ixp4xx_eth.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-index 25283f1..e540e51 100644
---- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
-+++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-@@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
- 	port->netdev = dev;
- 	port->id = pdev->id;
- 
-+	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-+	if (err < 0)
-+		goto err_free;
-+
- 	switch (port->id) {
- 	case IXP4XX_ETH_NPEA:
- 		port->regs = (struct eth_regs __iomem *)IXP4XX_EthA_BASE_VIRT;
--- 
-1.7.9.6
+	Arnd
