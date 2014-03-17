@@ -1,23 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 15:47:45 +0100
-Subject: [GIT PULL] at91: cleanup for 3.15 #1
-In-Reply-To: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1394647325-29757-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201403171547.45327.arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 17 Mar 2014 20:28:07 +0530
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <5346848.pBsh8NcQja@wuerfel>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+ <5346848.pBsh8NcQja@wuerfel>
+Message-ID: <CABb+yY0XXMQaEuDV0FeURjOijYEUKyqU9Dr6XTDRcxc1qaBu9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 March 2014, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> This is the first AT91 pull-request for 3.15, and a cleanup one. The most of it
-> is the conversion of two more Atmel SoCs to Device Tree. These are older that
-> the ones already converted. Moreover, they already use the CCF so there is no
-> need to come back on this later (maybe to remove some code when the other
-> non-DT boards are converted as well).
-> The defconfig update was needed because they were pretty old and some
-> interesting options were missing.
+On Mon, Mar 17, 2014 at 5:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 17 March 2014 17:33:59 Girish K S wrote:
+>> +Samsung Mailbox Driver
+>> +
+>> +Required properties:
+>> +- compatible:          Should be one of the following,
+>> +                           "samsung,gh7-mailbox" for
+>> +                               Samsung GH7 SoC series
+>> +                           "samsung,exynos-mailbox" for
+>> +                               exynosx SoC series
+>> +- reg:                 Contains the mailbox register address range (base address
+>> +                       and length)
+>> +- interrupts:          Contains the interrupt information for the mailbox
+>> +                       device.
+>> +- samsung,mbox-names:  Array of the names of the mailboxes
+>>
+>
+> I think we should not allow new mailbox drivers that don't conform to
+> the framework that is currently under discussion. In particular, this
+> means don't do a "samsung,mbox-names" property. The current consensus
+> seems to be to have a #mbox-cells" property that allows to pass extra
+> parameters from the client driver, and uses an "mboxes" property
+> to reference the mailbox provided.
+>
+> It would be good if you follow up for the subsystem discussion and
+> ensure it gets merged in time, and supports all the use cases you are
+> interested in. The interface is not entirely nailed down yet, so
+> it's a good time to contribute. However, I can already promise that
+> it won't use matching by strings.
+>
+I was just about to submit next revision of framework that this
+Samsung driver conforms to. Now I think I need some expert opinion ...
+(sorry if following is repetition)
 
-Pulled into next/cleanup, thanks!
+  As Kumar Gala pointed out in the other thread, the mailbox/ipc chain
+is going to be _very_ platform specific so much so that one rethinks
+if a common api is even warranted : because the client driver will be
+different even if just the remote api(which is going to be
+proprietary) changes, keeping everything else same. For example, a
+client driver for Highbank is highly unlikely to be reusable on
+Exynos, even if both used the same mailbox controller. By my limited
+foresight, mailbox assignment via DT doesn't bring us much benefit but
+only ritual code.
 
-	Arnd
+  Perhaps the mailbox controller driver should name its links as it
+wants. By how the remote works with the mailbox links, the client
+driver asks for a specific mailbox link (which maybe a hardcoded
+string in the driver or be gotten alongside other data via client's
+DT) ?
+
+  IOW we can't have a generic API/DT-bindings that could get us
+reusable client drivers. But only common framework/code that would
+otherwise be duplicated by every platform.
+
+Thanks
+Jassi
