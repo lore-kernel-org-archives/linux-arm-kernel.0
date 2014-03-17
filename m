@@ -1,46 +1,73 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Mar 2014 14:17:49 +0100
-Subject: [PATCH] clk: samsung: fixed compiler warning
- [-Wpointer-to-int-cast]
-In-Reply-To: <53264E61.2010502@samsung.com>
-References: <1393382561-5388-1-git-send-email-pankaj.dubey@samsung.com>
- <53264E61.2010502@samsung.com>
-Message-ID: <5326F5FD.5060302@samsung.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Mon, 17 Mar 2014 15:22:36 +0200
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <532692A7.7000509@ti.com>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <532037E0.1080309@ti.com> <53258DDA.50005@compulab.co.il>
+ <532692A7.7000509@ti.com>
+Message-ID: <5326F71C.1060602@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi Tomi,
 
-On 17.03.2014 02:22, Pankaj Dubey wrote:
-> On 02/26/2014 11:42 AM, Pankaj Dubey wrote:
->> When compiled using ARM64 cross compiler, gcc complains as
+Thank you for the feedback.
+
+We have OMAP5 based board with no ESD & Level Translator chip.
+So, I made a quick hack in tpd12s015 driver to skip using un-relevant GPIOs.
+
+I've copied DSS DT structure from uEmv board *.dts.
+However the HDMI output is not activate yet.
+
+Here is some debug output:
+
+root at cm-debian:~# dmesg | grep -i dss
+[    0.040554] omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+[    0.043135] omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
+[    0.045725] omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
+[    0.048311] omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+[    0.050888] omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+[    0.325392] DSS: set fck to 192000000
+[    0.325400] DSS: dss_runtime_get
+[    0.325427] DSS: dss_restore_context
+[    0.325445] OMAP DSS rev 6.1
+[    0.325450] DSS: dss_runtime_put
+[    0.325456] DSS: dss_save_context
+[    0.325461] DSS: context saved
+[    0.325707] DSS: dss_restore_context
+[    0.325711] DSS: context restored
+[    0.325746] omapdss_dispc 58001000.dispc: OMAP DISPC rev 5.1
+[    0.325838] DSS: dss_save_context
+[    0.325843] DSS: context saved
+
+
+I do not use uEvm BSP u-Boot. I'm forking from this source: 
+git://git.denx.de/u-boot-ti.git
+
+Perhaps I'm missing some clocks initialization?
+What are the correct bootargs for activating HDMI video output?
+
+Thank you in advance for the assistance,
+
+Dmitry
+
+
+On 03/17/2014 08:13 AM, Tomi Valkeinen wrote:
+> On 16/03/14 13:41, Dmitry Lifshitz wrote:
+>> Hi Tomi,
 >>
->> drivers/clk/samsung/clk.c:293:18:
->> warning: cast from pointer to integer of different size
->> [-Wpointer-to-int-cast]
+>> (resending in the text format)
 >>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/clk/samsung/clk.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
->> index 91bec3e..59142ba 100644
->> --- a/drivers/clk/samsung/clk.c
->> +++ b/drivers/clk/samsung/clk.c
->> @@ -278,7 +278,7 @@ void __init samsung_clk_of_register_fixed_ext(
->>       for_each_matching_node_and_match(np, clk_matches, &match) {
->>           if (of_property_read_u32(np, "clock-frequency", &freq))
->>               continue;
->> -        fixed_rate_clk[(u32)match->data].fixed_rate = freq;
->> +        fixed_rate_clk[(unsigned long)match->data].fixed_rate = freq;
->>       }
->>       samsung_clk_register_fixed_rate(fixed_rate_clk, nr_fixed_rate_clk);
->>   }
+>> Where can I get those unpublished omap5 and omap5-uevm display patches
+>> to test the video out with this patch?
+>> I'll appreciate your assistance in additional setup (like required uEvm
+>> .dts changes and DSI panel connection short guide).
+> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git
+> work/dss-dt-pyra
 >
-> Gentle Ping.
-
-Missed this patch, thanks. Applied for v3.15.
-
-Best regards,
-Tomasz
+> I've since added omap5 hdmi support, so omap5-uevm's hdmi output works
+> on that branch.
+>
+>   Tomi
+>
+>
