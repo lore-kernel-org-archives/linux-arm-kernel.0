@@ -1,79 +1,21 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Mar 2014 14:06:25 +0000
-Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
-In-Reply-To: <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
-Message-ID: <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 15:08:21 +0100
+Subject: [GIT PULL] at91: DT update for 3.15 #1
+In-Reply-To: <1394705197-29992-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1394705197-29992-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201403171508.21419.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 12:03:59PM +0000, Girish K S wrote:
-> This patch adds the dt node for the mailbox IP
+On Thursday 13 March 2014, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Signed-off-by: Girish K S <ks.giri@samsung.com>
-> 
-> Change-Id: I35e45e9a62592887a84a909aee54f259a2f731fa
-> ---
->  .../bindings/mailbox/samsung-mailbox.txt           |   24 +++++++
->  arch/arm64/boot/dts/samsung-gh7.dtsi               |   66 ++++++++++++++++++++
->  arch/arm64/boot/dts/samsung-ssdk-gh7.dts           |    3 +
->  3 files changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
-> new file mode 100644
-> index 0000000..1908d71
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
-> @@ -0,0 +1,24 @@
-> +
-> +Samsung Mailbox Driver
-> +
-> +Required properties:
-> +- compatible:		Should be one of the following,
-> +			    "samsung,gh7-mailbox" for
-> +				Samsung GH7 SoC series
-> +			    "samsung,exynos-mailbox" for
-> +				exynosx SoC series
-> +- reg:			Contains the mailbox register address range (base address
-> +			and length)
-> +- interrupts: 		Contains the interrupt information for the mailbox
-> +			device.
+> This is one request for AT91 DT update for 3.15. A lot of forgotten bits that
+> are corrected here, and old DT properties that are removed, nothing really new.
+> I think that the little modifications to the documentation can also go the
+> arm-soc way: there is no fundamental change to the binding, only more coherence
+> added.
 
-How many interrupts?
+Merged into next/dt branch, thanks!
 
-What are they for?
-
-> +- samsung,mbox-names:	Array of the names of the mailboxes
-
-Juding by the code there is one name per reg entry, but the description
-above implies a single entry (as all the dt fragments have).
-
-What values are expected? What is the consumer of these values? What are
-they used for?
-
-> +
-> +Example:
-> +
-> +/* Samsung GH7 SoC */
-> +mailbox at 100a0000 {
-> +	compatible = "samsung,gh7-mailbox";
-> +	reg = <0x0 0x100a0000 0x0 0x1000>;
-> +	interrupts = <0 310 0>;
-> +	samsung,mbox-names = "a7q-scp";
-> +};
-> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
-> index c3610bd..be4cce9 100644
-> --- a/arch/arm64/boot/dts/samsung-gh7.dtsi
-> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
-> @@ -107,5 +107,71 @@
->  			interrupts = <0 420 0>;
->  			arm,primecell-periphid = <0x341011>; /* HACK */
-
-This looks odd.
-
-What tree is this against?
-
-Cheers,
-Mark.
+	Arnd
