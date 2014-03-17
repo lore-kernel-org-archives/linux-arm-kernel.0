@@ -1,52 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 15:18:43 +0100
-Subject: [GIT PULL 2/2] omap overo related device tree changes for v3.15
-In-Reply-To: <20140313200253.GB5981@atomide.com>
-References: <20140313200135.GA5981@atomide.com>
- <20140313200253.GB5981@atomide.com>
-Message-ID: <201403171518.43389.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Mar 2014 15:22:10 +0100
+Subject: [PATCH 6/9] Doc/DT: Add DT binding documentation for MIPI DSI CM
+ Panel
+In-Reply-To: <1393590016-9361-7-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <4670830.fkS1noPxcd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 March 2014, Tony Lindgren wrote:
-> The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
-> 
->   Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-overo-signed
-> 
-> for you to fetch changes up to 28b191118c11719bb27db621425a70be28a40e08:
-> 
->   ARM: dts: Add support for the Overo Summit (2014-03-12 10:21:16 -0700)
-> 
-> ----------------------------------------------------------------
-> Updates to the .dts files to support more Gumstix boards.
-> 
-> These are sent separately from the rest of the .dts changes
-> as these depend on the fixes merged into v3.14-rc4, and
-> needed a bit more time to get updated on the fixes.
+Hi Tomi,
 
-Pulled into next/dt, thanks!
+Thank you for the patch.
 
-I had a trivial merge conflict in omap3-overo.dtsi that I resolved as below.
+On Friday 28 February 2014 14:20:13 Tomi Valkeinen wrote:
+> Add DT binding documentation for MIPI DSI Command Mode Panel.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/panel-dsi-cm.txt     | 26 +++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+> b/Documentation/devicetree/bindings/video/panel-dsi-cm.txt new file mode
+> 100644
+> index 000000000000..73f422556d4f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+> @@ -0,0 +1,26 @@
+> +Generic MIPI DSI Command Mode Panel
+> +===================================
+> +
+> +Required properties:
+> +- compatible: "panel-dsi-cm"
+> +
+> +Optional properties:
+> +- label: a symbolic name for the panel
+> +- gpios: panel reset gpio and TE gpio
+> +
+> +Required nodes:
+> +- Video port for DSI input
+> +
+> +Example
+> +-------
+> +
+> +lcd0: display {
+> +	compatible = "tpo,taal", "panel-dsi-cm";
+> +	label = "lcd0";
+> +
+> +	gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
 
-	Arnd
+If the panel uses a TE GPIO but no reset GPIO, do you plan to express this 
+with a "hole" for the reset GPIO ? e.g. something like
 
-diff --cc arch/arm/boot/dts/omap3-overo.dtsi
-index b08142f,c37b130..69ca7c4
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@@ -91,11 -33,3 +33,6 @@@
-        };
-  };
-  
-- &uart3 {
--       pinctrl-names = "default";
--       pinctrl-0 = <&uart3_pins>;
-- };
-- 
- +&mcbsp2 {
- +      status = "okay";
- +};
+	gpios = <0>, <&gpio4 6 GPIO_ACTIVE_HIGH>;
+
+Wouldn't it be better to split the gpios property into "reset-gpios" and "te-
+gpios" ?
+
+> +
+> +	lcd0_in: endpoint {
+> +		remote-endpoint = <&dsi1_out_ep>;
+> +	};
+> +};
+
+-- 
+Regards,
+
+Laurent Pinchart
