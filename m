@@ -1,61 +1,51 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 17 Mar 2014 15:07:30 -0700
-Subject: [RESEND PATCH] mm: hugetlb: Introduce
- huge_pte_{page,present,young}
-In-Reply-To: <1395082318-7703-1-git-send-email-steve.capper@linaro.org>
-References: <1395082318-7703-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140317150730.156a3325ff96dfc6e1352902@linux-foundation.org>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Mon, 17 Mar 2014 15:07:51 -0700
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140316094650.GV21483@n2100.arm.linux.org.uk>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140307044251.GD9985@codeaurora.org>
+ <CADHgK6s4K+K+OZuUZVbHKNzbFiHzm82Ss0WpSfkUdQgP+E3j=w@mail.gmail.com>
+ <20140316094650.GV21483@n2100.arm.linux.org.uk>
+Message-ID: <CADHgK6u7caDEZbt6Kj6VpzwADKytpk1068u_wQFFMvd3r1v1gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Mar 2014 18:51:58 +0000 Steve Capper <steve.capper@linaro.org> wrote:
+Thanks Russell!
 
-> Introduce huge pte versions of pte_page, pte_present and pte_young.
-> This allows ARM (without LPAE) to use alternative pte processing logic
-> for huge ptes.
-> 
-> Where these functions are not defined by architectural code they
-> fallback to the standard functions.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
-> Hi,
-> I'm resending this patch to provoke some discussion.
-> 
-> We already have some huge_pte_ style functions, and this patch adds a
-> few more (that simplify to the pte_ equivalents where unspecified).
-> 
-> Having separate hugetlb versions of pte_page, present and mkyoung
-> allows for a greatly simplified huge page implementation for ARM with
-> the classical MMU (which has a different bit layout for huge ptes).
+On 16 March 2014 02:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 10, 2014 at 11:32:17AM -0700, Sebastian Capella wrote:
+...
+> Let's look at the implementations...
+>
+> #define __pa(x)                 __virt_to_phys((unsigned long)(x))
+> static inline phys_addr_t __virt_to_phys(unsigned long x)
+> {
+>         return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+> }
+>
+> So, __pa() returns a phys_addr_t (which may be either 32-bit or 64-bit).
+>
+> #define virt_to_pfn(kaddr)  (__pa(kaddr) >> PAGE_SHIFT)
+>
+> And that will do an appropriate shift to convert the phys_addr_t to a PFN,
+> which will be fine to assign to an unsigned long variable.
+>
+> #define __phys_to_pfn(paddr)    ((unsigned long)((paddr) >> PAGE_SHIFT))
+>
+> This does the same thing, but has an explicit cast.
+>
+> So, the only difference between the two suggestions is that additional
+> cast, which has no effect here.
 
-Looks OK to me.  One thing...
+Sounds good, thanks!
 
-> --- a/include/linux/hugetlb.h
-> +++ b/include/linux/hugetlb.h
-> @@ -353,6 +353,18 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
->  }
->  #endif
->  
-> +#ifndef huge_pte_page
-> +#define huge_pte_page(pte)	pte_page(pte)
-> +#endif
+I was a little unsure about the page sizes that could affect all of
+the implementations.
 
-This #ifndef x #define x thing works well, but it is 100% unclear which
-arch header file is supposed to define x if it wishes to override the
-definition.  We've had problems with that in the past where different
-architectures put it in different files and various breakages ensued.
+I'll make this change and repost, basically using virt_to_pfn in place
+of the previous __pa_symbol, and remove unused declarations.
 
-So can we decide which arch header file is responsible for defining
-these, then document that right here in a comment and add an explicit
-#include <asm/that-file.h>?
+Thanks again!
 
-
-> +#ifndef huge_pte_present
-> +#define huge_pte_present(pte)	pte_present(pte)
-> +#endif
-> +
-> +#ifndef huge_pte_mkyoung
-> +#define huge_pte_mkyoung(pte)	pte_mkyoung(pte)
-> +#endif
-> +
+Sebastian
