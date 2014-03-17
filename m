@@ -1,285 +1,141 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 17 Mar 2014 19:31:58 +0100
-Subject: [PATCH 4/4] ata: add new-style AHCI platform driver for ST SPEAr1340
- AHCI controller
-In-Reply-To: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1395081118-15248-5-git-send-email-b.zolnierkie@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Mar 2014 13:37:56 -0500
+Subject: [RFC 2/9] opp-modifier: Add opp-modifier-reg driver
+In-Reply-To: <53270710.4060206@ti.com>
+References: <1394825135-60110-1-git-send-email-d-gerlach@ti.com>
+ <1394825135-60110-3-git-send-email-d-gerlach@ti.com>
+ <CAL_Jsq+BzJeaiPwJsH5bFmtsxCPOspEjnmMLdAVyLAriQTF+kw@mail.gmail.com>
+ <53270710.4060206@ti.com>
+Message-ID: <CAL_JsqLSq+ZhwgOoH7uvh-Otod6iECWTkDMyEvO6MjmdnJ-3Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new driver is named ahci_spear1340 and is only compile tested.  Once
-it is tested on the real hardware and verified to work correctly, the legacy
-platform code (which depends on the deprecated struct ahci_platform_data)
-can be removed.
+On Mon, Mar 17, 2014 at 9:30 AM, Nishanth Menon <nm@ti.com> wrote:
+> On 03/14/2014 04:00 PM, Rob Herring wrote:
+>> On Fri, Mar 14, 2014 at 2:25 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>> Driver to read from a register and depending on either set bits or
+>>> a specific known selectively enable or disable OPPs based on DT node.
+>>>
+>>> Can support opp-modifier-reg-bit where single bits within the register
+>>> determine the availability of an OPP or opp-modifier-reg-val where a
+>>> certain value inside the register or a portion of it determine what the
+>>> maximum allowed OPP is.
+>>>
+>>> The driver expects a device that has already has its OPPs loaded
+>>> and then will disable the OPPs not matching the criteria specified in
+>>> the opp-modifier table.
+>>>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/power/opp-modifier.txt     | 111 +++++++++
+>>>  drivers/power/opp/Makefile                         |   1 +
+>>>  drivers/power/opp/opp-modifier-reg.c               | 259 +++++++++++++++++++++
+>>>  3 files changed, 371 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/power/opp-modifier.txt
+>>>  create mode 100644 drivers/power/opp/opp-modifier-reg.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/opp-modifier.txt b/Documentation/devicetree/bindings/power/opp-modifier.txt
+>>> new file mode 100644
+>>> index 0000000..af8a2e9
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/opp-modifier.txt
+>>> @@ -0,0 +1,111 @@
+>>> +* OPP-Modifier - opp modifier to selectively enable operating points
+>>> +
+>>> +Many SoCs that have selectively modifiable OPPs can specify
+>>> +all available OPPs in their operating-points listing and then define
+>>> +opp_modifiers to enable or disable the OPPs that are actually available
+>>> +on the specific hardware.
+>>> +
+>>> +* OPP Modifier Provider
+>>
+>> Uggg. Please stop designing around the current OPP binding which has
+>> the problem that the OPP table is not extensible to add more data.
+>> Define a new OPP binding that solves these problems. This is at least
+> Generically, there are three different issues with current OPP bindings:
+> a) ability to enable disable certain OPPs depending on SoC OTP/Efuse
+> settings.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- drivers/ata/Kconfig          |   9 ++
- drivers/ata/Makefile         |   1 +
- drivers/ata/ahci_spear1340.c | 222 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 232 insertions(+)
- create mode 100644 drivers/ata/ahci_spear1340.c
+More generically: ...depending on variety of factors.
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 6379a00..32046d4 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -106,6 +106,15 @@ config AHCI_DA850
- 
- 	  If unsure, say N.
- 
-+config AHCI_SPEAR1340
-+	tristate "ST SPEAr1340 AHCI SATA support (experimental)"
-+	depends on MACH_SPEAR1340
-+	help
-+	  This option enables support for the ST SPEAr1340 SoC's
-+	  onboard AHCI SATA.
-+
-+	  If unsure, say N.
-+
- config AHCI_ST
- 	tristate "ST AHCI SATA support"
- 	depends on ARCH_STI
-diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-index 0646d83..45e8df9 100644
---- a/drivers/ata/Makefile
-+++ b/drivers/ata/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
- obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
-+obj-$(CONFIG_AHCI_SPEAR1340)	+= ahci_spear1340.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
- 
- # SFF w/ custom DMA
-diff --git a/drivers/ata/ahci_spear1340.c b/drivers/ata/ahci_spear1340.c
-new file mode 100644
-index 0000000..f1d798e
---- /dev/null
-+++ b/drivers/ata/ahci_spear1340.c
-@@ -0,0 +1,222 @@
-+/*
-+ * ST SPEAr1340 AHCI SATA platform driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2, or (at your option)
-+ * any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/pm.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/libata.h>
-+#include <linux/ahci_platform.h>
-+#include "ahci.h"
-+
-+#define VA_MISC_BASE				IOMEM(0xFD700000)
-+
-+/* Power Management Registers */
-+#define SPEAR1340_PCM_CFG			(VA_MISC_BASE + 0x100)
-+#define SPEAR1340_PCM_WKUP_CFG			(VA_MISC_BASE + 0x104)
-+#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE + 0x108)
-+
-+#define SPEAR1340_PERIP1_SW_RST			(VA_MISC_BASE + 0x318)
-+#define SPEAR1340_PERIP2_SW_RST			(VA_MISC_BASE + 0x31C)
-+#define SPEAR1340_PERIP3_SW_RST			(VA_MISC_BASE + 0x320)
-+
-+/* PCIE - SATA configuration registers */
-+#define SPEAR1340_PCIE_SATA_CFG			(VA_MISC_BASE + 0x424)
-+/* PCIE CFG MASks */
-+#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	(1 << 11)
-+#define SPEAR1340_PCIE_CFG_POWERUP_RESET	(1 << 10)
-+#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		(1 << 9)
-+#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		(1 << 8)
-+#define SPEAR1340_SATA_CFG_TX_CLK_EN		(1 << 4)
-+#define SPEAR1340_SATA_CFG_RX_CLK_EN		(1 << 3)
-+#define SPEAR1340_SATA_CFG_POWERUP_RESET	(1 << 2)
-+#define SPEAR1340_SATA_CFG_PM_CLK_EN		(1 << 1)
-+#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
-+#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
-+#define SPEAR1340_SATA_PCIE_CFG_MASK		0xF1F
-+#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
-+				 SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
-+				 SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
-+				 SPEAR1340_PCIE_CFG_POWERUP_RESET | \
-+				 SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
-+#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
-+				 SPEAR1340_SATA_CFG_PM_CLK_EN | \
-+				 SPEAR1340_SATA_CFG_POWERUP_RESET | \
-+				 SPEAR1340_SATA_CFG_RX_CLK_EN | \
-+				 SPEAR1340_SATA_CFG_TX_CLK_EN)
-+
-+#define SPEAR1340_PCIE_MIPHY_CFG		(VA_MISC_BASE + 0x428)
-+#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		(1 << 31)
-+#define SPEAR1340_MIPHY_CLK_REF_DIV2		(1 << 27)
-+#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
-+#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
-+#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
-+#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
-+		(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+		 SPEAR1340_MIPHY_CLK_REF_DIV2 | \
-+		 SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
-+#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
-+		(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
-+#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
-+		(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+		 SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
-+
-+static void ahci_spear1340_miphy_init(struct device *dev, void __iomem *addr)
-+{
-+	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
-+	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
-+	       SPEAR1340_PCIE_MIPHY_CFG);
-+	/* Switch on sata power domain */
-+	writel(readl(SPEAR1340_PCM_CFG) | 0x800, SPEAR1340_PCM_CFG);
-+	msleep(20);
-+	/* Disable PCIE SATA Controller reset */
-+	writel(readl(SPEAR1340_PERIP1_SW_RST) & ~0x1000,
-+	       SPEAR1340_PERIP1_SW_RST);
-+	msleep(20);
-+}
-+
-+static void ahci_spear1340_miphy_exit(struct device *dev)
-+{
-+	writel(0, SPEAR1340_PCIE_SATA_CFG);
-+	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
-+
-+	/* Enable PCIE SATA Controller reset */
-+	writel(readl(SPEAR1340_PERIP1_SW_RST) | 0x1000,
-+	       SPEAR1340_PERIP1_SW_RST);
-+	msleep(20);
-+	/* Switch off sata power domain */
-+	writel(readl(SPEAR1340_PCM_CFG) & ~0x800, SPEAR1340_PCM_CFG);
-+	msleep(20);
-+}
-+
-+static void ahci_spear1340_host_stop(struct ata_host *host)
-+{
-+	struct device *dev = host->dev;
-+	struct ahci_host_priv *hpriv = host->private_data;
-+
-+	ahci_spear1340_miphy_exit(dev);
-+
-+	ahci_platform_disable_resources(hpriv);
-+}
-+
-+static struct ata_port_operations ahci_spear1340_port_ops = {
-+	.inherits	= &ahci_platform_ops,
-+	.host_stop	= ahci_spear1340_host_stop,
-+};
-+
-+static const struct ata_port_info ahci_spear1340_port_info = {
-+	.flags		= AHCI_FLAG_COMMON,
-+	.pio_mask	= ATA_PIO4,
-+	.udma_mask	= ATA_UDMA6,
-+	.port_ops	= &ahci_spear1340_port_ops,
-+};
-+
-+static int ahci_spear1340_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct ahci_host_priv *hpriv;
-+	int rc;
-+
-+	hpriv = ahci_platform_get_resources(pdev);
-+	if (IS_ERR(hpriv))
-+		return PTR_ERR(hpriv);
-+
-+	rc = ahci_platform_enable_resources(hpriv);
-+	if (rc)
-+		return rc;
-+
-+	ahci_spear1340_miphy_init(dev, hpriv->mmio);
-+
-+	rc = ahci_platform_init_host(pdev, hpriv,
-+				     &ahci_spear1340_port_info, 0, 0);
-+	if (rc)
-+		goto miphy_exit;
-+
-+	return 0;
-+miphy_exit:
-+	ahci_spear1340_miphy_exit(dev);
-+	ahci_platform_disable_resources(hpriv);
-+	return rc;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int ahci_spear1340_suspend(struct device *dev)
-+{
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	int rc;
-+
-+	rc = ahci_platform_suspend_host(dev);
-+	if (rc)
-+		return rc;
-+
-+	if (dev->power.power_state.event != PM_EVENT_FREEZE)
-+		ahci_spear1340_miphy_exit(dev);
-+
-+	ahci_platform_disable_resources(hpriv);
-+
-+	return 0;
-+}
-+
-+static int ahci_spear1340_resume(struct device *dev)
-+{
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	int rc;
-+
-+	rc = ahci_platform_enable_resources(hpriv);
-+	if (rc)
-+		return rc;
-+
-+	if (dev->power.power_state.event != PM_EVENT_THAW)
-+		ahci_spear1340_miphy_init(dev, NULL);
-+
-+	rc = ahci_platform_resume_host(dev);
-+	if (rc)
-+		goto disable_resources;
-+
-+	/* We resumed so update PM runtime state */
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+
-+	return 0;
-+
-+disable_resources:
-+	ahci_platform_disable_resources(hpriv);
-+
-+	return rc;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(ahci_spear1340_pm_ops, ahci_spear1340_suspend,
-+			 ahci_spear1340_resume);
-+
-+static struct of_device_id ahci_spear1340_of_match[] = {
-+	{ .compatible = "snps,spear-ahci" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, ahci_spear1340_of_match);
-+
-+static struct platform_driver ahci_spear1340_driver = {
-+	.probe = ahci_spear1340_probe,
-+	.remove = ata_platform_remove_one,
-+	.driver = {
-+		.name = "ahci_spear1340",
-+		.owner = THIS_MODULE,
-+		.of_match_table = ahci_spear1340_of_match,
-+		.pm = &ahci_spear1340_pm_ops,
-+	},
-+};
-+module_platform_driver(ahci_spear1340_driver);
-+
-+MODULE_DESCRIPTION("ST SPEAr1340 AHCI SATA platform driver");
-+MODULE_AUTHOR("Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>");
-+MODULE_LICENSE("GPL");
--- 
-1.8.2.3
+> b) ability to reuse OPPs defined for one device node for another (cpu1
+> to reuse OPP definitions of cpu0)
+> c) ability to add additional information per OPP. we can argue this is
+> a superset of (a), but really, the problems are different.
+
+It is all additional data per OPP. Additional different information is
+of course for different problems. That doesn't mean we need different
+solutions.
+
+> Previous proposals include making each OPP as a phandle, but there
+> does not seem much traction in that direction either. - proposal here
+> has nothing to do with (b) or (c).
+
+They may have nothing to do with each other, but they all have to do
+with the OPP binding. If we're going to change/extend the binding,
+then all issues need to be taken into account.
+
+>> the 3rd OPP related binding addition I've seen recently. But I
+>> wouldn't spend a lot of effort on a new OPP binding just to add the
+>> functionality you are adding here because I don't like the whole
+>> concept in general. This might be a common way to determine valid OPPs
+>> on TI chips, but I think it is too low level and I don't want to see
+>
+> Not just TI chips, but iMX, now, Marvell, Xilinx as well. potentially
+> more as well. doing OTP/Efuse based decision on which OPPs are valid
+> on a chip is not a TI specific thing. This was the reason for us to
+> try to define something generic enough to be reused by more SoCs than
+> just TI.
+
+Agreed, but I'm not convinced how different SOCs determine valid OPPs
+is common enough. Certainly how to mark an entry disabled is common
+though.
+
+>> bindings for every different possible way. Just add platform code to
+>> do the OPP setup you need.
+> Errr.. adding platform code means the hardware description goes back
+> to kernel. is'nt that giving up on device tree binding for describing
+> hardware?
+
+We're always going to have some platform code. I'm not saying you have
+to in this case. I'm saying either come up with an OPP binding
+addressing all these issues or live with the existing one and fix it
+up in the kernel or bootloader.
+
+>> Frankly, I prefer the bootloader/firmware fixup the OPP table approach
+>> mentioned in the cpufreq-cpu0 thread. Somewhat less desirable, but the
+>> kernel could do the fixups as well (via of_update_property).
+>
+> a) Trying to move the hardware definition away from device tree seems
+> to me a major step backwards.
+> b) Allowing for definitions in platform code is a step backwards again
+> for a generic solution that works for more than 1 vendor.
+> c) moving the logic away to bootloader when it can easily be done in
+> kernel again is adding burden to bootloader for data it does need to
+> handle.
+
+The burden has to be somewhere. Maintaining a binding forever in the
+kernel is a burden as well if it is poorly designed.
+
+Valid OPPs are not going to just be random. There's probably on a few
+combinations and they'll be based on part# or speed grade or something
+(which in turn defines the efuses in your case). While a dev board may
+have random parts on it, an actual product would not. I could argue
+that your DTB just needs to be correct to begin with for a given
+part/design. Obviously, managing minor differences in a DTB like this
+can be a pain. This is why firmware or bootloaders do adjustments to
+the DTB at runtime and it is quite common.
+
+> OPP is a hardware behavior, which OPPs are enabled are described in
+> hardware on certain SoCs. the current proposal is to provide a generic
+> solution for those devices that allow for dynamic definition of OPPs
+> based on SoC efuse definition.
+
+What if the decision is not based on a single register bit? Perhaps
+efuses are not directly memory mapped. Maybe it is based on Si
+revision. Or you need to limit frequency because a certain board can't
+supply adequate current. You call this generic, but it is not. It
+doesn't even solve the part that is generic which is marking some OPPs
+disabled.
+
+Rob
