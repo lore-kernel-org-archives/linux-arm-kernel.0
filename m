@@ -1,440 +1,194 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 17 Mar 2014 14:57:07 +0100
-Subject: [PATCH v2 14/15] Input: atmel_tsadcc: remove driver
-In-Reply-To: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395064628-644-15-git-send-email-alexandre.belloni@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Mar 2014 09:00:03 -0500
+Subject: PL310 errata workarounds
+In-Reply-To: <20140316152953.GX21483@n2100.arm.linux.org.uk>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140316152953.GX21483@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqLDun2VkCFK9Fec6n38bNz2w9mscPdXcGYeLiZtiXkVDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel_tsadcc driver is not used anymore, it has been replaced by at91_adc so
-remove it.
+On Sun, Mar 16, 2014 at 10:29 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Okay, I've been going through the various initialisations of the L2x0
+> cache code, and there's some really fun stuff going on here:
+>
+> arch/arm/mach-imx/system.c:
+>         /* Configure the L2 PREFETCH and POWER registers */
+>         val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
+>         val |= 0x70800000;
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- MAINTAINERS                              |   6 -
- drivers/input/touchscreen/Kconfig        |  12 --
- drivers/input/touchscreen/Makefile       |   1 -
- drivers/input/touchscreen/atmel_tsadcc.c | 358 -------------------------------
- 4 files changed, 377 deletions(-)
- delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
+I wonder what is the desired setting for "Force write allocate" since
+this fails to mask bit 24. They are probably really wanting to set bit
+22.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c6d0e93eff62..134dd63dfa17 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1591,12 +1591,6 @@ S:	Supported
- F:	drivers/misc/atmel_tclib.c
- F:	drivers/clocksource/tcb_clksrc.c
- 
--ATMEL TSADCC DRIVER
--M:	Josh Wu <josh.wu@atmel.com>
--L:	linux-input at vger.kernel.org
--S:	Supported
--F:	drivers/input/touchscreen/atmel_tsadcc.c
--
- ATMEL USBA UDC DRIVER
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index 07e9e82029d1..4090f69e78af 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -559,18 +559,6 @@ config TOUCHSCREEN_TI_AM335X_TSC
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called ti_am335x_tsc.
- 
--config TOUCHSCREEN_ATMEL_TSADCC
--	tristate "Atmel Touchscreen Interface"
--	depends on ARCH_AT91
--	help
--	  Say Y here if you have a 4-wire touchscreen connected to the
--          ADC Controller on your Atmel SoC.
--
--	  If unsure, say N.
--
--	  To compile this driver as a module, choose M here: the
--	  module will be called atmel_tsadcc.
--
- config TOUCHSCREEN_UCB1400
- 	tristate "Philips UCB1400 touchscreen"
- 	depends on AC97_BUS
-diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-index 62801f213346..f326a8290593 100644
---- a/drivers/input/touchscreen/Makefile
-+++ b/drivers/input/touchscreen/Makefile
-@@ -13,7 +13,6 @@ obj-$(CONFIG_TOUCHSCREEN_AD7879_I2C)	+= ad7879-i2c.o
- obj-$(CONFIG_TOUCHSCREEN_AD7879_SPI)	+= ad7879-spi.o
- obj-$(CONFIG_TOUCHSCREEN_ADS7846)	+= ads7846.o
- obj-$(CONFIG_TOUCHSCREEN_ATMEL_MXT)	+= atmel_mxt_ts.o
--obj-$(CONFIG_TOUCHSCREEN_ATMEL_TSADCC)	+= atmel_tsadcc.o
- obj-$(CONFIG_TOUCHSCREEN_AUO_PIXCIR)	+= auo-pixcir-ts.o
- obj-$(CONFIG_TOUCHSCREEN_BU21013)	+= bu21013_ts.o
- obj-$(CONFIG_TOUCHSCREEN_CY8CTMG110)	+= cy8ctmg110_ts.o
-diff --git a/drivers/input/touchscreen/atmel_tsadcc.c b/drivers/input/touchscreen/atmel_tsadcc.c
-deleted file mode 100644
-index a7c9d6967d1e..000000000000
---- a/drivers/input/touchscreen/atmel_tsadcc.c
-+++ /dev/null
-@@ -1,358 +0,0 @@
--/*
-- *  Atmel Touch Screen Driver
-- *
-- *  Copyright (c) 2008 ATMEL
-- *  Copyright (c) 2008 Dan Liang
-- *  Copyright (c) 2008 TimeSys Corporation
-- *  Copyright (c) 2008 Justin Waters
-- *
-- *  Based on touchscreen code from Atmel Corporation.
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- */
--#include <linux/err.h>
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/input.h>
--#include <linux/slab.h>
--#include <linux/interrupt.h>
--#include <linux/clk.h>
--#include <linux/platform_device.h>
--#include <linux/io.h>
--#include <linux/platform_data/atmel.h>
--#include <mach/cpu.h>
--
--/* Register definitions based on AT91SAM9RL64 preliminary draft datasheet */
--
--#define ATMEL_TSADCC_CR		0x00	/* Control register */
--#define   ATMEL_TSADCC_SWRST	(1 << 0)	/* Software Reset*/
--#define	  ATMEL_TSADCC_START	(1 << 1)	/* Start conversion */
--
--#define ATMEL_TSADCC_MR		0x04	/* Mode register */
--#define	  ATMEL_TSADCC_TSAMOD	(3    <<  0)	/* ADC mode */
--#define	    ATMEL_TSADCC_TSAMOD_ADC_ONLY_MODE	(0x0)	/* ADC Mode */
--#define	    ATMEL_TSADCC_TSAMOD_TS_ONLY_MODE	(0x1)	/* Touch Screen Only Mode */
--#define	  ATMEL_TSADCC_LOWRES	(1    <<  4)	/* Resolution selection */
--#define	  ATMEL_TSADCC_SLEEP	(1    <<  5)	/* Sleep mode */
--#define	  ATMEL_TSADCC_PENDET	(1    <<  6)	/* Pen Detect selection */
--#define	  ATMEL_TSADCC_PRES	(1    <<  7)	/* Pressure Measurement Selection */
--#define	  ATMEL_TSADCC_PRESCAL	(0x3f <<  8)	/* Prescalar Rate Selection */
--#define	  ATMEL_TSADCC_EPRESCAL	(0xff <<  8)	/* Prescalar Rate Selection (Extended) */
--#define	  ATMEL_TSADCC_STARTUP	(0x7f << 16)	/* Start Up time */
--#define	  ATMEL_TSADCC_SHTIM	(0xf  << 24)	/* Sample & Hold time */
--#define	  ATMEL_TSADCC_PENDBC	(0xf  << 28)	/* Pen Detect debouncing time */
--
--#define ATMEL_TSADCC_TRGR	0x08	/* Trigger register */
--#define	  ATMEL_TSADCC_TRGMOD	(7      <<  0)	/* Trigger mode */
--#define	    ATMEL_TSADCC_TRGMOD_NONE		(0 << 0)
--#define     ATMEL_TSADCC_TRGMOD_EXT_RISING	(1 << 0)
--#define     ATMEL_TSADCC_TRGMOD_EXT_FALLING	(2 << 0)
--#define     ATMEL_TSADCC_TRGMOD_EXT_ANY		(3 << 0)
--#define     ATMEL_TSADCC_TRGMOD_PENDET		(4 << 0)
--#define     ATMEL_TSADCC_TRGMOD_PERIOD		(5 << 0)
--#define     ATMEL_TSADCC_TRGMOD_CONTINUOUS	(6 << 0)
--#define   ATMEL_TSADCC_TRGPER	(0xffff << 16)	/* Trigger period */
--
--#define ATMEL_TSADCC_TSR	0x0C	/* Touch Screen register */
--#define	  ATMEL_TSADCC_TSFREQ	(0xf <<  0)	/* TS Frequency in Interleaved mode */
--#define	  ATMEL_TSADCC_TSSHTIM	(0xf << 24)	/* Sample & Hold time */
--
--#define ATMEL_TSADCC_CHER	0x10	/* Channel Enable register */
--#define ATMEL_TSADCC_CHDR	0x14	/* Channel Disable register */
--#define ATMEL_TSADCC_CHSR	0x18	/* Channel Status register */
--#define	  ATMEL_TSADCC_CH(n)	(1 << (n))	/* Channel number */
--
--#define ATMEL_TSADCC_SR		0x1C	/* Status register */
--#define	  ATMEL_TSADCC_EOC(n)	(1 << ((n)+0))	/* End of conversion for channel N */
--#define	  ATMEL_TSADCC_OVRE(n)	(1 << ((n)+8))	/* Overrun error for channel N */
--#define	  ATMEL_TSADCC_DRDY	(1 << 16)	/* Data Ready */
--#define	  ATMEL_TSADCC_GOVRE	(1 << 17)	/* General Overrun Error */
--#define	  ATMEL_TSADCC_ENDRX	(1 << 18)	/* End of RX Buffer */
--#define	  ATMEL_TSADCC_RXBUFF	(1 << 19)	/* TX Buffer full */
--#define	  ATMEL_TSADCC_PENCNT	(1 << 20)	/* Pen contact */
--#define	  ATMEL_TSADCC_NOCNT	(1 << 21)	/* No contact */
--
--#define ATMEL_TSADCC_LCDR	0x20	/* Last Converted Data register */
--#define	  ATMEL_TSADCC_DATA	(0x3ff << 0)	/* Channel data */
--
--#define ATMEL_TSADCC_IER	0x24	/* Interrupt Enable register */
--#define ATMEL_TSADCC_IDR	0x28	/* Interrupt Disable register */
--#define ATMEL_TSADCC_IMR	0x2C	/* Interrupt Mask register */
--#define ATMEL_TSADCC_CDR0	0x30	/* Channel Data 0 */
--#define ATMEL_TSADCC_CDR1	0x34	/* Channel Data 1 */
--#define ATMEL_TSADCC_CDR2	0x38	/* Channel Data 2 */
--#define ATMEL_TSADCC_CDR3	0x3C	/* Channel Data 3 */
--#define ATMEL_TSADCC_CDR4	0x40	/* Channel Data 4 */
--#define ATMEL_TSADCC_CDR5	0x44	/* Channel Data 5 */
--
--#define ATMEL_TSADCC_XPOS	0x50
--#define ATMEL_TSADCC_Z1DAT	0x54
--#define ATMEL_TSADCC_Z2DAT	0x58
--
--#define PRESCALER_VAL(x)	((x) >> 8)
--
--#define ADC_DEFAULT_CLOCK	100000
--
--struct atmel_tsadcc {
--	struct input_dev	*input;
--	char			phys[32];
--	struct clk		*clk;
--	int			irq;
--	unsigned int		prev_absx;
--	unsigned int		prev_absy;
--	unsigned char		bufferedmeasure;
--};
--
--static void __iomem		*tsc_base;
--
--#define atmel_tsadcc_read(reg)		__raw_readl(tsc_base + (reg))
--#define atmel_tsadcc_write(reg, val)	__raw_writel((val), tsc_base + (reg))
--
--static irqreturn_t atmel_tsadcc_interrupt(int irq, void *dev)
--{
--	struct atmel_tsadcc	*ts_dev = (struct atmel_tsadcc *)dev;
--	struct input_dev	*input_dev = ts_dev->input;
--
--	unsigned int status;
--	unsigned int reg;
--
--	status = atmel_tsadcc_read(ATMEL_TSADCC_SR);
--	status &= atmel_tsadcc_read(ATMEL_TSADCC_IMR);
--
--	if (status & ATMEL_TSADCC_NOCNT) {
--		/* Contact lost */
--		reg = atmel_tsadcc_read(ATMEL_TSADCC_MR) | ATMEL_TSADCC_PENDBC;
--
--		atmel_tsadcc_write(ATMEL_TSADCC_MR, reg);
--		atmel_tsadcc_write(ATMEL_TSADCC_TRGR, ATMEL_TSADCC_TRGMOD_NONE);
--		atmel_tsadcc_write(ATMEL_TSADCC_IDR,
--				   ATMEL_TSADCC_EOC(3) | ATMEL_TSADCC_NOCNT);
--		atmel_tsadcc_write(ATMEL_TSADCC_IER, ATMEL_TSADCC_PENCNT);
--
--		input_report_key(input_dev, BTN_TOUCH, 0);
--		ts_dev->bufferedmeasure = 0;
--		input_sync(input_dev);
--
--	} else if (status & ATMEL_TSADCC_PENCNT) {
--		/* Pen detected */
--		reg = atmel_tsadcc_read(ATMEL_TSADCC_MR);
--		reg &= ~ATMEL_TSADCC_PENDBC;
--
--		atmel_tsadcc_write(ATMEL_TSADCC_IDR, ATMEL_TSADCC_PENCNT);
--		atmel_tsadcc_write(ATMEL_TSADCC_MR, reg);
--		atmel_tsadcc_write(ATMEL_TSADCC_IER,
--				   ATMEL_TSADCC_EOC(3) | ATMEL_TSADCC_NOCNT);
--		atmel_tsadcc_write(ATMEL_TSADCC_TRGR,
--				   ATMEL_TSADCC_TRGMOD_PERIOD | (0x0FFF << 16));
--
--	} else if (status & ATMEL_TSADCC_EOC(3)) {
--		/* Conversion finished */
--
--		if (ts_dev->bufferedmeasure) {
--			/* Last measurement is always discarded, since it can
--			 * be erroneous.
--			 * Always report previous measurement */
--			input_report_abs(input_dev, ABS_X, ts_dev->prev_absx);
--			input_report_abs(input_dev, ABS_Y, ts_dev->prev_absy);
--			input_report_key(input_dev, BTN_TOUCH, 1);
--			input_sync(input_dev);
--		} else
--			ts_dev->bufferedmeasure = 1;
--
--		/* Now make new measurement */
--		ts_dev->prev_absx = atmel_tsadcc_read(ATMEL_TSADCC_CDR3) << 10;
--		ts_dev->prev_absx /= atmel_tsadcc_read(ATMEL_TSADCC_CDR2);
--
--		ts_dev->prev_absy = atmel_tsadcc_read(ATMEL_TSADCC_CDR1) << 10;
--		ts_dev->prev_absy /= atmel_tsadcc_read(ATMEL_TSADCC_CDR0);
--	}
--
--	return IRQ_HANDLED;
--}
--
--/*
-- * The functions for inserting/removing us as a module.
-- */
--
--static int atmel_tsadcc_probe(struct platform_device *pdev)
--{
--	struct atmel_tsadcc	*ts_dev;
--	struct input_dev	*input_dev;
--	struct resource		*res;
--	struct at91_tsadcc_data *pdata = dev_get_platdata(&pdev->dev);
--	int		err;
--	unsigned int	prsc;
--	unsigned int	reg;
--
--	if (!pdata)
--		return -EINVAL;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "no mmio resource defined.\n");
--		return -ENXIO;
--	}
--
--	/* Allocate memory for device */
--	ts_dev = kzalloc(sizeof(struct atmel_tsadcc), GFP_KERNEL);
--	if (!ts_dev) {
--		dev_err(&pdev->dev, "failed to allocate memory.\n");
--		return -ENOMEM;
--	}
--	platform_set_drvdata(pdev, ts_dev);
--
--	input_dev = input_allocate_device();
--	if (!input_dev) {
--		dev_err(&pdev->dev, "failed to allocate input device.\n");
--		err = -EBUSY;
--		goto err_free_mem;
--	}
--
--	ts_dev->irq = platform_get_irq(pdev, 0);
--	if (ts_dev->irq < 0) {
--		dev_err(&pdev->dev, "no irq ID is designated.\n");
--		err = -ENODEV;
--		goto err_free_dev;
--	}
--
--	if (!request_mem_region(res->start, resource_size(res),
--				"atmel tsadcc regs")) {
--		dev_err(&pdev->dev, "resources is unavailable.\n");
--		err = -EBUSY;
--		goto err_free_dev;
--	}
--
--	tsc_base = ioremap(res->start, resource_size(res));
--	if (!tsc_base) {
--		dev_err(&pdev->dev, "failed to map registers.\n");
--		err = -ENOMEM;
--		goto err_release_mem;
--	}
--
--	err = request_irq(ts_dev->irq, atmel_tsadcc_interrupt, 0,
--			pdev->dev.driver->name, ts_dev);
--	if (err) {
--		dev_err(&pdev->dev, "failed to allocate irq.\n");
--		goto err_unmap_regs;
--	}
--
--	ts_dev->clk = clk_get(&pdev->dev, "tsc_clk");
--	if (IS_ERR(ts_dev->clk)) {
--		dev_err(&pdev->dev, "failed to get ts_clk\n");
--		err = PTR_ERR(ts_dev->clk);
--		goto err_free_irq;
--	}
--
--	ts_dev->input = input_dev;
--	ts_dev->bufferedmeasure = 0;
--
--	snprintf(ts_dev->phys, sizeof(ts_dev->phys),
--		 "%s/input0", dev_name(&pdev->dev));
--
--	input_dev->name = "atmel touch screen controller";
--	input_dev->phys = ts_dev->phys;
--	input_dev->dev.parent = &pdev->dev;
--
--	__set_bit(EV_ABS, input_dev->evbit);
--	input_set_abs_params(input_dev, ABS_X, 0, 0x3FF, 0, 0);
--	input_set_abs_params(input_dev, ABS_Y, 0, 0x3FF, 0, 0);
--
--	input_set_capability(input_dev, EV_KEY, BTN_TOUCH);
--
--	/* clk_enable() always returns 0, no need to check it */
--	clk_enable(ts_dev->clk);
--
--	prsc = clk_get_rate(ts_dev->clk);
--	dev_info(&pdev->dev, "Master clock is set at: %d Hz\n", prsc);
--
--	if (!pdata->adc_clock)
--		pdata->adc_clock = ADC_DEFAULT_CLOCK;
--
--	prsc = (prsc / (2 * pdata->adc_clock)) - 1;
--
--	/* saturate if this value is too high */
--	if (cpu_is_at91sam9rl()) {
--		if (prsc > PRESCALER_VAL(ATMEL_TSADCC_PRESCAL))
--			prsc = PRESCALER_VAL(ATMEL_TSADCC_PRESCAL);
--	} else {
--		if (prsc > PRESCALER_VAL(ATMEL_TSADCC_EPRESCAL))
--			prsc = PRESCALER_VAL(ATMEL_TSADCC_EPRESCAL);
--	}
--
--	dev_info(&pdev->dev, "Prescaler is set at: %d\n", prsc);
--
--	reg = ATMEL_TSADCC_TSAMOD_TS_ONLY_MODE		|
--		((0x00 << 5) & ATMEL_TSADCC_SLEEP)	|	/* Normal Mode */
--		((0x01 << 6) & ATMEL_TSADCC_PENDET)	|	/* Enable Pen Detect */
--		(prsc << 8)				|
--		((0x26 << 16) & ATMEL_TSADCC_STARTUP)	|
--		((pdata->pendet_debounce << 28) & ATMEL_TSADCC_PENDBC);
--
--	atmel_tsadcc_write(ATMEL_TSADCC_CR, ATMEL_TSADCC_SWRST);
--	atmel_tsadcc_write(ATMEL_TSADCC_MR, reg);
--	atmel_tsadcc_write(ATMEL_TSADCC_TRGR, ATMEL_TSADCC_TRGMOD_NONE);
--	atmel_tsadcc_write(ATMEL_TSADCC_TSR,
--		(pdata->ts_sample_hold_time << 24) & ATMEL_TSADCC_TSSHTIM);
--
--	atmel_tsadcc_read(ATMEL_TSADCC_SR);
--	atmel_tsadcc_write(ATMEL_TSADCC_IER, ATMEL_TSADCC_PENCNT);
--
--	/* All went ok, so register to the input system */
--	err = input_register_device(input_dev);
--	if (err)
--		goto err_fail;
--
--	return 0;
--
--err_fail:
--	clk_disable(ts_dev->clk);
--	clk_put(ts_dev->clk);
--err_free_irq:
--	free_irq(ts_dev->irq, ts_dev);
--err_unmap_regs:
--	iounmap(tsc_base);
--err_release_mem:
--	release_mem_region(res->start, resource_size(res));
--err_free_dev:
--	input_free_device(input_dev);
--err_free_mem:
--	kfree(ts_dev);
--	return err;
--}
--
--static int atmel_tsadcc_remove(struct platform_device *pdev)
--{
--	struct atmel_tsadcc *ts_dev = platform_get_drvdata(pdev);
--	struct resource *res;
--
--	free_irq(ts_dev->irq, ts_dev);
--
--	input_unregister_device(ts_dev->input);
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	iounmap(tsc_base);
--	release_mem_region(res->start, resource_size(res));
--
--	clk_disable(ts_dev->clk);
--	clk_put(ts_dev->clk);
--
--	kfree(ts_dev);
--
--	return 0;
--}
--
--static struct platform_driver atmel_tsadcc_driver = {
--	.probe		= atmel_tsadcc_probe,
--	.remove		= atmel_tsadcc_remove,
--	.driver		= {
--		.name	= "atmel_tsadcc",
--	},
--};
--module_platform_driver(atmel_tsadcc_driver);
--
--MODULE_LICENSE("GPL");
--MODULE_DESCRIPTION("Atmel TouchScreen Driver");
--MODULE_AUTHOR("Dan Liang <dan.liang@atmel.com>");
--
--- 
-1.8.3.2
+Setting prefetch enables and early BRESP could all be done
+unconditionally in the core code.
+
+>         /*
+>          * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+>          * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+>          * But according to ARM PL310 errata: 752271
+>          * ID: 752271: Double linefill feature can cause data corruption
+>          * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+>          * Workaround: The only workaround to this erratum is to disable the
+>          * double linefill feature. This is the default behavior.
+>          */
+>         if (cpu_is_imx6q())
+>                 val &= ~(1 << 30 | 1 << 23);
+>         writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
+>         val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
+>         writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
+>
+> You can wonder why we don't have 752271 implemented by the core code.
+>
+> arch/arm/mach-prima2/l2x0.c:
+> struct l2x0_aux
+> {
+>         u32 val;
+>         u32 mask;
+> };
+>
+> static struct l2x0_aux prima2_l2x0_aux __initconst = {
+>         .val = 2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT,
+>         .mask = 0,
+> };
+>
+> static struct l2x0_aux marco_l2x0_aux __initconst = {
+>         .val = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
+>                 (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
+>         .mask = L2X0_AUX_CTRL_MASK,
+
+What I like about this is all the bits they are clearing and failing
+to set. Shared override, prefetch, etc.
+
+> };
+>
+> static struct of_device_id sirf_l2x0_ids[] __initconst = {
+>         { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
+>         { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+>         {},
+> };
+>
+> static int __init sirfsoc_l2x0_init(void)
+> {
+>         struct device_node *np;
+>         const struct l2x0_aux *aux;
+>
+>         np = of_find_matching_node(NULL, sirf_l2x0_ids);
+>         if (np) {
+>                 aux = of_match_node(sirf_l2x0_ids, np)->data;
+>                 return l2x0_of_init(aux->val, aux->mask);
+>         }
+>
+>         return 0;
+> }
+> early_initcall(sirfsoc_l2x0_init);
+>
+> This shows everything that is /BAD/ about DT.  People go running around
+> stuffing crap like this in rather than thinking about the generic problem.
+> The sole function of the above compatible strings is to select between
+> different cache property configurations.  Now go back and look at the
+> iMX code above, which is doing the same thing but at runtime.
+>
+> Now think: why don't we _already_ have a dt property or two to specify
+> this information?
+>
+> The reason why we don't have that is because people do not think beyond
+> their nose when they encounter a problem.  They will not think whether
+> it should be fixed in a generic way.  They will not look to see whether
+> other people are suffering the same problem.
+>
+> The big problem is that _now_ we have to support this fuckage for ever,
+> and all because people can't look beyond their immediate problem.
+>
+> arch/arm/mach-zynq/common.c:
+> static void __init zynq_init_machine(void)
+> {
+>         /*
+>          * 64KB way size, 8-way associativity, parity disabled
+>          */
+>         l2x0_of_init(0x02060000, 0xF0F0FFFF);
+>
+> Oh look, same problem again.
+
+This all seems unnecessary. All these values should be correct at
+reset and this should be a nop unless the h/w is configured
+incorrectly. Surely h/w folks can tie off WAYSIZE correctly... It is
+also keeping shared attrib override disabled which I believe is
+generally wrong, and is masking 1 bit of force write allocate, but not
+the other.
+
+ePAPR already defines standard properties for cache layout which could
+be used here if really needed.
+
+> arch/arm/mach-ux500/cache-l2x0.c:
+>         /* DBx540's L2 has 128KB way size */
+>         if (cpu_is_ux540_family())
+>                 /* 128KB way size */
+>                 aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+>         else
+>                 /* 64KB way size */
+>                 aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+>
+>         /* 64KB way size, 8 way associativity, force WA */
+>         if (of_have_populated_dt())
+>                 l2x0_of_init(aux_val, 0xc0000fff);
+>         else
+>                 l2x0_init(l2x0_base, aux_val, 0xc0000fff);
+>
+> Okay, this has to cope with non-DT as well, but for the DT case, it is
+> again the same damned problem.
+
+This one is interesting in that it has to undo way locking done by the
+bootloader. So the bootloader has setup the L2 to some extent, but
+didn't configure aux ctrl already?
+
+The way unlocking could be done unconditionally in the core code
+perhaps. There could be issues on non-secure platforms though.
+
+>
+> arch/arm/mach-nomadik/cpu-8815.c:
+> #ifdef CONFIG_CACHE_L2X0
+>         /* At full speed latency must be >=2, so 0x249 in low bits */
+>         l2x0_of_init(0x00730249, 0xfe000fff);
+> #endif
+>
+> Do we actually end up with 0x249 in the low bits - because the fff in
+> the mask field preserves the values already in the aux register.
+> Moreover, don't we have DT properties to specify this information already,
+> so why isn't nomadik using them?  Nomadik is using a DT compatible string
+> of "arm,l210-cache", which has the properties "arm,tag-latency",
+> "arm,data-latency", "arm,dirty-latency" which allow that 0x249 to be
+> specified.
+
+l2x0_of_setup clears those mask bits if the DT properties are present,
+so it will work in that case. But otherwise, yes this is broken.
+
+> What the real painful bit here is that we have all these DT files out
+> there now which make the assumption that this code is going to always be
+> there, and there's not a /damned/ thing we can do with this crap now.
+> The best we can do is to try and stop this crap spreading further than
+> it already has.
+
+I think we really should have pushed that all aux_ctrl setup go into
+the bootloader. It's really not that different from errata work-around
+setup. It doesn't have the same race condition as enabling errata
+work-arounds may have, but does have the same secure vs. non-secure
+setup issue.
+
+Keeping the aux val/mask parameters in the DT case was definitely a
+mistake. DT or not, it is a fragile and error prone interface of magic
+values and we should have forced its removal when we had the chance.
+
+Rob
+
+> Yes, I'm pissed off with DT.  I'm pissed off with people not thinking
+> before creating this crap as well.  I'm pissed off with the people who
+> allegedly reviewed this crap.  I'm pissed off with the people who
+> allegedly reviewed the creation of these SoC specific compatible
+> strings just to be able to specify configuration data.
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
