@@ -1,80 +1,46 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 17 Mar 2014 16:22:11 +0000
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <CAL_Jsq+9X-9VahsP79mtHN0RC64vRA_2R3ucjX0LefO6q2YN3Q@mail.gmail.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
- <CAL_Jsq+9X-9VahsP79mtHN0RC64vRA_2R3ucjX0LefO6q2YN3Q@mail.gmail.com>
-Message-ID: <20140317162211.GH6457@e106497-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Mar 2014 17:22:43 +0100
+Subject: [PATCH v2 0/3] watchdog: sunxi: Change compatible patterns
+In-Reply-To: <20140315083711.GA11070@spo001.leaseweb.com>
+References: <1391808566-31008-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140303104042.GU607@lukather>
+ <20140311205405.GA10228@spo001.leaseweb.com>
+ <20140312091649.GU2815@lukather>
+ <20140312180751.GC1484@spo001.leaseweb.com>
+ <20140313111558.GH2815@lukather>
+ <20140315083711.GA11070@spo001.leaseweb.com>
+Message-ID: <20140317162243.GP27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 04:05:38PM +0000, Rob Herring wrote:
-> On Fri, Mar 14, 2014 at 10:34 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > Use the generic host bridge functions to provide support for
-> > PCI Express on arm64. There is no support for ISA memory.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  arch/arm64/Kconfig            |  19 +++-
-> >  arch/arm64/include/asm/Kbuild |   1 +
-> >  arch/arm64/include/asm/io.h   |   3 +-
-> >  arch/arm64/include/asm/pci.h  |  51 ++++++++++
-> >  arch/arm64/kernel/Makefile    |   1 +
-> >  arch/arm64/kernel/pci.c       | 173 ++++++++++++++++++++++++++++++++
-> >  6 files changed, 246 insertions(+), 2 deletions(-)
-> >  create mode 100644 arch/arm64/include/asm/pci.h
-> >  create mode 100644 arch/arm64/kernel/pci.c
+On Sat, Mar 15, 2014 at 09:37:11AM +0100, Wim Van Sebroeck wrote:
+> Hi Maxime,
 > 
-> [snip]
+> > 
+> > On Wed, Mar 12, 2014 at 07:07:51PM +0100, Wim Van Sebroeck wrote:
+> > > > > I'm OK with the patches, but what is the preferred way to get them upstream?
+> > > > > via watchdog tree or via arch/soc tree?
+> > > > 
+> > > > Since it touches the machine restart code, I'd prefer to merge it
+> > > > myself if it's ok?
+> > > 
+> > > No Problem. You have my Acked-by.
+> > 
+> > Actually, I only have to keep together patches 2 and 3. Could you
+> > merge the first one? I'll handle the two others.
 > 
-> > +#endif
-> > +
-> > +extern unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr);
-> 
-> Can we at least align the function definition across architectures if
-> not the implementation.
+> First one added to linux-watchdog-next.
 
-The choice of names is unfortunate. We are trying to follow the spirit of the
-arch/arm function, not the implementation, and for RFC that served the purpose.
-
-I'll come up with a better name as I don't intend to share the implementation
-with arch/arm here.
-
-Best regards,
-Liviu
-
-> 
-> 
-> > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
-> > +{
-> > +       struct ioresource *res;
-> > +       resource_size_t allocated_size = 0;
-> > +
-> > +       /* find if the range has not been already allocated */
-> > +       list_for_each_entry(res, &io_list, list) {
-> > +               if (address >= res->start &&
-> > +                       address + size <= res->start + size)
-> > +                       return 0;
-> > +               allocated_size += res->size;
-> > +       }
-> > +
-> > +       /* range not already registered, check for space */
-> > +       if (allocated_size + size > IO_SPACE_LIMIT)
-> 
-> I believe this needs to be "allocated_size + size - 1".
-> 
-> > +               return -E2BIG;
-> > +
-> 
+Thanks!
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/76ed589e/attachment.sig>
