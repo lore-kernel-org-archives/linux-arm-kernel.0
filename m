@@ -1,90 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Mar 2014 18:18:13 +0000
-Subject: Recent 3.x kernels: Memory leak causing OOMs
-In-Reply-To: <20140317180748.644d30e2@notabene.brown>
-References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
- <20140216225000.GO30257@n2100.arm.linux.org.uk>
- <1392670951.24429.10.camel@sakura.staff.proxad.net>
- <20140217210954.GA21483@n2100.arm.linux.org.uk>
- <20140315101952.GT21483@n2100.arm.linux.org.uk>
- <20140317180748.644d30e2@notabene.brown>
-Message-ID: <20140317181813.GA24144@arm.com>
+From: ananaza@iki.fi (Antti P Miettinen)
+Date: Mon, 17 Mar 2014 20:26:38 +0200 (EET)
+Subject: [PATCH RFC v4 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <20140317144515.GC28453@e102568-lin.cambridge.arm.com>
+References: <20140317115303.GB28453@e102568-lin.cambridge.arm.com>
+ <20140317.154940.169167846103479320.apm@brigitte.kvy.fi>
+ <20140317144515.GC28453@e102568-lin.cambridge.arm.com>
+Message-ID: <20140317.202638.1149319857823818469.apm@brigitte.kvy.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 06:07:48PM +1100, NeilBrown wrote:
-> On Sat, 15 Mar 2014 10:19:52 +0000 Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > unreferenced object 0xc3c3f880 (size 256):
-> >   comm "md2_resync", pid 4680, jiffies 638245 (age 8615.570s)
-> >   hex dump (first 32 bytes):
-> >     00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 f0  ................
-> >     00 00 00 00 10 00 00 00 00 00 00 00 00 00 00 00  ................
-> >   backtrace:
-> >     [<c008d4f0>] __save_stack_trace+0x34/0x40
-> >     [<c008d5f0>] create_object+0xf4/0x214
-> >     [<c02da114>] kmemleak_alloc+0x3c/0x6c
-> >     [<c008c0d4>] __kmalloc+0xd0/0x124
-> >     [<c00bb124>] bio_alloc_bioset+0x4c/0x1a4
-> >     [<c021206c>] r1buf_pool_alloc+0x40/0x148
-> >     [<c0061160>] mempool_alloc+0x54/0xfc
-> >     [<c0211938>] sync_request+0x168/0x85c
-> >     [<c021addc>] md_do_sync+0x75c/0xbc0
-> >     [<c021b594>] md_thread+0x138/0x154
-> >     [<c0037b48>] kthread+0xb0/0xbc
-> >     [<c0013190>] ret_from_fork+0x14/0x24
-> >     [<ffffffff>] 0xffffffff
-> > 
-> > with 3077 of these in the debug file.  3075 are for "md2_resync" and
-> > two are for "md4_resync".
-> > 
-> > /proc/slabinfo shows for this bucket:
-> > kmalloc-256         3237   3450    256   15    1 : tunables  120   60    0 : slabdata    230    230      0
-> > 
-> > but this would only account for about 800kB of memory usage, which itself
-> > is insignificant - so this is not the whole story.
-> > 
-> > It seems that this is the culpret for the allocations:
-> >         for (j = pi->raid_disks ; j-- ; ) {
-> >                 bio = bio_kmalloc(gfp_flags, RESYNC_PAGES);
-> > 
-> > Since RESYNC_PAGES will be 64K/4K=16, each struct bio_vec is 12 bytes
-> > (12 * 16 = 192) plus the size of struct bio, which would fall into this
-> > bucket.
-> > 
-> > I don't see anything obvious - it looks like it isn't every raid check
-> > which loses bios.  Not quite sure what to make of this right now.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> When we make a decision on what idle state to enter all we do, and
+> that's OS agnostic, is predicting (+checking the next event) the next IRQ and
+> see if it is worth entering a state or not. We have to compare it against
+> a baseline, which is the processor being in standbywfi and that's what
+> these bindings define.
 > 
-> I can't see anything obvious either.
+> I do not understand why you want to define min-residency against the
+> previous shallower state.
 > 
-> The bios allocated there are stored in a r1_bio and those pointers are never
-> changed.
-> If the r1_bio wasn't freed then when the data-check finished, mempool_destroy
-> would complain that the pool wasn't completely freed.
-> And when the r1_bio is freed, all the bios are put as well.
+> What this binding says is: standbywfi is the shallower idle state in
+> power consumption terms. Deeper idle states save more power than
+> standbywfi if the residency in that state is at least min-residency.
+> 
+> I do not see where the problem is to be honest, maybe I need an example.
+> 
+> Thanks!
+> Lorenzo
 
-It could be a false positive, there are areas that kmemleak doesn't scan
-like page allocations and the pointer reference graph it tries to build
-would fail.
+Sorry, I should have explained myself more clearly. I've been
+pondering about these issues somewhat lately so I'm perhaps suffering
+from a bit of a tunnel vision.
 
-What's interesting to see is the first few leaks reported as they are
-always reported in the order of allocation. In this case, the
-bio_kmalloc() returned pointer is stored in r1_bio. Is the r1_bio
-reported as a leak as well?
+In short, when we choose an idle state based on expected idle duration
+we are not comparing wfi against all possible idle states in turn and
+making a decision between wfi and state X. Instead we want to choose
+among all states the one that gives minimum energy for the expected
+idle time. I'll try to elaborate..
 
-The sync_request() function eventually gets rid of the r1_bio as it is a
-variable on the stack. But it is stored in a bio->bi_private variable
-and that's where I lost track of where pointers are referenced from.
+Entering and exiting idle states takes time at nonzero power. To make
+up for this lost energy we indeed want the time in the idle state to
+be sufficiently long to make up for the lost energy. Now the important
+question here is "make up compared to what?".
 
-A simple way to check whether it's a false positive is to do a:
+The energy over the idle time can be also interpreted as average
+power. When the idle time increases the average power for a state
+approaches the in-state power. A deeper idle state would be a state
+with lower in-state power and longer entry/exit time. Therefore the
+average power for a deeper idle state drops slower as function of idle
+time than the average power for a shallower idle state. If we'd plot
+the average power for a number of idle states as function of idle
+duration, we'd get a set of "constant over idle time plus constant"
+style curves. Average power for state 0 will drop fastest close to the
+in-state power of state 0. Average power for state 1 will drop slower
+and approach the in-state power of state 1, average power for state 2
+will drop even slower and approach the in-state power of state 3.
 
-echo dump=<unref obj addr> > /sys/kernel/debug/kmemleak
+To define that the min-residency is the breakeven time against state 0
+means that we are looking at the curves and asking "when does the
+average power for state X cross the average power for state 0?". But
+that would be the guideline for making a decision between state 0 and
+the state in question. Even if average power for state 2 is below
+the average power of state 0 it is not necessarily yet below the
+average power of state 1. To break even against state 1 the idle
+duration needs to be longer.
 
-If an object was reported as a leak but later on kmemleak doesn't know
-about it, it means that it was freed and hence a false positive (maybe I
-should add this as a warning in kmemleak if certain amount of leaked
-objects freeing is detected).
+Yet another way to look at this: for three states we can define three
+times of interest:
+- t1: the time when state1 breaks even against state0
+- t2: the time when state2 breaks even against state0
+- t3: the time when state2 breaks even against state1
+and t3 would typically be larger than t2.
 
--- 
-Catalin
+	--Antti
