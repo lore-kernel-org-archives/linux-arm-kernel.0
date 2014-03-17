@@ -1,62 +1,64 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:16:55 +0000
-Subject: [PATCH 40/44] ARM: l2c: ux500: implement dummy write_sec method
+Date: Mon, 17 Mar 2014 00:17:05 +0000
+Subject: [PATCH 42/44] ARM: l2c: implement L2C-310 erratum 752271 in core L2C
+ code
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLEd-0002ea-Mb@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEn-0002ei-U4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ux500 can't write to any of the secure registers on the L2C controllers,
-so provide a dummy handler which ignores all writes.
+Rather than having SoCs work around L2C erratum themselves, move them
+into core code.  This erratum affects the double linefill feature which
+needs to be disabled for r3p0 to r3p1-50rel0.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ux500/cache-l2x0.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 264f894c0e3d..5cc7e3625d8c 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -35,6 +35,14 @@ static int __init ux500_l2x0_unlock(void)
- 	return 0;
- }
- 
-+static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
-+{
-+	/*
-+	 * We can't write to secure registers as we are in non-secure
-+	 * mode, until we have some SMI service available.
-+	 */
-+}
-+
- static int __init ux500_l2x0_init(void)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index ae838bb97cc2..34980c75bacd 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -669,6 +669,11 @@ static const struct l2c_init_data l2c220_data = {
+  *	hit the line between the clean operation and invalidate operation,
+  *	resulting in the store being lost.
+  *
++ * 752271: PL310 R3P0->R3P1-50REL0, fixed R3P2.
++ *	Affects: 8x64-bit (double fill) line fetches
++ *	double fill line fetches can fail to cause dirty data to be evicted
++ *	from the cache before the new data overwrites the second line.
++ *
+  * 753970: PL310 R3P0, fixed R3P1.
+  *	Affects: sync
+  *	prevents merging writes after the sync operation, until another L2C
+@@ -818,7 +823,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	struct outer_cache_fns *fns)
  {
- 	u32 aux_val = 0x3e000000;
-@@ -56,21 +64,14 @@ static int __init ux500_l2x0_init(void)
- 		/* 64KB way size */
- 		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+ 	unsigned revision = cache_id & L2X0_CACHE_ID_RTL_MASK;
+-	const char *errata[4];
++	const char *errata[8];
+ 	unsigned n = 0;
  
-+	outer_cache.write_sec = ux500_l2c310_write_sec;
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
+@@ -837,6 +842,17 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 		errata[n++] = "727915";
+ 	}
+ 
++	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
++	    revision < L310_CACHE_ID_RTL_R3P2) {
++		u32 val = readl_relaxed(base + L2X0_PREFETCH_CTRL);
++		/* I don't think bit23 is required here... but iMX6 does so */
++		if (val & (BIT(30) | BIT(23))) {
++			val &= ~(BIT(30) | BIT(23));
++			l2c_write_sec(val, base, L2X0_PREFETCH_CTRL);
++			errata[n++] = "752271";
++		}
++	}
 +
- 	/* 64KB way size, 8 way associativity, force WA */
- 	if (of_have_populated_dt())
- 		l2x0_of_init(aux_val, 0xc0000fff);
- 	else
- 		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
- 
--	/*
--	 * We can't disable l2 as we are in non secure mode, currently
--	 * this seems be called only during kexec path. So let's
--	 * override outer.disable with nasty assignment until we have
--	 * some SMI service available.
--	 */
--	outer_cache.disable = NULL;
--	outer_cache.set_debug = NULL;
--
- 	return 0;
- }
- 
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_753970) &&
+ 	    revision == L310_CACHE_ID_RTL_R3P0) {
+ 		sync_reg_offset = L2X0_DUMMY_REG;
 -- 
 1.8.3.1
