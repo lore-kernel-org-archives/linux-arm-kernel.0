@@ -1,77 +1,85 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 17 Mar 2014 15:55:27 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <532017B3.708@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <532017B3.708@ti.com>
-Message-ID: <5326FECF.9070104@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Mar 2014 14:58:36 +0100
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <5326FB75.1050605@samsung.com>
+References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
+ <1394731053-6118-7-git-send-email-denis@eukrea.com>
+ <5326FB75.1050605@samsung.com>
+Message-ID: <2166863.3Fn4k2rvaz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Hello,
 
-Ping.
+On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
+> On 03/13/2014 06:17 PM, Denis Carikli wrote:
+> > We need a way to pass signal polarity informations
+> > between DRM panels, and the display drivers.
+> > 
+> > To do that, a pol_flags field was added to drm_display_mode.
+> > 
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > ---
+> > ChangeLog v10->v11:
+> > - Since the imx-drm won't be able to retrive its regulators
+> > 
+> >   from the device tree when using display-timings nodes,
+> >   and that I was told that the drm simple-panel driver
+> >   already supported that, I then, instead, added what was
+> >   lacking to make the eukrea displays work with the
+> >   drm-simple-panel driver.
+> >   
+> >   That required a way to get back the display polarity
+> >   informations from the imx-drm driver without affecting
+> >   userspace.
+> > 
+> > ---
+> > 
+> >  include/drm/drm_crtc.h |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> > index f764654..61a4fe1 100644
+> > --- a/include/drm/drm_crtc.h
+> > +++ b/include/drm/drm_crtc.h
+> > @@ -131,6 +131,13 @@ enum drm_mode_status {
+> > 
+> >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> > 
+> > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+> > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
+> > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
+> > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+> 
+> Could you add some description to these flags.
+> What are *_PRESERVE flags for?
+> Are those flags 1:1 compatible with respective 'videomode:flags'?
+> I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
+> right?
 
-Are you fine with me proceeding with the current V4L2 port/endpoint
-bindings?
+Possibly nitpicking, I wouldn't call the clock edge on which data signals are 
+generated/sampled "data polarity". This is clock polarity information.
 
- Tomi
+Have you seen cases where pixel data and DE are geenrated or need to be 
+sampled on different edges ?
 
-On 12/03/14 10:15, Tomi Valkeinen wrote:
-> Hi Grant,
-> 
-> On 28/02/14 14:20, Tomi Valkeinen wrote:
->> Hi,
->>
->> This series is a re-send of
->> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
->>
->> I'm cc'ing more people, and I want to clarify the contents of the series:
->>
->> While this has been developed for OMAP, only the first patch is about OMAP
->> bindings. The rest are generic bindings for video components, which can be used
->> on any platform.
->>
->> The bindings use the V4L2 style video port/endpoint system, described in
->> Documentation/devicetree/bindings/media/video-interfaces.txt, to connect the
->> components. The same port/endpoint bindings are used by Philipp Zabel in his
->> imx-drm patch series.
-> 
-> This series is a piece of bigger series, which brings DT support for
-> OMAP display subsystem. This uses the same V4L2 style ports/endpoints as
-> has been discussed recently regarding the series from Philipp. It
-> doesn't use the helper code from Philipp, but a custom one as Philipp's
-> code didn't exist when I made this, and also because I needed extra
-> functionality not present in Philipp's series (which aimed to just move
-> the current V4L2 code to a common place).
-> 
-> The main concerns with the ports/endpoints has been the optional 'port'
-> node for the case where we have a single endpoint, and the
-> double-linking of the endpoints.
-> 
-> If I remove the optional 'port' usage from my series, are you ok with me
-> proceeding with this series for 3.15, with the double-linked endpoints?
-> 
-> As far as I see, when we come to a conclusion how the linking should be
-> made, it's trivial to change the bindings in this series to match it,
-> even without needing any compatibility code. I just need to remove the
-> other link, and old dts files having double-linking will still work fine.
-> 
-> The reason I want to push this forward asap is that omap4 and omap5 are
-> already DT only, and for omap5 we don't have working display without DT
-> support for display. For omap4, we have a really hacky way to add
-> display support for a few boards, but that is causing major headaches
-> and I want to get rid of it.
-> 
->  Tomi
-> 
-> 
+> > +
+> >  struct drm_display_mode {
+> >  	/* Header */
+> >  	struct list_head head;
+> > @@ -183,6 +190,7 @@ struct drm_display_mode {
+> >  	int vrefresh;		/* in Hz */
+> >  	int hsync;		/* in kHz */
+> >  	enum hdmi_picture_aspect picture_aspect_ratio;
+> > +	unsigned int pol_flags;
+> >  };
+> >  
+> >  static inline bool drm_mode_is_stereo(const struct drm_display_mode
+> >  *mode)
 
+-- 
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/4a5eb300/attachment.sig>
+Laurent Pinchart
