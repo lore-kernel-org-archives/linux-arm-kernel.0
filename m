@@ -1,88 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Mar 2014 12:12:13 +0100
-Subject: [PATCH v2 1/2] irqchip: sun4i: Use handle_fasteoi_irq for all
- interrupts
-In-Reply-To: <1394895894-8891-2-git-send-email-hdegoede@redhat.com>
-References: <1394895894-8891-1-git-send-email-hdegoede@redhat.com>
- <1394895894-8891-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140317111213.GG27873@lukather>
+From: ananaza@iki.fi (Antti P Miettinen)
+Date: Mon, 17 Mar 2014 13:15:07 +0200 (EET)
+Subject: [PATCH RFC v4 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <1392724051-11950-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1392724051-11950-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1392724051-11950-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20140317.131507.1338341364843764791.apm@brigitte.kvy.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 04:04:53PM +0100, Hans de Goede wrote:
-> Since the sun4i irq chip does not require any action and clears the interrupt
-> when the level goes back to inactive, we don't need to mask / unmask for
-> non oneshot IRQs, to achieve this we make sun4i_irq_ack a nop for all irqs
-> except irq 0 and use handle_fasteoi_irq for all interrupts.
-> 
-> Now there might be a case when the device reactivates the interrupt
-> before the RETI. But that does not matter as we run the primary
-> interrupt handlers with interrupts disabled.
-> 
-> This also allows us to get rid of needing to use 2 irq_chip structs, this
-> means that the IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED will now influence
-> all interrupts rather then just irq 0, but that does not matter as the eoi
-> is now a nop anyways for all interrupts but irq 0.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/irqchip/irq-sun4i.c | 18 ++++--------------
->  1 file changed, 4 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> index a0ed1ea..6a8c88d 100644
-> --- a/drivers/irqchip/irq-sun4i.c
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -45,6 +45,9 @@ static void sun4i_irq_ack(struct irq_data *irqd)
->  	int reg = irq / 32;
->  	u32 val;
->  
-> +	if (irq != 0)
-> +		return; /* Only IRQ 0 / the ENMI needs to be acked */
-> +
->  	val = readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
->  	writel(val | (1 << irq_off),
->  	       sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-> @@ -76,13 +79,6 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
->  
->  static struct irq_chip sun4i_irq_chip = {
->  	.name		= "sun4i_irq",
-> -	.irq_mask	= sun4i_irq_mask,
-> -	.irq_unmask	= sun4i_irq_unmask,
-> -};
-> -
-> -/* IRQ 0 / the ENMI needs a late eoi call */
-> -static struct irq_chip sun4i_irq_chip_enmi = {
-> -	.name		= "sun4i_irq",
->  	.irq_eoi	= sun4i_irq_ack,
->  	.irq_mask	= sun4i_irq_mask,
->  	.irq_unmask	= sun4i_irq_unmask,
-> @@ -92,13 +88,7 @@ static struct irq_chip sun4i_irq_chip_enmi = {
->  static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
->  			 irq_hw_number_t hw)
->  {
-> -	if (hw == 0)
-> -		irq_set_chip_and_handler(virq, &sun4i_irq_chip_enmi,
-> -					 handle_fasteoi_irq);
-> -	else
-> -		irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> -					 handle_level_irq);
-> -
-> +	irq_set_chip_and_handler(virq, &sun4i_irq_chip, handle_fasteoi_irq);
->  	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+Sorry for having been lazy in commenting..
 
-Oh.. And you just did. Nevermind then.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Date: Tue, 18 Feb 2014 11:47:31 +0000
+> +	- min-residency
+> +		Usage: Required
+> +		Value type: <prop-encoded-array>
+> +		Definition: u32 value representing time in microseconds
+> +			    required for the CPU to be in the idle state to
+> +			    break even in power consumption terms compared
+> +			    to idle state idle_standby ([4][5]).
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+To me this continues to be a bit illdefined. Say we have three states:
+0,1,2. State 0 is the idle_standby. Providing a minimum residency for
+state 1 compared to state 0 sort of makes sense, but if we provide a
+minimum residency for state 2 compared to state 0 the break even time
+is going to be smaller than break even when comparing state 1 and
+state 2. With this data we'd enter state 2 when we'd be better off
+entering state 1.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/9e29c0b5/attachment.sig>
+	--Antti
