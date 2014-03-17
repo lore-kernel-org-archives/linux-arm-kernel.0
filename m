@@ -1,33 +1,39 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 16 Mar 2014 20:39:26 -0700
-Subject: [PATCH v4 00/10] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-In-Reply-To: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
+Date: Sun, 16 Mar 2014 20:39:38 -0700
+Subject: [PATCH v4 01/10] KVM: Add capability to advertise PSCI v0.2
+ support
+In-Reply-To: <1391686302-19451-2-git-send-email-anup.patel@linaro.org>
 References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140317033926.GA20648@cbox>
+ <1391686302-19451-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140317033938.GB20648@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 05:01:32PM +0530, Anup Patel wrote:
-> Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-> and Coordination Interface (PSCI) v0.1.
+On Thu, Feb 06, 2014 at 05:01:33PM +0530, Anup Patel wrote:
+> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
 > 
-> This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-> such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
-> provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
-> CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
-> later.
-
-This doesn't seem to be true any longer does it?
-
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  include/uapi/linux/kvm.h |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-> KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-> PSCI v0.2 to VCPUs.
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 932d7f2..fb3c3f3 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -675,6 +675,7 @@ struct kvm_ppc_smmu_info {
+>  #define KVM_CAP_SPAPR_MULTITCE 94
+>  #define KVM_CAP_EXT_EMUL_CPUID 95
+>  #define KVM_CAP_HYPERV_TIME 96
+> +#define KVM_CAP_ARM_PSCI_0_2 97
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
+> -- 
+> 1.7.9.5
 > 
 
-Besides the stuff you already added, I think you need to also add
-returning ALREADY_ON for the CPU_ON call if the VCPU requested is
-already on.
-
-Thanks,
--Christoffer
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
