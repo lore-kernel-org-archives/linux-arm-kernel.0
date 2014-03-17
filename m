@@ -1,46 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Mar 2014 15:35:53 -0400
-Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
-In-Reply-To: <201403171111.30596.arnd@arndb.de>
-References: <20140301052536.GS1872@titan.lakedaemon.net>
- <20140304025559.GY1872@titan.lakedaemon.net>
- <201403171111.30596.arnd@arndb.de>
-Message-ID: <20140317193552.GN15608@titan.lakedaemon.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 17 Mar 2014 15:37:47 -0400
+Subject: [PATCH] dma: Add Keystone Packet DMA Engine driver
+In-Reply-To: <20140317044223.GA1976@intel.com>
+References: <1393628200-12317-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140311102357.GR1976@intel.com> <531F6908.4010104@ti.com>
+ <20140312160017.GY1976@intel.com> <5320CEC4.1060306@ti.com>
+ <20140317044223.GA1976@intel.com>
+Message-ID: <53274F0B.5070201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 11:11:30AM +0100, Arnd Bergmann wrote:
-> On Tuesday 04 March 2014, Jason Cooper wrote:
-> > V2: removed the dove PMU interrupt node (er, undid the re-addition of
-> > the node.  ie: let the revert stand).  So, commit id's for this pull
-> > only are changed.  No previous pulls or tags affected.  Confirmed the
-> > change with a diff between the old branch and the new branch.  And did a
-> > run of building dtbs.  No problems.  Sorry for the confusion.
-> > 
-> > Russell just raised a very valid point today regarding the overall
-> > design of an eventual PMU driver that would cover several tasks we
-> > hadn't considered with the original binding.  Better to pull it now than
-> > have to support it indefinitely.  Revert of the driver in the works.
-> > 
-> > --- original text ---
-> > 
-> > Here's another rather large round of DT changes for mvebu.  It's all
-> > summed up below and has been in -next for a while now.
-> > 
-> > This is an incremental pull from tags/mvebu-dt-3.15-2 in the mvebu/dt
-> > branch up to tags/mvebu-dt-3.15-3.
-> > 
+On Monday 17 March 2014 12:42 AM, Vinod Koul wrote:
+> On Thu, Mar 13, 2014 at 05:16:52AM +0800, Santosh Shilimkar wrote:
+>> On Thursday 13 March 2014 12:00 AM, Vinod Koul wrote:
+>>> On Wed, Mar 12, 2014 at 03:50:32AM +0800, Santosh Shilimkar wrote:
+>>>> On Tuesday 11 March 2014 06:23 PM, Vinod Koul wrote:
+>>>>> On Fri, Feb 28, 2014 at 05:56:40PM -0500, Santosh Shilimkar wrote:
+>>>>>> From: Sandeep Nair <sandeep_n@ti.com>
+>>>>>>
+>>>>>> The Packet DMA driver sets up the dma channels and flows for the
+>>>>>> QMSS(Queue Manager SubSystem) who triggers the actual data movements
+>>>>>> across clients using destination queues. Every client modules like
+>>>>>> NETCP(Network Coprocessor), SRIO(Serial Rapid IO) and CRYPTO
+>>>>>> Engines has its own instance of packet dma hardware. QMSS has also
+>>>>>> an internal packet DMA module which is used as an infrastructure
+>>>>>> DMA with zero copy.
+>>>>>>
+>>>>>> Patch adds DMAEngine driver for Keystone Packet DMA hardware.
+>>>>>> The specifics on the device tree bindings for Packet DMA can be
+>>>>>> found in:
+>>>>>> 	Documentation/devicetree/bindings/dma/keystone-pktdma.txt
+>>>>>>
+>>>>>> The driver implements the configuration functions using standard DMAEngine
+>>>>>> apis. The data movement is managed by QMSS device driver.
+>>>>> Pls use subsystem appropriate name so here would have been dmaengine: ...
+>>>>>
+>>>>> So i am still missing stuff like prepare calls, irq, descriptor management to
+>>>>> call this a dmaengine driver.
+>>>>>
+>>>>> I guess you need to explain a bit more why the data movement is handled by some
+>>>>> other driver and not by this one
+>>>>>
+>>>> To expand above statement, Packet DMA hardware blocks on Keystone SOCs
+>>>> are DMAEngines. QMSS is centralised subsystem manages multiple functionalities
+>>>> including triggering dma transfers, descriptor management and completion
+>>>> irqs. There are separate instance of packet DMA hardware block per client
+>>>> device. We program the DMA hardware to allocate channels and flows. So
+>>>> the packet DMA resouces like dma channels and dma flows are configured
+>>>> and managed through the DMAEngine driver. Thats why we implement only
+>>>> device_alloc_chan_resources, device_free_chan_resources and device_control
+>>>> DMAEngine APIs.
+>>> Sorry am bit lost. If its a dmaengine then you still need to program the
+>>> transfers, how does that part work?
+>>>
+>> To simplify this bit more, you can think of this as DMA channels, flows
+>> are allocated and DMA channels are enabled by DMA engine and they remains
+>> enabled always as long as the channel in use. Enablling dma channel
+>> actually don't start the DMA transfer but just sets up the connection/pipe
+>> with peripheral and memory and vice a versa.
+>>
+>> All the descriptor management, triggering, sending completion interrupt or
+>> hardware signal to DMAEngine all managed by centralised QMSS.
+>>
+>> Actual copy of data is still done by DMA hardware but its completely
+>> transparent to software. DMAEngine hardware takes care of that in the
+>> backyard.
+> So you will use the dmaengine just for setting up the controller. Not for actual
+> transfers. Those would be governed by the QMSS, right?
+>
+Correct.
+ 
+> This means that someone expecting to use dmaengine API will get confused about
+> this and doing part (alloc) thru dmaengine and rest (transfers) using some other
+> API. This brings to me the design approach, does it really make sense creating
+> dmaengine driver for this when we are not fully complying to the API
 > 
-> Pulled into next/dt now, along with the #4 and #5. I got a trivial
-> merge conflict against the dts Makefile change from mach-qcom and
-> noticed that splitting up the dtb section into per-soc breaks
-> alphabetical ordering, which I changed in the merge by moving
-> it down to the end of the list.
+Thats fair. The rationale behind usage of DMEngine was that its the closest
+available subsystem which can be leveraged for this hardware. We can
+pretty much use all the standard DMAEngine device tree parsing as well as
+the config API to setup DMAs. 
 
-Ok, I've now adopted the same resolution as you wrt alphabetical order.
-There is one caveat, though.  I also relocated CONFIG_MACH_KIRKWOOD down
-to the end of the file as well.
+I think you made your stand clear, just to confirm, you don't prefer this
+driver to be a DMAEngine driver considering it doesn't fully complying to
+the APIs. We could document the deviation of 'transfer' handling to avoid
+any confusion.
 
-thx,
+Let me know your final thoughts and thanks a lot for the review.
 
-Jason.
+Regards,
+Santosh
