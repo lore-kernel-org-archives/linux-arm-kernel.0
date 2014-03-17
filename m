@@ -1,79 +1,42 @@
 From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 17 Mar 2014 14:42:35 +0100
-Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
- common, correct implementation
+Date: Mon, 17 Mar 2014 14:42:44 +0100
+Subject: [PATCH RESEND v2 2/2] ixp4xx_eth: Setup coherent_dma_mask
 In-Reply-To: <20140317144016.0508cc4d@marrow.netinsight.se>
 References: <20140317144016.0508cc4d@marrow.netinsight.se>
-Message-ID: <20140317144235.546d2e19@marrow.netinsight.se>
+Message-ID: <20140317144244.6d2e09f9@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-PCI devices can use the entire 32-bit range, PCI dittos are
-limited to the first 64MiB.
+This driver has been broken since commit 1a4901177574083c35fafc24c4d151c2a7c7647c
 
-Also actually setup coherent_dma_mask.
+  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
 
-The patch has been verified on a board with 128MiB memory, one
-ipx4xx_eth device and a e100 PCI device.
+in 3.7 and would fail with
+
+[   33.055473] net eth1: coherent DMA mask is unset
+[   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
+
+Fix by setting up the DMA mask to the entire 32-bit range.
 
 Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
 ---
-ChangeLog:
+ drivers/net/ethernet/xscale/ixp4xx_eth.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-* v2: Move EXPORT_SYMBOL together with dma_set_coherent_mask (Anrd Bergmann)
-
- arch/arm/mach-ixp4xx/common-pci.c |    9 ---------
- arch/arm/mach-ixp4xx/common.c     |   12 ++++++++++++
- 2 files changed, 12 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index 200970d..055d816 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -481,14 +481,5 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
+diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+index 25283f1..e540e51 100644
+--- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
++++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+@@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
+ 	port->netdev = dev;
+ 	port->id = pdev->id;
  
--int dma_set_coherent_mask(struct device *dev, u64 mask)
--{
--	if (mask >= SZ_64M - 1)
--		return 0;
--
--	return -EIO;
--}
--
- EXPORT_SYMBOL(ixp4xx_pci_read);
- EXPORT_SYMBOL(ixp4xx_pci_write);
--EXPORT_SYMBOL(dma_set_coherent_mask);
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 6d68aed..df82a2b 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -31,6 +31,7 @@
- #include <linux/gpio.h>
- #include <linux/cpu.h>
- #include <linux/sched_clock.h>
-+#include <linux/pci.h>
- 
- #include <mach/udc.h>
- #include <mach/hardware.h>
-@@ -578,6 +579,17 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
- 	}
- }
- 
-+int dma_set_coherent_mask(struct device *dev, u64 mask)
-+{
-+	if (dev_is_pci(dev) && mask >= SZ_64M)
-+		return -EIO;
++	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
++	if (err < 0)
++		goto err_free;
 +
-+	dev->coherent_dma_mask = mask;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(dma_set_coherent_mask);
-+
- #ifdef CONFIG_IXP4XX_INDIRECT_PCI
- /*
-  * In the case of using indirect PCI, we simply return the actual PCI
+ 	switch (port->id) {
+ 	case IXP4XX_ETH_NPEA:
+ 		port->regs = (struct eth_regs __iomem *)IXP4XX_EthA_BASE_VIRT;
 -- 
 1.7.9.6
