@@ -1,47 +1,25 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 17 Mar 2014 14:05:15 +0100
-Subject: [PATCH] ata: ahci_sunxi: disable resources on driver removal
-Message-ID: <4639408.hubNkUp5Oa@amdc1032>
+From: chris@printf.net (Chris Ball)
+Date: Mon, 17 Mar 2014 13:07:04 +0000
+Subject: [GIT PULL v2] SOCFPGA updates for 3.15, version 2
+In-Reply-To: <201403171038.16362.arnd@arndb.de> (Arnd Bergmann's message of
+ "Mon, 17 Mar 2014 10:38:16 +0100")
+References: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
+ <201403171038.16362.arnd@arndb.de>
+Message-ID: <864n2xx9c7.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add custom ->host_stop method to disable resources on driver removal.
+Hi Arnd,
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Compile tested only.
+On Mon, Mar 17 2014, Arnd Bergmann wrote:
+> Chris, it would be nice if you could revert d9c3f5df539a "dts: socfpga: Add
+> support for SD/MMC on the SOCFPGA platform" in your mmc tree now. The
+> commit is now also present in arm-soc where it belongs, and we will get
+> a merge conflict if we both carry it, due to the screwup on the
+> sysmgr node.
 
- drivers/ata/ahci_sunxi.c |   14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+I see, sorry about this.  I've pushed the revert to mmc-next now.
 
-Index: b/drivers/ata/ahci_sunxi.c
-===================================================================
---- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:48:26.292485389 +0100
-+++ b/drivers/ata/ahci_sunxi.c	2014-03-17 13:55:48.912477842 +0100
-@@ -156,13 +156,25 @@ static void ahci_sunxi_start_engine(stru
- 	sunxi_setbits(port_mmio + PORT_CMD, PORT_CMD_START);
- }
- 
-+static void ahci_sunxi_host_stop(struct ata_host *host)
-+{
-+	struct ahci_host_priv *hpriv = host->private_data;
-+
-+	ahci_platform_disable_resources(hpriv);
-+}
-+
-+static struct ata_port_operations ahci_sunxi_port_ops = {
-+	.inherits	= &ahci_platform_ops,
-+	.host_stop	= ahci_sunxi_host_stop,
-+};
-+
- static const struct ata_port_info ahci_sunxi_port_info = {
- 	AHCI_HFLAGS(AHCI_HFLAG_32BIT_ONLY | AHCI_HFLAG_NO_MSI |
- 			  AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ),
- 	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NCQ,
- 	.pio_mask	= ATA_PIO4,
- 	.udma_mask	= ATA_UDMA6,
--	.port_ops	= &ahci_platform_ops,
-+	.port_ops	= &ahci_sunxi_port_ops,
- };
- 
- static int ahci_sunxi_probe(struct platform_device *pdev)
+- Chris.
+-- 
+Chris Ball   <chris@printf.net>   <http://printf.net/>
