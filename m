@@ -1,31 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Mar 2014 15:05:05 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <5326F8C5.5090406@ti.com>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5326F8C5.5090406@ti.com>
-Message-ID: <CACRpkdYZMzw31NkA4uSq+ZowzOnZgZthXhZri-eJY2Ozb8aNRQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Mar 2014 14:06:25 +0000
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+Message-ID: <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 2:29 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+On Mon, Mar 17, 2014 at 12:03:59PM +0000, Girish K S wrote:
+> This patch adds the dt node for the mailbox IP
+> 
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
+> 
+> Change-Id: I35e45e9a62592887a84a909aee54f259a2f731fa
+> ---
+>  .../bindings/mailbox/samsung-mailbox.txt           |   24 +++++++
+>  arch/arm64/boot/dts/samsung-gh7.dtsi               |   66 ++++++++++++++++++++
+>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts           |    3 +
+>  3 files changed, 93 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+> new file mode 100644
+> index 0000000..1908d71
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+> @@ -0,0 +1,24 @@
+> +
+> +Samsung Mailbox Driver
+> +
+> +Required properties:
+> +- compatible:		Should be one of the following,
+> +			    "samsung,gh7-mailbox" for
+> +				Samsung GH7 SoC series
+> +			    "samsung,exynos-mailbox" for
+> +				exynosx SoC series
+> +- reg:			Contains the mailbox register address range (base address
+> +			and length)
+> +- interrupts: 		Contains the interrupt information for the mailbox
+> +			device.
 
-> One thing to note is that this driver is used by keystone too and all
-> its users are DT-only. Although I do not see any in-kernel DT GPIO users
-> even there.
->
-> I can confirm the patch does not break my gpiolib based test module
-> (test with and without DT), but then it did not have an issue even before.
+How many interrupts?
 
-Is that a Tested-by tag? :-)
+What are they for?
 
-If you're also convinced that fix is safe I'll push it as a fix to v3.14-rcN
-if for nothing else so for getting Mr. Holler to stop poking me in the
-chest.
+> +- samsung,mbox-names:	Array of the names of the mailboxes
 
-Yours,
-Linus Walleij
+Juding by the code there is one name per reg entry, but the description
+above implies a single entry (as all the dt fragments have).
+
+What values are expected? What is the consumer of these values? What are
+they used for?
+
+> +
+> +Example:
+> +
+> +/* Samsung GH7 SoC */
+> +mailbox at 100a0000 {
+> +	compatible = "samsung,gh7-mailbox";
+> +	reg = <0x0 0x100a0000 0x0 0x1000>;
+> +	interrupts = <0 310 0>;
+> +	samsung,mbox-names = "a7q-scp";
+> +};
+> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> index c3610bd..be4cce9 100644
+> --- a/arch/arm64/boot/dts/samsung-gh7.dtsi
+> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> @@ -107,5 +107,71 @@
+>  			interrupts = <0 420 0>;
+>  			arm,primecell-periphid = <0x341011>; /* HACK */
+
+This looks odd.
+
+What tree is this against?
+
+Cheers,
+Mark.
