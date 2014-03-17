@@ -1,30 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 10:16:55 +0100
-Subject: [GIT PULL] ARM: efm32: 2nd batch for 3.15-rc1
-In-Reply-To: <20140314205718.GA31517@pengutronix.de>
-References: <20140314205718.GA31517@pengutronix.de>
-Message-ID: <201403171016.56160.arnd@arndb.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 17 Mar 2014 10:19:17 +0100
+Subject: [PATCH v3 2/3] mfd: sec-core: Add of_compatible strings for clock MFD
+ cells
+In-Reply-To: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
+References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1395047958-17953-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> the following changes since commit d5d5ce952a66c32abf36a6fdf2a1ba6cb8da9b93:
-> 
->   ARM: efm32: drop unused file <mach/timex.h> (2014-02-24 10:07:27 +0100)
-> 
-> that you already pulled from me are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
-> 
-> for you to fetch changes up to 35c3a9c8074efa2e763ef1da31e6a9e419884a81:
-> 
->   ARM: efm32: properly namespace i2c location property (2014-03-14 16:04:30 +0100)
-> 
-> ----------------------------------------------------------------
-> Two more dt related efm32 fixes
+Add of_compatible strings for S5M8767 and S2MPS14 clock MFD cells.
 
-Pulled into next/dt, thanks!
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/mfd/sec-core.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-	Arnd
+diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+index d163c66edebb..716606479235 100644
+--- a/drivers/mfd/sec-core.c
++++ b/drivers/mfd/sec-core.c
+@@ -59,6 +59,7 @@ static const struct mfd_cell s5m8767_devs[] = {
+ 		.name = "s5m-rtc",
+ 	}, {
+ 		.name = "s5m8767-clk",
++		.of_compatible = "samsung,s5m8767-clk",
+ 	}
+ };
+ 
+@@ -67,6 +68,7 @@ static const struct mfd_cell s2mps11_devs[] = {
+ 		.name = "s2mps11-pmic",
+ 	}, {
+ 		.name = "s2mps11-clk",
++		.of_compatible = "samsung,s2mps11-clk",
+ 	}
+ };
+ 
+@@ -77,6 +79,7 @@ static const struct mfd_cell s2mps14_devs[] = {
+ 		.name = "s2mps14-rtc",
+ 	}, {
+ 		.name = "s2mps14-clk",
++		.of_compatible = "samsung,s2mps14-clk",
+ 	}
+ };
+ 
+-- 
+1.7.9.5
