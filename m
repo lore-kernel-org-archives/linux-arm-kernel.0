@@ -1,76 +1,45 @@
-From: ananaza@iki.fi (Antti P Miettinen)
-Date: Mon, 17 Mar 2014 20:26:38 +0200 (EET)
-Subject: [PATCH RFC v4 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <20140317144515.GC28453@e102568-lin.cambridge.arm.com>
-References: <20140317115303.GB28453@e102568-lin.cambridge.arm.com>
- <20140317.154940.169167846103479320.apm@brigitte.kvy.fi>
- <20140317144515.GC28453@e102568-lin.cambridge.arm.com>
-Message-ID: <20140317.202638.1149319857823818469.apm@brigitte.kvy.fi>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 17 Mar 2014 19:31:54 +0100
+Subject: [PATCH 0/4] ata: add remaining new-style AHCI platform drivers
+Message-ID: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> When we make a decision on what idle state to enter all we do, and
-> that's OS agnostic, is predicting (+checking the next event) the next IRQ and
-> see if it is worth entering a state or not. We have to compare it against
-> a baseline, which is the processor being in standbywfi and that's what
-> these bindings define.
-> 
-> I do not understand why you want to define min-residency against the
-> previous shallower state.
-> 
-> What this binding says is: standbywfi is the shallower idle state in
-> power consumption terms. Deeper idle states save more power than
-> standbywfi if the residency in that state is at least min-residency.
-> 
-> I do not see where the problem is to be honest, maybe I need an example.
-> 
-> Thanks!
-> Lorenzo
+Hi,
 
-Sorry, I should have explained myself more clearly. I've been
-pondering about these issues somewhat lately so I'm perhaps suffering
-from a bit of a tunnel vision.
+This patch series adds new-style AHCI platform drivers for DaVinci DA850
+AHCI controller and ST SPEAr1340 AHCI controller.  As a preparation for
+adding these drivers it also fixes ahci_platform_data->suspend() handling
+(patch #1) and moves library AHCI platform code to its own file (patch #2).
+The new AHCI platform drivers are only compile tested (they are marked as
+experimental because of this) and I would ask somebody with the hardware
+to verify them (thanks!).
 
-In short, when we choose an idle state based on expected idle duration
-we are not comparing wfi against all possible idle states in turn and
-making a decision between wfi and state X. Instead we want to choose
-among all states the one that gives minimum energy for the expected
-idle time. I'll try to elaborate..
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Entering and exiting idle states takes time at nonzero power. To make
-up for this lost energy we indeed want the time in the idle state to
-be sufficiently long to make up for the lost energy. Now the important
-question here is "make up compared to what?".
 
-The energy over the idle time can be also interpreted as average
-power. When the idle time increases the average power for a state
-approaches the in-state power. A deeper idle state would be a state
-with lower in-state power and longer entry/exit time. Therefore the
-average power for a deeper idle state drops slower as function of idle
-time than the average power for a shallower idle state. If we'd plot
-the average power for a number of idle states as function of idle
-duration, we'd get a set of "constant over idle time plus constant"
-style curves. Average power for state 0 will drop fastest close to the
-in-state power of state 0. Average power for state 1 will drop slower
-and approach the in-state power of state 1, average power for state 2
-will drop even slower and approach the in-state power of state 3.
+Bartlomiej Zolnierkiewicz (4):
+  ata: ahci_platform: fix ahci_platform_data->suspend method handling
+  ata: move library code from ahci_platform.c to libahci_platform.c
+  ata: add new-style AHCI platform driver for DaVinci DA850 AHCI
+    controller
+  ata: add new-style AHCI platform driver for ST SPEAr1340 AHCI
+    controller
 
-To define that the min-residency is the breakeven time against state 0
-means that we are looking at the curves and asking "when does the
-average power for state X cross the average power for state 0?". But
-that would be the guideline for making a decision between state 0 and
-the state in question. Even if average power for state 2 is below
-the average power of state 0 it is not necessarily yet below the
-average power of state 1. To break even against state 1 the idle
-duration needs to be longer.
+ drivers/ata/Kconfig            |  23 +-
+ drivers/ata/Makefile           |  10 +-
+ drivers/ata/ahci_da850.c       | 178 ++++++++++++++
+ drivers/ata/ahci_platform.c    | 508 --------------------------------------
+ drivers/ata/ahci_spear1340.c   | 222 +++++++++++++++++
+ drivers/ata/libahci_platform.c | 541 +++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 967 insertions(+), 515 deletions(-)
+ create mode 100644 drivers/ata/ahci_da850.c
+ create mode 100644 drivers/ata/ahci_spear1340.c
+ create mode 100644 drivers/ata/libahci_platform.c
 
-Yet another way to look at this: for three states we can define three
-times of interest:
-- t1: the time when state1 breaks even against state0
-- t2: the time when state2 breaks even against state0
-- t3: the time when state2 breaks even against state1
-and t3 would typically be larger than t2.
-
-	--Antti
+-- 
+1.8.2.3
