@@ -1,45 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Mar 2014 10:33:54 +0000
-Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <1395048095-32745-1-git-send-email-vkale@apm.com>
-References: <1395048095-32745-1-git-send-email-vkale@apm.com>
-Message-ID: <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 17 Mar 2014 12:07:37 +0100
+Subject: [PATCH v2] dt: platform driver: Fill the resources before probe
+ and defer if needed
+In-Reply-To: <20140308073758.DA63FC408EC@trevor.secretlab.ca>
+References: <20140220153042.DF053C4050F@trevor.secretlab.ca>
+ <1392988720-20976-1-git-send-email-jjhiblot@traphandler.com>
+ <20140308073758.DA63FC408EC@trevor.secretlab.ca>
+Message-ID: <CACh+v5P=tcc-h_9r7Btwyu+jWjwH2ocmW4VCgDYqY7VMWsHuOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 09:21:35AM +0000, Vinayak Kale wrote:
-> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
-> 
-> Please note that this patch has dependancy on a GIC driver patch [1] which is
-> yet to be approved by maintainers.
-> 
-> [1]- https://lkml.org/lkml/2014/2/27/605 
-> (irqchip:gic: change access of gicc_ctrl register to read modify write)
-> 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> ---
->  arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index d37d736..587348d 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -97,6 +97,11 @@
->  		clock-frequency = <50000000>;
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <1 12 0xff04>;
-> +	};
+Hi Grant,
 
-Do Potenza CPUs only have the PMUv3 events, and nothing
-Potenza-specific?
+Sorry for the delay, I was having nice vacations.
 
-I would have expected something like:
+2014-03-08 8:37 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
+> On Fri, 21 Feb 2014 14:18:40 +0100, Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
+>> The goal of this patch is to allow drivers to be probed even if at the time of
+>> the DT parsing some of their ressources are not available yet.
+>
+> Hi Jean-Jacques
+>
+> [...]
+>> +int of_platform_device_prepare(struct platform_device *dev)
+>> +{
+>> +     struct device_node *np;
+>> +     int i, irq_index;
+>> +     struct resource *res;
+>> +
+>> +     /*
+>> +      * This function applies only devices described in the DT.
+>> +      * Other platform devices have their ressources already populated.
+>> +      */
+>> +     np = dev->dev.of_node;
+>> +     if (!np)
+>> +             return 0;
+>
+> I believe we already talked about the above test. This function must
+> only process devices created by of_platform_populate(). Merely checking
+> the of_node pointer is not a sufficient test because there are other
+> paths in the kernel for creating platform_devices that might get a node
+> pointer attached to it.
+Yes we talked about this, but only to move it into of_platform_device_prepare().
+Is there an existing way to know for sure that the device has been
+created by of_platform_populate() ? I could not find one.
 
-compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-
-Cheers,
-Mark.
+Jean-Jacques
+>
+> g.
+>
