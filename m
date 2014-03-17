@@ -1,94 +1,85 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:17:16 +0000
-Subject: [PATCH 44/44] ARM: l2c: add L2C-310 power control DT properties
+Date: Mon, 17 Mar 2014 00:16:30 +0000
+Subject: [PATCH 35/44] ARM: outer cache: add WARN_ON() to outer_disable()
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLEy-0002er-51@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEE-0002eD-3f@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new properties for setting thte L3 power control register.  Two
-new properties are added:
-
-	arm,dynamic-clk-gating
-	arm,standby-mode
-
-iMX6 sets both these, add the properties there.
+Add WARN_ON() conditions to outer_disable() to ensure that its
+requirements aren't violated.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |  2 ++
- arch/arm/boot/dts/imx6qdl.dtsi                 |  2 ++
- arch/arm/boot/dts/imx6sl.dtsi                  |  2 ++
- arch/arm/mm/cache-l2x0.c                       | 10 ++++++++++
- 4 files changed, 16 insertions(+)
+ arch/arm/include/asm/outercache.h |  7 ++-----
+ arch/arm/mm/Makefile              |  1 +
+ arch/arm/mm/l2c-common.c          | 20 ++++++++++++++++++++
+ 3 files changed, 23 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mm/l2c-common.c
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index b513cb8196fe..e0dd400ecea6 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -40,6 +40,8 @@ implementations of the L2 cache controller with compatible programming models.
- - arm,filter-ranges : <start length> Starting address and length of window to
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
-+- arm,dynamic-clk-gating : Enables dynamic clock gating (PL310)
-+- arm,standby-mode : Enables standby mode (PL310)
- - interrupts : 1 combined interrupt.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 64a8cbe9480f..c96b7bc90dfe 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -114,6 +114,8 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,dynamic-clk-gating;
-+			arm,standby-mode;
- 		};
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index bd80540fe8b9..1ee2cf23fae1 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -21,6 +21,7 @@
+ #ifndef __ASM_OUTERCACHE_H
+ #define __ASM_OUTERCACHE_H
  
- 		pcie: pcie at 0x01000000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1aaf2d..8094ac1cedc5 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -81,6 +81,8 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,dynamic-clk-gating;
-+			arm,standby-mode;
- 		};
++#include <linux/bug.h>
+ #include <linux/types.h>
  
- 		pmu {
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 831c65d55ab3..547072b16768 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1079,6 +1079,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	u32 data[3] = { 0, 0, 0 };
- 	u32 tag[3] = { 0, 0, 0 };
- 	u32 filter[2] = { 0, 0 };
-+	u32 val;
+ struct outer_cache_fns {
+@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
+  * cache is pushed out to lower levels of system memory.  The note and
+  * conditions above concerning outer_flush_all() applies here.
+  */
+-static inline void outer_disable(void)
+-{
+-	if (outer_cache.disable)
+-		outer_cache.disable();
+-}
++extern void outer_disable(void);
  
- 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
- 	if (tag[0] && tag[1] && tag[2])
-@@ -1105,6 +1106,15 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
- 			       l2x0_base + L310_ADDR_FILTER_START);
- 	}
+ /**
+  * outer_resume: restore the cache configuration and re-enable outer cache
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 7f39ce2f841f..de5a6a27081b 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
+ AFLAGS_proc-v6.o	:=-Wa,-march=armv6
+ AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
+ 
++obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
+ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
+new file mode 100644
+index 000000000000..10a3cf28c362
+--- /dev/null
++++ b/arch/arm/mm/l2c-common.c
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2010 ARM Ltd.
++ * Written by Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/bug.h>
++#include <linux/smp.h>
++#include <asm/outercache.h>
 +
-+	val = 0;
-+	if (of_property_read_bool(np, "arm,dynamic-clk-gating"))
-+		val |= L310_DYNAMIC_CLK_GATING_EN;
-+	if (of_property_read_bool(np, "arm,standby-mode"))
-+		val |= L310_STNDBY_MODE_EN;
++void outer_disable(void)
++{
++	WARN_ON(!irqs_disabled());
++	WARN_ON(num_online_cpus() > 1);
 +
-+	if (val)
-+		l2c_write_sec(val, l2x0_base, L310_POWER_CTRL);
- }
- 
- static const struct l2c_init_data of_l2c310_data __initconst = {
++	if (outer_cache.disable)
++		outer_cache.disable();
++}
 -- 
 1.8.3.1
