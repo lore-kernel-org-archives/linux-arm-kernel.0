@@ -1,195 +1,77 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 17 Mar 2014 16:35:13 +0100
-Subject: [PATCH] ARM: zynq: Add OCM driver
-In-Reply-To: <20140317044830.GA18269@quad.lixom.net>
-References: <299e37ab245da9132808c6d4265a17b9a417bf62.1389022555.git.michal.simek@xilinx.com>
- <CAOesGMiroyjPbcjfG24_sUqCicCD4M7NF2aD=Xi8NVgagZThuA@mail.gmail.com>
- <53204C73.5070807@monstr.eu> <20140317044830.GA18269@quad.lixom.net>
-Message-ID: <53271631.4090205@monstr.eu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Mar 2014 15:37:38 +0000
+Subject: PL310 errata workarounds
+In-Reply-To: <CAL_Jsq+9Dm9S6rhQAt_umOM6T_x21O=Y_PPg0QyCH1zR_=yWoA@mail.gmail.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140314150110.GQ21483@n2100.arm.linux.org.uk>
+ <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
+ <20140316115207.GW21483@n2100.arm.linux.org.uk>
+ <CAL_Jsq+9Dm9S6rhQAt_umOM6T_x21O=Y_PPg0QyCH1zR_=yWoA@mail.gmail.com>
+Message-ID: <20140317153738.GB21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2014 05:48 AM, Olof Johansson wrote:
-> On Wed, Mar 12, 2014 at 01:00:51PM +0100, Michal Simek wrote:
->> Hi Olof,
->>
->>>> diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
->>>> new file mode 100644
->>>> index 0000000..64cb5e8
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
->>>> @@ -0,0 +1,17 @@
->>>> +Device tree bindings for Zynq's OCM
->>>> +
->>>> +The OCM is divided to 4 64kB segments which can be separately configured
->>>> +to low or high location. Location is controlled via SLCR.
->>>> +
->>>> +Required properties:
->>>> + compatible: Compatibility string. Must be "xlnx,zynq-ocm-1.0".
->>>> + reg: Specify the base and size of the OCM registers in the memory map.
->>>> +      E.g.: reg = <0xf800c000 0x1000>;
->>>> +
->>>> +Example:
->>>> +ocmc: ocmc at f800c000 {
->>>> +       compatible =  "xlnx,zynq-ocm-1.0";
->>>> +       interrupt-parent = <&intc>;
->>>> +       interrupts = <0 3 4>;
->>>> +       reg = <0xf800c000 0x1000>;
->>>> +} ;
->>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->>>> index 1d942e2..4929be5 100644
->>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->>>> @@ -66,6 +66,13 @@
->>>>                         cache-level = <2>;
->>>>                 };
->>>>
->>>> +               ocmc: ocmc at f800c000 {
->>>> +                       compatible = "xlnx,zynq-ocm-1.0";
->>>> +                       interrupt-parent = <&intc>;
->>>> +                       interrupts = <0 3 4>;
->>>> +                       reg = <0xf800c000 0x1000>;
->>>> +               } ;
->>>> +
->>>>                 uart0: uart at e0000000 {
->>>>                         compatible = "xlnx,xuartps";
->>>>                         status = "disabled";
->>>> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
->>>> index 323e505..f3e6ce4 100644
->>>> --- a/arch/arm/mach-zynq/Kconfig
->>>> +++ b/arch/arm/mach-zynq/Kconfig
->>>> @@ -15,5 +15,6 @@ config ARCH_ZYNQ
->>>>         select CADENCE_TTC_TIMER
->>>>         select ARM_GLOBAL_TIMER
->>>>         select MFD_SYSCON
->>>> +       select GENERIC_ALLOCATOR
->>>>         help
->>>>           Support for Xilinx Zynq ARM Cortex A9 Platform
->>>> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
->>>> index 1b25d92..626f64b 100644
->>>> --- a/arch/arm/mach-zynq/Makefile
->>>> +++ b/arch/arm/mach-zynq/Makefile
->>>> @@ -3,7 +3,7 @@
->>>>  #
->>>>
->>>>  # Common support
->>>> -obj-y                          := common.o slcr.o
->>>> +obj-y                          := common.o slcr.o zynq_ocm.o
->>>>  CFLAGS_REMOVE_hotplug.o                =-march=armv6k
->>>>  CFLAGS_hotplug.o               =-Wa,-march=armv7-a -mcpu=cortex-a9
->>>>  obj-$(CONFIG_HOTPLUG_CPU)      += hotplug.o
->>>> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
->>>> index b097844..953f6a1 100644
->>>> --- a/arch/arm/mach-zynq/common.h
->>>> +++ b/arch/arm/mach-zynq/common.h
->>>> @@ -24,6 +24,7 @@ extern int zynq_early_slcr_init(void);
->>>>  extern void zynq_slcr_system_reset(void);
->>>>  extern void zynq_slcr_cpu_stop(int cpu);
->>>>  extern void zynq_slcr_cpu_start(int cpu);
->>>> +extern u32 zynq_slcr_get_ocm_config(void);
->>>>
->>>>  #ifdef CONFIG_SMP
->>>>  extern void secondary_startup(void);
->>>> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
->>>> index c1f1499..9a37ab3 100644
->>>> --- a/arch/arm/mach-zynq/slcr.c
->>>> +++ b/arch/arm/mach-zynq/slcr.c
->>>> @@ -26,6 +26,7 @@
->>>>  #define SLCR_PS_RST_CTRL_OFFSET                0x200 /* PS Software Reset Control */
->>>>  #define SLCR_A9_CPU_RST_CTRL_OFFSET    0x244 /* CPU Software Reset Control */
->>>>  #define SLCR_REBOOT_STATUS_OFFSET      0x258 /* PS Reboot Status */
->>>> +#define SLCR_OCM_CFG_OFFSET            0x910 /* OCM Address Mapping */
->>>>
->>>>  #define SLCR_UNLOCK_MAGIC              0xDF0D
->>>>  #define SLCR_A9_CPU_CLKSTOP            0x10
->>>> @@ -107,6 +108,20 @@ void zynq_slcr_system_reset(void)
->>>>  }
->>>>
->>>>  /**
->>>> + * zynq_slcr_get_ocm_config - Get SLCR OCM config
->>>> + *
->>>> + * return:     OCM config bits
->>>> + */
->>>> +u32 zynq_slcr_get_ocm_config(void)
->>>> +{
->>>> +       u32 val;
->>>> +
->>>> +       zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
->>>> +
->>>> +       return val;
->>>> +}
->>>> +
->>>> +/**
->>>>   * zynq_slcr_cpu_start - Start cpu
->>>>   * @cpu:       cpu number
->>>>   */
->>>> diff --git a/arch/arm/mach-zynq/zynq_ocm.c b/arch/arm/mach-zynq/zynq_ocm.c
->>>> new file mode 100644
->>>> index 0000000..034a65b
->>>> --- /dev/null
->>>> +++ b/arch/arm/mach-zynq/zynq_ocm.c
->>>> @@ -0,0 +1,243 @@
->>>> +/*
->>>> + * Copyright (C) 2013 Xilinx
->>>> + *
->>>> + * Based on "Generic on-chip SRAM allocation driver"
->>>
->>> We're not adding new drivers under arch/arm, so if you need this
->>> driver then you should either merge it under drivers/ somewhere, or
->>> look at extending the generic driver in a way that you can reuse it.
->>
->> Driver is reusing ideas from this generic driver but
->> incorporation our changes to will be problematic.
->>
->> It is a shame that you didn't review the rest of code below.
->> The reason why I have added this driver to arch/arm/mach-zynq
->> was that there is code connection to zynq SMP bootup trampoline
->> which has to be added at 0x0 when OCM is placed at 0x0.
->> And this memory can't be used for generic purpose.
->> If you see any nice way how to it please let me know.
+On Mon, Mar 17, 2014 at 10:04:20AM -0500, Rob Herring wrote:
+> On Sun, Mar 16, 2014 at 6:52 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >    The MCPM stuff is another issue: what the conditions are there I've
+> >    no idea, but it looks like other CPUs will be running when it calls
+> >    outer_cache_flush().  MCPM commentry claims that this will be
+> >    "harmless" and I just had to laugh at that - even with this workaround
+> >    enabled, it doesn't fix the problem on L2C-310 R2P0 as the workaround
+> >    implementation only works on R3P0!
 > 
-> Rockchip just went through some of the same discussions -- they need to
-> use onchip SRAM for SMP spin-up. You should look at that patchset and
-> see if you can solve it in a similar manner, the needs seem to be quite
-> similar.
+> For MCPM, is there even a platform that has a PL310 used as an L3? I
+> suppose architecturally it is possible, but in reality it is probably
+> not something that's ever been tested.
 
-I found that
-http://www.spinics.net/lists/arm-kernel/msg310761.html
-it is definitely good starting point. Thanks for that.
+I have no idea about MCPM - it's something I've never used, even though
+I in theory have hardware which supports it.  From what I can tell,
+getting Linux running on the Versatile Express CA15 tile is something of
+a black art, there's only a relatively small number of people who have
+managed that feat.
 
-The solution which I have in my mind because of autodetection
-via slcr is to build up that node in zynq code from controller
-and support ranges in node just because of not copy that node
-in worst case 4 times.
+> > 2. on large (>= cache size) coherent DMA allocations via outer_flush_range()
+> >
+> > Consider using CMA for framebuffers, and allocating a 1080p framebuffer.
+> > That's going to be around 8MB in size, and that's going to need the L2
+> > purged of any cache lines associated with it.  As the L2 cache is
+> > normally around 512kB or maybe 1MB, walking every 32-byte cache line is
+> > extremely wasteful (that's 259200 clean+invalidate by PA operations, of
+> > which a maximum of 32768 could possibly hit a cache line), so we do want
+> > to preserve the ability to use this operation.
+> 
+> Aren't CMA buffers mapped coherently so the flush is not needed?
 
-               sram: sram at 0 {
-                       compatible = "mmio-sram";
-                       reg = <0x0 0x20000 0xfffe0000 0x20000>;
-                       #address-cells = <1>;
-                       #size-cells = <1>;
-                       ranges;
+Not initially, not when they're free, not when they're being re-used for
+non-CMA purposes.  Hence, they can contain dirty cache lines which need
+to be flushed out of their mappings to avoid interference with the
+coherent mapping.
 
-                       smp-sram at 0 {
-                               compatible = "xlnx,zynq-smp-sram";
-                               reg = <0x0 0x50>;
-                       };
-               };
+> This would help with contention in readl/writel, but you still have
+> most all the overhead of a spinlock. I'm not sure which is the bigger
+> component: lock contention or all the loads, stores and dsb/dmbs
+> associated with the lock.
 
-Thanks,
-Michal
+Using the arch r/w locks is not that heavy, and doesn't have the problem
+that interrupts are locked out during much of the L2 maintanence.  Even
+with arch r/w locks, the L2 cache ops don't show up much in perf, compared
+to the existing implementation where they show quite highly.
+
+The only issue is we'd only be able to use this optimisation when we
+aren't running in IRQ context anyway, which I think isn't that great a
+restriction on it.
+
+> Isn't using by way ops potentially broken if you are running a secure
+> OS? If linux is doing a by way operation and the secure OS does range
+> operations, someone is going to crash on an abort. I suppose no one
+> sees this due to the limited function of secure OSs.
+
+Let's cover that should it happen - a secure OS should check the status
+of the L2 hardware before issuing any cache operation anyway for exactly
+this reason (you can always read from the L2 registers to check whether
+any operation is in progress.)
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/3427ecb7/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
