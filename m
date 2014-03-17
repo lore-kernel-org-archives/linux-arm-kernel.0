@@ -1,184 +1,84 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 16 Mar 2014 20:40:33 -0700
-Subject: [PATCH v4 04/10] ARM/ARM64: KVM: Make kvm_psci_call() return
- convention more flexible
-In-Reply-To: <1391686302-19451-5-git-send-email-anup.patel@linaro.org>
+Date: Sun, 16 Mar 2014 20:40:42 -0700
+Subject: [PATCH v4 05/10] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space
+ API header
+In-Reply-To: <1391686302-19451-6-git-send-email-anup.patel@linaro.org>
 References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
- <1391686302-19451-5-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140317034033.GE20648@cbox>
+ <1391686302-19451-6-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140317034042.GF20648@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 05:01:36PM +0530, Anup Patel wrote:
-> Currently, the kvm_psci_call() returns 'true' or 'false' based on whether
-> the PSCI function call was handled successfully or not. This does not help
-> us emulate system-level PSCI functions where the actual emulation work will
-> be done by user space (QEMU or KVMTOOL). Examples of such system-level PSCI
-> functions are: PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET.
+On Thu, Feb 06, 2014 at 05:01:37PM +0530, Anup Patel wrote:
+> Currently, we don't have an exit reason to notify user space about
+> a system-level event (for e.g. system reset or shutdown) triggered
+> by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
+> this purpose. We can also inform user space about the 'type' and
+> architecture specific 'flags' of a system-level event using the
+> kvm_run structure.
 > 
-> This patch updates kvm_psci_call() to return three types of values:
-> 1) > 0 (success)
-> 2) = 0 (success but exit to user space)
-> 3) < 0 (errors)
+> This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
+> in-kernel PSCI v0.2 support to reset/shutdown VMs.
 > 
 > Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_psci.h   |    2 +-
->  arch/arm/kvm/handle_exit.c        |   10 +++++++---
->  arch/arm/kvm/psci.c               |   28 ++++++++++++++++------------
->  arch/arm64/include/asm/kvm_psci.h |    2 +-
->  arch/arm64/kvm/handle_exit.c      |   10 +++++++---
->  5 files changed, 32 insertions(+), 20 deletions(-)
+>  Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
+>  include/uapi/linux/kvm.h          |    8 ++++++++
+>  2 files changed, 23 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-> index 4c0e3e1..6bda945 100644
-> --- a/arch/arm/include/asm/kvm_psci.h
-> +++ b/arch/arm/include/asm/kvm_psci.h
-> @@ -22,6 +22,6 @@
->  #define KVM_ARM_PSCI_0_2	2
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 73cb211..0f70625 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2707,6 +2707,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
+>  external interrupt has just been delivered into the guest. User space
+>  should put the acknowledged interrupt vector into the 'epr' field.
 >  
->  int kvm_psci_version(struct kvm_vcpu *vcpu);
-> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
-> +int kvm_psci_call(struct kvm_vcpu *vcpu);
->  
->  #endif /* __ARM_KVM_PSCI_H__ */
-> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-> index 0de91fc..1270095 100644
-> --- a/arch/arm/kvm/handle_exit.c
-> +++ b/arch/arm/kvm/handle_exit.c
-> @@ -38,14 +38,18 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> +	int ret;
+> +		/* KVM_EXIT_SYSTEM_EVENT */
+> +		struct {
+> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
+> +#define KVM_SYSTEM_EVENT_RESET          2
+> +			__u32 type;
+> +			__u64 flags;
+> +		} system_event;
 > +
->  	trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
->  		      kvm_vcpu_hvc_get_imm(vcpu));
->  
-> -	if (kvm_psci_call(vcpu))
-> +	ret = kvm_psci_call(vcpu);
-> +	if (ret == -EINVAL) {
-> +		kvm_inject_undefined(vcpu);
->  		return 1;
-> +	}
->  
-> -	kvm_inject_undefined(vcpu);
-> -	return 1;
-> +	return ret;
->  }
->  
->  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index e4ec4af..252acd0 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -93,7 +93,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
->  	return KVM_ARM_PSCI_0_1;
->  }
->  
-> -static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
-> +static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  {
->  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->  	unsigned long val;
-> @@ -128,14 +128,14 @@ static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		val = KVM_PSCI_RET_NI;
->  		break;
->  	default:
-> -		return false;
-> +		return -EINVAL;
->  	}
->  
->  	*vcpu_reg(vcpu, 0) = val;
-> -	return true;
-> +	return 1;
->  }
->  
-> -static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-> +static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->  {
->  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->  	unsigned long val;
-> @@ -153,11 +153,11 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->  		val = KVM_PSCI_RET_NI;
->  		break;
->  	default:
-> -		return false;
-> +		return -EINVAL;
->  	}
->  
->  	*vcpu_reg(vcpu, 0) = val;
-> -	return true;
-> +	return 1;
->  }
->  
->  /**
-> @@ -165,12 +165,16 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->   * @vcpu: Pointer to the VCPU struct
->   *
->   * Handle PSCI calls from guests through traps from HVC instructions.
-> - * The calling convention is similar to SMC calls to the secure world where
-> - * the function number is placed in r0 and this function returns true if the
-> - * function number specified in r0 is withing the PSCI range, and false
-> - * otherwise.
-> + * The calling convention is similar to SMC calls to the secure world
-> + * where the function number is placed in r0.
-> + *
-> + * This function returns: > 0 (success), 0 (success but exit to user
-> + * space), and < 0 (errors)
-> + *
-> + * Errors:
-> + * -EINVAL: Unrecognized PSCI function
->   */
-> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
-> +int kvm_psci_call(struct kvm_vcpu *vcpu)
->  {
->  	switch (kvm_psci_version(vcpu)) {
->  	case KVM_ARM_PSCI_0_2:
-> @@ -178,6 +182,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->  	case KVM_ARM_PSCI_0_1:
->  		return kvm_psci_0_1_call(vcpu);
->  	default:
-> -		return false;
-> +		return -EINVAL;
+> +If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
+> +a system-level event using some architecture specific mechanism (hypercall
+> +or some special instruction). In case of ARM/ARM64, this is triggered using
+> +HVC instruction based PSCI call from the vcpu. The 'type' field describes
+> +the system-level event type. The 'flags' field describes architecture
+> +specific flags for the system-level event.
+> +
+>  		/* Fix the size of the union. */
+>  		char padding[256];
 >  	};
->  }
-> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
-> index e25c658..bc39e55 100644
-> --- a/arch/arm64/include/asm/kvm_psci.h
-> +++ b/arch/arm64/include/asm/kvm_psci.h
-> @@ -22,6 +22,6 @@
->  #define KVM_ARM_PSCI_0_2	2
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index fb3c3f3..0723853 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>  #define KVM_EXIT_WATCHDOG         21
+>  #define KVM_EXIT_S390_TSCH        22
+>  #define KVM_EXIT_EPR              23
+> +#define KVM_EXIT_SYSTEM_EVENT     24
 >  
->  int kvm_psci_version(struct kvm_vcpu *vcpu);
-> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
-> +int kvm_psci_call(struct kvm_vcpu *vcpu);
->  
->  #endif /* __ARM64_KVM_PSCI_H__ */
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 7bc41ea..743a74d 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -30,11 +30,15 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
->  
->  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	if (kvm_psci_call(vcpu))
-> +	int ret;
-> +
-> +	ret = kvm_psci_call(vcpu);
-> +	if (ret == -EINVAL) {
-> +		kvm_inject_undefined(vcpu);
->  		return 1;
-> +	}
->  
-> -	kvm_inject_undefined(vcpu);
-> -	return 1;
-> +	return ret;
->  }
->  
->  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  /* For KVM_EXIT_INTERNAL_ERROR */
+>  /* Emulate instruction failed. */
+> @@ -301,6 +302,13 @@ struct kvm_run {
+>  		struct {
+>  			__u32 epr;
+>  		} epr;
+> +		/* KVM_EXIT_SYSTEM_EVENT */
+> +		struct {
+> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
+> +#define KVM_SYSTEM_EVENT_RESET          2
+> +			__u32 type;
+> +			__u64 flags;
+> +		} system_event;
+>  		/* Fix the size of the union. */
+>  		char padding[256];
+>  	};
 > -- 
 > 1.7.9.5
 > 
