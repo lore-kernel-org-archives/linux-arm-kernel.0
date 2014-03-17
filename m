@@ -1,35 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Mar 2014 13:13:50 -0700
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15
-In-Reply-To: <20140310150926.GJ18707@titan.lakedaemon.net>
-References: <20140301025919.GQ1872@titan.lakedaemon.net>
- <20140310150926.GJ18707@titan.lakedaemon.net>
-Message-ID: <20140317201350.GA3861@quad.lixom.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 17 Mar 2014 17:47:06 -0300
+Subject: [PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
+In-Reply-To: <532748C2.9030009@gmail.com>
+References: <1394907484-26002-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <532748C2.9030009@gmail.com>
+Message-ID: <20140317204706.GB1118@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 11:09:26AM -0400, Jason Cooper wrote:
-> Olof,
+On Mar 17, Sebastian Hesselbarth wrote:
+> On 03/15/2014 07:17 PM, Ezequiel Garcia wrote:
+> >Fourth round of the patchset adding support for watchdog on Armada 375 and
+> >Armada 38x SoCs.
+> >
+> >The new Armada 375/385 SoCs have two registers for the watchdog RSTOUT:
+> >
+> >  1. It has a dedicated register (similar to the one in A370/XP)
+> >  2. Also has a bit in a shared RSTOUT register.
+> >
+> >Therefore, in order to support this two-folded RSTOUT, we extend the 'reg'
+> >property in the watchdog devicetree and require a new pair of cells to specify
+> >the shared RSTOUT.
+> >
+> >On the driver side, we need to implement per-SoC stop() and enabled()
+> >functions. Such somewhat complex infrastructure is needed to ensure the driver
+> >performs proper reset of the watchdog timer, by masking and disabling the
+> >RSTOUT before the interrupt is enabled.
+> >
+> >I've pushed a branch so people can test this easily, e.g. ensuring
+> >no regressions on Dove, Kirkwood and A370/XP:
 > 
-> I see you went through and handled quite a few pull requests this
-> weekend, but it looks like you skipped over this one I've replied to and:
+> Ezequiel,
 > 
-> [GIT PULL] ARM: mvebu: driver changes for v3.15
-> [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. pull #2)
-> [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
-> [GIT PULL] ARM: mvebu: defconfig changes for v3.15 (incr. pull #2)
+> Although, I just saw below that you actually already tested on Dove,
+> you can add my
 > 
-> It looks like I sent to arm at kernel.org on all of them, is there
-> something else I missed?
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > 
-> There's also another round of pull requests sent more recently, but I
-> haven't gotten that far through lakml yet. :)
 
-Nah, nothing you missed. I've noticed that when the flood of pull requests come
-in from one platform, I tend to save them to last when there are smaller sets
-pending. So I handled a lot of the smaller sets last weekend, but I had left
-the mvebu and renesas sets. I did the renesas ones last night, and Arnd did the
-rest today.
-
-
--Olof
+Great, thanks!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
