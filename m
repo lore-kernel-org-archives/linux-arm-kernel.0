@@ -1,27 +1,21 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 17 Mar 2014 14:57:55 -0400
-Subject: [PATCH 0/4] ata: add remaining new-style AHCI platform drivers
-In-Reply-To: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20140317185755.GA17373@mtj.dyndns.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 20:03:45 +0100
+Subject: [PATCH 4/4] ARM: add Marvell Dove and some drivers to multi_v7
+ defconfig
+In-Reply-To: <20140317152958.GJ15608@titan.lakedaemon.net>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140304040729.GJ1872@titan.lakedaemon.net>
+ <20140317152958.GJ15608@titan.lakedaemon.net>
+Message-ID: <201403172003.45615.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 07:31:54PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
+On Monday 17 March 2014, Jason Cooper wrote:
+> Here's the multi_v7_defconfig change I was referring to:
 > 
-> This patch series adds new-style AHCI platform drivers for DaVinci DA850
-> AHCI controller and ST SPEAr1340 AHCI controller.  As a preparation for
-> adding these drivers it also fixes ahci_platform_data->suspend() handling
-> (patch #1) and moves library AHCI platform code to its own file (patch #2).
-> The new AHCI platform drivers are only compile tested (they are marked as
-> experimental because of this) and I would ask somebody with the hardware
-> to verify them (thanks!).
+> https://lkml.kernel.org/r/1393536486-3827-5-git-send-email-sebastian.hesselbarth at gmail.com
+> 
 
-Nice cleanups.  I'll apply the patches once the drivers are verified
-to work.
+Applied to next/boards, thanks for the reminder!
 
-Thanks!
-
--- 
-tejun
+	Arnd
