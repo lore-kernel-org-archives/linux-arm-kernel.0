@@ -1,194 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Mar 2014 09:00:03 -0500
-Subject: PL310 errata workarounds
-In-Reply-To: <20140316152953.GX21483@n2100.arm.linux.org.uk>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140316152953.GX21483@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqLDun2VkCFK9Fec6n38bNz2w9mscPdXcGYeLiZtiXkVDg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Mar 2014 15:00:58 +0100
+Subject: [PATCH] ARM: mach-ux500|nomadik|u300: Align to common DT bindings
+ for mmci
+In-Reply-To: <CAPDyKFpJDKXK7siVMnB5umv6PnYAyNmto1yq9unxDaD9BP=oBQ@mail.gmail.com>
+References: <1394713963-18300-1-git-send-email-ulf.hansson@linaro.org>
+ <20140313174703.GO21483@n2100.arm.linux.org.uk>
+ <CAPDyKFrw092mbirDBffF6TraUoXDLh5movp_sf9PYERG88P-Qw@mail.gmail.com>
+ <CACRpkdZzObyJQmbAvovcor9NXeVnhEFO82jtxLZOdm48TPnudQ@mail.gmail.com>
+ <CAPDyKFpJDKXK7siVMnB5umv6PnYAyNmto1yq9unxDaD9BP=oBQ@mail.gmail.com>
+Message-ID: <CACRpkdYPHkEMBu7KMp25veTfXtpWZOOz39n-+jCZ+hTQMK2=Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 16, 2014 at 10:29 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Okay, I've been going through the various initialisations of the L2x0
-> cache code, and there's some really fun stuff going on here:
->
-> arch/arm/mach-imx/system.c:
->         /* Configure the L2 PREFETCH and POWER registers */
->         val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
->         val |= 0x70800000;
+On Mon, Mar 17, 2014 at 11:01 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 14 March 2014 11:58, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Fri, Mar 14, 2014 at 8:27 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 13 March 2014 18:47, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-I wonder what is the desired setting for "Force write allocate" since
-this fails to mask bit 24. They are probably really wanting to set bit
-22.
+>>>> NAK.  These bindings have been documented as being there since March
+>>>> 14th 2012, and therefore need to be supported for ever by the driver.
+>>>> You can _augment_ the bindings with the generic ones, and change the
+>>>> DT files, but you can't remove the parsing of the old property names.
+>>>
+>>> I was kind of expecting this response. :-)
+>>>
+>>> So, since we made a mistake about adding these DT bindings we are now
+>>> unable to remove them, is there really no way back?
+>>>
+>>> In this particular case, I am confident that it should be safe to
+>>> remove them, but I guess this is more matter of principle, right?
+>>
+>> I can guarantee that there are no deployed U300, Nomadik or
+>> Ux500 systems out there with DTBs deployed in them, and
+>> for certain no products. At one point that was the criterion...
+>> All setups actually use the appended device tree.
+>
+> It sure seems like it's safe to remove them.
+>
+> If you decide to accept the patch, could we queue it through ARM SOC
+> with your help Linus? Maybe even for 3.15 as the sooner the better!?
 
-Setting prefetch enables and early BRESP could all be done
-unconditionally in the core code.
+Actually I think I would want some indication from the device tree
+maintainers on this. After all they are safeguarding the DT
+process.
 
->         /*
->          * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
->          * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
->          * But according to ARM PL310 errata: 752271
->          * ID: 752271: Double linefill feature can cause data corruption
->          * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
->          * Workaround: The only workaround to this erratum is to disable the
->          * double linefill feature. This is the default behavior.
->          */
->         if (cpu_is_imx6q())
->                 val &= ~(1 << 30 | 1 << 23);
->         writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
->         val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
->         writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
->
-> You can wonder why we don't have 752271 implemented by the core code.
->
-> arch/arm/mach-prima2/l2x0.c:
-> struct l2x0_aux
-> {
->         u32 val;
->         u32 mask;
-> };
->
-> static struct l2x0_aux prima2_l2x0_aux __initconst = {
->         .val = 2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT,
->         .mask = 0,
-> };
->
-> static struct l2x0_aux marco_l2x0_aux __initconst = {
->         .val = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
->                 (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
->         .mask = L2X0_AUX_CTRL_MASK,
+I am however worried about the lack of response from that camp
+at times, this is supposed to be a simple yes/no question :-/
 
-What I like about this is all the bits they are clearing and failing
-to set. Shared override, prefetch, etc.
+DT folks??
 
-> };
->
-> static struct of_device_id sirf_l2x0_ids[] __initconst = {
->         { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
->         { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
->         {},
-> };
->
-> static int __init sirfsoc_l2x0_init(void)
-> {
->         struct device_node *np;
->         const struct l2x0_aux *aux;
->
->         np = of_find_matching_node(NULL, sirf_l2x0_ids);
->         if (np) {
->                 aux = of_match_node(sirf_l2x0_ids, np)->data;
->                 return l2x0_of_init(aux->val, aux->mask);
->         }
->
->         return 0;
-> }
-> early_initcall(sirfsoc_l2x0_init);
->
-> This shows everything that is /BAD/ about DT.  People go running around
-> stuffing crap like this in rather than thinking about the generic problem.
-> The sole function of the above compatible strings is to select between
-> different cache property configurations.  Now go back and look at the
-> iMX code above, which is doing the same thing but at runtime.
->
-> Now think: why don't we _already_ have a dt property or two to specify
-> this information?
->
-> The reason why we don't have that is because people do not think beyond
-> their nose when they encounter a problem.  They will not think whether
-> it should be fixed in a generic way.  They will not look to see whether
-> other people are suffering the same problem.
->
-> The big problem is that _now_ we have to support this fuckage for ever,
-> and all because people can't look beyond their immediate problem.
->
-> arch/arm/mach-zynq/common.c:
-> static void __init zynq_init_machine(void)
-> {
->         /*
->          * 64KB way size, 8-way associativity, parity disabled
->          */
->         l2x0_of_init(0x02060000, 0xF0F0FFFF);
->
-> Oh look, same problem again.
-
-This all seems unnecessary. All these values should be correct at
-reset and this should be a nop unless the h/w is configured
-incorrectly. Surely h/w folks can tie off WAYSIZE correctly... It is
-also keeping shared attrib override disabled which I believe is
-generally wrong, and is masking 1 bit of force write allocate, but not
-the other.
-
-ePAPR already defines standard properties for cache layout which could
-be used here if really needed.
-
-> arch/arm/mach-ux500/cache-l2x0.c:
->         /* DBx540's L2 has 128KB way size */
->         if (cpu_is_ux540_family())
->                 /* 128KB way size */
->                 aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
->         else
->                 /* 64KB way size */
->                 aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
->
->         /* 64KB way size, 8 way associativity, force WA */
->         if (of_have_populated_dt())
->                 l2x0_of_init(aux_val, 0xc0000fff);
->         else
->                 l2x0_init(l2x0_base, aux_val, 0xc0000fff);
->
-> Okay, this has to cope with non-DT as well, but for the DT case, it is
-> again the same damned problem.
-
-This one is interesting in that it has to undo way locking done by the
-bootloader. So the bootloader has setup the L2 to some extent, but
-didn't configure aux ctrl already?
-
-The way unlocking could be done unconditionally in the core code
-perhaps. There could be issues on non-secure platforms though.
-
->
-> arch/arm/mach-nomadik/cpu-8815.c:
-> #ifdef CONFIG_CACHE_L2X0
->         /* At full speed latency must be >=2, so 0x249 in low bits */
->         l2x0_of_init(0x00730249, 0xfe000fff);
-> #endif
->
-> Do we actually end up with 0x249 in the low bits - because the fff in
-> the mask field preserves the values already in the aux register.
-> Moreover, don't we have DT properties to specify this information already,
-> so why isn't nomadik using them?  Nomadik is using a DT compatible string
-> of "arm,l210-cache", which has the properties "arm,tag-latency",
-> "arm,data-latency", "arm,dirty-latency" which allow that 0x249 to be
-> specified.
-
-l2x0_of_setup clears those mask bits if the DT properties are present,
-so it will work in that case. But otherwise, yes this is broken.
-
-> What the real painful bit here is that we have all these DT files out
-> there now which make the assumption that this code is going to always be
-> there, and there's not a /damned/ thing we can do with this crap now.
-> The best we can do is to try and stop this crap spreading further than
-> it already has.
-
-I think we really should have pushed that all aux_ctrl setup go into
-the bootloader. It's really not that different from errata work-around
-setup. It doesn't have the same race condition as enabling errata
-work-arounds may have, but does have the same secure vs. non-secure
-setup issue.
-
-Keeping the aux val/mask parameters in the DT case was definitely a
-mistake. DT or not, it is a fragile and error prone interface of magic
-values and we should have forced its removal when we had the chance.
-
-Rob
-
-> Yes, I'm pissed off with DT.  I'm pissed off with people not thinking
-> before creating this crap as well.  I'm pissed off with the people who
-> allegedly reviewed this crap.  I'm pissed off with the people who
-> allegedly reviewed the creation of these SoC specific compatible
-> strings just to be able to specify configuration data.
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+Yours,
+Linus Walleij
