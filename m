@@ -1,28 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Mar 2014 15:13:35 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <532702A6.9070309@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5326F8C5.5090406@ti.com> <532702A6.9070309@ahsoftware.de>
-Message-ID: <CACRpkdZ_jsG1zyHP10op7zFUwj6giaUNzn0b3O_2S8zcALc5LA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 15:14:06 +0100
+Subject: [GIT PULL 1/2] omap device tree changes for v3.15, part 3
+In-Reply-To: <20140313200135.GA5981@atomide.com>
+References: <20140313200135.GA5981@atomide.com>
+Message-ID: <201403171514.07194.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 3:11 PM, Alexander Holler <holler@ahsoftware.de> wrote:
+On Thursday 13 March 2014, Tony Lindgren wrote:
+> Hi,
+> 
+> Resending these two, looks like my updated scripts have some issues hitting
+> the mailing lists..
+> 
+> The following changes since commit 18c49af3ee9e32a535413a949672bea726699f04:
+> 
+>   ARM: dts: am335x-evmsk: enable dual_emac mode (2014-03-05 11:53:36 -0800)
+> 
+> are available in the git repository at:
+>   
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-part3
+> 
+> for you to fetch changes up to e1902bbe44844597a38c8cbae30ca895f6e126ee:
+> 
+>   ARM: dts: Add MMC2/SDIO/WLAN support for cm-t3530 (2014-03-12 10:40:37 -0700)
+> 
+> ----------------------------------------------------------------
+> Device tree related changes to the omap iommu driver as that
+> is finally getting updated. Also few trivial board related
+> .dts updates to add more devices.
 
-> Thanks, maybe someone could add a
->
-> Cc: <stable@vger.kernel.org>
+Pulled into next/dt, thanks!
 
-OK if it goes in as fix I'll add this.
+I haven't really been following the iommu discussions, so I have to trust
+you are doing the right thing here. What is the status on iommu
+support through DT? Do we have or require a generic binding for iommus?
+Are you following that, or will you have to do incompatible changes to
+do that?
 
-> to get the fix back into 3.14 if it has go through -next.
-
-It's already in linux-next.
-
-Yours,
-Linus Walleij
+	Arnd
