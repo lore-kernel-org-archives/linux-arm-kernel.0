@@ -1,50 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 10:38:16 +0100
-Subject: [GIT PULL v2] SOCFPGA updates for 3.15, version 2
-In-Reply-To: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
-References: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
-Message-ID: <201403171038.16362.arnd@arndb.de>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Mon, 17 Mar 2014 10:43:33 +0100
+Subject: BUG_ON for DMA-bounce and bidirectional mappings (e100 on IXP4xx)
+In-Reply-To: <20140304123714.7e1fe704@marrow.netinsight.se>
+References: <20140304112459.354f0980@marrow.netinsight.se>
+ <20140304104528.GQ21483@n2100.arm.linux.org.uk>
+ <20140304123714.7e1fe704@marrow.netinsight.se>
+Message-ID: <20140317104333.31e75981@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 March 2014, dinguyen at altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+Hi again!
+
+On Tue, 4 Mar 2014 12:37:14 +0100
+Simon K?gstr?m <simon.kagstrom@netinsight.net> wrote:
+
+> On Tue, 4 Mar 2014 10:45:28 +0000
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 > 
-> Please consider pulling in these patches for v3.15 version 2. I apologize for
-> the build failure in version 1.
-
-Pulled again into next/drivers, but I'm not too happy about the
-resolution:
-
-> For this version, I also cherry-picked a commit that was also pulled into
-> Chris Ball's mmc tree.
+> > On Tue, Mar 04, 2014 at 11:24:59AM +0100, Simon K?gstr?m wrote:
+> > > We have a IXP4xx-based board which has an e100 NIC. During bootup, we
+> > > trigger a BUG_ON in dmabounce.c because the mapped direction doesn't
+> > > match the synced one. e100.c maps buffers bidirectional, but the sync
+> > > is done fromdevice.
+> > [...]
+> [...]
+> And the dma_debug code explicitly skips the check if the direction is
+> DMA_BIDIRECTIONAL:
+>
+>   static void check_sync(struct device *dev,
+> 		       struct dma_debug_entry *ref,
+> 		       bool to_cpu)
+>   {
+> 	[...]
+> 	if (entry->direction == DMA_BIDIRECTIONAL)
+> 		goto out;
 > 
-> 9b931361ff09 dts: socfpga: Add support for SD/MMC on the SOCFPGA platform
+> 	if (ref->direction != entry->direction) {
+> 		err_printk(dev, entry, "DMA-API: device driver syncs "
+> 				"DMA memory with different direction "
+> 				"[device address=0x%016llx] [size=%llu bytes] "
+> 				"[mapped with %s] [synced with %s]\n",
+> 				(unsigned long long)ref->dev_addr, entry->size,
+> 				dir2name[entry->direction],
+> 				dir2name[ref->direction]);
+> 	}
+> 	[...]
+>   }
 > 
-> Without this patch, I cannot cleanly fix the build error and avoid a merge
-> conflict.
+> Krzysztofs patch does the same for dmabounce.c, from the dma-debug code
+> it seems to me that it would make sense there as well?
 
-That patch should not have been merged through the MMC tree in the first
-place, precisely because of this type of conflict. Further, it should not
-have tried to fix up the coding style by changing the indentation of an
-unrelated DT node.
+I'd like to bring this issue up again. To me it seems Krzysztofs patch
+(pasted below again) would align the ARM dmabounce behaviour with the
+DMA API verifier code. Seems to make sense for my part at least.
+Comments?
 
-> [a5d6ac2a dts: socfpga: Add sysmgr node so the gmac can use to reference] will
-> fix the build failure in version 1.
+// Simon
 
-And this one should not have been applied on top, but rather folded
-into patch that originally broke the build, to ensure clean bisection.
-
-Unfortunately, we're running out of time to do this properly, and going
-forward with your branch seems like the best strategy. I realize you
-originally sent your branch a couple of weeks ago, so we should have
-caught this earlier.
-
-
-Chris, it would be nice if you could revert d9c3f5df539a "dts: socfpga: Add
-support for SD/MMC on the SOCFPGA platform" in your mmc tree now. The
-commit is now also present in arm-soc where it belongs, and we will get
-a merge conflict if we both carry it, due to the screwup on the
-sysmgr node.
-
-	Arnd
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -375,7 +375,7 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 
+ 	off = addr - buf->safe_dma_addr;
+ 
+-	BUG_ON(buf->direction != dir);
++	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
+ 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+@@ -415,7 +415,7 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+ 
+ 	off = addr - buf->safe_dma_addr;
+ 
+-	BUG_ON(buf->direction != dir);
++	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
+ 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
