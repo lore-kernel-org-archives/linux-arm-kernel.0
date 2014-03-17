@@ -1,50 +1,61 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:16:50 +0000
-Subject: [PATCH 39/44] ARM: l2c: highbank: implement new write_sec method
+Date: Mon, 17 Mar 2014 00:16:55 +0000
+Subject: [PATCH 40/44] ARM: l2c: ux500: implement dummy write_sec method
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEd-0002ea-Mb@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the write_sec method, we no longer need to override the default L2C
-disable method.  This can be handled via the write_sec method instead.
+ux500 can't write to any of the secure registers on the L2C controllers,
+so provide a dummy handler which ignores all writes.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-highbank/highbank.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/mach-ux500/cache-l2x0.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index c7de89b263dd..d6b803594358 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -51,11 +51,13 @@ static void __init highbank_scu_map_io(void)
+diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+index 264f894c0e3d..5cc7e3625d8c 100644
+--- a/arch/arm/mach-ux500/cache-l2x0.c
++++ b/arch/arm/mach-ux500/cache-l2x0.c
+@@ -35,6 +35,14 @@ static int __init ux500_l2x0_unlock(void)
+ 	return 0;
  }
  
- 
--static void highbank_l2x0_disable(void)
-+static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
++static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
++{
++	/*
++	 * We can't write to secure registers as we are in non-secure
++	 * mode, until we have some SMI service available.
++	 */
++}
++
+ static int __init ux500_l2x0_init(void)
  {
--	outer_flush_all();
--	/* Disable PL310 L2 Cache controller */
--	highbank_smc1(0x102, 0x0);
-+	if (reg == L2X0_CTRL)
-+		highbank_smc1(0x102, val);
-+	else
-+		WARN_ONCE(1, "Highbank L2C310: ignoring write to reg 0x%x\n",
-+			  reg);
- }
+ 	u32 aux_val = 0x3e000000;
+@@ -56,21 +64,14 @@ static int __init ux500_l2x0_init(void)
+ 		/* 64KB way size */
+ 		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
  
- static void __init highbank_init_irq(void)
-@@ -69,8 +71,8 @@ static void __init highbank_init_irq(void)
- 	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
- 	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
- 		highbank_smc1(0x102, 0x1);
-+		outer_cache.write_sec = highbank_l2x0_write_sec;
- 		l2x0_of_init(0, ~0UL);
--		outer_cache.disable = highbank_l2x0_disable;
- 	}
++	outer_cache.write_sec = ux500_l2c310_write_sec;
++
+ 	/* 64KB way size, 8 way associativity, force WA */
+ 	if (of_have_populated_dt())
+ 		l2x0_of_init(aux_val, 0xc0000fff);
+ 	else
+ 		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
+ 
+-	/*
+-	 * We can't disable l2 as we are in non secure mode, currently
+-	 * this seems be called only during kexec path. So let's
+-	 * override outer.disable with nasty assignment until we have
+-	 * some SMI service available.
+-	 */
+-	outer_cache.disable = NULL;
+-	outer_cache.set_debug = NULL;
+-
+ 	return 0;
  }
  
 -- 
