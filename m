@@ -1,39 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 10:53:18 +0100
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. pull #2)
-In-Reply-To: <20140301041947.GR1872@titan.lakedaemon.net>
-References: <20140301041947.GR1872@titan.lakedaemon.net>
-Message-ID: <201403171053.18567.arnd@arndb.de>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Mon, 17 Mar 2014 10:54:48 +0100
+Subject: [PATCH RESEND 0/2]: ixp4xx: Fix 3.7 regression for IXP4xx ethernet
+ driver
+Message-ID: <20140317105448.14bcb617@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 March 2014, Jason Cooper wrote:
-> All,
-> 
-> This is a big one for us :)  You've already pulled part of this as
-> mvebu/soc-3xx.  I merged that branch and mvebu/soc-kw back into
-> mvebu/soc.  This whole lot has been in -next all week.  Two minor issues
-> were discovered and patches added to correct them.
-> 
-> At this point I think the kirkwood and armada changes have been shaken
-> out enough that they no longer need their own branches.  If you don't
-> agree, just let me know and I'll send separate pull requests for the
-> per-SoC branches.
-> 
-> This is an incremental pull request from tags/mvebu-soc-3.15 in the
-> mvebu/soc branch up to tags/mvebu-soc-3.15-2.
-> 
-> There will be a small conflict between this branch and mvebu/dt.  This
-> is due to the kirkwood migration and maintaining bisectability.  I'll
-> detail the conflict in the mvebu/dt pull request.
-> 
-> Please pull.
-> 
+Hi!
 
-Pulled into next/soc, sorry for the delay.
+These two patches fixes the regression introduced in 3.7 by commit
+1a4901177574083c35fafc24c4d151c2a7c7647c,
 
-I noticed that the shortlog in the pull request listed the parts
-from mvebu/soc-3xx again, which confused me a bit because they
-didn't show up in the merge, but I checked that it's all good.
+  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
 
-	Arnd
+The patch above is not incorrect itself, but causes the driver to fail
+with
+
+  [   33.055473] net eth1: coherent DMA mask is unset
+  [   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
+
+The two patches fix this by generalizing and correcting the ixp4xx
+dma_set_coherent_mask(), which earlier only dealt with the PCI case.
+The second patch simply sets up the mask for the ixp4xx ethernet device.
+
+
+The patches have been verified on a board with 256MiB memory, one
+ipx4xx_eth device and a e100 PCI device, running Linus' tip.
+
+
+This issue has been discussed before:
+
+   https://lkml.org/lkml/2014/1/2/46
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148811.html
+
+
+This is a resend of the patch series. There was some discussion about it here:
+
+  http://www.spinics.net/lists/arm-kernel/msg313082.html
+
+and if I understand Russels comments (as per the documentation),
+drivers should setup the coherent DMA mask even if it happens to be the
+platform/CPU default.
+
+// Simon
