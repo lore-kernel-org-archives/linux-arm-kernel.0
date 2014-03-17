@@ -1,31 +1,87 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 17 Mar 2014 10:59:24 -0500
-Subject: [GIT PULL v2] SOCFPGA updates for 3.15, version 2
-In-Reply-To: <201403171431.05666.arnd@arndb.de>
-References: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
- <201403171038.16362.arnd@arndb.de> <864n2xx9c7.fsf@void.printf.net>
- <201403171431.05666.arnd@arndb.de>
-Message-ID: <1395071964.16340.3.camel@linux-builds1>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 17 Mar 2014 16:14:36 +0100
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <2166863.3Fn4k2rvaz@avalon>
+References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
+ <1394731053-6118-7-git-send-email-denis@eukrea.com>
+ <5326FB75.1050605@samsung.com> <2166863.3Fn4k2rvaz@avalon>
+Message-ID: <20140317161436.06169b33@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-03-17 at 14:31 +0100, Arnd Bergmann wrote:
-> On Monday 17 March 2014, Chris Ball wrote:
-> > On Mon, Mar 17 2014, Arnd Bergmann wrote:
-> > > Chris, it would be nice if you could revert d9c3f5df539a "dts: socfpga: Add
-> > > support for SD/MMC on the SOCFPGA platform" in your mmc tree now. The
-> > > commit is now also present in arm-soc where it belongs, and we will get
-> > > a merge conflict if we both carry it, due to the screwup on the
-> > > sysmgr node.
-> > 
-> > I see, sorry about this.  I've pushed the revert to mmc-next now.
-> > 
-> 
-> Ok, thanks!
-> 
+Hi,
 
-I apologize for causing the conflict, promise to be more aware this
-these issues in the future.
+Laurent Pinchart wrote:
+> Hello,
+> 
+> On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
+> > On 03/13/2014 06:17 PM, Denis Carikli wrote:
+> > > We need a way to pass signal polarity informations
+> > > between DRM panels, and the display drivers.
+> > > 
+> > > To do that, a pol_flags field was added to drm_display_mode.
+> > > 
+> > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > ---
+> > > ChangeLog v10->v11:
+> > > - Since the imx-drm won't be able to retrive its regulators
+> > > 
+> > >   from the device tree when using display-timings nodes,
+> > >   and that I was told that the drm simple-panel driver
+> > >   already supported that, I then, instead, added what was
+> > >   lacking to make the eukrea displays work with the
+> > >   drm-simple-panel driver.
+> > >   
+> > >   That required a way to get back the display polarity
+> > >   informations from the imx-drm driver without affecting
+> > >   userspace.
+> > > 
+> > > ---
+> > > 
+> > >  include/drm/drm_crtc.h |    8 ++++++++
+> > >  1 file changed, 8 insertions(+)
+> > > 
+> > > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> > > index f764654..61a4fe1 100644
+> > > --- a/include/drm/drm_crtc.h
+> > > +++ b/include/drm/drm_crtc.h
+> > > @@ -131,6 +131,13 @@ enum drm_mode_status {
+> > > 
+> > >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> > > 
+> > > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> > > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> > > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+> > > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
+> > > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
+> > > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+> > 
+> > Could you add some description to these flags.
+> > What are *_PRESERVE flags for?
+> > Are those flags 1:1 compatible with respective 'videomode:flags'?
+> > I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
+> > right?
+> 
+> Possibly nitpicking, I wouldn't call the clock edge on which data signals are 
+> generated/sampled "data polarity". This is clock polarity information.
+> 
+> Have you seen cases where pixel data and DE are geenrated or need to be 
+> sampled on different edges ?
+> 
+DE is not a clock signal, but an 'Enable' signal whose value (high or
+low) defines the window in which the pixel data is valid.
+The flag defines whether data is valid during the HIGH or LOW period of
+DE.
 
-Dinh
-> 	Arnd
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
