@@ -1,75 +1,79 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 17 Mar 2014 14:41:09 +0100
-Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
-In-Reply-To: <1394731053-6118-7-git-send-email-denis@eukrea.com>
-References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
- <1394731053-6118-7-git-send-email-denis@eukrea.com>
-Message-ID: <5326FB75.1050605@samsung.com>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Mon, 17 Mar 2014 14:42:35 +0100
+Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
+ common, correct implementation
+In-Reply-To: <20140317144016.0508cc4d@marrow.netinsight.se>
+References: <20140317144016.0508cc4d@marrow.netinsight.se>
+Message-ID: <20140317144235.546d2e19@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+Non-PCI devices can use the entire 32-bit range, PCI dittos are
+limited to the first 64MiB.
 
-Thanks for the patch.
+Also actually setup coherent_dma_mask.
 
-On 03/13/2014 06:17 PM, Denis Carikli wrote:
-> We need a way to pass signal polarity informations
->   between DRM panels, and the display drivers.
-> 
-> To do that, a pol_flags field was added to drm_display_mode.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v10->v11:
-> - Since the imx-drm won't be able to retrive its regulators
->   from the device tree when using display-timings nodes,
->   and that I was told that the drm simple-panel driver 
->   already supported that, I then, instead, added what was
->   lacking to make the eukrea displays work with the
->   drm-simple-panel driver.
-> 
->   That required a way to get back the display polarity
->   informations from the imx-drm driver without affecting
->   userspace.
-> ---
->  include/drm/drm_crtc.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-> index f764654..61a4fe1 100644
-> --- a/include/drm/drm_crtc.h
-> +++ b/include/drm/drm_crtc.h
-> @@ -131,6 +131,13 @@ enum drm_mode_status {
->  
->  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
->  
-> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-> +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
-> +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
-> +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
-> +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+The patch has been verified on a board with 128MiB memory, one
+ipx4xx_eth device and a e100 PCI device.
 
-Could you add some description to these flags.
-What are *_PRESERVE flags for?
-Are those flags 1:1 compatible with respective 'videomode:flags'?
-I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
-right?
+Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+---
+ChangeLog:
 
-Regards
-Andrzej
+* v2: Move EXPORT_SYMBOL together with dma_set_coherent_mask (Anrd Bergmann)
 
+ arch/arm/mach-ixp4xx/common-pci.c |    9 ---------
+ arch/arm/mach-ixp4xx/common.c     |   12 ++++++++++++
+ 2 files changed, 12 insertions(+), 9 deletions(-)
 
-> +
->  struct drm_display_mode {
->  	/* Header */
->  	struct list_head head;
-> @@ -183,6 +190,7 @@ struct drm_display_mode {
->  	int vrefresh;		/* in Hz */
->  	int hsync;		/* in kHz */
->  	enum hdmi_picture_aspect picture_aspect_ratio;
-> +	unsigned int pol_flags;
->  };
->  
->  static inline bool drm_mode_is_stereo(const struct drm_display_mode *mode)
-> 
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index 200970d..055d816 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -481,14 +481,5 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-int dma_set_coherent_mask(struct device *dev, u64 mask)
+-{
+-	if (mask >= SZ_64M - 1)
+-		return 0;
+-
+-	return -EIO;
+-}
+-
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+-EXPORT_SYMBOL(dma_set_coherent_mask);
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 6d68aed..df82a2b 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -31,6 +31,7 @@
+ #include <linux/gpio.h>
+ #include <linux/cpu.h>
+ #include <linux/sched_clock.h>
++#include <linux/pci.h>
+ 
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+@@ -578,6 +579,17 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
+ 	}
+ }
+ 
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (dev_is_pci(dev) && mask >= SZ_64M)
++		return -EIO;
++
++	dev->coherent_dma_mask = mask;
++
++	return 0;
++}
++EXPORT_SYMBOL(dma_set_coherent_mask);
++
+ #ifdef CONFIG_IXP4XX_INDIRECT_PCI
+ /*
+  * In the case of using indirect PCI, we simply return the actual PCI
+-- 
+1.7.9.6
