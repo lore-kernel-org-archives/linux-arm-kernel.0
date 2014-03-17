@@ -1,25 +1,25 @@
-From: chris@printf.net (Chris Ball)
-Date: Mon, 17 Mar 2014 13:07:04 +0000
-Subject: [GIT PULL v2] SOCFPGA updates for 3.15, version 2
-In-Reply-To: <201403171038.16362.arnd@arndb.de> (Arnd Bergmann's message of
- "Mon, 17 Mar 2014 10:38:16 +0100")
-References: <1394427333-9028-1-git-send-email-dinguyen@altera.com>
- <201403171038.16362.arnd@arndb.de>
-Message-ID: <864n2xx9c7.fsf@void.printf.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 17 Mar 2014 14:06:57 +0100
+Subject: [PATCH] ata: ahci_sunxi: make ahci_sunxi_resume() static
+Message-ID: <1725454.bVvdm9zQru@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/ata/ahci_sunxi.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Mon, Mar 17 2014, Arnd Bergmann wrote:
-> Chris, it would be nice if you could revert d9c3f5df539a "dts: socfpga: Add
-> support for SD/MMC on the SOCFPGA platform" in your mmc tree now. The
-> commit is now also present in arm-soc where it belongs, and we will get
-> a merge conflict if we both carry it, due to the screwup on the
-> sysmgr node.
-
-I see, sorry about this.  I've pushed the revert to mmc-next now.
-
-- Chris.
--- 
-Chris Ball   <chris@printf.net>   <http://printf.net/>
+Index: b/drivers/ata/ahci_sunxi.c
+===================================================================
+--- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:05.556474489 +0100
++++ b/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:06.220474478 +0100
+@@ -209,7 +209,7 @@ disable_resources:
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+-int ahci_sunxi_resume(struct device *dev)
++static int ahci_sunxi_resume(struct device *dev)
+ {
+ 	struct ata_host *host = dev_get_drvdata(dev);
+ 	struct ahci_host_priv *hpriv = host->private_data;
