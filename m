@@ -1,34 +1,38 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 17 Mar 2014 17:45:33 +0800
-Subject: [PATCH 0/8] ARM: at91: sama5d3: enable sound support
-Message-ID: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 11:11:30 +0100
+Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
+In-Reply-To: <20140304025559.GY1872@titan.lakedaemon.net>
+References: <20140301052536.GS1872@titan.lakedaemon.net>
+ <20140304025559.GY1872@titan.lakedaemon.net>
+Message-ID: <201403171111.30596.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add sound support on sama5d3xek board.
+On Tuesday 04 March 2014, Jason Cooper wrote:
+> V2: removed the dove PMU interrupt node (er, undid the re-addition of
+> the node.  ie: let the revert stand).  So, commit id's for this pull
+> only are changed.  No previous pulls or tags affected.  Confirmed the
+> change with a diff between the old branch and the new branch.  And did a
+> run of building dtbs.  No problems.  Sorry for the confusion.
+> 
+> Russell just raised a very valid point today regarding the overall
+> design of an eventual PMU driver that would cover several tasks we
+> hadn't considered with the original binding.  Better to pull it now than
+> have to support it indefinitely.  Revert of the driver in the works.
+> 
+> --- original text ---
+> 
+> Here's another rather large round of DT changes for mvebu.  It's all
+> summed up below and has been in -next for a while now.
+> 
+> This is an incremental pull from tags/mvebu-dt-3.15-2 in the mvebu/dt
+> branch up to tags/mvebu-dt-3.15-3.
+> 
 
-This patch series based on the following patch set:
-  clk: at91: better support for the PCKs
-  http://comments.gmane.org/gmane.linux.kernel/1664477
+Pulled into next/dt now, along with the #4 and #5. I got a trivial
+merge conflict against the dts Makefile change from mach-qcom and
+noticed that splitting up the dtb section into per-soc breaks
+alphabetical ordering, which I changed in the merge by moving
+it down to the end of the list.
 
-
-Bo Shen (5):
-  ARM: at91: sama5d3: add DMA property for SSC devices
-  ARM: at91: sama5d3: disable sound by default
-  ARM: at91: sama5d3: correct the sound compatible string
-  ARM: at91: sama5d3: add the missing property
-  ARM: at91: sama5d3: clock for ssc from rk pin
-
-Boris BREZILLON (3):
-  ASoC: atmel: support CCF based clks
-  ASoC: atmel: document clock properties of the wm8904 driver
-  ARM: at91/dt: add clock properties to the wm8904 codec node
-
- .../devicetree/bindings/sound/atmel-wm8904.txt     |  2 ++
- arch/arm/boot/dts/sama5d3.dtsi                     |  6 ++++++
- arch/arm/boot/dts/sama5d3xmb.dtsi                  | 11 +++++++++-
- sound/soc/atmel/atmel_wm8904.c                     | 25 +++++++++++-----------
- 4 files changed, 31 insertions(+), 13 deletions(-)
-
--- 
-1.8.5.2
+	Arnd
