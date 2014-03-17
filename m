@@ -1,15 +1,15 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Mar 2014 14:23:07 +0100
-Subject: [PATCH] ata: ahci_sunxi: make ahci_sunxi_resume() static
-In-Reply-To: <1725454.bVvdm9zQru@amdc1032>
-References: <1725454.bVvdm9zQru@amdc1032>
-Message-ID: <5326F73B.6080501@redhat.com>
+Date: Mon, 17 Mar 2014 14:23:18 +0100
+Subject: [PATCH] ata: ahci_sunxi: fix code formatting
+In-Reply-To: <10509185.3UEOEZKTc5@amdc1032>
+References: <10509185.3UEOEZKTc5@amdc1032>
+Message-ID: <5326F746.1080507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 03/17/2014 02:06 PM, Bartlomiej Zolnierkiewicz wrote:
+On 03/17/2014 02:08 PM, Bartlomiej Zolnierkiewicz wrote:
 > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
 Thanks for doing these clean-ups.
@@ -20,22 +20,63 @@ Regards,
 
 Hans
 
-
 > ---
->  drivers/ata/ahci_sunxi.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/ata/ahci_sunxi.c |   44 ++++++++++++++++++++++----------------------
+>  1 file changed, 22 insertions(+), 22 deletions(-)
 > 
 > Index: b/drivers/ata/ahci_sunxi.c
 > ===================================================================
-> --- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:05.556474489 +0100
-> +++ b/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:06.220474478 +0100
-> @@ -209,7 +209,7 @@ disable_resources:
->  }
+> --- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:06.220474478 +0100
+> +++ b/drivers/ata/ahci_sunxi.c	2014-03-17 14:00:48.720472730 +0100
+> @@ -27,28 +27,28 @@
+>  #include <linux/regulator/consumer.h>
+>  #include "ahci.h"
 >  
->  #ifdef CONFIG_PM_SLEEP
-> -int ahci_sunxi_resume(struct device *dev)
-> +static int ahci_sunxi_resume(struct device *dev)
+> -#define AHCI_BISTAFR 0x00a0
+> -#define AHCI_BISTCR 0x00a4
+> -#define AHCI_BISTFCTR 0x00a8
+> -#define AHCI_BISTSR 0x00ac
+> -#define AHCI_BISTDECR 0x00b0
+> -#define AHCI_DIAGNR0 0x00b4
+> -#define AHCI_DIAGNR1 0x00b8
+> -#define AHCI_OOBR 0x00bc
+> -#define AHCI_PHYCS0R 0x00c0
+> -#define AHCI_PHYCS1R 0x00c4
+> -#define AHCI_PHYCS2R 0x00c8
+> -#define AHCI_TIMER1MS 0x00e0
+> -#define AHCI_GPARAM1R 0x00e8
+> -#define AHCI_GPARAM2R 0x00ec
+> -#define AHCI_PPARAMR 0x00f0
+> -#define AHCI_TESTR 0x00f4
+> -#define AHCI_VERSIONR 0x00f8
+> -#define AHCI_IDR 0x00fc
+> -#define AHCI_RWCR 0x00fc
+> -#define AHCI_P0DMACR 0x0170
+> -#define AHCI_P0PHYCR 0x0178
+> -#define AHCI_P0PHYSR 0x017c
+> +#define AHCI_BISTAFR	0x00a0
+> +#define AHCI_BISTCR	0x00a4
+> +#define AHCI_BISTFCTR	0x00a8
+> +#define AHCI_BISTSR	0x00ac
+> +#define AHCI_BISTDECR	0x00b0
+> +#define AHCI_DIAGNR0	0x00b4
+> +#define AHCI_DIAGNR1	0x00b8
+> +#define AHCI_OOBR	0x00bc
+> +#define AHCI_PHYCS0R	0x00c0
+> +#define AHCI_PHYCS1R	0x00c4
+> +#define AHCI_PHYCS2R	0x00c8
+> +#define AHCI_TIMER1MS	0x00e0
+> +#define AHCI_GPARAM1R	0x00e8
+> +#define AHCI_GPARAM2R	0x00ec
+> +#define AHCI_PPARAMR	0x00f0
+> +#define AHCI_TESTR	0x00f4
+> +#define AHCI_VERSIONR	0x00f8
+> +#define AHCI_IDR	0x00fc
+> +#define AHCI_RWCR	0x00fc
+> +#define AHCI_P0DMACR	0x0170
+> +#define AHCI_P0PHYCR	0x0178
+> +#define AHCI_P0PHYSR	0x017c
+>  
+>  static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
 >  {
->  	struct ata_host *host = dev_get_drvdata(dev);
->  	struct ahci_host_priv *hpriv = host->private_data;
 > 
