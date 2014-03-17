@@ -1,60 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Mar 2014 14:30:58 +0100
-Subject: [PATCH v6 2/3] ARM: sun7i/sun6i: dts: Add NMI irqchip support
-In-Reply-To: <1394890861-18347-3-git-send-email-carlo@caione.org>
-References: <1394890861-18347-1-git-send-email-carlo@caione.org>
- <1394890861-18347-3-git-send-email-carlo@caione.org>
-Message-ID: <20140317133057.GK27873@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 14:38:49 +0100
+Subject: [GIT PULL] Allwinner defconfig additions for 3.15
+In-Reply-To: <20140313164250.GA13112@lukather>
+References: <20140313164250.GA13112@lukather>
+Message-ID: <201403171438.49371.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 02:41:00PM +0100, Carlo Caione wrote:
-> This patch adds DTS entries for NMI controller as child of GIC.
+On Thursday 13 March 2014, Maxime Ripard wrote:
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  arch/arm/boot/dts/sun6i-a31.dtsi | 9 +++++++++
->  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
->  2 files changed, 18 insertions(+)
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > 
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index 5256ad9..4a5050c 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -190,6 +190,15 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> +		nmi_intc: sc-nmi-intc at 01f00c0c {
+> are available in the git repository at:
+> 
+>   https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.15
+> 
+> for you to fetch changes up to 4f26b761531c00605010d595b495901106729f8b:
+> 
+>   ARM: sunxi: Enable A31 SPI and SID in the defconfig (2014-02-07 20:26:40 +0100)
+> 
 
-It should be interrupt-controller at 01f00c0c, according to the ePAPR.
+Pulled into next/boards, thanks!
 
-> +			compatible = "allwinner,sun6i-a31-sc-nmi";
-
-I'm curious, what is the "sc" for?
-
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			reg = <0x01f00c0c 0x38>;
-> +			interrupt-parent = <&gic>;
-
-This is actually the default.
-
-> +			interrupts = <0 0 4>;
-> +		};
-> +
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/aab143b9/attachment.sig>
+	Arnd
