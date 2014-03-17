@@ -1,25 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 11:12:08 +0100
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (incr. #5)
-In-Reply-To: <20140314143831.GD15608@titan.lakedaemon.net>
-References: <20140314143831.GD15608@titan.lakedaemon.net>
-Message-ID: <201403171112.08876.arnd@arndb.de>
+Date: Mon, 17 Mar 2014 11:22:08 +0100
+Subject: [GIT PULL] ARM: mvebu: driver changes for v3.15
+In-Reply-To: <20140310150926.GJ18707@titan.lakedaemon.net>
+References: <20140301025919.GQ1872@titan.lakedaemon.net>
+ <20140310150926.GJ18707@titan.lakedaemon.net>
+Message-ID: <201403171122.08671.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014, Jason Cooper wrote:
-> Guys,
+On Monday 10 March 2014, Jason Cooper wrote:
+> Olof,
 > 
-> Well, I lied :)  I thought round #4 would be the last one, but we have
-> one more.  This is a small set of changes, but it adds nand support for
-> the brand new Armada 38x SoCs.  It'd be really nice to get it in for
-> v3.15.
+> I see you went through and handled quite a few pull requests this
+> weekend, but it looks like you skipped over this one I've replied to and:
 > 
-> As usual, this is an incremental pull request from tags/mvebu-dt-3.15-4
-> up to tags/mvebu-dt-3.15-5 in the mvebu/dt branch.
+> [GIT PULL] ARM: mvebu: driver changes for v3.15
+> [GIT PULL] ARM: mvebu: soc changes for v3.15 (incr. pull #2)
+> [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
+> [GIT PULL] ARM: mvebu: defconfig changes for v3.15 (incr. pull #2)
 > 
-> Please pull.
+> It looks like I sent to arm at kernel.org on all of them, is there
+> something else I missed?
+> 
+> There's also another round of pull requests sent more recently, but I
+> haven't gotten that far through lakml yet. :)
 
-Pulled into next/dt
+I think I've got them all now (the defconfig one is next on my
+list), please verify.
 
 	Arnd
