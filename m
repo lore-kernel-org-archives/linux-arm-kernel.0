@@ -1,85 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Mar 2014 14:58:36 +0100
-Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
-In-Reply-To: <5326FB75.1050605@samsung.com>
-References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
- <1394731053-6118-7-git-send-email-denis@eukrea.com>
- <5326FB75.1050605@samsung.com>
-Message-ID: <2166863.3Fn4k2rvaz@avalon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 17 Mar 2014 14:56:55 +0100
+Subject: [PATCH v2 02/15] ARM: at91: sam9260: remove unused platform_data
+In-Reply-To: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395064628-644-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+num_channels and registers are not used anymore since they are defined inside
+the at91_adc driver and assigned by matching the id_table.
 
-On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
-> On 03/13/2014 06:17 PM, Denis Carikli wrote:
-> > We need a way to pass signal polarity informations
-> > between DRM panels, and the display drivers.
-> > 
-> > To do that, a pol_flags field was added to drm_display_mode.
-> > 
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > ---
-> > ChangeLog v10->v11:
-> > - Since the imx-drm won't be able to retrive its regulators
-> > 
-> >   from the device tree when using display-timings nodes,
-> >   and that I was told that the drm simple-panel driver
-> >   already supported that, I then, instead, added what was
-> >   lacking to make the eukrea displays work with the
-> >   drm-simple-panel driver.
-> >   
-> >   That required a way to get back the display polarity
-> >   informations from the imx-drm driver without affecting
-> >   userspace.
-> > 
-> > ---
-> > 
-> >  include/drm/drm_crtc.h |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-> > index f764654..61a4fe1 100644
-> > --- a/include/drm/drm_crtc.h
-> > +++ b/include/drm/drm_crtc.h
-> > @@ -131,6 +131,13 @@ enum drm_mode_status {
-> > 
-> >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
-> > 
-> > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-> > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-> > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
-> > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
-> > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
-> > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
-> 
-> Could you add some description to these flags.
-> What are *_PRESERVE flags for?
-> Are those flags 1:1 compatible with respective 'videomode:flags'?
-> I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
-> right?
+Also, remove the mach/at91_adc.h include that is not necessary anymore.
 
-Possibly nitpicking, I wouldn't call the clock edge on which data signals are 
-generated/sampled "data polarity". This is clock polarity information.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+---
+ arch/arm/mach-at91/at91sam9260_devices.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-Have you seen cases where pixel data and DE are geenrated or need to be 
-sampled on different edges ?
-
-> > +
-> >  struct drm_display_mode {
-> >  	/* Header */
-> >  	struct list_head head;
-> > @@ -183,6 +190,7 @@ struct drm_display_mode {
-> >  	int vrefresh;		/* in Hz */
-> >  	int hsync;		/* in kHz */
-> >  	enum hdmi_picture_aspect picture_aspect_ratio;
-> > +	unsigned int pol_flags;
-> >  };
-> >  
-> >  static inline bool drm_mode_is_stereo(const struct drm_display_mode
-> >  *mode)
-
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 0a0315920963..a299c50512f0 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -24,7 +24,6 @@
+ #include <mach/at91sam9260_matrix.h>
+ #include <mach/at91_matrix.h>
+ #include <mach/at91sam9_smc.h>
+-#include <mach/at91_adc.h>
+ 
+ #include "board.h"
+ #include "generic.h"
+@@ -1321,13 +1320,6 @@ static struct at91_adc_trigger at91_adc_triggers[] = {
+ 	},
+ };
+ 
+-static struct at91_adc_reg_desc at91_adc_register_g20 = {
+-	.channel_base = AT91_ADC_CHR(0),
+-	.drdy_mask = AT91_ADC_DRDY,
+-	.status_register = AT91_ADC_SR,
+-	.trigger_register = AT91_ADC_MR,
+-};
+-
+ void __init at91_add_device_adc(struct at91_adc_data *data)
+ {
+ 	if (!data)
+@@ -1345,9 +1337,7 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
+ 	if (data->use_external_triggers)
+ 		at91_set_A_periph(AT91_PIN_PA22, 0);
+ 
+-	data->num_channels = 4;
+ 	data->startup_time = 10;
+-	data->registers = &at91_adc_register_g20;
+ 	data->trigger_number = 4;
+ 	data->trigger_list = at91_adc_triggers;
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
