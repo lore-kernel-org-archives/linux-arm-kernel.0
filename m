@@ -1,74 +1,69 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:14:11 +0000
-Subject: [PATCH 08/44] ARM: l2c: split out cache unlock code
+Date: Mon, 17 Mar 2014 00:14:16 +0000
+Subject: [PATCH 09/44] ARM: l2c: provide generic helper for way-based
+ operations
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLBz-0002cL-Ny@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLC4-0002cR-RX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the cache unlock code out of l2x0_unlock().  We want to be able
-to re-use this functionality later.
+Provide a generic helper function for way based operations.  These are
+always background operations, and thus have to be waited for before a
+new operation is commenced.  This helper extracts that requirement from
+several locations in the code.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 595c50519e41..a1313d20f205 100644
+index a1313d20f205..1c3a23318f53 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -50,6 +50,9 @@ struct l2x0_regs l2x0_saved_regs;
- 
- static bool of_init = false;
- 
-+/*
-+ * Common code for all cache controllers.
-+ */
- static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
- {
- 	/* wait for cache operation by line or way to complete */
-@@ -67,6 +70,18 @@ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
+@@ -70,6 +70,12 @@ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
  	outer_cache.set_debug(val);
  }
  
-+static inline void l2c_unlock(void __iomem *base, unsigned num)
++static void __l2c_op_way(void __iomem *reg)
 +{
-+	unsigned i;
-+
-+	for (i = 0; i < num; i++) {
-+		writel_relaxed(0, base + L2X0_LOCKDOWN_WAY_D_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+		writel_relaxed(0, base + L2X0_LOCKDOWN_WAY_I_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+	}
++	writel_relaxed(l2x0_way_mask, reg);
++	cache_wait_way(reg, l2x0_way_mask);
 +}
 +
- #ifdef CONFIG_CACHE_PL310
- static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ static inline void l2c_unlock(void __iomem *base, unsigned num)
  {
-@@ -308,7 +323,6 @@ static void l2x0_disable(void)
- static void l2x0_unlock(u32 cache_id)
+ 	unsigned i;
+@@ -166,8 +172,7 @@ static void l2x0_cache_sync(void)
+ static void __l2x0_flush_all(void)
  {
- 	int lockregs;
--	int i;
- 
- 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	case L2X0_CACHE_ID_PART_L310:
-@@ -323,12 +337,7 @@ static void l2x0_unlock(u32 cache_id)
- 		break;
- 	}
- 
--	for (i = 0; i < lockregs; i++) {
--		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
--			       i * L2X0_LOCKDOWN_STRIDE);
--		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
--			       i * L2X0_LOCKDOWN_STRIDE);
--	}
-+	l2c_unlock(l2x0_base, lockregs);
+ 	debug_writel(0x03);
+-	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_INV_WAY);
+-	cache_wait_way(l2x0_base + L2X0_CLEAN_INV_WAY, l2x0_way_mask);
++	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
+ 	cache_sync();
+ 	debug_writel(0x00);
  }
+@@ -188,8 +193,7 @@ static void l2x0_clean_all(void)
  
- void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	/* clean all ways */
+ 	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+-	cache_wait_way(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
++	__l2c_op_way(l2x0_base + L2X0_CLEAN_WAY);
+ 	cache_sync();
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+@@ -202,8 +206,7 @@ static void l2x0_inv_all(void)
+ 	raw_spin_lock_irqsave(&l2x0_lock, flags);
+ 	/* Invalidating when L2 is enabled is a nono */
+ 	BUG_ON(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN);
+-	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+-	cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
++	__l2c_op_way(l2x0_base + L2X0_INV_WAY);
+ 	cache_sync();
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
 -- 
 1.8.3.1
