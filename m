@@ -1,42 +1,45 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 17 Mar 2014 12:30:02 +0200
-Subject: [PATCH v15][ 2/3] video: imxfb: Add DT default contrast control
- register property.
-In-Reply-To: <1394794553-14719-2-git-send-email-denis@eukrea.com>
-References: <1394794553-14719-1-git-send-email-denis@eukrea.com>
- <1394794553-14719-2-git-send-email-denis@eukrea.com>
-Message-ID: <5326CEAA.9090209@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Mar 2014 10:33:54 +0000
+Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
+In-Reply-To: <1395048095-32745-1-git-send-email-vkale@apm.com>
+References: <1395048095-32745-1-git-send-email-vkale@apm.com>
+Message-ID: <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/14 12:55, Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Grant Likely <grant.likely@linaro.org>
-> ---
-> ChangeLog v14->v15:
-> - Moved the Cc into git send-email.
-> - Rebased.
+On Mon, Mar 17, 2014 at 09:21:35AM +0000, Vinayak Kale wrote:
+> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
 > 
-> ChangeLog v5->v14:
-> - Remove people not concerned by this patch from the Cc list.
-> - Changed the property name to match the register name and function.
-> - Updated the documentation, code and commit message accordingly.
+> Please note that this patch has dependancy on a GIC driver patch [1] which is
+> yet to be approved by maintainers.
+> 
+> [1]- https://lkml.org/lkml/2014/2/27/605 
+> (irqchip:gic: change access of gicc_ctrl register to read modify write)
+> 
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
 > ---
->  .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
->  drivers/video/fbdev/imxfb.c                        |    3 +++
->  2 files changed, 6 insertions(+)
+>  arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index d37d736..587348d 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -97,6 +97,11 @@
+>  		clock-frequency = <50000000>;
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+> +		interrupts = <1 12 0xff04>;
+> +	};
 
-Queued for 3.15.
+Do Potenza CPUs only have the PMUv3 events, and nothing
+Potenza-specific?
 
- Tomi
+I would have expected something like:
 
+compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/8f94363c/attachment.sig>
+Cheers,
+Mark.
