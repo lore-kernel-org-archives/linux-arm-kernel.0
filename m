@@ -1,68 +1,62 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 17 Mar 2014 18:05:25 +0000
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <20140317173821.GJ24070@arm.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
- <20140314171457.GK18126@arm.com> <201403141838.08900.arnd@arndb.de>
- <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
- <20140317173821.GJ24070@arm.com>
-Message-ID: <20140317180525.GL6457@e106497-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 17 Mar 2014 19:09:54 +0100
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net> <531CFA28.9020600@gmail.com>
+ <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+Message-ID: <53273A72.2080402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 05:38:21PM +0000, Catalin Marinas wrote:
-> On Fri, Mar 14, 2014 at 06:05:27PM +0000, Liviu Dudau wrote:
-> > On Fri, Mar 14, 2014 at 05:38:08PM +0000, Arnd Bergmann wrote:
-> > > On Friday 14 March 2014, Catalin Marinas wrote:
-> > > > On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm64/kernel/pci.c
-> > > > [...]
-> > > > > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
-> > > > [...]
-> > > > > +unsigned long pci_address_to_pio(phys_addr_t address)
-> > > > [...]
-> > > > > +void pcibios_fixup_bus(struct pci_bus *bus)
-> > > > [ actually most of this file ]
-> > > > 
-> > > > Maybe it was raised before already but can we have __weak generic
-> > > > definitions of these functions? They don't seem to be arm64 specific in
-> > > > any way.
-> [...]
-> > Catalin, if you are happy to ask for ACKs from all arch maintainers that might get
-> > affected by our custom version of pci_address_to_pio() before you can pull PCI support
-> > for arm64 then I can propose a new patchset.
-> 
-> You don't need to change the other architectures, that's the point of a
-> __weak definition, it will be automatically overridden. If you want, you
-> can even place a GENERIC_PCI or whatever config option that is only
-> selected by arm64 for the time being.
+Hi Mike,
 
-pci_address_to_pio() is alread __weak. My patch was adding the arm64 version of it. Adding
-an #ifdef GENERIC_PCI to the __weak implementation is not just a temporary solution.
-We would still have to keep some sort of #ifdef around in the function as x86
-will never pickup our version. Regardless, the list of people that would need to ACK that
-change will increase, right?
+On 10.03.2014 01:08, Olof Johansson wrote:
+> On Sun, Mar 9, 2014 at 4:32 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 09.03.2014 19:35, Olof Johansson wrote:
+>>>
+>>> On Mon, Mar 03, 2014 at 09:56:11AM +0000, Kukjin Kim wrote:
+>>>>
+>>>> The following changes since commit
+>>>> 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>>>
+>>>>     Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>     http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>> tags/samsung-pm-1
+>>>>
+>>>> for you to fetch changes up to e11d919e4aa2009077e3e4f829ff991d37adca61:
+>>>>
+>>>>     ARM: EXYNOS: Drop legacy Exynos4 clock suspend/resume code (2014-02-14
+>>>> 08:16:01 +0900)
+>>>
+>>>
+>>> Hi,
+>>>
+>>> I don't see a single cc or acked-by line from Mike Turquette here. I'll
+>>> hold
+>>> off until he's had a chance to take a look at these ones; I suspect
+>>> they'll be
+>>> fine since it's mostly code refactoring though.
+>>
+>>
+>> I guess I should have ACKed them too, but it felt kind of strange to ACK my
+>> own patches. ;)
+>>
+>> Anyway, for all samsung-clk patches:
+>>
+>> Acked-by: Tomasz Figa <t.figa@samsung.com>
+>
+> Yeah, self-acking doesn't make much sense. :)
+>
+> I'm mostly worried about patches touching other subsystems without the
+> other maintainer being aware of it or having reviewed them. As I said,
+> these mostly look like refactorings but it's still good habit.
+
+May we get your ACK for this? I hope it's not too late already to have 
+them merged for 3.15.
 
 Best regards,
-Liviu
-
-> 
-> -- 
-> Catalin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Tomasz
