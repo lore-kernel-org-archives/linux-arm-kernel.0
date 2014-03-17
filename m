@@ -1,45 +1,42 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 17 Mar 2014 10:54:48 +0100
-Subject: [PATCH RESEND 0/2]: ixp4xx: Fix 3.7 regression for IXP4xx ethernet
- driver
-Message-ID: <20140317105448.14bcb617@marrow.netinsight.se>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 17 Mar 2014 10:40:04 +0100
+Subject: [PATCH RFC 0/5] Move tda998x to a couple encoder/connector
+Message-ID: <cover.1395049204.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The 'slave encoder' structure of the tda998x driver asks for glue
+between the DRM driver and the encoder/connector structures.
 
-These two patches fixes the regression introduced in 3.7 by commit
-1a4901177574083c35fafc24c4d151c2a7c7647c,
+Changing the tda998x driver to a simple encoder/connector simplifies
+the code of the tilcdc driver. This change is permitted by
+Russell's infrastructure for componentised subsystems.
 
-  ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+The proposed patch set does not include changes to the Armada DRM driver
+which has no DT support yet and which will not work anymore if this
+patch set is applied.
 
-The patch above is not incorrect itself, but causes the driver to fail
-with
+Jean-Francois Moine (5):
+  drm/i2c: tda998x: Move tda998x to a couple encoder/connector
+  drm/tilcdc: Change the interface with the tda998x driver
+  drm/i2c: tda998x: Add required properties
+  drm/tilcd: dts: Add the video sink
+  ARM: AM33XX: dts: Change the tda998x description
 
-  [   33.055473] net eth1: coherent DMA mask is unset
-  [   33.055523] net eth1: coherent allocation too big (requested 0x1000 mask 0x0)
+ .../devicetree/bindings/drm/i2c/tda998x.txt        |  12 +
+ .../devicetree/bindings/drm/tilcdc/slave.txt       |  18 -
+ .../devicetree/bindings/drm/tilcdc/tilcdc.txt      |   6 +
+ arch/arm/boot/dts/am335x-base0033.dts              |  28 +-
+ arch/arm/boot/dts/am335x-boneblack.dts             |  21 +-
+ drivers/gpu/drm/i2c/tda998x_drv.c                  | 335 +++++++++--------
+ drivers/gpu/drm/tilcdc/Makefile                    |   1 -
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c                |  81 +++-
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c              | 406 ---------------------
+ drivers/gpu/drm/tilcdc/tilcdc_slave.h              |  26 --
+ 10 files changed, 297 insertions(+), 637 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/drm/tilcdc/slave.txt
+ delete mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.c
+ delete mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.h
 
-The two patches fix this by generalizing and correcting the ixp4xx
-dma_set_coherent_mask(), which earlier only dealt with the PCI case.
-The second patch simply sets up the mask for the ixp4xx ethernet device.
-
-
-The patches have been verified on a board with 256MiB memory, one
-ipx4xx_eth device and a e100 PCI device, running Linus' tip.
-
-
-This issue has been discussed before:
-
-   https://lkml.org/lkml/2014/1/2/46
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148811.html
-
-
-This is a resend of the patch series. There was some discussion about it here:
-
-  http://www.spinics.net/lists/arm-kernel/msg313082.html
-
-and if I understand Russels comments (as per the documentation),
-drivers should setup the coherent DMA mask even if it happens to be the
-platform/CPU default.
-
-// Simon
+-- 
+1.9.0
