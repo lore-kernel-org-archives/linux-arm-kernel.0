@@ -1,136 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Mar 2014 10:04:20 -0500
-Subject: PL310 errata workarounds
-In-Reply-To: <20140316115207.GW21483@n2100.arm.linux.org.uk>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140314150110.GQ21483@n2100.arm.linux.org.uk>
- <CAL_JsqLuNz4EzGaQdb5eFSX5ip-spcDTFsNaFN094=XB_iPV3g@mail.gmail.com>
- <20140316115207.GW21483@n2100.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+9Dm9S6rhQAt_umOM6T_x21O=Y_PPg0QyCH1zR_=yWoA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Mon, 17 Mar 2014 16:06:28 +0100
+Subject: [PATCH v3 3/3] ARM: dts: berlin2q: add the Marvell BG2-Q DMP device
+ tree
+In-Reply-To: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1395068788-19786-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 16, 2014 at 6:52 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
->> On Fri, Mar 14, 2014 at 10:01 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Mar 14, 2014 at 02:48:35PM +0000, Russell King - ARM Linux wrote:
->> >> While looking at the now rather horrid L2C-2x0 code, there's some really
->> >> serious questions that have to be asked about some of these errata.
->> >>
->> >> 588369 affects PL310 up to and including R1P0, but is fixed in R2P0.
->> >>       This erratum requires a clean+invalidate request to be split into
->> >>       a separate clean request followed by an invalidate request.  This
->> >>       must be done with the debug register set to 0x03.
->> >>
->> >>       If the debug register is not set to 0x03, then it's effectively
->> >>       a separate clean operation followed by a separate invalidate
->> >>       operation.
->> >>
->> >> 727915 affects PL310 up to and including R3P0, but is fixed in R3P1.
->> >>       This erratum concerns writes which may be discarded as a result
->> >>       of a clean+invalidate request, particularly when a write hits
->> >>       the cache line being requested between the clean stage and the
->> >>       invalidate stage.
->> >>
->> >> Now, let's say that we have a PL310 R3P3 cache.  Linux is configured with
->> >> both workarounds enabled.  This has the effect that we never use the
->> >> clean+invalidate request.
->> >>
->> >> However, Rob's patch in 74ddcdb868a8 (ARM: 7608/1: l2x0: Only set
->> >> .set_debug on PL310 r3p0 and earlier) has the effect that we no longer
->> >> to the debug dance on such a cache.
->> >>
->> >> This means we're still splitting the clean+invalidate sequence into two
->> >> separate operations, so there's room for a write to hit the cache line
->> >> between the two operations and, therefore, be lost.
->> >>
->> >> So, do we actually care about 727915, because through applying Rob's
->> >> change, we've effectively re-exposed the problem which this erratum
->> >> refers to on all L2 cache controllers where this is actually fixed,
->> >> and it's been like this for 14 months without any reported issue.
->> >
->> > Another point here is... we don't even need 727915 at all: 727915 is
->> > about the clean+invalidate by WAY request, not clean+invalidate by PA.
->> > So really we should rip out references to this erratum because it's
->> > not applicable.
->>
->> Is there really no possibility of a write occurring during a
->> clean+invalidate by WAY? There is the case where large clean+inv by PA
->> uses a clean+inv by WAY. I'd guess this path is fairly rare. We would
->> never hit it on highbank because we'd never see a 4MB range and DMA is
->> normally coherent. But do the cpu suspend or kexec paths have an
->> issue?
->
-> To answer this point more fully: clean+invalidate by way is used in
-> two circumstances:
->
-> 1. when disabling the cache.  Here, we must be single threaded, with
->    interrupts disabled, and any other masters for the other cache
->    under control so they don't spit out spurious writes while we're
->    disabling it.
->
->    The suspend paths are careful enough: other CPUs have been hot-
->    unplugged, devices suspended, and interrupts are disabled at this
->    point, so that's safe.
->
->    kexec is slightly different - interrupts will be disabled, we will
->    only call outer_cache_disable() if we are the only CPU running at
->    soft_restart() time.  However, devices may or may not be suspended
->    (which would be an issue for the L2 cache if they're on the coherent
->    bus.)  So I think this is as safe as it can be.
->
->    The MCPM stuff is another issue: what the conditions are there I've
->    no idea, but it looks like other CPUs will be running when it calls
->    outer_cache_flush().  MCPM commentry claims that this will be
->    "harmless" and I just had to laugh at that - even with this workaround
->    enabled, it doesn't fix the problem on L2C-310 R2P0 as the workaround
->    implementation only works on R3P0!
+Adds initial support for the Marvell BG2-Q DMP. The board has 2GB of
+memory, an uart activated and what's initially supported by the Marvell
+Armada 1500 pro dtsi.
 
-For MCPM, is there even a platform that has a PL310 used as an L3? I
-suppose architecturally it is possible, but in reality it is probably
-not something that's ever been tested.
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile                 |  3 ++-
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/berlin2q-marvell-dmp.dts
 
-> 2. on large (>= cache size) coherent DMA allocations via outer_flush_range()
->
-> Consider using CMA for framebuffers, and allocating a 1080p framebuffer.
-> That's going to be around 8MB in size, and that's going to need the L2
-> purged of any cache lines associated with it.  As the L2 cache is
-> normally around 512kB or maybe 1MB, walking every 32-byte cache line is
-> extremely wasteful (that's 259200 clean+invalidate by PA operations, of
-> which a maximum of 32768 could possibly hit a cache line), so we do want
-> to preserve the ability to use this operation.
-
-Aren't CMA buffers mapped coherently so the flush is not needed?
-
-> However, one of the issues with background operations is that while the
-> background operation is in progress, you can't allow another operation
-> (atomic or background) to be issued - and that includes the sync operation.
-> L2C-310 issues a slave error in response to this, which will be reported
-> as an imprecise data abort.
->
-> This means that if we do want to avoid this waste, we need some kind of
-> locking: using a spinlock here is too heavy, I'm thinking about using
-> a read-write spinlock.  However, that brings with it all the lockdep
-> baggage with it which we already know we need to avoid, and there's no
-> raw_ variants of it.
->
-> The best idea I can come up with is to directly use the arch_ rw spinlock
-> variants - the read lock taken for the atomic operations so that many
-> of them can interleve, and the write lock taken for background operations
-> as only one can be active at any one time.
->
-> Thoughts?
-
-This would help with contention in readl/writel, but you still have
-most all the overhead of a spinlock. I'm not sure which is the bigger
-component: lock contention or all the loads, stores and dsb/dmbs
-associated with the lock.
-
-Isn't using by way ops potentially broken if you are running a secure
-OS? If linux is doing a by way operation and the secure OS does range
-operations, someone is going to crash on an abort. I suppose no one
-sees this due to the limited function of secure OSs.
-
-Rob
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 032030361bef..4a1c0cf01b93 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -52,7 +52,8 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2-sony-nsz-gs7.dtb	\
+-	berlin2cd-google-chromecast.dtb
++	berlin2cd-google-chromecast.dtb	\
++	berlin2q-marvell-dmp.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+new file mode 100644
+index 000000000000..2da9c41e29d8
+--- /dev/null
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "berlin2q.dtsi"
++
++/ {
++	model = "Marvell BG2-Q DMP";
++	compatible = "marvell,berlin2q-dmp", "marvell,berlin2q", "marvell,berlin";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>;
++	};
++
++	choosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+-- 
+1.8.3.2
