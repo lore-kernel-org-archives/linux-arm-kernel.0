@@ -1,82 +1,68 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Mar 2014 14:23:18 +0100
-Subject: [PATCH] ata: ahci_sunxi: fix code formatting
-In-Reply-To: <10509185.3UEOEZKTc5@amdc1032>
-References: <10509185.3UEOEZKTc5@amdc1032>
-Message-ID: <5326F746.1080507@redhat.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 17 Mar 2014 15:28:51 +0200
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <5326F71C.1060602@compulab.co.il>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <532037E0.1080309@ti.com> <53258DDA.50005@compulab.co.il>
+ <532692A7.7000509@ti.com> <5326F71C.1060602@compulab.co.il>
+Message-ID: <5326F893.3080607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/17/2014 02:08 PM, Bartlomiej Zolnierkiewicz wrote:
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
-Thanks for doing these clean-ups.
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-> ---
->  drivers/ata/ahci_sunxi.c |   44 ++++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 22 deletions(-)
+On 17/03/14 15:22, Dmitry Lifshitz wrote:
+> Hi Tomi,
 > 
-> Index: b/drivers/ata/ahci_sunxi.c
-> ===================================================================
-> --- a/drivers/ata/ahci_sunxi.c	2014-03-17 13:59:06.220474478 +0100
-> +++ b/drivers/ata/ahci_sunxi.c	2014-03-17 14:00:48.720472730 +0100
-> @@ -27,28 +27,28 @@
->  #include <linux/regulator/consumer.h>
->  #include "ahci.h"
->  
-> -#define AHCI_BISTAFR 0x00a0
-> -#define AHCI_BISTCR 0x00a4
-> -#define AHCI_BISTFCTR 0x00a8
-> -#define AHCI_BISTSR 0x00ac
-> -#define AHCI_BISTDECR 0x00b0
-> -#define AHCI_DIAGNR0 0x00b4
-> -#define AHCI_DIAGNR1 0x00b8
-> -#define AHCI_OOBR 0x00bc
-> -#define AHCI_PHYCS0R 0x00c0
-> -#define AHCI_PHYCS1R 0x00c4
-> -#define AHCI_PHYCS2R 0x00c8
-> -#define AHCI_TIMER1MS 0x00e0
-> -#define AHCI_GPARAM1R 0x00e8
-> -#define AHCI_GPARAM2R 0x00ec
-> -#define AHCI_PPARAMR 0x00f0
-> -#define AHCI_TESTR 0x00f4
-> -#define AHCI_VERSIONR 0x00f8
-> -#define AHCI_IDR 0x00fc
-> -#define AHCI_RWCR 0x00fc
-> -#define AHCI_P0DMACR 0x0170
-> -#define AHCI_P0PHYCR 0x0178
-> -#define AHCI_P0PHYSR 0x017c
-> +#define AHCI_BISTAFR	0x00a0
-> +#define AHCI_BISTCR	0x00a4
-> +#define AHCI_BISTFCTR	0x00a8
-> +#define AHCI_BISTSR	0x00ac
-> +#define AHCI_BISTDECR	0x00b0
-> +#define AHCI_DIAGNR0	0x00b4
-> +#define AHCI_DIAGNR1	0x00b8
-> +#define AHCI_OOBR	0x00bc
-> +#define AHCI_PHYCS0R	0x00c0
-> +#define AHCI_PHYCS1R	0x00c4
-> +#define AHCI_PHYCS2R	0x00c8
-> +#define AHCI_TIMER1MS	0x00e0
-> +#define AHCI_GPARAM1R	0x00e8
-> +#define AHCI_GPARAM2R	0x00ec
-> +#define AHCI_PPARAMR	0x00f0
-> +#define AHCI_TESTR	0x00f4
-> +#define AHCI_VERSIONR	0x00f8
-> +#define AHCI_IDR	0x00fc
-> +#define AHCI_RWCR	0x00fc
-> +#define AHCI_P0DMACR	0x0170
-> +#define AHCI_P0PHYCR	0x0178
-> +#define AHCI_P0PHYSR	0x017c
->  
->  static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
->  {
+> Thank you for the feedback.
 > 
+> We have OMAP5 based board with no ESD & Level Translator chip.
+> So, I made a quick hack in tpd12s015 driver to skip using un-relevant
+> GPIOs.
+
+If you don't have tpd12s015 on your board, don't modify it. Remove it
+from your board's dts file totally.
+
+> I've copied DSS DT structure from uEmv board *.dts.
+> However the HDMI output is not activate yet.
+> 
+> Here is some debug output:
+> 
+> root at cm-debian:~# dmesg | grep -i dss
+> [    0.040554] omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+> [    0.043135] omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
+> [    0.045725] omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
+> [    0.048311] omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+> [    0.050888] omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+> [    0.325392] DSS: set fck to 192000000
+> [    0.325400] DSS: dss_runtime_get
+> [    0.325427] DSS: dss_restore_context
+> [    0.325445] OMAP DSS rev 6.1
+> [    0.325450] DSS: dss_runtime_put
+> [    0.325456] DSS: dss_save_context
+> [    0.325461] DSS: context saved
+> [    0.325707] DSS: dss_restore_context
+> [    0.325711] DSS: context restored
+> [    0.325746] omapdss_dispc 58001000.dispc: OMAP DISPC rev 5.1
+> [    0.325838] DSS: dss_save_context
+> [    0.325843] DSS: context saved
+> 
+> 
+> I do not use uEvm BSP u-Boot. I'm forking from this source:
+> git://git.denx.de/u-boot-ti.git
+> 
+> Perhaps I'm missing some clocks initialization?
+> What are the correct bootargs for activating HDMI video output?
+
+HDMI is the only output on the uevm, and if your board is similar, no
+boot args are needed. But, of course, you need omapfb or omapdrm to
+manage the display.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140317/dcbd20db/attachment.sig>
