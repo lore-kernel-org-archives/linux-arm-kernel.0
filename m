@@ -1,53 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Mar 2014 07:20:26 +0100
-Subject: [PATCH v7][ 3/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <1394788369-5096-3-git-send-email-denis@eukrea.com>
-References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
- <1394788369-5096-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140317062026.GZ17250@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 16 Mar 2014 23:29:07 -0700
+Subject: [GIT PULL] Renesas intc Updates for v3.15
+In-Reply-To: <cover.1392962498.git.horms+renesas@verge.net.au>
+References: <cover.1392962498.git.horms+renesas@verge.net.au>
+Message-ID: <20140317062907.GA21917@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added Mark to Cc]
+On Fri, Feb 21, 2014 at 03:11:58PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider this Renesas ARM based SoC intc updates for v3.15.
+> 
+> Previously merging code for this driver was handled Paul Mundt
+> as part of his maintenance of SUPERH. However, SUPERH is in
+> the process of being orphaned. And as this driver is also listed
+> as being maintained by Magnus and myself as part of ARM/SHMOBILE ARM
+> I have picked up this patch.
+> 
+> If you would prefer not to handle this that is quite fine by me but in that
+> case I would appreciate advice on where I should send pull-requests.
 
-On Fri, Mar 14, 2014 at 10:12:47AM +0100, Denis Carikli wrote:
->  
-> +		of_property_read_string(display_np, "regulator-name",
-> +					&regulator_name);
-> +
+Do you anticipate any new development besides some minor one-off fixes and
+touching code that's related to shmobile/sh reworks?
 
-[...]
+If it's a low-volume thing that is likely to mostly have overlap with
+arm-soc/shmobile stuff then we might just as well take most of it. Otherwise,
+I think most architecture maintainers send things directly to Linus.
 
-> +	/* In dt mode,
-> +	 * using devm_regulator_get would require that the proprety referencing
-> +	 * the regulator phandle has to be inside the mx3fb node.
-> +	 */
-> +	if (np) {
-> +		if (regulator_name)
-> +			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
-> +
-> +		if (IS_ERR(mx3fbi->reg_lcd))
-> +			return PTR_ERR(mx3fbi->reg_lcd);
-> +	} else {
-> +		/* Permit that driver without a regulator in non-dt mode */
-> +		mx3fbi->reg_lcd = regulator_get(dev, "lcd");
-> +	}
+Either way, I'll merge this for now.
 
-This patch adds regulator support for the display of a i.MX3 IPU. The
-problem Denis has to solve here is that he needs to get the regulator,
-but the display devicenode doesn't have a struct device associated with
-it, so he cannot provide one to regulator_get(). One way out here could
-be a of_regulator_get(struct device_node *). Mark, would this be ok with
-you?
 
-(Of course a proper driver for the display would be nicer, but this
-would immediately bring us to some Common display framework, something
-which is being worked on quite a while now without success)
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-Olof
