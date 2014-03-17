@@ -1,83 +1,51 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:16:45 +0000
-Subject: [PATCH 38/44] ARM: l2c: OMAP: implement new write_sec method
+Date: Mon, 17 Mar 2014 00:16:50 +0000
+Subject: [PATCH 39/44] ARM: l2c: highbank: implement new write_sec method
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLET-0002eS-Ev@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the write_sec method, we no longer need to override the default
-L2C disable method, and we no longer need the L2C set_debug method.
-Both of these can be handled via the write_sec method.
+With the write_sec method, we no longer need to override the default L2C
+disable method.  This can be handled via the write_sec method instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap4-common.c | 38 ++++++++++++++++++++++----------------
- 1 file changed, 22 insertions(+), 16 deletions(-)
+ arch/arm/mach-highbank/highbank.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 6cd3f3772ecf..07b4efd23078 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -166,17 +166,29 @@ void __iomem *omap4_get_l2cache_base(void)
- 	return l2cache_base;
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index c7de89b263dd..d6b803594358 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -51,11 +51,13 @@ static void __init highbank_scu_map_io(void)
  }
  
--static void omap4_l2x0_disable(void)
-+static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
+ 
+-static void highbank_l2x0_disable(void)
++static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
  {
 -	outer_flush_all();
 -	/* Disable PL310 L2 Cache controller */
--	omap_smc1(0x102, 0x0);
--}
-+	unsigned smc_op;
- 
--static void omap4_l2x0_set_debug(unsigned long val)
--{
--	/* Program PL310 L2 Cache controller debug register */
--	omap_smc1(0x100, val);
-+	switch (reg) {
-+	case L2X0_CTRL:
-+		smc_op = 0x102;
-+		break;
-+
-+	case L2X0_AUX_CTRL:
-+		smc_op = 0x109;
-+		break;
-+
-+	case L2X0_DEBUG_CTRL:
-+		smc_op = 0x100:
-+		break;
-+
-+	default:
-+		WARN_ONCE(1, "OMAP L2C310: ignoring write to reg 0x%x\n", reg);
-+		return;
-+	}
-+
-+	omap_smc1(smc_op, val);
+-	highbank_smc1(0x102, 0x0);
++	if (reg == L2X0_CTRL)
++		highbank_smc1(0x102, val);
++	else
++		WARN_ONCE(1, "Highbank L2C310: ignoring write to reg 0x%x\n",
++			  reg);
  }
  
- static int __init omap_l2_cache_init(void)
-@@ -220,18 +232,12 @@ static int __init omap_l2_cache_init(void)
- 	/* Enable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x1);
- 
-+	outer_cache.write_sec = omap4_l2c310_write_sec;
- 	if (of_have_populated_dt())
- 		l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
- 	else
- 		l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
- 
--	/*
--	 * Override default outer_cache.disable with a OMAP4
--	 * specific one
--	*/
--	outer_cache.disable = omap4_l2x0_disable;
--	outer_cache.set_debug = omap4_l2x0_set_debug;
--
- 	return 0;
+ static void __init highbank_init_irq(void)
+@@ -69,8 +71,8 @@ static void __init highbank_init_irq(void)
+ 	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
+ 		highbank_smc1(0x102, 0x1);
++		outer_cache.write_sec = highbank_l2x0_write_sec;
+ 		l2x0_of_init(0, ~0UL);
+-		outer_cache.disable = highbank_l2x0_disable;
+ 	}
  }
- omap_early_initcall(omap_l2_cache_init);
+ 
 -- 
 1.8.3.1
