@@ -1,41 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Mar 2014 15:14:06 +0100
-Subject: [GIT PULL 1/2] omap device tree changes for v3.15, part 3
-In-Reply-To: <20140313200135.GA5981@atomide.com>
-References: <20140313200135.GA5981@atomide.com>
-Message-ID: <201403171514.07194.arnd@arndb.de>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 17 Mar 2014 15:13:25 +0100
+Subject: [linux-sunxi] Re: [PATCH v6 2/3] ARM: sun7i/sun6i: dts: Add NMI
+ irqchip support
+In-Reply-To: <20140317133057.GK27873@lukather>
+References: <1394890861-18347-1-git-send-email-carlo@caione.org>
+ <1394890861-18347-3-git-send-email-carlo@caione.org>
+ <20140317133057.GK27873@lukather>
+Message-ID: <CAOQ7t2b5w7P_pNPJPkfSfx-N8adSqe_bv1xPRLh0pEUg1P=68w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 March 2014, Tony Lindgren wrote:
-> Hi,
-> 
-> Resending these two, looks like my updated scripts have some issues hitting
-> the mailing lists..
-> 
-> The following changes since commit 18c49af3ee9e32a535413a949672bea726699f04:
-> 
->   ARM: dts: am335x-evmsk: enable dual_emac mode (2014-03-05 11:53:36 -0800)
-> 
-> are available in the git repository at:
->   
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-part3
-> 
-> for you to fetch changes up to e1902bbe44844597a38c8cbae30ca895f6e126ee:
-> 
->   ARM: dts: Add MMC2/SDIO/WLAN support for cm-t3530 (2014-03-12 10:40:37 -0700)
-> 
-> ----------------------------------------------------------------
-> Device tree related changes to the omap iommu driver as that
-> is finally getting updated. Also few trivial board related
-> .dts updates to add more devices.
+On Mon, Mar 17, 2014 at 2:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Mar 15, 2014 at 02:41:00PM +0100, Carlo Caione wrote:
+>> This patch adds DTS entries for NMI controller as child of GIC.
+>>
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi | 9 +++++++++
+>>  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
+>>  2 files changed, 18 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index 5256ad9..4a5050c 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -190,6 +190,15 @@
+>>               #size-cells = <1>;
+>>               ranges;
+>>
+>> +             nmi_intc: sc-nmi-intc at 01f00c0c {
+>
+> It should be interrupt-controller at 01f00c0c, according to the ePAPR.
 
-Pulled into next/dt, thanks!
+Ok
 
-I haven't really been following the iommu discussions, so I have to trust
-you are doing the right thing here. What is the status on iommu
-support through DT? Do we have or require a generic binding for iommus?
-Are you following that, or will you have to do incompatible changes to
-do that?
+>> +                     compatible = "allwinner,sun6i-a31-sc-nmi";
+>
+> I'm curious, what is the "sc" for?
 
-	Arnd
+It stands for System Control (in the datasheet the NMI controller is
+included in a block named System Controller)
+
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     reg = <0x01f00c0c 0x38>;
+>> +                     interrupt-parent = <&gic>;
+>
+> This is actually the default.
+
+I'll delete it.
+
+>> +                     interrupts = <0 0 4>;
+>> +             };
+>> +
+>
+> Thanks!
+> Maxime
+
+Thank you,
+
+-- 
+Carlo Caione
