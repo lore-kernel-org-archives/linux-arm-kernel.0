@@ -1,70 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Mar 2014 14:17:44 -0700
-Subject: [PATCH v5 0/9] Use regmap+devm+DT in pm8xxx input drivers
-In-Reply-To: <531F4CC8.5010202@codeaurora.org>
-References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
- <531F4CC8.5010202@codeaurora.org>
-Message-ID: <53276678.6060000@codeaurora.org>
+From: vincent.weaver@maine.edu (Vince Weaver)
+Date: Mon, 17 Mar 2014 17:16:43 -0400 (EDT)
+Subject: CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS and bcm2835_defconfig
+In-Reply-To: <alpine.DEB.2.10.1403121512370.2805@vincent-weaver-1.um.maine.edu>
+References: <alpine.DEB.2.10.1403101717050.31525@vincent-weaver-1.um.maine.edu>
+ <531FE40C.1060709@wwwdotorg.org>
+ <20140312113346.GA9347@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.10.1403120740100.2268@vincent-weaver-1.um.maine.edu>
+ <alpine.DEB.2.10.1403121512370.2805@vincent-weaver-1.um.maine.edu>
+Message-ID: <alpine.DEB.2.10.1403171713500.12761@vincent-weaver-1.um.maine.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping?
+On Wed, 12 Mar 2014, Vince Weaver wrote:
 
-On 03/11/14 10:50, Stephen Boyd wrote:
-> ping?
->
-> On 03/04/14 10:34, Stephen Boyd wrote:
->> These patches move the pm8xxx input drivers over to use devm_* APIs
->> and regmap. This breaks the dependency of these drivers on the pm8xxx
->> specific read/write calls and also simplifies the probe code a bit.
->> Finally we add devicetree support to these drivers so they can be probed
->> on the platforms that are supported upstream.
->>
->> Changes since v4:
->>  * Added reg property to bindings
->>  * Added linux,* properties to keypad binding
->>
->> Changes since v3:
->>  * Dropped devm conversion patch for pwrkey
->>  * Fixed compilation of keypad
->>
->> Changes since v2:
->>  * Rebased to v3.14-rc3
->>
->> Changes since v1:
->>  * Picked up Dmitry's version of devm for pwrkey
->>  * Added DT bindings and parsing patches
->>  * Dropped patches picked up by Dmitry
->>
->> Stephen Boyd (9):
->>   Input: pmic8xxx-keypad - Fix build by removing gpio configuration
->>   Input: pmic8xxx-keypad - Migrate to devm_* APIs
->>   Input: pmic8xxx-keypad - Migrate to regmap APIs
->>   Input: pmic8xxx-keypad - Migrate to DT
->>   Input: pmic8xxx-pwrkey - Migrate to DT
->>   Input: pm8xxx-vibrator - Add DT match table
->>   devicetree: bindings: Document PM8921/8058 keypads
->>   devicetree: bindings: Document PM8921/8058 power keys
->>   devicetree: bindings: Document PM8921/8058 vibrators
->>
->>  .../bindings/input/qcom,pm8xxx-keypad.txt          |  89 ++++++
->>  .../bindings/input/qcom,pm8xxx-pwrkey.txt          |  46 +++
->>  .../devicetree/bindings/input/qcom,pm8xxx-vib.txt  |  22 ++
->>  drivers/input/keyboard/pmic8xxx-keypad.c           | 348 ++++++++-------------
->>  drivers/input/misc/pm8xxx-vibrator.c               |   8 +
->>  drivers/input/misc/pmic8xxx-pwrkey.c               |  33 +-
->>  include/linux/input/pmic8xxx-keypad.h              |  52 ---
->>  include/linux/input/pmic8xxx-pwrkey.h              |  31 --
->>  8 files changed, 316 insertions(+), 313 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-keypad.txt
->>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-pwrkey.txt
->>  create mode 100644 Documentation/devicetree/bindings/input/qcom,pm8xxx-vib.txt
->>  delete mode 100644 include/linux/input/pmic8xxx-keypad.h
->>  delete mode 100644 include/linux/input/pmic8xxx-pwrkey.h
->>
->
+> On Wed, 12 Mar 2014, Vince Weaver wrote:
+> 
+> > On Wed, 12 Mar 2014, Will Deacon wrote:
+> > > 
+> > > I just took the tree you mentioned above, merged together 3.14-rc6,
+> > > for-3.15/soc and for-3.15/dt. Using the defconfig (+ appended dtb options)
+> > > and cross-compiling with a dated linaro toolchain, it booted fine on my rpi:
+> > > 
+> > >   Uncompressing Linux... done, booting the kernel.
+> > >   [    0.000000] Booting Linux on physical CPU 0x0
+> > >   [    0.000000] Initializing cgroup subsys cpuset
+> > >   [    0.000000] Initializing cgroup subsys cpu
+> > >   [    0.000000] Initializing cgroup subsys cpuacct
+> > >   [    0.000000] Linux version 3.14.0-rc6+ (will at tiny-lites) (gcc version 4.8.2 20130603 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.06 - Linaro GCC 2013.06) ) #8 Wed Mar 12 10:51:44 GMT 2014
+> > >   [    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387d
+> > >   [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+> > >   [    0.000000] Machine model: Raspberry Pi Model B
+> > >   [    0.000000] bootconsole [earlycon0] enabled
+> > >   [    0.000000] Memory policy: Data cache writeback
+> > >   [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 97536
+> > >   [...]
+> > > 
+> > > Which compiler are you using?
+> > 
+> > it's the gcc 4.6.3 that comes with the version of raspian on the rasp-pi 
+> > (I'm compiling natively).  Let me try again and double check there weren't 
+> > any other changes.
+> 
+> I re-built from scratch using the bcm2835_defconfig and again it hangs at 
+> boot, actually it looks like it hangs just after
+> 
+> 	Uncompressing Linux...
+> 
+> on the serial console.
+> 
+> The only difference in .config between a working config and the hanging 
+> one are
+> 	CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> 	CONFIG_ARCH_USE_BUILTIN_BSWAP
+> 
+> Unfortunately my machine is remote and I won't be able to get in and 
+> reboot it and do more testing until probably Friday.
 
+I re-ran the tests and it looks like there is no bug.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+My rap-pi apparently just seems to lock up on boot sometimes and 
+originally it seemed to do ao consistently with the 
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y
+kernel, but after hard power cycling it a few times I manage to get both
+ALIGNED and UNALIGNED kernels to boot.
+
+Sorry for the mistaken report,
+
+Vince
