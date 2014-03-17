@@ -1,44 +1,69 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Mar 2014 17:47:06 -0300
-Subject: [PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
-In-Reply-To: <532748C2.9030009@gmail.com>
-References: <1394907484-26002-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <532748C2.9030009@gmail.com>
-Message-ID: <20140317204706.GB1118@arch.cereza>
+Date: Mon, 17 Mar 2014 17:44:10 -0300
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140316070917.GA3094@arch.cereza>
+ <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
+Message-ID: <20140317204410.GA1118@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 17, Sebastian Hesselbarth wrote:
-> On 03/15/2014 07:17 PM, Ezequiel Garcia wrote:
-> >Fourth round of the patchset adding support for watchdog on Armada 375 and
-> >Armada 38x SoCs.
-> >
-> >The new Armada 375/385 SoCs have two registers for the watchdog RSTOUT:
-> >
-> >  1. It has a dedicated register (similar to the one in A370/XP)
-> >  2. Also has a bit in a shared RSTOUT register.
-> >
-> >Therefore, in order to support this two-folded RSTOUT, we extend the 'reg'
-> >property in the watchdog devicetree and require a new pair of cells to specify
-> >the shared RSTOUT.
-> >
-> >On the driver side, we need to implement per-SoC stop() and enabled()
-> >functions. Such somewhat complex infrastructure is needed to ensure the driver
-> >performs proper reset of the watchdog timer, by masking and disabling the
-> >RSTOUT before the interrupt is enabled.
-> >
-> >I've pushed a branch so people can test this easily, e.g. ensuring
-> >no regressions on Dove, Kirkwood and A370/XP:
-> 
-> Ezequiel,
-> 
-> Although, I just saw below that you actually already tested on Dove,
-> you can add my
-> 
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+On Mar 17, Sebastian Capella wrote:
+> On 16 March 2014 00:09, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > On Mar 05, Sebastian Capella wrote:
+> > [..]
+> >> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> >> index 1f8fed9..83707702 100644
+> >> --- a/arch/arm/mm/Kconfig
+> >> +++ b/arch/arm/mm/Kconfig
+> >> @@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
+> >>  config IO_36
+> >>       bool
+> >>
+> >> +config ARCH_HIBERNATION_POSSIBLE
+> ...
+> >> +     default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
+> ...
+> > Is there any reason why CPU_FEROCEON is not listed here? FWIW, I've just built
+> > (but not really tested) a Kirkwood kernel with CONFIG_HIBERNATION=y.
+> No reason; I did not change this from the original patch I'd received.
+>  I didn't try to get a comprehensive list of supported hardware.  To
+> my understanding, the goal is to get the infrastructure in so that
+> people can start working on their platforms and add support for them.
 > 
 
-Great, thanks!
+Sure, no problem. If you consider that build-test is enough, feel free to put
+CPU_FEROCEON on that list. We added suspend/resume to feroceon not long ago.
+
+> > And is there any reason to put this config in arch/arm/mm/Kconfig, instead of
+> > in arch/arm/Kconfig, below ARCH_SUSPEND_POSSIBLE?
+> I don't have a reason.  Anyone else have a comment on this?
+> Otherwise, I'll move it.. thanks!
+>
+
+It looked reasonable to me.
+
+> > I'm also puzzled about having two separate options for suspend and hibernate,
+> > maybe someone can explain me why a given CPU would support the former but not
+> > the latter?
+> It's part of having the generic hibernation implemented and available
+> but with architecture specific dependencies.  Where an architecture
+> may not have support for hibernation, it will prevent compilation of
+> the generic hibernation support.  For example, at the moment, ARM does
+> not support hibernation.
+[..]
+
+I guess my question wasn't clear. I mean to ask: Are there any other
+requirements on an ARM platform to support hibernation, other than
+suspend/resume support?
+
+If this is the *only* requirement, it seems to me we could make our
+ARCH_SUSPEND_POSSIBLE also select ARCH_HIBERNATION_POSSIBLE.
+
+Does this make sense?
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
