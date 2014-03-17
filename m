@@ -1,70 +1,107 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Mar 2014 17:44:10 -0300
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140316070917.GA3094@arch.cereza>
- <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
-Message-ID: <20140317204410.GA1118@arch.cereza>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 17 Mar 2014 15:55:52 -0500
+Subject: [GIT PULL 1/2] omap device tree changes for v3.15, part 3
+In-Reply-To: <20140317164509.GA30471@atomide.com>
+References: <20140313200135.GA5981@atomide.com>
+ <201403171514.07194.arnd@arndb.de> <20140317164509.GA30471@atomide.com>
+Message-ID: <53276158.2020101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 17, Sebastian Capella wrote:
-> On 16 March 2014 00:09, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> > On Mar 05, Sebastian Capella wrote:
-> > [..]
-> >> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> >> index 1f8fed9..83707702 100644
-> >> --- a/arch/arm/mm/Kconfig
-> >> +++ b/arch/arm/mm/Kconfig
-> >> @@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
-> >>  config IO_36
-> >>       bool
-> >>
-> >> +config ARCH_HIBERNATION_POSSIBLE
-> ...
-> >> +     default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
-> ...
-> > Is there any reason why CPU_FEROCEON is not listed here? FWIW, I've just built
-> > (but not really tested) a Kirkwood kernel with CONFIG_HIBERNATION=y.
-> No reason; I did not change this from the original patch I'd received.
->  I didn't try to get a comprehensive list of supported hardware.  To
-> my understanding, the goal is to get the infrastructure in so that
-> people can start working on their platforms and add support for them.
-> 
+Hi Arnd, Tony,
 
-Sure, no problem. If you consider that build-test is enough, feel free to put
-CPU_FEROCEON on that list. We added suspend/resume to feroceon not long ago.
-
-> > And is there any reason to put this config in arch/arm/mm/Kconfig, instead of
-> > in arch/arm/Kconfig, below ARCH_SUSPEND_POSSIBLE?
-> I don't have a reason.  Anyone else have a comment on this?
-> Otherwise, I'll move it.. thanks!
+On 03/17/2014 11:45 AM, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [140317 07:18]:
+>> On Thursday 13 March 2014, Tony Lindgren wrote:
+>>> Hi,
+>>>
+>>> Resending these two, looks like my updated scripts have some issues hitting
+>>> the mailing lists..
+>>>
+>>> The following changes since commit 18c49af3ee9e32a535413a949672bea726699f04:
+>>>
+>>>    ARM: dts: am335x-evmsk: enable dual_emac mode (2014-03-05 11:53:36 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/dt-part3
+>>>
+>>> for you to fetch changes up to e1902bbe44844597a38c8cbae30ca895f6e126ee:
+>>>
+>>>    ARM: dts: Add MMC2/SDIO/WLAN support for cm-t3530 (2014-03-12 10:40:37 -0700)
+>>>
+>>> ----------------------------------------------------------------
+>>> Device tree related changes to the omap iommu driver as that
+>>> is finally getting updated. Also few trivial board related
+>>> .dts updates to add more devices.
+>>
+>> Pulled into next/dt, thanks!
 >
+> Thanks, looks like the merge ddf071148934047b1e87bf89e823e74f267f0b84
+> introduces a build failure though:
+>
+> @@@ -22,8 -23,7 +23,7 @@@
+>    #include "common-board-devices.h"
+>    #include "dss-common.h"
+>    #include "control.h"
+> - #include "omap-secure.h"
+>   -#include "omap_device.h"
+>   +#include "soc.h"
+>
+>    struct pdata_init {
+>          const char *compatible;
+>
+> Those need to be added back to keep things building.
+>
+>> I haven't really been following the iommu discussions, so I have to trust
+>> you are doing the right thing here. What is the status on iommu
+>> support through DT? Do we have or require a generic binding for iommus?
+>
+> There are certainly various things that could be improved in the
+> drivers/iommu, just doing grep EXPORT_SYMBOL drivers/iommu shows quite
+> a few things that should probably be implemented in a generic way.
 
-It looked reasonable to me.
+Yes, Laurent is working towards removing omap-iovmm.c completely and 
+started a discussion/cleanup series towards thats[1]. I expect some of 
+the other export symbols for OMAP to also vanish slowly once iovmm is 
+removed.
 
-> > I'm also puzzled about having two separate options for suspend and hibernate,
-> > maybe someone can explain me why a given CPU would support the former but not
-> > the latter?
-> It's part of having the generic hibernation implemented and available
-> but with architecture specific dependencies.  Where an architecture
-> may not have support for hibernation, it will prevent compilation of
-> the generic hibernation support.  For example, at the moment, ARM does
-> not support hibernation.
-[..]
+>
+> Currently the bindings don't do much, but could probably be simplified
+> further. Things like ti,#tlb-entries and ti,iommu-bus-err-back may not
+> even be needed and could be set by the driver match .data based on the
+> compatible flag alone.
 
-I guess my question wasn't clear. I mean to ask: Are there any other
-requirements on an ARM platform to support hibernation, other than
-suspend/resume support?
+Yeah, I was in fact looking for feedback on exactly these properties 
+[2]. I haven't removed this as the only feedback I got was positive for 
+the changes [3].
 
-If this is the *only* requirement, it seems to me we could make our
-ARCH_SUSPEND_POSSIBLE also select ARCH_HIBERNATION_POSSIBLE.
+>
+> This set contains the independent SoC related changes related to get
+> things moving for the drivers/iommu changes as discussed here:
+>
+> http://www.spinics.net/lists/arm-kernel/msg312144.html
+>
+> Some things like reset are still being done using platform_data with
+> a promise of future patches:
+>
+> http://www.spinics.net/lists/linux-omap/msg104328.html
+>
+>> Are you following that, or will you have to do incompatible changes to
+>> do that?
+>
+> I'm not following too closely on the drivers/iommu parts, mostly
+> following just the moving away from platform data part at this point.
+> Suman can probably describe what needs to be done more accurately.
 
-Does this make sense?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+I am not expecting any changes to bindings as this series is mainly 
+adding the OMAP iommu DT nodes and having the OMAP IOMMU driver 
+functional with the DT-based IOMMU devices. We are yet to add any DTS 
+client devices use IOMMU.
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-omap&m=139423949120188&w=2
+[2] http://marc.info/?l=linux-omap&m=139231544416973&w=2
+[3] http://marc.info/?l=linux-omap&m=139338074931831&w=2
