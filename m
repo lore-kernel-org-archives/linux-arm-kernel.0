@@ -1,49 +1,60 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Mar 2014 10:23:30 -0400
-Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
-In-Reply-To: <201403171111.30596.arnd@arndb.de>
-References: <20140301052536.GS1872@titan.lakedaemon.net>
- <20140304025559.GY1872@titan.lakedaemon.net>
- <201403171111.30596.arnd@arndb.de>
-Message-ID: <20140317142330.GG15608@titan.lakedaemon.net>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 17 Mar 2014 16:23:34 +0200
+Subject: [PATCHv4 0/7] omap hwspinlock dt support
+In-Reply-To: <53239789.40600@ti.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <52F9282B.5000702@ti.com> <530B8C00.8020001@ti.com>
+ <CAK=WgbZp_RQPCeZJyMRkNTQxaJsnGZ3DnjhSkYYR_-PAE_Kp4g@mail.gmail.com>
+ <53239789.40600@ti.com>
+Message-ID: <CAK=WgbZCzA7JovSxnysHCQRZZWc3Z2j3AS8ekpM9fOZ160rmCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 11:11:30AM +0100, Arnd Bergmann wrote:
-> On Tuesday 04 March 2014, Jason Cooper wrote:
-> > V2: removed the dove PMU interrupt node (er, undid the re-addition of
-> > the node.  ie: let the revert stand).  So, commit id's for this pull
-> > only are changed.  No previous pulls or tags affected.  Confirmed the
-> > change with a diff between the old branch and the new branch.  And did a
-> > run of building dtbs.  No problems.  Sorry for the confusion.
-> > 
-> > Russell just raised a very valid point today regarding the overall
-> > design of an eventual PMU driver that would cover several tasks we
-> > hadn't considered with the original binding.  Better to pull it now than
-> > have to support it indefinitely.  Revert of the driver in the works.
-> > 
-> > --- original text ---
-> > 
-> > Here's another rather large round of DT changes for mvebu.  It's all
-> > summed up below and has been in -next for a while now.
-> > 
-> > This is an incremental pull from tags/mvebu-dt-3.15-2 in the mvebu/dt
-> > branch up to tags/mvebu-dt-3.15-3.
-> > 
-> 
-> Pulled into next/dt now, along with the #4 and #5. I got a trivial
-> merge conflict against the dts Makefile change from mach-qcom and
-> noticed that splitting up the dtb section into per-soc breaks
-> alphabetical ordering, which I changed in the merge by moving
-> it down to the end of the list.
+Hi Suman,
 
-Ok, I was trying to reduce conflicts by leaving things in place, then
-do a fixes-non-critical patch to put things back in alphabetical order
-after the dust had settled.
+On Sat, Mar 15, 2014 at 1:58 AM, Suman Anna <s-anna@ti.com> wrote:
+> The series doesn't change the semantics of hwspinlock registration or adds a
+> new OF controller registration function. Implementations would still need to
+> register a controller using a base_id and number of locks. The series rather
+> adds a DT-friendly function _ONLY_ for requesting a specific hwlock, and
+> there are no restrictions on the args specifier being relative id numbers.
+> Though this is what the simple default xlate helper does (most common
+> usage), the added xlate ops and #hwlock-cells should allow individual
+> implementation drivers to adjust any variations, and return a relative lock
+> w.r.t its registered base_id, as this is how a lock gets registered in the
+> first place.
 
-Stephen will probably want me to drop my resolution in mvebu's for-next
-so that we don't conflict.
+I might be missing something, but why can't we have the
+specifier+base_id be the hwlock id and then we can entirely drop most
+of the core changes in this patch-set? I realize we couldn't easily
+support sparse id numbers, but not sure this is relevant to
+hwspinlocks? do we have a use case that couldn't be supported in this
+case?
 
-thx,
+> I actually started out this series with the base_id property, and dropped it
+> in v3 based on comments looking at it from the request-specific-lock
+> semantics with DT. That said, the drivers still need to manage a 'base_id'
+> needed for registration when they get probed for multiple controllers.
+> Getting the base_id from DT _may_ be useful just for registration purposes,
+> but for requesting a hwlock, a controller phandle and an implementation
+> defined args-specifier should suffice IMHO.
 
-Jason.
+How could drivers know what the base_id is if DT doesn't provide it?
+please note that we can't depend on order of controller probing; the
+hwlock id numbers cannot depend on implementation details.
+
+> The exact notion of informing the hwspinlock core about a list of reserved
+> locks is missing at the moment (even in the non-DT case). I am not sure if
+> this got lost during the conversion of the registration from per lock to
+> registering a bank of locks together, or if it is implied by the base_id +
+> num_locks combination. The core today supports requesting only those locks
+> that were actually registered, whether allocating a free one dynamically or
+> giving a specific one.
+
+Before DT came along, early board code could have reserved specific
+hwspinlocks if needed. Now with DT, we should add the list of reserved
+locks to the controller node, in order to prevent them from being
+dynamically allocated by others.
+
+Thanks,
+Ohad.
