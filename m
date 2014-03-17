@@ -1,153 +1,106 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Mar 2014 00:16:19 +0000
-Subject: [PATCH 33/44] ARM: l2c: move way size calculation data into
- l2c_init_data
+Date: Mon, 17 Mar 2014 00:17:00 +0000
+Subject: [PATCH 41/44] ARM: l2c: remove old .set_debug method
 In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WPLE3-0002e5-T2@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WPLEi-0002ee-QY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the way size calculation data (base of way size) out of the
-switch statement into the provided initialisation data.
+We no longer need or require the .set_debug method; we handle everything
+it used to do via the .write_sec method instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/outercache.h |  1 -
+ arch/arm/mm/cache-l2x0.c          | 21 ++-------------------
+ 2 files changed, 2 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 69f57a5c0dd3..2e0de485a210 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -36,7 +36,6 @@ struct outer_cache_fns {
+ 	void (*resume)(void);
+ 
+ 	/* This is an ARM L2C thing */
+-	void (*set_debug)(unsigned long);
+ 	void (*write_sec)(unsigned long, unsigned);
+ };
+ 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index f9829c7165e8..44b8fd6ae2f6 100644
+index f9fe70792bc9..ae838bb97cc2 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -30,6 +30,7 @@
- 
- struct l2c_init_data {
- 	const char *type;
-+	unsigned way_size_0;
- 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
- 	void (*enable)(void __iomem *, u32);
- 	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
-@@ -469,6 +470,7 @@ static void l2c210_resume(void)
- 
- static const struct l2c_init_data l2c210_data __initconst = {
- 	.type = "L2C-210",
-+	.way_size_0 = SZ_8K,
- 	.enable = l2c210_enable,
- 	.outer_cache = {
- 		.inv_range = l2c210_inv_range,
-@@ -612,6 +614,7 @@ static void l2c220_sync(void)
- 
- static const struct l2c_init_data l2c220_data = {
- 	.type = "L2C-220",
-+	.way_size_0 = SZ_8K,
- 	.enable = l2c210_enable,
- 	.outer_cache = {
- 		.inv_range = l2c220_inv_range,
-@@ -853,6 +856,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 
- static const struct l2c_init_data l2c310_init_fns __initconst = {
- 	.type = "L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.enable = l2c310_enable,
- 	.fixup = l2c310_fixup,
- 	.save = l2c310_save,
-@@ -872,10 +876,8 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	u32 aux_val, u32 aux_mask, u32 cache_id)
+@@ -77,10 +77,7 @@ static void l2c_write_sec(unsigned long val, void __iomem *base, unsigned reg)
+  */
+ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
  {
- 	struct outer_cache_fns fns;
-+	unsigned way_size_bits, ways;
- 	u32 aux;
--	u32 way_size = 0;
--	int ways;
--	int way_size_shift = L2X0_WAY_SIZE_SHIFT;
+-	if (outer_cache.set_debug)
+-		outer_cache.set_debug(val);
+-	else
+-		l2c_write_sec(val, base, L2X0_DEBUG_CTRL);
++	l2c_write_sec(val, base, L2X0_DEBUG_CTRL);
+ }
  
- 	/*
- 	 * It is strange to save the register state before initialisation,
-@@ -906,7 +908,6 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	case AURORA_CACHE_ID:
- 		ways = (aux >> 13) & 0xf;
- 		ways = 2 << ((ways + 1) >> 2);
--		way_size_shift = AURORA_WAY_SIZE_SHIFT;
- 		break;
- 
- 	default:
-@@ -918,12 +919,15 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	l2x0_way_mask = (1 << ways) - 1;
- 
- 	/*
--	 * L2 cache Size =  Way size * Number of ways
-+	 * way_size_0 is the size that a way_size value of zero would be
-+	 * given the calculation: way_size = way_size_0 << way_size_bits.
-+	 * So, if way_size_bits=0 is reserved, but way_size_bits=1 is 16k,
-+	 * then way_size_0 would be 8k.
-+	 *
-+	 * L2 cache size = number of ways * way size.
- 	 */
--	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
--	way_size = 1 << (way_size + way_size_shift);
+ static void __l2c_op_way(void __iomem *reg)
+@@ -156,8 +153,7 @@ static inline void l2x0_inv_line(unsigned long addr)
+ #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+ static inline void debug_writel(unsigned long val)
+ {
+-	if (outer_cache.set_debug || outer_cache.write_sec)
+-		l2c_set_debug(l2x0_base, val);
++	l2c_set_debug(l2x0_base, val);
+ }
+ #else
+ /* Optimised out for non-errata case */
+@@ -682,11 +678,6 @@ static const struct l2c_init_data l2c220_data = {
+  *	Affects: store buffer
+  *	store buffer is not automatically drained.
+  */
+-static void l2c310_set_debug(unsigned long val)
+-{
+-	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
+-}
 -
--	l2x0_size = ways * way_size * SZ_1K;
-+	way_size_bits = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
-+	l2x0_size = ways * (data->way_size_0 << way_size_bits);
+ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -830,10 +821,6 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	const char *errata[4];
+ 	unsigned n = 0;
  
- 	fns = data->outer_cache;
+-	/* For compatibility */
+-	if (revision <= L310_CACHE_ID_RTL_R3P0)
+-		fns->set_debug = l2c310_set_debug;
+-
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
+ 	    revision < L310_CACHE_ID_RTL_R2P0 &&
+ 	    /* For compatibility */
+@@ -882,7 +869,6 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 		.flush_all = l2c210_flush_all,
+ 		.disable = l2c210_disable,
+ 		.sync = l2c210_sync,
+-		.set_debug = l2c310_set_debug,
+ 		.resume = l2c310_resume,
+ 	},
+ };
+@@ -948,8 +934,6 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	fns.write_sec = outer_cache.write_sec;
  	if (data->fixup)
-@@ -1020,6 +1024,7 @@ static void __init l2x0_of_parse(const struct device_node *np,
+ 		data->fixup(l2x0_base, cache_id, &fns);
+-	if (fns.write_sec)
+-		fns.set_debug = NULL;
  
- static const struct l2c_init_data of_l2c210_data __initconst = {
- 	.type = "L2C-210",
-+	.way_size_0 = SZ_8K,
- 	.of_parse = l2x0_of_parse,
- 	.enable = l2c210_enable,
- 	.outer_cache = {
-@@ -1035,6 +1040,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
- 
- static const struct l2c_init_data of_l2c220_data __initconst = {
- 	.type = "L2C-220",
-+	.way_size_0 = SZ_8K,
- 	.of_parse = l2x0_of_parse,
- 	.enable = l2c210_enable,
- 	.outer_cache = {
-@@ -1084,6 +1090,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 
- static const struct l2c_init_data of_l2c310_data __initconst = {
- 	.type = "L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.of_parse = l2c310_of_parse,
- 	.enable = l2c310_enable,
- 	.fixup = l2c310_fixup,
-@@ -1266,6 +1273,7 @@ static void __init aurora_of_parse(const struct device_node *np,
- 
- static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 	.type = "Aurora",
-+	.way_size_0 = SZ_4K,
- 	.of_parse = aurora_of_parse,
- 	.enable = aurora_enable,
- 	.fixup = aurora_fixup,
-@@ -1283,6 +1291,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 
- static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
- 	.type = "Aurora",
-+	.way_size_0 = SZ_4K,
- 	.of_parse = aurora_of_parse,
- 	.enable = aurora_enable_no_outer,
- 	.fixup = aurora_fixup,
-@@ -1435,6 +1444,7 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
- 
- static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 	.type = "BCM-L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.of_parse = l2c310_of_parse,
- 	.enable = l2c310_enable,
- 	.fixup = l2c310_fixup,
-@@ -1474,6 +1484,7 @@ static void tauros3_resume(void)
- 
- static const struct l2c_init_data of_tauros3_data __initconst = {
- 	.type = "Tauros3",
-+	.way_size_0 = SZ_8K, /* FIXME: a guess */
- 	.enable = l2x0_enable,
- 	.save  = tauros3_save,
- 	/* Tauros3 broadcasts L1 cache operations to L2 */
+ 	/*
+ 	 * Check if l2x0 controller is already enabled.  If we are booting
+@@ -1120,7 +1104,6 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ 		.flush_all   = l2c210_flush_all,
+ 		.disable     = l2c210_disable,
+ 		.sync        = l2c210_sync,
+-		.set_debug   = l2c310_set_debug,
+ 		.resume      = l2c310_resume,
+ 	},
+ };
 -- 
 1.8.3.1
