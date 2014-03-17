@@ -1,90 +1,82 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 17 Mar 2014 16:38:24 +0100
-Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
-In-Reply-To: <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
-References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
- <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <20140317163824.3c5480b3@amdc2363>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Mar 2014 16:44:26 +0100
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <20140317161436.06169b33@ipc1.ka-ro>
+References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
+ <2166863.3Fn4k2rvaz@avalon> <20140317161436.06169b33@ipc1.ka-ro>
+Message-ID: <2777667.XJdaUSpRsD@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+Hi Lothar,
 
-> Despite this patch set is working and applicable on top of 3.14-rc5, 
-> please regard it solely as a pure RFC.
+On Monday 17 March 2014 16:14:36 Lothar Wa?mann wrote:
+> Laurent Pinchart wrote:
+> > On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
+> > > On 03/13/2014 06:17 PM, Denis Carikli wrote:
+> > > > We need a way to pass signal polarity informations
+> > > > between DRM panels, and the display drivers.
+> > > > 
+> > > > To do that, a pol_flags field was added to drm_display_mode.
+> > > > 
+> > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > ---
+> > > > ChangeLog v10->v11:
+> > > > - Since the imx-drm won't be able to retrive its regulators
+> > > > 
+> > > >   from the device tree when using display-timings nodes,
+> > > >   and that I was told that the drm simple-panel driver
+> > > >   already supported that, I then, instead, added what was
+> > > >   lacking to make the eukrea displays work with the
+> > > >   drm-simple-panel driver.
+> > > >   
+> > > >   That required a way to get back the display polarity
+> > > >   informations from the imx-drm driver without affecting
+> > > >   userspace.
+> > > > 
+> > > > ---
+> > > > 
+> > > >  include/drm/drm_crtc.h |    8 ++++++++
+> > > >  1 file changed, 8 insertions(+)
+> > > > 
+> > > > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> > > > index f764654..61a4fe1 100644
+> > > > --- a/include/drm/drm_crtc.h
+> > > > +++ b/include/drm/drm_crtc.h
+> > > > @@ -131,6 +131,13 @@ enum drm_mode_status {
+> > > > 
+> > > >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> > > > 
+> > > > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> > > > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> > > > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+> > > > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
+> > > > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
+> > > > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+> > > 
+> > > Could you add some description to these flags.
+> > > What are *_PRESERVE flags for?
+> > > Are those flags 1:1 compatible with respective 'videomode:flags'?
+> > > I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
+> > > right?
+> > 
+> > Possibly nitpicking, I wouldn't call the clock edge on which data signals
+> > are generated/sampled "data polarity". This is clock polarity
+> > information.
+> > 
+> > Have you seen cases where pixel data and DE are geenrated or need to be
+> > sampled on different edges ?
 > 
-> This patch provides support for LAB governor build on top of ondemand.
-> Previous version of LAB can be found here:
-> http://thread.gmane.org/gmane.linux.kernel/1484746/match=cpufreq
-> 
-> LAB short reminder:
-> 
-> LAB uses information about how many cores are in "idle" state (the
-> core idleness is represented as the value between 0 and 100) and the
-> overall load of the system (from 0 to 100) to decide about frequency
-> to be set. It is extremely useful with SoCs like Exynos4412, which
-> can set only one frequency for all cores.
-> 
-> Important design decisions:
-> 
-> - Reuse well established ondemand governor's internal code. To do this
->   I had to expose some previously static internal ondemand code. 
->   This allowed smaller LAB code when compared to previous version.
-> 	
-> - LAB works on top of ondemand, which means that one via device tree
->   attributes can specify if and when e.g. BOOST shall be enabled or
-> if any particular frequency shall be imposed. For situation NOT
-> important from the power consumption reduction viewpoint the ondemand
-> is used to set proper frequency.
-> 
-> - It is only possible to either compile in or not the LAB into the
-> kernel. There is no "M" option for Kconfig. It is done on purpose,
-> since ondemand itself can be also compiled as a module and then it
-> would be possible to remove ondemand when LAB is working on top of it.
-> 
-> - The LAB operation is specified (and thereof extendable) via device
-> tree lab-ctrl-freq attribute defined at /cpus/cpu0.
-> 
-> 
-> Problems:
-> - How the governor will work for big.LITTLE systems (especially
-> Global Task Scheduling).
-> - Will there be agreement to expose internal ondemand code to be
-> reused for more specialized governors.
-> 
-> Test HW:
-> 	Exynos4412 - Trats2 board.
-> Above patches were posted on top of Linux 3.14-rc5
-> (SHA1: 3f9590c281c66162bf8ae9b7b2d987f0a89043c6)
-> 
+> DE is not a clock signal, but an 'Enable' signal whose value (high or
+> low) defines the window in which the pixel data is valid.
+> The flag defines whether data is valid during the HIGH or LOW period of
+> DE.
 
-Any comments about those patches?
-
-> Lukasz Majewski (5):
->   cpufreq:LAB:ondemand Adjust ondemand to be able to reuse its methods
->   cpufreq:LAB:cpufreq_governor Adjust cpufreq_governor.[h|c] to
-> support LAB
->   cpufreq:LAB:lab Add LAB governor code
->   cpufreq:LAB:Kconfig Add LAB definitions to Kconfig
->   cpufreq:LAB:dts:trats2: Add DTS nodes for LAB governor
-> 
->  arch/arm/boot/dts/exynos4412-trats2.dts |   29 ++
->  drivers/cpufreq/Kconfig                 |   28 ++
->  drivers/cpufreq/Makefile                |    1 +
->  drivers/cpufreq/cpufreq_governor.c      |    7 +
->  drivers/cpufreq/cpufreq_governor.h      |   12 +
->  drivers/cpufreq/cpufreq_lab.c           |  457
-> +++++++++++++++++++++++++++++++
-> drivers/cpufreq/cpufreq_ondemand.c      |   24 +- 7 files changed,
-> 550 insertions(+), 8 deletions(-) create mode 100644
-> drivers/cpufreq/cpufreq_lab.c
-> 
-
-
+The DRM_MODE_FLAG_POL_DE_(LOW|HIGH) do, by my impression of the proposed new 
+DRM_MODE_FLAG_POL_DE_*EDGE flags is that they define sampling clock edges, not 
+active levels.
 
 -- 
-Best regards,
+Regards,
 
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Laurent Pinchart
