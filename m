@@ -1,177 +1,83 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 16 Mar 2014 22:22:02 +0100
-Subject: [PATCH] dtc: add ability to make nodes conditional on them being
- referenced
-Message-ID: <199290403.sj4aYrj8FC@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Mar 2014 00:13:02 +0000
+Subject: [PATCH 00/44] outer cache changes
+Message-ID: <20140317001302.GY21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko Stuebner <heiko.stuebner@bq.com>
+This patch series is where I'm currently at with the total mess which
+is L2 cache support.  That's putting it mildly.  This isn't intended
+for anyone to pick up - this is still mostly in development.
 
-On i.MX, which carries a lot of pin-groups of which most are unused on
-individual boards, they noticed that this plethora of nodes also results
-in the runtime-lookup-performance also degrading [0].
+I need help with the Aurora/Tauros3/Broadcom stuff, as that remains
+addicted to the old buggy code that we used to have (eg, if you build
+a v6+v7 kernel, all PL310 errata get disabled.  If CONFIG_CACHE_PL310
+is enabled and you actually have a L2C-220, the necessary waits will
+be omitted.  If you enable erratum 588369 and set the .set_debug
+method to NULL or have a PL310 later than R3P0, you're opening a
+race condition. etc.)
 
-A i.MX-specific solution defining the pingroups in the board files but
-using macros to reference the pingroup-data was not well received.
+One of the potentially explosive issues is the utter crap and fscked
+state of DT implementation here, much of which /can't/ now be fixed
+without breaking existing DT based booting with existing files,
+because we have a mixture of DT properties combined with platform
+specific code setting various L2C configuration parameters (sometimes
+writing directly to the registers.)
 
-This patch is trying to solve this issue in a more general way, by
-adding the ability to mark nodes as needing to be referenced somewhere
-in the tree.
+For example, I've made a start at trying to prevent any further additions
+of platform code writing to the L2C-310's power control register by
+adding a couple of properties - but we can't delete the direct register
+write in iMX6 code without breaking existing DT descriptions.
 
-To mark a node a needing to be referenced it must be prefixed with
-/delete-unreferenced/. This makes dtc check the nodes reference-status
-when creating the flattened tree, dropping it if unreferenced.
+The same goes for the mess which is the auxillary control register,
+or now the prefetch control register.  Or the erratum 752271 which
+iMX6 implements in their own SoC specific code.
 
-For example, the i.MX6SL pingroup
+Here's the *big* explosive question: how have we ended up in this mess?
+A bigger question: why was none of this caught at review time?  An even
+bigger question (which I believe is at the root of much of the pain that
+people feel with DT): why aren't device properties being thought out
+better - by that I mean, why isn't the question "are the properties you
+are proposing for device X sufficient to describe all it's configurable
+parameters, and if not, what are you omitting?" being asked when new
+device bindings are being proposed.
 
-	/delete-unreferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
-		fsl,pins = <
-			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
-			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
-			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
-		>;
-	};
+You can see the extent of the L2C crap from the diffstat below - every
+arch/arm/mach-* file touched here is a symptom of failing to adequately
+describe the properties that platforms need to specify.  It's a failing
+of DT process.  It's a failing of review of SoC code.
 
-would only be included in the dtb if it got referenced somewhere
-as pingroup via
+Anyway, here's the diffstat so far.  Not Cc'ing anyone this time around
+(the Cc list is huge), so it's all on LAKML.
 
-	node {
-		pinctrl-0 <&pinctrl_ecscpi1_1>;
-	};
+ Documentation/devicetree/bindings/arm/l2cc.txt |    2 +
+ arch/arm/Kconfig                               |   51 -
+ arch/arm/boot/dts/imx6qdl.dtsi                 |    2 +
+ arch/arm/boot/dts/imx6sl.dtsi                  |    2 +
+ arch/arm/include/asm/hardware/cache-l2x0.h     |   63 +-
+ arch/arm/include/asm/outercache.h              |   67 +-
+ arch/arm/mach-cns3xxx/core.c                   |    8 +-
+ arch/arm/mach-highbank/highbank.c              |   12 +-
+ arch/arm/mach-imx/system.c                     |    8 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c      |    2 +-
+ arch/arm/mach-omap2/omap4-common.c             |   58 +-
+ arch/arm/mach-prima2/l2x0.c                    |    5 +-
+ arch/arm/mach-prima2/pm.c                      |    1 -
+ arch/arm/mach-realview/realview_pbx.c          |    4 +-
+ arch/arm/mach-spear/platsmp.c                  |   19 +-
+ arch/arm/mach-spear/spear13xx.c                |    6 +-
+ arch/arm/mach-sti/board-dt.c                   |    8 +-
+ arch/arm/mach-tegra/sleep.h                    |    8 +-
+ arch/arm/mach-ux500/cache-l2x0.c               |   23 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c              |    4 +-
+ arch/arm/mm/Kconfig                            |   51 +
+ arch/arm/mm/Makefile                           |    1 +
+ arch/arm/mm/cache-feroceon-l2.c                |    1 -
+ arch/arm/mm/cache-l2x0.c                       | 1354 +++++++++++++++++-------
+ arch/arm/mm/l2c-common.c                       |   20 +
+ arch/arm/plat-samsung/s5p-sleep.S              |    8 +-
+ 26 files changed, 1221 insertions(+), 567 deletions(-)
 
-[0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
-
-Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
----
-A sample implementation using the in-tree dtc in the linux kernel can
-be found at [1] and the very first rfc at [2].
-
-[1] http://comments.gmane.org/gmane.linux.drivers.devicetree/62357
-[2] http://comments.gmane.org/gmane.linux.drivers.devicetree/60145
-
- checks.c     |  2 ++
- dtc-lexer.l  |  7 +++++++
- dtc-parser.y |  5 +++++
- dtc.h        |  4 ++++
- flattree.c   |  3 +++
- livetree.c   | 14 ++++++++++++++
- 6 files changed, 35 insertions(+)
-
-diff --git a/checks.c b/checks.c
-index 47eda65..a82ba8d 100644
---- a/checks.c
-+++ b/checks.c
-@@ -472,6 +472,8 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
- 
- 		phandle = get_node_phandle(dt, refnode);
- 		*((cell_t *)(prop->val.val + m->offset)) = cpu_to_fdt32(phandle);
-+
-+		reference_node(refnode);
- 	}
- }
- ERROR(phandle_references, NULL, NULL, fixup_phandle_references, NULL,
-diff --git a/dtc-lexer.l b/dtc-lexer.l
-index 0821bde..6d7865d 100644
---- a/dtc-lexer.l
-+++ b/dtc-lexer.l
-@@ -140,6 +140,13 @@ static void lexical_error(const char *fmt, ...);
- 			return DT_DEL_NODE;
- 		}
- 
-+<*>"/delete-unreferenced/"	{
-+			DPRINT("Keyword: /delete-unreferenced/\n");
-+			DPRINT("<PROPNODENAME>\n");
-+			BEGIN(PROPNODENAME);
-+			return DT_DEL_UNREFERENCED;
-+		}
-+
- <*>{LABEL}:	{
- 			DPRINT("Label: %s\n", yytext);
- 			yylval.labelref = xstrdup(yytext);
-diff --git a/dtc-parser.y b/dtc-parser.y
-index ea57e0a..a203bed 100644
---- a/dtc-parser.y
-+++ b/dtc-parser.y
-@@ -60,6 +60,7 @@ extern bool treesource_error;
- %token DT_BITS
- %token DT_DEL_PROP
- %token DT_DEL_NODE
-+%token DT_DEL_UNREFERENCED
- %token <propnodename> DT_PROPNODENAME
- %token <integer> DT_LITERAL
- %token <integer> DT_CHAR_LITERAL
-@@ -450,6 +451,10 @@ subnode:
- 		{
- 			$$ = name_node(build_node_delete(), $2);
- 		}
-+	| DT_DEL_UNREFERENCED subnode
-+		{
-+			$$ = check_node_referenced($2);
-+		}
- 	| DT_LABEL subnode
- 		{
- 			add_label(&$2->labels, $1);
-diff --git a/dtc.h b/dtc.h
-index 20de073..ff45059 100644
---- a/dtc.h
-+++ b/dtc.h
-@@ -158,6 +158,8 @@ struct node {
- 	int addr_cells, size_cells;
- 
- 	struct label *labels;
-+
-+	int needs_reference, is_referenced;
- };
- 
- #define for_each_label_withdel(l0, l) \
-@@ -192,6 +194,8 @@ struct property *reverse_properties(struct property *first);
- struct node *build_node(struct property *proplist, struct node *children);
- struct node *build_node_delete(void);
- struct node *name_node(struct node *node, char *name);
-+struct node *check_node_referenced(struct node *node);
-+struct node *reference_node(struct node *node);
- struct node *chain_node(struct node *first, struct node *list);
- struct node *merge_nodes(struct node *old_node, struct node *new_node);
- 
-diff --git a/flattree.c b/flattree.c
-index bd99fa2..105e8fa 100644
---- a/flattree.c
-+++ b/flattree.c
-@@ -266,6 +266,9 @@ static void flatten_tree(struct node *tree, struct emitter *emit,
- 	if (tree->deleted)
- 		return;
- 
-+	if (tree->needs_reference && !tree->is_referenced)
-+		return;
-+
- 	emit->beginnode(etarget, tree->labels);
- 
- 	if (vi->flags & FTF_FULLPATH)
-diff --git a/livetree.c b/livetree.c
-index b61465f..98bb33d 100644
---- a/livetree.c
-+++ b/livetree.c
-@@ -134,6 +134,20 @@ struct node *name_node(struct node *node, char *name)
- 	return node;
- }
- 
-+struct node *check_node_referenced(struct node *node)
-+{
-+	node->needs_reference = 1;
-+
-+	return node;
-+}
-+
-+struct node *reference_node(struct node *node)
-+{
-+	node->is_referenced = 1;
-+
-+	return node;
-+}
-+
- struct node *merge_nodes(struct node *old_node, struct node *new_node)
- {
- 	struct property *new_prop, *old_prop;
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
