@@ -1,39 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 17 Mar 2014 19:18:35 +0100
-Subject: [PATCH] arm64/lib: add optimized implementation of sha_transform
-In-Reply-To: <1394809353-16707-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1394809353-16707-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <201403171918.35632.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Mar 2014 19:46:54 +0100
+Subject: [PATCH] ARM: prima2: build reset code standalone
+In-Reply-To: <3158149.XI9lgY9por@wuerfel>
+References: <3158149.XI9lgY9por@wuerfel>
+Message-ID: <201403171946.54825.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 14, 2014 at 04:02:33 PM, Ard Biesheuvel wrote:
-> This implementation keeps the 64 bytes of workspace in registers rather
-> than on the stack, eliminating most of the loads and stores, and reducing
-> the instruction count by about 25%.
+On Tuesday 11 March 2014, Arnd Bergmann wrote:
+> The prima2 platform code currently depends on the rstc
+> implementation and that in turn depends on the reset
+> controller framework. This removes the platform dependency
+> by letting the driver access arm_pm_restart directly
+> to turn the driver into a standalone entity, and also
+> removes the dependency on the reset controller framework
+> by using "if (IS_ENABLED(CONFIG_RESET_CONTROLLER))". This
+> will cause all code that is used for the reset controller
+> to be dropped by the compiler if the framework is disabled.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Hello all,
 > 
-> No performance numbers I am allowed to share, unfortunately, so if anyone
-> else (with access to actual, representative hardware) would care to have a
-> go, I would be very grateful.
-> 
-> This can be done by building the tcrypt.ko module (CONFIG_CRYPTO_TEST=m),
-> and inserting the module using 'mode=303' as a parameter (note that the
-> insmod always fails, but produces its test output to the kernel log). Also
-> note that the sha_transform() function will be part of the kernel proper,
-> so just rebuilding the sha1_generic module is not sufficient.
-> 
-> Cheers,
+> The problem only shows up in our for-next branch, I'd apply the
+> patch right away if I get an Ack.
 
-Won't the function sha_transform() collide with the one in lib/sha1.c ? Or will 
-the one in lib/sha1.c be overriden somehow ?
+Applied to next/cleanup now, which introduced the problem.
 
-Otherwise:
-
-Reviewed-by: Marek Vasut <marex@denx.de>
-
-Best regards,
-Marek Vasut
+	Arnd
