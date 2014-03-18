@@ -1,43 +1,36 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 08:33:55 +0200
-Subject: [PATCH 6/9] Doc/DT: Add DT binding documentation for MIPI DSI
- CM Panel
-In-Reply-To: <4670830.fkS1noPxcd@avalon>
+Date: Tue, 18 Mar 2014 08:41:55 +0200
+Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI
+ Panel
+In-Reply-To: <3721050.m43feCICLQ@avalon>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-7-git-send-email-tomi.valkeinen@ti.com>
- <4670830.fkS1noPxcd@avalon>
-Message-ID: <5327E8D3.5010907@ti.com>
+ <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
+ <3721050.m43feCICLQ@avalon>
+Message-ID: <5327EAB3.8080405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/14 16:22, Laurent Pinchart wrote:
+On 17/03/14 16:19, Laurent Pinchart wrote:
 
->> +Example
->> +-------
+>> +Generic MIPI DPI Panel
+>> +======================
 >> +
->> +lcd0: display {
->> +	compatible = "tpo,taal", "panel-dsi-cm";
->> +	label = "lcd0";
+>> +Required properties:
+>> +- compatible: "panel-dpi"
 >> +
->> +	gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
+>> +Optional properties:
+>> +- label: a symbolic name for the panel
+>> +- gpios: panel enable gpio and backlight enable gpio
 > 
-> If the panel uses a TE GPIO but no reset GPIO, do you plan to express this 
-> with a "hole" for the reset GPIO ? e.g. something like
-> 
-> 	gpios = <0>, <&gpio4 6 GPIO_ACTIVE_HIGH>;
+> While integrated in the panel module, the backlight is a separate piece of 
+> hardware, which could be controlled through other means (I2C for instance). 
+> Wouldn't it be better to add an explicit DT node for the backlight device and 
+> reference that node from the panel node ?
 
-Yes.
+Yes, I agree, but do we have the infrastructure or bindings for that?
 
-> Wouldn't it be better to split the gpios property into "reset-gpios" and "te-
-> gpios" ?
-
-Yes, I can change it. I don't have a strong preference.
-
-I've gotten similar comments for other bindings also, so I guess the
-preferred way is to use named "-gpios" properties for everything except
-the case where you really have multiple gpios with the same purpose?
-
-The gpio binding documentation doesn't give much guidance on this.
+Ah, I see we now do have a gpio-backlight driver, but it doesn't have DT
+bindings.
 
  Tomi
 
@@ -48,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 901 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/d3f51e70/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/85ddaef8/attachment.sig>
