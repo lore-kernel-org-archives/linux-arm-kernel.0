@@ -1,55 +1,138 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Mar 2014 14:05:03 +0100
-Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
-In-Reply-To: <20140318125623.GW21483@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 18 Mar 2014 14:04:38 +0100
+Subject: [PATCH 08/12] imx-drm: Use drm_display_mode timings flags.
+In-Reply-To: <1394731053-6118-8-git-send-email-denis@eukrea.com>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
- <1434295.j7EcSL7GQo@avalon> <20140318125623.GW21483@n2100.arm.linux.org.uk>
-Message-ID: <126833534.i9WITsrxHj@avalon>
+ <1394731053-6118-8-git-send-email-denis@eukrea.com>
+Message-ID: <20140318140438.7d3fd33a@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On Tuesday 18 March 2014 12:56:23 Russell King - ARM Linux wrote:
-> On Tue, Mar 18, 2014 at 01:41:54PM +0100, Laurent Pinchart wrote:
-> > Hi Lothar,
-> > 
-> > That's not my point. I *know* that DE is a data gating signal with a
-> > polarity already defined by the DRM_MODE_FLAG_POL_DE_(LOW|HIGH) flags.
-> > Like all other signals it gets generated on a clock edge and is sampled
-> > on a clock edge. The DRM_MODE_FLAG_POL_DE_*EDGE flags proposed above
-> > describe seem to describe just that, *not* the signal polarity. I thus
-> > want to know whether there are systems where the data signals and the DE
-> > signal need to be sampled on different edges of the pixel clock.
+Denis Carikli wrote:
+> The previous hardware behaviour was kept if the
+> flags are not set.
 > 
-> That's not relevant to this patch series though.  This patch series is
-> about adding configuration which will allow iMX6 SoCs to be properly
-> configured for their displays.
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v10->v11:
+> - This patch was splitted-out and adapted from:
+>   "Prepare imx-drm for extra display-timings retrival."
+> - The display-timings dt specific part was removed.
+> - The flags names were changed to use the DRM ones from:
+>   "drm: drm_display_mode: add signal polarity flags"
+> ---
+>  drivers/staging/imx-drm/imx-drm-core.c      |   10 ++++++++++
+>  drivers/staging/imx-drm/imx-drm.h           |    6 ++++++
+>  drivers/staging/imx-drm/imx-hdmi.c          |    3 +++
+>  drivers/staging/imx-drm/imx-ldb.c           |    3 +++
+>  drivers/staging/imx-drm/imx-tve.c           |    3 +++
+>  drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    6 ++++--
+>  drivers/staging/imx-drm/ipu-v3/ipu-di.c     |    7 ++++++-
+>  drivers/staging/imx-drm/ipuv3-crtc.c        |   21 +++++++++++++++++++--
+>  3 files changed, 29 insertions(+), 5 deletions(-)
 > 
-> iMX has the ability to:
-> 
-> - define the polarity of the clock signal
-> - define the polarity of the other signals
-> 
-> It does not have the ability to define which clock edge individual signals
-> like vsync (frame clock), hsync (line clock), disable enable change on
-> independently.
-> 
-> So, it doesn't make sense _here_ for the display enable to be defined by
-> an edge - it's not something that can be changed here.  What can only be
-> changed is it's active level.
-> 
-> Of course, there may be some which can do this, and that's a separate
-> problem that would need to be addressed when there's hardware that does
-> support it.
-> 
-> The objection which Lothar is raising is that _this_ definition does not
-> match the _hardware_ capabilities which it is intended to be used with,
-> which is a very valid objection.
+> diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+> index b95cba1..3abeea3 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+> +++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+> @@ -29,9 +29,11 @@ enum ipuv3_type {
+>  
+>  #define CLK_POL_ACTIVE_LOW	0
+>  #define CLK_POL_ACTIVE_HIGH	1
+> +#define CLK_POL_PRESERVE	2
+>  
+>  #define ENABLE_POL_NEGEDGE	0
+>  #define ENABLE_POL_POSEDGE	1
+> +#define ENABLE_POL_PRESERVE	2
+>  
+>  /*
+>   * Bitfield of Display Interface signal polarities.
+> @@ -43,10 +45,10 @@ struct ipu_di_signal_cfg {
+>  	unsigned clksel_en:1;
+>  	unsigned clkidle_en:1;
+>  	unsigned data_pol:1;	/* true = inverted */
+> -	unsigned clk_pol:1;
+> -	unsigned enable_pol:1;
+>  	unsigned Hsync_pol:1;	/* true = active high */
+>  	unsigned Vsync_pol:1;
+> +	u8 clk_pol;
+> +	u8 enable_pol;
+>  
+>  	u16 width;
+>  	u16 height;
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> index 53646aa..791080b 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> @@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+>  
+>  	if (sig->clk_pol == CLK_POL_ACTIVE_HIGH)
+>  		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+> +	else if (sig->clk_pol == CLK_POL_ACTIVE_LOW)
+> +		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
+>  
+>  	ipu_di_write(di, di_gen, DI_GENERAL);
+>  
+> @@ -604,10 +606,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+>  		     DI_SYNC_AS_GEN);
+>  
+>  	reg = ipu_di_read(di, DI_POL);
+> -	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
+> +	reg &= ~(DI_POL_DRDY_DATA_POLARITY);
+>  
+>  	if (sig->enable_pol == ENABLE_POL_POSEDGE)
+>  		reg |= DI_POL_DRDY_POLARITY_15;
+> +	else if (sig->enable_pol == ENABLE_POL_NEGEDGE)
+> +		reg &= ~DI_POL_DRDY_POLARITY_15;
+> +
+>  	if (sig->data_pol)
+>  		reg |= DI_POL_DRDY_DATA_POLARITY;
+>  
+> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+> index 8cfeb47..c75034e 100644
+> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
+> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+> @@ -157,8 +157,25 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+>  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>  		sig_cfg.Vsync_pol = 1;
+>  
+> -	sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
+> -	sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
+> +	if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_POSEDGE)
+> +		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
+> +	else if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
+> +		sig_cfg.enable_pol = ENABLE_POL_NEGEDGE;
+> +	else if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_PRESERVE)
+> +		sig_cfg.enable_pol = ENABLE_POL_PRESERVE;
+> +	else
+> +		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
+> +
+> +	if (mode->private_flags & DRM_MODE_FLAG_POL_DE_POSEDGE)
+> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_HIGH;
+> +	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
+> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
+> +	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_PRESERVE)
+> +		sig_cfg.clk_pol = CLK_POL_PRESERVE;
+> +	else
+> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
+>
+This is completely messed up. POL_PIXDATA should obviously define the
+clock edge at which the pixel data is sampled and thus should determine
+the value of sig_cfg.clk_pol and POL_DE should determine the value of
+sig_cfg.enable_pol.
 
-Thank you for the clarification. That absolutely makes sense.
 
+
+Lothar Wa?mann
 -- 
-Regards,
+___________________________________________________________
 
-Laurent Pinchart
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
