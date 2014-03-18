@@ -1,54 +1,62 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 18 Mar 2014 09:10:19 +0100
-Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <1394894616.578942243@f331.i.mail.ru>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <1394887464-969-17-git-send-email-mpa@pengutronix.de>
- <1394894616.578942243@f331.i.mail.ru>
-Message-ID: <20140318081019.GJ11360@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 18 Mar 2014 10:15:39 +0200
+Subject: [PATCHv2 0/8] Doc/DT: DT bindings for various display components
+Message-ID: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 06:43:36PM +0400, Alexander Shiyan wrote:
-> ???????, 15 ????? 2014, 13:44 +01:00 ?? Markus Pargmann <mpa@pengutronix.de>:
-> > This patch replaces the ssi specific functions write_ssi, read_ssi and
-> > write_ssi_mask by standard regmap function calls.
-> ...
-> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> ...
-> > +static const struct regmap_config fsl_ssi_regconfig = {
-> > +	.max_register = CCSR_SSI_SACCDIS,
-> > +	.reg_bits = 32,
-> > +	.val_bits = 32,
-> > +	.reg_stride = 4,
-> > +#ifdef PPC
-> > +	.val_format_endian = REGMAP_ENDIAN_BIG,
-> > +#endif
-> > +};
-> 
-> Why we cannot use REGMAP_ENDIAN_NATIVE here for all cases?
-> Theoretically, we can use for i.MX SOCs with different endianness,
-> so this will help us.
+Hi,
 
-I can change and test it on i.MX, but I am not sure if it helps with the
-PPC situation as I don't have the hardware.
+This is v2 of the series adding DT bindings for various display components. The
+v1 can be found from [1].
 
-Regards,
+The changes for v2:
 
-Markus
+* abbreviated endpoint format dropped (nacked)
+* MIPI DPI panel dropped (missing backlight handling, delayed to 3.16)
+* dvi-connector: add properties for analog/digital/dual-link
+* hdmi-connector: add connector type
+* split 'gpios' property to named gpios
+* use 'clocks' properties for OMAP DSS components
+* removed 'simple-bus' from OMAP DSS Core's compatible strings
 
-> 
-> ---
+[1] http://article.gmane.org/gmane.linux.drivers.devicetree/63885
+
+ Tomi
+
+Tomi Valkeinen (8):
+  Doc/DT: Add DT binding documentation for OMAP DSS
+  Doc/DT: Add DT binding documentation for Analog TV Connector
+  Doc/DT: Add DT binding documentation for DVI Connector
+  Doc/DT: Add DT binding documentation for HDMI Connector
+  Doc/DT: Add DT binding documentation for MIPI DSI CM Panel
+  Doc/DT: Add DT binding documentation for Sony acx565akm panel
+  Doc/DT: Add DT binding documentation for TFP410 encoder
+  Doc/DT: Add DT binding documentation for tpd12s015 encoder
+
+ .../bindings/video/analog-tv-connector.txt         |  25 +++
+ .../devicetree/bindings/video/dvi-connector.txt    |  35 ++++
+ .../devicetree/bindings/video/hdmi-connector.txt   |  28 +++
+ .../devicetree/bindings/video/panel-dsi-cm.txt     |  29 +++
+ .../devicetree/bindings/video/sony,acx565akm.txt   |  30 +++
+ .../devicetree/bindings/video/ti,omap-dss.txt      | 211 +++++++++++++++++++++
+ .../devicetree/bindings/video/ti,omap2-dss.txt     |  54 ++++++
+ .../devicetree/bindings/video/ti,omap3-dss.txt     |  83 ++++++++
+ .../devicetree/bindings/video/ti,omap4-dss.txt     | 111 +++++++++++
+ .../devicetree/bindings/video/ti,tfp410.txt        |  41 ++++
+ .../devicetree/bindings/video/ti,tpd12s015.txt     |  44 +++++
+ 11 files changed, 691 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/analog-tv-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+ create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap2-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap3-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap4-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tfp410.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/7ddc868b/attachment.sig>
+1.8.3.2
