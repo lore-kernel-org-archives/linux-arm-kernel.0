@@ -1,44 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Mar 2014 10:25:05 +0100
-Subject: [linux-sunxi] [PATCH v4 8/8] ARM: dts: sun7i: rename clock node
- names to clk@N
-In-Reply-To: <CAOesGMh9sQb6ReEM==U0zKk9BqAr_e7Uh=xKAxPyrBwbiOqiKQ@mail.gmail.com>
-References: <1391392304-4660-1-git-send-email-wens@csie.org>
- <1391392304-4660-9-git-send-email-wens@csie.org>
- <CAOesGMh9sQb6ReEM==U0zKk9BqAr_e7Uh=xKAxPyrBwbiOqiKQ@mail.gmail.com>
-Message-ID: <20140318092505.GX27873@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Mar 2014 09:30:35 +0000
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <20140318085030.66db84b7@ipc1.ka-ro>
+References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
+ <2166863.3Fn4k2rvaz@avalon> <20140317161436.06169b33@ipc1.ka-ro>
+ <2777667.XJdaUSpRsD@avalon> <20140318085030.66db84b7@ipc1.ka-ro>
+Message-ID: <20140318093035.GR21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Mar 17, 2014 at 06:06:37PM -0700, Olof Johansson wrote:
+On Tue, Mar 18, 2014 at 08:50:30AM +0100, Lothar Wa?mann wrote:
 > Hi,
 > 
-> On Sun, Feb 2, 2014 at 5:51 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > Device tree naming conventions state that node names should match
-> > node function. Change fully functioning clock nodes to match and
-> > add clock-output-names to all sunxi clock nodes.
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> 
-> This patch seems to have broken cubieboard2 in arm-soc for-next. Cubie
-> 1 is broken too, likely due to the corresponding change there.
-> 
-> Maxime, are we missing some dependency?
+> Laurent Pinchart wrote:
+> > Hi Lothar,
+> > 
+> > On Monday 17 March 2014 16:14:36 Lothar Wa?mann wrote:
+> > > DE is not a clock signal, but an 'Enable' signal whose value (high or
+> > > low) defines the window in which the pixel data is valid.
+> > > The flag defines whether data is valid during the HIGH or LOW period of
+> > > DE.
+> > 
+> > The DRM_MODE_FLAG_POL_DE_(LOW|HIGH) do, by my impression of the proposed new 
+> > DRM_MODE_FLAG_POL_DE_*EDGE flags is that they define sampling clock edges, not 
+> > active levels.
+> > 
+> The current naming of the flags gives the impression that they describe
+> the sampling edges of a clock signal. But the DE signal in fact is not
+> a clock signal but a level sensitive gating signal.
 
-Most likely what you are seeing is more what Kevin already caught here:
-http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002761.html
++1
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/c6d0176a/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
