@@ -1,54 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 18 Mar 2014 13:55:12 +0100
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <1395146702.2812.47.camel@joe-AO722>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
-Message-ID: <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Mar 2014 13:55:16 +0100
+Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.15 (incr. pull #3)
+In-Reply-To: <20140317142330.GG15608@titan.lakedaemon.net>
+References: <20140301052536.GS1872@titan.lakedaemon.net>
+ <201403171111.30596.arnd@arndb.de>
+ <20140317142330.GG15608@titan.lakedaemon.net>
+Message-ID: <201403181355.16350.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 1:45 PM, Joe Perches <joe@perches.com> wrote:
-> NCR does use pr_debug for the dprintk call, but
-> it also doesn't verify fmt/arg matching when not
-> compiled in
->
-> drivers/scsi/NCR5380.h-#if NDEBUG
-> drivers/scsi/NCR5380.h:#define dprintk(flg, fmt, args...) \
-> drivers/scsi/NCR5380.h- do { if ((NDEBUG) & (flg)) pr_debug(fmt, ## args); } while (0)
-> []
-> drivers/scsi/NCR5380.h-#else
-> drivers/scsi/NCR5380.h:#define dprintk(flg, fmt, args...)     do {} while (0)
->
-> It'd be nice to change the last do {} while (0)
-> to something like:
->
-> #define dprintk(flg, fmt, args...) \
-> do { if (0) pr_debug(fmt, ## args); } while (0)
->
-> so the compiler can always verify but not emit any
-> actual code or format strings.
->
-> Also, using macros with ... and __VA_ARGS__ is
-> a bit more modern.
->
-> #define dprintk(flg, fmt, ...) \
-> do { if (0) pr_debug(fmt, ##__VA_ARGS__); } while (0)
+On Monday 17 March 2014, Jason Cooper wrote:
+> On Mon, Mar 17, 2014 at 11:11:30AM +0100, Arnd Bergmann wrote:
+> > On Tuesday 04 March 2014, Jason Cooper wrote:
+> > Pulled into next/dt now, along with the #4 and #5. I got a trivial
+> > merge conflict against the dts Makefile change from mach-qcom and
+> > noticed that splitting up the dtb section into per-soc breaks
+> > alphabetical ordering, which I changed in the merge by moving
+> > it down to the end of the list.
+> 
+> Ok, I was trying to reduce conflicts by leaving things in place, then
+> do a fixes-non-critical patch to put things back in alphabetical order
+> after the dust had settled.
 
-Na, no_printk():
+Ah, that was clearly a better plan than what I did. I actually mismerged
+things at first and then spent some time cleaning it all up again.
 
-#define dprintk(flg, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
