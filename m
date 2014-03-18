@@ -1,50 +1,72 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 18 Mar 2014 15:08:36 +0900
-Subject: [PATCH] drm/exynos: Fix (more) freeing issues in exynos_drm_drv.c
-In-Reply-To: <01a301cf426d$55d080b0$01718210$@samsung.com>
-References: <1395026886-14325-1-git-send-email-djkurtz@chromium.org>
- <CAAQKjZMeeyD+6fhCaGk9qzX0oLTS=vHU86Y7gF9ZnbwcpTT7Kg@mail.gmail.com>
- <01a301cf426d$55d080b0$01718210$@samsung.com>
-Message-ID: <CAAQKjZPCq=d_mcWbpVhpMhXr1G3sDD7=BQ3cqOiqQ6_TTWfMCA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 18 Mar 2014 17:10:59 +1100
+Subject: linux-next: manual merge of the staging tree with the arm-soc tree
+Message-ID: <20140318171059.a1134a2c670e1b18847f98d0@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-18 14:45 GMT+09:00 Kukjin Kim <kgene.kim@samsung.com>:
-> Inki Dae wrote:
->>
->> Applied.
->>
->> Thanks,
->> Inki Dae
->>
->> 2014-03-17 12:28 GMT+09:00 Daniel Kurtz <djkurtz@chromium.org>:
->> > The following commit [0] fixed a use-after-free, but left the subdrv
->> open
->> > in the error path.
->> >
->> > [0] commit 6ca605f7c70895a35737435f17ae9cc5e36f1466
->> > drm/exynos: Fix freeing issues in exynos_drm_drv.c
->> >
->> > Change-Id: I452e944bf090fb11434d9e34213c890c41c15d73
->
-> This should be removed when Inki apply this.
->
+Hi Greg,
 
-No, Daniel's patch just complements above previous one that is what I missed.
+Today's linux-next merge of the staging tree got a conflict in
+Documentation/devicetree/bindings/iio/adc/at91_adc.txt between commit
+b5303ffbcf11 ("Documentation: dt: iio: improve atmel-adc documentation")
+from the arm-soc tree and commit 1a5b7d41f8f6 ("iio: at91: document ADC
+clock properties") from the staging tree.
 
-Thanks,
-Inki Dae
+[This file is renamed from
+Documentation/devicetree/bindings/arm/atmel-adc.txt in the arm-soc tree.]
 
-> Thanks,
-> Kukjin
->
->> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->> > ---
->> >  drivers/gpu/drm/exynos/exynos_drm_drv.c | 10 +++++++---
->> >  1 file changed, 7 insertions(+), 3 deletions(-)
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+index 82061c7e4fea,9a1175b46f49..000000000000
+--- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+@@@ -5,7 -5,10 +5,10 @@@ Required properties
+      <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+    - reg: Should contain ADC registers location and length
+    - interrupts: Should contain the IRQ line for the ADC
++   - clock-names: tuple listing input clock names.
++ 	Required elements: "adc_clk", "adc_op_clk".
++   - clocks: phandles to input clocks.
+ -  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+ +  - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
+      device
+    - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+      defined in the datasheet
+@@@ -41,14 -44,19 +44,16 @@@ Optional trigger Nodes
+  
+  Examples:
+  adc0: adc at fffb0000 {
+ +	#address-cells = <1>;
+ +	#size-cells = <0>;
+  	compatible = "atmel,at91sam9260-adc";
+  	reg = <0xfffb0000 0x100>;
+ -	interrupts = <20 4>;
+ +	interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
++ 	clocks = <&adc_clk>, <&adc_op_clk>;
++ 	clock-names = "adc_clk", "adc_op_clk";
+ -	atmel,adc-channel-base = <0x30>;
+  	atmel,adc-channels-used = <0xff>;
+ -	atmel,adc-drdy-mask = <0x10000>;
+ -	atmel,adc-num-channels = <8>;
+  	atmel,adc-startup-time = <40>;
+ -	atmel,adc-status-register = <0x1c>;
+ -	atmel,adc-trigger-register = <0x08>;
+ -	atmel,adc-use-external;
+ +	atmel,adc-use-external-triggers;
+  	atmel,adc-vref = <3300>;
+  	atmel,adc-res = <8 10>;
+  	atmel,adc-res-names = "lowres", "highres";
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/be9e9b24/attachment-0001.sig>
