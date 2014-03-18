@@ -1,40 +1,36 @@
-From: brezillonboris@gmail.com (Boris BREZILLON)
-Date: Tue, 18 Mar 2014 21:18:40 +0100
-Subject: [PATCH 07/11] ARM: at91/dt: add xtal frequencies to sama5d3 xplained
- board
-In-Reply-To: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
-References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1395173924-3648-8-git-send-email-b.brezillon.dev@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 18 Mar 2014 13:19:35 -0700
+Subject: [V2] arm: pj4: check cpu id for pj4 cp0 access
+In-Reply-To: <20140318201537.GA20942@beef>
+References: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
+ <20140318201537.GA20942@beef>
+Message-ID: <CAGa+x86Nrt47eFMoH9UHwG502J+p-Q0fsc38WG13tNmpYqLE3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define crystal properties of sama5d3 xplained board.
+On Tue, Mar 18, 2014 at 1:15 PM, Matt Porter <mporter@linaro.org> wrote:
+> On Fri, Jun 14, 2013 at 05:03:57AM -0400, Chao Xie wrote:
+>> Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+>> pj4_cpu0_init just return.
+>> This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
+>> use same platform code.
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> This patch fixes a boot failure in next now that ARCH_DOVE (and thus
+> CPU_PJ4) are enabled in multi_v7_defconfig. I verified that boot works
+> again in next with the BCM28155-AP board.
+>
+> Tested-by: Matt Porter <mporter@linaro.org>
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+I've also verified that this fixes the boot regression on the BCM28155-AP board.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index ce13755..df5b707 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -21,6 +21,16 @@
- 		reg = <0x20000000 0x10000000>;
- 	};
- 
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
- 	ahb {
- 		apb {
- 			mmc0: mmc at f0000000 {
--- 
-1.7.9.5
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Chao, can you collect the acks/tested-bys and submit this to Russell's
+patch tracker[1] so he can apply it please?.  Thanks.
+
+Kevin
+
+[1] http://www.arm.linux.org.uk/developer/patches/
