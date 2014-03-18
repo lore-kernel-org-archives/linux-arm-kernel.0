@@ -1,33 +1,56 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 18 Mar 2014 15:23:11 +0200
-Subject: [PATCH] ARM: dts: keystone: Fix control register range for clktsip
-Message-ID: <1395148991-22538-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 18 Mar 2014 14:26:53 +0100
+Subject: Deadlock with I2C based clock providers
+Message-ID: <5328499D.4040806@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The control register range for clktsio interferes with clkaemifspi clock.
-And it causes issues for NAND/AEMIF. So fix it.
+Hi Mike,
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
+I have a clock provide that implements the clock operations over i2c.
 
-Only comment is corrected.
+Although this is now possible since commit 533ddeb1e8 clk: allow 
+reentrant calls into the clk framework
 
- arch/arm/boot/dts/k2hk-clocks.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+that patch only deals with single threaded reentrancy.
 
-diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
-index a71aa29..8855b1f 100644
---- a/arch/arm/boot/dts/k2hk-clocks.dtsi
-+++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
-@@ -59,7 +59,7 @@ clocks {
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk16>;
- 		clock-output-names = "tsip";
--		reg = <0x0235000c 0xb00>, <0x02350000 0x400>;
-+		reg = <0x02350000 0xb00>, <0x02350000 0x400>;
- 		reg-names = "control", "domain";
- 		domain-id = <0>;
- 	};
--- 
-1.8.3.2
+
+The issue I am having involves two threads:
+
+Thread A calls the i2c clock driver
+Thread B is in an unrelated driver for another I2C device on the same 
+I2C bus (audio codec).
+
+
+Thread A:
+     clk_set_rate(my_clk)
+         clk_prepare_lock()  <== Takes clock lock
+         clk_change_rate()
+             ops->set_rate()
+                 i2c_transfer()
+                     i2c_lock_adapter()  <== Blocks on I2C bus lock
+
+
+
+Thread B:
+     i2c_transfer()
+         i2c_lock_adapter()    <== Takes I2C bus lock
+         i2c_imx_xfer()
+             i2c_imx_start()
+                 clk_prepare_enable(i2c_clk)
+                     clk_prepare_lock()  <== Blocks on clock lock
+
+
+The problem is that the locks are taken in the reverse order leading to 
+a classic deadlock.
+
+I saw your [RFC] clk: reentrancy via per-clock locking but that seemed 
+to have other problems.
+
+
+My current (horrible) workaround involves exposing clk_prepare_lock() 
+and calling it from i2c_core but that obviously isn't the right solution.
+
+Regards,
+
+Martin
