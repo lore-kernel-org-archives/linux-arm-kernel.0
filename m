@@ -1,73 +1,106 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 18 Mar 2014 14:07:51 +0100
-Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
- gate clocks
-In-Reply-To: <CAK9yfHxcArgmxm4wSipY1afjmG00zugyycdU+BQbuexvL2bmBw@mail.gmail.com>
-References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
- <5323078E.4060903@samsung.com>
- <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
- <20140318200329.cc1dca7541b4b1916e5d9d48@samsung.com>
- <CAK9yfHxcArgmxm4wSipY1afjmG00zugyycdU+BQbuexvL2bmBw@mail.gmail.com>
-Message-ID: <53284527.8010903@samsung.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 18 Mar 2014 15:12:34 +0200
+Subject: [PATCH] ARM: dts: keystone: use common "ti,
+ keystone" compatible instead of -evm
+Message-ID: <1395148354-22412-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.03.2014 12:18, Sachin Kamat wrote:
-> On 18 March 2014 16:33, Cho KyongHo <pullip.cho@samsung.com> wrote:
->> On Fri, 14 Mar 2014 22:27:59 +0530, Sachin Kamat wrote:
->>>   Hi KyongHo,
->>>
->>> On 14 March 2014 19:13, Tomasz Figa <t.figa@samsung.com> wrote:
->>>> Hi KyongHo,
->>>>
->>>>
->>>> On 14.03.2014 06:09, Cho KyongHo wrote:
->>>>>
->>>>> exynos-iommu driver must care about master H/W's gate clock as well as
->>>>> System MMU's gate clock. To enhance readability of the source code,
->>>>> macros to gate/ungate those clocks are defined.
->>>>>
->>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
->>>>> ---
->>>>>    drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
->>>>>    1 file changed, 22 insertions(+), 12 deletions(-)
->>>>>
->>>>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->>>>> index 71e77f1..cef62d0 100644
->>>>> --- a/drivers/iommu/exynos-iommu.c
->>>>> +++ b/drivers/iommu/exynos-iommu.c
->>>>> @@ -101,6 +101,16 @@
->>>>>    #define REG_PB1_SADDR         0x054
->>>>>    #define REG_PB1_EADDR         0x058
->>>>>
->>>>> +#define __clk_gate_ctrl(data, clk, en) do {            \
->>>>> +               if (data->clk)                          \
->>>>> +                       clk_##en##able(data->clk);      \
->>>>> +       } while (0)
->>>>> +
->>>>> +#define __sysmmu_clk_enable(data)      __clk_gate_ctrl(data, clk, en)
->>>>> +#define __sysmmu_clk_disable(data)     __clk_gate_ctrl(data, clk, dis)
->>>>> +#define __master_clk_enable(data)      __clk_gate_ctrl(data, clk_master,
->>>>> en)
->>>>> +#define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master,
->>>>> dis)
->>>>> +
->>>>
->>>>
->>>> I'd say that such macros only obfuscate code, without any gains, as you can
->>>> see in diffstat - this patch adds more lines than it removes.
->>>>
->>>> Please drop this change.
->>>
->>>   I agree with Tomasz here.
->>>
->>
->> Are you concerning about using macros or more insertions than deletions?
->
-> It is just making the code more difficult to read and understand.
+As suggested by Olof Johansson at
+http://www.spinics.net/lists/arm-kernel/msg314009.html.
+It be better just keeping a "ti,keystone" top-level compatible and
+just using that to probe. If so we don't have to touch the file
+for new boards in the future.
 
-Especially when hiding accesses to struct fields inside and doing fancy 
-stuff like concatenations.
+So use common "ti,keystone" compatible in keystone.c for all boards.
 
-Best regards,
-Tomasz
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Olof Johansson <olof@lixom.net>
+
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+
+Based on linux-next/master
+
+ Documentation/devicetree/bindings/arm/keystone/keystone.txt | 6 +++---
+ arch/arm/boot/dts/k2e-evm.dts                               | 2 +-
+ arch/arm/boot/dts/k2hk-evm.dts                              | 2 +-
+ arch/arm/boot/dts/k2l-evm.dts                               | 2 +-
+ arch/arm/mach-keystone/keystone.c                           | 5 +----
+ 5 files changed, 7 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+index ad16e7a..59d7a46 100644
+--- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
++++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+@@ -11,10 +11,10 @@ Required properties:
+ 
+ Boards:
+ -  Keystone 2 Hawking/Kepler EVM
+-   compatible = "ti,k2hk-evm"
++   compatible = "ti,k2hk-evm","ti,keystone"
+ 
+ -  Keystone 2 Lamarr EVM
+-   compatible = "ti,k2l-evm"
++   compatible = "ti,k2l-evm","ti,keystone"
+ 
+ -  Keystone 2 Edison EVM
+-   compatible = "ti,k2e-evm"
++   compatible = "ti,k2e-evm","ti,keystone"
+diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
+index bb8faeb..74b3b63 100644
+--- a/arch/arm/boot/dts/k2e-evm.dts
++++ b/arch/arm/boot/dts/k2e-evm.dts
+@@ -13,7 +13,7 @@
+ #include "k2e.dtsi"
+ 
+ / {
+-	compatible =  "ti,k2e-evm";
++	compatible =  "ti,k2e-evm","ti,keystone";
+ 	model = "Texas Instruments Keystone 2 Edison EVM";
+ 
+ 	soc {
+diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+index 1a1335b..f2a6658 100644
+--- a/arch/arm/boot/dts/k2hk-evm.dts
++++ b/arch/arm/boot/dts/k2hk-evm.dts
+@@ -13,7 +13,7 @@
+ #include "k2hk.dtsi"
+ 
+ / {
+-	compatible =  "ti,k2hk-evm";
++	compatible =  "ti,k2hk-evm","ti,keystone";
+ 	model = "Texas Instruments Keystone 2 Kepler/Hawking EVM";
+ 
+ 	soc {
+diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
+index ebf316a..50a7013 100644
+--- a/arch/arm/boot/dts/k2l-evm.dts
++++ b/arch/arm/boot/dts/k2l-evm.dts
+@@ -13,7 +13,7 @@
+ #include "k2l.dtsi"
+ 
+ / {
+-	compatible =  "ti,k2l-evm";
++	compatible =  "ti,k2l-evm","ti,keystone";
+ 	model = "Texas Instruments Keystone 2 Lamarr EVM";
+ 
+ 	soc {
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index aa0d212..e0b9e1b 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -46,10 +46,7 @@ static void __init keystone_init(void)
+ }
+ 
+ static const char *keystone_match[] __initconst = {
+-	"ti,keystone-evm",
+-	"ti,k2hk-evm",
+-	"ti,k2l-evm",
+-	"ti,k2e-evm",
++	"ti,keystone",
+ 	NULL,
+ };
+ 
+-- 
+1.8.3.2
