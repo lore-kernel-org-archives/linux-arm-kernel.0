@@ -1,111 +1,51 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Mar 2014 03:56:48 -0700
-Subject: [PATCH 1/2] mailbox: samsung: added support for samsung mailbox
-In-Reply-To: <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <1395057839-23871-2-git-send-email-ks.giri@samsung.com>
- <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
-Message-ID: <1395140208.2812.15.camel@joe-AO722>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 18 Mar 2014 11:58:27 +0100
+Subject: [PATCH RESEND] ARM: SPEAr1340: static-ize SATA functions
+Message-ID: <1678906.b5uh0Nm7QE@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-18 at 15:52 +0530, Girish KS wrote:
-> On Mon, Mar 17, 2014 at 5:33 PM, Girish K S <ks.giri@samsung.com> wrote:
+Make sata_miphy_exit(), sata_suspend() and sata_resume() static.
 
-Hi, just some trivial notes about the patch
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Previous submission:
+https://lkml.org/lkml/2013/10/4/369
 
-> > diff --git a/drivers/mailbox/mailbox-samsung.c b/drivers/mailbox/mailbox-samsung.c
-[]
-> > @@ -0,0 +1,354 @@
-> > +/*
-> > + * Copyright 2013 Samsung Electronics Co. Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms and conditions of the GNU General Public License,
-> > + * version 2, as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope it will be useful, but WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> > + * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along with
-> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
+ arch/arm/mach-spear/spear1340.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Please add
-
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
-before any #include so that error messages are
-prefixed in the output with "samsung-mailbox: "
-and the reader of the log has an idea what subsystem
-is emitting messages.
-
-> > +#include <linux/err.h>
-> > +#include <linux/module.h>
-> > +#include <linux/slab.h>
-[]
-> > +static int samsung_mbox_send_data(struct ipc_link *link, void *msg)
-> > +{
-[]
-> > +       /* Lock the mailbox for this transaction with the client id */
-> > +       writel(val, ipc_base + MBOX_REG_TXLOCK);
-> > +       do {
-> > +               if (time_after(jiffies, timeout)) {
-> > +                       pr_err("cannot aquire the lock\n");
-
-This would be prefixed appropriately via pr_fmt.
-Also, there's a typo of aquire here: acquire
-
-> > +static int samsung_mbox_startup(struct ipc_link *link, void *ignored)
-> > +{
-[]
-> > +       ret = devm_request_irq(dev, samsung_link->irq, samsung_ipc_handler,
-> > +                                       IRQF_SHARED, link->link_name,
-> > +                                       samsung_link);
-> > +       if (unlikely(ret)) {
-> > +               pr_err("failed to register mailbox interrupt:%d\n", ret);
-
-Here too it would be prefixed
-
-> > +static int samsung_mbox_probe(struct platform_device *pdev)
-> > +{
-> > +       struct samsung_mbox *samsung_mbox;
-> > +       struct samsung_mlink *mbox_link;
-> > +       struct resource res;
-> > +       struct ipc_link **link;
-> > +       int loop, count, ret = 0;
-> > +       struct device_node *node = pdev->dev.of_node;
-> > +
-> > +       if (!node) {
-> > +               dev_err(&pdev->dev, "driver doesnt support"
-> > +                               "non-dt devices\n");
-
-Please coalesce the format fragments.
-
-You would notice the missing space between
-"support" and "non-dt"
-
-		dev_err(&pdev->dev, "driver does not support non-dt devices\n");
-
-It's OK to exceed 80 columns for these format strings.
-
-> > diff --git a/include/linux/mailbox-samsung.h b/include/linux/mailbox-samsung.h
-[]
-> > +static inline unsigned long get_alligned_buffer(void)
-
-Typo: There's one l in aligned
-
-> > +{
-> > +       return __get_free_pages(GFP_KERNEL, REQUEST_PAGE_ORDER);
-> > +}
-> > +
-> > +static inline void put_alligned_buffer(unsigned long addr)
-> > +{
-
-here too
-
-> > +       free_pages(addr, REQUEST_PAGE_ORDER);
-> > +}
-> > +
+diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+index 3fb6834..e0e4251 100644
+--- a/arch/arm/mach-spear/spear1340.c
++++ b/arch/arm/mach-spear/spear1340.c
+@@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
+ 	return 0;
+ }
+ 
+-void sata_miphy_exit(struct device *dev)
++static void sata_miphy_exit(struct device *dev)
+ {
+ 	writel(0, SPEAR1340_PCIE_SATA_CFG);
+ 	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+@@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
+ 	msleep(20);
+ }
+ 
+-int sata_suspend(struct device *dev)
++static int sata_suspend(struct device *dev)
+ {
+ 	if (dev->power.power_state.event == PM_EVENT_FREEZE)
+ 		return 0;
+@@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-int sata_resume(struct device *dev)
++static int sata_resume(struct device *dev)
+ {
+ 	if (dev->power.power_state.event == PM_EVENT_THAW)
+ 		return 0;
+-- 
+1.8.2.3
