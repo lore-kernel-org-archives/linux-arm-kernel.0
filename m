@@ -1,44 +1,64 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 08:41:55 +0200
-Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI
- Panel
-In-Reply-To: <3721050.m43feCICLQ@avalon>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
- <3721050.m43feCICLQ@avalon>
-Message-ID: <5327EAB3.8080405@ti.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 18 Mar 2014 14:59:40 +0800
+Subject: [PATCH] drm/exynos: Fix (more) freeing issues in exynos_drm_drv.c
+In-Reply-To: <CAAQKjZPCq=d_mcWbpVhpMhXr1G3sDD7=BQ3cqOiqQ6_TTWfMCA@mail.gmail.com>
+References: <1395026886-14325-1-git-send-email-djkurtz@chromium.org>
+ <CAAQKjZMeeyD+6fhCaGk9qzX0oLTS=vHU86Y7gF9ZnbwcpTT7Kg@mail.gmail.com>
+ <01a301cf426d$55d080b0$01718210$@samsung.com>
+ <CAAQKjZPCq=d_mcWbpVhpMhXr1G3sDD7=BQ3cqOiqQ6_TTWfMCA@mail.gmail.com>
+Message-ID: <CAGS+omAH4AmY8Xg2Y9-x+gJGson9dize2xRMJ=V3NH7AP5Oeyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/14 16:19, Laurent Pinchart wrote:
+On Tue, Mar 18, 2014 at 2:08 PM, Inki Dae <inki.dae@samsung.com> wrote:
+> 2014-03-18 14:45 GMT+09:00 Kukjin Kim <kgene.kim@samsung.com>:
+>> Inki Dae wrote:
+>>>
+>>> Applied.
+>>>
+>>> Thanks,
+>>> Inki Dae
+>>>
+>>> 2014-03-17 12:28 GMT+09:00 Daniel Kurtz <djkurtz@chromium.org>:
+>>> > The following commit [0] fixed a use-after-free, but left the subdrv
+>>> open
+>>> > in the error path.
+>>> >
+>>> > [0] commit 6ca605f7c70895a35737435f17ae9cc5e36f1466
+>>> > drm/exynos: Fix freeing issues in exynos_drm_drv.c
+>>> >
+>>> > Change-Id: I452e944bf090fb11434d9e34213c890c41c15d73
+>>
+>> This should be removed when Inki apply this.
+>>
+>
+> No, Daniel's patch just complements above previous one that is what I missed.
+>
 
->> +Generic MIPI DPI Panel
->> +======================
->> +
->> +Required properties:
->> +- compatible: "panel-dpi"
->> +
->> +Optional properties:
->> +- label: a symbolic name for the panel
->> +- gpios: panel enable gpio and backlight enable gpio
-> 
-> While integrated in the panel module, the backlight is a separate piece of 
-> hardware, which could be controlled through other means (I2C for instance). 
-> Wouldn't it be better to add an explicit DT node for the backlight device and 
-> reference that node from the panel node ?
+Inki,
 
-Yes, I agree, but do we have the infrastructure or bindings for that?
+Ah, sorry for the original double post.  The first one (with the
+"Change-Id") went out too soon, and I forgot to ask for it to be
+ignored.
+Hopefully you picked up the second patch with the corrected commit message.
 
-Ah, I see we now do have a gpio-backlight driver, but it doesn't have DT
-bindings.
-
- Tomi
+Thanks,
+Daniel
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/85ddaef8/attachment.sig>
+> Thanks,
+> Inki Dae
+>
+>> Thanks,
+>> Kukjin
+>>
+>>> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>>> > ---
+>>> >  drivers/gpu/drm/exynos/exynos_drm_drv.c | 10 +++++++---
+>>> >  1 file changed, 7 insertions(+), 3 deletions(-)
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
