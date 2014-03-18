@@ -1,54 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Mar 2014 13:37:12 +0000
-Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <CAJ5Y-eZ5hWuph=K3dBUqSTSUr=O+dU4YayuVe30h4Uc7t-cczQ@mail.gmail.com>
-References: <1395048095-32745-1-git-send-email-vkale@apm.com>
- <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
- <CAPrCYkfxGVey_fQ47RO=XNnWYNM0qckdj9gMUZtZHkz6hR85xQ@mail.gmail.com>
- <CAJ5Y-eZ5hWuph=K3dBUqSTSUr=O+dU4YayuVe30h4Uc7t-cczQ@mail.gmail.com>
-Message-ID: <20140318133712.GB2941@e106331-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Mar 2014 15:03:23 +0100
+Subject: [PATCH v2 3/8] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <20140318105851.GO25478@lee--X1>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-4-git-send-email-carlo@caione.org>
+ <20140318090013.GU27873@lukather> <20140318095002.GM25478@lee--X1>
+ <20140318101554.GZ27873@lukather> <20140318105851.GO25478@lee--X1>
+Message-ID: <20140318140323.GB27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 01:17:46PM +0000, Ashwin Chaugle wrote:
->    Hi Vinayak, Mark,
+On Tue, Mar 18, 2014 at 10:58:51AM +0000, Lee Jones wrote:
+> > > > > This patch add support for the Power Enable Key found on MFD AXP202 and
+> > > > > AXP209. Besides the basic support for the button, the driver adds two
+> > > > > entries in sysfs to configure the time delay for power on/off.
+> > > > > 
+> > > > > Signed-off-by: Carlo Caione <carlo@caione.org>
+> > > > > ---
+> > > > >  drivers/input/misc/Kconfig      |  11 ++
+> > > > >  drivers/input/misc/Makefile     |   1 +
+> > > > >  drivers/input/misc/axp20x-pek.c | 267 ++++++++++++++++++++++++++++++++++++++++
+> > > > >  3 files changed, 279 insertions(+)
+> > > > >  create mode 100644 drivers/input/misc/axp20x-pek.c
+> > > > 
+> > > > From what I understood of the MFD framework, you usually have a MFD
+> > > > core driver that gets loaded from the DT and instantiate its various
+> > > > functions through sub-devices, that are registered through
+> > > > mfd_add_devices, and the drivers for these sub-devices are supported
+> > > > in sub-drivers that are located in the driver/mfd, alongside the core
+> > > > driver.
+> > > > 
+> > > > I believe that such a pattern allows for two interesting things:
+> > > >   - You don't have to search around the whole kernel tree to find
+> > > >     where a given sub-feature is supported.
+> > > >   - You don't have to cripple your DT with instantiation of all the
+> > > >     subcomponents, while you only really have one device.
+> > > > 
+> > > > Do you have a reason for not following this pattern?
+> > > 
+> > > Sorry Maxime, this is not the case.
+> > > 
+> > > If an MFD contains Regulators and USB & GPIO Controllers, I'd expect
+> > > to see the device represented in the following way:
+> > > 
+> > >   drivers/mfd/<id>.c
+> > >   drivers/{gpio,pinctrl}/{gpio,pinctrl}-<id>.c
+> > >   drivers/regulator/<id>-regulator.c
+> > >   drivers/usb/host/<id>.c
+> > 
+> > Oh, ok. Nevermind then :)
+> > 
+> > Just out of curiosity, some drivers at least seem to follow that trend
+> > in drivers/mfd, is there any reason for this (other than historical) ?
 > 
->    On 17 March 2014 07:22, Vinayak Kale <[1]vkale@apm.com> wrote:
-> 
->      > Do Potenza CPUs only have the PMUv3 events, and nothing
->      > Potenza-specific?
->      On top of PMUv3 events, Potenza CPU do have few implementation defined
->      events.
->      >
->      > I would have expected something like:
->      >
->      > compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
->      PMUv3 allows to have implementation defined events. And as such the
->      driver doesn't have any dependency on such events. Do you still think
->      we need additional compatible string for Potenza CPU?
-> 
->    Can't these implementation specific events be used as raw perf events, or
->    extending that event space? (Or is that interface gone?) I may be missing
->    the details here, but I'm wondering if the method to program and count
->    these extra events is similar to ARM architected events, then why add
->    another DT binding?
+> Would you mind providing an example?
 
-It would be possible to use raw events, however that's a software level
-detail, and not something that matters to the hardware description.
+I was under this impression given the naming scheme that they were
+using. Looking into it just proved me how wrong I was :)
 
-The hardware description should be as explicit as possible to allow the
-software stack to change in future. For example, we might want to expose
-implementation-specific events under sysfs in future, for which having
-the implementation-specific compatible string in addition to the more
-generic fallback is helpful.
+Sorry for the noise.
 
-This is why the compatible string exists. Making good use of it today
-means a platform is more likely to have good support in future.
-
-Having the string now is cheap, and makes it easier to tailor the
-software stack more to the hardware in future. Not having the string
-makes it harder. There is no reason not to have the more specific
-compatible string.
-
-Cheers,
-Mark.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/7395cd2d/attachment.sig>
