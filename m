@@ -1,32 +1,47 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?B?QW50b2luZSBUw6luYXJ0?=)
-Date: Tue, 18 Mar 2014 09:43:30 +0100
-Subject: [PATCH v3 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
-In-Reply-To: <20140318102435.2d29abc7@xhacker>
-References: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>	<1395068788-19786-2-git-send-email-antoine.tenart@free-electrons.com>
- <20140318102435.2d29abc7@xhacker>
-Message-ID: <53280732.4060707@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 18 Mar 2014 09:43:54 +0100
+Subject: [PATCHv2 4/8] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
+References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
+ <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1395132234.4134.1.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi Tomi,
 
-On 18/03/2014 03:24, Jisheng Zhang wrote:
->> +	sysclk: system-clock {
->> +		compatible = "fixed-factor-clock";
->> +		#clock-cells = <0>;
->> +		clocks = <&cpuclk>;
->> +		clock-multi = <1>;
->> +		clock-div = <3>;
->> +	};
->
-> Can you please name it as twdclk to avoid confusion? On Berlin, sysclk is another
-> clk rather than the clk for twd.
+Am Dienstag, den 18.03.2014, 10:15 +0200 schrieb Tomi Valkeinen:
+> Add DT binding documentation for HDMI Connector.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/hdmi-connector.txt   | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> new file mode 100644
+> index 000000000000..ccccc19e2573
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> @@ -0,0 +1,28 @@
+> +HDMI Connector
+> +==============
+> +
+> +Required properties:
+> +- compatible: "hdmi-connector"
+> +- type: the HDMI connector type: "a", "b", "c", "d" or "e"
+> +
+> +Optional properties:
+> +- label: a symbolic name for the connector
+> +
+> +Required nodes:
+> +- Video port for HDMI input
 
-Sure, I'll change the name and send a v4.
+Geert's comment also applies to all other connector types. These can be
+input connectors, too.
 
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+regards
+Philipp
