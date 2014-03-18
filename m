@@ -1,67 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Mar 2014 17:51:33 +0000
-Subject: [PATCH v2 1/5] drivers: input: keyboard: st-keyscan: add
- keyscan driver
-In-Reply-To: <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
-References: <1395154806-2810-1-git-send-email-gabriel.fernandez@st.com>
- <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20140318175133.GE2941@e106331-lin.cambridge.arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 18 Mar 2014 18:56:42 +0100
+Subject: [PATCH v2 0/7] rework sched_domain topology description
+Message-ID: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 03:00:02PM +0000, Gabriel FERNANDEZ wrote:
-> This patch adds ST Keyscan driver to use the keypad hw a subset
-> of ST boards provide. Specific board setup will be put in the
-> given dt.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-> ---
->  .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
->  drivers/input/keyboard/Kconfig                     |  12 +
->  drivers/input/keyboard/Makefile                    |   1 +
->  drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
->  4 files changed, 333 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
->  create mode 100644 drivers/input/keyboard/st-keyscan.c
-> 
-> diff --git a/Documentation/devicetree/bindings/input/st-keyscan.txt b/Documentation/devicetree/bindings/input/st-keyscan.txt
-> new file mode 100644
-> index 0000000..51eb428
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/st-keyscan.txt
-> @@ -0,0 +1,60 @@
-> +* ST Keyscan controller Device Tree bindings
-> +
-> +The ST keyscan controller Device Tree binding is based on the
-> +matrix-keymap.
-> +
-> +Required properties:
-> +- compatible: "st,sti-keyscan"
-> +
-> +- reg: Register base address and size of st-keyscan controller.
-> +
-> +- interrupts: Interrupt number for the st-keyscan controller.
-> +
-> +- clocks: Must contain one entry, for the module clock.
-> +  See ../clocks/clock-bindings.txt for details.
-> +
-> +- pinctrl: Should specify pin control groups used for this controller.
-> +  See ../pinctrl/pinctrl-bindings.txt for details.
-> +
-> +- linux,keymap: The keymap for keys as described in the binding document
-> +  devicetree/bindings/input/matrix-keymap.txt.
-> +
-> +- keypad,num-rows: Number of row lines connected to the keypad controller.
-> +
-> +- keypad,num-columns: Number of column lines connected to the keypad
-> +  controller.
-> +
-> +Optional property:
-> +- st,debounce_us: Debouncing interval time in microseconds
+This patchset was previously part of the larger tasks packing patchset [1].
+I have splitted the latter in 3 different patchsets (at least) to make the
+thing easier.
+-configuration of sched_domain topology (this patchset)
+-update and consolidation of cpu_power
+-tasks packing algorithm
 
-s/_/-/ here, please.
+Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
+the sched_domain level in order to let architectures to add specific level like
+the current BOOK level or the proposed power gating level for ARM architecture.
 
-Otherwise this looks ok.
+[1] https://lkml.org/lkml/2013/10/18/121
+[2] https://lkml.org/lkml/2013/11/5/239
+[3] https://lkml.org/lkml/2013/11/5/449
 
-Mark.
+Change since v1:
+- move sched_domains_curr_level back under #ifdef CONFIG_NUMA
+- use function pointer to set flag instead of a plain value.
+- add list of tunable flags in the commit message of patch 2
+- add SD_SHARE_POWER_DOMAIN flag for powerpc's SMT level
+
+Vincent Guittot (7):
+  sched: remove unused SCHED_INIT_NODE
+  sched: rework of sched_domain topology definition
+  sched: s390: create a dedicated topology table
+  sched: powerpc: create a dedicated topology table
+  sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
+  sched: ARM: create a dedicated scheduler topology table
+  sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT level
+
+ arch/arm/kernel/topology.c        |  26 ++++
+ arch/ia64/include/asm/topology.h  |  24 ----
+ arch/metag/include/asm/topology.h |  27 -----
+ arch/powerpc/kernel/smp.c         |  31 +++--
+ arch/s390/include/asm/topology.h  |  13 +-
+ arch/s390/kernel/topology.c       |  20 ++++
+ arch/tile/include/asm/topology.h  |  33 ------
+ include/linux/sched.h             |  49 +++++++-
+ include/linux/topology.h          | 128 ++------------------
+ kernel/sched/core.c               | 243 +++++++++++++++++++-------------------
+ 10 files changed, 254 insertions(+), 340 deletions(-)
+
+-- 
+1.9.0
