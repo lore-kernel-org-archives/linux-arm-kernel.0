@@ -1,47 +1,116 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Mar 2014 09:43:54 +0100
-Subject: [PATCHv2 4/8] Doc/DT: Add DT binding documentation for HDMI
- Connector
-In-Reply-To: <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
-References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
- <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1395132234.4134.1.camel@paszta.hi.pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Mar 2014 09:45:05 +0100
+Subject: [PATCH v2 2/8] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <1394898225-28452-3-git-send-email-carlo@caione.org>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-3-git-send-email-carlo@caione.org>
+Message-ID: <20140318084505.GT27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Sat, Mar 15, 2014 at 04:43:39PM +0100, Carlo Caione wrote:
+> Bindings documentation for the AXP20x driver. In this file also two
+> sub-nodes (PEK and regulators) are documented.
 
-Am Dienstag, den 18.03.2014, 10:15 +0200 schrieb Tomi Valkeinen:
-> Add DT binding documentation for HDMI Connector.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Reviewed-by: Archit Taneja <archit@ti.com>
+PEK doesn't look to be documented, either in this patch, or any other.
+
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 > ---
->  .../devicetree/bindings/video/hdmi-connector.txt   | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+>  Documentation/devicetree/bindings/mfd/axp20x.txt   | 83 ++++++++++++++++++++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+
+I don't really know what the DT maintainers are expecting here, but I
+would have done two patches.
+
+>  2 files changed, 84 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
 > new file mode 100644
-> index 000000000000..ccccc19e2573
+> index 0000000..982aefe
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
-> @@ -0,0 +1,28 @@
-> +HDMI Connector
-> +==============
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -0,0 +1,83 @@
+> +* axp20x device tree bindings
+> +
+> +The axp20x family current members :-
+> +axp202 (X-Powers)
+> +axp209 (X-Powers)
 > +
 > +Required properties:
-> +- compatible: "hdmi-connector"
-> +- type: the HDMI connector type: "a", "b", "c", "d" or "e"
+> +- compatible 			: Should be "x-powers,axp202" or "x-powers,axp209"
+> +- interrupt-controller 		: axp20x has its own internal IRQs
+> +- #interrupt-cells 		: Should be set to 1
+> +- interrupt-parent 		: The parent interrupt controller
+> +- interrupts 			: Interrupt specifiers for interrupt sources
+> +- reg 				: The I2C slave address for the AXP chip
 > +
-> +Optional properties:
-> +- label: a symbolic name for the connector
+> +Sub-nodes:
+> +* regulators : Contain the regulator nodes. The regulators are bound using
+> +	       their name as listed here: dcdc2, dcdc3, ldo1, ldo2, ldo3,
+> +	       ldo4, ldo5.
+> +	       The bindings details of individual regulator device can be found in:
+> +	       Documentation/devicetree/bindings/regulator/regulator.txt with the
+> +	       exception of:
 > +
-> +Required nodes:
-> +- Video port for HDMI input
+> +	- dcdc-freq		: defines the work frequency of DC-DC in KHz
+> +				  (range: 750-1875). Default: 1.5MHz
+> +	- dcdc-workmode		: Optional. 1 for PWM mode, 0 for AUTO mode
+> +				  Default: AUTO mode
 
-Geert's comment also applies to all other connector types. These can be
-input connectors, too.
+Those two are x-powers specific, or would it make sense to have them
+in other drivers too?
 
-regards
-Philipp
+If the former, please add the x-powers prefix.
+
+> +
+> +Example:
+> +
+> +axp: axp20x at 34 {
+> +	reg = <0x34>;
+> +	interrupt-parent = <&nmi_intc>;
+> +	interrupts = <0 8>;
+> +
+> +	compatible = "x-powers,axp209";
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
+> +
+> +	regulators {
+
+Do we really need that subnode ? it looks useless, and we already know
+that we are defining regulators here.
+
+> +		dcdc-freq = "1500";
+
+That frequency is defined at the same level than the dcdc-workmode
+property, yet they both seem to be placed at different levels.
+
+> +
+> +		axp_dcdc2: dcdc2 {
+> +			regulator-min-microvolt = <700000>;
+> +			regulator-max-microvolt = <2275000>;
+> +			dcdc-workmode = <0>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		axp_dcdc3: dcdc3 {
+> +			regulator-min-microvolt = <700000>;
+> +			regulator-max-microvolt = <3500000>;
+> +			dcdc-workmode = <0>;
+
+It looks like those are at their default values?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/8f9575d9/attachment.sig>
