@@ -1,46 +1,50 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 10:15:46 +0200
-Subject: [PATCHv2 7/8] Doc/DT: Add DT binding documentation for TFP410 encoder
+Date: Tue, 18 Mar 2014 10:15:47 +0200
+Subject: [PATCHv2 8/8] Doc/DT: Add DT binding documentation for tpd12s015
+ encoder
 In-Reply-To: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1395130547-18633-8-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1395130547-18633-9-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for TFP410 encoder
+Add DT binding documentation for tpd12s015 encoder
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Reviewed-by: Archit Taneja <archit@ti.com>
 ---
- .../devicetree/bindings/video/ti,tfp410.txt        | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/ti,tfp410.txt
+ .../devicetree/bindings/video/ti,tpd12s015.txt     | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
 
-diff --git a/Documentation/devicetree/bindings/video/ti,tfp410.txt b/Documentation/devicetree/bindings/video/ti,tfp410.txt
+diff --git a/Documentation/devicetree/bindings/video/ti,tpd12s015.txt b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
 new file mode 100644
-index 000000000000..2cbe32a3d0bb
+index 000000000000..26e6d32e3f20
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/ti,tfp410.txt
-@@ -0,0 +1,41 @@
-+TFP410 DPI to DVI encoder
-+=========================
++++ b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+@@ -0,0 +1,44 @@
++TPD12S015 HDMI level shifter and ESD protection chip
++====================================================
 +
 +Required properties:
-+- compatible: "ti,tfp410"
++- compatible: "ti,tpd12s015"
 +
 +Optional properties:
-+- powerdown-gpios: power-down gpio
++- gpios: CT CP HPD, LS OE and HPD gpios
 +
 +Required nodes:
-+- Video port 0 for DPI input
-+- Video port 1 for DVI output
++- Video port 0 for HDMI input
++- Video port 1 for HDMI output
 +
 +Example
 +-------
 +
-+tfp410: encoder at 0 {
-+	compatible = "ti,tfp410";
-+	powerdown-gpios = <&twl_gpio 2 GPIO_ACTIVE_LOW>;
++tpd12s015: encoder at 1 {
++	compatible = "ti,tpd12s015";
++
++	gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,	/* 60, CT CP HPD */
++		<&gpio2 9 GPIO_ACTIVE_HIGH>,	/* 41, LS OE */
++		<&gpio2 31 GPIO_ACTIVE_HIGH>;	/* 63, HPD */
 +
 +	ports {
 +		#address-cells = <1>;
@@ -49,16 +53,16 @@ index 000000000000..2cbe32a3d0bb
 +		port at 0 {
 +			reg = <0>;
 +
-+			tfp410_in: endpoint at 0 {
-+				remote-endpoint = <&dpi_out>;
++			tpd12s015_in: endpoint at 0 {
++				remote-endpoint = <&hdmi_out>;
 +			};
 +		};
 +
 +		port at 1 {
 +			reg = <1>;
 +
-+			tfp410_out: endpoint at 0 {
-+				remote-endpoint = <&dvi_connector_in>;
++			tpd12s015_out: endpoint at 0 {
++				remote-endpoint = <&hdmi_connector_in>;
 +			};
 +		};
 +	};
