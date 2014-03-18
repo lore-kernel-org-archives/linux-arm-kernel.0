@@ -1,107 +1,126 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Mar 2014 10:20:28 +0000
-Subject: [PATCH RFC 4/4] arm64: boot: dts: update rtsm aemv8 dts with PSCI and
- idle states
+Date: Tue, 18 Mar 2014 10:20:27 +0000
+Subject: [PATCH RFC 3/4] drivers: cpuidle: CPU idle ARM64 driver
 In-Reply-To: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1395138028-19630-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1395138028-19630-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the RTSM dts file with PSCI bindings and nodes
-describing the AEMv8 model idle states parameters.
+This patch implements a generic CPU idle driver for ARM64 machines.
 
-PSCI function IDs compliancy with PSCI v0.2 is still under development
-so this patch provides PSCI function IDs for demonstration purposes only.
+It relies on the ARM idle states infrastructure to initialize idle
+states count and respective parameters. Current code assumes the driver
+is managing idle states on all possible CPUs but can be easily
+generalized to support heterogenous systems and build cpumasks at
+runtime using MIDRs or DT cpu nodes compatible properties.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 50 ++++++++++++++++++++++++++++------
- 1 file changed, 42 insertions(+), 8 deletions(-)
+ drivers/cpuidle/Kconfig         |  5 +++++
+ drivers/cpuidle/Kconfig.arm64   | 13 +++++++++++++
+ drivers/cpuidle/Makefile        |  4 ++++
+ drivers/cpuidle/cpuidle-arm64.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 63 insertions(+)
+ create mode 100644 drivers/cpuidle/Kconfig.arm64
+ create mode 100644 drivers/cpuidle/cpuidle-arm64.c
 
-diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-index d79de9c..7e2de34 100644
---- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-+++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-@@ -27,37 +27,71 @@
- 		serial3 = &v2m_serial3;
- 	};
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index f04e25f..9b3f613 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -35,6 +35,11 @@ depends on ARM
+ source "drivers/cpuidle/Kconfig.arm"
+ endmenu
  
-+	psci {
-+		compatible = "arm,psci";
-+		method = "smc";
-+		/*
-+		 * Function IDs usage and compliancy with PSCI v0.2 still
-+		 * under discussion.  Current IDs should be considered
-+		 * temporary for demonstration purposes.
-+		 */
-+		cpu_suspend = <0x84000001>;
-+		cpu_off = <0x84000002>;
-+		cpu_on = <0x84000003>;
-+	};
++menu "ARM64 CPU Idle Drivers"
++depends on ARM64
++source "drivers/cpuidle/Kconfig.arm64"
++endmenu
 +
- 	cpus {
- 		#address-cells = <2>;
- 		#size-cells = <0>;
+ menu "POWERPC CPU Idle Drivers"
+ depends on PPC
+ source "drivers/cpuidle/Kconfig.powerpc"
+diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
+new file mode 100644
+index 0000000..42af83a
+--- /dev/null
++++ b/drivers/cpuidle/Kconfig.arm64
+@@ -0,0 +1,13 @@
++#
++# ARM64 CPU Idle drivers
++#
++
++config ARM64_CPUIDLE
++	bool "Generic ARM64 CPU idle Driver"
++	select ARM64_IDLE_STATES
++	help
++	  Select this to enable generic cpuidle driver for ARM v8.
++	  It provides a generic idle driver whose idle states are configured
++	  at run-time through DT nodes. Idle protocol backends are initialized
++	  by the device tree parsing code on matching the entry method for
++	  the respective protocol.
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index f71ae1b..4051b37 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -15,6 +15,10 @@ obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+ obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
  
-+		idle-states {
-+			entry-method = "arm,psci";
+ ###############################################################################
++# ARM64 drivers
++obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
 +
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				index = <1>;
-+				entry-method-param = <0x1010000>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <1000>;
-+				min-residency-us = <2500>;
-+				CPU_SLEEP_0: cpu-sleep-0 {
-+					compatible = "arm,idle-state";
-+					index = <0>;
-+					entry-method-param = <0x0010000>;
-+					entry-latency-us = <40>;
-+					exit-latency-us = <100>;
-+					min-residency-us = <150>;
-+				};
-+			};
-+		};
++###############################################################################
+ # POWERPC drivers
+ obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
+ obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
+diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+new file mode 100644
+index 0000000..08ffe16
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-arm64.c
+@@ -0,0 +1,41 @@
++/*
++ * ARM64 generic CPU idle driver.
++ *
++ * Copyright (C) 2014 ARM Ltd.
++ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x0>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x1>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x2>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x3>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 	};
- 
++#include <linux/cpuidle.h>
++#include <linux/cpumask.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++#include <asm/idle_states.h>
++
++struct cpuidle_driver arm64_idle_driver = {
++	.name = "arm64_idle",
++	.owner = THIS_MODULE,
++};
++
++/*
++ * arm64_idle_init
++ *
++ * Registers the arm specific cpuidle driver with the cpuidle
++ * framework. It relies on core code to parse the idle states
++ * and initialize them in the driver accordingly.
++ */
++static int __init arm64_idle_init(void)
++{
++	int ret;
++
++	arm64_idle_driver.cpumask = (struct cpumask *) cpu_possible_mask;
++	ret = arm_init_idle_driver(&arm64_idle_driver);
++	if (ret)
++		return ret;
++	return cpuidle_register(&arm64_idle_driver, NULL);
++}
++device_initcall(arm64_idle_init);
 -- 
 1.8.4
