@@ -1,109 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Mar 2014 18:10:54 +0000
-Subject: [PATCH v2 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
- and SSDK-GH7 board
-In-Reply-To: <010f01cf3f24$7002adb0$50080910$@samsung.com>
-References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
- <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
- <20140311182922.GD3263@e106331-lin.cambridge.arm.com>
- <01c501cf3dac$022879b0$06796d10$@samsung.com>
- <20140313103329.GD5035@e106331-lin.cambridge.arm.com>
- <010f01cf3f24$7002adb0$50080910$@samsung.com>
-Message-ID: <20140318181054.GF2941@e106331-lin.cambridge.arm.com>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 18 Mar 2014 12:14:37 -0600
+Subject: [PATCH] ata: Fix compiler warning with APM X-Gene host controller
+ driver
+Message-ID: <1395166477-26408-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 01:26:31AM +0000, Kukjin Kim wrote:
-> > > > > +		cpu at 000 {
-> > > > > +			device_type = "cpu";
-> > > > > +			compatible = "arm,armv8";
-> > > >
-> > > > The "arm,armv8" should be a fallback rather than the only entry. The
-> > > > precise core should be first (see arch/arm64/boot/dts/apm-storm.dtsi for
-> > > > an example).
-> > > >
-> > > Well, do I really need another name if GH7 has just 'ARMv8 core' exactly?
-> > 
-> > Yes please. You presumably don't have "just 'ARMv8 core'", but rather a
-> > specific ARMv8 implementation.
-> > 
-> OK, so in my understanding if it is really _just_ 'ARMv8 core' from S/W point
-> of view, "arm,armv8" should be fine. I will make sure.
+This patch fixes an compiler warning with APM X-Gene host controller
+driver when compiled with DEBUG enabled.
 
-It will work, sure. But the compatible list should also list the
-specific CPU. From the S/W point of view there are likely
-implementation-defined registers which mean that no real CPU will be
-"just" an ARMv8 core.
+Signed-off-by: Loc Ho <lho@apm.com>
+---
+ drivers/ata/ahci_xgene.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-We have enough trouble with DTBs for 32-bit SoCs not listing things they
-should. I see no reason to be lax here.
-
-> > > > > +	gic: interrupt-controller at 1C000000 {
-> > > > > +		compatible = "arm,cortex-a15-gic";
-> > > >
-> > > > We should have a more specific compatible string early in the list here
-> > > > too.
-> > > >
-> > > Well, I think more specific compatible string is not required for gic, there
-> > > were discussion about using another compatible string for gic-v2. And
-> > > cortex-a15-gic should be fine at this moment and if another name is required
-> > > as per previous discussion, we will then.
-> > 
-> > While it's probably ok to have "arm,cortex-a15-gic" in the compatible
-> > list, it would be good to also have a more specific string, so we can
-> > identify the GIC implementation precisely in future (in case we need to
-> > perform any workarounds, or there's some kind of optimisation we could
-> > perform for some implementations).
-> > 
-> Hmm... let's use just it for now then add another specific string later ;-)
-
-Why not do this from the start? Then we can actually rely on the DTB
-rather than it being useless.
-
-> > > > > +	pmu {
-> > > > > +		compatible = "arm,armv8-pmuv3";
-> > > >
-> > > > This is missing a specific compatible string.
-> > > >
-> > > I don't know why I need another specific compatible string here because I
-> > > thought the 'armv8-pmuv3' is enough.
-> > 
-> > Each CPU microarchitecture has different PMU events and quirks. While
-> > the CPU PMU might be compatible with ARMv8's PMUv3, it will also have
-> > implementation-specific events, and may have quirks we need to work
-> > around in future.
-> > 
-> > As with 32-bit, we'd expect these to be of the form
-> > "${implementor},${cpu}-pmu".
-> > 
-> OK.
-> 
-> +	compatible = "samsung,gh7-pmu", "armv8-pmuv3";
-
-Is GH7 an SoC or a CPU?
-
-> > > > > +		serial at 12c20000 {
-> > > > > +			compatible = "arm,pl011", "arm,primecell";
-> > > > > +			reg = <0 0x12c20000 0 0x10000>;
-> > > > > +			interrupts = <0 420 0>;
-> > > > > +		};
-> > > >
-> > > > These are both missing required clocks.
-> > > >
-> > > Yes right.
-> > 
-> > So you'll add these?
-> > 
-> To be honest, still I'm not sure how it should be handled because regarding
-> clocks do not need to handle in the kernel for GH7. And for it, I needed to
-> use some HACKs to change clock handling in the kernel. I will provide proper
-> solution soon.
-
-Are the clocks always-on, fixed-rate clocks, or does some firmware
-manage them dynamically? We have bindings for the former.
-
-There's not much point having a DTS upstream that relies on hacks which
-are not.
-
-Cheers,
-Mark.
+diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+index fcf21f1..77c89bf 100644
+--- a/drivers/ata/ahci_xgene.c
++++ b/drivers/ata/ahci_xgene.c
+@@ -329,7 +329,7 @@ static int xgene_ahci_hw_init(struct ahci_host_priv *hpriv)
+ 	writel(0xffffffff, hpriv->mmio + HOST_IRQ_STAT);
+ 	readl(hpriv->mmio + HOST_IRQ_STAT); /* Force a barrier */
+ 	writel(0, ctx->csr_core + INTSTATUSMASK);
+-	readl(ctx->csr_core + INTSTATUSMASK); /* Force a barrier */
++	val = readl(ctx->csr_core + INTSTATUSMASK); /* Force a barrier */
+ 	dev_dbg(ctx->dev, "top level interrupt mask 0x%X value 0x%08X\n",
+ 		INTSTATUSMASK, val);
+ 
+-- 
+1.5.5
