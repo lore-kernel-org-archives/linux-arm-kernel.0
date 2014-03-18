@@ -1,61 +1,60 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 19 Mar 2014 08:59:09 +0900
-Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
- functions
-In-Reply-To: <5328625B.508@samsung.com>
-References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
- <53230404.6070601@samsung.com>
- <20140318193817.3448387b75e109e814b9c025@samsung.com>
- <5328625B.508@samsung.com>
-Message-ID: <001201cf4306$0e16e540$2a44afc0$%han@samsung.com>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 18 Mar 2014 16:59:13 -0700
+Subject: [PATCH V5 0/5] Add X-Gene platform reboot mechanism
+In-Reply-To: <1391040198-14185-1-git-send-email-fkan@apm.com>
+References: <1391040198-14185-1-git-send-email-fkan@apm.com>
+Message-ID: <CAL85gmA=7auR3_=8J7FZctU=uiu+z0ZzNNC7XhZ2hGwW2aW9oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 12:12 AM, Tomasz Figa wrote:
-> On 18.03.2014 11:38, Cho KyongHo wrote:
-> > On Fri, 14 Mar 2014 14:28:36 +0100, Tomasz Figa wrote:
-> >> On 14.03.2014 06:05, Cho KyongHo wrote:
-> >>> This patch uses managed device helper functions in the probe().
-> >>>
-> >>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> >>> ---
-> >>>    drivers/iommu/exynos-iommu.c |   64 +++++++++++++++++-------------------------
-> >>>    1 file changed, 26 insertions(+), 38 deletions(-)
-> >>>
-> >>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> >>> index 36e6b73..33b424d 100644
-> >>> --- a/drivers/iommu/exynos-iommu.c
-> >>> +++ b/drivers/iommu/exynos-iommu.c
+Just want to ping this again, since no activity for a while. I have
+added endian and
+access size related information in the documentation.  Please let me
+know if more is
+needed.
 
-[.....]
-
-> >>>    	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>>    	if (!res) {
-> >>> -		dev_dbg(dev, "Unable to find IOMEM region\n");
-> >>> -		ret = -ENOENT;
-> >>> -		goto err_init;
-> >>> +		dev_err(dev, "Unable to find IOMEM region\n");
-> >>> +		return -ENOENT;
-> >>>    	}
-> >>
-> >> No need to check for error and print message, because
-> >> devm_ioremap_resource() already checks the passed resource and handles
-> >> error cases.
-> >>
-> >
-> > Yes but devm_ioremap_resource() just tells that the given 'res' is not
-> > correct. I think the message in the driver is more informative.
-> 
-> The common practice used in Linux kernel is to not duplicate such
-> messages. It is obvious that devm_ioremap_resource() printing such
-> message is related to an IOMEM resource anyway, as you can't used it
-> with other types of resources.
-
-+1
-
-I agree with Tomasz Figa's opinion.
-These messages have been being removed from Linux kernel.
-Thank you.
-
-Best regards,
-Jingoo Han
+On Wed, Jan 29, 2014 at 4:03 PM, Feng Kan <fkan@apm.com> wrote:
+> Enable reboot driver for the X-Gene platform. Add generic syscon reboot
+> driver.
+>
+> V5 Change:
+>         - Documentation update, endian and access size.
+>
+> V4 Change:
+>         - Remove old X-Gene reboot driver
+>         - Add generic syscon reboot driver
+>         - Add DTS and Kconfig for X-Gene reboot using syscon method
+>
+> V3 Change:
+>         - Remove the reboot driver's use of acpi resource patch.
+>         - Change the reboot driver to use syscon to parse out
+>           system clock register. Remove the old method of getting
+>           register from the reboot driver directly.
+>         - Remove documentation since its now simple.
+>
+> V2 Change:
+>         - Add support for using ACPI resource.
+>
+> Feng Kan (5):
+>   power: reset: Add generic SYSCON register mapped reset
+>   power: reset: Remove X-Gene reboot driver
+>   arm64: dts: Add X-Gene reboot driver dts node
+>   arm64: Select reboot driver for X-Gene platform
+>   Documentation: power: reset: Add documentation for generic SYSCON
+>     reboot driver
+>
+>  .../bindings/power/reset/syscon-reboot.txt         |   23 +++++
+>  arch/arm64/Kconfig                                 |    2 +
+>  arch/arm64/boot/dts/apm-storm.dtsi                 |   13 +++
+>  drivers/power/reset/Kconfig                        |    8 +-
+>  drivers/power/reset/Makefile                       |    2 +-
+>  drivers/power/reset/syscon-reboot.c                |  100 +++++++++++++++++++
+>  drivers/power/reset/xgene-reboot.c                 |  103 --------------------
+>  7 files changed, 143 insertions(+), 108 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>  create mode 100644 drivers/power/reset/syscon-reboot.c
+>  delete mode 100644 drivers/power/reset/xgene-reboot.c
+>
+> --
+> 1.7.6.1
+>
