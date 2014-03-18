@@ -1,131 +1,100 @@
 From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 18 Mar 2014 14:04:38 +0100
-Subject: [PATCH 08/12] imx-drm: Use drm_display_mode timings flags.
-In-Reply-To: <1394731053-6118-8-git-send-email-denis@eukrea.com>
+Date: Tue, 18 Mar 2014 14:05:14 +0100
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <1434295.j7EcSL7GQo@avalon>
 References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
- <1394731053-6118-8-git-send-email-denis@eukrea.com>
-Message-ID: <20140318140438.7d3fd33a@ipc1.ka-ro>
+ <2777667.XJdaUSpRsD@avalon> <20140318085030.66db84b7@ipc1.ka-ro>
+ <1434295.j7EcSL7GQo@avalon>
+Message-ID: <20140318140514.451822b5@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Denis Carikli wrote:
-> The previous hardware behaviour was kept if the
-> flags are not set.
+Laurent Pinchart wrote:
+> Hi Lothar,
 > 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v10->v11:
-> - This patch was splitted-out and adapted from:
->   "Prepare imx-drm for extra display-timings retrival."
-> - The display-timings dt specific part was removed.
-> - The flags names were changed to use the DRM ones from:
->   "drm: drm_display_mode: add signal polarity flags"
-> ---
->  drivers/staging/imx-drm/imx-drm-core.c      |   10 ++++++++++
->  drivers/staging/imx-drm/imx-drm.h           |    6 ++++++
->  drivers/staging/imx-drm/imx-hdmi.c          |    3 +++
->  drivers/staging/imx-drm/imx-ldb.c           |    3 +++
->  drivers/staging/imx-drm/imx-tve.c           |    3 +++
->  drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    6 ++++--
->  drivers/staging/imx-drm/ipu-v3/ipu-di.c     |    7 ++++++-
->  drivers/staging/imx-drm/ipuv3-crtc.c        |   21 +++++++++++++++++++--
->  3 files changed, 29 insertions(+), 5 deletions(-)
+> On Tuesday 18 March 2014 08:50:30 Lothar Wa?mann wrote:
+> > Laurent Pinchart wrote:
+> > > On Monday 17 March 2014 16:14:36 Lothar Wa?mann wrote:
+> > > > Laurent Pinchart wrote:
+> > > > > On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
+> > > > > > On 03/13/2014 06:17 PM, Denis Carikli wrote:
+> > > > > > > We need a way to pass signal polarity informations
+> > > > > > > between DRM panels, and the display drivers.
+> > > > > > > 
+> > > > > > > To do that, a pol_flags field was added to drm_display_mode.
+> > > > > > > 
+> > > > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > > > > ---
+> > > > > > > ChangeLog v10->v11:
+> > > > > > > - Since the imx-drm won't be able to retrive its regulators
+> > > > > > > 
+> > > > > > >   from the device tree when using display-timings nodes,
+> > > > > > >   and that I was told that the drm simple-panel driver
+> > > > > > >   already supported that, I then, instead, added what was
+> > > > > > >   lacking to make the eukrea displays work with the
+> > > > > > >   drm-simple-panel driver.
+> > > > > > >   
+> > > > > > >   That required a way to get back the display polarity
+> > > > > > >   informations from the imx-drm driver without affecting
+> > > > > > >   userspace.
+> > > > > > > 
+> > > > > > > ---
+> > > > > > > 
+> > > > > > >  include/drm/drm_crtc.h |    8 ++++++++
+> > > > > > >  1 file changed, 8 insertions(+)
+> > > > > > > 
+> > > > > > > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> > > > > > > index f764654..61a4fe1 100644
+> > > > > > > --- a/include/drm/drm_crtc.h
+> > > > > > > +++ b/include/drm/drm_crtc.h
+> > > > > > > @@ -131,6 +131,13 @@ enum drm_mode_status {
+> > > > > > > 
+> > > > > > >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> > > > > > > 
+> > > > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> > > > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> > > > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+> > > > > > > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
+> > > > > > > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
+> > > > > > > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+> > > > > > 
+> > > > > > Could you add some description to these flags.
+> > > > > > What are *_PRESERVE flags for?
+> > > > > > Are those flags 1:1 compatible with respective 'videomode:flags'?
+> > > > > > I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH),
+> > > > > > am I right?
+> > > > > 
+> > > > > Possibly nitpicking, I wouldn't call the clock edge on which data
+> > > > > signals are generated/sampled "data polarity". This is clock polarity
+> > > > > information.
+> > > > > 
+> > > > > Have you seen cases where pixel data and DE are geenrated or need to
+> > > > > be sampled on different edges ?
+> > > > 
+> > > > DE is not a clock signal, but an 'Enable' signal whose value (high or
+> > > > low) defines the window in which the pixel data is valid.
+> > > > The flag defines whether data is valid during the HIGH or LOW period of
+> > > > DE.
+> > > 
+> > > The DRM_MODE_FLAG_POL_DE_(LOW|HIGH) do, by my impression of the proposed
+> > > new DRM_MODE_FLAG_POL_DE_*EDGE flags is that they define sampling clock
+> > > edges, not active levels.
+> > 
+> > The current naming of the flags gives the impression that they describe
+> > the sampling edges of a clock signal. But the DE signal in fact is not
+> > a clock signal but a level sensitive gating signal.
 > 
-> diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-> index b95cba1..3abeea3 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-> +++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-> @@ -29,9 +29,11 @@ enum ipuv3_type {
->  
->  #define CLK_POL_ACTIVE_LOW	0
->  #define CLK_POL_ACTIVE_HIGH	1
-> +#define CLK_POL_PRESERVE	2
->  
->  #define ENABLE_POL_NEGEDGE	0
->  #define ENABLE_POL_POSEDGE	1
-> +#define ENABLE_POL_PRESERVE	2
->  
->  /*
->   * Bitfield of Display Interface signal polarities.
-> @@ -43,10 +45,10 @@ struct ipu_di_signal_cfg {
->  	unsigned clksel_en:1;
->  	unsigned clkidle_en:1;
->  	unsigned data_pol:1;	/* true = inverted */
-> -	unsigned clk_pol:1;
-> -	unsigned enable_pol:1;
->  	unsigned Hsync_pol:1;	/* true = active high */
->  	unsigned Vsync_pol:1;
-> +	u8 clk_pol;
-> +	u8 enable_pol;
->  
->  	u16 width;
->  	u16 height;
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> index 53646aa..791080b 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> @@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
->  
->  	if (sig->clk_pol == CLK_POL_ACTIVE_HIGH)
->  		di_gen |= DI_GEN_POLARITY_DISP_CLK;
-> +	else if (sig->clk_pol == CLK_POL_ACTIVE_LOW)
-> +		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
->  
->  	ipu_di_write(di, di_gen, DI_GENERAL);
->  
-> @@ -604,10 +606,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
->  		     DI_SYNC_AS_GEN);
->  
->  	reg = ipu_di_read(di, DI_POL);
-> -	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
-> +	reg &= ~(DI_POL_DRDY_DATA_POLARITY);
->  
->  	if (sig->enable_pol == ENABLE_POL_POSEDGE)
->  		reg |= DI_POL_DRDY_POLARITY_15;
-> +	else if (sig->enable_pol == ENABLE_POL_NEGEDGE)
-> +		reg &= ~DI_POL_DRDY_POLARITY_15;
-> +
->  	if (sig->data_pol)
->  		reg |= DI_POL_DRDY_DATA_POLARITY;
->  
-> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-> index 8cfeb47..c75034e 100644
-> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
-> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> @@ -157,8 +157,25 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
->  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->  		sig_cfg.Vsync_pol = 1;
->  
-> -	sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
-> -	sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
-> +	if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_POSEDGE)
-> +		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
-> +	else if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
-> +		sig_cfg.enable_pol = ENABLE_POL_NEGEDGE;
-> +	else if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_PRESERVE)
-> +		sig_cfg.enable_pol = ENABLE_POL_PRESERVE;
-> +	else
-> +		sig_cfg.enable_pol = ENABLE_POL_POSEDGE;
-> +
-> +	if (mode->private_flags & DRM_MODE_FLAG_POL_DE_POSEDGE)
-> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_HIGH;
-> +	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_NEGEDGE)
-> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
-> +	else if (mode->private_flags & DRM_MODE_FLAG_POL_DE_PRESERVE)
-> +		sig_cfg.clk_pol = CLK_POL_PRESERVE;
-> +	else
-> +		sig_cfg.clk_pol = CLK_POL_ACTIVE_LOW;
+> That's not my point. I *know* that DE is a data gating signal with a polarity 
+> already defined by the DRM_MODE_FLAG_POL_DE_(LOW|HIGH) flags. Like all other 
+> signals it gets generated on a clock edge and is sampled on a clock edge. The 
+> DRM_MODE_FLAG_POL_DE_*EDGE flags proposed above describe seem to describe just 
 >
-This is completely messed up. POL_PIXDATA should obviously define the
-clock edge at which the pixel data is sampled and thus should determine
-the value of sig_cfg.clk_pol and POL_DE should determine the value of
-sig_cfg.enable_pol.
+The important word here is 'seem'.
 
 
-
-Lothar Wa?mann
+Lothar Wa?ann
 -- 
 ___________________________________________________________
 
