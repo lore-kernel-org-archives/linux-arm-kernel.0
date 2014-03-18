@@ -1,61 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 18 Mar 2014 21:21:35 +0530
-Subject: [PATCH] dma: Add Keystone Packet DMA Engine driver
-In-Reply-To: <4424649.TIey3uEAed@wuerfel>
-References: <1393628200-12317-1-git-send-email-santosh.shilimkar@ti.com>
- <53274F0B.5070201@ti.com> <20140318152444.GC1976@intel.com>
- <4424649.TIey3uEAed@wuerfel>
-Message-ID: <20140318155135.GF1976@intel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 18 Mar 2014 12:09:22 -0400
+Subject: [PATCH] ARM: dts: keystone: Fix domain register range for clkfftc1
+In-Reply-To: <1395148697-22481-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1395148697-22481-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <53286FB2.1040903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 04:38:25PM +0100, Arnd Bergmann wrote:
-> On Tuesday 18 March 2014 20:54:44 Vinod Koul wrote:
-> > On Mon, Mar 17, 2014 at 03:37:47PM -0400, Santosh Shilimkar wrote:
-> > > >> To simplify this bit more, you can think of this as DMA channels, flows
-> > > >> are allocated and DMA channels are enabled by DMA engine and they remains
-> > > >> enabled always as long as the channel in use. Enablling dma channel
-> > > >> actually don't start the DMA transfer but just sets up the connection/pipe
-> > > >> with peripheral and memory and vice a versa.
-> > > >>
-> > > >> All the descriptor management, triggering, sending completion interrupt or
-> > > >> hardware signal to DMAEngine all managed by centralised QMSS.
-> > > >>
-> > > >> Actual copy of data is still done by DMA hardware but its completely
-> > > >> transparent to software. DMAEngine hardware takes care of that in the
-> > > >> backyard.
-> > > > So you will use the dmaengine just for setting up the controller. Not for actual
-> > > > transfers. Those would be governed by the QMSS, right?
-> > > >
-> > > Correct.
-> > >  
-> > > > This means that someone expecting to use dmaengine API will get confused about
-> > > > this and doing part (alloc) thru dmaengine and rest (transfers) using some other
-> > > > API. This brings to me the design approach, does it really make sense creating
-> > > > dmaengine driver for this when we are not fully complying to the API
-> > > > 
-> > > Thats fair. The rationale behind usage of DMEngine was that its the closest
-> > > available subsystem which can be leveraged for this hardware. We can
-> > > pretty much use all the standard DMAEngine device tree parsing as well as
-> > > the config API to setup DMAs. 
-> > > 
-> > > I think you made your stand clear, just to confirm, you don't prefer this
-> > > driver to be a DMAEngine driver considering it doesn't fully complying to
-> > > the APIs. We could document the deviation of 'transfer' handling to avoid
-> > > any confusion.
-> > Yup, a user will just get confused as the driver doenst conform the dmaengine
-> > API. Unless someone comes up witha  strong argument on why it should be
-> > dmaengine driver and what befits we see form such a model, i would like a
-> > damengine driver to comply to standard API and usage.
+On Tuesday 18 March 2014 09:18 AM, Ivan Khoronzhuk wrote:
+> The domain register range for clkfftc1 has to be 0x0235004c
+> instead of 0x023504c0.
 > 
-> I think it would be possible to turn the QMSS driver into a library and have
-> the packet DMA code use the proper dmaengine API by calling into that code.
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+Thanks .. Applying for 3.15-fixes
+
+>  arch/arm/boot/dts/k2hk-clocks.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> The main user of packet DMA (the ethernet driver) would however still have
-> to call into QMSS directly, so I'm not sure if it's worth the effort.
-
-Wouldn't that make clients use a standard API and also help in transaction
-management by using existing infrastructure
-
--- 
-~Vinod
+> diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+> index 8855b1f..96e6536 100644
+> --- a/arch/arm/boot/dts/k2hk-clocks.dtsi
+> +++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+> @@ -209,7 +209,7 @@ clocks {
+>  		compatible = "ti,keystone,psc-clock";
+>  		clocks = <&chipclk13>;
+>  		clock-output-names = "fftc-1";
+> -		reg = <0x02350074 0xb00>, <0x023504c0 0x400>;
+> +		reg = <0x02350074 0xb00>, <0x0235004c 0x400>;
+>  		reg-names = "control", "domain";
+>  		domain-id = <19>;
+>  	};
+> 
