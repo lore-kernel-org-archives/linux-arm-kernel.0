@@ -1,29 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 18 Mar 2014 11:21:38 +1100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20140318112138.75a24ca8a0719d5b3fb98720@canb.auug.org.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Mar 2014 09:27:48 +0900
+Subject: [PATCH] ARM: shmobile: koelsch-reference: Annotate clk_names as
+ __initconst
+In-Reply-To: <5326E154.9040800@cogentembedded.com>
+References: <1395022796-3199-1-git-send-email-horms+renesas@verge.net.au>
+ <5326E154.9040800@cogentembedded.com>
+Message-ID: <20140318002748.GB6275@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Mar 17, 2014 at 03:49:40PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 17-03-2014 6:19, Simon Horman wrote:
+> 
+>    Apparently you meant clk_enables in the subject, not clk_names.
 
-Today's linux-next merge of the mvebu tree got a conflict in
-arch/arm/boot/dts/Makefile between commit 8fc1b0f87d9f ("ARM: qcom: Split
-Qualcomm support into legacy and multiplatform") from the arm-soc tree
-and commits 97623e934388 ("Merge branch 'mvebu/dt' into for-next") and
-54cab10f63f2 ("Merge branch 'mvebu/soc3' into next/dt") from the mvebu
-tree.
+Thanks, I have queued up the following:
 
-I fixed it up (which produced no git diff) and can carry the fix as
-necessary (no action is required).
 
+From: Simon Horman <horms+renesas@verge.net.au>
+
+ARM: shmobile: koelsch-reference: Annotate clk_enables as __initconst
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index a39114a..63117d52 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -110,7 +110,7 @@ static const struct clk_name clk_names[] __initconst = {
+ /*
+  * This is a really crude hack to work around core platform clock issues
+  */
+-static const struct clk_name clk_enables[] = {
++static const struct clk_name clk_enables[] __initconst = {
+ 	{ "ether", NULL, "ee700000.ethernet" },
+ 	{ "i2c2", NULL, "e6530000.i2c" },
+ 	{ "msiof0", NULL, "e6e20000.spi" },
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/74ddaf2c/attachment.sig>
+1.8.5.2
