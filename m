@@ -1,34 +1,71 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 18 Mar 2014 18:56:49 +0100
-Subject: [PATCH v2 7/7] sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT level
+Date: Tue, 18 Mar 2014 18:56:48 +0100
+Subject: [PATCH v2 6/7] sched: ARM: create a dedicated scheduler topology table
 In-Reply-To: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
 References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1395165409-18055-8-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1395165409-18055-7-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the power domain dependency at SMT level of Power8 but keep the flag
-clear at CPU level. The goal is to consolidate tasks on the threads of a
-core up to a level as decribed in the link below:
-https://lkml.org/lkml/2014/3/12/16
+Create a dedicated topology table for ARM which will create new level to
+differentiate CPUs that can or not powergate independantly from others.
+
+The patch gives an example of how to add domain that will take advantage of
+SD_SHARE_POWERDOMAIN.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- arch/powerpc/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/topology.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-index c9cade5..fbbac3c 100644
---- a/arch/powerpc/kernel/smp.c
-+++ b/arch/powerpc/kernel/smp.c
-@@ -759,7 +759,7 @@ int setup_profiling_timer(unsigned int multiplier)
- /* cpumask of CPUs with asymetric SMT dependancy */
- static const int powerpc_smt_flags(void)
- {
--	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
-+	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES | SD_SHARE_POWERDOMAIN;
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 0bc94b1..71e1fec 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -185,6 +185,15 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
+ 	return &cpu_topology[cpu].core_sibling;
+ }
  
- 	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
- 		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
++/*
++ * The current assumption is that we can power gate each core independently.
++ * This will be superseded by DT binding once available.
++ */
++const struct cpumask *cpu_corepower_mask(int cpu)
++{
++	return &cpu_topology[cpu].thread_sibling;
++}
++
+ static void update_siblings_masks(unsigned int cpuid)
+ {
+ 	struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
+@@ -266,6 +275,20 @@ void store_cpu_topology(unsigned int cpuid)
+ 		cpu_topology[cpuid].socket_id, mpidr);
+ }
+ 
++static inline const int cpu_corepower_flags(void)
++{
++	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
++}
++
++static struct sched_domain_topology_level arm_topology[] = {
++#ifdef CONFIG_SCHED_MC
++	{ cpu_corepower_mask, cpu_corepower_flags, SD_INIT_NAME(GMC) },
++	{ cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
++#endif
++	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
++	{ NULL, },
++};
++
+ /*
+  * init_cpu_topology is called at boot when only one cpu is running
+  * which prevent simultaneous write access to cpu_topology array
+@@ -289,4 +312,7 @@ void __init init_cpu_topology(void)
+ 	smp_wmb();
+ 
+ 	parse_dt_topology();
++
++	/* Set scheduler topology descriptor */
++	set_sched_topology(arm_topology);
+ }
 -- 
 1.9.0
