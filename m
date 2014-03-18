@@ -1,57 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Mar 2014 17:18:02 +0100
-Subject: [RFC] ASoC: samsung: don't build pcm and spdif on exynos
-Message-ID: <201403181718.02780.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 18 Mar 2014 12:19:31 -0400
+Subject: [PATCH] dma: Add Keystone Packet DMA Engine driver
+In-Reply-To: <20140318152444.GC1976@intel.com>
+References: <1393628200-12317-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140311102357.GR1976@intel.com> <531F6908.4010104@ti.com>
+ <20140312160017.GY1976@intel.com> <5320CEC4.1060306@ti.com>
+ <20140317044223.GA1976@intel.com> <53274F0B.5070201@ti.com>
+ <20140318152444.GC1976@intel.com>
+Message-ID: <53287213.3060705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit d37bdf736d9b "ASoC: samsung: Use ASoC dmaengine code where
-possible", Mark Brown changed the EXYNOS ASoC code to no longer
-use the private dma interfaces that are standing in the way of
-multiplatform enablement.
+On Tuesday 18 March 2014 11:24 AM, Vinod Koul wrote:
+> On Mon, Mar 17, 2014 at 03:37:47PM -0400, Santosh Shilimkar wrote:
+>>>> To simplify this bit more, you can think of this as DMA channels, flows
+>>>> are allocated and DMA channels are enabled by DMA engine and they remains
+>>>> enabled always as long as the channel in use. Enablling dma channel
+>>>> actually don't start the DMA transfer but just sets up the connection/pipe
+>>>> with peripheral and memory and vice a versa.
+>>>>
+>>>> All the descriptor management, triggering, sending completion interrupt or
+>>>> hardware signal to DMAEngine all managed by centralised QMSS.
+>>>>
+>>>> Actual copy of data is still done by DMA hardware but its completely
+>>>> transparent to software. DMAEngine hardware takes care of that in the
+>>>> backyard.
+>>> So you will use the dmaengine just for setting up the controller. Not for actual
+>>> transfers. Those would be governed by the QMSS, right?
+>>>
+>> Correct.
+>>  
+>>> This means that someone expecting to use dmaengine API will get confused about
+>>> this and doing part (alloc) thru dmaengine and rest (transfers) using some other
+>>> API. This brings to me the design approach, does it really make sense creating
+>>> dmaengine driver for this when we are not fully complying to the API
+>>>
+>> Thats fair. The rationale behind usage of DMEngine was that its the closest
+>> available subsystem which can be leveraged for this hardware. We can
+>> pretty much use all the standard DMAEngine device tree parsing as well as
+>> the config API to setup DMAs. 
+>>
+>> I think you made your stand clear, just to confirm, you don't prefer this
+>> driver to be a DMAEngine driver considering it doesn't fully complying to
+>> the APIs. We could document the deviation of 'transfer' handling to avoid
+>> any confusion.
+> Yup, a user will just get confused as the driver doenst conform the dmaengine
+> API. Unless someone comes up witha  strong argument on why it should be
+> dmaengine driver and what befits we see form such a model, i would like a
+> damengine driver to comply to standard API and usage.
+> 
+OK thanks !!
 
-However, in 313367e7bfa "ASoC: Samsung: Update Kconfig for I2S,SPDIF
-and PCM audio", two new users of that interface appeared, since it
-is now possible to enable SND_SOC_SAMSUNG_SMDK_SPDIF and
-SND_SOC_SMDK_WM8994_PCM on all Samsung SoCs including EXYNOS.
-
-This patch does a partial revert of 313367e7bfa by allowing these
-drivers on all samsung platforms except EXYNOS, so we can proceed
-with the multiplatform patches.
-
-If support for these drivers is actually needed on EXYNOS machines,
-the drivers should probably first be moved over to use the dmaengine
-code.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sangsu Park <sangsu4u.park@samsung.com>
-Cc: Sangbeom Kim <sbkim73@samsung.com>
-Cc: Padmavathi Venna <padma.v@samsung.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
-Padma, could you comment on this? When you did the patch that introduced
-the usage of these drivers on EXYNOS, did you actually need that for
-a particular machine that would get broken by this revert?
-
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 7b610a8..efc01e0 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -167,7 +167,7 @@ config SND_SOC_GONI_AQUILA_WM8994
- 
- config SND_SOC_SAMSUNG_SMDK_SPDIF
- 	tristate "SoC S/PDIF Audio support for SMDK"
--	depends on SND_SOC_SAMSUNG
-+	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
- 	select SND_SAMSUNG_SPDIF
- 	help
- 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
-@@ -183,7 +183,7 @@ config SND_SOC_SMDK_WM8580_PCM
- 
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG
-+	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
- 	depends on I2C=y
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
+Regards,
+Santosh
