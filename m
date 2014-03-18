@@ -1,51 +1,64 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 18 Mar 2014 11:13:35 +0100
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <20140317232359.GA8943@kroah.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
- <20140317232359.GA8943@kroah.com>
-Message-ID: <CACQ1gAjNfZ5e7tp6zpXZfceyDeORTODxHMN-YM3hY0Zz-vEefA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 18 Mar 2014 10:20:24 +0000
+Subject: [PATCH RFC 0/4] arm64: generic idle states
+Message-ID: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-18 0:23 GMT+01:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
->> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
->> GPIO.
->> This will be useful for many boards which have a serial controller that
->> only handle CTS/RTS pins (or even just RX/TX).
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->
-> I can't take this series through my tty tree as the non-tty patches
-> don't apply, so feel free to take them through whatever tree is needed.
->
-> greg k-h
+Idle states on most ARM platforms can be characterized by a set of
+parameters that are platform agnostic and describe the HW idle states
+features. So far, CPU idle drivers for ARM platforms required the definition
+of parameters through static tables, duplicating control data for different
+platforms. Moreover, the lack of standardization on firmware interfaces
+hampered any standardization effort, resulting in CPU idle drivers for ARM
+platforms containing duplicated code and platform specific power down routines.
 
-To clarify things, here are the patches that this series needs, on top
-of 3.14-rc6:
-tty/tty-next tree: ddaa603739fe tty/serial: at91: use dev_err instead of printk
-tty/tty-next tree: a3c1fa99f4d2 tty/serial: at91: remove unused open/close hooks
-ukl/dropmachtimexh-fixup: 354e57f3a0a2 ARM/serial: at91: switch atmel
-serial to use gpiolib
-tree unknown: [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
-pinctrl/for-next: 8af584b86836 pinctrl: at91: implement get_direction
+The introduction of the PSCI firmware interface, and more in general, well
+defined suspend back-ends, allows the definition of generic idle states and
+the respective kernel infrastructure to support them.
 
-after that, the series applies cleanly.
-the patch "[PATCH v3 5/7] ARM: at91: gpio: implement get_direction"
-has been acked-by Linus, but I didn't found it in a tree.
+Building on top of DT idle states bindings[1], that standardize idle states
+parameters and corresponding suspend back-ends, this patchset provides code
+that parses DT idle states nodes and builds at run-time the control data
+infrastructure required by the generic ARM64 CPU idle driver, that just
+becomes a container for idle states storage.
 
-onto next-20140318, it only needs "[PATCH v3 5/7] ARM: at91: gpio:
-implement get_direction" .
+Idle states define an entry method (eg PSCI), that requires the respective
+kernel back-end to be invoked to initialize idle states parameters, so that
+when the idle driver executes the back-end specific entry method a table
+look-up can be carried out to retrieve the corresponding idle state parameter.
 
-trees:
-tty: git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
-ukl: git://git.pengutronix.de/git/ukl/linux.git
-pinctrl: git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
+The idle states bindings can be extended with new back-ends; the idle
+states parser must be updated accordingly so that the corresponding back
+end initializer can be invoked at boot time for parameters initialization.
 
+Patchset has been tested on AEM v8 models, on top of the bootwrapper PSCI CPU
+SUSPEND implementation which provides simulated core power gating.
 
-Richard.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/233478.html
+
+Lorenzo Pieralisi (4):
+  arm64: kernel: implement DT based idle states infrastructure
+  arm64: add PSCI CPU_SUSPEND based cpu_suspend support
+  drivers: cpuidle: CPU idle ARM64 driver
+  arm64: boot: dts: update rtsm aemv8 dts with PSCI and idle states
+
+ arch/arm64/Kconfig                     |   4 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts |  50 ++++-
+ arch/arm64/include/asm/idle_states.h   |  20 ++
+ arch/arm64/include/asm/psci.h          |   6 +
+ arch/arm64/kernel/Makefile             |   1 +
+ arch/arm64/kernel/idle_states.c        | 398 +++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/psci.c               |  84 +++++++
+ drivers/cpuidle/Kconfig                |   5 +
+ drivers/cpuidle/Kconfig.arm64          |  13 ++
+ drivers/cpuidle/Makefile               |   4 +
+ drivers/cpuidle/cpuidle-arm64.c        |  41 ++++
+ 11 files changed, 618 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/include/asm/idle_states.h
+ create mode 100644 arch/arm64/kernel/idle_states.c
+ create mode 100644 drivers/cpuidle/Kconfig.arm64
+ create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+
+-- 
+1.8.4
