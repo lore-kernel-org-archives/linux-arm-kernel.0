@@ -1,61 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Mar 2014 10:58:51 +0000
-Subject: [PATCH v2 3/8] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <20140318101554.GZ27873@lukather>
-References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-4-git-send-email-carlo@caione.org>
- <20140318090013.GU27873@lukather> <20140318095002.GM25478@lee--X1>
- <20140318101554.GZ27873@lukather>
-Message-ID: <20140318105851.GO25478@lee--X1>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 18 Mar 2014 16:30:08 +0530
+Subject: [PATCH RESEND] ARM: SPEAr1340: static-ize SATA functions
+In-Reply-To: <1678906.b5uh0Nm7QE@amdc1032>
+References: <1678906.b5uh0Nm7QE@amdc1032>
+Message-ID: <CAOh2x=nr1mrkcFk8nQFwNXxCqMPiN1Hq4=f1wwN=i65StawJ1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > This patch add support for the Power Enable Key found on MFD AXP202 and
-> > > > AXP209. Besides the basic support for the button, the driver adds two
-> > > > entries in sysfs to configure the time delay for power on/off.
-> > > > 
-> > > > Signed-off-by: Carlo Caione <carlo@caione.org>
-> > > > ---
-> > > >  drivers/input/misc/Kconfig      |  11 ++
-> > > >  drivers/input/misc/Makefile     |   1 +
-> > > >  drivers/input/misc/axp20x-pek.c | 267 ++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 279 insertions(+)
-> > > >  create mode 100644 drivers/input/misc/axp20x-pek.c
-> > > 
-> > > From what I understood of the MFD framework, you usually have a MFD
-> > > core driver that gets loaded from the DT and instantiate its various
-> > > functions through sub-devices, that are registered through
-> > > mfd_add_devices, and the drivers for these sub-devices are supported
-> > > in sub-drivers that are located in the driver/mfd, alongside the core
-> > > driver.
-> > > 
-> > > I believe that such a pattern allows for two interesting things:
-> > >   - You don't have to search around the whole kernel tree to find
-> > >     where a given sub-feature is supported.
-> > >   - You don't have to cripple your DT with instantiation of all the
-> > >     subcomponents, while you only really have one device.
-> > > 
-> > > Do you have a reason for not following this pattern?
-> > 
-> > Sorry Maxime, this is not the case.
-> > 
-> > If an MFD contains Regulators and USB & GPIO Controllers, I'd expect
-> > to see the device represented in the following way:
-> > 
-> >   drivers/mfd/<id>.c
-> >   drivers/{gpio,pinctrl}/{gpio,pinctrl}-<id>.c
-> >   drivers/regulator/<id>-regulator.c
-> >   drivers/usb/host/<id>.c
-> 
-> Oh, ok. Nevermind then :)
-> 
-> Just out of curiosity, some drivers at least seem to follow that trend
-> in drivers/mfd, is there any reason for this (other than historical) ?
+On Tue, Mar 18, 2014 at 4:28 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Make sata_miphy_exit(), sata_suspend() and sata_resume() static.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> Previous submission:
+> https://lkml.org/lkml/2013/10/4/369
+>
+>  arch/arm/mach-spear/spear1340.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+> index 3fb6834..e0e4251 100644
+> --- a/arch/arm/mach-spear/spear1340.c
+> +++ b/arch/arm/mach-spear/spear1340.c
+> @@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
+>         return 0;
+>  }
+>
+> -void sata_miphy_exit(struct device *dev)
+> +static void sata_miphy_exit(struct device *dev)
+>  {
+>         writel(0, SPEAR1340_PCIE_SATA_CFG);
+>         writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+> @@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
+>         msleep(20);
+>  }
+>
+> -int sata_suspend(struct device *dev)
+> +static int sata_suspend(struct device *dev)
+>  {
+>         if (dev->power.power_state.event == PM_EVENT_FREEZE)
+>                 return 0;
+> @@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
+>         return 0;
+>  }
+>
+> -int sata_resume(struct device *dev)
+> +static int sata_resume(struct device *dev)
+>  {
+>         if (dev->power.power_state.event == PM_EVENT_THAW)
+>                 return 0;
 
-Would you mind providing an example?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
