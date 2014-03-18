@@ -1,48 +1,74 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Mar 2014 23:12:39 +0900
-Subject: [GIT PULL 1/2] Samsung 2nd cleanup for v3.15
-Message-ID: <53285457.80900@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 18 Mar 2014 15:26:48 +0100
+Subject: [PATCH v11 20/27] iommu/exynos: allow having multiple System MMUs
+ for a master H/W
+In-Reply-To: <20140318220128.564740c88d06b86c9c5c10e3@samsung.com>
+References: <20140314141050.c8bedcb66532d277c496796d@samsung.com>
+ <53232A53.4040708@samsung.com>
+ <20140318220128.564740c88d06b86c9c5c10e3@samsung.com>
+Message-ID: <532857A8.5060000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d9671ca923445aa870ecc34df3db01dd602d87fc:
 
-   ARM: EXYNOS: Remove uncompress.h (2014-02-24 09:39:18 +0900)
 
-are available in the git repository at:
+On 18.03.2014 14:01, Cho KyongHo wrote:
+> On Fri, 14 Mar 2014 17:12:03 +0100, Tomasz Figa wrote:
+>> Hi KyongHo,
+>>
+>> On 14.03.2014 06:10, Cho KyongHo wrote:
+>>> Some master device descriptor like fimc-is which is an abstraction
+>>> of very complex H/W may have multiple System MMUs. For those devices,
+>>> the design of the link between System MMU and its master H/W is needed
+>>> to be reconsidered.
+>>>
+>>> A link structure, sysmmu_list_data is introduced that provides a link
+>>> to master H/W and that has a pointer to the device descriptor of a
+>>> System MMU. Given a device descriptor of a master H/W, it is possible
+>>> to traverse all System MMUs that must be controlled along with the
+>>> master H/W.
+>>
+>> NAK.
+>>
+>> A device driver should handle particular hardware instances separately,
+>> without abstracting a virtual hardware instance consisting of multiple
+>> physical ones.
+>>
+>> If such abstraction is needed, it should be done above the exynos-iommu
+>> driver, e.g. by something like iommu-composite driver that would
+>> aggregate several IOMMUs. Keep in mind that such IOMMUs in a group could
+>> be different, e.g. different Exynos SysMMU versions or even completely
+>> different IPs handled by different drivers.
+>>
+>> Still, I don't think there is a real need for such abstraction. Instead,
+>> related drivers shall be fixed to properly handle multiple memory
+>> masters and their IOMMUs.
+>>
+>
+> G2D, Scalers and FIMD of Exynos5420 has 2 System MMUs while aother SoC like
+> Exynos5250 does not.
+>
+> I don't understand why you are negative to this approach.
+> This is the simplest than the others.
+>
+> Let me show you an example.
+> FIMC-IS driver just controls MCU in FIMC-IS subsystem and the firmware of
+> the MCU controls all other peripherals in the subsystem. Each peripherals
+> have their own System MMU. Moreover, the configuration of the peripherals
+> varies according to the SoCs.
+>
+> If System MMU driver accepts multiple masters, everything is done in DT.
+> But I worry that it is not easy if System MMU driver does not support
+> multiple masters.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-cleanup-2
+I believe I have stated enough reasons why this kind of implementation 
+is bad. I'm not going to waste time repeating myself.
 
-for you to fetch changes up to 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
+Your concerns presented above are valid, however they are not related to 
+what is wrong with this patch. I have given you two proper ways to 
+handle this, none should be forced upon particular IOMMU master drivers 
+- their authors should have the chance to select the method that works 
+best for them.
 
-   ARM: SAMSUNG: remove all custom uncompress.h (2014-03-11 22:05:18 +0900)
-
-----------------------------------------------------------------
-Samsung cleanup-2 for v3.15
-- use generic uncompress.h and remove all custom
-   uncompress.h in mach-s3c24xx, s3c64xx, s5p64x0,
-   s5pc100, s5pv210 and plat-samsung directories.
-
-Note that based on previous tags/samsung-cleanup
-
-----------------------------------------------------------------
-Heiko Stuebner (2):
-       ARM: SAMSUNG: use generic uncompress.h
-       ARM: SAMSUNG: remove all custom uncompress.h
-
-  arch/arm/Kconfig.debug                          |   4 +-
-  arch/arm/mach-s3c24xx/include/mach/uncompress.h |  57 --------
-  arch/arm/mach-s3c64xx/include/mach/uncompress.h |  31 -----
-  arch/arm/mach-s5p64x0/include/mach/uncompress.h |  34 -----
-  arch/arm/mach-s5pc100/include/mach/uncompress.h |  30 ----
-  arch/arm/mach-s5pv210/include/mach/uncompress.h |  28 ----
-  arch/arm/plat-samsung/include/plat/uncompress.h | 175 
-------------------------
-  7 files changed, 2 insertions(+), 357 deletions(-)
-  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/uncompress.h
-  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/uncompress.h
-  delete mode 100644 arch/arm/mach-s5p64x0/include/mach/uncompress.h
-  delete mode 100644 arch/arm/mach-s5pc100/include/mach/uncompress.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/uncompress.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/uncompress.h
+Best regards,
+Tomasz
