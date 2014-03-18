@@ -1,98 +1,61 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 18 Mar 2014 08:50:30 +0100
-Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
-In-Reply-To: <2777667.XJdaUSpRsD@avalon>
-References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
- <2166863.3Fn4k2rvaz@avalon> <20140317161436.06169b33@ipc1.ka-ro>
- <2777667.XJdaUSpRsD@avalon>
-Message-ID: <20140318085030.66db84b7@ipc1.ka-ro>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 18 Mar 2014 09:04:43 +0100
+Subject: [PATCH v2 3/5] net: cpsw: Add control-module macid driver
+In-Reply-To: <20140317171136.GC30471@atomide.com>
+References: <1394888864-11007-1-git-send-email-mpa@pengutronix.de>
+ <1394888864-11007-4-git-send-email-mpa@pengutronix.de>
+ <20140317171136.GC30471@atomide.com>
+Message-ID: <20140318080443.GH11360@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Laurent Pinchart wrote:
-> Hi Lothar,
+On Mon, Mar 17, 2014 at 10:11:36AM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> On Monday 17 March 2014 16:14:36 Lothar Wa?mann wrote:
-> > Laurent Pinchart wrote:
-> > > On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
-> > > > On 03/13/2014 06:17 PM, Denis Carikli wrote:
-> > > > > We need a way to pass signal polarity informations
-> > > > > between DRM panels, and the display drivers.
-> > > > > 
-> > > > > To do that, a pol_flags field was added to drm_display_mode.
-> > > > > 
-> > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > > ---
-> > > > > ChangeLog v10->v11:
-> > > > > - Since the imx-drm won't be able to retrive its regulators
-> > > > > 
-> > > > >   from the device tree when using display-timings nodes,
-> > > > >   and that I was told that the drm simple-panel driver
-> > > > >   already supported that, I then, instead, added what was
-> > > > >   lacking to make the eukrea displays work with the
-> > > > >   drm-simple-panel driver.
-> > > > >   
-> > > > >   That required a way to get back the display polarity
-> > > > >   informations from the imx-drm driver without affecting
-> > > > >   userspace.
-> > > > > 
-> > > > > ---
-> > > > > 
-> > > > >  include/drm/drm_crtc.h |    8 ++++++++
-> > > > >  1 file changed, 8 insertions(+)
-> > > > > 
-> > > > > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-> > > > > index f764654..61a4fe1 100644
-> > > > > --- a/include/drm/drm_crtc.h
-> > > > > +++ b/include/drm/drm_crtc.h
-> > > > > @@ -131,6 +131,13 @@ enum drm_mode_status {
-> > > > > 
-> > > > >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
-> > > > > 
-> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
-> > > > > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
-> > > > > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
-> > > > > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
-> > > > 
-> > > > Could you add some description to these flags.
-> > > > What are *_PRESERVE flags for?
-> > > > Are those flags 1:1 compatible with respective 'videomode:flags'?
-> > > > I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
-> > > > right?
-> > > 
-> > > Possibly nitpicking, I wouldn't call the clock edge on which data signals
-> > > are generated/sampled "data polarity". This is clock polarity
-> > > information.
-> > > 
-> > > Have you seen cases where pixel data and DE are geenrated or need to be
-> > > sampled on different edges ?
-> > 
-> > DE is not a clock signal, but an 'Enable' signal whose value (high or
-> > low) defines the window in which the pixel data is valid.
-> > The flag defines whether data is valid during the HIGH or LOW period of
-> > DE.
+> * Markus Pargmann <mpa@pengutronix.de> [140315 06:12]:
+> > This driver extracts the hardware macid from the control module of
+> > am335x processors. It exports a function cpsw_ctrl_macid_read for cpsw
+> > to get the macid from within the processor.
 > 
-> The DRM_MODE_FLAG_POL_DE_(LOW|HIGH) do, by my impression of the proposed new 
-> DRM_MODE_FLAG_POL_DE_*EDGE flags is that they define sampling clock edges, not 
-> active levels.
+> Few things have improved recently :) This can be now implemented
+> in a much cleaner way using regmap against the already defined syscon
+> node.
 > 
-The current naming of the flags gives the impression that they describe
-the sampling edges of a clock signal. But the DE signal in fact is not
-a clock signal but a level sensitive gating signal.
+> For an example, see how the MMC PBIAS regulator is using regmap
+> in Linux next:
+> 
+> 11469e0bb1 (regulator: add pbias regulator support)
+> cd042fe5c1 (ARM: dts: add pbias dt node)
+> 
+> That avoids the problem of the tinkering with SoC specific registers
+> that belong to another device.
+> 
+> So please update this series for regmap, let's not add more mapping
+> of system control module registers to the drivers.
 
+Thanks, I will have a look into this and update the series.
 
-Lothar Wa?mann
+Regards,
+
+Markus
+
+> 
+> Regards,
+> 
+> Tony
+> 
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/fa76d622/attachment.sig>
