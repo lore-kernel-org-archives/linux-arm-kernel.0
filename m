@@ -1,27 +1,18 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 18 Mar 2014 10:33:57 +0800
-Subject: [PATCH 3/3] defconfig: arm: sama5_defconfig: update
-In-Reply-To: <1395110037-23151-1-git-send-email-wenyou.yang@atmel.com>
-References: <1395110037-23151-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1395110037-23151-4-git-send-email-wenyou.yang@atmel.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 17 Mar 2014 20:19:16 -0700
+Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
+ structure
+In-Reply-To: <20140318002822.372705594@telegraphics.com.au>
+References: <20140318002822.372705594@telegraphics.com.au>
+Message-ID: <1395112756.20860.1.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to enable CONFIG_AT91_SLOW_CLOCK
+On Tue, 2014-03-18 at 11:28 +1100, Finn Thain wrote:
+> This patch series addresses several issues with NCR5380 drivers:
+[]
+> 3. Broken debugging code.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/configs/sama5_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+My preference would be to change dprintk to scsi_dbg
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index dc3881e..a15879c 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -201,3 +201,4 @@ CONFIG_CRYPTO_DEV_ATMEL_TDES=y
- CONFIG_CRYPTO_DEV_ATMEL_SHA=y
- CONFIG_CRC_CCITT=m
- CONFIG_CRC_ITU_T=m
-+CONFIG_AT91_SLOW_CLOCK=y
--- 
-1.7.9.5
+Seems sensible otherwise.
