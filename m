@@ -1,41 +1,111 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 18 Mar 2014 16:24:17 +0530
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <532815A8.9090807@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5326F8C5.5090406@ti.com>
- <CACRpkdYZMzw31NkA4uSq+ZowzOnZgZthXhZri-eJY2Ozb8aNRQ@mail.gmail.com>
- <532805AE.9000806@ti.com> <532815A8.9090807@ahsoftware.de>
-Message-ID: <532825D9.4050708@ti.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 18 Mar 2014 03:56:48 -0700
+Subject: [PATCH 1/2] mailbox: samsung: added support for samsung mailbox
+In-Reply-To: <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-2-git-send-email-ks.giri@samsung.com>
+ <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
+Message-ID: <1395140208.2812.15.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On Tue, 2014-03-18 at 15:52 +0530, Girish KS wrote:
+> On Mon, Mar 17, 2014 at 5:33 PM, Girish K S <ks.giri@samsung.com> wrote:
 
-On Tuesday 18 March 2014 03:15 PM, Alexander Holler wrote:
-> Am 18.03.2014 09:37, schrieb Sekhar Nori:
-> 
->> It is safe - at the least it does not break anything that is already
->> working. I guess the decision to put it into -rc depends on whether you
->> consider out of tree dtbs to be a valid usecase for the kernel.
-> 
-> That's all DT is about, getting rid of the necessity for in-tree
-> hw-descriptions. ;)
-> 
-> But I don't need any rush here, I'm just unable to understand why the
-> -rc phase isn't used for bug fixing as I believe that's what this phase
-> is for.
+Hi, just some trivial notes about the patch
 
-The push back you are seeing is because this is pretty late in -rc
-cycle. If this push back was not there the bug fix cycle would probably
-never close.
+> > diff --git a/drivers/mailbox/mailbox-samsung.c b/drivers/mailbox/mailbox-samsung.c
+[]
+> > @@ -0,0 +1,354 @@
+> > +/*
+> > + * Copyright 2013 Samsung Electronics Co. Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms and conditions of the GNU General Public License,
+> > + * version 2, as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License along with
+> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
 
-In all probability, if this was -rc2 or even -rc3 there would not be so
-much discussion.
+Please add
 
-Thanks,
-Sekhar
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+before any #include so that error messages are
+prefixed in the output with "samsung-mailbox: "
+and the reader of the log has an idea what subsystem
+is emitting messages.
+
+> > +#include <linux/err.h>
+> > +#include <linux/module.h>
+> > +#include <linux/slab.h>
+[]
+> > +static int samsung_mbox_send_data(struct ipc_link *link, void *msg)
+> > +{
+[]
+> > +       /* Lock the mailbox for this transaction with the client id */
+> > +       writel(val, ipc_base + MBOX_REG_TXLOCK);
+> > +       do {
+> > +               if (time_after(jiffies, timeout)) {
+> > +                       pr_err("cannot aquire the lock\n");
+
+This would be prefixed appropriately via pr_fmt.
+Also, there's a typo of aquire here: acquire
+
+> > +static int samsung_mbox_startup(struct ipc_link *link, void *ignored)
+> > +{
+[]
+> > +       ret = devm_request_irq(dev, samsung_link->irq, samsung_ipc_handler,
+> > +                                       IRQF_SHARED, link->link_name,
+> > +                                       samsung_link);
+> > +       if (unlikely(ret)) {
+> > +               pr_err("failed to register mailbox interrupt:%d\n", ret);
+
+Here too it would be prefixed
+
+> > +static int samsung_mbox_probe(struct platform_device *pdev)
+> > +{
+> > +       struct samsung_mbox *samsung_mbox;
+> > +       struct samsung_mlink *mbox_link;
+> > +       struct resource res;
+> > +       struct ipc_link **link;
+> > +       int loop, count, ret = 0;
+> > +       struct device_node *node = pdev->dev.of_node;
+> > +
+> > +       if (!node) {
+> > +               dev_err(&pdev->dev, "driver doesnt support"
+> > +                               "non-dt devices\n");
+
+Please coalesce the format fragments.
+
+You would notice the missing space between
+"support" and "non-dt"
+
+		dev_err(&pdev->dev, "driver does not support non-dt devices\n");
+
+It's OK to exceed 80 columns for these format strings.
+
+> > diff --git a/include/linux/mailbox-samsung.h b/include/linux/mailbox-samsung.h
+[]
+> > +static inline unsigned long get_alligned_buffer(void)
+
+Typo: There's one l in aligned
+
+> > +{
+> > +       return __get_free_pages(GFP_KERNEL, REQUEST_PAGE_ORDER);
+> > +}
+> > +
+> > +static inline void put_alligned_buffer(unsigned long addr)
+> > +{
+
+here too
+
+> > +       free_pages(addr, REQUEST_PAGE_ORDER);
+> > +}
+> > +
