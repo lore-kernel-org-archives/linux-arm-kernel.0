@@ -1,118 +1,142 @@
-From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
-Date: Tue, 18 Mar 2014 17:04:36 -0500
-Subject: [PATCH 2/2] v1 ARM: sun4i: spi: Allow Tx transfers larger than FIFO
- size
-Message-ID: <1521319.la1khlz7Zz@nukelap.gtech>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 18 Mar 2014 15:08:06 -0700
+Subject: [UPDATED PATCH v3 10/52] arm,
+ kvm: Fix CPU hotplug callback registration
+In-Reply-To: <53281E89.7080201@linux.vnet.ibm.com>
+References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
+ <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
+ <20140312232127.GC24808@cbox> <53229701.8050405@linux.vnet.ibm.com>
+ <20140314191055.GF28661@cbox> <53281E89.7080201@linux.vnet.ibm.com>
+Message-ID: <CAMJs5B9kVX9urC2PCXY2kbH-j1fA8bge0KQa1z0nK+A689SNYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable and use the Tx FIFO 3/4 interrupt to replenish the FIFO on
-large SPI bursts. This requires more care in when the interrupt is
-left enabled, as this interrupt will continually trigger when the FIFO
-is less than 1/4 full, even though we acknowledge it.
+On 18 March 2014 03:23, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> On 03/15/2014 12:40 AM, Christoffer Dall wrote:
+>> On Fri, Mar 14, 2014 at 11:13:29AM +0530, Srivatsa S. Bhat wrote:
+>>> On 03/13/2014 04:51 AM, Christoffer Dall wrote:
+>>>> On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
+>>>>> Subsystems that want to register CPU hotplug callbacks, as well as perform
+>>>>> initialization for the CPUs that are already online, often do it as shown
+>>>>> below:
+>>>>>
+> [...]
+>>>> Just so we're clear, the existing code was simply racy as not prone to
+>>>> deadlocks, right?
+>>>>
+>>>> This makes it clear that the test above for compatible CPUs can be quite
+>>>> easily evaded by using CPU hotplug, but we don't really have a good
+>>>> solution for handling that yet...  Hmmm, grumble grumble, I guess if you
+>>>> hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
+>>>>
+>>>
+>>> In this particular case, there was no deadlock possibility, rather the
+>>> existing code had insufficient synchronization against CPU hotplug.
+>>>
+>>> init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
+>>> using on_each_cpu(). If a CPU came online after this point and before calling
+>>> register_cpu_notifier(), that CPU would remain uninitialized because this
+>>> subsystem would miss the hot-online event. This patch fixes this bug and
+>>> also uses the new synchronization method (instead of get/put_online_cpus())
+>>> to ensure that we don't deadlock with CPU hotplug.
+>>>
+>>
+>> Yes, that was my conclusion as well.  Thanks for clarifying.  (It could
+>> be noted in the commit message as well if you should feel so inclined).
+>>
+>
+> Please find the patch with updated changelog (and your Ack) below.
+> (No changes in code).
+>
 
-Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
----
- drivers/spi/spi-sun4i.c | 44 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 38 insertions(+), 6 deletions(-)
+perfect, thanks!
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index 09d4b54..174736c 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -48,6 +48,7 @@
- 
- #define SUN4I_INT_CTL_REG		0x0c
- #define SUN4I_INT_CTL_RF_F34			BIT(4)
-+#define SUN4I_INT_CTL_TF_E34			BIT(12)
- #define SUN4I_INT_CTL_TC			BIT(16)
- 
- #define SUN4I_INT_STA_REG		0x10
-@@ -100,6 +101,21 @@ static inline void sun4i_spi_write(struct sun4i_spi 
-*sspi, u32 reg, u32 value)
- 	writel(value, sspi->base_addr + reg);
- }
- 
-+static inline int sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
-+{
-+	u32 reg;
-+	reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
-+	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
-+	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
-+}
-+
-+static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 
-intm)
-+{
-+	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
-+	reg &= ~intm;
-+	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
-+}
-+
- static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
- {
- 	u32 reg, cnt;
-@@ -181,10 +197,6 @@ static int sun4i_spi_transfer_one(struct spi_master 
-*master,
- 	if (tfr->len > SUN4I_MAX_XFER_SIZE)
- 		return -EINVAL;
- 
--	/* We only support read transfers larger than the FIFO */
--	if ((tfr->len > SUN4I_FIFO_DEPTH) && tfr->tx_buf)
--		return -EINVAL;
--
- 	reinit_completion(&sspi->done);
- 	sspi->tx_buf = tfr->tx_buf;
- 	sspi->rx_buf = tfr->rx_buf;
-@@ -280,8 +292,11 @@ static int sun4i_spi_transfer_one(struct spi_master 
-*master,
- 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
- 
- 	/* Enable the interrupts */
--	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
--						 SUN4I_INT_CTL_RF_F34);
-+	reg = SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34;
-+	/* Only enable Tx FIFO interrupt if we really need it */
-+	if (tx_len > SUN4I_FIFO_DEPTH)
-+		reg |= SUN4I_INT_CTL_TF_E34;
-+	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
- 
- 	/* Start the transfer */
- 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
-@@ -306,6 +321,7 @@ static irqreturn_t sun4i_spi_handler(int irq, void 
-*dev_id)
- {
- 	struct sun4i_spi *sspi = dev_id;
- 	u32 status = sun4i_spi_read(sspi, SUN4I_INT_STA_REG);
-+	u32 cnt;
- 
- 	/* Transfer complete */
- 	if (status & SUN4I_INT_CTL_TC) {
-@@ -323,6 +339,22 @@ static irqreturn_t sun4i_spi_handler(int irq, void 
-*dev_id)
- 		return IRQ_HANDLED;
- 	}
- 
-+	/* Transmit FIFO 3/4 empty */
-+	if (status & SUN4I_INT_CTL_TF_E34) {
-+		/* See how much data can fit */
-+		cnt = SUN4I_FIFO_DEPTH - sun4i_spi_get_tx_fifo_count(sspi);
-+		sun4i_spi_fill_fifo(sspi, cnt);
-+
-+		if(!sspi->len)
-+			/* nothing left to transmit */
-+			sun4i_spi_disable_interrupt(sspi, 
-SUN4I_INT_CTL_TF_E34);
-+
-+		/* Only clear the interrupt _after_ re-seeding the FIFO */
-+		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, 
-SUN4I_INT_CTL_TF_E34);
-+
-+		return IRQ_HANDLED;
-+	}
-+
- 	return IRQ_NONE;
- }
- 
--- 
-1.8.5.3
+> From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+> Subject: [PATCH] arm, kvm: Fix CPU hotplug callback registration
+>
+> Subsystems that want to register CPU hotplug callbacks, as well as perform
+> initialization for the CPUs that are already online, often do it as shown
+> below:
+>
+>         get_online_cpus();
+>
+>         for_each_online_cpu(cpu)
+>                 init_cpu(cpu);
+>
+>         register_cpu_notifier(&foobar_cpu_notifier);
+>
+>         put_online_cpus();
+>
+> This is wrong, since it is prone to ABBA deadlocks involving the
+> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+> with CPU hotplug operations).
+>
+> Instead, the correct and race-free way of performing the callback
+> registration is:
+>
+>         cpu_notifier_register_begin();
+>
+>         for_each_online_cpu(cpu)
+>                 init_cpu(cpu);
+>
+>         /* Note the use of the double underscored version of the API */
+>         __register_cpu_notifier(&foobar_cpu_notifier);
+>
+>         cpu_notifier_register_done();
+>
+>
+> In the existing arm kvm code, there is no synchronization with CPU hotplug
+> to avoid missing the hotplug events that might occur after invoking
+> init_hyp_mode() and before calling register_cpu_notifier(). Fix this bug
+> and also use the new synchronization method (instead of get/put_online_cpus())
+> to ensure that we don't deadlock with CPU hotplug.
+>
+> Cc: Gleb Natapov <gleb@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Cc: kvm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+> ---
+>
+>  arch/arm/kvm/arm.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index bd18bb8..f0e50a0 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
+>                 }
+>         }
+>
+> +       cpu_notifier_register_begin();
+> +
+>         err = init_hyp_mode();
+>         if (err)
+>                 goto out_err;
+>
+> -       err = register_cpu_notifier(&hyp_init_cpu_nb);
+> +       err = __register_cpu_notifier(&hyp_init_cpu_nb);
+>         if (err) {
+>                 kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+>                 goto out_err;
+>         }
+>
+> +       cpu_notifier_register_done();
+> +
+>         hyp_cpu_pm_init();
+>
+>         kvm_coproc_table_init();
+>         return 0;
+>  out_err:
+> +       cpu_notifier_register_done();
+>         return err;
+>  }
+>
+>
+>
