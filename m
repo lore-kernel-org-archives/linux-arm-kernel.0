@@ -1,158 +1,95 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 18 Mar 2014 16:48:37 +0200
-Subject: [PATCH v3 5/8] ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
-In-Reply-To: <alpine.DEB.2.02.1403132123070.25824@utopia.booyaka.com>
-References: <1394187308-19622-1-git-send-email-rogerq@ti.com>
- <1394187308-19622-6-git-send-email-rogerq@ti.com>
- <20140312174703.GD1996@atomide.com>
- <alpine.DEB.2.02.1403132123070.25824@utopia.booyaka.com>
-Message-ID: <53285CC5.2000907@ti.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 18 Mar 2014 17:48:15 +0200
+Subject: [linux-next][regression] [PATCH] percpu: add preemption checks
+ to __this_cpu ops
+In-Reply-To: <alpine.DEB.2.10.1403180922050.17965@nuc>
+References: <53285FE7.5010203@ti.com> <alpine.DEB.2.10.1403180922050.17965@nuc>
+Message-ID: <53286ABF.3040408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 03/13/2014 11:44 PM, Paul Walmsley wrote:
-> On Wed, 12 Mar 2014, Tony Lindgren wrote:
-> 
->> * Roger Quadros <rogerq@ti.com> [140307 02:18]:
->>> From: Keshava Munegowda <keshava_mgowda@ti.com>
->>>
->>> Create hwmods for ocp2scp3 and sata modules.
+On 03/18/2014 04:37 PM, Christoph Lameter wrote:
+> On Tue, 18 Mar 2014, Grygorii Strashko wrote:
+>
+>> diff --git a/lib/smp_processor_id.c b/lib/smp_processor_id.c
+>> index a270dce..73a2004 100644
+>> --- a/lib/smp_processor_id.c
+>> +++ b/lib/smp_processor_id.c
+>> @@ -58,9 +58,6 @@ EXPORT_SYMBOL(debug_smp_processor_id);
 >>
->> Paul, does this look OK to you?
-> 
-> I didn't go over every entry with a magnifying glass, but did take a 
-> quick look at the sysc_offs and the clkdms - the basics look OK.
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
+>>   notrace void __this_cpu_preempt_check(const char *op)
+>>   {
+>> -       char text[40];
+>> -
+>> -       snprintf(text, sizeof(text), "__this_cpu_%s()", op);
+>> -       check_preemption_disabled(text);
+>> +       check_preemption_disabled(op);
+>>   }
+>>   EXPORT_SYMBOL(__this_cpu_preempt_check);
+>
+> So it looks like there is an early this cpu operation in a context that
+> cannot handle snprintf. But the checks in check_preemption_disabled()
+> avoid processing there so that works.
 
-Is there any chance this can still make it into 3.15? Would be nice to have SATA
-working out of the box.
+Just to be sure that I've described time point of issue correctly:
+[    2.161746] dwc3 2690000.dwc3: failed to initialize core
+[    2.167255] dwc3: probe of 2690000.dwc3 failed with error -38
+[    2.259687] Freeing unused kernel memory: 280K (c0678000 - c06be000)
 
-cheers,
--roger
+Please press Enter to activate this console.
+^^^ system stall here
 
-> 
-> - Paul
-> 
->>
->> Regards,
->>
->> Tony
->>  
->>> [Roger Q] Clean up.
->>>
->>> CC: Benoit Cousson <bcousson@baylibre.com>
->>> CC: Paul Walmsley <paul@pwsan.com>
->>> CC: Tony Lindgren <tony@atomide.com>
->>> Signed-off-by: Balaji T K <balajitk@ti.com>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>> ---
->>>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++++
->>>  1 file changed, 73 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->>> index e297d62..227a69f 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->>> @@ -1726,6 +1726,77 @@ static struct omap_hwmod omap54xx_wd_timer2_hwmod = {
->>>  	},
->>>  };
->>>  
->>> +/*
->>> + * 'ocp2scp' class
->>> + * bridge to transform ocp interface protocol to scp (serial control port)
->>> + * protocol
->>> + */
->>> +/* ocp2scp3 */
->>> +static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
->>> +/* l4_cfg -> ocp2scp3 */
->>> +static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp3 = {
->>> +	.master		= &omap54xx_l4_cfg_hwmod,
->>> +	.slave		= &omap54xx_ocp2scp3_hwmod,
->>> +	.clk		= "l4_root_clk_div",
->>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>> +
->>> +static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
->>> +	.name		= "ocp2scp3",
->>> +	.class		= &omap54xx_ocp2scp_hwmod_class,
->>> +	.clkdm_name	= "l3init_clkdm",
->>> +	.prcm = {
->>> +		.omap4 = {
->>> +			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
->>> +			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
->>> +			.modulemode   = MODULEMODE_HWCTRL,
->>> +		},
->>> +	},
->>> +};
->>> +
->>> +/*
->>> + * 'sata' class
->>> + * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
->>> + */
->>> +
->>> +static struct omap_hwmod_class_sysconfig omap54xx_sata_sysc = {
->>> +	.sysc_offs	= 0x0000,
->>> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
->>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
->>> +			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
->>> +			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
->>> +	.sysc_fields	= &omap_hwmod_sysc_type2,
->>> +};
->>> +
->>> +static struct omap_hwmod_class omap54xx_sata_hwmod_class = {
->>> +	.name	= "sata",
->>> +	.sysc	= &omap54xx_sata_sysc,
->>> +};
->>> +
->>> +/* sata */
->>> +static struct omap_hwmod omap54xx_sata_hwmod = {
->>> +	.name		= "sata",
->>> +	.class		= &omap54xx_sata_hwmod_class,
->>> +	.clkdm_name	= "l3init_clkdm",
->>> +	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
->>> +	.main_clk	= "func_48m_fclk",
->>> +	.mpu_rt_idx	= 1,
->>> +	.prcm = {
->>> +		.omap4 = {
->>> +			.clkctrl_offs = OMAP54XX_CM_L3INIT_SATA_CLKCTRL_OFFSET,
->>> +			.context_offs = OMAP54XX_RM_L3INIT_SATA_CONTEXT_OFFSET,
->>> +			.modulemode   = MODULEMODE_SWCTRL,
->>> +		},
->>> +	},
->>> +};
->>> +
->>> +/* l4_cfg -> sata */
->>> +static struct omap_hwmod_ocp_if omap54xx_l4_cfg__sata = {
->>> +	.master		= &omap54xx_l4_cfg_hwmod,
->>> +	.slave		= &omap54xx_sata_hwmod,
->>> +	.clk		= "l3_iclk_div",
->>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>>  
->>>  /*
->>>   * Interfaces
->>> @@ -2399,6 +2470,8 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
->>>  	&omap54xx_l4_cfg__usb_tll_hs,
->>>  	&omap54xx_l4_cfg__usb_otg_ss,
->>>  	&omap54xx_l4_wkup__wd_timer2,
->>> +	&omap54xx_l4_cfg__ocp2scp3,
->>> +	&omap54xx_l4_cfg__sata,
->>>  	NULL,
->>>  };
->>>  
->>> -- 
->>> 1.8.3.2
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> 
-> - Paul
-> 
+
+Any way, I can boot and console works fine with your change :)
+Thanks.
+
+Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+>
+> We could fix this by moving the string concatenation operation into
+> the check function.
+>
+> Index: linux/lib/smp_processor_id.c
+> ===================================================================
+> --- linux.orig/lib/smp_processor_id.c	2014-03-18 09:36:31.330450525 -0500
+> +++ linux/lib/smp_processor_id.c	2014-03-18 09:36:37.822315534 -0500
+> @@ -7,7 +7,8 @@
+>   #include <linux/kallsyms.h>
+>   #include <linux/sched.h>
+>
+> -notrace static unsigned int check_preemption_disabled(char *what)
+> +notrace static unsigned int check_preemption_disabled(const char *what1,
+> +							const char *what2)
+>   {
+>   	int this_cpu = raw_smp_processor_id();
+>
+> @@ -38,8 +39,8 @@
+>   	if (!printk_ratelimit())
+>   		goto out_enable;
+>
+> -	printk(KERN_ERR "BUG: using %s in preemptible [%08x] code: %s/%d\n",
+> -		what, preempt_count() - 1, current->comm, current->pid);
+> +	printk(KERN_ERR "BUG: using %s%s() in preemptible [%08x] code: %s/%d\n",
+> +		what1, what2, preempt_count() - 1, current->comm, current->pid);
+>
+>   	print_symbol("caller is %s\n", (long)__builtin_return_address(0));
+>   	dump_stack();
+> @@ -52,15 +53,12 @@
+>
+>   notrace unsigned int debug_smp_processor_id(void)
+>   {
+> -	return check_preemption_disabled("smp_processor_id()");
+> +	return check_preemption_disabled("smp_processor_id","");
+>   }
+>   EXPORT_SYMBOL(debug_smp_processor_id);
+>
+>   notrace void __this_cpu_preempt_check(const char *op)
+>   {
+> -	char text[40];
+> -
+> -	snprintf(text, sizeof(text), "__this_cpu_%s()", op);
+> -	check_preemption_disabled(text);
+> +	check_preemption_disabled("__this_cpu_", op);
+>   }
+>   EXPORT_SYMBOL(__this_cpu_preempt_check);
+>
