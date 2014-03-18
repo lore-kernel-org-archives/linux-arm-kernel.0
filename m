@@ -1,25 +1,109 @@
 From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
-Date: Tue, 18 Mar 2014 15:04:02 -0700 (PDT)
-Subject: [PATCH 0/2] v1: ARM: sun4i: spi: Allow transfers larger than FIFO size
-Message-ID: <4636665.0CNduaaJi4@nukelap.gtech>
+Date: Tue, 18 Mar 2014 17:04:19 -0500
+Subject: [PATCH 1/2] v1 ARM: sun4i: spi: Allow Rx transfers larger than FIFO
+ size
+Message-ID: <2167943.Zs1zPAMITN@nukelap.gtech>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are designed to apply on top of sunxi-next. They depend on 
-Maxime Ripard's SPI patches for Allwinner A10 (sun4i).
+SPI transfers were limited to one FIFO depth, which is 64 bytes.
+This was an artificial limitation, however, as the hardware can handle
+much larger bursts. To accommodate this, we enable the interrupt when
+the Rx FIFO is 3/4 full, and drain the FIFO within the interrupt
+handler. The 3/4 ratio was chosen arbitrarily, with the intention to
+reduce the potential number of interrupts.
 
-I've watched the bus with a logic analyzer to make sure thing are sane, but 
-I'm only able to go up to 10MHz on my LA. Unfortunately, the SPI chip I was 
-using as a test device decided to die mid-way, so I was unable to test how 
-well full-duplex communication works on these large transfers
+Since the SUN4I_CTL_TP bit is set, the hardware will pause
+transmission whenever the FIFO is full, so there is no risk of losing
+data if we can't service the interrupt in time.
 
-Alexandru Gagniuc (2):
-  ARM: sun4i: spi: Allow Rx transfers larger than FIFO size
-  ARM: sun4i: spi: Allow Tx transfers larger than FIFO size
+This patch only handles long Rx transfers, and continues to return
+-EINVAL on long Tx transfers. Tx transfers are handled in a subsequent
+patch.
 
- drivers/spi/spi-sun4i.c | 56 
-+++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 52 insertions(+), 4 deletions(-)
+Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
+---
+ drivers/spi/spi-sun4i.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 3f82705..09d4b54 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -47,6 +47,7 @@
+ #define SUN4I_CTL_TP				BIT(18)
+ 
+ #define SUN4I_INT_CTL_REG		0x0c
++#define SUN4I_INT_CTL_RF_F34			BIT(4)
+ #define SUN4I_INT_CTL_TC			BIT(16)
+ 
+ #define SUN4I_INT_STA_REG		0x10
+@@ -68,6 +69,8 @@
+ #define SUN4I_XMIT_CNT_REG		0x24
+ #define SUN4I_XMIT_CNT(cnt)			((cnt) & 0xffffff)
+ 
++#define SUN4I_MAX_XFER_SIZE			0xffffff
++
+ #define SUN4I_FIFO_STA_REG		0x28
+ #define SUN4I_FIFO_STA_RF_CNT_MASK		0x7f
+ #define SUN4I_FIFO_STA_RF_CNT_BITS		0
+@@ -175,8 +178,11 @@ static int sun4i_spi_transfer_one(struct spi_master 
+*master,
+ 	int ret = 0;
+ 	u32 reg;
+ 
+-	/* We don't support transfer larger than the FIFO */
+-	if (tfr->len > SUN4I_FIFO_DEPTH)
++	if (tfr->len > SUN4I_MAX_XFER_SIZE)
++		return -EINVAL;
++
++	/* We only support read transfers larger than the FIFO */
++	if ((tfr->len > SUN4I_FIFO_DEPTH) && tfr->tx_buf)
+ 		return -EINVAL;
+ 
+ 	reinit_completion(&sspi->done);
+@@ -274,7 +280,8 @@ static int sun4i_spi_transfer_one(struct spi_master 
+*master,
+ 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 
+ 	/* Enable the interrupts */
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
++						 SUN4I_INT_CTL_RF_F34);
+ 
+ 	/* Start the transfer */
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+@@ -287,7 +294,7 @@ static int sun4i_spi_transfer_one(struct spi_master 
+*master,
+ 		goto out;
+ 	}
+ 
+-	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
++	/* FIFO is drained during the interrupt handler */
+ 
+ out:
+ 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, 0);
+@@ -303,10 +310,19 @@ static irqreturn_t sun4i_spi_handler(int irq, void 
+*dev_id)
+ 	/* Transfer complete */
+ 	if (status & SUN4I_INT_CTL_TC) {
+ 		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TC);
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 		complete(&sspi->done);
+ 		return IRQ_HANDLED;
+ 	}
+ 
++	/* Receive FIFO 3/4 full */
++	if (status & SUN4I_INT_CTL_RF_F34) {
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
++		/* Only clear the interrupt _after_ draining the FIFO */
++		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, 
+SUN4I_INT_CTL_RF_F34);
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+ 
 -- 
 1.8.5.3
