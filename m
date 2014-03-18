@@ -1,132 +1,153 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 18 Mar 2014 14:40:56 -0700
-Subject: [PATCH v9 0/2] hibernation support on ARM
-Message-ID: <1395178858-27343-1-git-send-email-sebastian.capella@linaro.org>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Tue, 18 Mar 2014 14:48:30 -0700
+Subject: [PATCH v2 11/15] arm64: add EFI stub
+In-Reply-To: <1395178831.2967.29.camel@deneb.redhat.com>
+References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+ <1394750828-16351-12-git-send-email-leif.lindholm@linaro.org>
+ <20140318120919.GG13200@arm.com>
+ <1395153629.2967.10.camel@deneb.redhat.com>
+ <20140318182826.GC20497@arm.com>
+ <1395178831.2967.29.camel@deneb.redhat.com>
+Message-ID: <CAFECyb_NuHBQD3zPouDde3WTyz8RrUu1OWFOt6VWX_U5n1g8MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 18, 2014 at 2:40 PM, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-03-18 at 18:28 +0000, Catalin Marinas wrote:
+>> On Tue, Mar 18, 2014 at 02:40:29PM +0000, Mark Salter wrote:
+>> > On Tue, 2014-03-18 at 12:09 +0000, Catalin Marinas wrote:
+>> > > On Thu, Mar 13, 2014 at 10:47:04PM +0000, Leif Lindholm wrote:
+>> > > > --- /dev/null
+>> > > > +++ b/arch/arm64/kernel/efi-entry.S
+>> > > > @@ -0,0 +1,93 @@
+>> > > > +/*
+>> > > > + * EFI entry point.
+>> > > > + *
+>> > > > + * Copyright (C) 2013 Red Hat, Inc.
+>> > > > + * Author: Mark Salter <msalter@redhat.com>
+>> > > > + *
+>> > > > + * This program is free software; you can redistribute it and/or modify
+>> > > > + * it under the terms of the GNU General Public License version 2 as
+>> > > > + * published by the Free Software Foundation.
+>> > > > + *
+>> > > > + */
+>> > > > +#include <linux/linkage.h>
+>> > > > +#include <linux/init.h>
+>> > > > +
+>> > > > +#include <asm/assembler.h>
+>> > > > +
+>> > > > +#define EFI_LOAD_ERROR 0x8000000000000001
+>> > > > +
+>> > > > +       __INIT
+>> > > > +
+>> > > > +       /*
+>> > > > +        * We arrive here from the EFI boot manager with:
+>> > > > +        *
+>> > > > +        *    * MMU on with identity-mapped RAM.
+>> > > > +        *    * Icache and Dcache on
+>> > > > +        *
+>> > > > +        * We will most likely be running from some place other than where
+>> > > > +        * we want to be. The kernel image wants to be placed at TEXT_OFFSET
+>> > > > +        * from start of RAM.
+>> > > > +        */
+>> > > > +ENTRY(efi_stub_entry)
+>> > > > +       stp     x29, x30, [sp, #-32]!
+>> > > > +
+>> > > > +       /*
+>> > > > +        * Call efi_entry to do the real work.
+>> > > > +        * x0 and x1 are already set up by firmware. Current runtime
+>> > > > +        * address of image is calculated and passed via *image_addr.
+>> > > > +        *
+>> > > > +        * unsigned long efi_entry(void *handle,
+>> > > > +        *                         efi_system_table_t *sys_table,
+>> > > > +        *                         unsigned long *image_addr) ;
+>> > > > +        */
+>> > > > +       adrp    x8, _text
+>> > > > +       add     x8, x8, #:lo12:_text
+>> > > > +       add     x2, sp, 16
+>> > > > +       str     x8, [x2]
+>> > > > +       bl      efi_entry
+>> > > > +       cmn     x0, #1
+>> > > > +       b.eq    efi_load_fail
+>> > > > +
+>> > > > +       /*
+>> > > > +        * efi_entry() will have relocated the kernel image if necessary
+>> > > > +        * and we return here with device tree address in x0 and the kernel
+>> > > > +        * entry point stored at *image_addr. Save those values in registers
+>> > > > +        * which are preserved by __flush_dcache_all.
+>> > > > +        */
+>> > > > +       ldr     x1, [sp, #16]
+>> > > > +       mov     x20, x0
+>> > > > +       mov     x21, x1
+>> > > > +
+>> > > > +       /* Turn off Dcache and MMU */
+>> > > > +       mrs     x0, CurrentEL
+>> > > > +       cmp     x0, #PSR_MODE_EL2t
+>> > > > +       ccmp    x0, #PSR_MODE_EL2h, #0x4, ne
+>> > > > +       b.ne    1f
+>> > > > +       mrs     x0, sctlr_el2
+>> > > > +       bic     x0, x0, #1 << 0 // clear SCTLR.M
+>> > > > +       bic     x0, x0, #1 << 2 // clear SCTLR.C
+>> > > > +       msr     sctlr_el2, x0
+>> > > > +       isb
+>> > > > +       b       2f
+>> > > > +1:
+>> > > > +       mrs     x0, sctlr_el1
+>> > > > +       bic     x0, x0, #1 << 0 // clear SCTLR.M
+>> > > > +       bic     x0, x0, #1 << 2 // clear SCTLR.C
+>> > > > +       msr     sctlr_el1, x0
+>> > > > +       isb
+>> > > > +2:
+>> > > > +       bl      __flush_dcache_all
+>> > >
+>> > > In linux-next I'm pushing a patch which no longer exports the
+>> > > __flush_dcache_all function. The reason is that it doesn't really work
+>> > > if you have a (not fully transparent) external cache like on the Applied
+>> > > Micro boards. There other issues when running as a guest as well.
+>> > >
+>> > > If you know exactly what needs to be flushed here, can you use a range
+>> > > (MVA) operation?
+>> >
+>> > This is just before the EFI stub jumps to kernel proper. The only things
+>> > in the dcache would be from identity mapped references to RAM used by
+>> > UEFI. The booting.txt doc says dcache should be off and invalidated. I
+>> > am just wanting to comply with that. The code here doesn't really know
+>> > the extent of DRAM to flush by address.
+>>
+>> Does UEFI do anything with the caches before invoking the EFI_STUB code?
+>> I guess it doesn't since that's just another application for it. Can
+>> UEFI flush the caches via exit boot? When is this called?
+>>
+>> As I said, we have a real problem here since the EFI_STUB call does not
+>> have information about the SoC to be able to flush all the caches. But
+>> UEFI should know more about the hardware.
+>>
+>> If UEFI doesn't handle the caches, the only thing left to EFI_STUB is to
+>> flush by MVA. We don't need to flush the whole DRAM (and I would even
+>> recommend it) but at least the relevant kernel code/data touched with
+>> the MMU disabled.
+>>
+>
+> So, it goes like this:
+>
+>   1) UEFI calls stub with MMU/Caches on. Stub/kernel can be anywhere.
+>   2) Stub runs and relocates kernel to the desired runtime location
+>      but continues to execute from wherever UEFI loaded it until just
+>      after ExitBootServices().
+>   3) After ExitBootServices, efi_entry() returns relocated entry point
+>      for kernel to efi_stub_entry() in efi-entry.S where the Dcache and
+>      MMU are turned off, the __flush_dcache_all is called, then the
+>      code jumps to the kernel proper entry point.
+>
+> It isn't clear to me if UEFI does cache flushing at ExitBootServices
+> time, but even so, at least stack use will get cached between then and
+> the kernel entry point. The stub could conceivably get its hands on the
+> EFI memmap and invalidate dcache using address ranges from UEFI memory
+> descriptors so maybe that is the way we should do it.
+>
 
-Cc: Russ Dill <Russ.Dill@ti.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Austin <jonathan.austin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Jiang Liu <liuj97@gmail.com>
-Cc: Sricharan R <r.sricharan@ti.com>
-Cc: Victor Kamensky <victor.kamensky@linaro.org>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Robin Holt <robin.m.holt@gmail.com>
-Cc: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-Cc: Steven Capper <steve.capper@linaro.org>
-Cc: Tejun Heo <tj@kernel.org>
+I looked at the UEFI spec and there is no mention of cache flushing in
+ExitBootServices(),
+so it seems it is up to the OS to do any cache management.
 
-
-Patches adding support for hibernation on ARM
- - ARM hibernation / suspend-to-disk
- - Change soft_restart to use non-tracing raw_local_irq_disable
-
-Patches based on v3.14-rc7 tag, verified hibernation on beaglebone black on a
-branch based on 3.13 merged with initial omap support from Russ Dill which
-can be found here (includes v1 patchset):
-http://git.linaro.org/git-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
-
-[PATCH v9 1/2] ARM: avoid tracers in soft_restart
- arch/arm/kernel/process.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
- Use raw_local_irq_disable in place of local_irq_disable to avoid
- infinite abort recursion while tracing. (unchanged since v3)
-
-[PATCH v9 2/2] ARM hibernation / suspend-to-disk
- arch/arm/Kconfig              |    5 ++
- arch/arm/include/asm/memory.h |    1 +
- arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/hibernate.c   |  107 +++++++++++++++++++++++++++++++++++++++++
- include/linux/suspend.h       |    2 +
- 5 files changed, 116 insertions(+)
-
- Adds support for ARM based hibernation
-
-
-Additional notes:
------------------
-
-There are two checkpatch warnings added by this patch.  These follow
-behavior in existing hibernation implementations on other platforms.
-
-
-    WARNING: externs should be avoided in .c files
-    #131: FILE: arch/arm/kernel/hibernate.c:25:
-    +extern const void __nosave_begin, __nosave_end;
-
-  This extern is picking up the linker nosave region definitions, only
-  used in hibernate.  Follows same extern line used mips, powerpc, s390,
-  sh, sparc, x86 & unicore32
-
-    WARNING: externs should be avoided in .c files
-    #209: FILE: arch/arm/kernel/hibernate.c:103:
-    +	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-
-  This extern is used in the arch/arm/ in hibernate, process and bL_switcher
-
-
-Changes in v9:
---------------
-* replace pfn calculationwith virt_to_pfn
-* automatically allow ARCH_HIBERNATION_POSSIBLE if SUSPEND permitted
-* move handling of ARCH config flag to arch/arm/Kconfig
-
-Changes in v8:
---------------
-* remove definition and use of __pa_symbol
-
-Changes in v7:
---------------
-* remove use of RELOC_HIDE macro
-* remove unused #includes
-* fixup comment for arch_restore_image
-* ensure alignment of resume stack on 8 byte boundary
-
-Changes in v6:
---------------
-* Simplify static variable names
-
-Changes in v5:
---------------
-* Fixed checkpatch warning on trailing whitespace
-
-Changes in v4:
---------------
-* updated comment for soft_restart with review feedback
-* dropped freeze_processes patch which was queued separately 
-  to 3.14 by Rafael Wysocki:
-  https://lkml.org/lkml/2014/2/25/683
-
-Changes in v3:
---------------
-* added comment to use of soft_restart
-* drop irq disable soft_restart patch
-* add patch to avoid tracers in soft_restart by using raw_local_irq_*
-
-Changes in v2:
---------------
-* Removed unneeded flush_thread, use of __naked and cpu_init.
-* dropped Cyril Chemparathy <cyril@ti.com> from Cc: list as 
-  emails are bouncing.
-
-Thanks,
-
-Sebastian Capella
+Roy
