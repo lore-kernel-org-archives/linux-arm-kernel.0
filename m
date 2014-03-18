@@ -1,74 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 00:15:39 +0100
-Subject: [PATCH 1/3] ARM: at91/dt: sam9g45: improve ADC/touchscreen support
-In-Reply-To: <1395184541-5787-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395184541-5787-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395184541-5787-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Mar 2014 00:43:33 +0100
+Subject: [PATCHv2 4/8] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <1395132234.4134.1.camel@paszta.hi.pengutronix.de>
+References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
+ <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
+ <1395132234.4134.1.camel@paszta.hi.pengutronix.de>
+Message-ID: <1664822.t9aWz7hh4g@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the compatible string, adds the pinmuxing for the ADC pins.
+Hello,
 
-Also, removes atmel,adc-use-external-triggers as it is not possible to remove it
-unless redefining the whole adc node
+On Tuesday 18 March 2014 09:43:54 Philipp Zabel wrote:
+> Am Dienstag, den 18.03.2014, 10:15 +0200 schrieb Tomi Valkeinen:
+> > Add DT binding documentation for HDMI Connector.
+> > 
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Reviewed-by: Archit Taneja <archit@ti.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/video/hdmi-connector.txt   | 28 +++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/video/hdmi-connector.txt> 
+> > diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> > b/Documentation/devicetree/bindings/video/hdmi-connector.txt new file
+> > mode 100644
+> > index 000000000000..ccccc19e2573
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> > @@ -0,0 +1,28 @@
+> > +HDMI Connector
+> > +==============
+> > +
+> > +Required properties:
+> > +- compatible: "hdmi-connector"
+> > +- type: the HDMI connector type: "a", "b", "c", "d" or "e"
+> > +
+> > +Optional properties:
+> > +- label: a symbolic name for the connector
+> > +
+> > +Required nodes:
+> > +- Video port for HDMI input
+> 
+> Geert's comment also applies to all other connector types. These can be
+> input connectors, too.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+We might not need to define all the properties required by input connectors 
+now, but we need to make sure that future extensions will be backward-
+compatible. I don't see a problem in making the connector DT bindings depend 
+on the direction as long as the direction is specified in the DT node, either 
+explicitly or implicitly.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index dc4fb7d99902..b1d67282b0b6 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -136,6 +136,36 @@
- 				      >;
- 
- 				/* shared pinctrl settings */
-+				adc0 {
-+					pinctrl_adc0_adtrg: adc0_adtrg {
-+						atmel,pins = <AT91_PIOD 28 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad0: adc0_ad0 {
-+						atmel,pins = <AT91_PIOD 20 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad1: adc0_ad1 {
-+						atmel,pins = <AT91_PIOD 21 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad2: adc0_ad2 {
-+						atmel,pins = <AT91_PIOD 22 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad3: adc0_ad3 {
-+						atmel,pins = <AT91_PIOD 23 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad4: adc0_ad4 {
-+						atmel,pins = <AT91_PIOD 24 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad5: adc0_ad5 {
-+						atmel,pins = <AT91_PIOD 25 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad6: adc0_ad6 {
-+						atmel,pins = <AT91_PIOD 26 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+					pinctrl_adc0_ad7: adc0_ad7 {
-+						atmel,pins = <AT91_PIOD 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				dbgu {
- 					pinctrl_dbgu: dbgu-0 {
- 						atmel,pins =
-@@ -634,10 +664,9 @@
- 			adc0: adc at fffb0000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				compatible = "atmel,at91sam9260-adc";
-+				compatible = "atmel,at91sam9g45-adc";
- 				reg = <0xfffb0000 0x100>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
--				atmel,adc-use-external-triggers;
- 				atmel,adc-channels-used = <0xff>;
- 				atmel,adc-vref = <3300>;
- 				atmel,adc-startup-time = <40>;
+An obvious solution would be to have separate "hdmi-input-connector" and 
+"hdmi-output-connector" compatible strings but I don't like that, as there's 
+no difference in the HDMI connector itself, only in the usage.
+
+We could also add a "direction" property (possibly later, with a default value 
+of "output" in that case), or rely on the link direction, but in the latter 
+case that would require reaching an agreement in the current link directions 
+debate.
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
