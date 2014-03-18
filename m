@@ -1,72 +1,41 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 18 Mar 2014 17:10:59 +1100
-Subject: linux-next: manual merge of the staging tree with the arm-soc tree
-Message-ID: <20140318171059.a1134a2c670e1b18847f98d0@canb.auug.org.au>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 17 Mar 2014 23:30:30 -0700
+Subject: Tegra baseline test results for v3.14-rc7
+Message-ID: <5327E806.3010108@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Here are some basic Tegra test results for Linux v3.14-rc7.
+Logs and other details at:
 
-Today's linux-next merge of the staging tree got a conflict in
-Documentation/devicetree/bindings/iio/adc/at91_adc.txt between commit
-b5303ffbcf11 ("Documentation: dt: iio: improve atmel-adc documentation")
-from the arm-soc tree and commit 1a5b7d41f8f6 ("iio: at91: document ADC
-clock properties") from the staging tree.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc7/20140317231219/
 
-[This file is renamed from
-Documentation/devicetree/bindings/arm/atmel-adc.txt in the arm-soc tree.]
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Test summary
+------------
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-diff --cc Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-index 82061c7e4fea,9a1175b46f49..000000000000
---- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-@@@ -5,7 -5,10 +5,10 @@@ Required properties
-      <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
-    - reg: Should contain ADC registers location and length
-    - interrupts: Should contain the IRQ line for the ADC
-+   - clock-names: tuple listing input clock names.
-+ 	Required elements: "adc_clk", "adc_op_clk".
-+   - clocks: phandles to input clocks.
- -  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
- +  - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
-      device
-    - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
-      defined in the datasheet
-@@@ -41,14 -44,19 +44,16 @@@ Optional trigger Nodes
-  
-  Examples:
-  adc0: adc at fffb0000 {
- +	#address-cells = <1>;
- +	#size-cells = <0>;
-  	compatible = "atmel,at91sam9260-adc";
-  	reg = <0xfffb0000 0x100>;
- -	interrupts = <20 4>;
- +	interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
-+ 	clocks = <&adc_clk>, <&adc_op_clk>;
-+ 	clock-names = "adc_clk", "adc_op_clk";
- -	atmel,adc-channel-base = <0x30>;
-  	atmel,adc-channels-used = <0xff>;
- -	atmel,adc-drdy-mask = <0x10000>;
- -	atmel,adc-num-channels = <8>;
-  	atmel,adc-startup-time = <40>;
- -	atmel,adc-status-register = <0x1c>;
- -	atmel,adc-trigger-register = <0x08>;
- -	atmel,adc-use-external;
- +	atmel,adc-use-external-triggers;
-  	atmel,adc-vref = <3300>;
-  	atmel,adc-res = <8 10>;
-  	atmel,adc-res-names = "lowres", "highres";
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/be9e9b24/attachment-0001.sig>
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc6 (fa389e220254c69ffae0d403eac4146171062d08)):
+    text     data      bss    total  kernel
+    -595     -128        0     -723  multi_v7_defconfig
+    -523     -128        0     -651  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc6 (fa389e220254c69ffae0d403eac4146171062d08))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+       -8k       8k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+       -8k       8k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
