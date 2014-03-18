@@ -1,135 +1,47 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 18 Mar 2014 15:53:05 +0530
-Subject: [UPDATED PATCH v3 10/52] arm,
- kvm: Fix CPU hotplug callback registration
-In-Reply-To: <20140314191055.GF28661@cbox>
-References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
- <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
- <20140312232127.GC24808@cbox> <53229701.8050405@linux.vnet.ibm.com>
- <20140314191055.GF28661@cbox>
-Message-ID: <53281E89.7080201@linux.vnet.ibm.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 18 Mar 2014 11:23:43 +0100
+Subject: [PATCH RESEND 1/2] ARM: ixp4xx: Make dma_set_coherent_mask common,
+ correct implementation
+In-Reply-To: <20140318090905.72a686e8@marrow.netinsight.se> ("Simon
+ =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Tue, 18 Mar 2014 09:09:05
+ +0100")
+References: <20140317105448.14bcb617@marrow.netinsight.se>
+ <20140317105659.449505d8@marrow.netinsight.se>
+ <m3iorcj6nb.fsf@t19.piap.pl>
+ <20140318090905.72a686e8@marrow.netinsight.se>
+Message-ID: <m361nbkdow.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2014 12:40 AM, Christoffer Dall wrote:
-> On Fri, Mar 14, 2014 at 11:13:29AM +0530, Srivatsa S. Bhat wrote:
->> On 03/13/2014 04:51 AM, Christoffer Dall wrote:
->>> On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
->>>> Subsystems that want to register CPU hotplug callbacks, as well as perform
->>>> initialization for the CPUs that are already online, often do it as shown
->>>> below:
->>>>
-[...]
->>> Just so we're clear, the existing code was simply racy as not prone to
->>> deadlocks, right?
->>>
->>> This makes it clear that the test above for compatible CPUs can be quite
->>> easily evaded by using CPU hotplug, but we don't really have a good
->>> solution for handling that yet...  Hmmm, grumble grumble, I guess if you
->>> hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
->>>
->>
->> In this particular case, there was no deadlock possibility, rather the
->> existing code had insufficient synchronization against CPU hotplug.
->>
->> init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
->> using on_each_cpu(). If a CPU came online after this point and before calling
->> register_cpu_notifier(), that CPU would remain uninitialized because this
->> subsystem would miss the hot-online event. This patch fixes this bug and
->> also uses the new synchronization method (instead of get/put_online_cpus())
->> to ensure that we don't deadlock with CPU hotplug.
->>
-> 
-> Yes, that was my conclusion as well.  Thanks for clarifying.  (It could
-> be noted in the commit message as well if you should feel so inclined).
-> 
+Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
 
-Please find the patch with updated changelog (and your Ack) below.
-(No changes in code).
+>> +#ifdef CONFIG_PCI
+>
+> To me it seems the conditional compilation is superfluous - dev_is_pci
+> is used to check for PCI-devices anyway, and the compiler should be
+> smart enough to remove dead code for the non-PCI case.
 
-From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-Subject: [PATCH] arm, kvm: Fix CPU hotplug callback registration
+Right.
 
-Subsystems that want to register CPU hotplug callbacks, as well as perform
-initialization for the CPUs that are already online, often do it as shown
-below:
+>> +static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+>> +{
+>> +	return (dma_addr + size) >= SZ_64M;
+>> +}
+>> +
+>> +static int ixp4xx_platform_notify_remove(struct device *dev)
+>> +{
+>> +	if (dev->bus == &pci_bus_type)
+>
+> if (dev_is_pci(dev))
 
-	get_online_cpus();
+Sure.
+I will finally fix this, but I want it to at least successfully build
+and boot on a couple of boards from different makers before I send
+anything to be applied.
 
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
+Just not now :-(
+-- 
+Krzysztof Halasa
 
-	register_cpu_notifier(&foobar_cpu_notifier);
-
-	put_online_cpus();
-
-This is wrong, since it is prone to ABBA deadlocks involving the
-cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-with CPU hotplug operations).
-
-Instead, the correct and race-free way of performing the callback
-registration is:
-
-	cpu_notifier_register_begin();
-
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
-
-	/* Note the use of the double underscored version of the API */
-	__register_cpu_notifier(&foobar_cpu_notifier);
-
-	cpu_notifier_register_done();
-
-
-In the existing arm kvm code, there is no synchronization with CPU hotplug
-to avoid missing the hotplug events that might occur after invoking
-init_hyp_mode() and before calling register_cpu_notifier(). Fix this bug
-and also use the new synchronization method (instead of get/put_online_cpus())
-to ensure that we don't deadlock with CPU hotplug.
-
-Cc: Gleb Natapov <gleb@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: kvmarm at lists.cs.columbia.edu
-Cc: kvm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Paolo Bonzini <pbonzini@redhat.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
-
- arch/arm/kvm/arm.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bd18bb8..f0e50a0 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
- 
-+	cpu_notifier_register_begin();
-+
- 	err = init_hyp_mode();
- 	if (err)
- 		goto out_err;
- 
--	err = register_cpu_notifier(&hyp_init_cpu_nb);
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
- 		goto out_err;
- 	}
- 
-+	cpu_notifier_register_done();
-+
- 	hyp_cpu_pm_init();
- 
- 	kvm_coproc_table_init();
- 	return 0;
- out_err:
-+	cpu_notifier_register_done();
- 	return err;
- }
- 
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
