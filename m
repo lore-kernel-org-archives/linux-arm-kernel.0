@@ -1,47 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Mar 2014 13:27:56 +0900
-Subject: [GIT PULL] Samsung non-critical fixes for v3.15
-Message-ID: <5327CB4C.9070905@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 18 Mar 2014 10:13:28 +0530
+Subject: [PATCH 3/3] ARM: OMAP2+: Add machine entry for dra72x devices
+In-Reply-To: <5323B90C.80803@ti.com>
+References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
+ <1394788841-15112-4-git-send-email-rnayak@ti.com> <5323B90C.80803@ti.com>
+Message-ID: <5327CEF0.3070301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On Saturday 15 March 2014 07:51 AM, Suman Anna wrote:
+> Hi Rajendra,
+> 
+> On 03/14/2014 04:20 AM, Nayak, Rajendra wrote:
+>> The only difference from the dra75x devices is the missing .smp entry.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
+>>   1 file changed, 18 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 8e3daa1..d803d99 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -253,4 +253,22 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+>>       .dt_compat    = dra7xx_boards_compat,
+>>       .restart    = omap44xx_restart,
+>>   MACHINE_END
+>> +
+>> +static const char *dra72_boards_compat[] __initdata = {
+> 
+> How about using dra72x_ instead of dra72_ and keeping it consistent
+> at the other places as well?
 
-   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+Sure, I can do that. Thanks.
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-fixes
-
-for you to fetch changes up to baf64abc468c7583592f67197ae23fa31414b4db:
-
-   ARM: S3C64XX: mach-crag6410-module.c is not modular (2014-02-16 
-02:05:44 +0900)
-
-----------------------------------------------------------------
-Samsung non-critical fixes for v3.15
-- fix typo CONFIG_CPU_S3C2443 in Kconfig
-- fix G3D regulator on because of entering low power mode
-   for exynos5250-arndale
-- fix CONFIG_USB_EHCI_EXYNOS for exynos_defconfig
-- fix initcall of mach-crag6410-module.c
-
-----------------------------------------------------------------
-Paul Bolle (1):
-       ARM: S3C24XX: Fix typo CONFIG_CPUS_3C2443
-
-Paul Gortmaker (1):
-       ARM: S3C64XX: mach-crag6410-module.c is not modular
-
-Tomasz Figa (1):
-       ARM: dts: Keep G3D regulator always on for exynos5250-arndale
-
-Tushar Behera (1):
-       ARM: exynos_defconfig: Update EHCI config entry
-
-  arch/arm/boot/dts/exynos5250-arndale.dts     | 1 +
-  arch/arm/configs/exynos_defconfig            | 2 +-
-  arch/arm/mach-s3c24xx/common.c               | 2 +-
-  arch/arm/mach-s3c64xx/mach-crag6410-module.c | 2 +-
-  4 files changed, 4 insertions(+), 3 deletions(-)
+> 
+> regards
+> Suman
+> 
+>> +    "ti,dra72x",
+>> +    "ti,dra7",
+>> +    NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(DRA72_DT, "Generic DRA72 (Flattened Device Tree)")
+>> +    .reserve    = omap_reserve,
+>> +    .map_io        = omap5_map_io,
+>> +    .init_early    = dra7xx_init_early,
+>> +    .init_late    = dra7xx_init_late,
+>> +    .init_irq    = omap_gic_of_init,
+>> +    .init_machine    = omap_generic_init,
+>> +    .init_time    = omap5_realtime_timer_init,
+>> +    .dt_compat    = dra72_boards_compat,
+>> +    .restart    = omap44xx_restart,
+>> +MACHINE_END
+>>   #endif
+>>
+> 
