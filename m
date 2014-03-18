@@ -1,70 +1,56 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Mar 2014 14:15:19 -0600
-Subject: [PATCH] ARM: dts: ventana: fix eth1 pci dev node
-In-Reply-To: <CAJ+vNU2Av-n1-efbFbXNvO4SmoobL_WpQKApFRS1Zjy0egLLzw@mail.gmail.com>
-References: <1394747064-4106-1-git-send-email-tharvey@gateworks.com>
- <20140314132805.GD813@S2101-09.ap.freescale.net>
- <CAJ+vNU2Av-n1-efbFbXNvO4SmoobL_WpQKApFRS1Zjy0egLLzw@mail.gmail.com>
-Message-ID: <20140318201519.GA8637@obsidianresearch.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 18 Mar 2014 16:15:37 -0400
+Subject: [V2] arm: pj4: check cpu id for pj4 cp0 access
+In-Reply-To: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
+References: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140318201537.GA20942@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 01:02:55PM -0700, Tim Harvey wrote:
-> > Is this whole bridge/switch hierarchy binding documented somewhere
-> > or is this just something that work for you?
+On Fri, Jun 14, 2013 at 05:03:57AM -0400, Chao Xie wrote:
+> Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+> pj4_cpu0_init just return.
+> This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
+> use same platform code.
 > 
-> I'm not sure where its 'best' documented, but it is the way the
-> kernel works.
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-It is documented in the 'PCI Bus Binding to Open Firware'
-publication from IEEE.
+This patch fixes a boot failure in next now that ARCH_DOVE (and thus
+CPU_PJ4) are enabled in multi_v7_defconfig. I verified that boot works
+again in next with the BCM28155-AP board.
 
-> >> +             pcie at 0,0 {
-> >> +                     /* 01:00.0 PCIe switch */
-> >> +                     #address-cells = <3>;
-> >> +                     #size-cells = <2>;
-> >> +                     device_type = "pci";
-> >> +                     reg = <0x0 0 0 0 0>;
-> >> +
-> >> +                     pcie at 8,0 {
-> >
-> > What's the naming schema for all these pcie nodes?  Generally, we should
-> > have the numbers encoded in the node name coming from the address cells
-> > in 'reg' property.
+Tested-by: Matt Porter <mporter@linaro.org>
 
-The 'reg' property for PCI encodes the device and function number, and
-the suffix in the device path is of the form @DEVICE,FUNCTION (see
-2.2.1.3 of the spec)
-
-So device=8, function=0 is @8,0 and reg = 0x4000.
-
-> I was hoping there was a way to reference PCI nodes by BDF values as
-> I'm simply trying to define a marvell,sky2 device at 08:00.0.  I found
-> that the kernel's OF parsing code for PCI requires you to nest the
-> nodes to match the bus hierarchy.  In order to map a dt node to a PCI
-> device, the bus the device is on must have a dt node itself, which is
-> what creates the need for the nesting.  Note that the bus topology
-> here rc -> P2P bridge -> GigE.
-
-Right, otherwise the kernel and firmware would have to agree on bus
-numbering. With nesting it only has to agree on the device numbering,
-which is a fixed property of PCI.
-
-> >> +                             /* 02:08.0 PCIe switch port */
-> >> +                             #address-cells = <3>;
-> >> +                             #size-cells = <2>;
-> >> +                             device_type = "pci";
-> >> +                             reg = <0x4000 0 0 0 0>;
-> >> +                             eth1: pcie at 0,0 {
-> >> +                                     /* 08:00.0 GigE */
-> >> +                                     #address-cells = <3>;
-> >> +                                     #size-cells = <2>;
-> >> +                                     device_type = "pci";
-> >> +                                     reg = <0x0 0 0 0 0>;
-> >> +                                     compatible = "marvell,sky2";
-> >> +                             };
-
-Don't forget your interrupts and interrupt-map - every DT nodes need
-to describe how its interrupts are routed.
-
-Jason
+> arch/arm/kernel/pj4-cp0.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+> index 679cf4d..bf658d3 100644
+> --- a/arch/arm/kernel/pj4-cp0.c
+> +++ b/arch/arm/kernel/pj4-cp0.c
+> @@ -17,6 +17,10 @@
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+>  #include <asm/thread_notify.h>
+> +#include <asm/cputype.h>
+> +
+> +#define CORE_PJ4_MASK	0xfffffff0
+> +#define CORE_PJ4_ID	0x562f5840
+>  
+>  static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
+>  {
+> @@ -79,6 +83,13 @@ static void __init pj4_cp_access_write(u32 value)
+>  static int __init pj4_cp0_init(void)
+>  {
+>  	u32 cp_access;
+> +	unsigned int cpuid;
+> +
+> +	cpuid = read_cpuid_id();
+> +
+> +	/* If it is not a pj4 core, skip it. */
+> +	if ((cpuid & CORE_PJ4_MASK) != CORE_PJ4_ID)
+> +		return 0;
+>  
+>  	cp_access = pj4_cp_access_read() & ~0xf;
+>  	pj4_cp_access_write(cp_access);
