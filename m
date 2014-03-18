@@ -1,56 +1,65 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 10:15:45 +0200
-Subject: [PATCHv2 6/8] Doc/DT: Add DT binding documentation for Sony acx565akm
- panel
+Date: Tue, 18 Mar 2014 10:15:46 +0200
+Subject: [PATCHv2 7/8] Doc/DT: Add DT binding documentation for TFP410 encoder
 In-Reply-To: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1395130547-18633-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1395130547-18633-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for Sony acx565akm panel
+Add DT binding documentation for TFP410 encoder
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Reviewed-by: Sebastian Reichel <sre@debian.org>
 Reviewed-by: Archit Taneja <archit@ti.com>
 ---
- .../devicetree/bindings/video/sony,acx565akm.txt   | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
+ .../devicetree/bindings/video/ti,tfp410.txt        | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tfp410.txt
 
-diff --git a/Documentation/devicetree/bindings/video/sony,acx565akm.txt b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
+diff --git a/Documentation/devicetree/bindings/video/ti,tfp410.txt b/Documentation/devicetree/bindings/video/ti,tfp410.txt
 new file mode 100644
-index 000000000000..e12333280749
+index 000000000000..2cbe32a3d0bb
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
-@@ -0,0 +1,30 @@
-+Sony ACX565AKM SDI Panel
-+========================
++++ b/Documentation/devicetree/bindings/video/ti,tfp410.txt
+@@ -0,0 +1,41 @@
++TFP410 DPI to DVI encoder
++=========================
 +
 +Required properties:
-+- compatible: "sony,acx565akm"
++- compatible: "ti,tfp410"
 +
 +Optional properties:
-+- label: a symbolic name for the panel
-+- reset-gpios: panel reset gpio
++- powerdown-gpios: power-down gpio
 +
 +Required nodes:
-+- Video port for SDI input
++- Video port 0 for DPI input
++- Video port 1 for DVI output
 +
 +Example
 +-------
 +
-+acx565akm at 2 {
-+	compatible = "sony,acx565akm";
-+	spi-max-frequency = <6000000>;
-+	reg = <2>;
++tfp410: encoder at 0 {
++	compatible = "ti,tfp410";
++	powerdown-gpios = <&twl_gpio 2 GPIO_ACTIVE_LOW>;
 +
-+	label = "lcd";
-+	reset-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	port {
-+		lcd_in: endpoint {
-+			remote-endpoint = <&sdi_out>;
++		port at 0 {
++			reg = <0>;
++
++			tfp410_in: endpoint at 0 {
++				remote-endpoint = <&dpi_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			tfp410_out: endpoint at 0 {
++				remote-endpoint = <&dvi_connector_in>;
++			};
 +		};
 +	};
 +};
