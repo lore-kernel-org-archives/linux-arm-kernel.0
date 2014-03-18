@@ -1,46 +1,144 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 18 Mar 2014 20:03:18 +0100
-Subject: [PATCHv2] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
- EV-MSK
-In-Reply-To: <5326BB1B.8030900@visionsystems.de>
-References: <1393837376-25779-1-git-send-email-kaloz@openwrt.org>
- <5326BB1B.8030900@visionsystems.de>
-Message-ID: <op.xcxlvsl42s3iss@ecaz>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 18 Mar 2014 13:02:55 -0700
+Subject: [PATCH] ARM: dts: ventana: fix eth1 pci dev node
+In-Reply-To: <20140314132805.GD813@S2101-09.ap.freescale.net>
+References: <1394747064-4106-1-git-send-email-tharvey@gateworks.com>
+ <20140314132805.GD813@S2101-09.ap.freescale.net>
+Message-ID: <CAJ+vNU2Av-n1-efbFbXNvO4SmoobL_WpQKApFRS1Zjy0egLLzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yegor,
-
-On Mon, 17 Mar 2014 10:06:35 +0100, Yegor Yefremov <yegor.yefremov@visionsystems.de> wrote:
-
-> I have some trouble with WLAN. If I make extensive scanning (just start NetworkManager and wait a minute or so) I get following errors over and over again:
+On Fri, Mar 14, 2014 at 6:28 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Thu, Mar 13, 2014 at 02:44:24PM -0700, Tim Harvey wrote:
+>> Properly add the PCI device node for the 2nd GigE port so that the device
+>> driver can get its MAC from DT.  Note that the Ventana bootloader uses
+>> the ethernet1 alias to populate the MAC address by adding the local-mac-address
+>> property.  Also remove the unnecesssary 'sky2' alias.
+>>
+>> This is based on Shawn's for-next branch
 >
-> [  717.608550] wlcore: Scan completed due to error.
-> [  717.613422] ------------[ cut here ]------------
-> [  717.618405] WARNING: CPU: 0 PID: 940 at drivers/net/wireless/ti/wlcore/main.c:789 wl12xx_queue_recovery_work+0x60/0x6c()
-> [  717.629832] Modules linked in:
-> [  717.633055] CPU: 0 PID: 940 Comm: kworker/u2:2 Tainted: G        W    3.14.0-rc4-12737-gefb78a0-dirty #214
-> [  717.643264] Workqueue: phy0 wl1271_scan_complete_work
-> [  717.648649] [<c00151e0>] (unwind_backtrace) from [<c0011e38>] (show_stack+0x10/0x14)
-> [  717.656762] [<c0011e38>] (show_stack) from [<c05a1944>] (dump_stack+0x7c/0x94)
-> [  717.664372] [<c05a1944>] (dump_stack) from [<c00402bc>] (warn_slowpath_common+0x6c/0x90)
-> [  717.672876] [<c00402bc>] (warn_slowpath_common) from [<c004037c>] (warn_slowpath_null+0x1c/0x24)
-> [  717.682110] [<c004037c>] (warn_slowpath_null) from [<c035be0c>] (wl12xx_queue_recovery_work+0x60/0x6c)
-> [  717.691889] [<c035be0c>] (wl12xx_queue_recovery_work) from [<c036d804>] (wl1271_scan_complete_work+0xf8/0x108)
-> [  717.702391] [<c036d804>] (wl1271_scan_complete_work) from [<c0058ff4>] (process_one_work+0x1ac/0x4c4)
-> [  717.712110] [<c0058ff4>] (process_one_work) from [<c0059e88>] (worker_thread+0x114/0x3b4)
-> [  717.720707] [<c0059e88>] (worker_thread) from [<c005fa44>] (kthread+0xcc/0xe8)
-> [  717.728306] [<c005fa44>] (kthread) from [<c000e388>] (ret_from_fork+0x14/0x2c)
-> [  717.735856] ---[ end trace f4d374bb2ca37664 ]---
-> [  717.743587] wlcore: Hardware recovery in progress. FW ver: Rev 6.3.10.0.133
-> [  717.752600] wlcore: pc: 0x0, hint_sts: 0x00000020 count: 6
-> [  717.759609] wlcore: down
-> [  717.764108] ieee80211 phy0: Hardware restart was requested
-> [  718.250930] wlcore: firmware booted (Rev 6.3.10.0.133)
+> This line shouldn't be necessarily in the commit log.
+
+ok
+
 >
-> Have you experienced such behavior?
+>>
+>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> ---
+>>  arch/arm/boot/dts/imx6q-gw5400-a.dts  | 40 +++++++++++++++++++++++++++++++----
+>>  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 39 ++++++++++++++++++++++++++++++----
+>>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 39 ++++++++++++++++++++++++++++++----
+>>  3 files changed, 106 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+>> index 902f983..5d2b912 100644
+>> --- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
+>> +++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+>> @@ -16,7 +16,7 @@
+>>       model = "Gateworks Ventana GW5400-A";
+>>       compatible = "gw,imx6q-gw5400-a", "gw,ventana", "fsl,imx6q";
+>>
+>> -     /* these are used by bootloader for disabling nodes */
+>> +     /* these are used by bootloader for configuring nodes */
+>>       aliases {
+>>               ethernet0 = &fec;
+>>               ethernet1 = &eth1;
+>> @@ -26,7 +26,7 @@
+>>               led0 = &led0;
+>>               led1 = &led1;
+>>               led2 = &led2;
+>> -             sky2 = &eth1;
+>> +
+>
+> No need to add a new line.
 
-With older firmwares, quite often. 6.3.10.0.133 sounds amazingly old, the latest is 8.8.0.0.13. What kernel are you on?
+oops - will remove
 
+>
+>>               ssi0 = &ssi1;
+>>               spi0 = &ecspi1;
+>>               usb0 = &usbh1;
+>> @@ -496,8 +496,40 @@
+>>       reset-gpio = <&gpio1 29 0>;
+>>       status = "okay";
+>>
+>> -     eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+>> -             compatible = "marvell,sky2";
+>
+> So this was just a placeholder and did not actually work in any way,
+> right?
 
-Imre
+Kind of - it worked with a non-upstream patch against the sky2 driver
+which used the dt alias of 'sky2' to get to its mac address.  I've
+since learned how to reference PCI dt nodes properly and have patched
+the sky2 driver the proper way (see
+http://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/drivers/net/ethernet/marvell/sky2.c?id=3ee2f8ce1ab8f235bda164295fa0cf39ec1c2400).
+ So now, I'm 'fixing' the improper way I did it before.
+
+>
+>> +     pcie at 0,0 {
+>
+> Is this whole bridge/switch hierarchy binding documented somewhere or is
+> this just something that work for you?
+
+I'm not sure where its 'best' documented, but it is the way the kernel works.
+
+>
+>> +             /* 00:00.0 host-bridge */
+>> +             #address-cells = <3>;
+>> +             #size-cells = <2>;
+>> +             device_type = "pci";
+>> +             reg = <0x0 0 0 0 0>;
+>> +
+>> +             /*
+>> +              * GigE PCI dev node needs to be defined so that enet driver
+>> +              * can use it to obtain its boot-loader specified MAC
+>> +              */
+>> +             pcie at 0,0 {
+>> +                     /* 01:00.0 PCIe switch */
+>> +                     #address-cells = <3>;
+>> +                     #size-cells = <2>;
+>> +                     device_type = "pci";
+>> +                     reg = <0x0 0 0 0 0>;
+>> +
+>> +                     pcie at 8,0 {
+>
+> What's the naming schema for all these pcie nodes?  Generally, we should
+> have the numbers encoded in the node name coming from the address cells
+> in 'reg' property.
+>
+> Shawn
+
+I'm cc'ing Jason as some of his comments to another thread helped me
+understand how to define a PCI device node off a bus in dt properly -
+perhaps he knows where its best documented.
+
+I was hoping there was a way to reference PCI nodes by BDF values as
+I'm simply trying to define a marvell,sky2 device at 08:00.0.  I found
+that the kernel's OF parsing code for PCI requires you to nest the
+nodes to match the bus hierarchy.  In order to map a dt node to a PCI
+device, the bus the device is on must have a dt node itself, which is
+what creates the need for the nesting.  Note that the bus topology
+here rc -> P2P bridge -> GigE.
+
+Tim
+
+>
+>> +                             /* 02:08.0 PCIe switch port */
+>> +                             #address-cells = <3>;
+>> +                             #size-cells = <2>;
+>> +                             device_type = "pci";
+>> +                             reg = <0x4000 0 0 0 0>;
+>> +                             eth1: pcie at 0,0 {
+>> +                                     /* 08:00.0 GigE */
+>> +                                     #address-cells = <3>;
+>> +                                     #size-cells = <2>;
+>> +                                     device_type = "pci";
+>> +                                     reg = <0x0 0 0 0 0>;
+>> +                                     compatible = "marvell,sky2";
+>> +                             };
+>> +                     };
+>> +             };
+>>       };
+>>  };
+>>
