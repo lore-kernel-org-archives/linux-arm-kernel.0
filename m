@@ -1,48 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Mar 2014 15:23:35 -0700
-Subject: [PATCH v2 1/7] ARM: KVM: switch hypervisor into BE mode in case
- of BE host
-In-Reply-To: <1392183693-21238-2-git-send-email-victor.kamensky@linaro.org>
-References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
- <1392183693-21238-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140318222335.GG1297@cbox>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Wed, 19 Mar 2014 10:14:22 +1100 (EST)
+Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
+ structure
+In-Reply-To: <1395148051.2812.51.camel@joe-AO722>
+References: <20140318002822.372705594@telegraphics.com.au>
+ <1395112756.20860.1.camel@joe-AO722>
+ <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
+ <1395146702.2812.47.camel@joe-AO722>
+ <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
+ <1395148051.2812.51.camel@joe-AO722>
+Message-ID: <alpine.LNX.2.00.1403190925550.6652@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:41:27PM -0800, Victor Kamensky wrote:
-> Switch hypervisor to run in BE mode if image is compiled
-> with CONFIG_CPU_BIG_ENDIAN.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm/kvm/init.S | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 1b9844d..74f0718 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -22,6 +22,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/assembler.h>
->  
->  /********************************************************************
->   * Hypervisor initialization
-> @@ -70,6 +71,8 @@ __do_hyp_init:
->  	cmp	r0, #0			@ We have a SP?
->  	bne	phase2			@ Yes, second stage init
->  
-> +ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
-> +
->  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
->  	mcrr	p15, 4, r2, r3, c2
->  
-> -- 
-> 1.8.1.4
-> 
 
-Won't splitting up the patches this way break bisectability?
+On Tue, 18 Mar 2014, Joe Perches wrote:
 
--Christoffer
+> On Tue, 2014-03-18 at 13:55 +0100, Geert Uytterhoeven wrote:
+
+> > 
+> > #define dprintk(flg, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
+> 
+> Fine, but with a correction.
+> 
+> no_printk keeps all side effects like performing any function calls made 
+> by the statement or accessing any volatiles.
+> 
+> Using
+> 
+> do { if (0) no_printk(fmt, ##__VA_ARGS__); } while (0)
+> 
+> does not have any side-effects.
+
+I take your point about having the compiler check arguments when
+NDEBUG & flg == 0.
+
+As for side-effects, chip register accesses would be affected if dprintk() 
+expanded to no_printk() when NDEBUG & flg == 0.
+
+E.g. NCR5380.c line 1213:
+dprintk(NDEBUG_INTR, "scsi : unknown interrupt, BASR 0x%X, MR 0x%X, SR 0x%x\n",
+                     basr, NCR5380_read(MODE_REG), NCR5380_read(STATUS_REG));
+
+I don't want to re-introduce side-effects into a dozen different NCR5380 
+drivers on three different architectures when I can test only one of those 
+drivers. It's difficult to get good code coverage even for one driver.
+
+-- 
