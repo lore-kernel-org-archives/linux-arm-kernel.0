@@ -1,28 +1,30 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 18 Mar 2014 16:00:04 +0100
-Subject: [PATCH v2 3/5] ARM: STi: DT: add keyscan for stih416
+Date: Tue, 18 Mar 2014 16:00:03 +0100
+Subject: [PATCH v2 2/5] ARM: STi: DT: add keyscan for stih415
 In-Reply-To: <1395154806-2810-1-git-send-email-gabriel.fernandez@st.com>
 References: <1395154806-2810-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1395154806-2810-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1395154806-2810-3-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keyscan support for stih416.
-It is disabled by default given that it is not enabled on all boards.
+From: Giuseppe CONDORELLI <giuseppe.condorelli@st.com>
+
+Add keyscan support for stih415.
+It is put disabled by default because it is not enabled on all boards
 Also there are PIOs conflict with already claimed lines.
 
 Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi         | 10 ++++++++++
+ arch/arm/boot/dts/stih415-pinctrl.dtsi | 16 ++++++++++++++++
+ arch/arm/boot/dts/stih415.dtsi         | 10 ++++++++++
  2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index b29ff4b..79c036a 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -98,6 +98,22 @@
+diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+index e56449d..3e5e074 100644
+--- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+@@ -87,6 +87,22 @@
  				};
  			};
  
@@ -45,11 +47,11 @@ index b29ff4b..79c036a 100644
  			sbc_i2c0 {
  				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
  					st,pins {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index b7ab47b..8a695dc 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -145,5 +145,15 @@
+diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
+index d9c7dd1..bda9e23 100644
+--- a/arch/arm/boot/dts/stih415.dtsi
++++ b/arch/arm/boot/dts/stih415.dtsi
+@@ -136,5 +136,15 @@
  
  			status		= "disabled";
  		};
