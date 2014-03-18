@@ -1,66 +1,41 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 18 Mar 2014 14:03:01 +0900
-Subject: [PATCH] drm/exynos: Fix (more) freeing issues in exynos_drm_drv.c
-In-Reply-To: <1395026886-14325-1-git-send-email-djkurtz@chromium.org>
-References: <1395026886-14325-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <CAAQKjZMeeyD+6fhCaGk9qzX0oLTS=vHU86Y7gF9ZnbwcpTT7Kg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 18 Mar 2014 07:29:34 +0200
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <53270510.1030301@compulab.co.il>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <532037E0.1080309@ti.com> <53258DDA.50005@compulab.co.il>
+ <532692A7.7000509@ti.com> <5326F71C.1060602@compulab.co.il>
+ <5326F893.3080607@ti.com> <53270510.1030301@compulab.co.il>
+Message-ID: <5327D9BE.80503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied.
+On 17/03/14 16:22, Dmitry Lifshitz wrote:
+> Hi Tomi,
+> 
+> Unfortunately, I have a lack of experience with DT DSS stuff.
+> 
+> How should I define the endpoints and the connector in my case?
+> Please, could you provide some reference.
 
-Thanks,
-Inki Dae
+See Documentation/devicetree/bindings/media/video-interfaces.txt for a
+description of the ports and endpoints.
 
-2014-03-17 12:28 GMT+09:00 Daniel Kurtz <djkurtz@chromium.org>:
-> The following commit [0] fixed a use-after-free, but left the subdrv open
-> in the error path.
->
-> [0] commit 6ca605f7c70895a35737435f17ae9cc5e36f1466
-> drm/exynos: Fix freeing issues in exynos_drm_drv.c
->
-> Change-Id: I452e944bf090fb11434d9e34213c890c41c15d73
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_drv.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-> index 215131a..c204b4e 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-> @@ -172,20 +172,24 @@ static int exynos_drm_open(struct drm_device *dev, struct drm_file *file)
->
->         ret = exynos_drm_subdrv_open(dev, file);
->         if (ret)
-> -               goto out;
-> +               goto err_file_priv_free;
->
->         anon_filp = anon_inode_getfile("exynos_gem", &exynos_drm_gem_fops,
->                                         NULL, 0);
->         if (IS_ERR(anon_filp)) {
->                 ret = PTR_ERR(anon_filp);
-> -               goto out;
-> +               goto err_subdrv_close;
->         }
->
->         anon_filp->f_mode = FMODE_READ | FMODE_WRITE;
->         file_priv->anon_filp = anon_filp;
->
->         return ret;
-> -out:
-> +
-> +err_subdrv_close:
-> +       exynos_drm_subdrv_close(dev, file);
-> +
-> +err_file_priv_free:
->         kfree(file_priv);
->         file->driver_priv = NULL;
->         return ret;
-> --
-> 1.9.0.279.gdc9e3eb
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+If your board is similar to uevm except you don't have the tpd12s015,
+then you just need to remove the tpd12s015 from the .dts file, and
+connect the OMAP's HDMI output directly to the connector.
+
+> Regarding omapfb, is it sufficient to turn it on in the Kernel config?
+
+Yes.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/1e2da321/attachment.sig>
