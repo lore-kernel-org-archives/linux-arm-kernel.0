@@ -1,53 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 18 Mar 2014 14:13:53 +0100
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <1395148051.2812.51.camel@joe-AO722>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
- <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
- <1395148051.2812.51.camel@joe-AO722>
-Message-ID: <CAMuHMdVxTQDdpcdjZZRSrvT8cmuT2AkE1q6WaSWey8U+PuVX2w@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 18 Mar 2014 15:18:17 +0200
+Subject: [PATCH] ARM: dts: keystone: Fix domain register range for clkfftc1
+Message-ID: <1395148697-22481-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+The domain register range for clkfftc1 has to be 0x0235004c
+instead of 0x023504c0.
 
-On Tue, Mar 18, 2014 at 2:07 PM, Joe Perches <joe@perches.com> wrote:
-> On Tue, 2014-03-18 at 13:55 +0100, Geert Uytterhoeven wrote:
->> On Tue, Mar 18, 2014 at 1:45 PM, Joe Perches <joe@perches.com> wrote:
->> > #define dprintk(flg, fmt, ...) \
->> > do { if (0) pr_debug(fmt, ##__VA_ARGS__); } while (0)
->>
->> Na, no_printk():
->>
->> #define dprintk(flg, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
->
-> Fine, but with a correction.
->
-> no_printk keeps all side effects like
-> performing any function calls made by the
-> statement or accessing any volatiles.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/boot/dts/k2hk-clocks.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-That's true...
-
-> Using
->
-> do { if (0) no_printk(fmt, ##__VA_ARGS__); } while (0)
->
-> does not have any side-effects.
-
-... but all current users in include/ have the side-effects.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+index 8855b1f..96e6536 100644
+--- a/arch/arm/boot/dts/k2hk-clocks.dtsi
++++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+@@ -209,7 +209,7 @@ clocks {
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+ 		clock-output-names = "fftc-1";
+-		reg = <0x02350074 0xb00>, <0x023504c0 0x400>;
++		reg = <0x02350074 0xb00>, <0x0235004c 0x400>;
+ 		reg-names = "control", "domain";
+ 		domain-id = <19>;
+ 	};
+-- 
+1.8.3.2
