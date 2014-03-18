@@ -1,302 +1,109 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Mar 2014 18:08:57 +0000
-Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
- infrastructure
-In-Reply-To: <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
-References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
-Message-ID: <20140318180856.GB792@e102568-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Mar 2014 18:10:54 +0000
+Subject: [PATCH v2 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <010f01cf3f24$7002adb0$50080910$@samsung.com>
+References: <1394491879-5320-1-git-send-email-kgene.kim@samsung.com>
+ <1394491879-5320-2-git-send-email-kgene.kim@samsung.com>
+ <20140311182922.GD3263@e106331-lin.cambridge.arm.com>
+ <01c501cf3dac$022879b0$06796d10$@samsung.com>
+ <20140313103329.GD5035@e106331-lin.cambridge.arm.com>
+ <010f01cf3f24$7002adb0$50080910$@samsung.com>
+Message-ID: <20140318181054.GF2941@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, Mar 14, 2014 at 01:26:31AM +0000, Kukjin Kim wrote:
+> > > > > +		cpu at 000 {
+> > > > > +			device_type = "cpu";
+> > > > > +			compatible = "arm,armv8";
+> > > >
+> > > > The "arm,armv8" should be a fallback rather than the only entry. The
+> > > > precise core should be first (see arch/arm64/boot/dts/apm-storm.dtsi for
+> > > > an example).
+> > > >
+> > > Well, do I really need another name if GH7 has just 'ARMv8 core' exactly?
+> > 
+> > Yes please. You presumably don't have "just 'ARMv8 core'", but rather a
+> > specific ARMv8 implementation.
+> > 
+> OK, so in my understanding if it is really _just_ 'ARMv8 core' from S/W point
+> of view, "arm,armv8" should be fine. I will make sure.
 
-thanks for reviewing.
+It will work, sure. But the compatible list should also list the
+specific CPU. From the S/W point of view there are likely
+implementation-defined registers which mean that no real CPU will be
+"just" an ARMv8 core.
 
-On Tue, Mar 18, 2014 at 01:27:29PM +0000, Rob Herring wrote:
-> On Tue, Mar 18, 2014 at 5:20 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On most common ARM systems, the low-power states a CPU can be put into are
-> > not discoverable in HW and require device tree bindings to describe
-> > the respective power domains, power down protocol and idle states parameters.
-> >
-> > In order to enable DT based idle states and configure idle drivers, this
-> > patch implements the bulk infrastructure required to parse the device tree
-> > idle states bindings and functions to initizialize idle driver and protocol
-> > back-ends.
-> >
-> > Protocol back-ends (eg PSCI) must register a protocol initializer with
-> > the idle state parser so that upon protocol detection, the parsing code
-> > can call the back-end infrastructure to complete the idle driver
-> > initialization.
-> >
-> > Idle state index 0 is always initialized, ie always considered present
-> > on all ARM platforms.
-> >
-> > Code that initializes idle states checks the CPU idle driver cpumask so
-> > that multiple CPU idle drivers can be initialized through it in the
-> > kernel. The CPU idle driver cpumask defines which idle states should be
-> > considered valid for the driver, ie idle states that are valid on a set
-> > of cpus the idle driver manages.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm64/Kconfig                   |   4 +
-> >  arch/arm64/include/asm/idle_states.h |  20 ++
-> >  arch/arm64/kernel/Makefile           |   1 +
-> >  arch/arm64/kernel/idle_states.c      | 397 +++++++++++++++++++++++++++++++++++
+We have enough trouble with DTBs for 32-bit SoCs not listing things they
+should. I see no reason to be lax here.
+
+> > > > > +	gic: interrupt-controller at 1C000000 {
+> > > > > +		compatible = "arm,cortex-a15-gic";
+> > > >
+> > > > We should have a more specific compatible string early in the list here
+> > > > too.
+> > > >
+> > > Well, I think more specific compatible string is not required for gic, there
+> > > were discussion about using another compatible string for gic-v2. And
+> > > cortex-a15-gic should be fine at this moment and if another name is required
+> > > as per previous discussion, we will then.
+> > 
+> > While it's probably ok to have "arm,cortex-a15-gic" in the compatible
+> > list, it would be good to also have a more specific string, so we can
+> > identify the GIC implementation precisely in future (in case we need to
+> > perform any workarounds, or there's some kind of optimisation we could
+> > perform for some implementations).
+> > 
+> Hmm... let's use just it for now then add another specific string later ;-)
+
+Why not do this from the start? Then we can actually rely on the DTB
+rather than it being useless.
+
+> > > > > +	pmu {
+> > > > > +		compatible = "arm,armv8-pmuv3";
+> > > >
+> > > > This is missing a specific compatible string.
+> > > >
+> > > I don't know why I need another specific compatible string here because I
+> > > thought the 'armv8-pmuv3' is enough.
+> > 
+> > Each CPU microarchitecture has different PMU events and quirks. While
+> > the CPU PMU might be compatible with ARMv8's PMUv3, it will also have
+> > implementation-specific events, and may have quirks we need to work
+> > around in future.
+> > 
+> > As with 32-bit, we'd expect these to be of the form
+> > "${implementor},${cpu}-pmu".
+> > 
+> OK.
 > 
-> This all belongs in drivers/cpuidle either as part of your driver or
-> as library calls the driver can use as it is very obvious it is
-> dependent on cpuidle.
+> +	compatible = "samsung,gh7-pmu", "armv8-pmuv3";
 
-Yes, and it is something I thought about before posting. There are a
-couple of dependencies to be managed though (PSCI and cpu_suspend API),
-I can probably make the build dependent on ARM64 for the moment.
+Is GH7 an SoC or a CPU?
 
-I will look into this.
+> > > > > +		serial at 12c20000 {
+> > > > > +			compatible = "arm,pl011", "arm,primecell";
+> > > > > +			reg = <0 0x12c20000 0 0x10000>;
+> > > > > +			interrupts = <0 420 0>;
+> > > > > +		};
+> > > >
+> > > > These are both missing required clocks.
+> > > >
+> > > Yes right.
+> > 
+> > So you'll add these?
+> > 
+> To be honest, still I'm not sure how it should be handled because regarding
+> clocks do not need to handle in the kernel for GH7. And for it, I needed to
+> use some HACKs to change clock handling in the kernel. I will provide proper
+> solution soon.
 
-> >  4 files changed, 422 insertions(+)
-> >  create mode 100644 arch/arm64/include/asm/idle_states.h
-> >  create mode 100644 arch/arm64/kernel/idle_states.c
-> >
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 27bbcfc..3132572 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -295,6 +295,10 @@ config ARCH_SUSPEND_POSSIBLE
-> >  config ARM64_CPU_SUSPEND
-> >         def_bool PM_SLEEP
-> >
-> > +config ARM64_IDLE_STATES
-> 
-> Idle states apply to ARM as well, right?
+Are the clocks always-on, fixed-rate clocks, or does some firmware
+manage them dynamically? We have bindings for the former.
 
-Eh, yes with a couple of twists, see above.
+There's not much point having a DTS upstream that relies on hacks which
+are not.
 
-> OF_IDLE_STATES?
-
-Seems sensible.
-
-> > +       def_bool CPU_IDLE
-> > +       select ARM64_CPU_SUSPEND
-> 
-> This should probably get renamed to ARCH_CPU_SUSPEND. There's no need
-> for different names for arm and arm64.
-
-Yes I think that makes sense, I will move parsing code to drivers/cpuidle and
-check if the CONFIG rename might cause issues.
-
-[...]
-
-> > +static struct idle_state idle_states[CPUIDLE_STATE_MAX] __initdata;
-> > +typedef int (*idle_states_initializer)(struct cpumask *, struct idle_state *,
-> > +                                      unsigned int);
-> > +
-> > +struct protocol_init {
-> > +       const char *prot;
-> > +       idle_states_initializer prot_init;
-> > +};
-> > +
-> > +static const struct protocol_init protocols[] __initconst = {
-> > +       {}
-> > +};
-> > +
-> > +static __init const struct protocol_init *get_protocol(const char *str)
-> > +{
-> 
-> This needs a better name or to be removed until you actually need it.
-> What protocols do you expect to have? This kind of looks like GUFI
-> trying to do DT vs. ACPI backends.
-
-Better name probably, but I do now want to hardcode PSCI either (patch 2 adds
-the PSCI backend initializer), I am not sure that would make people extremely
-happy and this code can be reused by different back-end implementations with
-nary a problem.
-
-Code has to be generic enough to call initialization for different suspend
-backends, I do not think I am asking too much here.
-
-> > +       int i;
-> > +
-> > +       if (!str)
-> > +               return NULL;
-> > +
-> > +       for (i = 0; protocols[i].prot; i++)
-> > +               if (!strcmp(protocols[i].prot, str))
-> > +                       return &protocols[i];
-> > +
-> > +       return NULL;
-> > +}
-> > +
-> > +static void __init idle_state_cpu_mask(int cpu, struct idle_state *idle_state,
-> > +                                      struct device_node *cn)
-> > +{
-> > +       int i = 0;
-> > +       struct device_node *cpu_state;
-> > +
-> > +       do {
-> > +               cpu_state = of_parse_phandle(cn, "cpu-idle-states", i++);
-> > +               if (cpu_state && idle_state->node == cpu_state)
-> > +                       cpumask_set_cpu(cpu, &idle_state->cpus);
-> > +               of_node_put(cpu_state);
-> > +       } while (cpu_state);
-> > +}
-> > +
-> > +static int __init parse_idle_states_node(struct device_node *parent, int cnt,
-> > +                                        const cpumask_t *cpus)
-> > +{
-> > +       struct device_node *state;
-> 
-> node or np or state_node so it is clear this is a device_node.
-
-Ok.
-
-> > +       struct idle_state *idle_state;
-> > +       int cpu;
-> > +
-> > +       for_each_child_of_node(parent, state) {
-> > +
-> > +               if (!of_device_is_compatible(state, "arm,idle-state")) {
-> > +                       pr_warn(" %s has child nodes that are not idle states\n",
-> > +                               parent->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               idle_state = &idle_states[cnt];
-> > +
-> > +               pr_debug(" * %s...\n", state->full_name);
-> > +
-> > +               idle_state->node = state;
-> > +               /*
-> > +                * Check cpus on which the idle state is valid
-> > +                */
-> > +               for_each_possible_cpu(cpu) {
-> > +                       struct device_node *cn;
-> > +
-> > +                       cn = of_get_cpu_node(cpu, NULL);
-> > +                       if (!cn) {
-> > +                               pr_err("missing device node for CPU %d\n", cpu);
-> > +                               continue;
-> > +                       }
-> > +                       idle_state_cpu_mask(cpu, idle_state, cn);
-> > +               }
-> > +
-> > +               /*
-> > +                * The driver cpumask is not a subset of cpus on which the
-> > +                * idle state is valid, hence the idle state is skipped for
-> > +                * this driver.
-> > +                */
-> > +               if (!cpumask_subset(cpus, &idle_state->cpus))
-> > +                       continue;
-> > +
-> > +               if (of_property_read_u32(state, "index", &idle_state->index)) {
-> > +                       pr_debug(" * %s missing index property\n",
-> > +                                    state->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               if (of_property_read_u32(state, "entry-latency-us",
-> > +                                        &idle_state->entry_latency)) {
-> > +                       pr_debug(" * %s missing entry latency property\n",
-> > +                                    state->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               if (of_property_read_u32(state, "exit-latency-us",
-> > +                                        &idle_state->exit_latency)) {
-> > +                       pr_debug(" * %s missing exit latency property\n",
-> > +                                    state->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               if (of_property_read_u32(state, "min-residency-us",
-> > +                                        &idle_state->min_residency)) {
-> > +                       pr_debug(" * %s missing min-residency property\n",
-> > +                                    state->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               if (of_property_read_u32(state, "entry-method-param",
-> > +                                        &idle_state->param)) {
-> > +                       pr_debug(" * %s missing entry-method-param property\n",
-> > +                                    state->full_name);
-> > +                       continue;
-> > +               }
-> > +
-> > +               if (++cnt == CPUIDLE_STATE_MAX) {
-> > +                       pr_warn("Number of parsed states equal static CPU idle state limit\n");
-> > +                       of_node_put(state);
-> > +                       break;
-> > +               }
-> > +       }
-> > +
-> > +       return cnt;
-> > +}
-> > +
-> > +static int __init parse_idle_states(struct device_node *root, int cnt,
-> > +                                   const cpumask_t *cpus)
-> > +{
-> > +       int head_idx, curr_idx;
-> > +       struct device_node *curr = root;
-> > +
-> > +       /*
-> > +        * Breadth-first DT idle states parsing
-> > +        *
-> > +        * Sweep idle states level in the device tree and use the
-> > +        * idle_states array to stash the visited nodes, as a queue.
-> > +        *
-> > +        * parse_idle_states_node() updates the idle_states array by
-> > +        * initializing entries, stashing the device tree node for the
-> > +        * corresponding state (struct idle_state.node) and incrementing
-> > +        * the idle states counter that is returned so that curr_idx is
-> > +        * kept up-to-date while descending into tree levels.
-> > +        *
-> > +        * Store the initial counter head_idx and curr_idx and use head_idx
-> > +        * as a queue of node indices to be visited.
-> > +        *
-> > +        * When we reach the max number of CPU idle states or
-> > +        * head_idx == curr_idx (empty nodes queue) we are done.
-> > +        */
-> > +       head_idx = curr_idx = cnt;
-> > +
-> > +       do {
-> > +               curr_idx = parse_idle_states_node(curr, curr_idx, cpus);
-> > +               if (curr_idx == CPUIDLE_STATE_MAX || head_idx == curr_idx)
-> > +                       break;
-> > +               /*
-> > +                * idle_states array is updated by parse_idle_states_node(),
-> > +                * we can use the initialized states as a queue of nodes
-> > +                * that need to be checked for their idle states siblings.
-> > +                * head_idx works as a pointer into the queue to get the
-> > +                * next node to be parsed.
-> > +                */
-> > +               curr = idle_states[head_idx++].node;
-> > +       } while (curr);
-> 
-> I still object to index property and this is why. You need to be able
-> to determine state order by actual h/w properties. That is what you
-> are doing in your head when you define the indexes.
-> 
-> You really want a linked list here that you can sort as you go and not
-> care what order you parse DT nodes. Not to mention you don't know how
-> many states you will have.
-
-This code does not care about the order of nodes, the index is just there
-to keep track of nodes that have still to be parsed. Sorting is done later,
-using the index property (totally unrelated to the {head/curr}_idx) which I
-understand is frowned upon in DT world (but in this case I think it could be
-accepted, certainly it would make my life easier).
-
-Having said that, I like the idea of implementing it with a linked list and
-sorting states while parsing them. I will remove that index property and
-replace it with an actual hw property: power_consumption ? Or should I just
-use min_residency (the higher the required residency the deeper the idle
-state) ? Defining the power consumption (or better savings) for a state is
-an _outright_ can of worms, that's why using an index is easier.
-
-Thoughts ?
-
-Thanks,
-Lorenzo
+Cheers,
+Mark.
