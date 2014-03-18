@@ -1,34 +1,33 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Mar 2014 06:20:27 -0700
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <CAMuHMdVxTQDdpcdjZZRSrvT8cmuT2AkE1q6WaSWey8U+PuVX2w@mail.gmail.com>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
- <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
- <1395148051.2812.51.camel@joe-AO722>
- <CAMuHMdVxTQDdpcdjZZRSrvT8cmuT2AkE1q6WaSWey8U+PuVX2w@mail.gmail.com>
-Message-ID: <1395148827.2812.54.camel@joe-AO722>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 18 Mar 2014 15:23:11 +0200
+Subject: [PATCH] ARM: dts: keystone: Fix control register range for clktsip
+Message-ID: <1395148991-22538-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-18 at 14:13 +0100, Geert Uytterhoeven wrote:
-> > no_printk keeps all side effects like
-> > performing any function calls made by the
-> > statement or accessing any volatiles.
-> That's true...
-> > Using
-> > do { if (0) no_printk(fmt, ##__VA_ARGS__); } while (0)
-> > does not have any side-effects.
-> ... but all current users in include/ have the side-effects.
+The control register range for clktsio interferes with clkaemifspi clock.
+And it causes issues for NAND/AEMIF. So fix it.
 
-I believe that's intentional, but <shrug>.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
 
-I prefer debug statements to have _no_
-side effects when not compiled-in/enabled.
+Only comment is corrected.
 
-Opinions vary.
+ arch/arm/boot/dts/k2hk-clocks.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-cheers, Joe
+diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+index a71aa29..8855b1f 100644
+--- a/arch/arm/boot/dts/k2hk-clocks.dtsi
++++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+@@ -59,7 +59,7 @@ clocks {
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk16>;
+ 		clock-output-names = "tsip";
+-		reg = <0x0235000c 0xb00>, <0x02350000 0x400>;
++		reg = <0x02350000 0xb00>, <0x02350000 0x400>;
+ 		reg-names = "control", "domain";
+ 		domain-id = <0>;
+ 	};
+-- 
+1.8.3.2
