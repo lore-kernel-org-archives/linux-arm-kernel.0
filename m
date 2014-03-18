@@ -1,71 +1,45 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Tue, 18 Mar 2014 20:03:29 +0900
-Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
- gate clocks
-In-Reply-To: <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
-References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
- <5323078E.4060903@samsung.com>
- <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
-Message-ID: <20140318200329.cc1dca7541b4b1916e5d9d48@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 18 Mar 2014 12:07:48 +0100
+Subject: [PATCH v6 05/10] V4L: s5c73m3: Add device tree support
+In-Reply-To: <201403181105.47922.arnd@arndb.de>
+References: <1394122819-9582-1-git-send-email-s.nawrocki@samsung.com>
+ <1394122819-9582-6-git-send-email-s.nawrocki@samsung.com>
+ <201403181105.47922.arnd@arndb.de>
+Message-ID: <53282904.6080004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Mar 2014 22:27:59 +0530, Sachin Kamat wrote:
->  Hi KyongHo,
+On 18/03/14 11:05, Arnd Bergmann wrote:
+> On Thursday 06 March 2014, Sylwester Nawrocki wrote:
+>> This patch adds the V4L2 asynchronous subdev registration and
+>> device tree support. Common clock API is used to control the
+>> sensor master clock from within the subdev.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> On 14 March 2014 19:13, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Hi KyongHo,
-> >
-> >
-> > On 14.03.2014 06:09, Cho KyongHo wrote:
-> >>
-> >> exynos-iommu driver must care about master H/W's gate clock as well as
-> >> System MMU's gate clock. To enhance readability of the source code,
-> >> macros to gate/ungate those clocks are defined.
-> >>
-> >> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> >> ---
-> >>   drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
-> >>   1 file changed, 22 insertions(+), 12 deletions(-)
-> >>
-> >> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> >> index 71e77f1..cef62d0 100644
-> >> --- a/drivers/iommu/exynos-iommu.c
-> >> +++ b/drivers/iommu/exynos-iommu.c
-> >> @@ -101,6 +101,16 @@
-> >>   #define REG_PB1_SADDR         0x054
-> >>   #define REG_PB1_EADDR         0x058
-> >>
-> >> +#define __clk_gate_ctrl(data, clk, en) do {            \
-> >> +               if (data->clk)                          \
-> >> +                       clk_##en##able(data->clk);      \
-> >> +       } while (0)
-> >> +
-> >> +#define __sysmmu_clk_enable(data)      __clk_gate_ctrl(data, clk, en)
-> >> +#define __sysmmu_clk_disable(data)     __clk_gate_ctrl(data, clk, dis)
-> >> +#define __master_clk_enable(data)      __clk_gate_ctrl(data, clk_master,
-> >> en)
-> >> +#define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master,
-> >> dis)
-> >> +
-> >
-> >
-> > I'd say that such macros only obfuscate code, without any gains, as you can
-> > see in diffstat - this patch adds more lines than it removes.
-> >
-> > Please drop this change.
+> This driver is in linux-next now, but
 > 
->  I agree with Tomasz here.
+>> +	node_ep = v4l2_of_get_next_endpoint(node, NULL);
+>> +	if (!node_ep) {
+>> +		dev_warn(dev, "no endpoint defined for node: %s\n",
+>> +						node->full_name);
+>> +		return 0;
+>>  	}
 > 
+> This function is not defined here, leading to build errors.
 
-Are you concerning about using macros or more insertions than deletions?
+*sigh* it seems this [1] patch series ended up somehow in -next,
+but it shouldn't. Mauro, could you please remove the 'exynos'
+branch from media-next tree ? This should fix the problem.
+Even though I have been trying to merge this patch to mainline
+for ages, I'm ready to resign from it for now, not to add to
+the mess we are already seeing [2].
 
-The deletions in this patch are only clk_enable() and clk_disable()
-but they must be
-"if (!IS_ERR(clk)) clk_enable(clk)" and "if (!IS_ERR(clk)) clk_disable(clk)".
 
-I think use of macro is fancier in that case.
+[1] https://lkml.org/lkml/2014/3/6/352
+[2] https://lkml.org/lkml/2014/3/17/547
 
-Thank you.
-
-KyongHo.
+Thanks,
+Sylwester
