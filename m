@@ -1,38 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Mar 2014 11:56:42 +0000
-Subject: [PATCH 1/2] serial: s3c: Fix build of header without serial_core.h
- preinclusion
-Message-ID: <1395143803-2032-1-git-send-email-broonie@kernel.org>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 18 Mar 2014 23:00:12 +1100 (EST)
+Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
+ structure
+In-Reply-To: <1395112756.20860.1.camel@joe-AO722>
+References: <20140318002822.372705594@telegraphics.com.au>
+ <1395112756.20860.1.camel@joe-AO722>
+Message-ID: <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
 
-serial_s3c.h uses upf_t which is defined in serial_core.h but does not
-include that itself meaning that users which include serial_s3c.h by
-itself don't build.
+On Mon, 17 Mar 2014, Joe Perches wrote:
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
+> 
+> My preference would be to change dprintk to scsi_dbg
 
-This is needed together with patch 2 to fix build failures in -next, I
-didn't have the time/enthusiasm to isolate the issue.
+Can you be more specific? I gather you're not referring to the debugging 
+routines in include/scsi/scsi_dbg.h as they aren't equivalent.
 
- include/linux/serial_s3c.h | 2 ++
- 1 file changed, 2 insertions(+)
+Is it the name "dprintk" you object to?
 
-diff --git a/include/linux/serial_s3c.h b/include/linux/serial_s3c.h
-index 907d9d1d56cf..44e4a6b92ddb 100644
---- a/include/linux/serial_s3c.h
-+++ b/include/linux/serial_s3c.h
-@@ -29,6 +29,8 @@
- #ifndef __ASM_ARM_REGS_SERIAL_H
- #define __ASM_ARM_REGS_SERIAL_H
- 
-+#include <linux/serial_core.h>
-+
- #define S3C2410_URXH	  (0x24)
- #define S3C2410_UTXH	  (0x20)
- #define S3C2410_ULCON	  (0x00)
+I went looking in drivers/scsi/ for some kind of naming convention for a 
+conditional printk. There are some other variations on the theme (DEBUG, 
+PDEBUG, PERROR, etc) but dprintk() seems to be the most popular.
+
 -- 
-1.9.0
