@@ -1,501 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Mar 2014 10:20:25 +0000
-Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
- infrastructure
-In-Reply-To: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Mar 2014 11:15:54 +0100
+Subject: [PATCH v2 3/8] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <20140318095002.GM25478@lee--X1>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-4-git-send-email-carlo@caione.org>
+ <20140318090013.GU27873@lukather> <20140318095002.GM25478@lee--X1>
+Message-ID: <20140318101554.GZ27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On most common ARM systems, the low-power states a CPU can be put into are
-not discoverable in HW and require device tree bindings to describe
-the respective power domains, power down protocol and idle states parameters.
+On Tue, Mar 18, 2014 at 09:50:02AM +0000, Lee Jones wrote:
+> > > This patch add support for the Power Enable Key found on MFD AXP202 and
+> > > AXP209. Besides the basic support for the button, the driver adds two
+> > > entries in sysfs to configure the time delay for power on/off.
+> > > 
+> > > Signed-off-by: Carlo Caione <carlo@caione.org>
+> > > ---
+> > >  drivers/input/misc/Kconfig      |  11 ++
+> > >  drivers/input/misc/Makefile     |   1 +
+> > >  drivers/input/misc/axp20x-pek.c | 267 ++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 279 insertions(+)
+> > >  create mode 100644 drivers/input/misc/axp20x-pek.c
+> > 
+> > From what I understood of the MFD framework, you usually have a MFD
+> > core driver that gets loaded from the DT and instantiate its various
+> > functions through sub-devices, that are registered through
+> > mfd_add_devices, and the drivers for these sub-devices are supported
+> > in sub-drivers that are located in the driver/mfd, alongside the core
+> > driver.
+> > 
+> > I believe that such a pattern allows for two interesting things:
+> >   - You don't have to search around the whole kernel tree to find
+> >     where a given sub-feature is supported.
+> >   - You don't have to cripple your DT with instantiation of all the
+> >     subcomponents, while you only really have one device.
+> > 
+> > Do you have a reason for not following this pattern?
+> 
+> Sorry Maxime, this is not the case.
+> 
+> If an MFD contains Regulators and USB & GPIO Controllers, I'd expect
+> to see the device represented in the following way:
+> 
+>   drivers/mfd/<id>.c
+>   drivers/{gpio,pinctrl}/{gpio,pinctrl}-<id>.c
+>   drivers/regulator/<id>-regulator.c
+>   drivers/usb/host/<id>.c
 
-In order to enable DT based idle states and configure idle drivers, this
-patch implements the bulk infrastructure required to parse the device tree
-idle states bindings and functions to initizialize idle driver and protocol
-back-ends.
+Oh, ok. Nevermind then :)
 
-Protocol back-ends (eg PSCI) must register a protocol initializer with
-the idle state parser so that upon protocol detection, the parsing code
-can call the back-end infrastructure to complete the idle driver
-initialization.
+Just out of curiosity, some drivers at least seem to follow that trend
+in drivers/mfd, is there any reason for this (other than historical) ?
 
-Idle state index 0 is always initialized, ie always considered present
-on all ARM platforms.
+Thanks,
+Maxime
 
-Code that initializes idle states checks the CPU idle driver cpumask so
-that multiple CPU idle drivers can be initialized through it in the
-kernel. The CPU idle driver cpumask defines which idle states should be
-considered valid for the driver, ie idle states that are valid on a set
-of cpus the idle driver manages.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm64/Kconfig                   |   4 +
- arch/arm64/include/asm/idle_states.h |  20 ++
- arch/arm64/kernel/Makefile           |   1 +
- arch/arm64/kernel/idle_states.c      | 397 +++++++++++++++++++++++++++++++++++
- 4 files changed, 422 insertions(+)
- create mode 100644 arch/arm64/include/asm/idle_states.h
- create mode 100644 arch/arm64/kernel/idle_states.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc..3132572 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -295,6 +295,10 @@ config ARCH_SUSPEND_POSSIBLE
- config ARM64_CPU_SUSPEND
- 	def_bool PM_SLEEP
- 
-+config ARM64_IDLE_STATES
-+	def_bool CPU_IDLE
-+	select ARM64_CPU_SUSPEND
-+
- endmenu
- 
- menu "CPU Power Management"
-diff --git a/arch/arm64/include/asm/idle_states.h b/arch/arm64/include/asm/idle_states.h
-new file mode 100644
-index 0000000..0b9f9ba
---- /dev/null
-+++ b/arch/arm64/include/asm/idle_states.h
-@@ -0,0 +1,20 @@
-+#ifndef __ARM64_IDLE_STATES
-+#define __ARM64_IDLE_STATES
-+
-+struct idle_state {
-+	u32	index;
-+	u32	entry_latency;
-+	u32	exit_latency;
-+	u32	min_residency;
-+	u32	param;
-+	struct device_node *node;
-+	struct idle_state *state;
-+	cpumask_t	cpus;
-+	bool	logic_state_retained;
-+	bool	cache_state_retained;
-+};
-+
-+struct cpuidle_driver;
-+
-+int __init arm_init_idle_driver(struct cpuidle_driver *drv);
-+#endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b..2afc9a0 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -19,6 +19,7 @@ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
-+arm64-obj-$(CONFIG_ARM64_IDLE_STATES)	+= idle_states.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
-diff --git a/arch/arm64/kernel/idle_states.c b/arch/arm64/kernel/idle_states.c
-new file mode 100644
-index 0000000..0386cff
---- /dev/null
-+++ b/arch/arm64/kernel/idle_states.c
-@@ -0,0 +1,397 @@
-+/*
-+ * ARM device tree idle states parsing code.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+
-+#include <asm/idle_states.h>
-+#include <asm/psci.h>
-+#include <asm/suspend.h>
-+
-+static struct idle_state idle_states[CPUIDLE_STATE_MAX] __initdata;
-+typedef int (*idle_states_initializer)(struct cpumask *, struct idle_state *,
-+				       unsigned int);
-+
-+struct protocol_init {
-+	const char *prot;
-+	idle_states_initializer prot_init;
-+};
-+
-+static const struct protocol_init protocols[] __initconst = {
-+	{}
-+};
-+
-+static __init const struct protocol_init *get_protocol(const char *str)
-+{
-+	int i;
-+
-+	if (!str)
-+		return NULL;
-+
-+	for (i = 0; protocols[i].prot; i++)
-+		if (!strcmp(protocols[i].prot, str))
-+			return &protocols[i];
-+
-+	return NULL;
-+}
-+
-+static void __init idle_state_cpu_mask(int cpu, struct idle_state *idle_state,
-+				       struct device_node *cn)
-+{
-+	int i = 0;
-+	struct device_node *cpu_state;
-+
-+	do {
-+		cpu_state = of_parse_phandle(cn, "cpu-idle-states", i++);
-+		if (cpu_state && idle_state->node == cpu_state)
-+			cpumask_set_cpu(cpu, &idle_state->cpus);
-+		of_node_put(cpu_state);
-+	} while (cpu_state);
-+}
-+
-+static int __init parse_idle_states_node(struct device_node *parent, int cnt,
-+					 const cpumask_t *cpus)
-+{
-+	struct device_node *state;
-+	struct idle_state *idle_state;
-+	int cpu;
-+
-+	for_each_child_of_node(parent, state) {
-+
-+		if (!of_device_is_compatible(state, "arm,idle-state")) {
-+			pr_warn(" %s has child nodes that are not idle states\n",
-+				parent->full_name);
-+			continue;
-+		}
-+
-+		idle_state = &idle_states[cnt];
-+
-+		pr_debug(" * %s...\n", state->full_name);
-+
-+		idle_state->node = state;
-+		/*
-+		 * Check cpus on which the idle state is valid
-+		 */
-+		for_each_possible_cpu(cpu) {
-+			struct device_node *cn;
-+
-+			cn = of_get_cpu_node(cpu, NULL);
-+			if (!cn) {
-+				pr_err("missing device node for CPU %d\n", cpu);
-+				continue;
-+			}
-+			idle_state_cpu_mask(cpu, idle_state, cn);
-+		}
-+
-+		/*
-+		 * The driver cpumask is not a subset of cpus on which the
-+		 * idle state is valid, hence the idle state is skipped for
-+		 * this driver.
-+		 */
-+		if (!cpumask_subset(cpus, &idle_state->cpus))
-+			continue;
-+
-+		if (of_property_read_u32(state, "index", &idle_state->index)) {
-+			pr_debug(" * %s missing index property\n",
-+				     state->full_name);
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(state, "entry-latency-us",
-+					 &idle_state->entry_latency)) {
-+			pr_debug(" * %s missing entry latency property\n",
-+				     state->full_name);
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(state, "exit-latency-us",
-+					 &idle_state->exit_latency)) {
-+			pr_debug(" * %s missing exit latency property\n",
-+				     state->full_name);
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(state, "min-residency-us",
-+					 &idle_state->min_residency)) {
-+			pr_debug(" * %s missing min-residency property\n",
-+				     state->full_name);
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(state, "entry-method-param",
-+					 &idle_state->param)) {
-+			pr_debug(" * %s missing entry-method-param property\n",
-+				     state->full_name);
-+			continue;
-+		}
-+
-+		if (++cnt == CPUIDLE_STATE_MAX) {
-+			pr_warn("Number of parsed states equal static CPU idle state limit\n");
-+			of_node_put(state);
-+			break;
-+		}
-+	}
-+
-+	return cnt;
-+}
-+
-+static int __init parse_idle_states(struct device_node *root, int cnt,
-+				    const cpumask_t *cpus)
-+{
-+	int head_idx, curr_idx;
-+	struct device_node *curr = root;
-+
-+	/*
-+	 * Breadth-first DT idle states parsing
-+	 *
-+	 * Sweep idle states level in the device tree and use the
-+	 * idle_states array to stash the visited nodes, as a queue.
-+	 *
-+	 * parse_idle_states_node() updates the idle_states array by
-+	 * initializing entries, stashing the device tree node for the
-+	 * corresponding state (struct idle_state.node) and incrementing
-+	 * the idle states counter that is returned so that curr_idx is
-+	 * kept up-to-date while descending into tree levels.
-+	 *
-+	 * Store the initial counter head_idx and curr_idx and use head_idx
-+	 * as a queue of node indices to be visited.
-+	 *
-+	 * When we reach the max number of CPU idle states or
-+	 * head_idx == curr_idx (empty nodes queue) we are done.
-+	 */
-+	head_idx = curr_idx = cnt;
-+
-+	do {
-+		curr_idx = parse_idle_states_node(curr, curr_idx, cpus);
-+		if (curr_idx == CPUIDLE_STATE_MAX || head_idx == curr_idx)
-+			break;
-+		/*
-+		 * idle_states array is updated by parse_idle_states_node(),
-+		 * we can use the initialized states as a queue of nodes
-+		 * that need to be checked for their idle states siblings.
-+		 * head_idx works as a pointer into the queue to get the
-+		 * next node to be parsed.
-+		 */
-+		curr = idle_states[head_idx++].node;
-+	} while (curr);
-+
-+	return curr_idx;
-+}
-+
-+/*
-+ * Sort states according to their index value, higher indexes
-+ * imply higher power savings, as expected by the CPU idle subsystem.
-+ */
-+static void __init sort_states(int count)
-+{
-+	int i, j;
-+	struct idle_state *idle_state;
-+
-+	/*
-+	 * move pointers instead of entries
-+	 */
-+	for (i = 0; i < count; i++)
-+		idle_states[i].state = &idle_states[i];
-+
-+	/*
-+	 * Selection sort is acceptable here, since the
-+	 * number of states is small (<=CPUIDLE_STATE_MAX)
-+	 *
-+	 * Index starts from 1, we know index 0 is standby wfi and
-+	 * it is always the idle state with higher power consumption
-+	 */
-+	for (i = 1; i < count - 1; i++) {
-+		u32 elem = i;
-+		for (j = i+1; j < count; j++) {
-+			if (idle_states[j].state->index <
-+					idle_states[elem].state->index)
-+				elem = j;
-+		}
-+		if (i != elem) {
-+			idle_state = idle_states[i].state;
-+			idle_states[i].state = idle_states[elem].state;
-+			idle_states[elem].state = idle_state;
-+		}
-+	}
-+}
-+
-+/*
-+ * arm_dt_init_idle_states - Parse DT idle states and initialize the protocol
-+ *			     back-end
-+ *
-+ * @prot: pointer to the protocol initializer. Initialized only if return code
-+ *        is >0
-+ * @cpus: CPU idle driver cpumask
-+ *
-+ * Returns:
-+ *	Number of idle states detected upon success
-+ *	<0 on failure
-+ */
-+static int __init arm_dt_init_idle_states(const struct protocol_init **prot,
-+					  const cpumask_t *cpus)
-+{
-+	struct device_node *cpups;
-+	const char *entry_method;
-+	/* start from 1, stanbywfi is always there */
-+	int cnt = 1, ret = 0;
-+
-+	if (!prot)
-+		return -EINVAL;
-+
-+	cpups = of_find_node_by_path("/cpus/idle-states");
-+
-+	if (!cpups)
-+		return -ENODEV;
-+
-+	cnt = parse_idle_states(cpups, cnt, cpus);
-+
-+	if (cnt == 1) {
-+		ret = -ENODATA;
-+		goto put_node;
-+	}
-+
-+	/*
-+	 * idle driver expects states to sorted in terms of power
-+	 * consumption
-+	 */
-+	sort_states(cnt);
-+
-+	if (of_property_read_string(cpups, "entry-method", &entry_method)) {
-+		pr_warn(" * %s missing entry_method property\n",
-+			    cpups->full_name);
-+		ret = -EOPNOTSUPP;
-+		goto put_node;
-+	}
-+
-+	*prot = get_protocol(entry_method);
-+	if (!*prot) {
-+		pr_warn("Missing protocol initializer\n");
-+		ret = -EOPNOTSUPP;
-+		goto put_node;
-+	}
-+
-+	pr_debug("detected %u idle states\n", cnt);
-+
-+put_node:
-+	of_node_put(cpups);
-+	return ret ? : cnt;
-+}
-+
-+/*
-+ * arm_enter_idle_state - Programs CPU to enter the specified state
-+ *
-+ * @dev: cpuidle device
-+ * @drv: cpuidle driver
-+ * @idx: state index
-+ *
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ */
-+static int arm_enter_idle_state(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int idx)
-+{
-+	int ret;
-+
-+	if (!idx) {
-+		/*
-+		 * idle index 0 is just standby wfi, does not require CPU
-+		 * to be suspended
-+		 */
-+		cpu_do_idle();
-+		return idx;
-+	}
-+
-+	cpu_pm_enter();
-+	/*
-+	 * Pass idle state index to cpu_suspend which in turn will call
-+	 * the CPU ops suspend protocol with idle index as a parameter
-+	 */
-+	ret = cpu_suspend(idx);
-+
-+	cpu_pm_exit();
-+
-+	return ret ? : idx;
-+}
-+
-+int __init arm_init_idle_driver(struct cpuidle_driver *drv)
-+{
-+	int i,  idle_states_nb;
-+	struct idle_state *idle_state;
-+	struct cpuidle_state *s;
-+	const struct protocol_init *prot;
-+
-+	drv->states[0].exit_latency = 1;
-+	drv->states[0].target_residency = 1;
-+	drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
-+	drv->states[0].enter = arm_enter_idle_state;
-+	strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
-+	strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
-+
-+	idle_states_nb = arm_dt_init_idle_states(&prot, drv->cpumask);
-+
-+	if (idle_states_nb < 0) {
-+		/*
-+		 * No DT based idle states detected
-+		 * Initialize driver count and exit successfully.
-+		 */
-+		drv->state_count = 1;
-+		return 0;
-+	}
-+
-+	/*
-+	 * We finally have some idle states to initialize.
-+	 * Driver state 0 corresponds to WFI, start from index 1 and count up
-+	 * to idle_states_nb (parsed idle states + WFI).
-+	 * arm_dt_init_idle_states() ensures that CPUIDLE_STATE_MAX is not
-+	 * exceeded.
-+	 */
-+	s = &drv->states[1];
-+	for (i = 1; i < idle_states_nb; i++, s++) {
-+		idle_state = idle_states[i].state;
-+		if (!idle_state)
-+			break;
-+
-+		strncpy(s->name, idle_state->node->name, CPUIDLE_NAME_LEN);
-+		strncpy(s->desc, idle_state->node->name, CPUIDLE_DESC_LEN);
-+
-+		s->exit_latency =
-+			idle_state->entry_latency + idle_state->exit_latency;
-+		s->target_residency = idle_state->min_residency;
-+		/*
-+		 * TBD: flag for timers is set implicitly for now but must be
-+		 * linked to power domains.
-+		 */
-+		if (!idle_state->logic_state_retained)
-+			s->flags |= CPUIDLE_FLAG_TIMER_STOP;
-+		s->flags |= CPUIDLE_FLAG_TIME_VALID;
-+		s->enter = arm_enter_idle_state;
-+	}
-+
-+	/*
-+	 * If we are here, we have a protocol back-end to initialize.
-+	 *
-+	 * If protocol initializer fails reset states count to 1 (wfi)
-+	 */
-+	if (prot->prot_init(drv->cpumask, idle_states, idle_states_nb))
-+		i = 1;
-+
-+	pr_info("idle states initialized, prototocol: %s states count: %u",
-+		prot->prot, i);
-+
-+	drv->state_count = i;
-+	return 0;
-+}
-+
 -- 
-1.8.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/f84d8126/attachment.sig>
