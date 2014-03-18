@@ -1,52 +1,56 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 10:15:43 +0200
-Subject: [PATCHv2 4/8] Doc/DT: Add DT binding documentation for HDMI Connector
+Date: Tue, 18 Mar 2014 10:15:45 +0200
+Subject: [PATCHv2 6/8] Doc/DT: Add DT binding documentation for Sony acx565akm
+ panel
 In-Reply-To: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1395130547-18633-7-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for HDMI Connector.
+Add DT binding documentation for Sony acx565akm panel
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Reviewed-by: Sebastian Reichel <sre@debian.org>
 Reviewed-by: Archit Taneja <archit@ti.com>
 ---
- .../devicetree/bindings/video/hdmi-connector.txt   | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+ .../devicetree/bindings/video/sony,acx565akm.txt   | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
 
-diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+diff --git a/Documentation/devicetree/bindings/video/sony,acx565akm.txt b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
 new file mode 100644
-index 000000000000..ccccc19e2573
+index 000000000000..e12333280749
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
-@@ -0,0 +1,28 @@
-+HDMI Connector
-+==============
++++ b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
+@@ -0,0 +1,30 @@
++Sony ACX565AKM SDI Panel
++========================
 +
 +Required properties:
-+- compatible: "hdmi-connector"
-+- type: the HDMI connector type: "a", "b", "c", "d" or "e"
++- compatible: "sony,acx565akm"
 +
 +Optional properties:
-+- label: a symbolic name for the connector
++- label: a symbolic name for the panel
++- reset-gpios: panel reset gpio
 +
 +Required nodes:
-+- Video port for HDMI input
++- Video port for SDI input
 +
 +Example
 +-------
 +
-+hdmi0: connector at 1 {
-+	compatible = "hdmi-connector";
-+	label = "hdmi";
++acx565akm at 2 {
++	compatible = "sony,acx565akm";
++	spi-max-frequency = <6000000>;
++	reg = <2>;
 +
-+	type = "a";
++	label = "lcd";
++	reset-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
 +
 +	port {
-+		hdmi_connector_in: endpoint {
-+			remote-endpoint = <&tpd12s015_out>;
++		lcd_in: endpoint {
++			remote-endpoint = <&sdi_out>;
 +		};
 +	};
 +};
