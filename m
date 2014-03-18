@@ -1,412 +1,163 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Tue, 18 Mar 2014 20:23:20 +0900
-Subject: [PATCH v11 19/27] iommu/exynos: add support for power management
- subsystems.
-In-Reply-To: <53232959.7020306@samsung.com>
-References: <20140314141028.4b0b62d895905988ab5dda88@samsung.com>
- <53232959.7020306@samsung.com>
-Message-ID: <20140318202320.a3101304bbc51cc9f169cdaa@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 18 Mar 2014 19:19:54 +0800
+Subject: [PATCH 3/3] [media] atmel-isi: add primary DT support
+In-Reply-To: <1395141238-5948-1-git-send-email-josh.wu@atmel.com>
+References: <1395141238-5948-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1395141594-6065-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Mar 2014 17:07:53 +0100, Tomasz Figa wrote:
-> Hi KyongHo,
-> 
-> On 14.03.2014 06:10, Cho KyongHo wrote:
-> > This adds support for Suspend to RAM and Runtime Power Management.
-> >
-> > Since System MMU is located in the same local power domain of its
-> > master H/W, System MMU must be initialized before it is working if
-> > its power domain was ever turned off. TLB invalidation according to
-> > unmapping on page tables must also be performed while power domain is
-> > turned on.
-> >
-> > This patch ensures that resume and runtime_resume(restore_state)
-> > functions in this driver is called before the calls to resume and
-> > runtime_resume callback functions in the drivers of master H/Ws.
-> > Likewise, suspend and runtime_suspend(save_state) functions in this
-> > driver is called after the calls to suspend and runtime_suspend in the
-> > drivers of master H/Ws.
-> >
-> > In order to get benefit of this support, the master H/W and its System
-> > MMU must resides in the same power domain in terms of Linux kernel. If
-> > a master H/W does not use generic I/O power domain, its driver must
-> > call iommu_attach_device() after its local power domain is turned on,
-> > iommu_detach_device before turned off.
-> >
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >   drivers/iommu/exynos-iommu.c |  220 ++++++++++++++++++++++++++++++++++++++----
-> >   1 file changed, 201 insertions(+), 19 deletions(-)
-> >
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index 9037da0..84ba29a 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -28,6 +28,7 @@
-> >   #include <linux/export.h>
-> >   #include <linux/of.h>
-> >   #include <linux/of_platform.h>
-> > +#include <linux/pm_domain.h>
-> >   #include <linux/notifier.h>
-> >
-> >   #include <asm/cacheflush.h>
-> > @@ -203,6 +204,7 @@ struct sysmmu_drvdata {
-> >   	int activations;
-> >   	rwlock_t lock;
-> >   	struct iommu_domain *domain;
-> > +	bool runtime_active;
-> >   	unsigned long pgtable;
-> >   };
-> >
-> > @@ -388,7 +390,8 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
-> >   		data->pgtable = 0;
-> >   		data->domain = NULL;
-> >
-> > -		__sysmmu_disable_nocount(data);
-> > +		if (data->runtime_active)
-> > +			__sysmmu_disable_nocount(data);
-> >
-> >   		dev_dbg(data->sysmmu, "Disabled\n");
-> >   	} else  {
-> > @@ -449,7 +452,8 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
-> >   		data->pgtable = pgtable;
-> >   		data->domain = domain;
-> >
-> > -		__sysmmu_enable_nocount(data);
-> > +		if (data->runtime_active)
-> > +			__sysmmu_enable_nocount(data);
-> >
-> >   		dev_dbg(data->sysmmu, "Enabled\n");
-> >   	} else {
-> > @@ -534,13 +538,11 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
-> >   	data = dev_get_drvdata(owner->sysmmu);
-> >
-> >   	read_lock_irqsave(&data->lock, flags);
-> > -	if (is_sysmmu_active(data)) {
-> > -		unsigned int maj;
-> > +	if (is_sysmmu_active(data) && data->runtime_active) {
-> >   		unsigned int num_inv = 1;
-> >
-> >   		__master_clk_enable(data);
-> >
-> > -		maj = __raw_readl(data->sfrbase + REG_MMU_VERSION);
-> >   		/*
-> >   		 * L2TLB invalidation required
-> >   		 * 4KB page: 1 invalidation
-> > @@ -551,7 +553,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
-> >   		 * 1MB page can be cached in one of all sets.
-> >   		 * 64KB page can be one of 16 consecutive sets.
-> >   		 */
-> > -		if ((maj >> 28) == 2) /* major version number */
-> > +		if (__sysmmu_version(data, NULL) == 2) /* major version number */
-> >   			num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
-> >
-> >   		if (sysmmu_block(data->sfrbase)) {
-> > @@ -576,7 +578,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
-> >   	data = dev_get_drvdata(owner->sysmmu);
-> >
-> >   	read_lock_irqsave(&data->lock, flags);
-> > -	if (is_sysmmu_active(data)) {
-> > +	if (is_sysmmu_active(data) && data->runtime_active) {
-> >   		__master_clk_enable(data);
-> >   		if (sysmmu_block(data->sfrbase)) {
-> >   			__sysmmu_tlb_invalidate(data->sfrbase);
-> > @@ -677,11 +679,40 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
-> >   	platform_set_drvdata(pdev, data);
-> >
-> >   	pm_runtime_enable(dev);
-> > +	data->runtime_active = !pm_runtime_enabled(dev);
-> 
-> Hmm, this seems to be a bit misleading. The field is named 
-> runtime_active, but the assignment makes it true if PM runtime is _not_ 
-> enabled (i.e. inactive). Is this correct?
-> 
+This patch add the DT support for Atmel ISI driver.
+It use the same v4l2 DT interface that defined in video-interfaces.txt.
 
-I agree that it may lead misunderstood.
-data->runtime_active actually indicates if electric power is asserted
-to the System MMU. pm_runtime_enable() call must enable runtime pm
-for the given device. If runtime pm is not enabled although pm_runtime_enable()
-is called, CONFIG_PM_RUNTIME is not configured.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Cc: devicetree at vger.kernel.org
+---
+ .../devicetree/bindings/media/atmel-isi.txt        |   51 ++++++++++++++++++++
+ drivers/media/platform/soc_camera/atmel-isi.c      |   33 ++++++++++++-
+ 2 files changed, 82 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
 
-Actually, it is replacible with 
-if (IS_ENABLED(CONFIG_PM_RUNTIME)) 
-    data->runtime_active = true;
-
-> >
-> >   	dev_dbg(dev, "Probed and initialized\n");
-> >   	return 0;
-> >   }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int sysmmu_suspend(struct device *dev)
-> > +{
-> > +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-> > +	unsigned long flags;
-> > +	read_lock_irqsave(&data->lock, flags);
-> > +	if (is_sysmmu_active(data) &&
-> > +		(!pm_runtime_enabled(dev) || data->runtime_active))
-> > +		__sysmmu_disable_nocount(data);
-> > +	read_unlock_irqrestore(&data->lock, flags);
-> > +	return 0;
-> > +}
-> > +
-> > +static int sysmmu_resume(struct device *dev)
-> > +{
-> > +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-> > +	unsigned long flags;
-> > +	read_lock_irqsave(&data->lock, flags);
-> > +	if (is_sysmmu_active(data) &&
-> > +		(!pm_runtime_enabled(dev) || data->runtime_active))
-> > +		__sysmmu_enable_nocount(data);
-> > +	read_unlock_irqrestore(&data->lock, flags);
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> > +static SIMPLE_DEV_PM_OPS(sysmmu_pm_ops, sysmmu_suspend, sysmmu_resume);
-> > +
-> >   #ifdef CONFIG_OF
-> >   static struct of_device_id sysmmu_of_match[] __initconst = {
-> >   	{ .compatible	= "samsung,sysmmu-v1", },
-> > @@ -698,6 +729,7 @@ static struct platform_driver exynos_sysmmu_driver __refdata = {
-> >   	.driver	= {
-> >   		.owner		= THIS_MODULE,
-> >   		.name		= "exynos-sysmmu",
-> > +		.pm		= &sysmmu_pm_ops,
-> >   		.of_match_table	= of_match_ptr(sysmmu_of_match),
-> >   	}
-> >   };
-> > @@ -1111,24 +1143,152 @@ err_reg_driver:
-> >   }
-> >   subsys_initcall(exynos_iommu_init);
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int sysmmu_pm_genpd_suspend(struct device *dev)
-> > +{
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +	int ret;
-> > +
-> > +	ret = pm_generic_suspend(dev);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	return pm_generic_suspend(owner->sysmmu);
-> > +}
-> > +
-> > +static int sysmmu_pm_genpd_resume(struct device *dev)
-> > +{
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +	int ret;
-> > +
-> > +	ret = pm_generic_resume(owner->sysmmu);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	return pm_generic_resume(dev);
-> > +}
-> > +#endif
-> > +
-> > +#ifdef CONFIG_PM_RUNTIME
-> > +static void sysmmu_restore_state(struct device *sysmmu)
-> > +{
-> > +	struct sysmmu_drvdata *data = dev_get_drvdata(sysmmu);
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&data->lock, flags);
-> > +	data->runtime_active = true;
-> > +	if (is_sysmmu_active(data))
-> > +		__sysmmu_enable_nocount(data);
-> > +	spin_unlock_irqrestore(&data->lock, flags);
-> > +}
-> > +
-> > +static void sysmmu_save_state(struct device *sysmmu)
-> > +{
-> > +	struct sysmmu_drvdata *data = dev_get_drvdata(sysmmu);
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&data->lock, flags);
-> > +	if (is_sysmmu_active(data))
-> > +		__sysmmu_disable_nocount(data);
-> > +	data->runtime_active = false;
-> > +	spin_unlock_irqrestore(&data->lock, flags);
-> > +}
-> > +
-> > +static int sysmmu_pm_genpd_save_state(struct device *dev)
-> > +{
-> > +	struct exynos_iommu_client *client = dev->archdata.iommu;
-> > +	int (*cb)(struct device *__dev);
-> > +	int ret = 0;
-> > +
-> > +	if (dev->type && dev->type->pm)
-> > +		cb = dev->type->pm->runtime_suspend;
-> > +	else if (dev->class && dev->class->pm)
-> > +		cb = dev->class->pm->runtime_suspend;
-> > +	else if (dev->bus && dev->bus->pm)
-> > +		cb = dev->bus->pm->runtime_suspend;
-> > +	else
-> > +		cb = NULL;
-> > +
-> > +	if (!cb && dev->driver && dev->driver->pm)
-> > +		cb = dev->driver->pm->runtime_suspend;
-> > +
-> > +	if (cb)
-> > +		ret = cb(dev);
-> > +
-> > +	if (ret == 0)
-> > +		sysmmu_save_state(client->sysmmu);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int sysmmu_pm_genpd_restore_state(struct device *dev)
-> > +{
-> > +	struct exynos_iommu_client *client = dev->archdata.iommu;
-> > +	int (*cb)(struct device *__dev);
-> > +	int ret = 0;
-> > +
-> > +	if (dev->type && dev->type->pm)
-> > +		cb = dev->type->pm->runtime_resume;
-> > +	else if (dev->class && dev->class->pm)
-> > +		cb = dev->class->pm->runtime_resume;
-> > +	else if (dev->bus && dev->bus->pm)
-> > +		cb = dev->bus->pm->runtime_resume;
-> > +	else
-> > +		cb = NULL;
-> > +
-> > +	if (!cb && dev->driver && dev->driver->pm)
-> > +		cb = dev->driver->pm->runtime_resume;
-> > +
-> > +	sysmmu_restore_state(client->sysmmu);
-> > +
-> > +	if (cb)
-> > +		ret = cb(dev);
-> > +
-> > +	if (ret)
-> > +		sysmmu_save_state(client->sysmmu);
-> > +
-> > +	return ret;
-> > +}
-> > +#endif
-> > +
-> > +#ifdef CONFIG_PM_GENERIC_DOMAINS
-> > +struct gpd_dev_ops sysmmu_devpm_ops = {
-> > +#ifdef CONFIG_PM_RUNTIME
-> > +	.save_state = &sysmmu_pm_genpd_save_state,
-> > +	.restore_state = &sysmmu_pm_genpd_restore_state,
-> > +#endif
-> > +#ifdef CONFIG_PM_SLEEP
-> > +	.suspend = &sysmmu_pm_genpd_suspend,
-> > +	.resume = &sysmmu_pm_genpd_resume,
-> > +#endif
-> > +};
-> > +#endif /* CONFIG_PM_GENERIC_DOMAINS */
-> > +
-> >   static int sysmmu_hook_driver_register(struct notifier_block *nb,
-> >   					unsigned long val,
-> >   					void *p)
-> >   {
-> >   	struct device *dev = p;
-> >
-> > +	/*
-> > +	 * No System MMU assigned even though in the initial state.
-> > +	 * See exynos_sysmmu_probe().
-> > +	 */
-> > +	if (dev->archdata.iommu == NULL)
-> > +		return 0;
-> > +
-> >   	switch (val) {
-> >   	case BUS_NOTIFY_BIND_DRIVER:
-> >   	{
-> >   		struct exynos_iommu_owner *owner;
-> > +		int ret;
-> >
-> > -		/* No System MMU assigned. See exynos_sysmmu_probe(). */
-> > -		if (dev->archdata.iommu == NULL)
-> > -			break;
-> > +		BUG_ON(!dev_get_drvdata(dev->archdata.iommu));
-> >
-> >   		owner = devm_kzalloc(dev, sizeof(*owner), GFP_KERNEL);
-> >   		if (!owner) {
-> >   			dev_err(dev, "No Memory for exynos_iommu_owner\n");
-> > +			dev->archdata.iommu = NULL;
-> >   			return -ENOMEM;
-> >   		}
-> >
-> > @@ -1136,22 +1296,44 @@ static int sysmmu_hook_driver_register(struct notifier_block *nb,
-> >   		INIT_LIST_HEAD(&owner->client);
-> >   		owner->sysmmu = dev->archdata.iommu;
-> >
-> > +		ret = pm_genpd_add_callbacks(dev, &sysmmu_devpm_ops, NULL);
-> > +		if (ret && (ret != -ENOSYS)) {
-> > +			dev_err(dev,
-> > +				"Failed to register 'dev_pm_ops' for iommu\n");
-> > +			devm_kfree(dev, owner);
-> > +			dev->archdata.iommu = NULL;
-> > +			return ret;
-> > +		}
-> > +
-> >   		dev->archdata.iommu = owner;
-> >   		break;
-> >   	}
-> > -	case BUS_NOTIFY_UNBOUND_DRIVER:
-> > +	case BUS_NOTIFY_BOUND_DRIVER:
-> >   	{
-> >   		struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > -		if (owner) {
-> > -			struct device *sysmmu = owner->sysmmu;
-> > -			/* if still attached to an iommu_domain. */
-> > -			if (WARN_ON(!list_empty(&owner->client)))
-> > -				iommu_detach_device(owner->domain, owner->dev);
-> > -			devm_kfree(dev, owner);
-> > -			dev->archdata.iommu = sysmmu;
-> > +		if (!pm_runtime_enabled(dev)) {
-> > +			struct sysmmu_drvdata *data =
-> > +					dev_get_drvdata(owner->sysmmu);
-> > +			if (pm_runtime_enabled(data->sysmmu)) {
-> > +				data->runtime_active = true;
-> > +				if (is_sysmmu_active(data))
-> > +					__sysmmu_enable_nocount(data);
-> > +				pm_runtime_disable(data->sysmmu);
-> > +			}
-> >   		}
-> >   		break;
-> >   	}
-> > +	case BUS_NOTIFY_UNBOUND_DRIVER:
-> > +	{
-> > +		struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +		struct device *sysmmu = owner->sysmmu;
-> > +		if (WARN_ON(!list_empty(&owner->client)))
-> > +			iommu_detach_device(owner->domain, dev);
-> > +		__pm_genpd_remove_callbacks(dev, false);
-> > +		devm_kfree(dev, owner);
-> > +		dev->archdata.iommu = sysmmu;
-> > +		break;
-> > +	}
-> >   	} /* switch (val) */
-> >
-> >   	return 0;
-> > @@ -1165,4 +1347,4 @@ static int __init exynos_iommu_prepare(void)
-> >   {
-> >   	return bus_register_notifier(&platform_bus_type, &sysmmu_notifier);
-> >   }
-> > -arch_initcall(exynos_iommu_prepare);
-> > +subsys_initcall_sync(exynos_iommu_prepare);
-> 
-> Again, initcall is not quite right way to handle platform-specific 
-> things, considering that we are going to have a multiplatform kernel.
-> 
-> Anyway, I'm not sure if genpd is the right place to plug into with IOMMU 
-> power management. Marek Szyprowski has already solved this issue without 
-> hacks like this in our internal code, he's on holidays right now, but I 
-> added him on Cc and also Bartlomiej Zolnierkiewicz, who may also know 
-> something about this. Also added some PM guys on Cc.
-> 
-
-Thank you for the information.
-
-I am wating for the reply from Marek.
-
-Regards,
-
-KyongHo
+diff --git a/Documentation/devicetree/bindings/media/atmel-isi.txt b/Documentation/devicetree/bindings/media/atmel-isi.txt
+new file mode 100644
+index 0000000..07f00eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/atmel-isi.txt
+@@ -0,0 +1,51 @@
++Atmel Image Sensor Interface (ISI) SoC Camera Subsystem
++----------------------------------------------
++
++Required properties:
++- compatible: must be "atmel,at91sam9g45-isi"
++- reg: physical base address and length of the registers set for the device;
++- interrupts: should contain IRQ line for the ISI;
++- clocks: list of clock specifiers, corresponding to entries in
++          the clock-names property;
++- clock-names: must contain "isi_clk", which is the isi peripherial clock.
++               "isi_mck" is optinal, it is the master clock output to sensor.
++
++Optional properties:
++- atmel,isi-disable-preview: a boolean property to disable the preview channel;
++
++Example:
++	isi: isi at f0034000 {
++		compatible = "atmel,at91sam9g45-isi";
++		reg = <0xf0034000 0x4000>;
++		interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
++
++		clocks = <&isi_clk>, <&pck1>;
++		clock-names = "isi_clk", "isi_mck";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_isi &pinctrl_pck1_as_isi_mck>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			isi_0: endpoint {
++				remote-endpoint = <&ov2640_0>;
++			};
++		};
++	};
++
++	i2c1: i2c at f0018000 {
++		ov2640: camera at 0x30 {
++			compatible = "omnivision,ov2640";
++			reg = <0x30>;
++
++			port {
++				ov2640_0: endpoint {
++					remote-endpoint = <&isi_0>;
++					bus-width = <8>;
++				};
++			};
++		};
++	};
++
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index 93bf1cb..1822129 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -19,6 +19,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -33,6 +34,7 @@
+ #define VID_LIMIT_BYTES			(16 * 1024 * 1024)
+ #define MIN_FRAME_RATE			15
+ #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
++#define ISI_DEFAULT_MCLK_FREQ		25000000
+ 
+ /* Frame buffer descriptor */
+ struct fbd {
+@@ -878,6 +880,22 @@ static int atmel_isi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int atmel_isi_probe_dt(struct atmel_isi *isi,
++			struct platform_device *pdev)
++{
++	struct device_node *node = pdev->dev.of_node;
++
++	isi->pdata.full_mode = !of_property_read_bool(node,
++			"atmel,isi-disable-preview");
++
++	/* Default settings for ISI */
++	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
++	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
++	isi->pdata.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
++
++	return 0;
++}
++
+ static int atmel_isi_probe(struct platform_device *pdev)
+ {
+ 	unsigned int irq;
+@@ -889,7 +907,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	struct isi_platform_data *pdata;
+ 
+ 	pdata = dev->platform_data;
+-	if (!pdata || !pdata->data_width_flags) {
++	if ((!pdata || !pdata->data_width_flags) && !pdev->dev.of_node) {
+ 		dev_err(&pdev->dev,
+ 			"No config available for Atmel ISI\n");
+ 		return -EINVAL;
+@@ -905,7 +923,11 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(isi->pclk))
+ 		return PTR_ERR(isi->pclk);
+ 
+-	memcpy(&isi->pdata, pdata, sizeof(struct isi_platform_data));
++	if (pdata)
++		memcpy(&isi->pdata, pdata, sizeof(struct isi_platform_data));
++	else	/* dt probe */
++		atmel_isi_probe_dt(isi, pdev);
++
+ 	isi->active = NULL;
+ 	spin_lock_init(&isi->lock);
+ 	INIT_LIST_HEAD(&isi->video_buffer_list);
+@@ -1007,11 +1029,18 @@ err_alloc_ctx:
+ 	return ret;
+ }
+ 
++static const struct of_device_id atmel_isi_of_match[] = {
++	{ .compatible = "atmel,at91sam9g45-isi" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, atmel_isi_of_match);
++
+ static struct platform_driver atmel_isi_driver = {
+ 	.remove		= atmel_isi_remove,
+ 	.driver		= {
+ 		.name = "atmel_isi",
+ 		.owner = THIS_MODULE,
++		.of_match_table = atmel_isi_of_match,
+ 	},
+ };
+ 
+-- 
+1.7.9.5
