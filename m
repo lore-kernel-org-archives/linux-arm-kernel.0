@@ -1,37 +1,73 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Mar 2014 06:07:31 -0700
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
- <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
-Message-ID: <1395148051.2812.51.camel@joe-AO722>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 18 Mar 2014 14:07:51 +0100
+Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
+ gate clocks
+In-Reply-To: <CAK9yfHxcArgmxm4wSipY1afjmG00zugyycdU+BQbuexvL2bmBw@mail.gmail.com>
+References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
+ <5323078E.4060903@samsung.com>
+ <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
+ <20140318200329.cc1dca7541b4b1916e5d9d48@samsung.com>
+ <CAK9yfHxcArgmxm4wSipY1afjmG00zugyycdU+BQbuexvL2bmBw@mail.gmail.com>
+Message-ID: <53284527.8010903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-18 at 13:55 +0100, Geert Uytterhoeven wrote:
-> On Tue, Mar 18, 2014 at 1:45 PM, Joe Perches <joe@perches.com> wrote:
+On 18.03.2014 12:18, Sachin Kamat wrote:
+> On 18 March 2014 16:33, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>> On Fri, 14 Mar 2014 22:27:59 +0530, Sachin Kamat wrote:
+>>>   Hi KyongHo,
+>>>
+>>> On 14 March 2014 19:13, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>> Hi KyongHo,
+>>>>
+>>>>
+>>>> On 14.03.2014 06:09, Cho KyongHo wrote:
+>>>>>
+>>>>> exynos-iommu driver must care about master H/W's gate clock as well as
+>>>>> System MMU's gate clock. To enhance readability of the source code,
+>>>>> macros to gate/ungate those clocks are defined.
+>>>>>
+>>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+>>>>> ---
+>>>>>    drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
+>>>>>    1 file changed, 22 insertions(+), 12 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>>>>> index 71e77f1..cef62d0 100644
+>>>>> --- a/drivers/iommu/exynos-iommu.c
+>>>>> +++ b/drivers/iommu/exynos-iommu.c
+>>>>> @@ -101,6 +101,16 @@
+>>>>>    #define REG_PB1_SADDR         0x054
+>>>>>    #define REG_PB1_EADDR         0x058
+>>>>>
+>>>>> +#define __clk_gate_ctrl(data, clk, en) do {            \
+>>>>> +               if (data->clk)                          \
+>>>>> +                       clk_##en##able(data->clk);      \
+>>>>> +       } while (0)
+>>>>> +
+>>>>> +#define __sysmmu_clk_enable(data)      __clk_gate_ctrl(data, clk, en)
+>>>>> +#define __sysmmu_clk_disable(data)     __clk_gate_ctrl(data, clk, dis)
+>>>>> +#define __master_clk_enable(data)      __clk_gate_ctrl(data, clk_master,
+>>>>> en)
+>>>>> +#define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master,
+>>>>> dis)
+>>>>> +
+>>>>
+>>>>
+>>>> I'd say that such macros only obfuscate code, without any gains, as you can
+>>>> see in diffstat - this patch adds more lines than it removes.
+>>>>
+>>>> Please drop this change.
+>>>
+>>>   I agree with Tomasz here.
+>>>
+>>
+>> Are you concerning about using macros or more insertions than deletions?
+>
+> It is just making the code more difficult to read and understand.
 
-Hi Geert.
+Especially when hiding accesses to struct fields inside and doing fancy 
+stuff like concatenations.
 
-> > #define dprintk(flg, fmt, ...) \
-> > do { if (0) pr_debug(fmt, ##__VA_ARGS__); } while (0)
-> 
-> Na, no_printk():
-> 
-> #define dprintk(flg, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
-
-Fine, but with a correction.
-
-no_printk keeps all side effects like
-performing any function calls made by the
-statement or accessing any volatiles.
-
-Using
-
-do { if (0) no_printk(fmt, ##__VA_ARGS__); } while (0)
-
-does not have any side-effects.
+Best regards,
+Tomasz
