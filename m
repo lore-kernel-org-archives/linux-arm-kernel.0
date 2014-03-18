@@ -1,56 +1,67 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 18 Mar 2014 16:15:37 -0400
-Subject: [V2] arm: pj4: check cpu id for pj4 cp0 access
-In-Reply-To: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
-References: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <20140318201537.GA20942@beef>
+From: brezillonboris@gmail.com (Boris BREZILLON)
+Date: Tue, 18 Mar 2014 21:18:33 +0100
+Subject: [PATCH 00/11] ARM: at91: rework main and slow clk implementation
+Message-ID: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 05:03:57AM -0400, Chao Xie wrote:
-> Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
-> pj4_cpu0_init just return.
-> This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
-> use same platform code.
-> 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hello,
 
-This patch fixes a boot failure in next now that ARCH_DOVE (and thus
-CPU_PJ4) are enabled in multi_v7_defconfig. I verified that boot works
-again in next with the BCM28155-AP board.
+This series introduce the real clock model (as described in atmel datasheets)
+for slow and main clocks.
 
-Tested-by: Matt Porter <mporter@linaro.org>
+The modifications introduced by this series break the DT compat, but, as the
+at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
+eval boards) I think it won't impact a lot of users.
 
-> arch/arm/kernel/pj4-cp0.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> index 679cf4d..bf658d3 100644
-> --- a/arch/arm/kernel/pj4-cp0.c
-> +++ b/arch/arm/kernel/pj4-cp0.c
-> @@ -17,6 +17,10 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <asm/thread_notify.h>
-> +#include <asm/cputype.h>
-> +
-> +#define CORE_PJ4_MASK	0xfffffff0
-> +#define CORE_PJ4_ID	0x562f5840
->  
->  static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
->  {
-> @@ -79,6 +83,13 @@ static void __init pj4_cp_access_write(u32 value)
->  static int __init pj4_cp0_init(void)
->  {
->  	u32 cp_access;
-> +	unsigned int cpuid;
-> +
-> +	cpuid = read_cpuid_id();
-> +
-> +	/* If it is not a pj4 core, skip it. */
-> +	if ((cpuid & CORE_PJ4_MASK) != CORE_PJ4_ID)
-> +		return 0;
->  
->  	cp_access = pj4_cp_access_read() & ~0xf;
->  	pj4_cp_access_write(cp_access);
+I tested it on sama5d3.
+Alexandre, Jean-Jacques, could you test this series on your eval boards
+(sam9261ek and sam9rlek) so that we can move to this new model and hopefully
+consider the at91 clk DT binding as (almost :-)) stable.
+
+Jean-Jacques, as you can see I reworked my first implementation as you
+suggested, do you want me to add your Signed-off-by in the next version ?
+
+Mike, if this series is accepted, I'd like to get it merged as soon as possible
+to prevent other developpers from using a deprecated DT binding.
+
+Best Regards,
+
+Boris
+
+Boris BREZILLON (11):
+  clk: at91: rework main clk implementation
+  clk: at91: update main clk documentation
+  clk: at91: add slow clks driver
+  clk: at91: add slow clk documentation
+  ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
+  ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
+  ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
+  ARM: at91/dt: move at91sam9261 SoC to the new main clock model
+  ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
+  ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
+  ARM: at91/dt: define sam9rlek crystal frequencies
+
+ .../devicetree/bindings/clock/at91-clock.txt       |  128 ++++-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   10 +
+ arch/arm/boot/dts/at91sam9261.dtsi                 |   10 +-
+ arch/arm/boot/dts/at91sam9261ek.dts                |    4 +
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |   45 +-
+ arch/arm/boot/dts/at91sam9rlek.dts                 |    8 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |   61 +-
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  |   10 +
+ drivers/clk/at91/Makefile                          |    4 +-
+ drivers/clk/at91/clk-main.c                        |  581 +++++++++++++++++---
+ drivers/clk/at91/clk-slow.c                        |  467 ++++++++++++++++
+ drivers/clk/at91/pmc.c                             |   12 +
+ drivers/clk/at91/pmc.h                             |    9 +
+ drivers/clk/at91/sckc.c                            |   57 ++
+ drivers/clk/at91/sckc.h                            |   22 +
+ include/linux/clk/at91_pmc.h                       |    1 +
+ 16 files changed, 1342 insertions(+), 87 deletions(-)
+ create mode 100644 drivers/clk/at91/clk-slow.c
+ create mode 100644 drivers/clk/at91/sckc.c
+ create mode 100644 drivers/clk/at91/sckc.h
+
+-- 
+1.7.9.5
