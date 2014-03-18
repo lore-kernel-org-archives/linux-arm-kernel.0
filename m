@@ -1,142 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Mar 2014 15:08:06 -0700
-Subject: [UPDATED PATCH v3 10/52] arm,
- kvm: Fix CPU hotplug callback registration
-In-Reply-To: <53281E89.7080201@linux.vnet.ibm.com>
-References: <20140310203312.10746.310.stgit@srivatsabhat.in.ibm.com>
- <20140310203538.10746.25364.stgit@srivatsabhat.in.ibm.com>
- <20140312232127.GC24808@cbox> <53229701.8050405@linux.vnet.ibm.com>
- <20140314191055.GF28661@cbox> <53281E89.7080201@linux.vnet.ibm.com>
-Message-ID: <CAMJs5B9kVX9urC2PCXY2kbH-j1fA8bge0KQa1z0nK+A689SNYg@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 18 Mar 2014 18:15:33 -0400
+Subject: [GIT PULL] uprobes: Add uprobes support for ARM
+In-Reply-To: <20140317235229.GQ21483@n2100.arm.linux.org.uk>
+References: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
+ <531F5799.2070302@linaro.org> <20140317235229.GQ21483@n2100.arm.linux.org.uk>
+Message-ID: <5328C585.6070100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2014 03:23, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> On 03/15/2014 12:40 AM, Christoffer Dall wrote:
->> On Fri, Mar 14, 2014 at 11:13:29AM +0530, Srivatsa S. Bhat wrote:
->>> On 03/13/2014 04:51 AM, Christoffer Dall wrote:
->>>> On Tue, Mar 11, 2014 at 02:05:38AM +0530, Srivatsa S. Bhat wrote:
->>>>> Subsystems that want to register CPU hotplug callbacks, as well as perform
->>>>> initialization for the CPUs that are already online, often do it as shown
->>>>> below:
->>>>>
-> [...]
->>>> Just so we're clear, the existing code was simply racy as not prone to
->>>> deadlocks, right?
->>>>
->>>> This makes it clear that the test above for compatible CPUs can be quite
->>>> easily evaded by using CPU hotplug, but we don't really have a good
->>>> solution for handling that yet...  Hmmm, grumble grumble, I guess if you
->>>> hotplug unsupported CPUs on a KVM/ARM system for now, stuff will break.
->>>>
->>>
->>> In this particular case, there was no deadlock possibility, rather the
->>> existing code had insufficient synchronization against CPU hotplug.
->>>
->>> init_hyp_mode() would invoke cpu_init_hyp_mode() on currently online CPUs
->>> using on_each_cpu(). If a CPU came online after this point and before calling
->>> register_cpu_notifier(), that CPU would remain uninitialized because this
->>> subsystem would miss the hot-online event. This patch fixes this bug and
->>> also uses the new synchronization method (instead of get/put_online_cpus())
->>> to ensure that we don't deadlock with CPU hotplug.
->>>
+On 03/17/14 19:52, Russell King - ARM Linux wrote:
+> On Tue, Mar 11, 2014 at 02:36:09PM -0400, David Long wrote:
+>>    git://git.linaro.org/people/dave.long/linux.git uprobes-v7
 >>
->> Yes, that was my conclusion as well.  Thanks for clarifying.  (It could
->> be noted in the commit message as well if you should feel so inclined).
+>> for you to fetch changes up to e55c35236b8adf79453a998506ec6081833b9484:
 >>
+>>    ARM: add uprobes support (2014-03-11 11:40:29 -0400)
 >
-> Please find the patch with updated changelog (and your Ack) below.
-> (No changes in code).
+> I pulled this a week ago into my devel-testing (which is unpublished),
+> and while it hasn't shown any signs of functional problems, I was just
+> about to merge it into devel-stable when I noticed the history.
+>
+> This is based upon:
+>
+> Merge branch 'for-next' of git://git.samba.org/sfrench/cifs-2.6
+> + Linux 3.11
+> + Merge branch 'perf-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+> + Linux 3.12-rc5
+> + Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+> + Linux 3.13-rc3
+> + Linux 3.13-rc4
+> + Linux 3.13-rc8
+> + Linux 3.14-rc2
+> + Linux 3.14-rc4
+> + Linux 3.14-rc5
+> |
+> [your uprobes patches]
+>
+> where each + is a merge of the named commit into the previous.  This is
+> the kind of thing which will make Linus quite unhappy: please base
+> patches off a plain -rc release, not off a merge commit.
+>
+> I'm sure there's others on the mailing list who can guide you on this
+> point, but I do need to ask you to re-spin without those merges.  I'm
+> happy to take a respin of it provided it's based on 3.14-rc5 (so I can
+> more easily confirm that there aren't any changes which I haven't
+> already tested.)
+
+OK, I consulted with a couple coworkers and the fix for this was 
+particularly easy.  The respun branch is in place now.  Same repo, same 
+branch name, based on v3.14-rc5.  Sorry for the newbie mistake.
+
+I'm assuming a new git-pull request is not required (until I hear 
+otherwise).
+
+> Thanks, and sorry about the lateness of this email.
 >
 
-perfect, thanks!
+I'm just back Monday night from a few days vacation, so your timing was 
+perfect for me.
 
-> From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> Subject: [PATCH] arm, kvm: Fix CPU hotplug callback registration
->
-> Subsystems that want to register CPU hotplug callbacks, as well as perform
-> initialization for the CPUs that are already online, often do it as shown
-> below:
->
->         get_online_cpus();
->
->         for_each_online_cpu(cpu)
->                 init_cpu(cpu);
->
->         register_cpu_notifier(&foobar_cpu_notifier);
->
->         put_online_cpus();
->
-> This is wrong, since it is prone to ABBA deadlocks involving the
-> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-> with CPU hotplug operations).
->
-> Instead, the correct and race-free way of performing the callback
-> registration is:
->
->         cpu_notifier_register_begin();
->
->         for_each_online_cpu(cpu)
->                 init_cpu(cpu);
->
->         /* Note the use of the double underscored version of the API */
->         __register_cpu_notifier(&foobar_cpu_notifier);
->
->         cpu_notifier_register_done();
->
->
-> In the existing arm kvm code, there is no synchronization with CPU hotplug
-> to avoid missing the hotplug events that might occur after invoking
-> init_hyp_mode() and before calling register_cpu_notifier(). Fix this bug
-> and also use the new synchronization method (instead of get/put_online_cpus())
-> to ensure that we don't deadlock with CPU hotplug.
->
-> Cc: Gleb Natapov <gleb@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: kvmarm at lists.cs.columbia.edu
-> Cc: kvm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> ---
->
->  arch/arm/kvm/arm.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bd18bb8..f0e50a0 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1051,21 +1051,26 @@ int kvm_arch_init(void *opaque)
->                 }
->         }
->
-> +       cpu_notifier_register_begin();
-> +
->         err = init_hyp_mode();
->         if (err)
->                 goto out_err;
->
-> -       err = register_cpu_notifier(&hyp_init_cpu_nb);
-> +       err = __register_cpu_notifier(&hyp_init_cpu_nb);
->         if (err) {
->                 kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
->                 goto out_err;
->         }
->
-> +       cpu_notifier_register_done();
-> +
->         hyp_cpu_pm_init();
->
->         kvm_coproc_table_init();
->         return 0;
->  out_err:
-> +       cpu_notifier_register_done();
->         return err;
->  }
->
->
->
+-dl
