@@ -1,49 +1,28 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 19 Mar 2014 10:14:22 +1100 (EST)
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <1395148051.2812.51.camel@joe-AO722>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
- <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
- <1395148051.2812.51.camel@joe-AO722>
-Message-ID: <alpine.LNX.2.00.1403190925550.6652@nippy.intranet>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Mar 2014 00:15:38 +0100
+Subject: [PATCH 0/3] ARM: at91: improve at91sam9m10g45ek support
+Message-ID: <1395184541-5787-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here are a few DT improvements for the at91sam9m10g45ek.
 
-On Tue, 18 Mar 2014, Joe Perches wrote:
+The first patch corrects the ADC support for the at91sam9g45.
 
-> On Tue, 2014-03-18 at 13:55 +0100, Geert Uytterhoeven wrote:
+The second patch adds ADC and touchscreen support to the at91sam9m10g45ek.
 
-> > 
-> > #define dprintk(flg, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
-> 
-> Fine, but with a correction.
-> 
-> no_printk keeps all side effects like performing any function calls made 
-> by the statement or accessing any volatiles.
-> 
-> Using
-> 
-> do { if (0) no_printk(fmt, ##__VA_ARGS__); } while (0)
-> 
-> does not have any side-effects.
+The last one corrects the PWM polarity after the polarity got right in the
+driver, following patch "PWM: atmel-pwm: Fix polarity handling"
 
-I take your point about having the compiler check arguments when
-NDEBUG & flg == 0.
 
-As for side-effects, chip register accesses would be affected if dprintk() 
-expanded to no_printk() when NDEBUG & flg == 0.
+Alexandre Belloni (3):
+  ARM: at91/dt: sam9g45: improve ADC/touchscreen support
+  ARM: at91/dt: at91sam9m10g45ek: add ADC and touchscreen support
+  ARM: at91/dt: at91sam9m10g45ek PWM leds polarity is inversed
 
-E.g. NCR5380.c line 1213:
-dprintk(NDEBUG_INTR, "scsi : unknown interrupt, BASR 0x%X, MR 0x%X, SR 0x%x\n",
-                     basr, NCR5380_read(MODE_REG), NCR5380_read(STATUS_REG));
-
-I don't want to re-introduce side-effects into a dozen different NCR5380 
-drivers on three different architectures when I can test only one of those 
-drivers. It's difficult to get good code coverage even for one driver.
+ arch/arm/boot/dts/at91sam9g45.dtsi     | 33 +++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/at91sam9m10g45ek.dts | 20 ++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
 
 -- 
+1.8.3.2
