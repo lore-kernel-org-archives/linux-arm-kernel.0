@@ -1,49 +1,103 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 18 Mar 2014 10:02:20 +0800
-Subject: [PATCH v4] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <20140317045105.GB1976@intel.com>
-References: <1389190369-2012-1-git-send-email-21cnbao@gmail.com>
- <20140120074857.GJ26823@intel.com>
- <CAGsJ_4zcwCx0RNMNx8YaDBFtGE=02-B79+WKDGeky80X5agcuw@mail.gmail.com>
- <CAGsJ_4zMYGTS4CyCsTAH_5PMK3v4Pr+e88YjXL=d3A=EjPf9rQ@mail.gmail.com>
- <20140317045105.GB1976@intel.com>
-Message-ID: <CAGsJ_4yvqYSg9bj3EJSnsiHbgNHfHo0Dgn-kKAZmsOPp81QU1A@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 18 Mar 2014 10:24:35 +0800
+Subject: [PATCH v3 1/3] ARM: dts: berlin2q: add the Marvell Armada 1500 pro
+In-Reply-To: <1395068788-19786-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1395068788-19786-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1395068788-19786-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140318102435.2d29abc7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-17 12:51 GMT+08:00 Vinod Koul <vinod.koul@intel.com>:
-> On Sat, Mar 01, 2014 at 10:49:18AM +0800, Barry Song wrote:
->> 2014-01-20 17:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
->> > 2014/1/20 Vinod Koul <vinod.koul@intel.com>:
->> >> On Wed, Jan 08, 2014 at 10:12:49PM +0800, Barry Song wrote:
->> >>> From: Barry Song <Baohua.Song@csr.com>
->> >>>
->> >>> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
->> >>> we add a xlate() to let dma clients be able to find right dma_chan by generic
->> >>> "dmas" properties in dts.
->> >>>
->> >>> Cc: Mark Rutland <mark.rutland@arm.com>
->> >>> Cc: Lars-Peter Clausen <lars@metafoo.de>
->> >>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> >> Look okay, need an ACk from DT maintainers before I can apply...
->>
->> Hi Vinod,
->> v5 is sent to devicetree list and there is no object.
->> http://www.spinics.net/lists/devicetree/msg19677.html
->> this patch is using general dt-binding for dma completely same with
->> other dma drivers, there is no special binding here.
->> so i think there is no reason to wait for merging since now updates
->> for its clients e.g. SPI, UART have been in 3.14-rc.
-> I still need the ack for DT folks... Seems still missing :(
+Hi Antoine,
 
-Vinod, it seems nobody in dt has noticed this change since there is
-not a real change for DT binding. if we need an ack for every normal
-change in dt, the maintain chain might be easily broken.it seems it is
-not always a good practice?
+On Mon, 17 Mar 2014 08:06:26 -0700
+Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
 
->
-> --
-> ~Vinod
+> Adds initial support for the Marvell Armada 1500 pro (BG2Q) SoC (Berlin
+> family). The SoC has nodes for cpu, l2 cache controller, interrupt
+> controllers, local timer, apb timers and uarts for now.
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/berlin2q.dtsi | 210
+> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 210 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/berlin2q.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi
+> b/arch/arm/boot/dts/berlin2q.dtsi new file mode 100644
+> index 000000000000..7a50267b1044
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -0,0 +1,210 @@
+> +/*
+> + * Copyright (C) 2014 Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
+> +	compatible = "marvell,berlin2q", "marvell,berlin";
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			next-level-cache = <&l2>;
+> +			reg = <3>;
+> +		};
+> +	};
+> +
+> +	smclk: sysmgr-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <25000000>;
+> +	};
+> +
+> +	cpuclk: cpu-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <1200000000>;
+> +	};
+> +
+> +	sysclk: system-clock {
+> +		compatible = "fixed-factor-clock";
+> +		#clock-cells = <0>;
+> +		clocks = <&cpuclk>;
+> +		clock-multi = <1>;
+> +		clock-div = <3>;
+> +	};
 
--barry
+Can you please name it as twdclk to avoid confusion? On Berlin, sysclk is another
+clk rather than the clk for twd. 
