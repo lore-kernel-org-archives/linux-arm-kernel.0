@@ -1,171 +1,65 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 18 Mar 2014 17:01:05 +0800
-Subject: [PATCH] ARM: mmp: allow platform devices with modular USB
-In-Reply-To: <5101681.pZMdJoGtZk@wuerfel>
-References: <5101681.pZMdJoGtZk@wuerfel>
-Message-ID: <CAN1soZys1-uO9bCY_C7cF19-nrRVSw-CLGj--g5m7nCjuvZAsw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Mar 2014 10:04:50 +0100
+Subject: [PATCH v2 6/8] ARM: sunxi: dt: Add x-powers-axp209.dtsi file
+In-Reply-To: <1394898225-28452-7-git-send-email-carlo@caione.org>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-7-git-send-email-carlo@caione.org>
+Message-ID: <20140318090450.GV27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 11:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The USB host drivers need platform data to be defined on
-> pxa168 and pxa910, but the conditionals used in the devices.c
-> file only work if the drivers are built-in. This patch
-> fixes the definition by changing the #ifdef to #if IS_ENABLED(),
-> which works both for built-in and modular Kconfig symbols.
->
-> I found one specific problem using 'randconfig' builds, but
-> for consistency, this patch uses IS_ENABLED() for all Kconfig
-> symbols in these three files.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> index 0c00209..7e02485 100644
-> --- a/arch/arm/mach-mmp/aspenite.c
-> +++ b/arch/arm/mach-mmp/aspenite.c
-> @@ -231,7 +231,7 @@ static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
->         .debounce_interval      = 30,
->  };
->
-> -#if defined(CONFIG_USB_EHCI_MV)
-> +#if IS_ENABLED(CONFIG_USB_EHCI_MV)
->  static struct mv_usb_platform_data pxa168_sph_pdata = {
->         .mode           = MV_USB_MODE_HOST,
->         .phy_init       = pxa_usb_phy_init,
-> @@ -258,7 +258,7 @@ static void __init common_init(void)
->         /* off-chip devices */
->         platform_device_register(&smc91x_device);
->
-> -#if defined(CONFIG_USB_EHCI_MV)
-> +#if IS_ENABLED(CONFIG_USB_EHCI_MV)
->         pxa168_add_usb_host(&pxa168_sph_pdata);
->  #endif
->  }
-> diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-> index dd2d8b1..2bcb766 100644
-> --- a/arch/arm/mach-mmp/devices.c
-> +++ b/arch/arm/mach-mmp/devices.c
-> @@ -72,7 +72,7 @@ int __init pxa_register_device(struct pxa_device_desc *desc,
->         return platform_device_add(pdev);
->  }
->
-> -#if defined(CONFIG_USB) || defined(CONFIG_USB_GADGET)
-> +#if IS_ENABLED(CONFIG_USB) || IS_ENABLED(CONFIG_USB_GADGET)
->
->  /*****************************************************************************
->   * The registers read/write routines
-> @@ -112,9 +112,9 @@ static void u2o_write(void __iomem *base, unsigned int offset,
->         readl_relaxed(base + offset);
->  }
->
-> -#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV)
-> +#if IS_ENABLED(CONFIG_USB_MV_UDC) || IS_ENABLED(CONFIG_USB_EHCI_MV)
->
-> -#if defined(CONFIG_CPU_PXA910) || defined(CONFIG_CPU_PXA168)
-> +#if IS_ENABLED(CONFIG_CPU_PXA910) || IS_ENABLED(CONFIG_CPU_PXA168)
->
->  static DEFINE_MUTEX(phy_lock);
->  static int phy_init_cnt;
-> @@ -238,10 +238,10 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
->  #endif
->  #endif
->
-> -#ifdef CONFIG_USB_SUPPORT
-> +#if IS_ENABLED(CONFIG_USB_SUPPORT)
->  static u64 usb_dma_mask = ~(u32)0;
->
-> -#ifdef CONFIG_USB_MV_UDC
-> +#if IS_ENABLED(CONFIG_USB_MV_UDC)
->  struct resource pxa168_u2o_resources[] = {
->         /* regbase */
->         [0] = {
-> @@ -276,7 +276,7 @@ struct platform_device pxa168_device_u2o = {
->  };
->  #endif /* CONFIG_USB_MV_UDC */
->
-> -#ifdef CONFIG_USB_EHCI_MV_U2O
-> +#if IS_ENABLED(CONFIG_USB_EHCI_MV_U2O)
->  struct resource pxa168_u2oehci_resources[] = {
->         /* regbase */
->         [0] = {
-> @@ -312,7 +312,7 @@ struct platform_device pxa168_device_u2oehci = {
->  };
->  #endif
->
-> -#if defined(CONFIG_USB_MV_OTG)
-> +#if IS_ENABLED(CONFIG_USB_MV_OTG)
->  struct resource pxa168_u2ootg_resources[] = {
->         /* regbase */
->         [0] = {
-> diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-> index cfadd97..ac4af81 100644
-> --- a/arch/arm/mach-mmp/ttc_dkb.c
-> +++ b/arch/arm/mach-mmp/ttc_dkb.c
-> @@ -164,8 +164,8 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
->         },
->  };
->
-> -#ifdef CONFIG_USB_SUPPORT
-> -#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
-> +#if IS_ENABLED(CONFIG_USB_SUPPORT)
-> +#if IS_ENABLED(CONFIG_USB_MV_UDC) || IS_ENABLED(CONFIG_USB_EHCI_MV_U2O)
->
->  static struct mv_usb_platform_data ttc_usb_pdata = {
->         .vbus           = NULL,
-> @@ -178,14 +178,14 @@ static struct mv_usb_platform_data ttc_usb_pdata = {
->  #endif
->  #endif
->
-> -#ifdef CONFIG_MTD_NAND_PXA3xx
-> +#if IS_ENABLED(CONFIG_MTD_NAND_PXA3xx)
->  static struct pxa3xx_nand_platform_data dkb_nand_info = {
->         .enable_arbiter = 1,
->         .num_cs = 1,
->  };
->  #endif
->
-> -#ifdef CONFIG_MMP_DISP
-> +#if IS_ENABLED(CONFIG_MMP_DISP)
->  /* path config */
->  #define CFG_IOPADMODE(iopad)   (iopad)  /* 0x0 ~ 0xd */
->  #define SCLK_SOURCE_SELECT(x)  (x << 30) /* 0x0 ~ 0x3 */
-> @@ -275,7 +275,7 @@ static void __init ttc_dkb_init(void)
->
->         /* on-chip devices */
->         pxa910_add_uart(1);
-> -#ifdef CONFIG_MTD_NAND_PXA3xx
-> +#if IS_ENABLED(CONFIG_MTD_NAND_PXA3xx)
->         pxa910_add_nand(&dkb_nand_info);
->  #endif
->
-> @@ -285,22 +285,22 @@ static void __init ttc_dkb_init(void)
->                                  sizeof(struct pxa_gpio_platform_data));
->         platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
->
-> -#ifdef CONFIG_USB_MV_UDC
-> +#if IS_ENABLED(CONFIG_USB_MV_UDC)
->         pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
->         platform_device_register(&pxa168_device_u2o);
->  #endif
->
-> -#ifdef CONFIG_USB_EHCI_MV_U2O
-> +#if IS_ENABLED(CONFIG_USB_EHCI_MV_U2O)
->         pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
->         platform_device_register(&pxa168_device_u2oehci);
->  #endif
->
-> -#ifdef CONFIG_USB_MV_OTG
-> +#if IS_ENABLED(CONFIG_USB_MV_OTG)
->         pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
->         platform_device_register(&pxa168_device_u2ootg);
->  #endif
->
-> -#ifdef CONFIG_MMP_DISP
-> +#if IS_ENABLED(CONFIG_MMP_DISP)
->         add_disp();
->  #endif
->  }
->
+On Sat, Mar 15, 2014 at 04:43:43PM +0100, Carlo Caione wrote:
+> This dtsi describes the axp209 PMIC, and is to be included from inside
+> the i2c controller node to which the axp209 is connected.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  arch/arm/boot/dts/x-powers-axp209.dtsi | 60 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/x-powers-axp209.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/x-powers-axp209.dtsi b/arch/arm/boot/dts/x-powers-axp209.dtsi
+> new file mode 100644
+> index 0000000..d272e67
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/x-powers-axp209.dtsi
+> @@ -0,0 +1,60 @@
+> +/*
+> + * x-powers,axp209 common code to be include from inside the axp209 node
+> + *
+> + * Copyright 2014 - Carlo Caione <carlo@caione.org>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+I didn't even know such a thing was possible :)
+Nice hack.
+
+> +	compatible = "x-powers,axp209";
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
+
+However, I'd move this out of it, and in the board file, so that we
+actually get an idea by looking at the board DTS of what device we are
+actually registering at this given address, and what it's capable of.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/0887235f/attachment.sig>
