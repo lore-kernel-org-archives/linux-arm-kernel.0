@@ -1,31 +1,98 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 18 Mar 2014 08:43:09 +0100
-Subject: [PATCH RESEND v2 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <20140317144244.6d2e09f9@marrow.netinsight.se> ("Simon
- =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Mon, 17 Mar 2014 14:42:44
- +0100")
-References: <20140317144016.0508cc4d@marrow.netinsight.se>
- <20140317144244.6d2e09f9@marrow.netinsight.se>
-Message-ID: <m3eh20j6k2.fsf@t19.piap.pl>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 18 Mar 2014 08:50:30 +0100
+Subject: [PATCH 07/12] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <2777667.XJdaUSpRsD@avalon>
+References: <1394731053-6118-1-git-send-email-denis@eukrea.com>
+ <2166863.3Fn4k2rvaz@avalon> <20140317161436.06169b33@ipc1.ka-ro>
+ <2777667.XJdaUSpRsD@avalon>
+Message-ID: <20140318085030.66db84b7@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
+Hi,
 
-> +++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-> @@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
->  	port->netdev = dev;
->  	port->id = pdev->id;
->  
-> +	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-> +	if (err < 0)
-> +		goto err_free;
-> +
+Laurent Pinchart wrote:
+> Hi Lothar,
+> 
+> On Monday 17 March 2014 16:14:36 Lothar Wa?mann wrote:
+> > Laurent Pinchart wrote:
+> > > On Monday 17 March 2014 14:41:09 Andrzej Hajda wrote:
+> > > > On 03/13/2014 06:17 PM, Denis Carikli wrote:
+> > > > > We need a way to pass signal polarity informations
+> > > > > between DRM panels, and the display drivers.
+> > > > > 
+> > > > > To do that, a pol_flags field was added to drm_display_mode.
+> > > > > 
+> > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > > ---
+> > > > > ChangeLog v10->v11:
+> > > > > - Since the imx-drm won't be able to retrive its regulators
+> > > > > 
+> > > > >   from the device tree when using display-timings nodes,
+> > > > >   and that I was told that the drm simple-panel driver
+> > > > >   already supported that, I then, instead, added what was
+> > > > >   lacking to make the eukrea displays work with the
+> > > > >   drm-simple-panel driver.
+> > > > >   
+> > > > >   That required a way to get back the display polarity
+> > > > >   informations from the imx-drm driver without affecting
+> > > > >   userspace.
+> > > > > 
+> > > > > ---
+> > > > > 
+> > > > >  include/drm/drm_crtc.h |    8 ++++++++
+> > > > >  1 file changed, 8 insertions(+)
+> > > > > 
+> > > > > diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> > > > > index f764654..61a4fe1 100644
+> > > > > --- a/include/drm/drm_crtc.h
+> > > > > +++ b/include/drm/drm_crtc.h
+> > > > > @@ -131,6 +131,13 @@ enum drm_mode_status {
+> > > > > 
+> > > > >  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> > > > > 
+> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> > > > > +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+> > > > > +#define DRM_MODE_FLAG_POL_DE_NEGEDGE		BIT(4)
+> > > > > +#define DRM_MODE_FLAG_POL_DE_POSEDGE		BIT(5)
+> > > > > +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
+> > > > 
+> > > > Could you add some description to these flags.
+> > > > What are *_PRESERVE flags for?
+> > > > Are those flags 1:1 compatible with respective 'videomode:flags'?
+> > > > I guess DE flags should be rather DRM_MODE_FLAG_POL_DE_(LOW|HIGH), am I
+> > > > right?
+> > > 
+> > > Possibly nitpicking, I wouldn't call the clock edge on which data signals
+> > > are generated/sampled "data polarity". This is clock polarity
+> > > information.
+> > > 
+> > > Have you seen cases where pixel data and DE are geenrated or need to be
+> > > sampled on different edges ?
+> > 
+> > DE is not a clock signal, but an 'Enable' signal whose value (high or
+> > low) defines the window in which the pixel data is valid.
+> > The flag defines whether data is valid during the HIGH or LOW period of
+> > DE.
+> 
+> The DRM_MODE_FLAG_POL_DE_(LOW|HIGH) do, by my impression of the proposed new 
+> DRM_MODE_FLAG_POL_DE_*EDGE flags is that they define sampling clock edges, not 
+> active levels.
+> 
+The current naming of the flags gives the impression that they describe
+the sampling edges of a clock signal. But the DE signal in fact is not
+a clock signal but a level sensitive gating signal.
 
-Yeah. One could also set both masks with the new single call. The driver
-uses both streaming and coherent mapping.
+
+Lothar Wa?mann
 -- 
-Krzysztof Halasa
+___________________________________________________________
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
