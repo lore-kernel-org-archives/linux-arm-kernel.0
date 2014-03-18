@@ -1,73 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Mar 2014 15:03:23 +0100
-Subject: [PATCH v2 3/8] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <20140318105851.GO25478@lee--X1>
-References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-4-git-send-email-carlo@caione.org>
- <20140318090013.GU27873@lukather> <20140318095002.GM25478@lee--X1>
- <20140318101554.GZ27873@lukather> <20140318105851.GO25478@lee--X1>
-Message-ID: <20140318140323.GB27873@lukather>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 18 Mar 2014 17:01:59 +0200
+Subject: [linux-next][regression] [PATCH] percpu: add preemption checks to
+ __this_cpu ops
+Message-ID: <53285FE7.5010203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 10:58:51AM +0000, Lee Jones wrote:
-> > > > > This patch add support for the Power Enable Key found on MFD AXP202 and
-> > > > > AXP209. Besides the basic support for the button, the driver adds two
-> > > > > entries in sysfs to configure the time delay for power on/off.
-> > > > > 
-> > > > > Signed-off-by: Carlo Caione <carlo@caione.org>
-> > > > > ---
-> > > > >  drivers/input/misc/Kconfig      |  11 ++
-> > > > >  drivers/input/misc/Makefile     |   1 +
-> > > > >  drivers/input/misc/axp20x-pek.c | 267 ++++++++++++++++++++++++++++++++++++++++
-> > > > >  3 files changed, 279 insertions(+)
-> > > > >  create mode 100644 drivers/input/misc/axp20x-pek.c
-> > > > 
-> > > > From what I understood of the MFD framework, you usually have a MFD
-> > > > core driver that gets loaded from the DT and instantiate its various
-> > > > functions through sub-devices, that are registered through
-> > > > mfd_add_devices, and the drivers for these sub-devices are supported
-> > > > in sub-drivers that are located in the driver/mfd, alongside the core
-> > > > driver.
-> > > > 
-> > > > I believe that such a pattern allows for two interesting things:
-> > > >   - You don't have to search around the whole kernel tree to find
-> > > >     where a given sub-feature is supported.
-> > > >   - You don't have to cripple your DT with instantiation of all the
-> > > >     subcomponents, while you only really have one device.
-> > > > 
-> > > > Do you have a reason for not following this pattern?
-> > > 
-> > > Sorry Maxime, this is not the case.
-> > > 
-> > > If an MFD contains Regulators and USB & GPIO Controllers, I'd expect
-> > > to see the device represented in the following way:
-> > > 
-> > >   drivers/mfd/<id>.c
-> > >   drivers/{gpio,pinctrl}/{gpio,pinctrl}-<id>.c
-> > >   drivers/regulator/<id>-regulator.c
-> > >   drivers/usb/host/<id>.c
-> > 
-> > Oh, ok. Nevermind then :)
-> > 
-> > Just out of curiosity, some drivers at least seem to follow that trend
-> > in drivers/mfd, is there any reason for this (other than historical) ?
-> 
-> Would you mind providing an example?
+Hi All,
 
-I was under this impression given the naming scheme that they were
-using. Looking into it just proved me how wrong I was :)
+The regression is observed in the current linux-next on ARM Keystone 2 SoC:
+- system is booted till console and in a second or two and then stall, no messages displayed
+(CONFIG_DEBUG_PREEMPT=y).
 
-Sorry for the noise.
+The cause of regression has been bisected to the commit:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/7395cd2d/attachment.sig>
+commit 589a606f9539663f162e4a110d117527833b58a4
+Author: Christoph Lameter <cl@linux.com>
+Date:   Mon Mar 17 11:27:41 2014 +1100
+
+    percpu: add preemption checks to __this_cpu ops
+    
+    We define a check function in order to avoid trouble with the include
+    files.  Then the higher level __this_cpu macros are modified to invoke the
+    preemption check.
+    
+    Signed-off-by: Christoph Lameter <cl@linux.com>
+    Acked-by: Ingo Molnar <mingo@kernel.org>
+    Cc: Tejun Heo <tj@kernel.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+
+[=== 1 ===]
+If above patch is reverted - system can boot again.
+
+[=== 2 ===]
+If I apply below change - system can boot again.
+
+diff --git a/lib/smp_processor_id.c b/lib/smp_processor_id.c
+index a270dce..73a2004 100644
+--- a/lib/smp_processor_id.c
++++ b/lib/smp_processor_id.c
+@@ -58,9 +58,6 @@ EXPORT_SYMBOL(debug_smp_processor_id);
+ 
+ notrace void __this_cpu_preempt_check(const char *op)
+ {
+-       char text[40];
+-
+-       snprintf(text, sizeof(text), "__this_cpu_%s()", op);
+-       check_preemption_disabled(text);
++       check_preemption_disabled(op);
+ }
+ EXPORT_SYMBOL(__this_cpu_preempt_check);
+
+
+linux-next top commits:
+3bd688c Add linux-next specific files for 20140318
+9a63a74 Merge branch 'akpm/master'
+ccdf335 mm: add strictlimit knob
+589a606 percpu: add preemption checks to __this_cpu ops
+cdbd87c net: replace __this_cpu_inc in route.c with raw_cpu_inc
+049fcfe modules: use raw_cpu_write for initialization of per cpu refcount.
+b46b094 mm: use raw_cpu ops for determining current NUMA node
+d934df8 percpu: add raw_cpu_ops
+c4a8790 arm: move arm_dma_limit to setup_dma_zone
+
+Regards,
+-grygorii
