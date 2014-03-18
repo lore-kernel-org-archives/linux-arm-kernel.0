@@ -1,699 +1,351 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Tue, 18 Mar 2014 18:56:05 +0900
-Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
- functions
-In-Reply-To: <5322FD14.5090602@samsung.com>
-References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
- <5322FD14.5090602@samsung.com>
-Message-ID: <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 18 Mar 2014 09:50:02 +0000
+Subject: [PATCH v2 3/8] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <20140318090013.GU27873@lukather>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-4-git-send-email-carlo@caione.org>
+ <20140318090013.GU27873@lukather>
+Message-ID: <20140318095002.GM25478@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Mar 2014 13:59:00 +0100, Tomasz Figa wrote:
-> Hi KyongHo,
-> 
-> On 14.03.2014 06:08, Cho KyongHo wrote:
-> > Runtime power management by exynos-iommu driver independently from
-> > master H/W's runtime pm is not useful for power saving since attaching
-> > master H/W in probing time turns on its local power endlessly.
-> > Thus this removes runtime pm API calls.
-> > Runtime PM support is added in the following commits to exynos-iommu
-> > driver.
-> 
-> The patch seems to be doing something completely different than the 
-> commit description suggests. Please rewrite the description to describe 
-> the patch correctly.
-> 
-I agree with your comment whatever the purpose of the change is.
-The commit message will be updated.
-
-> >
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > This patch add support for the Power Enable Key found on MFD AXP202 and
+> > AXP209. Besides the basic support for the button, the driver adds two
+> > entries in sysfs to configure the time delay for power on/off.
+> > 
+> > Signed-off-by: Carlo Caione <carlo@caione.org>
 > > ---
-> >   drivers/iommu/exynos-iommu.c |  369 +++++++++++++++++++++++++++---------------
-> >   1 file changed, 238 insertions(+), 131 deletions(-)
-> >
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index 3458349..6834556 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -27,6 +27,8 @@
-> >   #include <linux/memblock.h>
-> >   #include <linux/export.h>
-> >   #include <linux/of.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/notifier.h>
-> >
-> >   #include <asm/cacheflush.h>
-> >   #include <asm/pgtable.h>
-> > @@ -111,6 +113,8 @@
-> >   #define __master_clk_enable(data)	__clk_gate_ctrl(data, clk_master, en)
-> >   #define __master_clk_disable(data)	__clk_gate_ctrl(data, clk_master, dis)
-> >
-> > +#define has_sysmmu(dev)		(dev->archdata.iommu != NULL)
-> > +
-> >   static struct kmem_cache *lv2table_kmem_cache;
-> >
-> >   static unsigned long *section_entry(unsigned long *pgtable, unsigned long iova)
-> > @@ -159,6 +163,16 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
-> >   	"UNKNOWN FAULT"
-> >   };
-> >
-> > +/* attached to dev.archdata.iommu of the master device */
-> > +struct exynos_iommu_owner {
-> > +	struct list_head client; /* entry of exynos_iommu_domain.clients */
-> > +	struct device *dev;
-> > +	struct device *sysmmu;
-> > +	struct iommu_domain *domain;
-> > +	void *vmm_data;         /* IO virtual memory manager's data */
-> > +	spinlock_t lock;        /* Lock to preserve consistency of System MMU */
+> >  drivers/input/misc/Kconfig      |  11 ++
+> >  drivers/input/misc/Makefile     |   1 +
+> >  drivers/input/misc/axp20x-pek.c | 267 ++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 279 insertions(+)
+> >  create mode 100644 drivers/input/misc/axp20x-pek.c
 > 
-> Please don't use spaces for alignment.
+> From what I understood of the MFD framework, you usually have a MFD
+> core driver that gets loaded from the DT and instantiate its various
+> functions through sub-devices, that are registered through
+> mfd_add_devices, and the drivers for these sub-devices are supported
+> in sub-drivers that are located in the driver/mfd, alongside the core
+> driver.
 > 
-OK.
+> I believe that such a pattern allows for two interesting things:
+>   - You don't have to search around the whole kernel tree to find
+>     where a given sub-feature is supported.
+>   - You don't have to cripple your DT with instantiation of all the
+>     subcomponents, while you only really have one device.
+> 
+> Do you have a reason for not following this pattern?
 
+Sorry Maxime, this is not the case.
+
+If an MFD contains Regulators and USB & GPIO Controllers, I'd expect
+to see the device represented in the following way:
+
+  drivers/mfd/<id>.c
+  drivers/{gpio,pinctrl}/{gpio,pinctrl}-<id>.c
+  drivers/regulator/<id>-regulator.c
+  drivers/usb/host/<id>.c
+
+> > diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> > index 7904ab0..87244fb 100644
+> > --- a/drivers/input/misc/Kconfig
+> > +++ b/drivers/input/misc/Kconfig
+> > @@ -393,6 +393,17 @@ config INPUT_RETU_PWRBUTTON
+> >  	  To compile this driver as a module, choose M here. The module will
+> >  	  be called retu-pwrbutton.
+> >  
+> > +config INPUT_AXP20X_PEK
+> > +	tristate "X-Powers AXP20X power button driver"
+> > +	depends on MFD_AXP20X
+> > +	help
+> > +	  Say Y here if you want to enable power key reporting via the
+> > +	  AXP20X PMIC.
+> > +
+> > +	  To compile this driver as a module, choose M here. The module will
+> > +	  be called axp20x-pek.
+> > +
+> > +
+> >  config INPUT_TWL4030_PWRBUTTON
+> >  	tristate "TWL4030 Power button Driver"
+> >  	depends on TWL4030_CORE
+> > diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> > index cda71fc..624abf5 100644
+> > --- a/drivers/input/misc/Makefile
+> > +++ b/drivers/input/misc/Makefile
+> > @@ -50,6 +50,7 @@ obj-$(CONFIG_INPUT_POWERMATE)		+= powermate.o
+> >  obj-$(CONFIG_INPUT_PWM_BEEPER)		+= pwm-beeper.o
+> >  obj-$(CONFIG_INPUT_RB532_BUTTON)	+= rb532_button.o
+> >  obj-$(CONFIG_INPUT_RETU_PWRBUTTON)	+= retu-pwrbutton.o
+> > +obj-$(CONFIG_INPUT_AXP20X_PEK)		+= axp20x-pek.o
+> >  obj-$(CONFIG_INPUT_GPIO_ROTARY_ENCODER)	+= rotary_encoder.o
+> >  obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
+> >  obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
+> > diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
+> > new file mode 100644
+> > index 0000000..060212f
+> > --- /dev/null
+> > +++ b/drivers/input/misc/axp20x-pek.c
+> > @@ -0,0 +1,267 @@
+> > +/*
+> > + * axp20x power button driver.
+> > + *
+> > + * Copyright (C) 2013 Carlo Caione <carlo@caione.org>
+> > + *
+> > + * This file is subject to the terms and conditions of the GNU General
+> > + * Public License. See the file "COPYING" in the main directory of this
+> > + * archive for more details.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/errno.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/init.h>
+> > +#include <linux/input.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mfd/axp20x.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#define AXP20X_PEK_STARTUP_MASK		(0xc0)
+> > +#define AXP20X_PEK_SHUTDOWN_MASK	(0x03)
+> > +
+> > +static const char const *startup_time[] = { "128ms", "3s" , "1s", "2s" };
+> > +static const char const *shutdown_time[] = { "4s", "6s" , "8s", "10s" };
+> > +
+> > +struct axp20x_pek {
+> > +	struct axp20x_dev *axp20x;
+> > +	struct input_dev *input;
+> > +	int irq_dbr;
+> > +	int irq_dbf;
 > > +};
 > > +
-> >   struct exynos_iommu_domain {
-> >   	struct list_head clients; /* list of sysmmu_drvdata.node */
-> >   	unsigned long *pgtable; /* lv1 page table, 16KB */
-> > @@ -168,9 +182,8 @@ struct exynos_iommu_domain {
-> >   };
-> >
-> >   struct sysmmu_drvdata {
-> > -	struct list_head node; /* entry of exynos_iommu_domain.clients */
-> >   	struct device *sysmmu;	/* System MMU's device descriptor */
-> > -	struct device *dev;	/* Owner of system MMU */
-> > +	struct device *master;	/* Owner of system MMU */
-> >   	void __iomem *sfrbase;
-> >   	struct clk *clk;
-> >   	struct clk *clk_master;
-> > @@ -239,7 +252,6 @@ static void __sysmmu_tlb_invalidate_entry(void __iomem *sfrbase,
-> >   static void __sysmmu_set_ptbase(void __iomem *sfrbase,
-> >   				       unsigned long pgd)
-> >   {
-> > -	__raw_writel(0x1, sfrbase + REG_MMU_CFG); /* 16KB LV1, LRU */
-> >   	__raw_writel(pgd, sfrbase + REG_PT_BASE_ADDR);
-> >
-> >   	__sysmmu_tlb_invalidate(sfrbase);
-> > @@ -299,7 +311,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
-> >   					itype, base, addr);
-> >   		if (data->domain)
-> >   			ret = report_iommu_fault(data->domain,
-> > -					data->dev, addr, itype);
-> > +					data->master, addr, itype);
-> >   	}
-> >
-> >   	/* fault is not recovered by fault handler */
-> > @@ -316,116 +328,148 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
-> >   	return IRQ_HANDLED;
-> >   }
-> >
-> > -static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
-> > +static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
-> 
-> If you are changing the names anyway, it would be probably a good idea 
-> to reduce code obfuscation a bit and drop the underscores from 
-> beginnings of function names. Also I'd suggest keeping the "exynos_" prefix.
-
-Thanks for the suggestion.
-__exynos_sysmmu_disable is splitted into 2 functions: __sysmmu_disable
-and __sysmmu_disable_nocount.
-I agree with you that it is good idea to reduce code obfuscation but
-I don't think dropping beginning underscores of function names reduces
-obfuscation.
-
-> 
-> >   {
-> > -	unsigned long flags;
-> > -	bool disabled = false;
-> > -
-> > -	write_lock_irqsave(&data->lock, flags);
-> > -
-> > -	if (!set_sysmmu_inactive(data))
-> > -		goto finish;
-> > -
-> > -	__master_clk_enable(data);
-> > +	clk_enable(data->clk_master);
-> >
-> >   	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
-> > +	__raw_writel(0, data->sfrbase + REG_MMU_CFG);
-> >
-> >   	__sysmmu_clk_disable(data);
-> >   	__master_clk_disable(data);
-> > +}
-> >
-> > -	disabled = true;
-> > -	data->pgtable = 0;
-> > -	data->domain = NULL;
-> > -finish:
-> > -	write_unlock_irqrestore(&data->lock, flags);
-> > +static bool __sysmmu_disable(struct sysmmu_drvdata *data)
+> > +struct axp20x_pek_ext_attr {
+> > +	const char const **str;
+> > +	unsigned int mask;
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr axp20x_pek_startup_ext_attr = {
+> > +	.str	= startup_time,
+> > +	.mask	= AXP20X_PEK_STARTUP_MASK,
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr axp20x_pek_shutdown_ext_attr = {
+> > +	.str	= shutdown_time,
+> > +	.mask	= AXP20X_PEK_SHUTDOWN_MASK,
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr *get_axp_ext_attr(struct device_attribute *attr)
 > > +{
-> > +	bool disabled;
-> > +	unsigned long flags;
-> > +
-> > +	write_lock_irqsave(&data->lock, flags);
-> > +
-> > +	disabled = set_sysmmu_inactive(data);
-> > +
-> > +	if (disabled) {
-> > +		data->pgtable = 0;
-> > +		data->domain = NULL;
-> > +
-> > +		__sysmmu_disable_nocount(data);
-> >
-> > -	if (disabled)
-> >   		dev_dbg(data->sysmmu, "Disabled\n");
-> > -	else
-> > -		dev_dbg(data->sysmmu, "%d times left to be disabled\n",
-> > +	} else  {
-> > +		dev_dbg(data->sysmmu, "%d times left to disable\n",
-> >   					data->activations);
-> > +	}
-> > +
-> > +	write_unlock_irqrestore(&data->lock, flags);
-> >
-> >   	return disabled;
-> >   }
-> >
-> > -/* __exynos_sysmmu_enable: Enables System MMU
-> > - *
-> > - * returns -error if an error occurred and System MMU is not enabled,
-> > - * 0 if the System MMU has been just enabled and 1 if System MMU was already
-> > - * enabled before.
-> > - */
-> > -static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
-> > +static void __sysmmu_init_config(struct sysmmu_drvdata *data)
-> > +{
-> > +	unsigned long cfg = 0;
-> > +
-> > +	__raw_writel(cfg, data->sfrbase + REG_MMU_CFG);
+> > +	return container_of(attr, struct dev_ext_attribute, attr)->var;
 > > +}
 > > +
-> > +static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
+> > +static ssize_t axp20x_show_ext_attr(struct device *dev, struct device_attribute *attr,
+> > +			     char *buf)
 > > +{
-> > +	__master_clk_enable(data);
-> > +	__sysmmu_clk_enable(data);
+> > +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> > +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> > +	unsigned int val;
+> > +	int ret, i;
+> > +	int cnt = 0;
 > > +
-> > +	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
+> > +	ret = regmap_read(axp20x_pek->axp20x->regmap, AXP20X_PEK_KEY, &val);
+> > +	if (ret != 0)
+> > +		return ret;
 > > +
-> > +	__sysmmu_init_config(data);
+> > +	val &= axp20x_ea->mask;
+> > +	val >>= ffs(axp20x_ea->mask) - 1;
 > > +
-> > +	__sysmmu_set_ptbase(data->sfrbase, data->pgtable);
+> > +	for (i = 0; i < 4; i++) {
+> > +		if (val == i)
+> > +			cnt += sprintf(buf + cnt, "[%s] ", axp20x_ea->str[i]);
+> > +		else
+> > +			cnt += sprintf(buf + cnt, "%s ", axp20x_ea->str[i]);
+> > +	}
 > > +
-> > +	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+> > +	cnt += sprintf(buf + cnt, "\n");
 > > +
-> > +	__master_clk_disable(data);
+> > +	return cnt;
 > > +}
 > > +
-> > +static int __sysmmu_enable(struct sysmmu_drvdata *data,
-> >   			unsigned long pgtable, struct iommu_domain *domain)
-> >   {
-> >   	int ret = 0;
-> >   	unsigned long flags;
-> >
-> >   	write_lock_irqsave(&data->lock, flags);
-> > +	if (set_sysmmu_active(data)) {
-> > +		data->pgtable = pgtable;
-> > +		data->domain = domain;
-> >
-> > -	if (!set_sysmmu_active(data)) {
-> > -		if (WARN_ON(pgtable != data->pgtable)) {
-> > -			ret = -EBUSY;
-> > -			set_sysmmu_inactive(data);
-> > -		} else {
-> > -			ret = 1;
-> > -		}
-> > +		__sysmmu_enable_nocount(data);
-> >
-> > -		dev_dbg(data->sysmmu, "Already enabled\n");
-> > -		goto finish;
-> > +		dev_dbg(data->sysmmu, "Enabled\n");
-> > +	} else {
-> > +		ret = (pgtable == data->pgtable) ? 1 : -EBUSY;
+> > +static ssize_t axp20x_store_ext_attr(struct device *dev, struct device_attribute *attr,
+> > +			      const char *buf, size_t count)
+> > +{
+> > +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> > +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> > +	char val_str[20];
+> > +	int ret, i;
+> > +	size_t len;
 > > +
-> > +		dev_dbg(data->sysmmu, "already enabled\n");
-> >   	}
-> >
-> > -	data->pgtable = pgtable;
-> > +	if (WARN_ON(ret < 0))
-> > +		set_sysmmu_inactive(data); /* decrement count */
-> >
-> > -	__master_clk_enable(data);
-> > -	__sysmmu_clk_enable(data);
-> > +	write_unlock_irqrestore(&data->lock, flags);
-> >
-> > -	__sysmmu_set_ptbase(data->sfrbase, pgtable);
-> > +	return ret;
+> > +	val_str[sizeof(val_str) - 1] = '\0';
+> > +	strncpy(val_str, buf, sizeof(val_str) - 1);
+> > +	len = strlen(val_str);
+> > +
+> > +	if (len && val_str[len - 1] == '\n')
+> > +		val_str[len - 1] = '\0';
+> > +
+> > +	for (i = 0; i < 4; i++) {
+> > +		if (!strcmp(val_str, axp20x_ea->str[i])) {
+> > +
+> > +			i <<= ffs(axp20x_ea->mask) - 1;
+> > +			ret = regmap_update_bits(axp20x_pek->axp20x->regmap,
+> > +						 AXP20X_PEK_KEY,
+> > +						 axp20x_ea->mask, i);
+> > +			if (ret != 0)
+> > +				return -EINVAL;
+> > +			return count;
+> > +		}
+> > +	}
+> > +
+> > +	return -EINVAL;
 > > +}
-> >
-> > -	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
-> > +/* __exynos_sysmmu_enable: Enables System MMU
-> > + *
-> > + * returns -error if an error occurred and System MMU is not enabled,
-> > + * 0 if the System MMU has been just enabled and 1 if System MMU was already
-> > + * enabled before.
-> > + */
-> > +static int __exynos_sysmmu_enable(struct device *dev, unsigned long pgtable,
-> > +				  struct iommu_domain *domain)
+> > +
+> > +static struct dev_ext_attribute axp20x_dev_attr_startup = {
+> > +	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> > +	.var	= &axp20x_pek_startup_ext_attr
+> > +};
+> > +
+> > +static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
+> > +	__ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> > +	&axp20x_pek_shutdown_ext_attr
+> > +};
+> > +
+> > +static struct attribute *dev_attrs[] = {
+> > +	&axp20x_dev_attr_startup.attr.attr,
+> > +	&axp20x_dev_attr_shutdown.attr.attr,
+> > +	NULL,
+> > +};
+> > +
+> > +static struct attribute_group dev_attr_group = {
+> > +	.attrs	= dev_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group *dev_attr_groups[] = {
+> > +	&dev_attr_group,
+> > +	NULL,
+> > +};
+> > +
+> > +static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
 > > +{
-> > +	int ret = 0;
-> > +	unsigned long flags;
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +	struct sysmmu_drvdata *data;
-> >
-> > -	__master_clk_disable(data);
-> > +	BUG_ON(!has_sysmmu(dev));
-> >
-> > -	data->domain = domain;
-> > +	spin_lock_irqsave(&owner->lock, flags);
-> >
-> > -	dev_dbg(data->sysmmu, "Enabled\n");
-> > -finish:
-> > -	write_unlock_irqrestore(&data->lock, flags);
-> > +	data = dev_get_drvdata(owner->sysmmu);
+> > +	struct input_dev *idev = pwr;
+> > +	struct axp20x_pek *axp20x_pek = input_get_drvdata(idev);
 > > +
-> > +	ret = __sysmmu_enable(data, pgtable, domain);
-> > +	if (ret >= 0)
-> > +		data->master = dev;
+> > +	if (irq == axp20x_pek->irq_dbr)
+> > +		input_report_key(idev, KEY_POWER, true);
+> > +	else if (irq == axp20x_pek->irq_dbf)
+> > +		input_report_key(idev, KEY_POWER, false);
 > > +
-> > +	spin_unlock_irqrestore(&owner->lock, flags);
-> >
-> >   	return ret;
-> >   }
-> >
-> >   int exynos_sysmmu_enable(struct device *dev, unsigned long pgtable)
-> >   {
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > -	int ret;
-> > -
-> >   	BUG_ON(!memblock_is_memory(pgtable));
-> >
-> > -	ret = pm_runtime_get_sync(data->sysmmu);
-> > -	if (ret < 0) {
-> > -		dev_dbg(data->sysmmu, "Failed to enable\n");
-> > -		return ret;
-> > -	}
-> > -
-> > -	ret = __exynos_sysmmu_enable(data, pgtable, NULL);
-> > -	if (WARN_ON(ret < 0)) {
-> > -		pm_runtime_put(data->sysmmu);
-> > -		dev_err(data->sysmmu, "Already enabled with page table %#lx\n",
-> > -			data->pgtable);
-> > -	} else {
-> > -		data->dev = dev;
-> > -	}
-> > -
-> > -	return ret;
-> > +	return __exynos_sysmmu_enable(dev, pgtable, NULL);
-> >   }
-> >
-> >   static bool exynos_sysmmu_disable(struct device *dev)
-> >   {
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > -	bool disabled;
-> > +	unsigned long flags;
-> > +	bool disabled = true;
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +	struct sysmmu_drvdata *data;
+> > +	input_sync(idev);
 > > +
-> > +	BUG_ON(!has_sysmmu(dev));
-> >
-> > -	disabled = __exynos_sysmmu_disable(data);
-> > -	pm_runtime_put(data->sysmmu);
-> > +	spin_lock_irqsave(&owner->lock, flags);
+> > +	return IRQ_HANDLED;
+> > +}
 > > +
-> > +	data = dev_get_drvdata(owner->sysmmu);
-> > +
-> > +	disabled = __sysmmu_disable(data);
-> > +	if (disabled)
-> > +		data->master = NULL;
-> > +
-> > +	spin_unlock_irqrestore(&owner->lock, flags);
-> >
-> >   	return disabled;
-> >   }
-> > @@ -433,11 +477,13 @@ static bool exynos_sysmmu_disable(struct device *dev)
-> >   static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
-> >   					size_t size)
-> >   {
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> >   	unsigned long flags;
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > +	struct sysmmu_drvdata *data;
-> >
-> > -	read_lock_irqsave(&data->lock, flags);
-> > +	data = dev_get_drvdata(owner->sysmmu);
-> >
-> > +	read_lock_irqsave(&data->lock, flags);
-> >   	if (is_sysmmu_active(data)) {
-> >   		unsigned int maj;
-> >   		unsigned int num_inv = 1;
-> > @@ -465,19 +511,21 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
-> >   		}
-> >   		__master_clk_disable(data);
-> >   	} else {
-> > -		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
-> > +		dev_dbg(dev, "disabled. Skipping TLB invalidation @ %#lx\n",
-> > +			iova);
-> >   	}
-> > -
-> >   	read_unlock_irqrestore(&data->lock, flags);
-> >   }
-> >
-> >   void exynos_sysmmu_tlb_invalidate(struct device *dev)
-> >   {
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> >   	unsigned long flags;
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > +	struct sysmmu_drvdata *data;
-> >
-> > -	read_lock_irqsave(&data->lock, flags);
-> > +	data = dev_get_drvdata(owner->sysmmu);
-> >
-> > +	read_lock_irqsave(&data->lock, flags);
-> >   	if (is_sysmmu_active(data)) {
-> >   		__master_clk_enable(data);
-> >   		if (sysmmu_block(data->sfrbase)) {
-> > @@ -486,9 +534,8 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
-> >   		}
-> >   		__master_clk_disable(data);
-> >   	} else {
-> > -		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
-> > +		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
-> >   	}
-> > -
-> >   	read_unlock_irqrestore(&data->lock, flags);
-> >   }
-> >
-> > @@ -498,6 +545,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
-> >   	struct device *dev = &pdev->dev;
-> >   	struct sysmmu_drvdata *data;
-> >   	struct resource *res;
-> > +	struct device_node *node;
-> >
-> >   	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> >   	if (!data)
-> > @@ -549,9 +597,32 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
-> >   		return ret;
-> >   	}
-> >
-> > +	/* Relation between master and System MMU is 1:1. */
-> > +	node = of_parse_phandle(dev->of_node, "mmu-masters", 0);
-> > +	if (node) {
-> > +		struct platform_device *master = of_find_device_by_node(node);
-> > +
-> > +		if (!master) {
-> > +			dev_err(dev, "%s: mmu-master '%s' not found\n",
-> > +				__func__, node->name);
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		if (master->dev.archdata.iommu != NULL) {
-> > +			dev_err(dev, "%s: '%s' is master of other MMU\n",
-> > +				__func__, node->name);
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		/*
-> > +		 * archdata.iommu will be initialized with exynos_iommu_client
-> > +		 * in sysmmu_hook_driver_register().
-> > +		 */
-> > +		master->dev.archdata.iommu = dev;
-> > +	}
-> > +
-> >   	data->sysmmu = dev;
-> >   	rwlock_init(&data->lock);
-> > -	INIT_LIST_HEAD(&data->node);
-> >
-> >   	platform_set_drvdata(pdev, data);
-> >
-> > @@ -629,7 +700,7 @@ err_pgtable:
-> >   static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> >   {
-> >   	struct exynos_iommu_domain *priv = domain->priv;
-> > -	struct sysmmu_drvdata *data;
-> > +	struct exynos_iommu_owner *owner;
-> >   	unsigned long flags;
-> >   	int i;
-> >
-> > @@ -637,11 +708,14 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> >
-> >   	spin_lock_irqsave(&priv->lock, flags);
-> >
-> > -	list_for_each_entry(data, &priv->clients, node) {
-> > -		while (!exynos_sysmmu_disable(data->dev))
-> > +	list_for_each_entry(owner, &priv->clients, client) {
-> > +		while (!exynos_sysmmu_disable(owner->dev))
-> >   			; /* until System MMU is actually disabled */
-> 
-> What about using list_for_each_entry_safe() and calling list_del_init() 
-> here directly?
-> 
-
-That require another variable to be defined.
-I just wanted to avoid that because I think it is prettier.
-Moreover, list_del_init() below the empty while() clause may make
-the source code readers misunderstood..
-
-> >   	}
-> >
-> > +	while (!list_empty(&priv->clients))
-> > +		list_del_init(priv->clients.next);
-> > +
-> >   	spin_unlock_irqrestore(&priv->lock, flags);
-> >
-> >   	for (i = 0; i < NUM_LV1ENTRIES; i++)
-> > @@ -658,41 +732,28 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> >   static int exynos_iommu_attach_device(struct iommu_domain *domain,
-> >   				   struct device *dev)
-> >   {
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > +	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> >   	struct exynos_iommu_domain *priv = domain->priv;
-> >   	unsigned long flags;
-> >   	int ret;
-> >
-> > -	ret = pm_runtime_get_sync(data->sysmmu);
-> > -	if (ret < 0)
-> > -		return ret;
-> > -
-> > -	ret = 0;
-> > -
-> >   	spin_lock_irqsave(&priv->lock, flags);
-> >
-> > -	ret = __exynos_sysmmu_enable(data, __pa(priv->pgtable), domain);
-> > -
-> > +	ret = __exynos_sysmmu_enable(dev, __pa(priv->pgtable), domain);
-> >   	if (ret == 0) {
-> > -		/* 'data->node' must not be appeared in priv->clients */
-> > -		BUG_ON(!list_empty(&data->node));
-> > -		data->dev = dev;
-> > -		list_add_tail(&data->node, &priv->clients);
-> > +		list_add_tail(&owner->client, &priv->clients);
-> > +		owner->domain = domain;
-> >   	}
-> >
-> >   	spin_unlock_irqrestore(&priv->lock, flags);
-> >
-> > -	if (ret < 0) {
-> > -		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %#lx\n",
-> > +	if (ret < 0)
-> > +		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %#x\n",
-> >   				__func__, __pa(priv->pgtable));
-> > -		pm_runtime_put(data->sysmmu);
-> > -	} else if (ret > 0) {
-> > -		dev_dbg(dev, "%s: IOMMU with pgtable 0x%lx already attached\n",
-> > -					__func__, __pa(priv->pgtable));
-> > -	} else {
-> > -		dev_dbg(dev, "%s: Attached new IOMMU with pgtable 0x%lx\n",
-> > -					__func__, __pa(priv->pgtable));
-> > -	}
-> > +	else
-> > +		dev_dbg(dev, "%s: Attached IOMMU with pgtable 0x%x%s\n",
-> > +					__func__, __pa(priv->pgtable),
-> > +					(ret == 0) ? "" : ", again");
-> >
-> >   	return ret;
-> >   }
-> > @@ -700,39 +761,29 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
-> >   static void exynos_iommu_detach_device(struct iommu_domain *domain,
-> >   				    struct device *dev)
-> >   {
-> > -	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-> > +	struct exynos_iommu_owner *owner;
-> >   	struct exynos_iommu_domain *priv = domain->priv;
-> > -	struct list_head *pos;
-> >   	unsigned long flags;
-> > -	bool found = false;
-> >
-> >   	spin_lock_irqsave(&priv->lock, flags);
-> >
-> > -	list_for_each(pos, &priv->clients) {
-> > -		if (list_entry(pos, struct sysmmu_drvdata, node) == data) {
-> > -			found = true;
-> > +	list_for_each_entry(owner, &priv->clients, client) {
-> > +		if (owner == dev->archdata.iommu) {
-> > +			if (exynos_sysmmu_disable(dev)) {
-> > +				list_del_init(&owner->client);
-> > +				owner->domain = NULL;
-> > +			}
-> >   			break;
-> >   		}
-> >   	}
-> >
-> > -	if (!found)
-> > -		goto finish;
-> > -
-> > -	if (__exynos_sysmmu_disable(data)) {
-> > -		dev_dbg(dev, "%s: Detached IOMMU with pgtable %#lx\n",
-> > -					__func__, __pa(priv->pgtable));
-> > -		list_del_init(&data->node);
-> > -
-> > -	} else {
-> > -		dev_dbg(dev, "%s: Detaching IOMMU with pgtable %#lx delayed",
-> > -					__func__, __pa(priv->pgtable));
-> > -	}
-> > -
-> > -finish:
-> >   	spin_unlock_irqrestore(&priv->lock, flags);
-> >
-> > -	if (found)
-> > -		pm_runtime_put(data->sysmmu);
-> > +	if (owner == dev->archdata.iommu)
-> > +		dev_dbg(dev, "%s: Detached IOMMU with pgtable %#x\n",
-> > +					__func__, __pa(priv->pgtable));
-> > +	else
-> > +		dev_dbg(dev, "%s: No IOMMU is attached\n", __func__);
-> >   }
-> >
-> >   static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
-> > @@ -862,7 +913,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
-> >   					       unsigned long iova, size_t size)
-> >   {
-> >   	struct exynos_iommu_domain *priv = domain->priv;
-> > -	struct sysmmu_drvdata *data;
-> > +	struct exynos_iommu_owner *owner;
-> >   	unsigned long flags;
-> >   	unsigned long *ent;
-> >   	size_t err_pgsize;
-> > @@ -923,8 +974,8 @@ done:
-> >   	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> >
-> >   	spin_lock_irqsave(&priv->lock, flags);
-> > -	list_for_each_entry(data, &priv->clients, node)
-> > -		sysmmu_tlb_invalidate_entry(data->dev, iova, size);
-> > +	list_for_each_entry(owner, &priv->clients, client)
-> > +		sysmmu_tlb_invalidate_entry(owner->dev, iova, size);
-> >   	spin_unlock_irqrestore(&priv->lock, flags);
-> >
-> >   	return size;
-> > @@ -1009,3 +1060,59 @@ err_reg_driver:
-> >   	return ret;
-> >   }
-> >   subsys_initcall(exynos_iommu_init);
-> > +
-> > +static int sysmmu_hook_driver_register(struct notifier_block *nb,
-> > +					unsigned long val,
-> > +					void *p)
+> > +static int axp20x_pek_probe(struct platform_device *pdev)
 > > +{
-> > +	struct device *dev = p;
+> > +	struct axp20x_pek *axp20x_pek;
+> > +	struct axp20x_dev *axp20x;
+> > +	struct input_dev *idev;
+> > +	int error;
 > > +
-> > +	switch (val) {
-> > +	case BUS_NOTIFY_BIND_DRIVER:
-> > +	{
-> > +		struct exynos_iommu_owner *owner;
-> 
-> Please move this variable to the top of the function and drop the braces 
-> around case blocks.
-
-I don't think it is required because this function is modified
-by the following patches.
-
-> 
+> > +	axp20x_pek = devm_kzalloc(&pdev->dev, sizeof(struct axp20x_pek),
+> > +				  GFP_KERNEL);
+> > +	if (!axp20x_pek)
+> > +		return -ENOMEM;
 > > +
-> > +		/* No System MMU assigned. See exynos_sysmmu_probe(). */
-> > +		if (dev->archdata.iommu == NULL)
-> > +			break;
-> 
-> This looks strange... (see below)
-> 
-> Also this looks racy. There are no guarantees about device probing 
-> order, so you may end up with master devices being probed before the 
-> IOMMUs. Deferred probing should be used to handle this correctly.
-
-System MMU driver must be probed earlier than the drivers of master devices
-because the drivers may want to use System MMU for their initial task.
-
-> 
+> > +	axp20x_pek->axp20x = dev_get_drvdata(pdev->dev.parent);
+> > +	axp20x = axp20x_pek->axp20x;
 > > +
-> > +		owner = devm_kzalloc(dev, sizeof(*owner), GFP_KERNEL);
-> > +		if (!owner) {
-> > +			dev_err(dev, "No Memory for exynos_iommu_owner\n");
-> > +			return -ENOMEM;
-> > +		}
-> > +
-> > +		owner->dev = dev;
-> > +		INIT_LIST_HEAD(&owner->client);
-> > +		owner->sysmmu = dev->archdata.iommu;
-> > +
-> > +		dev->archdata.iommu = owner;
-> 
-> I don't understand what is happening here in this case statement. There 
-> is already something assigned to dev->archdata.iommu, but this code 
-> reassigns something else to this field. This means that you attempt to 
-> use the same field to store pointers to objects of different types, 
-> which I believe is broken, because you have no way to check what kind of 
-> object is currently pointed by such (void *) pointer.
-> 
-
-exynos_sysmmu_probe() assigns the device descriptor of the probing System MMU
-to archdata.iommu of its master device. The assignment is just a marker that
-the device is a master device of a System MMU.
-If dev->archdata.iommu has a value in the case of BUS_NOTIFY_BIND_DRIVER,
-the 'dev' is a master devices of a System MMU. Then sysmmu_hook_driver_register()
-assigns the data structure to handle System MMU to dev->archdata.iommu.
-
-> > +		break;
+> > +	axp20x_pek->irq_dbr = platform_get_irq_byname(pdev, "PEK_DBR");
+> > +	if (axp20x_pek->irq_dbr < 0) {
+> > +		dev_err(&pdev->dev, "No IRQ for PEK_DBR, error=%d\n",
+> > +				axp20x_pek->irq_dbr);
+> > +		return axp20x_pek->irq_dbr;
 > > +	}
-> > +	case BUS_NOTIFY_UNBOUND_DRIVER:
-> > +	{
-> > +		struct exynos_iommu_owner *owner = dev->archdata.iommu;
-> > +		if (owner) {
-> > +			struct device *sysmmu = owner->sysmmu;
-> > +			/* if still attached to an iommu_domain. */
-> > +			if (WARN_ON(!list_empty(&owner->client)))
-> > +				iommu_detach_device(owner->domain, owner->dev);
-> > +			devm_kfree(dev, owner);
-> > +			dev->archdata.iommu = sysmmu;
-> > +		}
-> > +		break;
+> > +	axp20x_pek->irq_dbr = regmap_irq_get_virq(axp20x->regmap_irqc,
+> > +						  axp20x_pek->irq_dbr);
+> > +
+> > +	axp20x_pek->irq_dbf = platform_get_irq_byname(pdev, "PEK_DBF");
+> > +	if (axp20x_pek->irq_dbf < 0) {
+> > +		dev_err(&pdev->dev, "No IRQ for PEK_DBF, error=%d\n",
+> > +				axp20x_pek->irq_dbf);
+> > +		return axp20x_pek->irq_dbf;
 > > +	}
-> > +	} /* switch (val) */
+> > +	axp20x_pek->irq_dbf = regmap_irq_get_virq(axp20x->regmap_irqc,
+> > +						  axp20x_pek->irq_dbf);
+> > +
+> > +	axp20x_pek->input = devm_input_allocate_device(&pdev->dev);
+> > +	if (!axp20x_pek->input)
+> > +		return -ENOMEM;
+> > +
+> > +	idev = axp20x_pek->input;
+> > +
+> > +	idev->name = "axp20x-pek";
+> > +	idev->phys = "m1kbd/input2";
+> > +	idev->dev.parent = &pdev->dev;
+> > +
+> > +	input_set_capability(idev, EV_KEY, KEY_POWER);
+> > +
+> > +	input_set_drvdata(idev, axp20x_pek);
+> > +
+> > +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbr,
+> > +					  NULL, axp20x_pek_irq, 0,
+> > +					  "axp20x-pek-dbr", idev);
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
+> > +			axp20x_pek->irq_dbr, error);
+> > +
+> > +		return error;
+> > +	}
+> > +
+> > +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbf,
+> > +					  NULL, axp20x_pek_irq, 0,
+> > +					  "axp20x-pek-dbf", idev);
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Failed to request dbf IRQ#%d: %d\n",
+> > +			axp20x_pek->irq_dbf, error);
+> > +		return error;
+> > +	}
+> > +
+> > +	idev->dev.groups = dev_attr_groups;
+> > +	error = input_register_device(idev);
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Can't register input device: %d\n", error);
+> > +		return error;
+> > +	}
+> > +
+> > +	platform_set_drvdata(pdev, axp20x_pek);
 > > +
 > > +	return 0;
 > > +}
 > > +
-> > +static struct notifier_block sysmmu_notifier = {
-> > +	.notifier_call = &sysmmu_hook_driver_register,
-> > +};
-> > +
-> > +static int __init exynos_iommu_prepare(void)
+> > +static int axp20x_pek_remove(struct platform_device *pdev)
 > > +{
-> > +	return bus_register_notifier(&platform_bus_type, &sysmmu_notifier);
+> > +	struct axp20x_pek *axp20x_pek = platform_get_drvdata(pdev);
+> > +
+> > +	input_unregister_device(axp20x_pek->input);
+> > +
+> > +	return 0;
 > > +}
-> > +arch_initcall(exynos_iommu_prepare);
+> > +
+> > +static const struct of_device_id axp20x_pek_match[] = {
+> > +	{ .compatible = "x-powers,axp20x-pek", },
 > 
-> I don't think it is a good idea to use such initcalls in drivers, as it 
-> is not multiplatform friendly. On a multiplatform kernel with 
-> exynos-iommu driver simply compiled in this notifier will register on 
-> any platform, not only on Exynos.
+> No pattern-matching compatible strings please.
 > 
-Ok.
-I will change this function not to be called for the platforms
-which does not have Exynos System MMU.
+> Thanks!
+> Maxime
+> 
 
-Thank you for your review.
 
-KyongHo.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
