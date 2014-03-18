@@ -1,52 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Mar 2014 23:52:29 +0000
-Subject: [GIT PULL] uprobes: Add uprobes support for ARM
-In-Reply-To: <531F5799.2070302@linaro.org>
-References: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
- <531F5799.2070302@linaro.org>
-Message-ID: <20140317235229.GQ21483@n2100.arm.linux.org.uk>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 18 Mar 2014 11:21:38 +1100
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+Message-ID: <20140318112138.75a24ca8a0719d5b3fb98720@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 02:36:09PM -0400, David Long wrote:
->   git://git.linaro.org/people/dave.long/linux.git uprobes-v7
-> 
-> for you to fetch changes up to e55c35236b8adf79453a998506ec6081833b9484:
-> 
->   ARM: add uprobes support (2014-03-11 11:40:29 -0400)
+Hi all,
 
-I pulled this a week ago into my devel-testing (which is unpublished),
-and while it hasn't shown any signs of functional problems, I was just
-about to merge it into devel-stable when I noticed the history.
+Today's linux-next merge of the mvebu tree got a conflict in
+arch/arm/boot/dts/Makefile between commit 8fc1b0f87d9f ("ARM: qcom: Split
+Qualcomm support into legacy and multiplatform") from the arm-soc tree
+and commits 97623e934388 ("Merge branch 'mvebu/dt' into for-next") and
+54cab10f63f2 ("Merge branch 'mvebu/soc3' into next/dt") from the mvebu
+tree.
 
-This is based upon:
-
-Merge branch 'for-next' of git://git.samba.org/sfrench/cifs-2.6
-+ Linux 3.11
-+ Merge branch 'perf-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-+ Linux 3.12-rc5
-+ Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
-+ Linux 3.13-rc3
-+ Linux 3.13-rc4
-+ Linux 3.13-rc8
-+ Linux 3.14-rc2
-+ Linux 3.14-rc4
-+ Linux 3.14-rc5
-|
-[your uprobes patches]
-
-where each + is a merge of the named commit into the previous.  This is
-the kind of thing which will make Linus quite unhappy: please base
-patches off a plain -rc release, not off a merge commit.
-
-I'm sure there's others on the mailing list who can guide you on this
-point, but I do need to ask you to re-spin without those merges.  I'm
-happy to take a respin of it provided it's based on 3.14-rc5 (so I can
-more easily confirm that there aren't any changes which I haven't
-already tested.)
-
-Thanks, and sorry about the lateness of this email.
+I fixed it up (which produced no git diff) and can carry the fix as
+necessary (no action is required).
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/74ddaf2c/attachment.sig>
