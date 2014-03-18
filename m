@@ -1,37 +1,38 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Mar 2014 11:56:43 +0000
-Subject: [PATCH 2/2] ARM: s3c64xx: Fix build for implicit serial_s3c.h
- inclusion
-In-Reply-To: <1395143803-2032-1-git-send-email-broonie@kernel.org>
-References: <1395143803-2032-1-git-send-email-broonie@kernel.org>
-Message-ID: <1395143803-2032-2-git-send-email-broonie@kernel.org>
+Date: Tue, 18 Mar 2014 11:56:42 +0000
+Subject: [PATCH 1/2] serial: s3c: Fix build of header without serial_core.h
+ preinclusion
+Message-ID: <1395143803-2032-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-Some very recent change appears to have removed an implicit inclusion of
-serial_s3c.h causing build failures due to references to UART registers
-in the serial port restore code in next-20140318.  Include it explicitly
-to fix the build.
+serial_s3c.h uses upf_t which is defined in serial_core.h but does not
+include that itself meaning that users which include serial_s3c.h by
+itself don't build.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm/mach-s3c64xx/include/mach/pm-core.h | 2 ++
+
+This is needed together with patch 2 to fix build failures in -next, I
+didn't have the time/enthusiasm to isolate the issue.
+
+ include/linux/serial_s3c.h | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/pm-core.h b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-index c0537f40a3d8..a30a1e3ffc6a 100644
---- a/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-@@ -15,6 +15,8 @@
- #ifndef __MACH_S3C64XX_PM_CORE_H
- #define __MACH_S3C64XX_PM_CORE_H __FILE__
+diff --git a/include/linux/serial_s3c.h b/include/linux/serial_s3c.h
+index 907d9d1d56cf..44e4a6b92ddb 100644
+--- a/include/linux/serial_s3c.h
++++ b/include/linux/serial_s3c.h
+@@ -29,6 +29,8 @@
+ #ifndef __ASM_ARM_REGS_SERIAL_H
+ #define __ASM_ARM_REGS_SERIAL_H
  
-+#include <linux/serial_s3c.h>
++#include <linux/serial_core.h>
 +
- #include <mach/regs-gpio.h>
- 
- static inline void s3c_pm_debug_init_uart(void)
+ #define S3C2410_URXH	  (0x24)
+ #define S3C2410_UTXH	  (0x20)
+ #define S3C2410_ULCON	  (0x00)
 -- 
 1.9.0
