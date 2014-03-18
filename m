@@ -1,41 +1,51 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 17 Mar 2014 23:30:30 -0700
-Subject: Tegra baseline test results for v3.14-rc7
-Message-ID: <5327E806.3010108@nvidia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 18 Mar 2014 08:33:55 +0200
+Subject: [PATCH 6/9] Doc/DT: Add DT binding documentation for MIPI DSI
+ CM Panel
+In-Reply-To: <4670830.fkS1noPxcd@avalon>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-7-git-send-email-tomi.valkeinen@ti.com>
+ <4670830.fkS1noPxcd@avalon>
+Message-ID: <5327E8D3.5010907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.14-rc7.
-Logs and other details at:
+On 17/03/14 16:22, Laurent Pinchart wrote:
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc7/20140317231219/
+>> +Example
+>> +-------
+>> +
+>> +lcd0: display {
+>> +	compatible = "tpo,taal", "panel-dsi-cm";
+>> +	label = "lcd0";
+>> +
+>> +	gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
+> 
+> If the panel uses a TE GPIO but no reset GPIO, do you plan to express this 
+> with a "hole" for the reset GPIO ? e.g. something like
+> 
+> 	gpios = <0>, <&gpio4 6 GPIO_ACTIVE_HIGH>;
+
+Yes.
+
+> Wouldn't it be better to split the gpios property into "reset-gpios" and "te-
+> gpios" ?
+
+Yes, I can change it. I don't have a strong preference.
+
+I've gotten similar comments for other bindings also, so I guess the
+preferred way is to use named "-gpios" properties for everything except
+the case where you really have multiple gpios with the same purpose?
+
+The gpio binding documentation doesn't give much guidance on this.
+
+ Tomi
 
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.14-rc6 (fa389e220254c69ffae0d403eac4146171062d08)):
-    text     data      bss    total  kernel
-    -595     -128        0     -723  multi_v7_defconfig
-    -523     -128        0     -651  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.14-rc6 (fa389e220254c69ffae0d403eac4146171062d08))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-       -8k       8k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-       -8k       8k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/d3f51e70/attachment.sig>
