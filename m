@@ -1,40 +1,48 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 18 Mar 2014 10:16:49 -0400
-Subject: [PATCH v2 13/15] arm64: add EFI runtime services
-In-Reply-To: <20140318123418.GH13200@arm.com>
-References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
- <1394750828-16351-14-git-send-email-leif.lindholm@linaro.org>
- <20140318123418.GH13200@arm.com>
-Message-ID: <1395152209.2967.3.camel@deneb.redhat.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Mar 2014 23:12:39 +0900
+Subject: [GIT PULL 1/2] Samsung 2nd cleanup for v3.15
+Message-ID: <53285457.80900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-18 at 12:34 +0000, Catalin Marinas wrote:
-> On Thu, Mar 13, 2014 at 10:47:06PM +0000, Leif Lindholm wrote:
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/efi.c
-> [...]
-> > +/*
-> > + * Called from setup_arch with interrupts disabled.
-> > + */
-> > +void __init efi_enter_virtual_mode(void)
-> [...]
-> > --- a/init/main.c
-> > +++ b/init/main.c
-> > @@ -902,6 +902,10 @@ static noinline void __init kernel_init_freeable(void)
-> >         smp_prepare_cpus(setup_max_cpus);
-> > 
-> >         do_pre_smp_initcalls();
-> > +
-> > +       if (IS_ENABLED(CONFIG_ARM64) && efi_enabled(EFI_BOOT))
-> > +               efi_enter_virtual_mode();
-> 
-> The comment for the efi_enter_virtual_mode() function says "called from
-> setup_arch with interrupts disabled". None of these are true for the
-> call above (and I would really prefer an arch call than this arm64
-> conditional call in init/main.c.
-> 
+The following changes since commit d9671ca923445aa870ecc34df3db01dd602d87fc:
 
-Right, the call changed to later in boot but the comment didn't. Calling
-from setup_arch is too early. But an early_initcall would work and would
-get rid of the ugly CONFIG_ARM64 test.
+   ARM: EXYNOS: Remove uncompress.h (2014-02-24 09:39:18 +0900)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-cleanup-2
+
+for you to fetch changes up to 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
+
+   ARM: SAMSUNG: remove all custom uncompress.h (2014-03-11 22:05:18 +0900)
+
+----------------------------------------------------------------
+Samsung cleanup-2 for v3.15
+- use generic uncompress.h and remove all custom
+   uncompress.h in mach-s3c24xx, s3c64xx, s5p64x0,
+   s5pc100, s5pv210 and plat-samsung directories.
+
+Note that based on previous tags/samsung-cleanup
+
+----------------------------------------------------------------
+Heiko Stuebner (2):
+       ARM: SAMSUNG: use generic uncompress.h
+       ARM: SAMSUNG: remove all custom uncompress.h
+
+  arch/arm/Kconfig.debug                          |   4 +-
+  arch/arm/mach-s3c24xx/include/mach/uncompress.h |  57 --------
+  arch/arm/mach-s3c64xx/include/mach/uncompress.h |  31 -----
+  arch/arm/mach-s5p64x0/include/mach/uncompress.h |  34 -----
+  arch/arm/mach-s5pc100/include/mach/uncompress.h |  30 ----
+  arch/arm/mach-s5pv210/include/mach/uncompress.h |  28 ----
+  arch/arm/plat-samsung/include/plat/uncompress.h | 175 
+------------------------
+  7 files changed, 2 insertions(+), 357 deletions(-)
+  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/uncompress.h
+  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/uncompress.h
+  delete mode 100644 arch/arm/mach-s5p64x0/include/mach/uncompress.h
+  delete mode 100644 arch/arm/mach-s5pc100/include/mach/uncompress.h
+  delete mode 100644 arch/arm/mach-s5pv210/include/mach/uncompress.h
+  delete mode 100644 arch/arm/plat-samsung/include/plat/uncompress.h
