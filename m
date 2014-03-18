@@ -1,116 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Mar 2014 09:45:05 +0100
-Subject: [PATCH v2 2/8] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1394898225-28452-3-git-send-email-carlo@caione.org>
-References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-3-git-send-email-carlo@caione.org>
-Message-ID: <20140318084505.GT27873@lukather>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 18 Mar 2014 10:52:59 +0200
+Subject: [PATCHv2 2/8] Doc/DT: Add DT binding documentation for Analog
+ TV Connector
+In-Reply-To: <CAMuHMdVhh_qqXvUP9zUo0iCJ=O6bLqp-qTdaMQNLNcVgAgROBg@mail.gmail.com>
+References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>	<1395130547-18633-3-git-send-email-tomi.valkeinen@ti.com>
+ <CAMuHMdVhh_qqXvUP9zUo0iCJ=O6bLqp-qTdaMQNLNcVgAgROBg@mail.gmail.com>
+Message-ID: <5328096B.5080206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 04:43:39PM +0100, Carlo Caione wrote:
-> Bindings documentation for the AXP20x driver. In this file also two
-> sub-nodes (PEK and regulators) are documented.
-
-PEK doesn't look to be documented, either in this patch, or any other.
-
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt   | 83 ++++++++++++++++++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
-
-I don't really know what the DT maintainers are expecting here, but I
-would have done two patches.
-
->  2 files changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+On 18/03/14 10:40, Geert Uytterhoeven wrote:
+> Hi Tomi,
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> new file mode 100644
-> index 0000000..982aefe
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -0,0 +1,83 @@
-> +* axp20x device tree bindings
-> +
-> +The axp20x family current members :-
-> +axp202 (X-Powers)
-> +axp209 (X-Powers)
-> +
-> +Required properties:
-> +- compatible 			: Should be "x-powers,axp202" or "x-powers,axp209"
-> +- interrupt-controller 		: axp20x has its own internal IRQs
-> +- #interrupt-cells 		: Should be set to 1
-> +- interrupt-parent 		: The parent interrupt controller
-> +- interrupts 			: Interrupt specifiers for interrupt sources
-> +- reg 				: The I2C slave address for the AXP chip
-> +
-> +Sub-nodes:
-> +* regulators : Contain the regulator nodes. The regulators are bound using
-> +	       their name as listed here: dcdc2, dcdc3, ldo1, ldo2, ldo3,
-> +	       ldo4, ldo5.
-> +	       The bindings details of individual regulator device can be found in:
-> +	       Documentation/devicetree/bindings/regulator/regulator.txt with the
-> +	       exception of:
-> +
-> +	- dcdc-freq		: defines the work frequency of DC-DC in KHz
-> +				  (range: 750-1875). Default: 1.5MHz
-> +	- dcdc-workmode		: Optional. 1 for PWM mode, 0 for AUTO mode
-> +				  Default: AUTO mode
+> On Tue, Mar 18, 2014 at 9:15 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/video/analog-tv-connector.txt
+>> @@ -0,0 +1,25 @@
+>> +Analog TV Connector
+>> +===================
+>> +
+>> +Required properties:
+>> +- compatible: "composite-connector" or "svideo-connector"
+>> +
+>> +Optional properties:
+>> +- label: a symbolic name for the connector
+>> +
+>> +Required nodes:
+>> +- Video port for TV input
+> 
+> Only input, not output?
 
-Those two are x-powers specific, or would it make sense to have them
-in other drivers too?
+Yes, I have only made the bindings for display. I have no experience on
+the capture side. I can change the port bindings for the connectors to
+say they may be input or output, but I have to say I have no idea
+whether the bindings work for capture.
 
-If the former, please add the x-powers prefix.
+But this is also something that I think could be extended in the future,
+when we have some code to actually use them on capture pipeline. For now
+it may be safer to keep them only for display.
 
-> +
-> +Example:
-> +
-> +axp: axp20x at 34 {
-> +	reg = <0x34>;
-> +	interrupt-parent = <&nmi_intc>;
-> +	interrupts = <0 8>;
-> +
-> +	compatible = "x-powers,axp209";
-> +	interrupt-controller;
-> +	#interrupt-cells = <1>;
-> +
-> +	regulators {
+> Have you considered adding bindings for other analog connector types?
+>   - composite (YCbCr),
+>   - component with and without sync-on-green (RGB and RGBHV),
+>   - D-terminal (D1/D2/D3/D4/D5).
+> 
+> Am I missing some?
 
-Do we really need that subnode ? it looks useless, and we already know
-that we are defining regulators here.
+No, I haven't. I have no experience on those, and generally very little
+experience on analog video. I've added bindings only for the hardware I
+have.
 
-> +		dcdc-freq = "1500";
+If there are lots of different analog TV connectors, should I just split
+the current "analog-tv-connector" into separate composite and svideo,
+instead of trying to manage them with a single one? The reason I
+combined composite and svideo was that there didn't seem anything else
+to specify than the connector type.
 
-That frequency is defined at the same level than the dcdc-workmode
-property, yet they both seem to be placed at different levels.
+ Tomi
 
-> +
-> +		axp_dcdc2: dcdc2 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <2275000>;
-> +			dcdc-workmode = <0>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_dcdc3: dcdc3 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <3500000>;
-> +			dcdc-workmode = <0>;
 
-It looks like those are at their default values?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/8f9575d9/attachment.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/0fe5f211/attachment.sig>
