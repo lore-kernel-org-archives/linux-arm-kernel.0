@@ -1,34 +1,50 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 18 Mar 2014 10:33:55 +0800
-Subject: [PATCH 1/3] ARM: at91: pm: add the socs support the DDRC controller
+Date: Tue, 18 Mar 2014 10:33:56 +0800
+Subject: [PATCH 2/3] ARM: at91: pm_slowclock: add enter standby mode for ARMv7
 In-Reply-To: <1395110037-23151-1-git-send-email-wenyou.yang@atmel.com>
 References: <1395110037-23151-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1395110037-23151-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1395110037-23151-3-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-socs: at91sam9x5, at91sam9n12, sama5d3
-
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- arch/arm/mach-at91/pm.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/pm_slowclock.S |   16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 8bda1ce..7280d09 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -238,7 +238,10 @@ static int at91_pm_enter(suspend_state_t state)
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 2001877..842ddaf 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -102,6 +102,20 @@ tmp2	.req	r5
+ 2:
+ 	.endm
  
- 				if (cpu_is_at91rm9200())
- 					memctrl = AT91_MEMCTRL_MC;
--				else if (cpu_is_at91sam9g45())
-+				else if (cpu_is_at91sam9g45()
-+					|| cpu_is_at91sam9x5()
-+					|| cpu_is_at91sam9n12()
-+					|| cpu_is_sama5d3())
- 					memctrl = AT91_MEMCTRL_DDRSDR;
- #ifdef CONFIG_AT91_SLOW_CLOCK
- 				/* copy slow_clock handler to SRAM, and call it */
++/*
++ * Put the processor to enter into Standby mode, wait for interrupt to wakeup
++ */
++	.macro _do_wfi
++
++#if defined(CONFIG_CPU_V7)
++	dsb
++	wfi		@ Wait For Interrupt
++#else
++	mcr	p15, 0, tmp1, c7, c0, 4
++#endif
++
++	.endm
++
+ 	.text
+ 
+ /* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
+@@ -220,7 +234,7 @@ sdr_sr_done:
+ 	str	tmp1, [pmc, #AT91_CKGR_MOR]
+ 
+ 	/* Wait for interrupt */
+-	mcr	p15, 0, tmp1, c7, c0, 4
++	_do_wfi
+ 
+ 	/* Turn on the main oscillator */
+ 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
 -- 
 1.7.9.5
