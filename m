@@ -1,52 +1,54 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 18 Mar 2014 15:35:32 +0200
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <53278950.5030905@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <52F9282B.5000702@ti.com> <530B8C00.8020001@ti.com>
- <CAK=WgbZp_RQPCeZJyMRkNTQxaJsnGZ3DnjhSkYYR_-PAE_Kp4g@mail.gmail.com>
- <53239789.40600@ti.com>
- <CAK=WgbZCzA7JovSxnysHCQRZZWc3Z2j3AS8ekpM9fOZ160rmCA@mail.gmail.com>
- <532748B7.1080606@ti.com>
- <CAK=WgbYjtw+cxy5wX6pjK=Rpj6wOk6Cu+GrPuFN+sqtgDAY=_Q@mail.gmail.com>
- <53278950.5030905@ti.com>
-Message-ID: <CAK=WgbZ1M0JZE2BH0ukNo33hBuffTGbd3-DD0WCiwZ-akgvQ-Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Mar 2014 13:37:12 +0000
+Subject: arm64: dts: Add PMU node for APM X-Gene Storm SOC
+In-Reply-To: <CAJ5Y-eZ5hWuph=K3dBUqSTSUr=O+dU4YayuVe30h4Uc7t-cczQ@mail.gmail.com>
+References: <1395048095-32745-1-git-send-email-vkale@apm.com>
+ <20140317103353.GD8070@e106331-lin.cambridge.arm.com>
+ <CAPrCYkfxGVey_fQ47RO=XNnWYNM0qckdj9gMUZtZHkz6hR85xQ@mail.gmail.com>
+ <CAJ5Y-eZ5hWuph=K3dBUqSTSUr=O+dU4YayuVe30h4Uc7t-cczQ@mail.gmail.com>
+Message-ID: <20140318133712.GB2941@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Tue, Mar 18, 2014 at 01:17:46PM +0000, Ashwin Chaugle wrote:
+>    Hi Vinayak, Mark,
+> 
+>    On 17 March 2014 07:22, Vinayak Kale <[1]vkale@apm.com> wrote:
+> 
+>      > Do Potenza CPUs only have the PMUv3 events, and nothing
+>      > Potenza-specific?
+>      On top of PMUv3 events, Potenza CPU do have few implementation defined
+>      events.
+>      >
+>      > I would have expected something like:
+>      >
+>      > compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
+>      PMUv3 allows to have implementation defined events. And as such the
+>      driver doesn't have any dependency on such events. Do you still think
+>      we need additional compatible string for Potenza CPU?
+> 
+>    Can't these implementation specific events be used as raw perf events, or
+>    extending that event space? (Or is that interface gone?) I may be missing
+>    the details here, but I'm wondering if the method to program and count
+>    these extra events is similar to ARM architected events, then why add
+>    another DT binding?
 
-On Tue, Mar 18, 2014 at 1:46 AM, Suman Anna <s-anna@ti.com> wrote:
-> So far, we have not come across multiple controllers. I see your point,
-> and I think this also depends on the semantics of how you exchange the
-> lock id number. The agreement at the moment is on base_ids across
-> multiple SoC components. If the semantics involve exchanging the
-> controller instance, for example, then we might get away with it. But
-> that probably involves adding additional helpers to retrieve controller
-> instance in addition to lock number, or some other similar functions.
+It would be possible to use raw events, however that's a software level
+detail, and not something that matters to the hardware description.
 
-Yes, this could be done too, but I agree it is less simple with no real win.
+The hardware description should be as explicit as possible to allow the
+software stack to change in future. For example, we might want to expose
+implementation-specific events under sysfs in future, for which having
+the implementation-specific compatible string in addition to the more
+generic fallback is helpful.
 
-> Sorry, I should have rephrased it better - by order, I meant the
-> inherent order between board early code and other drivers. With DT, we
-> cannot guarantee that right, as specific locks are requested from drivers.
+This is why the compatible string exists. Making good use of it today
+means a platform is more likely to have good support in future.
 
-Yeah.
+Having the string now is cheap, and makes it easier to tailor the
+software stack more to the hardware in future. Not having the string
+makes it harder. There is no reason not to have the more specific
+compatible string.
 
-> Understood. And we may have to assign the client association with a lock
-> as well. These are core changes that were actually not needed in the
-> non-DT case due to the inherent order as stated above. So, are you
-> suggesting that we add one more property to the controller node to mark
-> which are reserved, or rely on constructing this through DT tree parsing?
-
-I guess this is a question to the DT folks; both approaches work from
-hwspinlock perspective.
-
-In the past Arnd Benoit and myself were happy with adding one more
-property to the controller node, but this might be somewhat error
-prone as it leaves room for mistakes - developers can add hwlock
-phandles and forget to update the reserved property in the controller
-node.
-
-Thanks,
-Ohad.
+Cheers,
+Mark.
