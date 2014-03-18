@@ -1,52 +1,107 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Mar 2014 11:26:00 +0400
-Subject: [PATCH] arm64/lib: add optimized implementation of sha_transform
-In-Reply-To: <201403171918.35632.marex@denx.de>
-References: <1394809353-16707-1-git-send-email-ard.biesheuvel@linaro.org>
- <201403171918.35632.marex@denx.de>
-Message-ID: <CAKv+Gu9=SXJngmeYC9bDjgr+VF-b-Hj1jf_NWdPwNzn8z3MVKA@mail.gmail.com>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Tue, 18 Mar 2014 15:35:59 +0800
+Subject: [PATCH v2] ARM: mm: support big-endian page tables
+In-Reply-To: <5301B4AF.1040305@huawei.com>
+References: <5301B4AF.1040305@huawei.com>
+Message-ID: <5327F75F.1010406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2014 22:18, Marek Vasut <marex@denx.de> wrote:
-> On Friday, March 14, 2014 at 04:02:33 PM, Ard Biesheuvel wrote:
->> This implementation keeps the 64 bytes of workspace in registers rather
->> than on the stack, eliminating most of the loads and stores, and reducing
->> the instruction count by about 25%.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> Hello all,
->>
->> No performance numbers I am allowed to share, unfortunately, so if anyone
->> else (with access to actual, representative hardware) would care to have a
->> go, I would be very grateful.
->>
->> This can be done by building the tcrypt.ko module (CONFIG_CRYPTO_TEST=m),
->> and inserting the module using 'mode=303' as a parameter (note that the
->> insmod always fails, but produces its test output to the kernel log). Also
->> note that the sha_transform() function will be part of the kernel proper,
->> so just rebuilding the sha1_generic module is not sufficient.
->>
->> Cheers,
->
-> Won't the function sha_transform() collide with the one in lib/sha1.c ? Or will
-> the one in lib/sha1.c be overriden somehow ?
->
+Hi Russell,
 
-No, this works pretty well, in fact: arch/*/lib has precedence over
-lib/, and objects (declared with lib-y +=)  are only included to
-satisfy unresolved dependencies. So the second (generic) sha1.o will
-not get linked.
+Cloud you please take a look at this?
 
-> Otherwise:
->
-> Reviewed-by: Marek Vasut <marex@denx.de>
->
+Thanks!
 
-Thanks. I did send a v2 which is actually a lot different from the
-version you reviewed, so I won't carry over your reviewed-by without
-your acknowledgement.
+On 2014/2/17 15:05, Jianguo Wu wrote:
 
-Cheers,
-Ard.
+> When enable LPAE and big-endian in a hisilicon board, while specify
+> mem=384M mem=512M at 7680M, will get bad page state:
+> 
+> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+> BUG: Bad page state in process init  pfn:fa442
+> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+> page flags: 0x40000400(reserved)
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+> 
+> The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
+> I find in page fault handler, will get wrong pfn from pte just after set pte,
+> as follow:
+> do_anonymous_page()
+> {
+> 	...
+> 	set_pte_at(mm, address, page_table, entry);
+> 	
+> 	//debug code
+> 	pfn = pte_pfn(entry);
+> 	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
+> 
+> 	//read out the pte just set
+> 	new_pte = pte_offset_map(pmd, address);
+> 	new_pfn = pte_pfn(*new_pte);
+> 	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
+> 	...
+> }
+> 
+> pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
+> new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+> 
+> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
+> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
+> high 32-bit in r2, this will cause wrong pfn stored in pte,
+> so we should exchange r2 and r3 for big-endian.
+> 
+> Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+> ---
+>  arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
+>  1 files changed, 13 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 01a719e..22e3ad6 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
+>  	mov	pc, lr
+>  ENDPROC(cpu_v7_switch_mm)
+>  
+> +#ifdef __ARMEB__
+> +#define rl r3
+> +#define rh r2
+> +#else
+> +#define rl r2
+> +#define rh r3
+> +#endif
+> +
+>  /*
+>   * cpu_v7_set_pte_ext(ptep, pte)
+>   *
+> @@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
+>   */
+>  ENTRY(cpu_v7_set_pte_ext)
+>  #ifdef CONFIG_MMU
+> -	tst	r2, #L_PTE_VALID
+> +	tst	rl, #L_PTE_VALID
+>  	beq	1f
+> -	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+> -	bicne	r2, #L_PTE_VALID
+> +	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
+> +	bicne	rl, #L_PTE_VALID
+>  	bne	1f
+> -	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+> -	orreq	r2, #L_PTE_RDONLY
+> +	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
+> +	orreq	rl, #L_PTE_RDONLY
+>  1:	strd	r2, r3, [r0]
+>  	ALT_SMP(W(nop))
+>  	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
