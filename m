@@ -1,53 +1,52 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 18 Mar 2014 09:06:16 +0200
-Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI
- Panel
-In-Reply-To: <5327EAB3.8080405@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
- <3721050.m43feCICLQ@avalon> <5327EAB3.8080405@ti.com>
-Message-ID: <5327F068.7010100@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 18 Mar 2014 11:26:00 +0400
+Subject: [PATCH] arm64/lib: add optimized implementation of sha_transform
+In-Reply-To: <201403171918.35632.marex@denx.de>
+References: <1394809353-16707-1-git-send-email-ard.biesheuvel@linaro.org>
+ <201403171918.35632.marex@denx.de>
+Message-ID: <CAKv+Gu9=SXJngmeYC9bDjgr+VF-b-Hj1jf_NWdPwNzn8z3MVKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/14 08:41, Tomi Valkeinen wrote:
-> On 17/03/14 16:19, Laurent Pinchart wrote:
-> 
->>> +Generic MIPI DPI Panel
->>> +======================
->>> +
->>> +Required properties:
->>> +- compatible: "panel-dpi"
->>> +
->>> +Optional properties:
->>> +- label: a symbolic name for the panel
->>> +- gpios: panel enable gpio and backlight enable gpio
+On 17 March 2014 22:18, Marek Vasut <marex@denx.de> wrote:
+> On Friday, March 14, 2014 at 04:02:33 PM, Ard Biesheuvel wrote:
+>> This implementation keeps the 64 bytes of workspace in registers rather
+>> than on the stack, eliminating most of the loads and stores, and reducing
+>> the instruction count by about 25%.
 >>
->> While integrated in the panel module, the backlight is a separate piece of 
->> hardware, which could be controlled through other means (I2C for instance). 
->> Wouldn't it be better to add an explicit DT node for the backlight device and 
->> reference that node from the panel node ?
-> 
-> Yes, I agree, but do we have the infrastructure or bindings for that?
-> 
-> Ah, I see we now do have a gpio-backlight driver, but it doesn't have DT
-> bindings.
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> Hello all,
+>>
+>> No performance numbers I am allowed to share, unfortunately, so if anyone
+>> else (with access to actual, representative hardware) would care to have a
+>> go, I would be very grateful.
+>>
+>> This can be done by building the tcrypt.ko module (CONFIG_CRYPTO_TEST=m),
+>> and inserting the module using 'mode=303' as a parameter (note that the
+>> insmod always fails, but produces its test output to the kernel log). Also
+>> note that the sha_transform() function will be part of the kernel proper,
+>> so just rebuilding the sha1_generic module is not sufficient.
+>>
+>> Cheers,
+>
+> Won't the function sha_transform() collide with the one in lib/sha1.c ? Or will
+> the one in lib/sha1.c be overriden somehow ?
+>
 
-Seems there's a patch from Denis Carikli for this, which will probably
-be merged for 3.15.
+No, this works pretty well, in fact: arch/*/lib has precedence over
+lib/, and objects (declared with lib-y +=)  are only included to
+satisfy unresolved dependencies. So the second (generic) sha1.o will
+not get linked.
 
-I realized I don't actually use panel-dpi at the moment in my OMAP DSS
-DT series, as I dropped the board changes that used panel-dpi. So I'll
-drop panel-dpi bindings from my series, and the backlight for panel-dpi
-can then be fixed for 3.16.
+> Otherwise:
+>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+>
 
- Tomi
+Thanks. I did send a v2 which is actually a lot different from the
+version you reviewed, so I won't carry over your reviewed-by without
+your acknowledgement.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/ed0d92a9/attachment-0001.sig>
+Cheers,
+Ard.
