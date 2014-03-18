@@ -1,173 +1,67 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 18 Mar 2014 18:40:59 +0100
-Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
-In-Reply-To: <014f01cf4245$3833cfd0$a89b6f70$@samsung.com>
-References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
- <53075164.8080800@samsung.com> <531D07FC.2050805@gmail.com>
- <014f01cf4245$3833cfd0$a89b6f70$@samsung.com>
-Message-ID: <5328852B.9090403@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Mar 2014 17:51:33 +0000
+Subject: [PATCH v2 1/5] drivers: input: keyboard: st-keyscan: add
+ keyscan driver
+In-Reply-To: <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
+References: <1395154806-2810-1-git-send-email-gabriel.fernandez@st.com>
+ <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20140318175133.GE2941@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Tue, Mar 18, 2014 at 03:00:02PM +0000, Gabriel FERNANDEZ wrote:
+> This patch adds ST Keyscan driver to use the keypad hw a subset
+> of ST boards provide. Specific board setup will be put in the
+> given dt.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
+> ---
+>  .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
+>  drivers/input/keyboard/Kconfig                     |  12 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
+>  4 files changed, 333 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
+>  create mode 100644 drivers/input/keyboard/st-keyscan.c
+> 
+> diff --git a/Documentation/devicetree/bindings/input/st-keyscan.txt b/Documentation/devicetree/bindings/input/st-keyscan.txt
+> new file mode 100644
+> index 0000000..51eb428
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/st-keyscan.txt
+> @@ -0,0 +1,60 @@
+> +* ST Keyscan controller Device Tree bindings
+> +
+> +The ST keyscan controller Device Tree binding is based on the
+> +matrix-keymap.
+> +
+> +Required properties:
+> +- compatible: "st,sti-keyscan"
+> +
+> +- reg: Register base address and size of st-keyscan controller.
+> +
+> +- interrupts: Interrupt number for the st-keyscan controller.
+> +
+> +- clocks: Must contain one entry, for the module clock.
+> +  See ../clocks/clock-bindings.txt for details.
+> +
+> +- pinctrl: Should specify pin control groups used for this controller.
+> +  See ../pinctrl/pinctrl-bindings.txt for details.
+> +
+> +- linux,keymap: The keymap for keys as described in the binding document
+> +  devicetree/bindings/input/matrix-keymap.txt.
+> +
+> +- keypad,num-rows: Number of row lines connected to the keypad controller.
+> +
+> +- keypad,num-columns: Number of column lines connected to the keypad
+> +  controller.
+> +
+> +Optional property:
+> +- st,debounce_us: Debouncing interval time in microseconds
 
-On 18.03.2014 01:58, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> On 21.02.2014 14:15, Tomasz Figa wrote:
->>> Hi Kukjin,
->>>
->>> On 06.02.2014 20:12, Tomasz Figa wrote:
->>>> Current Samsung PM code is heavily unprepared for multiplatform
-> systems.
->>>> The design implies accessing functions and global variables defined in
->>>> particular mach- subdirectory from common code in plat-, which is not
->>>> allowed when building ARCH_MULTIPLATFORM. In addition there is a lot of
->>>> forced code unification, which makes common function handle any
->> possible
->>>> quirks of all supported SoCs. In the end this design turned out to not
->>>> work too well, ending with a lot of empty functions exported from
-> mach-,
->>>> just because code in common pm.c calls them. Moreover, recent trend of
->>>> moving lower level suspend/resume code to proper drivers, like pinctrl
->>>> or clk, made a lot of code there redundant, especially on DT-only
->>>> platforms
->>>> like Exynos.
->>>>
->>>> This patch series attempts to untie Exynos PM support from the legacy
->>>> Samsung PM core and make it multiplatform-aware, by isolating truly
->>>> generic parts of the latter, making them multiplatform-friendly and
->> then
->>>> reimplementing Exynos PM support in a multiplatform-capable way by
->> using
->>>> those generic parts. The result is that now PM initialization is
->> started
->>>> from mach-exynos*-dt, which calls Exynos-specific initialization code
->>>> that
->>>> registers platform_suspend_ops, so control flow is basically reversed
->>>> ending with mach- code calling more generic plat- code if needed.
->>>>
->>>> This is limited to Exynos right now, but remaining SoCs could follow
->>>> in further series.
->>>>
->>>> Depends on Samsung PM consolidation part 1 (clocks) series:
->>>>    - http://thread.gmane.org/gmane.linux.kernel.samsung-soc/26816
->>>>
->>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
->>>> Arndale boards (except suspend/resume, which is broken because of
->>>> unrelated reasons):
->>>>
->>>> Tested-by: Tomasz Figa <t.figa@samsung.com>
->>>>
->>>> Changes since v1 (RFC):
->>>>    - fixed l2x0 resume,
->>>>    - fixed checkpatch complaints (about issues in existing code being
->>>> moved),
->>>>    - rebased on top of current linux-next,
->>>>    - slightly reordered patches to make the order more logical.
->>>>
->>>> Tomasz Figa (12):
->>>>     ARM: EXYNOS: Do not resume l2x0 if not enabled before suspend
->>>>     ARM: SAMSUNG: Add soc_is_s3c2410() helper
->>>>     ARM: SAMSUNG: pm: Save UART DIVSLOT register based on SoC type
->>>>     ARM: SAMSUNG: pm: Use debug_ll_addr() to get UART base address
->>>>     ARM: SAMSUNG: pm: Consolidate PM debug functions
->>>>     ARM: SAMSUNG: pm: Move Samsung PM debug code into separate file
->>>>     ARM: SAMSUNG: Move common save/restore helpers to separate file
->>>>     ARM: SAMSUNG: pm: Move s3c_pm_check_* prototypes to plat/pm-common.h
->>>>     ARM: EXYNOS: Kconfig: Fix abuse of CONFIG_PM
->>>>     ARM: EXYNOS: Remove PM initcalls and useless indirection
->>>>     ARM: EXYNOS: Stop using legacy Samsung PM code
->>>>     ARM: exynos: Allow wake-up using GIC interrupts
->>>>
->>>>    arch/arm/mach-exynos/Kconfig                   |  16 +--
->>>>    arch/arm/mach-exynos/Makefile                  |   2 +-
->>>>    arch/arm/mach-exynos/common.c                  |   1 +
->>>>    arch/arm/mach-exynos/common.h                  |  14 ++
->>>>    arch/arm/mach-exynos/include/mach/pm-core.h    |  75 -----------
->>>>    arch/arm/mach-exynos/pm.c                      | 172
->>>> +++++++++++++++++++------
->>>>    arch/arm/mach-exynos/regs-pmu.h                |   2 +
->>>>    arch/arm/mach-exynos/sleep.S                   |  85 ++++++++++++
->>>>    arch/arm/mach-s3c64xx/pm.c                     |   1 -
->>>>    arch/arm/mach-s5p64x0/pm.c                     |   1 -
->>>>    arch/arm/plat-samsung/Makefile                 |   2 +
->>>>    arch/arm/plat-samsung/include/plat/cpu.h       |   6 +
->>>>    arch/arm/plat-samsung/include/plat/pm-common.h | 110 ++++++++++++++++
->>>>    arch/arm/plat-samsung/include/plat/pm.h        |  80 +-----------
->>>>    arch/arm/plat-samsung/pm-check.c               |   2 +-
->>>>    arch/arm/plat-samsung/pm-common.c              |  75 +++++++++++
->>>>    arch/arm/plat-samsung/pm-debug.c               |  98 ++++++++++++++
->>>>    arch/arm/plat-samsung/pm.c                     | 146
->>>> ---------------------
->>>>    arch/arm/plat-samsung/s5p-sleep.S              |  43 -------
->>>>    19 files changed, 531 insertions(+), 400 deletions(-)
->>>>    delete mode 100644 arch/arm/mach-exynos/include/mach/pm-core.h
->>>>    create mode 100644 arch/arm/mach-exynos/sleep.S
->>>>    create mode 100644 arch/arm/plat-samsung/include/plat/pm-common.h
->>>>    create mode 100644 arch/arm/plat-samsung/pm-common.c
->>>>    create mode 100644 arch/arm/plat-samsung/pm-debug.c
->>>>
->
-> Hi Tomasz,
->
-> Build error happens with s3c6400_defconfig:
->
-> In file included from arch/arm/plat-samsung/pm.c:38:0:
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h: In function
-> 's3c_pm_arch_update_uart':
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:64:32: error: 'S3C2410_UCON'
-> undeclared (first use in this function)
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:64:32: note: each undeclared
-> identifier is reported only once for each function it appears in
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:65:24: error:
-> 'S3C6400_UCON_CLKMASK' undeclared (first use in this function)
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:73:16: error:
-> 'S3C2410_UCON_TXILEVEL' undeclared (first use in this function)
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:73:40: error:
-> 'S3C2410_UCON_RXILEVEL' undeclared (first use in this function)
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:87:18: error:
-> 'S3C6400_UCON_UCLK0' undeclared (first use in this function)
-> arch/arm/mach-s3c64xx/include/mach/pm-core.h:89:15: error:
-> 'S3C6400_UCON_PCLK2' undeclared (first use in this function)
-> make[2]: *** [arch/arm/plat-samsung/pm.o] Error 1
-> make[1]: *** [arch/arm/plat-samsung] Error 2
-> make[1]: *** Waiting for unfinished jobs....
->
-> And with s5p64x0_defconfig:
->
-> In file included from arch/arm/plat-samsung/pm.c:38:0:
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h: In function
-> 's3c_pm_arch_update_uart':
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:57:32: error: 'S3C2410_UCON'
-> undeclared (first use in this function)
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:57:32: note: each undeclared
-> identifier is reported only once for each function it appears in
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:58:24: error:
-> 'S3C6400_UCON_CLKMASK' undeclared (first use in this function)
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:68:16: error:
-> 'S3C2410_UCON_TXILEVEL' undeclared (first use in this function)
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:68:40: error:
-> 'S3C2410_UCON_RXILEVEL' undeclared (first use in this function)
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:85:18: error:
-> 'S3C6400_UCON_UCLK0' undeclared (first use in this function)
-> arch/arm/mach-s5p64x0/include/mach/pm-core.h:87:11: error:
-> 'S3C6400_UCON_PCLK2' undeclared (first use in this function)
-> make[2]: *** [arch/arm/plat-samsung/pm.o] Error 1
-> make[2]: *** Waiting for unfinished jobs....
->    CC      arch/arm/mach-s5p64x0/setup-sdhci-gpio.o
->    CC      fs/char_dev.o
-> make[1]: *** [arch/arm/plat-samsung] Error 2
-> make[1]: *** Waiting for unfinished jobs....
->
-> Please see the 'v3.15-next/s2r-pm-samsung-2' branch.
+s/_/-/ here, please.
 
-I've sent a series of fixup patches:
+Otherwise this looks ok.
 
-http://www.spinics.net/lists/arm-kernel/msg316390.html
-
-Compile tested on s3c24xx, s3c64xx, s5p64x0, s5pv210 and exynos with and 
-without CONFIG_PM_SLEEP.
-
-Best regards,
-Tomasz
+Mark.
