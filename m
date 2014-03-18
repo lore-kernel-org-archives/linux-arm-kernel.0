@@ -1,60 +1,35 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 18 Mar 2014 10:13:28 +0530
-Subject: [PATCH 3/3] ARM: OMAP2+: Add machine entry for dra72x devices
-In-Reply-To: <5323B90C.80803@ti.com>
-References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
- <1394788841-15112-4-git-send-email-rnayak@ti.com> <5323B90C.80803@ti.com>
-Message-ID: <5327CEF0.3070301@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 18 Mar 2014 10:19:10 +0530
+Subject: [PATCH] ARM: davinci: fix DT booting with default defconfig
+In-Reply-To: <CAGa+x84fYJAS3y+SHbZP2DULujWs0una590XR25QSn3azyR5xQ@mail.gmail.com>
+References: <1394818228-1846-1-git-send-email-khilman@linaro.org>	<53268151.7030409@ti.com>
+ <CAGa+x84fYJAS3y+SHbZP2DULujWs0una590XR25QSn3azyR5xQ@mail.gmail.com>
+Message-ID: <5327D046.3080800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 March 2014 07:51 AM, Suman Anna wrote:
-> Hi Rajendra,
-> 
-> On 03/14/2014 04:20 AM, Nayak, Rajendra wrote:
->> The only difference from the dra75x devices is the missing .smp entry.
+On Tuesday 18 March 2014 03:01 AM, Kevin Hilman wrote:
+> On Sun, Mar 16, 2014 at 10:00 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Friday 14 March 2014 11:00 PM, Kevin Hilman wrote:
+>>> Davinci boards tend to have older booloaders without DTB support.
+>>> Enable appended DTB support by default to allow DT booting on older
+>>> platforms.  While there, also enable /proc/device-tree support for
+>>> easy verification of DT boot.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>> Sekhar, this applies on top of your latest defconfig cleanup queued
+>>> for v3.15 and validated with DT and legacy boot on DA850 EVM.
 >>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>   arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
->>   1 file changed, 18 insertions(+)
+>> Thanks Kevin. If you will take this directly through ARM-SoC:
 >>
->> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
->> index 8e3daa1..d803d99 100644
->> --- a/arch/arm/mach-omap2/board-generic.c
->> +++ b/arch/arm/mach-omap2/board-generic.c
->> @@ -253,4 +253,22 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
->>       .dt_compat    = dra7xx_boards_compat,
->>       .restart    = omap44xx_restart,
->>   MACHINE_END
->> +
->> +static const char *dra72_boards_compat[] __initdata = {
+>> Acked-by: Sekhar Nori <nsekhar@ti.com>
 > 
-> How about using dra72x_ instead of dra72_ and keeping it consistent
-> at the other places as well?
+> I'd prefer if you just take it along with your changes.  Maybe as a
+> fix for v3.15-rc since it fixes some booting issues with legacy
+> booting on top of your defconfig cleanup.
 
-Sure, I can do that. Thanks.
+Okay sure.
 
-> 
-> regards
-> Suman
-> 
->> +    "ti,dra72x",
->> +    "ti,dra7",
->> +    NULL,
->> +};
->> +
->> +DT_MACHINE_START(DRA72_DT, "Generic DRA72 (Flattened Device Tree)")
->> +    .reserve    = omap_reserve,
->> +    .map_io        = omap5_map_io,
->> +    .init_early    = dra7xx_init_early,
->> +    .init_late    = dra7xx_init_late,
->> +    .init_irq    = omap_gic_of_init,
->> +    .init_machine    = omap_generic_init,
->> +    .init_time    = omap5_realtime_timer_init,
->> +    .dt_compat    = dra72_boards_compat,
->> +    .restart    = omap44xx_restart,
->> +MACHINE_END
->>   #endif
->>
-> 
+Thanks,
+Sekhar
