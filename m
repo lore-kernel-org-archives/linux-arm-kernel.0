@@ -1,55 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Mar 2014 11:01:23 +0000
-Subject: [PATCH 1/5] drivers: input: keyboard: st-keyscan: add keyscan
- driver
-In-Reply-To: <53281F1E.7010403@st.com>
-References: <1393990772-9567-1-git-send-email-gabriel.fernandez@st.com>
- <1393990772-9567-2-git-send-email-gabriel.fernandez@st.com>
- <20140310114819.GO14976@lee--X1> <5322D63D.5030403@st.com>
- <20140314104222.GB3432@lee--X1> <53281F1E.7010403@st.com>
-Message-ID: <20140318110123.GP25478@lee--X1>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Tue, 18 Mar 2014 20:03:29 +0900
+Subject: [PATCH v11 15/27] iommu/exynos: use convenient macro to handle
+ gate clocks
+In-Reply-To: <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
+References: <20140314140951.3d443a3096e80297c9fecef0@samsung.com>
+ <5323078E.4060903@samsung.com>
+ <CAK9yfHx_=Os1G46nNO1HDA3tigkRNeHKN1KGCvuN=w7dRTkfjg@mail.gmail.com>
+Message-ID: <20140318200329.cc1dca7541b4b1916e5d9d48@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>Sorry for the delay. It was a hectic week last week.
-> >>>
-> >>>As promised:
-> >>>
-> >>>>This patch adds ST Keyscan driver to use the keypad hw a subset
-> >>>>of ST boards provide. Specific board setup will be put in the
-> >>>>given dt.
-> >>>>
-> >>>>Signed-off-by: Giuseppe Condorelli<giuseppe.condorelli@st.com>
-> >>>>Signed-off-by: Gabriel Fernandez<gabriel.fernandez@st.com>
-> >>>Are you sure these are in the correct order?
-> >>ok i change the order
-> >I'm not saying they are in the wrong order, I'm just asking. Who wrote
-> >the patch? Has it changed since?
-> Sorry...
-> I wrote the patch, then Guiseppe has changed and tested, and I re-modifiedit
-
-Ah, then it starts to get very complicated. :)
-
-If you wrote the patch, you need to be at the top of the list.
-
-<snip>
-
-> >>>+keyscan: keyscan at fe4b0000 {
-> >>>+	compatible = "st,keypad";
-> >>>Is there any way we can make this more specific to _this_ IP?
-> >>for my knowledge this IP is the same for stixxxx platform.
-> >So st,stix-keypad, or st,sti4x-keypad?
+On Fri, 14 Mar 2014 22:27:59 +0530, Sachin Kamat wrote:
+>  Hi KyongHo,
+> 
+> On 14 March 2014 19:13, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi KyongHo,
 > >
-> >I'm just thinking about future proofing the architecture. What if ST
-> >released stj which has a different keypad IP?
-> After discussing internally with st  "st,sti-keyscan" is better
+> >
+> > On 14.03.2014 06:09, Cho KyongHo wrote:
+> >>
+> >> exynos-iommu driver must care about master H/W's gate clock as well as
+> >> System MMU's gate clock. To enhance readability of the source code,
+> >> macros to gate/ungate those clocks are defined.
+> >>
+> >> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> >> ---
+> >>   drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++------------
+> >>   1 file changed, 22 insertions(+), 12 deletions(-)
+> >>
+> >> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> >> index 71e77f1..cef62d0 100644
+> >> --- a/drivers/iommu/exynos-iommu.c
+> >> +++ b/drivers/iommu/exynos-iommu.c
+> >> @@ -101,6 +101,16 @@
+> >>   #define REG_PB1_SADDR         0x054
+> >>   #define REG_PB1_EADDR         0x058
+> >>
+> >> +#define __clk_gate_ctrl(data, clk, en) do {            \
+> >> +               if (data->clk)                          \
+> >> +                       clk_##en##able(data->clk);      \
+> >> +       } while (0)
+> >> +
+> >> +#define __sysmmu_clk_enable(data)      __clk_gate_ctrl(data, clk, en)
+> >> +#define __sysmmu_clk_disable(data)     __clk_gate_ctrl(data, clk, dis)
+> >> +#define __master_clk_enable(data)      __clk_gate_ctrl(data, clk_master,
+> >> en)
+> >> +#define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master,
+> >> dis)
+> >> +
+> >
+> >
+> > I'd say that such macros only obfuscate code, without any gains, as you can
+> > see in diffstat - this patch adds more lines than it removes.
+> >
+> > Please drop this change.
+> 
+>  I agree with Tomasz here.
+> 
 
-Perfect.
+Are you concerning about using macros or more insertions than deletions?
 
-<snip>
+The deletions in this patch are only clk_enable() and clk_disable()
+but they must be
+"if (!IS_ERR(clk)) clk_enable(clk)" and "if (!IS_ERR(clk)) clk_disable(clk)".
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I think use of macro is fancier in that case.
+
+Thank you.
+
+KyongHo.
