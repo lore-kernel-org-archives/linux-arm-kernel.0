@@ -1,209 +1,74 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Mar 2014 17:16:43 -0700
-Subject: [PATCH v3 1/3] clk: s2mps11: Add support for S2MPS14 clocks
-In-Reply-To: <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
-References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
- <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140319001643.30995.46947@quantum>
+Date: Tue, 18 Mar 2014 16:29:17 -0700
+Subject: Deadlock with I2C based clock providers
+In-Reply-To: <5328499D.4040806@parkeon.com>
+References: <5328499D.4040806@parkeon.com>
+Message-ID: <20140318232917.30995.41976@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2014-03-17 02:19:16)
-> This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
-> s2mps11 clock driver.
+Quoting Martin Fuzzey (2014-03-18 06:26:53)
+> Hi Mike,
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> I have a clock provide that implements the clock operations over i2c.
+> 
+> Although this is now possible since commit 533ddeb1e8 clk: allow 
+> reentrant calls into the clk framework
+> 
+> that patch only deals with single threaded reentrancy.
+> 
+> 
+> The issue I am having involves two threads:
+> 
+> Thread A calls the i2c clock driver
+> Thread B is in an unrelated driver for another I2C device on the same 
+> I2C bus (audio codec).
+> 
+> 
+> Thread A:
+>      clk_set_rate(my_clk)
+>          clk_prepare_lock()  <== Takes clock lock
+>          clk_change_rate()
+>              ops->set_rate()
+>                  i2c_transfer()
+>                      i2c_lock_adapter()  <== Blocks on I2C bus lock
+> 
+> 
+> 
+> Thread B:
+>      i2c_transfer()
+>          i2c_lock_adapter()    <== Takes I2C bus lock
+>          i2c_imx_xfer()
+>              i2c_imx_start()
+>                  clk_prepare_enable(i2c_clk)
+>                      clk_prepare_lock()  <== Blocks on clock lock
+> 
+> 
+> The problem is that the locks are taken in the reverse order leading to 
+> a classic deadlock.
+> 
+> I saw your [RFC] clk: reentrancy via per-clock locking but that seemed 
+> to have other problems.
+> 
+> 
+> My current (horrible) workaround involves exposing clk_prepare_lock() 
+> and calling it from i2c_core but that obviously isn't the right solution.
 
-This does not apply cleanly to to clk tree trip, nor does it compile
-after manually merging due to changes introducing
-linux/mfd/samsung/s2mps14.h.
+A slightly less hacky (but still horrible) solution might be to move the
+calls to clk_prepare_enable before calling i2c_lock_adapter().
 
-The changes look OK to me so maybe Lee can take it with my Ack?
-
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Alternatively some trylock solution might be necessary to unwind the
+locks and yield execution for a while and then try again. The clk
+framework reentrancy patches are pretty irrelevant here since those were
+only designed to allow reentrancy from within the same task context and
+this is not an example of that. This deadlock is a more clear-cut
+circular dependency between i2c and the clock framework.
 
 Regards,
 Mike
 
-> ---
->  drivers/clk/Kconfig       |    8 +++---
->  drivers/clk/clk-s2mps11.c |   61 ++++++++++++++++++++++++++++++++++-----------
->  2 files changed, 50 insertions(+), 19 deletions(-)
 > 
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 6f56d3a4f010..8f9ce8ba036d 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -65,12 +65,12 @@ config COMMON_CLK_SI570
->           clock generators.
->  
->  config COMMON_CLK_S2MPS11
-> -       tristate "Clock driver for S2MPS11/S5M8767 MFD"
-> +       tristate "Clock driver for S2MPS1X/S5M8767 MFD"
->         depends on MFD_SEC_CORE
->         ---help---
-> -         This driver supports S2MPS11/S5M8767 crystal oscillator clock. These
-> -         multi-function devices have 3 fixed-rate oscillators, clocked at
-> -         32KHz each.
-> +         This driver supports S2MPS11/S2MPS14/S5M8767 crystal oscillator
-> +         clock. These multi-function devices have two (S2MPS14) or three
-> +         (S2MPS11, S5M8767) fixed-rate oscillators, clocked at 32KHz each.
->  
->  config CLK_TWL6040
->         tristate "External McPDM functional clock from twl6040"
-> diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-> index 508875535e1e..8dafb552274f 100644
-> --- a/drivers/clk/clk-s2mps11.c
-> +++ b/drivers/clk/clk-s2mps11.c
-> @@ -1,7 +1,7 @@
->  /*
->   * clk-s2mps11.c - Clock driver for S2MPS11.
->   *
-> - * Copyright (C) 2013 Samsung Electornics
-> + * Copyright (C) 2013,2014 Samsung Electornics
->   *
->   * This program is free software; you can redistribute  it and/or modify it
->   * under  the terms of  the GNU General  Public License as published by the
-> @@ -13,10 +13,6 @@
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
->   *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> - *
->   */
->  
->  #include <linux/module.h>
-> @@ -27,6 +23,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/platform_device.h>
->  #include <linux/mfd/samsung/s2mps11.h>
-> +#include <linux/mfd/samsung/s2mps14.h>
->  #include <linux/mfd/samsung/s5m8767.h>
->  #include <linux/mfd/samsung/core.h>
->  
-> @@ -125,7 +122,21 @@ static struct clk_init_data s2mps11_clks_init[S2MPS11_CLKS_NUM] = {
->         },
->  };
->  
-> -static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
-> +static struct clk_init_data s2mps14_clks_init[S2MPS11_CLKS_NUM] = {
-> +       [S2MPS11_CLK_AP] = {
-> +               .name = "s2mps14_ap",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +       [S2MPS11_CLK_BT] = {
-> +               .name = "s2mps14_bt",
-> +               .ops = &s2mps11_clk_ops,
-> +               .flags = CLK_IS_ROOT,
-> +       },
-> +};
-> +
-> +static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev,
-> +               struct clk_init_data *clks_init)
->  {
->         struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
->         struct device_node *clk_np;
-> @@ -145,9 +156,12 @@ static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
->         if (!clk_table)
->                 return ERR_PTR(-ENOMEM);
->  
-> -       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +               if (!clks_init[i].name)
-> +                       continue; /* Skip clocks not present in some devices */
->                 of_property_read_string_index(clk_np, "clock-output-names", i,
-> -                               &s2mps11_clks_init[i].name);
-> +                               &clks_init[i].name);
-> +       }
->  
->         return clk_np;
->  }
-> @@ -158,6 +172,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         struct s2mps11_clk *s2mps11_clks, *s2mps11_clk;
->         struct device_node *clk_np = NULL;
->         unsigned int s2mps11_reg;
-> +       struct clk_init_data *clks_init;
->         int i, ret = 0;
->         u32 val;
->  
-> @@ -168,25 +183,33 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->  
->         s2mps11_clk = s2mps11_clks;
->  
-> -       clk_np = s2mps11_clk_parse_dt(pdev);
-> -       if (IS_ERR(clk_np))
-> -               return PTR_ERR(clk_np);
-> -
->         switch (platform_get_device_id(pdev)->driver_data) {
->         case S2MPS11X:
->                 s2mps11_reg = S2MPS11_REG_RTC_CTRL;
-> +               clks_init = s2mps11_clks_init;
-> +               break;
-> +       case S2MPS14X:
-> +               s2mps11_reg = S2MPS14_REG_RTCCTRL;
-> +               clks_init = s2mps14_clks_init;
->                 break;
->         case S5M8767X:
->                 s2mps11_reg = S5M8767_REG_CTRL1;
-> +               clks_init = s2mps11_clks_init;
->                 break;
->         default:
->                 dev_err(&pdev->dev, "Invalid device type\n");
->                 return -EINVAL;
->         };
->  
-> +       clk_np = s2mps11_clk_parse_dt(pdev, clks_init);
-> +       if (IS_ERR(clk_np))
-> +               return PTR_ERR(clk_np);
-> +
->         for (i = 0; i < S2MPS11_CLKS_NUM; i++, s2mps11_clk++) {
-> +               if (!clks_init[i].name)
-> +                       continue; /* Skip clocks not present in some devices */
->                 s2mps11_clk->iodev = iodev;
-> -               s2mps11_clk->hw.init = &s2mps11_clks_init[i];
-> +               s2mps11_clk->hw.init = &clks_init[i];
->                 s2mps11_clk->mask = 1 << i;
->                 s2mps11_clk->reg = s2mps11_reg;
->  
-> @@ -220,8 +243,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
->         }
->  
->         if (clk_table) {
-> -               for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +               for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +                       /* Skip clocks not present on S2MPS14 */
-> +                       if (!clks_init[i].name)
-> +                               continue;
->                         clk_table[i] = s2mps11_clks[i].clk;
-> +               }
->  
->                 clk_data.clks = clk_table;
->                 clk_data.clk_num = S2MPS11_CLKS_NUM;
-> @@ -250,14 +277,18 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
->         struct s2mps11_clk *s2mps11_clks = platform_get_drvdata(pdev);
->         int i;
->  
-> -       for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-> +       for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-> +               if (!s2mps11_clks[i].lookup)
-> +                       continue; /* Skip clocks not present in some devices */
->                 clkdev_drop(s2mps11_clks[i].lookup);
-> +       }
->  
->         return 0;
->  }
->  
->  static const struct platform_device_id s2mps11_clk_id[] = {
->         { "s2mps11-clk", S2MPS11X},
-> +       { "s2mps14-clk", S2MPS14X},
->         { "s5m8767-clk", S5M8767X},
->         { },
->  };
-> -- 
-> 1.7.9.5
+> Regards,
+> 
+> Martin
 > 
