@@ -1,52 +1,25 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 18 Mar 2014 22:53:58 +0100
-Subject: [PATCH v3 0/5] Add Broadcom Kona PWM Support
-In-Reply-To: <20140314134324.GY25092@beef>
-References: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
- <20140314134324.GY25092@beef>
-Message-ID: <20140318215357.GI5917@mithrandir>
+From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
+Date: Tue, 18 Mar 2014 15:04:02 -0700 (PDT)
+Subject: [PATCH 0/2] v1: ARM: sun4i: spi: Allow transfers larger than FIFO size
+Message-ID: <4636665.0CNduaaJi4@nukelap.gtech>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 09:43:24AM -0400, Matt Porter wrote:
-> On Wed, Mar 12, 2014 at 01:15:41PM -0700, Tim Kryger wrote:
-> > This series introduces the driver for the Kona PWM controller found in
-> > Broadcom mobile SoCs like bcm281xx and updates the device tree and the
-> > defconfig to enable use of this hardware on the bcm28155 AP board.
-> > 
-> > Changes since v2:
-> >   - SoC DTS file updated to use real clock's phandle + specifier
-> >   - Toggle smooth mode off during apply so new settings take immediately
-> > 
-> > Changes since v1:
-> >   - Fixed up macros to be clearer and more complete
-> >   - Corrected spelling and punctuation mistakes
-> >   - Added support for polarity
-> >   - Made peripheral clock use more efficient
-> >   - Made prescale and duty computation clearer
-> >   - Moved Makefile addition to keep alphabetical
-> >   - Split complex lines into multiple steps
-> > 
-> > Dependencies:
-> > The "ARM: dts: Declare the PWM for bcm11351 (bcm281xx)" patch depends
-> > upon "ARM: dts: bcm281xx: define real clocks" which is queued up in
-> > for-next of arm-soc. See https://lkml.org/lkml/2014/2/14/451
-> > 
-> > Tim Kryger (5):
-> >   Documentation: dt: Add Kona PWM binding
-> >   pwm: kona: Introduce Kona PWM controller support
-> 
-> Thierry, are you planning to merge these first two for 3.15? If so, I
-> will apply dts patches for my last mach-bcm 3.15 pull. I don't want to
-> do so until the binding is accepted.
+These patches are designed to apply on top of sunxi-next. They depend on 
+Maxime Ripard's SPI patches for Allwinner A10 (sun4i).
 
-I've reviewed this and it doesn't look like 3.15 material.
+I've watched the bus with a logic analyzer to make sure thing are sane, but 
+I'm only able to go up to 10MHz on my LA. Unfortunately, the SPI chip I was 
+using as a test device decided to die mid-way, so I was unable to test how 
+well full-duplex communication works on these large transfers
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140318/f1040b72/attachment.sig>
+Alexandru Gagniuc (2):
+  ARM: sun4i: spi: Allow Rx transfers larger than FIFO size
+  ARM: sun4i: spi: Allow Tx transfers larger than FIFO size
+
+ drivers/spi/spi-sun4i.c | 56 
++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 52 insertions(+), 4 deletions(-)
+
+-- 
+1.8.5.3
