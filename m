@@ -1,38 +1,81 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 19 Mar 2014 13:35:19 -0400
-Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
-Message-ID: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 18:46:28 +0100
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <CABb+yY0XXMQaEuDV0FeURjOijYEUKyqU9Dr6XTDRcxc1qaBu9g@mail.gmail.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <5346848.pBsh8NcQja@wuerfel>
+ <CABb+yY0XXMQaEuDV0FeURjOijYEUKyqU9Dr6XTDRcxc1qaBu9g@mail.gmail.com>
+Message-ID: <201403191846.28563.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an LPAE system, the physical addresses used by VirtIO-MMIO may
-be larger than 32 bits, even if the header and configuration space
-addresses fit into 32 bits. For example with the Versatile Express
-memory map using 4G memory, the following error occured when trying
-to use a VirtIO-MMIO block device.
+On Monday 17 March 2014, Jassi Brar wrote:
+> On Mon, Mar 17, 2014 at 5:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 17 March 2014 17:33:59 Girish K S wrote:
+> >> +Samsung Mailbox Driver
+> >> +
+> >> +Required properties:
+> >> +- compatible:          Should be one of the following,
+> >> +                           "samsung,gh7-mailbox" for
+> >> +                               Samsung GH7 SoC series
+> >> +                           "samsung,exynos-mailbox" for
+> >> +                               exynosx SoC series
+> >> +- reg:                 Contains the mailbox register address range (base address
+> >> +                       and length)
+> >> +- interrupts:          Contains the interrupt information for the mailbox
+> >> +                       device.
+> >> +- samsung,mbox-names:  Array of the names of the mailboxes
+> >>
+> >
+> > I think we should not allow new mailbox drivers that don't conform to
+> > the framework that is currently under discussion. In particular, this
+> > means don't do a "samsung,mbox-names" property. The current consensus
+> > seems to be to have a #mbox-cells" property that allows to pass extra
+> > parameters from the client driver, and uses an "mboxes" property
+> > to reference the mailbox provided.
+> >
+> > It would be good if you follow up for the subsystem discussion and
+> > ensure it gets merged in time, and supports all the use cases you are
+> > interested in. The interface is not entirely nailed down yet, so
+> > it's a good time to contribute. However, I can already promise that
+> > it won't use matching by strings.
+> >
+> I was just about to submit next revision of framework that this
+> Samsung driver conforms to. Now I think I need some expert opinion ...
+> (sorry if following is repetition)
+> 
+>   As Kumar Gala pointed out in the other thread, the mailbox/ipc chain
+> is going to be _very_ platform specific so much so that one rethinks
+> if a common api is even warranted : because the client driver will be
+> different even if just the remote api(which is going to be
+> proprietary) changes, keeping everything else same. For example, a
+> client driver for Highbank is highly unlikely to be reusable on
+> Exynos, even if both used the same mailbox controller. By my limited
+> foresight, mailbox assignment via DT doesn't bring us much benefit but
+> only ritual code.
 
-EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: : unaligned directory entry - offset=0, inode=3755990991, rec_len=57311, name_len=223
+I don't see what that would change. Doing a cross-device binding in DT
+is hard, as we see by lots of people (e.g. the above "samsung,mbox-names"
+crap) getting it wrong. If we do it properly once, everyone can use the
+same binding, and common code to parse the connection between the
+mailbox driver and the user.
 
-To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
-VIRTIO_MMIO are selected.
+>   Perhaps the mailbox controller driver should name its links as it
+> wants. By how the remote works with the mailbox links, the client
+> driver asks for a specific mailbox link (which maybe a hardcoded
+> string in the driver or be gotten alongside other data via client's
+> DT) ?
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+I don't see why we should do it any different from the other bindings.
+Let's just stick with mboxes/mbox-names or mailboxes/mailbox-names
+if you prefer.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed9..a62bcc9 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -617,6 +617,7 @@ config ARM_LPAE
- 	bool "Support for the Large Physical Address Extension"
- 	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
- 		!CPU_32v4 && !CPU_32v3
-+	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
- 	help
- 	  Say Y if you have an ARMv7 processor supporting the LPAE page
- 	  table format and you would like to access memory beyond the
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+>   IOW we can't have a generic API/DT-bindings that could get us
+> reusable client drivers. But only common framework/code that would
+> otherwise be duplicated by every platform.
+
+That is a major benefit though.
+Also even if most drivers won't work across multiple platforms, there
+is still a reasonable chance that /some/ drivers will.
+
+	Arnd
