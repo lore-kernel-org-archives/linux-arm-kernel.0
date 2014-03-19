@@ -1,76 +1,53 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 14:03:19 +0100
-Subject: [PATCH 06/16] ARM: at91: remove useless at91_pwm_leds()
+Date: Wed, 19 Mar 2014 14:03:21 +0100
+Subject: [PATCH 08/16] backlight: pwm_bl: set pwm polarity when using platform
+ data
 In-Reply-To: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395234209-15546-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395234209-15546-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all at91 boards using leds-atmel-pwm switched to leds-pwm, the
-at91_pwm_leds() function is not used anymore.
+Set inversed polarity when .pwm_active_low is set in the platform_data. With
+device tree, this is taken care of by of_pwm_xlate_with_flags(), called from
+of_pwm_get().
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/board.h |  1 -
- arch/arm/mach-at91/leds.c  | 37 -------------------------------------
- 2 files changed, 38 deletions(-)
+ drivers/video/backlight/pwm_bl.c | 8 ++++++++
+ include/linux/pwm_backlight.h    | 1 +
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
-index 4e773b55bc2d..836e9a537e0c 100644
---- a/arch/arm/mach-at91/board.h
-+++ b/arch/arm/mach-at91/board.h
-@@ -123,6 +123,5 @@ extern void __init at91_add_device_can(struct at91_can_data *data);
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index b75201ff46f6..ffdd3b2b2742 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -309,6 +309,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	if (data->pwm_period_ns > 0)
+ 		pwm_set_period(pb->pwm, data->pwm_period_ns);
  
-  /* LEDs */
- extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
--extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
++	/*
++	 * The DT case is taking care of polarity in of_pwm_get(). For the
++	 * non-DT case, set the polarity from platform data.
++	 */
++	if (data->pwm_active_low)
++		if (pwm_set_polarity(pb->pwm, PWM_POLARITY_INVERSED))
++			dev_err(&pdev->dev, "impossible to invert polarity\n");
++
+ 	pb->period = pwm_get_period(pb->pwm);
+ 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
  
- #endif
-diff --git a/arch/arm/mach-at91/leds.c b/arch/arm/mach-at91/leds.c
-index 3e22978b5547..684723ba24f3 100644
---- a/arch/arm/mach-at91/leds.c
-+++ b/arch/arm/mach-at91/leds.c
-@@ -53,40 +53,3 @@ void __init at91_gpio_leds(struct gpio_led *leds, int nr)
- void __init at91_gpio_leds(struct gpio_led *leds, int nr) {}
- #endif
- 
--
--/* ------------------------------------------------------------------------- */
--
--#if defined (CONFIG_LEDS_ATMEL_PWM)
--
--/*
-- * PWM Leds
-- */
--
--static struct gpio_led_platform_data pwm_led_data;
--
--static struct platform_device at91_pwm_leds_device = {
--	.name			= "leds-atmel-pwm",
--	.id			= -1,
--	.dev.platform_data	= &pwm_led_data,
--};
--
--void __init at91_pwm_leds(struct gpio_led *leds, int nr)
--{
--	int i;
--	u32 pwm_mask = 0;
--
--	if (!nr)
--		return;
--
--	for (i = 0; i < nr; i++)
--		pwm_mask |= (1 << leds[i].gpio);
--
--	pwm_led_data.leds = leds;
--	pwm_led_data.num_leds = nr;
--
--	at91_add_device_pwm(pwm_mask);
--	platform_device_register(&at91_pwm_leds_device);
--}
--#else
--void __init at91_pwm_leds(struct gpio_led *leds, int nr){}
--#endif
+diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
+index 2de2e275b2cb..b924fce5c97a 100644
+--- a/include/linux/pwm_backlight.h
++++ b/include/linux/pwm_backlight.h
+@@ -15,6 +15,7 @@ struct platform_pwm_backlight_data {
+ 	unsigned int dft_brightness;
+ 	unsigned int lth_brightness;
+ 	unsigned int pwm_period_ns;
++	bool pwm_active_low;
+ 	unsigned int *levels;
+ 	int enable_gpio;
+ 	unsigned long enable_gpio_flags;
 -- 
 1.8.3.2
