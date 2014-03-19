@@ -1,134 +1,73 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Mar 2014 00:05:56 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <20140319225137.GM7528@n2100.arm.linux.org.uk>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <201403192252.32443.marex@denx.de>
- <20140319225137.GM7528@n2100.arm.linux.org.uk>
-Message-ID: <201403200005.56334.marex@denx.de>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Wed, 19 Mar 2014 16:12:38 -0700
+Subject: [PATCH v5 0/4] APM X-Gene PCIe controller
+Message-ID: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 at 11:51:38 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 19, 2014 at 10:52:32PM +0100, Marek Vasut wrote:
+This patch adds support for AppliedMicro X-Gene PCIe host controller. The
+driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
+cards.
 
-[...]
+X-Gene PCIe controller driver has depedency on the pcie arm64 arch support.
+Liviu Dudau from ARM has sent a patch set for pcie arm64 arch support and
+support for creating generic pcie bridge from device tree. Liviu's patches
+are available here
+1. https://lkml.org/lkml/2014/3/14/320
+2. https://lkml.org/lkml/2014/3/14/279
 
-> > Speaking of FEC and slightly off-topic, have you ever seen this on your
-> > box [1]/[2]/[3] ? I wonder if this might be cache-related as well, since
-> > I saw similar issue on MX6 with PCIe-connected ethernet. I cannot put a
-> > finger on this though.
-> 
-> I think I've seen something similar once or twice.
+If someone wishes to test PCIe on X-Gene with this patch set, above mentioned
+patches from Liviu must be applied before the patches in this patch set.
 
-Nice, thanks for confirming this.
+changes since V4:
+1. fix section mismatch warnings
+2. fix the patch description
+3. fix indentation
+4. update read/write cfg functions by passing both addr and offset.
+5. use 'time_before' for timeout.
+6. remove unnecessary 'IS_ERR_OR_NULL'. Keep 'IS_ERR' for 'clk_get'
+7. remove BUG_ON for pci_ioremap_io. 
 
-> Let me just pull up the transmit function.  This is the code which
-> writes to the descriptors (which frankly is pretty horrid):
+changes since V3:
+1. remove 'struct hw_pci' and supporting ops in hw_pci
+2. add code to create the host bridge from dts
+3. add code to scan the the host bridge
+4. modify outbound windows setup function to get resource information from
+   'bridge->windows'
+5. add compatible string in pcie dts node with current X-Gene SOC name.
 
-Yes.
+changes since V2:
+1. redefined each PCI port in different PCI domain correctly.
+2. removed setup_lane and setup_link functions from driver.
+3. removed scan_bus wrapper and set_primary_bus hack.
+4. added pci_ioremap_io for io resources.
 
->         bdp->cbd_datlen = skb->len;
->         bdp->cbd_bufaddr = dma_map_single(&fep->pdev->dev, bufaddr,
->                         skb->len, DMA_TO_DEVICE); <-- barrier inside
->                 ebdp->cbd_bdu = 0;
->                         ebdp->cbd_esc = BD_ENET_TX_INT;
->                                 ebdp->cbd_esc |= BD_ENET_TX_PINS;
->         bdp->cbd_sc = status;
->         writel(0, fep->hwp + FEC_X_DES_ACTIVE); <-- barrier before write
-> 
-> A couple of points here:
-> 
-> 1. The hardware operates in a ring - it can read the next ring if it
->    sees the BD_ENET_TX_READY bit set if has just finished processing
->    the previous descriptor - this can happen before the write to
->    FEC_X_DES_ACTIVE.
-> 
-> 2. The ARM can re-order writes.  The writes it can re-order are:
-> 
-> 	bdp->cbd_bufaddr
-> 	ebdp->cbd_bdu
-> 	ebdp->cbd_esc
-> 	ebdp->cbd_sc
-> 
-> Hence, it's entirely possible for the FEC to see the updated descriptor
-> status before the rest of the descriptor has been written.  What's missing
-> is a barrier between the descriptor writes, and the final write to
-> bdp->cbd_sc.
+changes since V1:
+1. added PCI domain support
+2. reading cpu and pci addresses from device tree to configure regions.
+3. got rid of unnecessary wrappers for readl and writel.
+4. got rid of endpoint configuration code.
+5. added 'dma-ranges' property support to read inbound region configuration.
+6. renamed host driver file to 'pci-xgene.c' from 'pcie-xgene.c'
+7. dropped 'clock-names' property from bindings
+8. added comments whereever requested.
 
-I think there might even be another thing at play here, but please correct me if 
-I am wrong. If you look at fb8ef788680d48523321e5f150b23700a1caf980 , this patch 
-actually has no functional impact on the driver , right ?
+Tanmay Inamdar (4):
+  pci: APM X-Gene PCIe controller driver
+  arm64: dts: APM X-Gene PCIe device tree nodes
+  dt-bindings: pci: xgene pcie device tree bindings
+  MAINTAINERS: entry for APM X-Gene PCIe host driver
 
-It does no functional change at all, but it changed something for Fugang. This 
-makes me also believe there might clearly be something afoot with the DMA 
-descriptors. Reading Documentation/DMA-API.txt , I noticed the ring with the 
-descriptors is allocated with dma_alloc_coherent() . Yet, DMA-API.txt , section 
-I, states:
+ .../devicetree/bindings/pci/xgene-pci.txt          |   52 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm64/boot/dts/apm-mustang.dts                |    8 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  155 +++++
+ drivers/pci/host/Kconfig                           |   10 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-xgene.c                       |  725 ++++++++++++++++++++
+ 7 files changed, 958 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci.txt
+ create mode 100644 drivers/pci/host/pci-xgene.c
 
-"
- 29 Consistent memory is memory for which a write by either the device or
- 30 the processor can immediately be read by the processor or device
- 31 without having to worry about caching effects.  (You may however need
- 32 to make sure to flush the processor's write buffers before telling
- 33 devices to read that memory.)
-"
-
-So the writes into the descriptor from the CPU might even be stuck in the CPU's 
-write buffer when this code below from fec_main.c is called:
-
- 438         /* Trigger transmission start */
- 439         writel(0, fep->hwp + FEC_X_DES_ACTIVE);
-
-Does this also make sense or is my idea completely flawed please ?
-
-> Had I not got distracted by the L2 issues, I'd have posted my FEC patches
-> by now... in any case, my current xmit function looks a little different -
-> I've organised it such that:
-> 
-> 1. We don't modify anything until we're past the point where things can
->    error out.
-> 
-> 2. Writes to the descriptor are localised in one area.
-> 
-> 3. There's a wmb() barrier between cbd_sc and the previous writes - I
->    discussed this with Will Deacon, which resulted in this documentation
->    for the barrier:
-> 
->         /*
->          * We need the preceding stores to the descriptor to complete
->          * before updating the status field, which hands it over to the
->          * hardware.  The corresponding rmb() is "in the hardware".
->          */
-> 
-> The second thing that causes the transmit timeouts is the horrid way
-> NAPI has been added to the driver - it's racy.  NAPI itself isn't the
-> problem, it's this (compressed a bit to show only the relevant bits):
-
-I fully agree there are multiple race conditions in the driver as it is now.
-
-[...]
-
-> That all said - with the patch below I haven't seen problems since.
-> (which is the quickest way I can think of to get you a copy of what
-> I'm presently running - I've killed a number of debug bits denoted by
-> all the blank lines - and this is against -rc7.)  You may notice that
-> I added some TX ring dumping code to the driver - always useful in
-> these situations. ;-)
-
-I will test this ASAP on multiple MX6es and let you know of the result.
-
-> This patch is of course the consolidated version: individually, this
-> would be at least 19 patches with nice commit messages describing
-> each change...
-
-Please keep me on CC of those, I'd be very interested to test them.
-
-> As far as the 600Mbps receive - you need the right conditions for that.
-> I select the performance cpufreq governor after boot, and let the boot
-> quiesce.  It doesn't take much for it to drop back to 460Mbps - another
-> running process other than iperf -s is sufficient to do that.
-> 
-> Let me know how you get on with this.
-
-Roger that, will do, thank you very much !
+-- 
+1.7.9.5
