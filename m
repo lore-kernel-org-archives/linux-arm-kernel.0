@@ -1,43 +1,39 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 19 Mar 2014 14:54:53 -0400
-Subject: [PATCH] checkpatch.pl: Add check for Change-Id
-Message-ID: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Mar 2014 12:04:18 -0700
+Subject: [PATCH 0/4] sunxi clock fixes
+In-Reply-To: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
+References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140319190418.30995.17661@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A commit hook for the Gerrit code review server inserts change
-identifiers so Gerrit can track patches through multiple revisions.
-These identifiers are noise in the context of the upstream kernel.
-(Many Gerrit servers are private. Even given a public instance,
-given only a Change-Id, one must guess which server a change was
-tracked on. Patches submitted to the Linux kernel mailing lists
-should be able to stand on their own. If it's truly useful to
-reference code review on a Gerrit server, a URL is a much clearer
-way to do so.) Thus, issue an error when a Change-Id: line is
-encountered.
+Quoting Emilio L?pez (2014-03-19 11:19:29)
+> Hi everyone,
+> 
+> This is a small series of patches fixing a couple of bugs that are 
+> present on the sunxi clock driver. Mike, are there any chances we can
+> take these during the 3.15 merge window or -rc period?
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- scripts/checkpatch.pl | 6 ++++++
- 1 file changed, 6 insertions(+)
+I can take these towards 3.15. Do you want me to take the dts patch too?
 
-diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-index 464dcef..afd6dde 100755
---- a/scripts/checkpatch.pl
-+++ b/scripts/checkpatch.pl
-@@ -1891,6 +1891,12 @@ sub process {
- 			}
- 		}
- 
-+# Check for unwanted Gerrit info
-+		if ($line =~ /^\s*change-id:/i) {
-+			ERROR("BAD_SIGN_OFF",
-+			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
-+		}
-+
- # Check for wrappage within a valid hunk of the file
- 		if ($realcnt != 0 && $line !~ m{^(?:\+|-| |\\ No newline|$)}) {
- 			ERROR("CORRUPTED_PATCH",
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+Regards,
+Mike
+
+> 
+> Cheers,
+> 
+> Emilio
+> 
+> Emilio L?pez (4):
+>   clk: sunxi: fix A20 PLL4 calculation
+>   ARM: sun7i: fix PLL4 clock and add PLL8
+>   clk: sunxi: fix some calculations
+>   clk: sunxi: fix thinko in comment
+> 
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 10 +++++++++-
+>  drivers/clk/sunxi/clk-sunxi.c    | 15 +++++++++++----
+>  2 files changed, 20 insertions(+), 5 deletions(-)
+> 
+> -- 
+> 1.9.0
+> 
