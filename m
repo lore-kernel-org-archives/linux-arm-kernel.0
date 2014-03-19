@@ -1,39 +1,57 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Mar 2014 12:04:18 -0700
-Subject: [PATCH 0/4] sunxi clock fixes
-In-Reply-To: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
-References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20140319190418.30995.17661@quantum>
+Date: Wed, 19 Mar 2014 12:11:17 -0700
+Subject: [PATCH v3 1/3] clk: s2mps11: Add support for S2MPS14 clocks
+In-Reply-To: <1395215408.18730.2.camel@AMDC1943>
+References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
+ <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
+ <20140319001643.30995.46947@quantum> <1395215408.18730.2.camel@AMDC1943>
+Message-ID: <20140319191117.30995.13715@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2014-03-19 11:19:29)
-> Hi everyone,
+Quoting Krzysztof Kozlowski (2014-03-19 00:50:08)
+> On Tue, 2014-03-18 at 17:16 -0700, Mike Turquette wrote:
+> > Quoting Krzysztof Kozlowski (2014-03-17 02:19:16)
+> > > This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
+> > > s2mps11 clock driver.
+> > > 
+> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > 
+> > This does not apply cleanly to to clk tree trip, nor does it compile
+> > after manually merging due to changes introducing
+> > linux/mfd/samsung/s2mps14.h.
+> > 
+> > The changes look OK to me so maybe Lee can take it with my Ack?
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> > 
 > 
-> This is a small series of patches fixing a couple of bugs that are 
-> present on the sunxi clock driver. Mike, are there any chances we can
-> take these during the 3.15 merge window or -rc period?
+> Hi,
+> 
+> Thanks for the Ack. The patch depends on Tushar Behera's patches:
+>  - [PATCH V2 0/2] Add support for clocks in S5M8767
+>    http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27264
+> which are waiting for some time. Both patchsets should be pulled
+> together.
 
-I can take these towards 3.15. Do you want me to take the dts patch too?
+I took those patches in yesterday. So we have three options:
+
+1) MFD tree can pull a stable commit from the clk tree. I'm happy to
+make a topic branch for this. Then these patches can be applied.
+
+2) clk tree can pull a stable commit from the mfd tree if the mfd folks
+can provide one.
+
+3) Wait until after the merge window to apply this one to the clk tree.
+I don't currently plan to send 2 PRs during the merge window, so this
+could either go in 3.16 or maybe into 3.15 if a split PR is sent.
 
 Regards,
 Mike
 
 > 
-> Cheers,
-> 
-> Emilio
-> 
-> Emilio L?pez (4):
->   clk: sunxi: fix A20 PLL4 calculation
->   ARM: sun7i: fix PLL4 clock and add PLL8
->   clk: sunxi: fix some calculations
->   clk: sunxi: fix thinko in comment
-> 
->  arch/arm/boot/dts/sun7i-a20.dtsi | 10 +++++++++-
->  drivers/clk/sunxi/clk-sunxi.c    | 15 +++++++++++----
->  2 files changed, 20 insertions(+), 5 deletions(-)
-> 
-> -- 
-> 1.9.0
+> Best regards,
+> Krzysztof
 > 
