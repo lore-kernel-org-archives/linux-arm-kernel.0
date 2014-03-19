@@ -1,38 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:03 +0100
-Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+Date: Wed, 19 Mar 2014 20:29:12 +0100
+Subject: [PATCH 15/62] ARM: ixp4xx/omixp: always include linux/leds.h
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-7-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-16-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ohci-da8xx driver uses the DA8XX_SYSCFG0_VIRT macro to
-access the CFGCHIP2 register for controlling its PHY.
+The omixp board code unconditionally defines a gpio-led
+device, but for some reason includes the header file
+for this only if CONFIG_LEDS_CLASS is enabled, causing
+a build error otherwise.
 
-The macro in turn relies on the da8xx_syscfg0_base global
-variable. Since the OHCI driver can be a loadable module,
-this requires the symbol to be exported from platform code.
+Removing the #ifdef fixes the build error with no downsides
+whatsoever.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-ixp4xx/omixp-setup.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 0486cdf..4da868a 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -66,6 +66,7 @@
- #define DA850_DMA_MMCSD1_TX	EDMA_CTLR_CHAN(1, 29)
+diff --git a/arch/arm/mach-ixp4xx/omixp-setup.c b/arch/arm/mach-ixp4xx/omixp-setup.c
+index 75ef03d..2d494b4 100644
+--- a/arch/arm/mach-ixp4xx/omixp-setup.c
++++ b/arch/arm/mach-ixp4xx/omixp-setup.c
+@@ -17,9 +17,7 @@
+ #include <linux/serial_8250.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+-#ifdef CONFIG_LEDS_CLASS
+ #include <linux/leds.h>
+-#endif
  
- void __iomem *da8xx_syscfg0_base;
-+EXPORT_SYMBOL_GPL(da8xx_syscfg0_base); /* used by OHCI_HCD */
- void __iomem *da8xx_syscfg1_base;
- 
- static struct plat_serial8250_port da8xx_serial0_pdata[] = {
+ #include <asm/setup.h>
+ #include <asm/memory.h>
 -- 
 1.8.3.2
