@@ -1,216 +1,86 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Mar 2014 18:22:14 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <16403654.Dg5ZqMop7H@avalon>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <20140226221939.GC21483@n2100.arm.linux.org.uk> <16403654.Dg5ZqMop7H@avalon>
-Message-ID: <2098368.XZDkvYocrm@avalon>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 19 Mar 2014 17:21:41 +0000
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140319135619.GC6231@localhost>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140314171457.GK18126@arm.com> <201403141838.08900.arnd@arndb.de>
+ <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
+ <20140317173821.GJ24070@arm.com>
+ <20140317180525.GL6457@e106497-lin.cambridge.arm.com>
+ <20140319135619.GC6231@localhost>
+Message-ID: <20140319172140.GA16328@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-(CC'ing Philipp Zabel who might be able to provide feedback as a user of the 
-component framework)
-
-Could you please have a look at the questions below and provide an answer when 
-you'll have time ? I'd like to bridge the gap between the component and the 
-V4L2 asynchronous registration implementations.
-
-On Friday 07 March 2014 00:24:33 Laurent Pinchart wrote:
-> On Wednesday 26 February 2014 22:19:39 Russell King - ARM Linux wrote:
-> > On Wed, Feb 26, 2014 at 10:00:25PM +0100, Guennadi Liakhovetski wrote:
-> > > Hi Russell
+On Wed, Mar 19, 2014 at 01:56:19PM +0000, Catalin Marinas wrote:
+> On Mon, Mar 17, 2014 at 06:05:25PM +0000, Liviu Dudau wrote:
+> > On Mon, Mar 17, 2014 at 05:38:21PM +0000, Catalin Marinas wrote:
+> > > On Fri, Mar 14, 2014 at 06:05:27PM +0000, Liviu Dudau wrote:
+> > > > On Fri, Mar 14, 2014 at 05:38:08PM +0000, Arnd Bergmann wrote:
+> > > > > On Friday 14 March 2014, Catalin Marinas wrote:
+> > > > > > On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
+> > > > > > > --- /dev/null
+> > > > > > > +++ b/arch/arm64/kernel/pci.c
+> > > > > > [...]
+> > > > > > > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
+> > > > > > [...]
+> > > > > > > +unsigned long pci_address_to_pio(phys_addr_t address)
+> > > > > > [...]
+> > > > > > > +void pcibios_fixup_bus(struct pci_bus *bus)
+> > > > > > [ actually most of this file ]
+> > > > > > 
+> > > > > > Maybe it was raised before already but can we have __weak generic
+> > > > > > definitions of these functions? They don't seem to be arm64 specific in
+> > > > > > any way.
+> > > [...]
+> > > > Catalin, if you are happy to ask for ACKs from all arch maintainers that might get
+> > > > affected by our custom version of pci_address_to_pio() before you can pull PCI support
+> > > > for arm64 then I can propose a new patchset.
 > > > 
-> > > (I suspect this my email will be rejected by ALKML too like other my
-> > > recent emails, but at least other MLs will pick it up and individual CCs
-> > > too, so, if replying, maybe it would be good to keep my entire reply,
-> > > all the more that it's going to be very short)
-> > > 
-> > > On Thu, 2 Jan 2014, Russell King wrote:
-> > > > Subsystems such as ALSA, DRM and others require a single card-level
-> > > > device structure to represent a subsystem.  However, firmware tends to
-> > > > describe the individual devices and the connections between them.
-> > > > 
-> > > > Therefore, we need a way to gather up the individual component devices
-> > > > together, and indicate when we have all the component devices.
-> > > > 
-> > > > We do this in DT by providing a "superdevice" node which specifies
-> > > > 
-> > > > the components, eg:
-> > > > 	imx-drm {
-> > > > 		compatible = "fsl,drm";
-> > > > 		crtcs = <&ipu1>;
-> > > > 		connectors = <&hdmi>;
-> > > > 	};
-> > > 
-> > > It is a pity linux-media wasn't CC'ed and apparently V4L developers
-> > > didn't notice this and other related patches in a "clean up" series, and
-> > > now this patch is already in the mainline. But at least I'd like to ask
-> > > whether the bindings, defined in
-> > > Documentation/devicetree/bindings/media/video-interfaces.txt and
-> > > implemented in drivers/media/v4l2-core/v4l2-of.c have been considered
-> > > for this job, and - if so - why have they been found unsuitable?
-> > > Wouldn't it have been better to use and - if needed - extend them to
-> > > cover any deficiencies? Even though the implementation is currently
-> > > located under drivers/media/v4l2-code/ it's pretty generic and should be
-> > > easily transferable to a more generic location.
+> > > You don't need to change the other architectures, that's the point of a
+> > > __weak definition, it will be automatically overridden. If you want, you
+> > > can even place a GENERIC_PCI or whatever config option that is only
+> > > selected by arm64 for the time being.
 > > 
-> > The component helpers have nothing to do with DT apart from solving
-> > the problem of how to deal with subsystems which expect a single device,
-> > but we have a group of devices and their individual drivers to cope with.
-> > Subsystems like DRM and ALSA.
+> > pci_address_to_pio() is alread __weak. My patch was adding the arm64 version of it. Adding
+> > an #ifdef GENERIC_PCI to the __weak implementation is not just a temporary solution.
 > 
-> (and V4L2)
+> Ah, I start to understand what you mean, pci_address_to_pio() is already
+> defined as __weak in drivers/of/address.c. So the reason we redefine it
+> on arm64 is that it uses the io_list resources which are populated by
+> pci_register_io_range(). Do you see any other architecture using a
+> similar logic (that could be shared)?
+
+All architectures that memory map the PCI IO range should be supported by my version of
+pci_address_to_pio(). But that still leaves the x86 and those architectures that have
+separate IO space or map it 1:1 into CPU address space to carry a different version (which
+the current "generic" weak version catters for).
+
 > 
-> Point duly taken. First of all I want to mention that your proposal is
-> greatly appreciated. This is a problem that crosses subsystem boundaries,
-> and should thus be addressed centrally.
+> Any other functions in this file that could be shared (and are not
+> __weak already)?
+
+A version of the pci_register_io_range() that uses part of pci_ioremap_io() (the calculation
+of io_offset part).
+
+My ultimate point is that no matter how long we argue about the shape of the functions that
+I've added into arch/arm64/kernel/pci.c I don't think we can get away without having that
+file, or at least not in the first phase if we want speedy integration into mainline.
+
+Best regards,
+Liviu
+
 > 
-> However, we (as in the V4L2 community, and me personally) would have
-> appreciated to be CC'ed on the proposal. As you might know we already had a
-> solution for this problem, albeit V4L2-specific, in drivers/media/v4l2-
-> core/v4l2-async.c. Whether or not this solution should have been made
-> generic instead of coming up with a new separate implementation would of
-> course have been debatable, but the most important point would have been to
-> make sure that v4l2-async could easily be implemented on top of the common
-> component architecture.
-> 
-> The topic is particularly hot given that a similar solution was also
-> proposed as part of the now defunct (or at least hibernating) common
-> display framework. If I had replied to this mail thread without sleeping on
-> it first I might not have known better and have got half-paranoid,
-> wondereding whether there had been a deliberate attempt to fast-track this
-> API before the V4L2 developers noticed. To be perfectly clear, there is
-> *NO* implicit or explicit such accusation here, as I know better.
-> 
-> Let's all take this as a positive opportunity to cooperate more closely,
-> media devices still need a huge effort to be cleanly supported on modern
-> hardware, and we'll need all the development power we can get.
-> 
-> Accordingly, I would like to comment on the component API, despite the fact
-> that it has been merged in mainline already. The first thing that I believe
-> is missing is documentation. Do you have any pending patch for that, either
-> as kerneldoc or as a text file for Documentation/ ? As I've read the code
-> to understand it I might have missed so design goals, so please bear with
-> the stupid questions that may follow.
-> 
-> I'll first provide a brief comparison of the two models to make the rest of
-> the comments easier to understand.
-> 
-> v4l2-async calls the component master object v4l2_async_notifier. The base
-> component child object is a v4l2_subdev instance instead of being a plain
-> device. v4l2_subdev instances are stored in v4l2-async lists similarly to
-> how the component framework stores objects, except that the list head is
-> directly embedded inside the v4l2_subdev structure instead of being part of
-> a separate structure allocated by the framework.
-> 
-> The notifier has three callback functions, bound, complete and unbind. The
-> bound function is called when one component has been bound to the master.
-> Similarly the unbind function is called when one component is about to be
-> unbound from the master. The complete function is called when all components
-> have been bound, and is thus equivalent to the bind function of the
-> component framework.
-> 
-> Notifiers are registered along with a list of match entries. A match entry
-> is roughly equivalent to the compare function passed to
-> component_master_add_child, except that it includes built-in support for
-> matching on an OF node, dev_name or I2C bus number and child address.
-> 
-> Whenever a subdev (component child) is registered with
-> v4l2_async_register_subdev (equivalent to component_add), the list of
-> notifiers (masters) is walked and their match entries are processed. If a
-> matching entry is found the subdev is bound to the notifier immediately,
-> otherwise it is added to a list of unbound subdevices (component_list).
-> Whenever a notifier (component master) is registered with
-> v4l2_async_notifier_register (component_master_add) the list of unbound
-> subdevs is walked and every match entry of the notifier is tested. If a
-> matching entry is found the subdev is bound to the notifier.
-> 
-> I've seen a couple of core differences in concept between your component
-> model and the v4l2-async model:
-> 
-> - The component framework uses private master and component structures.
-> Wouldn't it simplify the code from a memory management point of view to
-> expose the master structure (which would then be embedded in
-> driver-specific structures) and the component structure (which would be
-> embedded in struct device) ? The latter would be slightly more intrusive
-> from a struct device point of view, so I don't have a strong opinion there
-> yet, exposing the master structure only might be better.
-> 
-> - The component framework requires the master to provide an add_components
-> operation that will call the component_master_add_child function for every
-> component it needs, with a compare function. The add child function is
-> called when the master is registered, and then for every component added to
-> the system. I'm not sure to understand the design decisions behind this,
-> but these two levels of indirection appear pretty complex and confusing.
-> Wouldn't it be simpler to pass an array of match entries to the master
-> registration function instead and remove the add_components operation ? A
-> match entry would basically be a structure with a compare function and a
-> compare_data pointer.
-> 
-> We could also extend the match entry with explicit support for OF node and
-> I2C bus number + address matching as those are the most common cases, or at
-> least provide a couple of standard compare functions for those cases.
-> 
-> - The component framework doesn't provide partial bind support. Children are
-> bound to the master only when all children are available. This makes it
-> impossible in practice to implement v4l2-async on top of the component
-> framework. What would you think about adding optional partial bind support
-> ? The master operations would then have partial bind, complete bind,
-> partial unbind and complete unbind functions. Drivers that only need full
-> bind support could set the partial bind and unbind functions to NULL.
-> 
-> > It is completely agnostic to whether you're using platform data, DT or
-> > even ACPI - this code could *not* care less.  None of that comes anywhere
-> > near what this patch does.  It merely provides a way to collect up
-> > individual devices from co-operating drivers, and control their binding
-> > such that a subsystem like DRM or ALSA can be presented with a "card"
-> > level view of the hardware rather than a multi-device medusa with all
-> > the buggy, racy, crap fsckage that people come up to make that kind of
-> > thing work.
-> > 
-> > Now, as for the binding above, first, what does "eg" mean... and
-> > secondly, how would a binding which refers to crtcs and connectors
-> > have anything to do with ALSA?  Clearly this isn't an example of a
-> > binding for an ALSA use, which was talked about in the very first
-> > line of the above commit commentry.  So it's quite clear that what is
-> > given there is an example of how it /could/ be used.
-> > 
-> > I suppose I could have instead turned imx-drm into a completely unusable
-> > mess by not coming up with some kind of binding, and instead submitted
-> > a whole pile of completely untested code.  Alternatively, I could've
-> > used the OF binding as you're suggesting, but that would mean radically
-> > changing the /existing/ bindings for the IPU as a whole - something
-> > which others are better suited at as they have a /much/ better
-> > understanding of the complexities of this hardware than I.
-> > 
-> > So, what I have done is implemented - for a driver in staging which is
-> > still subject to ongoing development and non-stable DT bindings -
-> > something which allows forward progress with a *minimum* of disruption
-> > to the existing DT bindings for everyone, while still allowing forward
-> > progress.
-> > 
-> > Better bindings for imx-drm are currently being worked on.  Philipp
-> > Zabel of Pengutronix is currently looking at it, and has posted many
-> > RFC patches on this very subject, including moving the V4L2 OF helpers
-> > to a more suitable location.  OF people have been involved in that
-> > discussion over the preceding weeks, and there's a working implementation
-> > of imx-drm using these helpers from v4l2.
-> > 
-> > I'm finding people who are working in the same area and trying to get
-> > everyone talking to each other so that we /do/ end up with a set of
-> > bindings for the display stuff which are suitable for everyone.  Tomi
-> > from TI has already expressed his input to this ongoing discussion.
-> > 
-> > You're welcome to get involved in those discussions too.
-> > 
-> > I hope this makes it clear, and clears up the confusion.
-> > 
-> > Thanks.
+> -- 
+> Catalin
 
 -- 
-Regards,
-
-Laurent Pinchart
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
