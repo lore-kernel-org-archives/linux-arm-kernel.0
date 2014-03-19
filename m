@@ -1,68 +1,85 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 14:03:18 +0100
-Subject: [PATCH 05/16] ARM: at91: at91sam9rl: switch to generic PWM framework
+Date: Wed, 19 Mar 2014 14:03:24 +0100
+Subject: [PATCH 11/16] avr32: merisc: use generic leds_pwm driver
 In-Reply-To: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395234209-15546-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395234209-15546-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
+Switch to the generic leds_pwm driver instead of leds-atmel-pwm.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9rl.c         |  1 +
- arch/arm/mach-at91/at91sam9rl_devices.c | 11 ++---------
- 2 files changed, 3 insertions(+), 9 deletions(-)
+ arch/avr32/boards/merisc/setup.c | 34 +++++++++++++++++++++-------------
+ 1 file changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 4d2006351d1d..bc035a9ff53c 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -199,6 +199,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("pclk", "fffc4000.ssc", &ssc1_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi0_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.1", &twi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 9ccae034119c..a396d6d56ffe 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -797,9 +797,7 @@ static void __init at91_add_device_watchdog(void) {}
-  *  PWM
-  * --------------------------------------------------------------------*/
+diff --git a/arch/avr32/boards/merisc/setup.c b/arch/avr32/boards/merisc/setup.c
+index ed137e335796..b0980c1946a7 100644
+--- a/arch/avr32/boards/merisc/setup.c
++++ b/arch/avr32/boards/merisc/setup.c
+@@ -22,6 +22,8 @@
+ #include <linux/irq.h>
+ #include <linux/fb.h>
+ #include <linux/atmel-mci.h>
++#include <linux/pwm.h>
++#include <linux/leds_pwm.h>
  
--#if defined(CONFIG_ATMEL_PWM)
--static u32 pwm_mask;
--
-+#if IS_ENABLED(CONFIG_PWM_ATMEL)
- static struct resource pwm_resources[] = {
- 	[0] = {
- 		.start	= AT91SAM9RL_BASE_PWMC,
-@@ -814,11 +812,8 @@ static struct resource pwm_resources[] = {
+ #include <asm/io.h>
+ #include <asm/setup.h>
+@@ -167,24 +169,29 @@ static struct i2c_board_info __initdata i2c_info[] = {
+ 	},
  };
  
- static struct platform_device at91sam9rl_pwm0_device = {
--	.name	= "atmel_pwm",
-+	.name	= "at91sam9rl-pwm",
- 	.id	= -1,
+-#ifdef CONFIG_LEDS_ATMEL_PWM
+-static struct gpio_led stk_pwm_led[] = {
++#if IS_ENABLED(CONFIG_LEDS_PWM)
++static struct pwm_lookup pwm_lookup[] = {
++	PWM_LOOKUP("at91sam9rl-pwm", 0, "leds_pwm", "backlight"),
++};
++
++static struct led_pwm pwm_leds[] = {
+ 	{
+ 		.name	= "backlight",
+-		.gpio	= 0,		/* PWM channel 0 (LCD backlight) */
++		.max_brightness = 255,
++		.pwm_period_ns  = 5000,
+ 	},
+ };
+ 
+-static struct gpio_led_platform_data stk_pwm_led_data = {
+-	.num_leds	= ARRAY_SIZE(stk_pwm_led),
+-	.leds		= stk_pwm_led,
++static struct led_pwm_platform_data pwm_data = {
++	.num_leds       = ARRAY_SIZE(pwm_leds),
++	.leds           = pwm_leds,
+ };
+ 
+-static struct platform_device stk_pwm_led_dev = {
+-	.name	= "leds-atmel-pwm",
+-	.id	= -1,
 -	.dev	= {
--		.platform_data		= &pwm_mask,
--	},
- 	.resource	= pwm_resources,
- 	.num_resources	= ARRAY_SIZE(pwm_resources),
+-		.platform_data	= &stk_pwm_led_data,
++static struct platform_device leds_pwm = {
++	.name   = "leds_pwm",
++	.id     = -1,
++	.dev    = {
++		.platform_data = &pwm_data,
+ 	},
  };
-@@ -837,8 +832,6 @@ void __init at91_add_device_pwm(u32 mask)
- 	if (mask & (1 << AT91_PWM3))
- 		at91_set_B_periph(AT91_PIN_PD8, 1);	/* enable PWM3 */
+ #endif
+@@ -278,9 +285,10 @@ static int __init merisc_init(void)
  
--	pwm_mask = mask;
--
- 	platform_device_register(&at91sam9rl_pwm0_device);
- }
+ 	at32_add_device_mci(0, &mci0_data);
+ 
+-#ifdef CONFIG_LEDS_ATMEL_PWM
++#if IS_ENABLED(CONFIG_LEDS_PWM)
++	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
+ 	at32_add_device_pwm((1 << 0) | (1 << 2));
+-	platform_device_register(&stk_pwm_led_dev);
++	platform_device_register(&leds_pwm);
  #else
+ 	at32_add_device_pwm((1 << 2));
+ #endif
 -- 
 1.8.3.2
