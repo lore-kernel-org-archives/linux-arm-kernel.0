@@ -1,49 +1,47 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 19 Mar 2014 10:42:32 +0100
-Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for ARM64
-Message-ID: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Mar 2014 10:50:38 +0100
+Subject: [PATCH] Video: atmel: avoid the id of fix screen info is
+ overwritten
+In-Reply-To: <1395215275-14345-1-git-send-email-voice.shen@atmel.com>
+References: <1395215275-14345-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <5329686E.4070202@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+On 19/03/2014 08:47, Bo Shen :
+> Correct passing parameter sequence, which will avoid the id of
+> fix screen info is overwritten.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Also includes the test suite for dwarf unwinding, by adding the
-arch specific test code and the perf_regs_load function.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This series depends on the following kernel patches series:
-- AARCH64 unwinding support [1],
-- ARM libdw integration [2],
-and on the changes from the branch for:
-- libdw AARCH64 unwinding support [3].
+Thanks.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg304483.html
-[2] http://www.spinics.net/lists/arm-kernel/msg312423.html
-[3] https://git.fedorahosted.org/cgit/elfutils.git/log/?h=mjw/aarch64-unwind
+> ---
+>  drivers/video/atmel_lcdfb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index cd96162..695f28a 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -1190,12 +1190,12 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>  	if (!sinfo->config)
+>  		goto free_info;
+>  
+> -	strcpy(info->fix.id, sinfo->pdev->name);
+>  	info->flags = ATMEL_LCDFB_FBINFO_DEFAULT;
+>  	info->pseudo_palette = sinfo->pseudo_palette;
+>  	info->fbops = &atmel_lcdfb_ops;
+>  
+>  	info->fix = atmel_lcdfb_fix;
+> +	strcpy(info->fix.id, sinfo->pdev->name);
+>  
+>  	/* Enable LCDC Clocks */
+>  	sinfo->bus_clk = clk_get(dev, "hclk");
+> 
 
-
-Jean Pihet (3):
-  perf tests: Introduce perf_regs_load function on ARM64
-  perf tests: Add dwarf unwind test on ARM64
-  perf tools: Add libdw DWARF post unwind support for ARM64
-
- tools/perf/Makefile.perf                   |  2 +-
- tools/perf/arch/arm64/Makefile             |  7 ++++
- tools/perf/arch/arm64/include/perf_regs.h  |  5 +++
- tools/perf/arch/arm64/tests/dwarf-unwind.c | 59 ++++++++++++++++++++++++++++++
- tools/perf/arch/arm64/tests/regs_load.S    | 39 ++++++++++++++++++++
- tools/perf/arch/arm64/util/unwind-libdw.c  | 53 +++++++++++++++++++++++++++
- tools/perf/tests/builtin-test.c            |  3 +-
- tools/perf/tests/tests.h                   |  3 +-
- 8 files changed, 168 insertions(+), 3 deletions(-)
- create mode 100644 tools/perf/arch/arm64/tests/dwarf-unwind.c
- create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
- create mode 100644 tools/perf/arch/arm64/util/unwind-libdw.c
-
----
-
-- Rebased on latest acme/perf/core git tree,
-- Tested on the ARMv8 Foundation emulator.
 
 -- 
-1.7.11.7
+Nicolas Ferre
