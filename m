@@ -1,39 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 11:46:08 +0100
-Subject: [PATCH] Documentation: dt: list all compatible strings for at91
-In-Reply-To: <5329727E.40604@atmel.com>
-References: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5329727E.40604@atmel.com>
-Message-ID: <20140319104607.GM12021@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Mar 2014 10:57:06 +0000
+Subject: [PATCH v2 11/15] arm64: add EFI stub
+In-Reply-To: <1395178831.2967.29.camel@deneb.redhat.com>
+References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
+ <1394750828-16351-12-git-send-email-leif.lindholm@linaro.org>
+ <20140318120919.GG13200@arm.com>
+ <1395153629.2967.10.camel@deneb.redhat.com>
+ <20140318182826.GC20497@arm.com>
+ <1395178831.2967.29.camel@deneb.redhat.com>
+Message-ID: <20140319105706.GE2214@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/2014 at 11:33:34 +0100, Nicolas Ferre wrote :
-> On 19/03/2014 11:26, Alexandre Belloni :
-> > Avoids getting the newly introduced warning:
-> > WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
-> > +				compatible = "atmel,at91sam9g45-adc";
-> > 
-> > Introduced by:
-> > bff5da433525 checkpatch: add DT compatible string documentation checks
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Tue, Mar 18, 2014 at 09:40:31PM +0000, Mark Salter wrote:
+> On Tue, 2014-03-18 at 18:28 +0000, Catalin Marinas wrote:
+> > If UEFI doesn't handle the caches, the only thing left to EFI_STUB is to
+> > flush by MVA. We don't need to flush the whole DRAM (and I would even
+> > recommend it) but at least the relevant kernel code/data touched with
+> > the MMU disabled.
 > 
-> Ok, if it is needed.
+> So, it goes like this:
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>   1) UEFI calls stub with MMU/Caches on. Stub/kernel can be anywhere.
+>   2) Stub runs and relocates kernel to the desired runtime location
+>      but continues to execute from wherever UEFI loaded it until just
+>      after ExitBootServices().
+>   3) After ExitBootServices, efi_entry() returns relocated entry point
+>      for kernel to efi_stub_entry() in efi-entry.S where the Dcache and
+>      MMU are turned off, the __flush_dcache_all is called, then the
+>      code jumps to the kernel proper entry point.
 > 
-> BTW, I do not see the devicetree maintainers in the list of CC. If it is
-> done for other architectures, I am fine with it, but if we are the only
-> one to start this move, I would like them to be aware.
-> 
+> It isn't clear to me if UEFI does cache flushing at ExitBootServices
+> time, but even so, at least stack use will get cached between then and
+> the kernel entry point. The stub could conceivably get its hands on the
+> EFI memmap and invalidate dcache using address ranges from UEFI memory
+> descriptors so maybe that is the way we should do it.
 
-Right, I'll resend.
+I think the stub just needs to flush the relocated kernel image, ensure
+it is sync with the memory. Additional flushing can be done by the
+kernel for bits it writes (like page tables, code patching etc). We can
+enter the kernel with the SCTLR.I bit set, so it can allocate in an
+unified cache already and D-cache maintenance would be needed anyway.
 
-Marvell is already listing all their compatibles but there is still the
-issue for nvidia and fsl.
+Another aspect in the booting document is that we require any external
+cache to be disabled. I think on ARMv8 with a more transparent external
+cache we can relax this (Applied's SoC already does this). Otherwise,
+since external cache enabling is usually a secure operation, we would
+need some SoC specific code just for this early during boot and I'd like
+to avoid it.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
