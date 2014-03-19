@@ -1,58 +1,44 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Mar 2014 13:57:58 -0700
-Subject: pull request on hisilicon clock driver
-In-Reply-To: <CAN1soZxL61veKXCqB1r4Vjy3RcLOQDJK9qDpm6-Dog6jH_v1UA@mail.gmail.com>
-References: <CAN1soZxL61veKXCqB1r4Vjy3RcLOQDJK9qDpm6-Dog6jH_v1UA@mail.gmail.com>
-Message-ID: <20140319205758.31449.31775@quantum>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 19 Mar 2014 14:11:08 -0700
+Subject: [PATCH 20/62] ARM: msm: add missing include of linux/module.h
+In-Reply-To: <1395257399-359545-21-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-21-git-send-email-arnd@arndb.de>
+Message-ID: <20140319211108.GA10102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Haojian Zhuang (2014-03-19 00:51:22)
-> Hi Mike,
-> 
-> Please help to merge the pull request on hisilicon clock driver.
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/clk-hisi
+On Wed, Mar 19, 2014 at 08:29:17PM +0100, Arnd Bergmann wrote:
+>After the restructuring of the module.h and init.h headers,
+>we now need to include this explicitly here.
+>
+>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>Cc: David Brown <davidb@codeaurora.org>
+>Cc: Daniel Walker <dwalker@fifo99.com>
+>Cc: Bryan Huntsman <bryanh@codeaurora.org>
+>---
+> arch/arm/mach-msm/dma.c | 1 +
+> 1 file changed, 1 insertion(+)
 
-Taken into clk-next.
+Acked-by: David Brown <davidb@codeaurora.org>
 
-Regards,
-Mike
+>diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+>index f8f6adf..ba62f02 100644
+>--- a/arch/arm/mach-msm/dma.c
+>+++ b/arch/arm/mach-msm/dma.c
+>@@ -18,6 +18,7 @@
+> #include <linux/io.h>
+> #include <linux/interrupt.h>
+> #include <linux/completion.h>
+>+#include <linux/module.h>
+> #include <mach/dma.h>
+> #include <mach/msm_iomap.h>
+>
+>-- 
+>1.8.3.2
+>
 
-> 
-> for you to fetch changes up to 75af25f581b1ffc63e06cb01547b3141d4cd5f58:
-> 
->   clk: hisi: remove static variable (2014-03-19 15:31:27 +0800)
-> 
-> ----------------------------------------------------------------
-> updating clock drivers for Hisilicon
-> 
-> ----------------------------------------------------------------
-> Haojian Zhuang (3):
->       clk: hisi: assign missing clk to table
->       clk: hip04: add clock driver
->       clk: hisi: remove static variable
-> 
->  drivers/clk/Makefile                    |  1 +
->  drivers/clk/hisilicon/Makefile          |  5 ++++-
->  drivers/clk/hisilicon/clk-hi3620.c      | 25 ++++++++-----------------
->  drivers/clk/hisilicon/clk-hip04.c       | 58
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/hisilicon/clk.c             | 62
-> +++++++++++++++++++++++++++++++++++++++++++++++---------------
->  drivers/clk/hisilicon/clk.h             | 17 +++++++++++------
->  include/dt-bindings/clock/hip04-clock.h | 35
-> +++++++++++++++++++++++++++++++++++
->  7 files changed, 164 insertions(+), 39 deletions(-)
->  create mode 100644 drivers/clk/hisilicon/clk-hip04.c
->  create mode 100644 include/dt-bindings/clock/hip04-clock.h
-> 
-> Best Regards
-> Haojian
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
