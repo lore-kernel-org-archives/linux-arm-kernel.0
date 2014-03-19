@@ -1,25 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 21:24:17 +0100
-Subject: [PATCH 59/62] ARM: shmobile: ak4642 needs i2c support
-In-Reply-To: <532A0323.3080305@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Mar 2014 13:34:31 -0700
+Subject: [PATCH 23/62] ARM: omap1: fix building without 32K_TIMER
+In-Reply-To: <20140319200100.GB4271@saruman.home>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-60-git-send-email-arnd@arndb.de>
- <532A0323.3080305@cogentembedded.com>
-Message-ID: <201403192124.17492.arnd@arndb.de>
+ <1395257399-359545-24-git-send-email-arnd@arndb.de>
+ <20140319195913.GA4271@saruman.home>
+ <20140319200100.GB4271@saruman.home>
+Message-ID: <20140319203431.GA8333@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Sergei Shtylyov wrote:
-> On 03/19/2014 10:29 PM, Arnd Bergmann wrote:
+* Felipe Balbi <balbi@ti.com> [140319 13:06]:
+> On Wed, Mar 19, 2014 at 02:59:13PM -0500, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Wed, Mar 19, 2014 at 08:29:20PM +0100, Arnd Bergmann wrote:
+> > > If we enable CONFIG_OMAP_MPU_TIMER and CONFIG_OMAP_DM_TIMER but
+> > > not CONFIG_OMAP_32K_TIMER on OMAP1, we currently get this build error:
+> > > 
+> > > mach-omap1/pm.c: In function 'omap1_pm_idle':
+> > > mach-omap1/pm.c:123:9: error: 'enable_dyn_sleep' undeclared (first use in this function)
+> > >   while (enable_dyn_sleep) {
+> > >          ^
+> > > mach-omap1/pm.c:123:9: note: each undeclared identifier is reported only once for each function it appears in
+> > > 
+> > > This attempts to fix the #ifdef logic to deal with all combinations
+> > > of timers.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: linux-omap at vger.kernel.org
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > 
+> > I had sent a fix for months and months ago, what happened to it ?
 > 
-> > We cannot select SND_SOC_AK4642 if the I2C core layer
-> > is disabled. Making the select statement conditional
-> > ensures that we can build all configurations.
+> Here
 > 
->     Yes, but you also touch WM8978 selects. Is it the same as AK4642 or you 
-> just forgot to mention that?
+> http://marc.info/?l=linux-omap&m=138963632408031&w=2
+> 
+> Tony, did you forget to send a pull request ?
 
-My bad, I probably screwed up when I folded some older patches
-into a common one.
+Hmm yes weird, can't see it in my omap-for-v3.14/fixes branch.
 
-	Arnd
+I must have gotten interrupted while applying and then probably
+ran git reset --hard before committing.
+
+Arnd, maybe pick up Felipe's earlier patch instead?
+
+Acked-by: Tony Lindgren <tony@atomide.com>
