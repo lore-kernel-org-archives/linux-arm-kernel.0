@@ -1,57 +1,78 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 19 Mar 2014 10:11:30 +0200
-Subject: [PATCHv2 4/8] Doc/DT: Add DT binding documentation for HDMI
- Connector
-In-Reply-To: <1395216233.4300.6.camel@paszta.hi.pengutronix.de>
-References: <1395130547-18633-1-git-send-email-tomi.valkeinen@ti.com>	
- <1395130547-18633-5-git-send-email-tomi.valkeinen@ti.com>	
- <1395132234.4134.1.camel@paszta.hi.pengutronix.de>	
- <1664822.t9aWz7hh4g@avalon>
- <1395216233.4300.6.camel@paszta.hi.pengutronix.de>
-Message-ID: <53295132.6000003@ti.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 19 Mar 2014 09:19:43 +0100
+Subject: [PATCH 00/11] ARM: at91: rework main and slow clk implementation
+In-Reply-To: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <CACh+v5N9Pxmuj_M4NLQQVLs-tuNYUAb8K1fdueWa+TcBxxt=Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/14 10:03, Philipp Zabel wrote:
-
->>> Geert's comment also applies to all other connector types. These can be
->>> input connectors, too.
->>
->> We might not need to define all the properties required by input connectors 
->> now, but we need to make sure that future extensions will be backward-
->> compatible. I don't see a problem in making the connector DT bindings depend 
->> on the direction as long as the direction is specified in the DT node, either 
->> explicitly or implicitly.
->>
->> An obvious solution would be to have separate "hdmi-input-connector" and 
->> "hdmi-output-connector" compatible strings but I don't like that, as there's 
->> no difference in the HDMI connector itself, only in the usage.
-> 
-> I don't think this is necessary, either. I just meant the wording for
-> the video port should leave the direction unspecified. I imagine
-> somebody somewhere will connect a HDMI connector to a mux so that it can
-> be either input or output.
-
-I don't disagree, but I think it's better to change the wording when
-someone has a working setup and can try it. These bindings have been
-designed only with video output in mind, and I'd rather have them
-constrained to that purpose for now.
-
-One reason for keeping them output only is that when someone wants to
-use these for capture, he needs to change the binding docs, and it'll
-gather more attention than just using the bindings in a board's dts.
-
-That said, we should take care to make the bindings so that nothing
-prevents their use for capture (which I think they allow in their
-current form).
-
- Tomi
+Hi Boris,
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/d4352c4b/attachment.sig>
+2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
+>
+> Hello,
+>
+> This series introduce the real clock model (as described in atmel datasheets)
+> for slow and main clocks.
+>
+> The modifications introduced by this series break the DT compat, but, as the
+> at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
+> eval boards) I think it won't impact a lot of users.
+>
+> I tested it on sama5d3.
+> Alexandre, Jean-Jacques, could you test this series on your eval boards
+> (sam9261ek and sam9rlek) so that we can move to this new model and hopefully
+> consider the at91 clk DT binding as (almost :-)) stable.
+I'll try to do this this week, but I can make no promise
+>
+> Jean-Jacques, as you can see I reworked my first implementation as you
+> suggested, do you want me to add your Signed-off-by in the next version ?
+Nop, you did the job, not I.
+
+>
+> Mike, if this series is accepted, I'd like to get it merged as soon as possible
+> to prevent other developpers from using a deprecated DT binding.
+>
+> Best Regards,
+>
+> Boris
+>
+> Boris BREZILLON (11):
+>   clk: at91: rework main clk implementation
+>   clk: at91: update main clk documentation
+>   clk: at91: add slow clks driver
+>   clk: at91: add slow clk documentation
+>   ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
+>   ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
+>   ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
+>   ARM: at91/dt: move at91sam9261 SoC to the new main clock model
+>   ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
+>   ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
+>   ARM: at91/dt: define sam9rlek crystal frequencies
+>
+>  .../devicetree/bindings/clock/at91-clock.txt       |  128 ++++-
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   10 +
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |   10 +-
+>  arch/arm/boot/dts/at91sam9261ek.dts                |    4 +
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |   45 +-
+>  arch/arm/boot/dts/at91sam9rlek.dts                 |    8 +
+>  arch/arm/boot/dts/sama5d3.dtsi                     |   61 +-
+>  arch/arm/boot/dts/sama5d3xcm.dtsi                  |   10 +
+>  drivers/clk/at91/Makefile                          |    4 +-
+>  drivers/clk/at91/clk-main.c                        |  581 +++++++++++++++++---
+>  drivers/clk/at91/clk-slow.c                        |  467 ++++++++++++++++
+>  drivers/clk/at91/pmc.c                             |   12 +
+>  drivers/clk/at91/pmc.h                             |    9 +
+>  drivers/clk/at91/sckc.c                            |   57 ++
+>  drivers/clk/at91/sckc.h                            |   22 +
+>  include/linux/clk/at91_pmc.h                       |    1 +
+>  16 files changed, 1342 insertions(+), 87 deletions(-)
+>  create mode 100644 drivers/clk/at91/clk-slow.c
+>  create mode 100644 drivers/clk/at91/sckc.c
+>  create mode 100644 drivers/clk/at91/sckc.h
+>
+> --
+> 1.7.9.5
+>
