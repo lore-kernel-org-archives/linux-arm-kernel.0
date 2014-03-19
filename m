@@ -1,116 +1,87 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Mar 2014 14:20:34 +0100
-Subject: [PATCH v11 20/27] iommu/exynos: allow having multiple System MMUs
- for a master H/W
-In-Reply-To: <20140319093929.d3a7cea131c626cf978e0ff1@samsung.com>
-References: <20140314141050.c8bedcb66532d277c496796d@samsung.com>
- <53232A53.4040708@samsung.com>
- <20140318220128.564740c88d06b86c9c5c10e3@samsung.com>
- <532857A8.5060000@samsung.com>
- <20140319093929.d3a7cea131c626cf978e0ff1@samsung.com>
-Message-ID: <532999A2.6030107@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Mar 2014 08:22:21 -0500
+Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
+References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
+ <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <CAL_JsqJqUrSD26gXL+sRVJCO8+nLL-72=MCoMDY47Woe5LON6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.03.2014 01:39, Cho KyongHo wrote:
-> On Tue, 18 Mar 2014 15:26:48 +0100, Tomasz Figa wrote:
->>
->>
->> On 18.03.2014 14:01, Cho KyongHo wrote:
->>> On Fri, 14 Mar 2014 17:12:03 +0100, Tomasz Figa wrote:
->>>> Hi KyongHo,
->>>>
->>>> On 14.03.2014 06:10, Cho KyongHo wrote:
->>>>> Some master device descriptor like fimc-is which is an abstraction
->>>>> of very complex H/W may have multiple System MMUs. For those devices,
->>>>> the design of the link between System MMU and its master H/W is needed
->>>>> to be reconsidered.
->>>>>
->>>>> A link structure, sysmmu_list_data is introduced that provides a link
->>>>> to master H/W and that has a pointer to the device descriptor of a
->>>>> System MMU. Given a device descriptor of a master H/W, it is possible
->>>>> to traverse all System MMUs that must be controlled along with the
->>>>> master H/W.
->>>>
->>>> NAK.
->>>>
->>>> A device driver should handle particular hardware instances separately,
->>>> without abstracting a virtual hardware instance consisting of multiple
->>>> physical ones.
->>>>
->>>> If such abstraction is needed, it should be done above the exynos-iommu
->>>> driver, e.g. by something like iommu-composite driver that would
->>>> aggregate several IOMMUs. Keep in mind that such IOMMUs in a group could
->>>> be different, e.g. different Exynos SysMMU versions or even completely
->>>> different IPs handled by different drivers.
->>>>
->>>> Still, I don't think there is a real need for such abstraction. Instead,
->>>> related drivers shall be fixed to properly handle multiple memory
->>>> masters and their IOMMUs.
->>>>
->>>
->>> G2D, Scalers and FIMD of Exynos5420 has 2 System MMUs while aother SoC like
->>> Exynos5250 does not.
->>>
->>> I don't understand why you are negative to this approach.
->>> This is the simplest than the others.
->>>
->>> Let me show you an example.
->>> FIMC-IS driver just controls MCU in FIMC-IS subsystem and the firmware of
->>> the MCU controls all other peripherals in the subsystem. Each peripherals
->>> have their own System MMU. Moreover, the configuration of the peripherals
->>> varies according to the SoCs.
->>>
->>> If System MMU driver accepts multiple masters, everything is done in DT.
->>> But I worry that it is not easy if System MMU driver does not support
->>> multiple masters.
->>
->> I believe I have stated enough reasons why this kind of implementation
->> is bad. I'm not going to waste time repeating myself.
->>
->> Your concerns presented above are valid, however they are not related to
->> what is wrong with this patch. I have given you two proper ways to
->> handle this, none should be forced upon particular IOMMU master drivers
->> - their authors should have the chance to select the method that works
->> best for them.
->>
+On Thu, Feb 6, 2014 at 5:31 AM, Anup Patel <anup.patel@linaro.org> wrote:
+> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
+> VCPUs. This patch extends current in-kernel PSCI emulation to provide
+> PSCI v0.2 interface to VCPUs.
+
+[snip]
+
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index ef0c878..9c922d9 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -83,6 +83,7 @@ struct kvm_regs {
+>  #define KVM_VGIC_V2_CPU_SIZE           0x2000
 >
-> I don't still understand why you think this patch is wrong.
-> I think this is the best way not to think for all the driver developers
-> about other things than their business logic.
-
-I agree, but one of the ways I proposed (an iommu-composite layer above 
-the IOMMU low level drivers) doesn't add any extra responsibility of 
-driver developers.
-
-Moreover, it's this kind of business logic in low level drivers that is 
-adding more responsibility, because it introduces additional complexity 
-and makes the driver harder to read, maintain and extend in future.
-
+>  #define KVM_ARM_VCPU_POWER_OFF         0 /* CPU is started in OFF state */
+> +#define KVM_ARM_VCPU_PSCI_0_2          1 /* CPU uses PSCI v0.2 */
 >
-> This does not hurt anyone and I think this is good enough.
+>  struct kvm_vcpu_init {
+>         __u32 target;
+> @@ -192,7 +193,7 @@ struct kvm_arch_memory_slot {
+>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>  #define KVM_ARM_IRQ_GIC_MAX            127
 >
+> -/* PSCI interface */
+> +/* PSCI v0.1 interface */
+>  #define KVM_PSCI_FN_BASE               0x95c1ba5e
+>  #define KVM_PSCI_FN(n)                 (KVM_PSCI_FN_BASE + (n))
 
-Well, it is barely good enough. It is a good practice to make a low 
-level driver handle a single device instance and this is how Linux 
-driver model is designed.
+While this is really KVM specific since the base can be anything...
 
-Moreover, a single device tree node _must_ represent a single hardware 
-block, so you can't group multiple SysMMUs into a single device tree node.
+> @@ -201,9 +202,41 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_FN_CPU_ON             KVM_PSCI_FN(2)
+>  #define KVM_PSCI_FN_MIGRATE            KVM_PSCI_FN(3)
+>
+> +/* PSCI v0.2 interface */
+> +#define KVM_PSCI_0_2_FN_BASE           0x84000000
+> +#define KVM_PSCI_0_2_FN(n)             (KVM_PSCI_0_2_FN_BASE + (n))
+> +#define KVM_PSCI_0_2_FN64_BASE         0xC4000000
+> +#define KVM_PSCI_0_2_FN64(n)           (KVM_PSCI_0_2_FN64_BASE + (n))
+> +
+> +#define KVM_PSCI_0_2_FN_PSCI_VERSION   KVM_PSCI_0_2_FN(0)
+> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND    KVM_PSCI_0_2_FN(1)
+> +#define KVM_PSCI_0_2_FN_CPU_OFF                KVM_PSCI_0_2_FN(2)
+> +#define KVM_PSCI_0_2_FN_CPU_ON         KVM_PSCI_0_2_FN(3)
+> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO  KVM_PSCI_0_2_FN(4)
+> +#define KVM_PSCI_0_2_FN_MIGRATE                KVM_PSCI_0_2_FN(5)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
+> +                                       KVM_PSCI_0_2_FN(6)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
+> +                                       KVM_PSCI_0_2_FN(7)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF     KVM_PSCI_0_2_FN(8)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET   KVM_PSCI_0_2_FN(9)
+> +
+> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND  KVM_PSCI_0_2_FN64(1)
+> +#define KVM_PSCI_0_2_FN64_CPU_ON       KVM_PSCI_0_2_FN64(3)
+> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO        KVM_PSCI_0_2_FN64(4)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE      KVM_PSCI_0_2_FN64(5)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
+> +                                       KVM_PSCI_0_2_FN64(7)
+> +
+> +/* PSCI return values */
+>  #define KVM_PSCI_RET_SUCCESS           0
+>  #define KVM_PSCI_RET_NI                        ((unsigned long)-1)
+>  #define KVM_PSCI_RET_INVAL             ((unsigned long)-2)
+>  #define KVM_PSCI_RET_DENIED            ((unsigned long)-3)
+> +#define KVM_PSCI_RET_ALREADY_ON                ((unsigned long)-4)
+> +#define KVM_PSCI_RET_ON_PENDING                ((unsigned long)-5)
+> +#define KVM_PSCI_RET_INTERNAL_FAILURE  ((unsigned long)-6)
+> +#define KVM_PSCI_RET_NOT_PRESENT       ((unsigned long)-7)
+> +#define KVM_PSCI_RET_DISABLED          ((unsigned long)-8)
 
-Furthermore, if you force grouping of SysMMUs into a single virtual one, 
-you enforce using the same address space for all masters of some 
-particular hardware blocks, while potentially driver developers would 
-like to separate them.
+These definitions are common across arm and arm64, baremetal and kvm
+in the kernel, and the kernel and qemu. Soon they will also be needed
+in qemu for system emulation support of PSCI. We need these in a
+common header to share.
 
-A good interface design should not enforce any particular implementation 
-and this is what we should stick to in this case as well.
-
-> If you want to provide another layer between master device and system mmu
-> as you mentioned, you do that. This patch does not restrict it.
-
-It does, as mentioned above. With a device tree listing multiple SysMMUs 
-as one, you can't separate them.
-
-Best regards,
-Tomasz
+Rob
