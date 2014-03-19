@@ -1,84 +1,67 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 19 Mar 2014 11:51:54 +0530
-Subject: [PATCH v2 5/7] sched: add a new SD_SHARE_POWERDOMAIN for
- sched_domain
-In-Reply-To: <1395165409-18055-6-git-send-email-vincent.guittot@linaro.org>
-References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
- <1395165409-18055-6-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <53293782.9060708@linux.vnet.ibm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Mar 2014 23:43:03 -0700
+Subject: [PATCH] clk: socfpga: Fix section mismatch warning
+In-Reply-To: <1394744881-15254-1-git-send-email-dinguyen@altera.com>
+References: <1394744881-15254-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140319064303.30995.2917@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-
-On 03/18/2014 11:26 PM, Vincent Guittot wrote:
-> A new flag SD_SHARE_POWERDOMAIN is created to reflect whether groups of CPUs
-> in a sched_domain level can or not reach different power state. As an example,
-> the flag should be cleared at CPU level if groups of cores can be power gated
-> independently. This information can be used to add load balancing level between
-> group of CPUs than can power gate independantly. The default behavior of the
-> scheduler is to spread tasks across CPUs and groups of CPUs so the flag is set
-> into all sched_domains.
-
-I don't see this flag being set either in sd_init() or in
-default_topology[]. Should not the default_topology[] flag setting
-routines set this flag at every level of sched domain along with other
-topology flags, unless the arch wants to override it?
-
-Regards
-Preeti U Murthy
-> This flag is part of the topology flags that can be set by arch.
+Quoting dinguyen at altera.com (2014-03-13 14:08:01)
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> WARNING: drivers/clk/socfpga/built-in.o(.data+0xc0): Section mismatch in
+> reference from the variable socfpga_child_clocks to the function
+> .init.text:socfpga_pll_init()
+> The variable socfpga_child_clocks references
+> the function __init socfpga_pll_init()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+> 
+> WARNING: drivers/clk/socfpga/built-in.o(.data+0x184): Section mismatch in
+> reference from the variable socfpga_child_clocks to the function
+> .init.text:socfpga_periph_init()
+> The variable socfpga_child_clocks references
+> the function __init socfpga_periph_init()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+> 
+> WARNING: drivers/clk/socfpga/built-in.o(.data+0x248): Section mismatch in
+> reference from the variable socfpga_child_clocks to the function
+> .init.text:socfpga_gate_init()
+> The variable socfpga_child_clocks references
+> the function __init socfpga_gate_init()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+> 
+> Reported-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+
+Thanks! Taken into clk-next.
+
+Regards,
+Mike
+
 > ---
->  include/linux/sched.h | 1 +
->  kernel/sched/core.c   | 9 ++++++---
->  2 files changed, 7 insertions(+), 3 deletions(-)
+>  drivers/clk/socfpga/clk.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index 6479de4..7048369 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -861,6 +861,7 @@ enum cpu_idle_type {
->  #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
->  #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
->  #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
-> +#define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
->  #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
->  #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
->  #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index 0b51ee3..224ec3b 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -5298,7 +5298,8 @@ static int sd_degenerate(struct sched_domain *sd)
->  			 SD_BALANCE_FORK |
->  			 SD_BALANCE_EXEC |
->  			 SD_SHARE_CPUPOWER |
-> -			 SD_SHARE_PKG_RESOURCES)) {
-> +			 SD_SHARE_PKG_RESOURCES |
-> +			 SD_SHARE_POWERDOMAIN)) {
->  		if (sd->groups != sd->groups->next)
->  			return 0;
->  	}
-> @@ -5329,7 +5330,8 @@ sd_parent_degenerate(struct sched_domain *sd, struct sched_domain *parent)
->  				SD_BALANCE_EXEC |
->  				SD_SHARE_CPUPOWER |
->  				SD_SHARE_PKG_RESOURCES |
-> -				SD_PREFER_SIBLING);
-> +				SD_PREFER_SIBLING |
-> +				SD_SHARE_POWERDOMAIN);
->  		if (nr_node_ids == 1)
->  			pflags &= ~SD_SERIALIZE;
->  	}
-> @@ -5946,7 +5948,8 @@ static int sched_domains_curr_level;
->  	(SD_SHARE_CPUPOWER |		\
->  	 SD_SHARE_PKG_RESOURCES |	\
->  	 SD_NUMA |			\
-> -	 SD_ASYM_PACKING)
-> +	 SD_ASYM_PACKING |		\
-> +	 SD_SHARE_POWERDOMAIN)
-> 
->  static struct sched_domain *
->  sd_init(struct sched_domain_topology_level *tl, int cpu)
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 6217d5d..35a960a 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+> @@ -28,7 +28,7 @@
+>  
+>  void __iomem *clk_mgr_base_addr;
+>  
+> -static struct of_device_id socfpga_child_clocks[] = {
+> +static const struct of_device_id socfpga_child_clocks[] __initconst = {
+>         { .compatible = "altr,socfpga-pll-clock", socfpga_pll_init, },
+>         { .compatible = "altr,socfpga-perip-clk", socfpga_periph_init, },
+>         { .compatible = "altr,socfpga-gate-clk", socfpga_gate_init, },
+> -- 
+> 1.7.9.5
 > 
