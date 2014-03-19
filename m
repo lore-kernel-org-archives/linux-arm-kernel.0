@@ -1,116 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Mar 2014 11:19:23 +0100
-Subject: [PATCH 00/15] iio: adc: at91 cleanups and atmel_tsadcc removal
-In-Reply-To: <5325EDAF.4060003@kernel.org>
-References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5325EDAF.4060003@kernel.org>
-Message-ID: <53296F2B.3010406@atmel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 19 Mar 2014 19:39:28 +0900
+Subject: [PATCH v2 0/4] Introduce new Kconfig for Samsung common clock
+In-Reply-To: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <532973E0.6060904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/2014 19:30, Jonathan Cameron :
-> On 05/03/14 17:35, Alexandre Belloni wrote:
->> This patch set is a followup of my previous series: iio: adc: at91 fixes
->>
->> I'm sorry it is so long, I made sure this is bissectable.
-> It's a nice series, don't apologise for doing things right!
-> 
-> Clearly there are a few outstanding snippets from the reviews so far, but we
-> are getting to the point where we need to agree on a path for this.  I'm
-> happy to take the whole series through the IIO tree if Dmitry and the at91
-> maintainers are happy with that.  If it is considered two invasive form the
-> atmel side then I'm perfectly happy with someone to take it through the relevant
-> platform tree instead.
+On 03/12/2014 01:32 PM, Pankaj Dubey wrote:
+> Introduce a new Kconfig file for Samsung common clock infrastructure
+> related config options. As current Samsung common clock gets compiled
+> based on PLAT_SAMSUNG, but moving ahead with ARM64 we can not have any
+> more such config options, so this patch introduce new COMMON_CLK_SAMSUNG
+> invisible option. This option also select COMMON_CLK so ARCH Kconfig just
+> need to select COMMON_CLK_SAMSUNG in case they want to use Samsung common
+> clock.
+>
+> This series is based on Kukjin's for-next branch.
+>
+> V2:
+>   1) Adding new Kconfig file for Samsung common clock.
+>   2) Make COMMON_CLK_SAMSUNG option invisible. (as suggested by Tomasz Figa)
+>   3) Let COMMON_CLK_SAMSUNG select COMMON_CLK. (as suggested by Tomasz Figa)
+>   4) Move S3C24XX clock config option in new Kconfig file.
+>
+> Pankaj Dubey (4):
+>    clk: samsung: add new Kconfig for Samsung common clock options
+>    drivers: clk: use CONFIG_COMMON_CLK_SAMSUNG for Samsung clock support
+>    ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and ARCH_S3C64XX
+>    ARM: S3C24XX: remove S3C24XX specific clock Kconfig options
+>
+>   arch/arm/Kconfig              |    4 ++--
+>   arch/arm/mach-s3c24xx/Kconfig |   14 --------------
+>   drivers/clk/Kconfig           |    2 ++
+>   drivers/clk/Makefile          |    2 +-
+>   drivers/clk/samsung/Kconfig   |   11 +++++++++++
+>   5 files changed, 16 insertions(+), 17 deletions(-)
+>   create mode 100644 drivers/clk/samsung/Kconfig
+>
 
-Jonathan, Dmitry,
++CC: Mike and Tomasz Figa
 
-Considering the amount of AT91 files touched by this series, I would
-like to take everything through Atmel's git tree and later on arm-soc.
+Sorry, during posting second version I forgot to CC Clock maintainer's,
+so CC'ing now.
 
-
-> I'm obviously not going to pick it up at all until it has a complete set
-> of at91 maintainer acks though!
-> 
-> Realistically it's missed the coming merge window anyway, so we have a fair
-> bit of time.
-
-Yes, I will review Alexandre's v2 series.
-
-Thanks a lot for your review and for having thought about the path that
-these patches would take.
-
-Bye,
-
-
-> Jonathan
->>
->> 1-3) The first 3 patches are cleaning up the patform_data used for at91_adc.
->>
->> 4-5) Then touchscreen support for older ADCs is added, this allows to use that
->>       for the sam9m10g45ek.
->>
->> 6) Following those modifications, the mach/at91_adc.h is not used anywhere but
->>     in the at91_adc driver so it is remove and its content (register definitions)
->>     placed directly in the driver.
->>
->> 7-9) at91sam9rl support is added to at91_adc and is used for the at91sam9rl
->>       based boards.
->>
->> 10-11) Prepare the atmel_tsadcc removal by switching sam9rl and sam9g45 to use
->>         only at91_adc instead of atmel_tsadcc.
->>
->> 12-15) atmel_tsadcc removal
->>
->>
->> Alexandre Belloni (15):
->>    ARM: at91: sam9g45: remove unused platform_data
->>    ARM: at91: sam9260: remove unused platform_data
->>    iio: adc: at91: cleanup platform_data
->>    iio: adc: at91_adc: Add support for touchscreens without TSMR
->>    ARM: at91: sam9m10g45ek: Add touchscreen support through at91_adc
->>    iio: adc: at91: remove unused include from include/mach
->>    iio: adc: at91: add sam9rl support
->>    ARM: at91: sam9rl: add at91_adc to support adc and touchscreen
->>    ARM: at91: sam9rlek add touchscreen support through at91_adc
->>    ARM: at91: sam9g45: switch from atmel_tsadcc to at91_adc
->>    ARM: at91: sam9rl: switch from atmel_tsadcc to at91_adc
->>    ARM: at91: remove atmel_tsadcc platform_data
->>    ARM: at91: remove atmel_tsadcc from sama5_defconfig
->>    Input: atmel_tsadcc: remove driver
->>    ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node
->>
->>   MAINTAINERS                                |   6 -
->>   arch/arm/boot/dts/at91-cosino_mega2560.dts |   5 -
->>   arch/arm/configs/at91sam9g45_defconfig     |   3 +-
->>   arch/arm/configs/at91sam9rl_defconfig      |   3 +-
->>   arch/arm/configs/sama5_defconfig           |   1 -
->>   arch/arm/mach-at91/at91sam9260_devices.c   |  10 -
->>   arch/arm/mach-at91/at91sam9g45.c           |   2 +-
->>   arch/arm/mach-at91/at91sam9g45_devices.c   |  63 +----
->>   arch/arm/mach-at91/at91sam9rl.c            |   7 +
->>   arch/arm/mach-at91/at91sam9rl_devices.c    |  83 +++++--
->>   arch/arm/mach-at91/board-sam9m10g45ek.c    |  16 +-
->>   arch/arm/mach-at91/board-sam9rlek.c        |  16 +-
->>   arch/arm/mach-at91/board.h                 |   3 -
->>   arch/arm/mach-at91/include/mach/at91_adc.h | 107 ---------
->>   drivers/iio/adc/at91_adc.c                 | 339 +++++++++++++++++++++++----
->>   drivers/input/touchscreen/Kconfig          |  12 -
->>   drivers/input/touchscreen/Makefile         |   1 -
->>   drivers/input/touchscreen/atmel_tsadcc.c   | 358 -----------------------------
->>   include/linux/platform_data/at91_adc.h     |  27 +--
->>   include/linux/platform_data/atmel.h        |   7 -
->>   20 files changed, 380 insertions(+), 689 deletions(-)
->>   delete mode 100644 arch/arm/mach-at91/include/mach/at91_adc.h
->>   delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+Link for this series: http://lkml.org/lkml/2014/3/12/10
 
 -- 
-Nicolas Ferre
+Best Regards,
+Pankaj Dubey
