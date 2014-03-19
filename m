@@ -1,47 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:13 +0100
-Subject: [PATCH 16/62] ARM: ixp4xx: avoid use of PCIBIOS_MIN_MEM in io.h
+Date: Wed, 19 Mar 2014 20:29:33 +0100
+Subject: [PATCH 36/62] ARM: rpc: autoselect CPU_SA110
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-17-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-37-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using CONFIG_IXP4XX_INDIRECT_PCI, we run into a recursive
-header file dependency between mach/io.h and asm/pci.h, resulting
-in a build failure:
-
-mach-ixp4xx/include/mach/io.h: In function 'is_pci_memory':
-mach-ixp4xx/include/mach/io.h:53:18: error: 'PCIBIOS_MIN_MEM' undeclared (first use in this function)
-  return (addr >= PCIBIOS_MIN_MEM) && (addr <= 0x4FFFFFFF);
-                  ^
-mach-ixp4xx/include/mach/io.h:53:18: note: each undeclared identifier is reported only once for each function it appears in
-
-We can work around this by referencing the pcibios_min_mem variable
-directly through an extern declaration, rather than using the macro.
+ARCH_RPC no longer supports other CPUs aside from StrongARM110,
+so we can make the option implicitly selected by the platform
+and no longer give the option of building a kernel without CPU
+support.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-ixp4xx/include/mach/io.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig    | 1 +
+ arch/arm/mm/Kconfig | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index 5cf30d1..559c69a 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -48,9 +48,10 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
-  * fallback to the default.
-  */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5776c12..4721007 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -696,6 +696,7 @@ config ARCH_RPC
+ 	select ARCH_MAY_HAVE_PC_FDC
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ARCH_USES_GETTIMEOFFSET
++	select CPU_SA110
+ 	select FIQ
+ 	select HAVE_IDE
+ 	select HAVE_PATA_PLATFORM
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index dccd7e1..297b63b 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -264,7 +264,7 @@ config CPU_ARM1026
  
-+extern unsigned long pcibios_min_mem;
- static inline int is_pci_memory(u32 addr)
- {
--	return (addr >= PCIBIOS_MIN_MEM) && (addr <= 0x4FFFFFFF);
-+	return (addr >= pcibios_min_mem) && (addr <= 0x4FFFFFFF);
- }
- 
- #define writeb(v, p)			__indirect_writeb(v, p)
+ # SA110
+ config CPU_SA110
+-	bool "Support StrongARM(R) SA-110 processor" if ARCH_RPC
++	bool
+ 	select CPU_32v3 if ARCH_RPC
+ 	select CPU_32v4 if !ARCH_RPC
+ 	select CPU_ABRT_EV4
 -- 
 1.8.3.2
