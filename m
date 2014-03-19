@@ -1,73 +1,28 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Mar 2014 17:23:39 +0000
-Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
- infrastructure
-In-Reply-To: <CADHgK6uwUDndVHQaWU=3R7A16hc4PYJCAfMLi3uBnrDjYidPXg@mail.gmail.com>
-References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
- <20140318180856.GB792@e102568-lin.cambridge.arm.com>
- <CADHgK6uwUDndVHQaWU=3R7A16hc4PYJCAfMLi3uBnrDjYidPXg@mail.gmail.com>
-Message-ID: <20140319172338.GA31368@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Mar 2014 17:27:06 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <2098368.XZDkvYocrm@avalon>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <20140226221939.GC21483@n2100.arm.linux.org.uk> <16403654.Dg5ZqMop7H@avalon>
+ <2098368.XZDkvYocrm@avalon>
+Message-ID: <20140319172706.GG7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 09:49:12PM +0000, Sebastian Capella wrote:
-> On 18 March 2014 11:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >> > +        * When we reach the max number of CPU idle states or
-> >> > +        * head_idx == curr_idx (empty nodes queue) we are done.
-> >> > +        */
-> >> > +       head_idx = curr_idx = cnt;
-> >> > +
-> >> > +       do {
-> >> > +               curr_idx = parse_idle_states_node(curr, curr_idx, cpus);
-> >> > +               if (curr_idx == CPUIDLE_STATE_MAX || head_idx == curr_idx)
-> >> > +                       break;
-> >> > +               /*
-> >> > +                * idle_states array is updated by parse_idle_states_node(),
-> >> > +                * we can use the initialized states as a queue of nodes
-> >> > +                * that need to be checked for their idle states siblings.
-> >> > +                * head_idx works as a pointer into the queue to get the
-> >> > +                * next node to be parsed.
-> >> > +                */
-> >> > +               curr = idle_states[head_idx++].node;
-> >> > +       } while (curr);
-> >>
-> >> I still object to index property and this is why. You need to be able
-> >> to determine state order by actual h/w properties. That is what you
-> >> are doing in your head when you define the indexes.
-> >>
-> >> You really want a linked list here that you can sort as you go and not
-> >> care what order you parse DT nodes. Not to mention you don't know how
-> >> many states you will have.
-> >
-> > This code does not care about the order of nodes, the index is just there
-> > to keep track of nodes that have still to be parsed. Sorting is done later,
-> > using the index property (totally unrelated to the {head/curr}_idx) which I
-> > understand is frowned upon in DT world (but in this case I think it could be
-> > accepted, certainly it would make my life easier).
-> >
-> > Having said that, I like the idea of implementing it with a linked list and
-> > sorting states while parsing them. I will remove that index property and
-> > replace it with an actual hw property: power_consumption ? Or should I just
-> > use min_residency (the higher the required residency the deeper the idle
-> > state) ? Defining the power consumption (or better savings) for a state is
-> > an _outright_ can of worms, that's why using an index is easier.
-> >
-> > Thoughts ?
+On Wed, Mar 19, 2014 at 06:22:14PM +0100, Laurent Pinchart wrote:
+> Hi Russell,
 > 
-> How about something like rank, power_rank or power_score since it's
-> neither an index nor a physical value but a value for sorting states
-> relative to each other?
+> (CC'ing Philipp Zabel who might be able to provide feedback as a user of the 
+> component framework)
+> 
+> Could you please have a look at the questions below and provide an answer when 
+> you'll have time ? I'd like to bridge the gap between the component and the 
+> V4L2 asynchronous registration implementations.
 
-Well, if it is just a renaming issue we can use index just as well.
+I have a reply partly prepared, but I'm snowed under by the L2 cache stuff
+at the moment, sorry.
 
-I hope that by now it is understood that the index property is not
-the state index, it is a value representing relative power consumption.
-
-Rob is asking a property describing hw, and honestly unless we define
-a power consumption property value (defining what it means will be rather
-complicated though) I'd rather remove index altogether and use min_residency
-as a comparison value instead.
-
-Lorenzo
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
