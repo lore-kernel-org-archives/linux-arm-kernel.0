@@ -1,97 +1,133 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Wed, 19 Mar 2014 09:36:40 +0530
-Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
-In-Reply-To: <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
- <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
-Message-ID: <CAKrE-KeJPqFC__mNhFV6qexL0+E_B6Fm+u8S4iKnCR8vibCseA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Mar 2014 21:26:53 -0700
+Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
+ rates
+In-Reply-To: <5326F02F.2030604@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
+ <52FE1DF2.2040707@ti.com> <20140227022524.12081.32368@quantum>
+ <5326F02F.2030604@ti.com>
+Message-ID: <20140319042653.30995.3101@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 7:36 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Mar 17, 2014 at 12:03:59PM +0000, Girish K S wrote:
->> This patch adds the dt node for the mailbox IP
->>
->> Signed-off-by: Girish K S <ks.giri@samsung.com>
->>
->> Change-Id: I35e45e9a62592887a84a909aee54f259a2f731fa
->> ---
->>  .../bindings/mailbox/samsung-mailbox.txt           |   24 +++++++
->>  arch/arm64/boot/dts/samsung-gh7.dtsi               |   66 ++++++++++++++++++++
->>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts           |    3 +
->>  3 files changed, 93 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
->> new file mode 100644
->> index 0000000..1908d71
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
->> @@ -0,0 +1,24 @@
->> +
->> +Samsung Mailbox Driver
->> +
->> +Required properties:
->> +- compatible:                Should be one of the following,
->> +                         "samsung,gh7-mailbox" for
->> +                             Samsung GH7 SoC series
->> +                         "samsung,exynos-mailbox" for
->> +                             exynosx SoC series
->> +- reg:                       Contains the mailbox register address range (base address
->> +                     and length)
->> +- interrupts:                Contains the interrupt information for the mailbox
->> +                     device.
->
-> How many interrupts?
-just one receive interrupt
-I will update this detail in binding doc
->
-> What are they for?
-It is only for receive from remote processor
->
->> +- samsung,mbox-names:        Array of the names of the mailboxes
->
-> Juding by the code there is one name per reg entry, but the description
-> above implies a single entry (as all the dt fragments have).
->
-> What values are expected? What is the consumer of these values? What are
-> they used for?
-These names are used to mention the links in the platform. tx and rx
-link via mailbox.
-i can mention of 2 consumers now. the ipmi driver and the cpu freq
-driver. They are used
-to exchange information with the remote processor
->
->> +
->> +Example:
->> +
->> +/* Samsung GH7 SoC */
->> +mailbox at 100a0000 {
->> +     compatible = "samsung,gh7-mailbox";
->> +     reg = <0x0 0x100a0000 0x0 0x1000>;
->> +     interrupts = <0 310 0>;
->> +     samsung,mbox-names = "a7q-scp";
->> +};
->> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
->> index c3610bd..be4cce9 100644
->> --- a/arch/arm64/boot/dts/samsung-gh7.dtsi
->> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
->> @@ -107,5 +107,71 @@
->>                       interrupts = <0 420 0>;
->>                       arm,primecell-periphid = <0x341011>; /* HACK */
->
-> This looks odd.
->
-> What tree is this against?
+Quoting Tomi Valkeinen (2014-03-17 05:53:03)
+> On 27/02/14 04:25, Mike Turquette wrote:
+> > Quoting Tero Kristo (2014-02-14 05:45:22)
+> >> On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
+> >>> clk-divider.c does not calculate the rates consistently at the moment.
+> >>>
+> >>> As an example, on OMAP3 we have a clock divider with a source clock of
+> >>> 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
+> >>>
+> >>> 6: 144000000
+> >>> 7: 123428571.428571...
+> >>> 8: 108000000
+> >>>
+> >>> Calling clk_round_rate() with the rate in the first column will give the
+> >>> rate in the second column:
+> >>>
+> >>> 144000000 -> 144000000
+> >>> 143999999 -> 123428571
+> >>> 123428572 -> 123428571
+> >>> 123428571 -> 108000000
+> >>>
+> >>> Note how clk_round_rate() returns 123428571 for rates from 123428572 to
+> >>> 143999999, which is mathematically correct, but when clk_round_rate() is
+> >>> called with 123428571, the returned value is surprisingly 108000000.
+> >>>
+> >>> This means that the following code works a bit oddly:
+> >>>
+> >>> rate = clk_round_rate(clk, 123428572);
+> >>> clk_set_rate(clk, rate);
+> >>>
+> >>> As clk_set_rate() also does clock rate rounding, the result is that the
+> >>> clock is set to the rate of 108000000, not 123428571 returned by the
+> >>> clk_round_rate.
+> >>>
+> >>> This patch changes the clk-divider.c to use DIV_ROUND_UP when
+> >>> calculating the rate. This gives the following behavior which fixes the
+> >>> inconsistency:
+> >>>
+> >>> 144000000 -> 144000000
+> >>> 143999999 -> 123428572
+> >>> 123428572 -> 123428572
+> >>> 123428571 -> 108000000
+> >>>
+> >>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> >>> Cc: Mike Turquette <mturquette@linaro.org>
+> >>> ---
+> >>>   drivers/clk/clk-divider.c | 10 +++++-----
+> >>>   1 file changed, 5 insertions(+), 5 deletions(-)
+> >>>
+> >>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> >>> index 5543b7df8e16..ec22112e569f 100644
+> >>> --- a/drivers/clk/clk-divider.c
+> >>> +++ b/drivers/clk/clk-divider.c
+> >>> @@ -24,7 +24,7 @@
+> >>>    * Traits of this clock:
+> >>>    * prepare - clk_prepare only ensures that parents are prepared
+> >>>    * enable - clk_enable only ensures that parents are enabled
+> >>> - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
+> >>> + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
+> >>>    * parent - fixed parent.  No clk_set_parent support
+> >>>    */
+> >>>
+> >>> @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+> >>>               return parent_rate;
+> >>>       }
+> >>>
+> >>> -     return parent_rate / div;
+> >>> +     return DIV_ROUND_UP(parent_rate, div);
+> >>>   }
+> >>>
+> >>>   /*
+> >>> @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+> >>>               }
+> >>>               parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+> >>>                               MULT_ROUND_UP(rate, i));
+> >>> -             now = parent_rate / i;
+> >>> +             now = DIV_ROUND_UP(parent_rate, i);
+> >>>               if (now <= rate && now > best) {
+> >>>                       bestdiv = i;
+> >>>                       best = now;
+> >>> @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> >>>       int div;
+> >>>       div = clk_divider_bestdiv(hw, rate, prate);
+> >>>
+> >>> -     return *prate / div;
+> >>> +     return DIV_ROUND_UP(*prate, div);
+> >>>   }
+> >>>
+> >>>   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> >>> @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> >>>       unsigned long flags = 0;
+> >>>       u32 val;
+> >>>
+> >>> -     div = parent_rate / rate;
+> >>> +     div = DIV_ROUND_UP(parent_rate, rate);
+> >>>       value = _get_val(divider, div);
+> >>>
+> >>>       if (value > div_mask(divider))
+> >>>
+> >>
+> >> Basically the patch looks good to me, but it might be good to have a 
+> >> testing round of sort with this. It can potentially cause regressions on 
+> >> multiple boards if the drivers happen to rely on the "broken" clock 
+> >> rates. Same for patch #2 which is a copy paste of this one, but only 
+> >> impacts TI boards.
+> > 
+> > Agreed. I've taken patches #1 & #2 into clk-next. Let's let them stew in
+> > -next for a while and see if anyone's board catches on fire.
+> 
+> Are these on the way to 3.15?
 
-Sorry this was based on a internal tree. Will base it on Kukjin's gh7 base patch
+Yes, they've been in -next for a couple of weeks.
 
->
-> Cheers,
-> Mark.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Mike
+
+> 
+>  Tomi
+> 
+> 
