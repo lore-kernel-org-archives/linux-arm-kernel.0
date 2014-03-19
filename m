@@ -1,41 +1,50 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 19 Mar 2014 13:47:38 -0300
-Subject: stmmac-socfpga breakage in arm-soc
-In-Reply-To: <29079107.ja9Hu9mMY0@wuerfel>
-References: <201403191333.01095.arnd@arndb.de> <4337501.shzGE38xmF@wuerfel>
- <5329AAE1.7030705@gmail.com> <29079107.ja9Hu9mMY0@wuerfel>
-Message-ID: <5329CA2A.8030309@elopez.com.ar>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Mar 2014 16:50:58 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140319163339.GP11706@sirena.org.uk>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+ <20140319160414.GA19953@red-moon>
+ <20140319163339.GP11706@sirena.org.uk>
+Message-ID: <20140319165058.GA21513@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Mar 19, 2014 at 04:33:39PM +0000, Mark Brown wrote:
+> On Wed, Mar 19, 2014 at 04:04:14PM +0000, Lorenzo Pieralisi wrote:
+> > > +void __init init_cpu_topology(void)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	reset_cpu_topology();
+> > > +
+> > > +	ret = parse_dt_topology();
+> > > +	if (ret != 0)
+> > > +		reset_cpu_topology();
+> 
+> > ret is unused so should be removed. You could remove the first reset call and
+> 
+> I'm sorry, I don't follow?  The use is quoted above...  
 
-El 19/03/14 11:58, Arnd Bergmann escribi?:
-(snip)
-> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
-> index 5748351..19d5648 100644
-> --- a/Documentation/devicetree/bindings/net/stmmac.txt
-> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
-> @@ -31,6 +31,10 @@ Optional properties:
->   - reset-names: Should contain the reset signal name "stmmaceth", if a
->   	reset phandle is given
->   - max-frame-size: See ethernet.txt file in the same directory
-> +- clocks: If present, the first clock should be the GMAC main clock,
-> +  further clocks may be specified in derived bindings
-> +- clock-names: One name for each entry in the clocks property, the
-> +  first one should be "stmmaceth".
->
->   Examples:
->
-> @@ -43,4 +47,6 @@ Examples:
->   		mac-address = [000000000000]; /* Filled in by U-Boot */
->   		max-frame-size = <3800>;
->   		phy-mode = "gmii";
-> +		clocks = <&clock>;
-> +		clock-names = "stmmaceth">
+if (parse_dt_topology())
+	reset_cpu_topology();
 
-There's a small typo there on the ;
+If you want to leave ret there I do not care, I flag what I notice.
 
-Cheers,
+> > use static initialization for that, it is a matter of taste though.
+> 
+> Static initialisation can't cover the calls to set_power_scale() and
+> having a different thing for default and unwinding cases seems likely to
+> be error prone.
+> 
+> > A comment is in order, whatever approach you go for.
+> 
+> I'm not sure what the confusion is here so I don't know what a comment
+> would clarify.  Could you say what it is you find confusing please?
 
-Emilio
+It is worth explaining why you want to reset the topology for the sake
+of completeness, I do not think I am asking too much.
+
+parse_cluster() return value issue I flagged up must be fixed though.
+
+Thanks,
+Lorenzo
