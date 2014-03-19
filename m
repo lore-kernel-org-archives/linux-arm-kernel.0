@@ -1,53 +1,28 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 19 Mar 2014 22:54:33 +0100
-Subject: PL310 errata workarounds
-In-Reply-To: <20140319214631.GL7528@n2100.arm.linux.org.uk>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <CAL_JsqK6+gz6u=bSUFS7qjKANd2ZSQV5bWccw85KvAA7aP0FrA@mail.gmail.com>
- <20140319214631.GL7528@n2100.arm.linux.org.uk>
-Message-ID: <201403192254.34024.marex@denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Mar 2014 14:57:33 -0700
+Subject: [PATCH v2] Documentation: clk: Add locking documentation
+In-Reply-To: <1427024.Y6pT20dv1F@avalon>
+References: <1393591256-6932-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1427024.Y6pT20dv1F@avalon>
+Message-ID: <20140319215733.31449.47481@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 at 10:46:32 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 19, 2014 at 04:35:58PM -0500, Rob Herring wrote:
-> > On Wed, Mar 19, 2014 at 4:22 PM, Marek Vasut <marex@denx.de> wrote:
-> > > On Friday, March 14, 2014 at 08:14:06 PM, Rob Herring wrote:
-> > >> On Fri, Mar 14, 2014 at 12:57 PM, Russell King - ARM Linux
-> > >> 
-> > >> <linux@arm.linux.org.uk> wrote:
-> > >> > On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
-> > >> >> The obvious fix is to convert l2x0_flush_line to a function ptr
-> > >> >> which just further complicates the code.
-> > >> > 
-> > >> > I currently regard this code as unmaintainable, so right now I'm in
-> > >> > the process of completely rewriting it, going back to the specs and
-> > >> > checking what is required.  Sharing code between the L210, L220 and
-> > >> > L310 looks good from the point of view of keeping the line count
-> > >> > down, but actually they're quite different and have various
-> > >> > different requirements.
-> > >> > 
-> > >> > Out of those, L220 is the odd one out: all operations are background
-> > >> > operations there, which means they have to be waited for. 
-> > >> > Currently, if you have one of these, and you build a multiplatform
-> > >> > kernel which includes PL310 support, you don't wait for any of
-> > >> > these and you probably see a lot of data corruption as a result.
-> > >> 
-> > >> Oops. I guess there are not many users as the L220 was primarily used
-> > >> with the 1176 (and 11MP?) IIRC. I guess one of the primary 1176 based
-> > >> platforms currently used is RPi, but it appears the BCM2835 doesn't
-> > >> have an L2 (other than some custom L2 for the GPU).
-> > > 
-> > > Won't Freescale i.MX35 help here ? It's 1136JF-S core and has some L2
-> > > cache.
-> > 
-> > No. 1136 uses L210. 1176 uses L220. There was the i.MX37 which had an
-> > 1176, but it was pretty short lived and never saw upstream support.
+Quoting Laurent Pinchart (2014-03-12 05:11:01)
+> Hello,
 > 
-> Don't worry too much about the L220 - the Realview boards have one, and
-> I have one Realview EB board:
+> On Friday 28 February 2014 13:40:56 Laurent Pinchart wrote:
+> > Briefly documentation the common clock framework locking scheme from a
+> > clock driver point of view.
+> > 
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Ping ? Is this version better (and acceptable) ?
 
-OK, gotcha.
+Yes, thanks much for the resend. I fixed a small typo in the changelog:
+s/documentation/document/
 
-Best regards,
-Marek Vasut
+Taken into clk-next.
+
+Regards,
+Mike
