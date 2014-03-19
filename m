@@ -1,68 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:11 +0100
-Subject: [PATCH 14/62] ARM: imx: imx6q_set_lpm is only defined for CONFIG_PM=y
+Date: Wed, 19 Mar 2014 20:29:21 +0100
+Subject: [PATCH 24/62] ARM: omap1: select I2C where needed for PMIC
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-15-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-25-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This ensures that we only call imx6q_set_lpm if CONFIG_PM
-is enabled and we are building the pm-imx6q.c file.
+The OMAP H2, OSK and OSIRIS machines cannot build without
+I2C and TPS65010 both enabled unconditionally.
 
-Another fix that has been suggested for this is to always
-build this file conditionally build only the parts of it
-that are relevant only to CONFIG_PM.
+In each case, failing to enable CONFIG_I2C results in a
+build or link error, so most consistent solution is to
+ensure that it is impossible to disable those options.
+
+It would be nice to leave CONFIG_I2C as user-selectable,
+but doing that properly would require more work.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 ---
- arch/arm/mach-imx/clk-imx6q.c      | 3 ++-
- arch/arm/mach-imx/clk-imx6sl.c     | 3 ++-
- arch/arm/mach-imx/cpuidle-imx6sl.c | 3 +++
- 3 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap1/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index b0e7f9d..133b23e 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -478,7 +478,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
- 
- 	/* Set initial power mode */
--	imx6q_set_lpm(WAIT_CLOCKED);
-+	if (IS_ENABLED(CONFIG_PM))
-+		imx6q_set_lpm(WAIT_CLOCKED);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
- 	base = of_iomap(np, 0);
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index f7073c0..a882bdf 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -382,7 +382,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clk_set_parent(clks[IMX6SL_CLK_SPDIF0_SEL], clks[IMX6SL_CLK_PLL3_PFD3]);
- 
- 	/* Set initial power mode */
--	imx6q_set_lpm(WAIT_CLOCKED);
-+	if (IS_ENABLED(CONFIG_PM))
-+		imx6q_set_lpm(WAIT_CLOCKED);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
- 	base = of_iomap(np, 0);
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-index d4b6b81..c9a6aa8 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sl.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-@@ -53,5 +53,8 @@ static struct cpuidle_driver imx6sl_cpuidle_driver = {
- 
- int __init imx6sl_cpuidle_init(void)
- {
-+	if (!IS_ENABLED(CONFIG_PM))
-+		return -ENOSYS;
-+
- 	return cpuidle_register(&imx6sl_cpuidle_driver, NULL);
- }
+diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+index cdd05f2..23ab1d5 100644
+--- a/arch/arm/mach-omap1/Kconfig
++++ b/arch/arm/mach-omap1/Kconfig
+@@ -44,6 +44,8 @@ config MACH_OMAP_INNOVATOR
+ config MACH_OMAP_H2
+ 	bool "TI H2 Support"
+ 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
++	select TPS65010
++	select I2C
+     	help
+ 	  TI OMAP 1610/1611B H2 board support. Say Y here if you have such
+ 	  a board.
+@@ -64,6 +66,8 @@ config MACH_HERALD
+ config MACH_OMAP_OSK
+ 	bool "TI OSK Support"
+ 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
++	select TPS65010
++	select I2C
+     	help
+ 	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
+           if you have such a board.
 -- 
 1.8.3.2
