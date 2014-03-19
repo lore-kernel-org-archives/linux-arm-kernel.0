@@ -1,53 +1,40 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 19 Mar 2014 13:47:38 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140319154434.GA3488@arch.cereza>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140316070917.GA3094@arch.cereza>
- <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
- <20140317204410.GA1118@arch.cereza>
- <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
- <20140319154434.GA3488@arch.cereza>
-Message-ID: <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
+From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
+Date: Wed, 19 Mar 2014 15:41:07 -0500
+Subject: [PATCH v2 0/1] ARM: sun4i: spi: Allow transfers larger than FIFO size
+Message-ID: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2014 08:44, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Thanks!
-> On the other side, this board has no pm_power_off() support, which means
-> kernel_halt() is called after kernel_power_off().
+This is the second iteration of the patches sent yesterday. Per
+Maxime's request, I have squashed them into one single patch, and
+applied most of the suggestion he made.
+
+As far as only clearing the interrupt _after_ draining the FIFO, I
+found that we usually get one extra Rx interrupt per burst if we do
+this, so I left the comment in.
+
+>>       /* Enable the interrupts */
+>> -     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
+>> -                                              SUN4I_INT_CTL_RF_F34);
+>> +     reg = SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34;
+>> +     /* Only enable Tx FIFO interrupt if we really need it */
+>> +     if (tx_len > SUN4I_FIFO_DEPTH)
+>> +             reg |= SUN4I_INT_CTL_TF_E34;
+>> +     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
 >
-> I'm not sure if a NULL pm_power_off() is supported, but this makes my kernel
-> crash in a reboot notifier that's called twice (first in kernel_power_off
-> and then in kernel_halt):
+> I'd be much dumber than that. Why don't you just enable both
+> interrupts all the time if we need larger transfers ?
 
-The omap board I'm using has a null pm_power_off.  I added code to
-bypass kernel_power_off in the event pm_power_off is null like this:
+As I've pointed out previously, this interrupt is PITA, as it triggers
+an IRQ storm if enabled without much thought. I found that
+(tx_len > SUN4I_FIFO_DEPTH) is the best check for when it's safe to
+enable this interrupt.
 
+Alexandru Gagniuc (1):
+  ARM: sun4i: spi: Allow transfers larger than FIFO size
 
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index a5f702a..d96b910 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -594,7 +594,8 @@ static void power_down(void)
-        case HIBERNATION_PLATFORM:
-                hibernation_platform_enter();
-        case HIBERNATION_SHUTDOWN:
--               kernel_power_off();
-+               if (pm_power_off)
-+                       kernel_power_off();
-                break;
- #ifdef CONFIG_SUSPEND
-        case HIBERNATION_SUSPEND:
+ drivers/spi/spi-sun4i.c | 68 +++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 63 insertions(+), 5 deletions(-)
 
-
-This follows the behavior in the reboot syscall which does it this way
-also.  I'm testing this now, and it seems work fine.  If this looks
-good, I can add it as an additional patch.
-
-Thanks,
-
-Sebastian
+--
+1.8.5.3
