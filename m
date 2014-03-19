@@ -1,49 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Mar 2014 13:34:31 -0700
-Subject: [PATCH 23/62] ARM: omap1: fix building without 32K_TIMER
-In-Reply-To: <20140319200100.GB4271@saruman.home>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Mar 2014 21:37:47 +0100
+Subject: [PATCH 25/62] ARM: mvebu: add missing header
+In-Reply-To: <1395257399-359545-26-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-24-git-send-email-arnd@arndb.de>
- <20140319195913.GA4271@saruman.home>
- <20140319200100.GB4271@saruman.home>
-Message-ID: <20140319203431.GA8333@atomide.com>
+ <1395257399-359545-26-git-send-email-arnd@arndb.de>
+Message-ID: <532A001B.5000708@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140319 13:06]:
-> On Wed, Mar 19, 2014 at 02:59:13PM -0500, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Wed, Mar 19, 2014 at 08:29:20PM +0100, Arnd Bergmann wrote:
-> > > If we enable CONFIG_OMAP_MPU_TIMER and CONFIG_OMAP_DM_TIMER but
-> > > not CONFIG_OMAP_32K_TIMER on OMAP1, we currently get this build error:
-> > > 
-> > > mach-omap1/pm.c: In function 'omap1_pm_idle':
-> > > mach-omap1/pm.c:123:9: error: 'enable_dyn_sleep' undeclared (first use in this function)
-> > >   while (enable_dyn_sleep) {
-> > >          ^
-> > > mach-omap1/pm.c:123:9: note: each undeclared identifier is reported only once for each function it appears in
-> > > 
-> > > This attempts to fix the #ifdef logic to deal with all combinations
-> > > of timers.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: linux-omap at vger.kernel.org
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > 
-> > I had sent a fix for months and months ago, what happened to it ?
+On 19/03/2014 20:29, Arnd Bergmann wrote:
+> The definition for SIGBUS may not be visible without including
+> linux/signal.h, as I found during randconfig testing.
 > 
-> Here
+> Adding an explicit include is certainly the right thing to do.
 > 
-> http://marc.info/?l=linux-omap&m=138963632408031&w=2
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
+> ---
+>  arch/arm/mach-mvebu/board-v7.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Tony, did you forget to send a pull request ?
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 746134e..333fca8 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/clocksource.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/mbus.h>
+> +#include <linux/signal.h>
+>  #include <linux/slab.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+> 
 
-Hmm yes weird, can't see it in my omap-for-v3.14/fixes branch.
 
-I must have gotten interrupted while applying and then probably
-ran git reset --hard before committing.
-
-Arnd, maybe pick up Felipe's earlier patch instead?
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
