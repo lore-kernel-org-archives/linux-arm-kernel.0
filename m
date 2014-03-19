@@ -1,43 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:29 +0100
-Subject: [PATCH 32/62] ARM: pxa: fix pxa_ssp_* declarations
+Date: Wed, 19 Mar 2014 20:29:40 +0100
+Subject: [PATCH 43/62] ARM: integrator: only select pl01x if TTY is enabled
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-33-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-44-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions declared in include/linux/pxa2xx_ssp.h are
-defined in plat-pxa/ssp.c, which can also be built for
-PLAT_MMP, but may be disabled there. This can lead to
-both unresolved symbols at link time and to duplicate
-symbols at compile time for random configurations.
-
-Changing the #ifdef in the header file to match the
-Kconfig symbol that decides if the file is built solves
-both problems.
+Building the integrator platform without TTY support currently
+results in a build failure because we always turn on the
+pl010 or pl011 drivers. Changing this to a conditional 'select'
+statement enables us to build more random configurations, although
+it should have little impact for practical configurations.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Daniel Mack <zonque@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- include/linux/pxa2xx_ssp.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-integrator/Kconfig | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/pxa2xx_ssp.h b/include/linux/pxa2xx_ssp.h
-index 4944420..f2b4051 100644
---- a/include/linux/pxa2xx_ssp.h
-+++ b/include/linux/pxa2xx_ssp.h
-@@ -219,7 +219,7 @@ static inline u32 pxa_ssp_read_reg(struct ssp_device *dev, u32 reg)
- 	return __raw_readl(dev->mmio_base + reg);
- }
- 
--#ifdef CONFIG_ARCH_PXA
-+#if IS_ENABLED(CONFIG_PXA_SSP)
- struct ssp_device *pxa_ssp_request(int port, const char *label);
- void pxa_ssp_free(struct ssp_device *);
- struct ssp_device *pxa_ssp_request_of(const struct device_node *of_node,
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 6e8b0e1..ba43321 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -6,8 +6,8 @@ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
+ 	select CLKSRC_MMIO
+ 	select MIGHT_HAVE_PCI
+-	select SERIAL_AMBA_PL010
+-	select SERIAL_AMBA_PL010_CONSOLE
++	select SERIAL_AMBA_PL010 if TTY
++	select SERIAL_AMBA_PL010_CONSOLE if TTY
+ 	select SOC_BUS
+ 	help
+ 	  Include support for the ARM(R) Integrator/AP and
+@@ -18,8 +18,8 @@ config ARCH_INTEGRATOR_CP
+ 	select ARCH_CINTEGRATOR
+ 	select ARM_TIMER_SP804
+ 	select PLAT_VERSATILE_CLCD
+-	select SERIAL_AMBA_PL011
+-	select SERIAL_AMBA_PL011_CONSOLE
++	select SERIAL_AMBA_PL011 if TTY
++	select SERIAL_AMBA_PL011_CONSOLE if TTY
+ 	select SOC_BUS
+ 	help
+ 	  Include support for the ARM(R) Integrator CP platform.
 -- 
 1.8.3.2
