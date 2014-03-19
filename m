@@ -1,40 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:12 +0100
-Subject: [PATCH 15/62] ARM: ixp4xx/omixp: always include linux/leds.h
+Date: Wed, 19 Mar 2014 20:29:09 +0100
+Subject: [PATCH 12/62] ARM: hisi: fix building without CONFIG_HOTPLUG_CPU
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-16-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omixp board code unconditionally defines a gpio-led
-device, but for some reason includes the header file
-for this only if CONFIG_LEDS_CLASS is enabled, causing
-a build error otherwise.
-
-Removing the #ifdef fixes the build error with no downsides
-whatsoever.
+The hisi SMP code always uses the hi3xxx_set_cpu() function
+defined in the hotplug.c file, so we cannot build without
+this when CONFIG_SMP is enabled. This patch slightly restructures
+the code so we always build the parts of hotplug.c that we need
+but just leave out the CPU disable logic if CONFIG_HOTPLUG_CPU
+is turned off.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-ixp4xx/omixp-setup.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-hisi/Makefile  | 3 +--
+ arch/arm/mach-hisi/hotplug.c | 2 ++
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/omixp-setup.c b/arch/arm/mach-ixp4xx/omixp-setup.c
-index 75ef03d..2d494b4 100644
---- a/arch/arm/mach-ixp4xx/omixp-setup.c
-+++ b/arch/arm/mach-ixp4xx/omixp-setup.c
-@@ -17,9 +17,7 @@
- #include <linux/serial_8250.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
--#ifdef CONFIG_LEDS_CLASS
- #include <linux/leds.h>
--#endif
+diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+index 6870058..2ae1b59 100644
+--- a/arch/arm/mach-hisi/Makefile
++++ b/arch/arm/mach-hisi/Makefile
+@@ -3,5 +3,4 @@
+ #
  
- #include <asm/setup.h>
- #include <asm/memory.h>
+ obj-y	+= hisilicon.o
+-obj-$(CONFIG_SMP)		+= platsmp.o
+-obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
++obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
+diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
+index b909854..abd441b 100644
+--- a/arch/arm/mach-hisi/hotplug.c
++++ b/arch/arm/mach-hisi/hotplug.c
+@@ -178,6 +178,7 @@ static inline void cpu_enter_lowpower(void)
+ 	  : "cc");
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
+ void hi3xxx_cpu_die(unsigned int cpu)
+ {
+ 	cpu_enter_lowpower();
+@@ -198,3 +199,4 @@ int hi3xxx_cpu_kill(unsigned int cpu)
+ 	hi3xxx_set_cpu(cpu, false);
+ 	return 1;
+ }
++#endif
 -- 
 1.8.3.2
