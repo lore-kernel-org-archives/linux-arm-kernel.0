@@ -1,45 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:23 +0100
-Subject: [PATCH 26/62] ARM: mvebu: don't select CONFIG_NEON
+Date: Wed, 19 Mar 2014 20:29:45 +0100
+Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-27-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-49-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_NEON is meant to be user-selectable. Turning it on
-unconditionally means we can't build a smaller kernel when
-we don't need it, and causes build errors if CONFIG_VFP
-is not also enabled.
+The power domain code is only available when CONFIG_PM
+is enabled, so we must not select that unconditionally for
+s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
+mirrors what we do on other platforms, and fixes a possible
+randconfig build bug.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-mvebu/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 485513cb..b24a082 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -39,7 +39,6 @@ config MACH_ARMADA_375
- 	select ARMADA_375_CLK
- 	select CPU_V7
- 	select MACH_MVEBU_V7
--	select NEON
- 	select PINCTRL_ARMADA_375
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
-@@ -53,7 +52,6 @@ config MACH_ARMADA_38X
- 	select ARMADA_38X_CLK
- 	select CPU_V7
- 	select MACH_MVEBU_V7
--	select NEON
- 	select PINCTRL_ARMADA_38X
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4721007..6ffcadd 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -764,7 +764,7 @@ config ARCH_S3C64XX
+ 	select HAVE_TCM
+ 	select NO_IOPORT
+ 	select PLAT_SAMSUNG
+-	select PM_GENERIC_DOMAINS
++	select PM_GENERIC_DOMAINS if PM
+ 	select S3C_DEV_NAND
+ 	select S3C_GPIO_TRACK
+ 	select SAMSUNG_ATAGS
 -- 
 1.8.3.2
