@@ -1,48 +1,75 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 20 Mar 2014 00:15:44 +0200
-Subject: [PATCH 1/2] mtd: davinci-nand: add dts property for
- NAND_NO_SUBPAGE_WRITE option
-In-Reply-To: <1395267345-27795-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1395267345-27795-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1395267345-27795-2-git-send-email-ivan.khoronzhuk@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Mar 2014 15:35:36 -0700
+Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
+ driver support
+In-Reply-To: <531E11B7.6080109@ti.com>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-4-git-send-email-nm@ti.com>
+ <20140224015826.GU25940@sirena.org.uk> <530B594F.2030500@ti.com>
+ <20140303035426.GC2411@sirena.org.uk> <531DF250.5060100@ti.com>
+ <20140310172221.GT28112@sirena.org.uk> <531DF931.1060108@ti.com>
+ <20140310180131.GZ28112@sirena.org.uk> <531E11B7.6080109@ti.com>
+Message-ID: <20140319223536.31449.32103@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a property to disable subpage write.
+Quoting Nishanth Menon (2014-03-10 12:25:43)
+> On 03/10/2014 01:01 PM, Mark Brown wrote:
+> > On Mon, Mar 10, 2014 at 12:41:05PM -0500, Nishanth Menon wrote:
+> > 
+> >> The only other options are:
+> >> a) Abstract it at a higher level at "user drivers", since they are
+> >> aware of the sequencing needs - but this partially defeats the
+> >> purpose, unless ofcourse, we do a tricky implementation such as:
+> >> clk a, b, c -> prenotifiers in a, postnotifiers in c (which as you
+> >> mentioned is a little trickier to get right).
+> >> b) introduce a higher level generic dvfs function[1] which does not
+> >> seem very attractive either.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
- drivers/mtd/nand/davinci_nand.c                        | 3 +++
- 2 files changed, 5 insertions(+)
+I disagree that a higher level DVFS interface is unattractive. I think
+it has taken a while to get there but people are finally interested in
+this. A small amount of discussion about this took place at Linaro
+Connect earlier this month (just hallway talk) but we shouldn't rule out
+the idea of a general framework for managing DVFS, which frankly is
+complex enough to merit not being shoved into the clock layer.
 
-diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-index cfb18ab..50af930 100644
---- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-@@ -53,6 +53,8 @@ Recommended properties :
- 				identifier is saved in OOB area. If not present
- 				false.
- 
-+- ti,davinci-nosubpage-write:	disable subpage write for the device
-+
- Deprecated properties:
- 
- - ti,davinci-ecc-mode:		operation mode of the NAND ecc mode. ECC mode
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index 4615d79..3ba058d 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -581,6 +581,9 @@ static struct davinci_nand_pdata
- 		    of_property_read_bool(pdev->dev.of_node,
- 			"ti,davinci-nand-use-bbt"))
- 			pdata->bbt_options = NAND_BBT_USE_FLASH;
-+		if (of_property_read_bool(pdev->dev.of_node,
-+			"ti,davinci-no-subpage-write"))
-+			pdata->options |= NAND_NO_SUBPAGE_WRITE;
- 	}
- 
- 	return dev_get_platdata(&pdev->dev);
--- 
-1.8.3.2
+> > 
+> >> Any other suggestions other than limiting the usage(and documenting it
+> >> so) and hoping for a future evolution to take this into consideration?
+> > 
+> > Something might be doable with telling the clock API about maintianing
+> > ratios between clocks?  I do think we should have an idea where we'd go
+> > with such requirements, even if we don't currently handle it, so that we
+> > can hopefully avoid another round of refactoring everything but it
+> > doesn't seem 100% essential, just very nice to have.
+
+This sounds reasonable but I must point out that the clock framework
+today (based on the existing clk.h api) does not have a single instance
+of constraint-based logic. For instance there is no clk_set_min_rate or
+clk_set_max_rate or clk_set_rate_range. These have been discussed before
+but I feel that pushing something before now would have been premature
+given that the level of discussion around those features never hit
+critical mass.
+
+So the ratio thing is sensible, but it would be the first
+constraint-like mechanism in the clock framework so what that looks like
+bares careful consideration.
+
+> > 
+> Mike,
+> Any suggestions about the above? could we use composite clocks in some
+> manner here(even though I think the original intent of the same was
+> not the same)?
+
+NACK. Let's just model the hardware in the clock framework, please. If
+you need to invent fake clocks to represent other constructs then it
+means the framework is missing something (or we're missing an entire
+framework, e.g. DVFS).
+
+Regards,
+Mike
+
+> 
+> -- 
+> Regards,
+> Nishanth Menon
