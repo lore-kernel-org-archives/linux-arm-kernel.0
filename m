@@ -1,43 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Mar 2014 14:12:08 -0600
-Subject: [PATCH 62/62] ARM: tegra: make debug_ll code build for ARMv6
-In-Reply-To: <6268308.cWSbPODKo9@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Mar 2014 20:12:55 +0000
+Subject: [PATCH 37/62] ARM: sa1100/pxa: fix MTD_XIP build
+In-Reply-To: <1395257399-359545-38-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-63-git-send-email-arnd@arndb.de>
- <5329F296.6030308@wwwdotorg.org> <6268308.cWSbPODKo9@wuerfel>
-Message-ID: <5329FA18.6090208@wwwdotorg.org>
+ <1395257399-359545-38-git-send-email-arnd@arndb.de>
+Message-ID: <20140319201255.GI7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2014 01:51 PM, Arnd Bergmann wrote:
-> On Wednesday 19 March 2014 13:40:06 Stephen Warren wrote:
->> Hmmm. This code is guaranteed to only execute on Tegra (well, perhaps
->> someone can turn on the wrong debug option and run it on non-Tegra, but
->> then it's guaranteed not to work since the HW it touches doesn't exist).
->> As such, the code ought to be able to use ARMv7 instructions.
->>
->> As a fix for similar issues in assembly code in arch/arm/mach-tegra/*.S,
->> Makefile there does:
->>
->> asflags-y                               += -march=armv7-a
->>
->> (I think you added that? Yes, in 408e713545ca "ARM: tegra: build
->> assembly files with -march=armv7-a")
->>
->> Shouldn't we use the same fix in this case too?
+On Wed, Mar 19, 2014 at 08:29:34PM +0100, Arnd Bergmann wrote:
+> In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
+> to IOMEM", the definition of the OSCR macro was changed to be an
+> __iomem pointer, but the same register is also used by the XIP
+> code. This patch does the corresponding change here as well.
 > 
-> That was my first idea, but I couldn't come up with a nice way to do this
-> for arch/arm/kernel/debug.S, which #includes the specific implementation.
+> Since PXA now uses a local variable for the base address of the
+> ICIP register, the xip_irqpending function has to be moved
+> into irq.c in the process.
 > 
-> I'd rather not put lots of per-platform hacks into arch/arm/kernel/Makefile.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-pxa/include/mach/mtd-xip.h    | 7 ++++---
+>  arch/arm/mach-pxa/irq.c                     | 8 ++++++++
+>  arch/arm/mach-sa1100/include/mach/mtd-xip.h | 4 ++--
+>  3 files changed, 14 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> index 990d2bf..c4c90d1 100644
+> --- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> +++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> @@ -17,11 +17,12 @@
+>  
+>  #include <mach/regs-ost.h>
+>  
+> -#define xip_irqpending()	(ICIP & ICMR)
+> +extern bool xip_irqpending(void);
+>  
+>  /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+> -#define xip_currtime()		(OSCR)
+> -#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
+> +#define xip_irqpending()	xip_irqpending()
+> +#define xip_currtime()		readl(OSCR)
+> +#define xip_elapsed_since(x)	(signed)((readl(OSCR) - (x)) / 4)
 
-Oh, I guess the fact it's include makes it a bit more painful.
+I don't think you can do that.  I believe xip_irqpending() has to be
+inline so that the XIP code (located in RAM) can detect when an
+interrupt is pending, suspend the MTD operation, switch the MTD back
+to read mode, and then allow the kernel to run.
 
-You could deal with it in Kconfig reasonably easily by having each of
-DEBUG_*_UART select a config option indicating how to compile code that
-includes DEBUG_LL_INCLUDE, and then have the Makefiles set up asflags
-based on those. Still, that would be a lot of work and this patch is
-simpler.
+I'd be nervous about this without Nicolas checking it, or it being
+built and the resulting assembly inspected.
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
