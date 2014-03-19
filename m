@@ -1,53 +1,48 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 19 Mar 2014 14:11:47 -0700
-Subject: [PATCH 21/62] ARM: msm: avoid calling debug_ll_addr on !MMU
-In-Reply-To: <1395257399-359545-22-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-22-git-send-email-arnd@arndb.de>
-Message-ID: <20140319211147.GB10102@codeaurora.org>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 19 Mar 2014 14:06:54 -0700
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140316070917.GA3094@arch.cereza>
+ <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
+ <20140317204410.GA1118@arch.cereza>
+ <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
+ <20140319154434.GA3488@arch.cereza>
+ <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
+Message-ID: <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:18PM +0100, Arnd Bergmann wrote:
->MSM7X00A has an open-coded version of debug_ll_io_init so it
->can use MT_DEVICE_NONSHARED as required by the platform.
+On 19 March 2014 13:47, Sebastian Capella <sebastian.capella@linaro.org> wrote:
+> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> index a5f702a..d96b910 100644
+> --- a/kernel/power/hibernate.c
+> +++ b/kernel/power/hibernate.c
+> @@ -594,7 +594,8 @@ static void power_down(void)
+>         case HIBERNATION_PLATFORM:
+>                 hibernation_platform_enter();
+>         case HIBERNATION_SHUTDOWN:
+> -               kernel_power_off();
+> +               if (pm_power_off)
+> +                       kernel_power_off();
+>                 break;
+>  #ifdef CONFIG_SUSPEND
+>         case HIBERNATION_SUSPEND:
 >
->However, this fails to build on no-MMU kernels because the
->debug_ll_addr function is not available. Since the iotable_init
->function doesn't actually do anyting in this configuration,
->we can simply get away by enclosing the broken function call
->in an #ifdef, which seems to be the least ugly workaround.
 >
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->Cc: David Brown <davidb@codeaurora.org>
->Cc: Daniel Walker <dwalker@fifo99.com>
->Cc: Bryan Huntsman <bryanh@codeaurora.org>
->---
-> arch/arm/mach-msm/io.c | 2 ++
-> 1 file changed, 2 insertions(+)
+> This follows the behavior in the reboot syscall which does it this way
+> also.  I'm testing this now, and it seems work fine.  If this looks
+> good, I can add it as an additional patch.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+BTW, one thing I would point out is that kernel_power_off and
+kernel_halt call the same notifier but with different parameters
+(SYS_POWER_OFF and SYS_HALT).
 
->diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
->index adc8971..34e0947 100644
->--- a/arch/arm/mach-msm/io.c
->+++ b/arch/arm/mach-msm/io.c
->@@ -78,8 +78,10 @@ void __init msm_map_common_io(void)
-> 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
-> #if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> 		defined(CONFIG_DEBUG_MSM_UART3)
->+#ifdef CONFIG_MMU
-> 	debug_ll_addr(&msm_io_desc[size - 1].pfn,
-> 		      &msm_io_desc[size - 1].virtual);
->+#endif
-> 	msm_io_desc[size - 1].pfn = __phys_to_pfn(msm_io_desc[size - 1].pfn);
-> #endif
-> 	iotable_init(msm_io_desc, size);
->-- 
->1.8.3.2
->
+If pm_power_down is null, I dont see why we'd want to notify
+SYS_POWER_OFF before SYS_HALT.  With the previous change I'm assuming
+there's no benefit, so please chime in if you know a reason.
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+
+Sebastian
