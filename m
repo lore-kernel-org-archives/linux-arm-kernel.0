@@ -1,26 +1,66 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 19 Mar 2014 13:41:26 +0100 (CET)
-Subject: [PATCH v6 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for
- NMI controller
-In-Reply-To: <20140319123241.GI27873@lukather>
-References: <1394890861-18347-1-git-send-email-carlo@caione.org>
- <alpine.DEB.2.02.1403191213240.18573@ionos.tec.linutronix.de>
- <20140319123241.GI27873@lukather>
-Message-ID: <alpine.DEB.2.02.1403191341070.18573@ionos.tec.linutronix.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 19 Mar 2014 13:41:49 +0100
+Subject: [PATCH v2 2/7] sched: rework of sched_domain topology definition
+In-Reply-To: <53297F10.3050106@arm.com>
+References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
+ <1395165409-18055-3-git-send-email-vincent.guittot@linaro.org>
+ <53297F10.3050106@arm.com>
+Message-ID: <20140319124149.GM27632@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Mar 2014, Maxime Ripard wrote:
 
-> On Wed, Mar 19, 2014 at 12:13:56PM +0100, Thomas Gleixner wrote:
-> > On Sat, 15 Mar 2014, Carlo Caione wrote:
-> > 
-> > > Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
-> > > Three register are present to (un)mask, control and acknowledge NMI.
-> > > These two patches add a new irqchip driver in cascade with GIC.
-> > 
-> > If I get an ack for the DT parts, I'll pick it up.
+The keyboard deity gave us delete, please apply graciously when replying
+to large emails.
+
+On Wed, Mar 19, 2014 at 11:27:12AM +0000, Dietmar Eggemann wrote:
+> On 18/03/14 17:56, Vincent Guittot wrote:
+> > +       if (sd->flags & SD_SHARE_CPUPOWER) {
+> > +               sd->imbalance_pct = 110;
+> > +               sd->smt_gain = 1178; /* ~15% */
+> > +               sd->flags |= arch_sd_sibling_asym_packing();
+> > +
+> > +       } else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
+> > +               sd->imbalance_pct = 117;
+> > +               sd->cache_nice_tries = 1;
+> > +               sd->busy_idx = 2;
+> > +
+> > +#ifdef CONFIG_NUMA
+> > +       } else if (sd->flags & SD_NUMA) {
+> > +               sd->cache_nice_tries = 2;
+> > +               sd->busy_idx = 3;
+> > +               sd->idle_idx = 2;
+> > +
+> > +               sd->flags |= SD_SERIALIZE;
+> > +               if (sched_domains_numa_distance[tl->numa_level] > RECLAIM_DISTANCE) {
+> > +                       sd->flags &= ~(SD_BALANCE_EXEC |
+> > +                                      SD_BALANCE_FORK |
+> > +                                      SD_WAKE_AFFINE);
+> > +               }
+> > +
+> > +#endif
+> > +       } else {
+> > +               sd->flags |= SD_PREFER_SIBLING;
+> > +               sd->cache_nice_tries = 1;
+> > +               sd->busy_idx = 2;
+> > +               sd->idle_idx = 1;
+> > +       }
 > 
-> I had some comments on it, so Carlo will probably resubmit it.
+> This 'if ... else statement' is still a weak point from the perspective
+> of making the code robust:
 
-That's the resubmit as far as I can tell.
+<snip>
+
+> Is there a way to check that MC and GMC have to have
+> SD_SHARE_PKG_RESOURCES set so that this can't happen unnoticed?
+
+So from the core codes perspective those names mean less than nothing.
+Its just a string to carry along for us meat-bags. The string isn't even
+there when !SCHED_DEBUG.
+
+So from this codes POV you told it it had a domain without PKGSHARE,
+that's fine.
+
+That said; yeah the thing isn't the prettiest piece of code. But it has
+the big advantage of being the one place where we convert topology into
+behaviour.
