@@ -1,39 +1,33 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 19 Mar 2014 13:02:33 -0400
-Subject: [PATCH] ARM: Remove extraneous kcmp syscall ignore
-In-Reply-To: <1392403099-13411-1-git-send-email-cov@codeaurora.org>
-References: <1392403099-13411-1-git-send-email-cov@codeaurora.org>
-Message-ID: <5329CDA9.7000707@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Mar 2014 17:03:18 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140319165058.GA21513@red-moon>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+ <20140319160414.GA19953@red-moon>
+ <20140319163339.GP11706@sirena.org.uk>
+ <20140319165058.GA21513@red-moon>
+Message-ID: <20140319170318.GS11706@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 01:38 PM, Christopher Covington wrote:
-> The kcmp system call was ported to ARM in
-> commit 3f7d1fe108dbaefd0c57a41753fc2c90b395f458
-> "ARM: 7665/1: Wire up kcmp syscall".
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm/include/asm/unistd.h | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-> index 141baa3..cbd6197 100644
-> --- a/arch/arm/include/asm/unistd.h
-> +++ b/arch/arm/include/asm/unistd.h
-> @@ -48,6 +48,5 @@
->   */
->  #define __IGNORE_fadvise64_64
->  #define __IGNORE_migrate_pages
-> -#define __IGNORE_kcmp
->  
->  #endif /* __ASM_ARM_UNISTD_H */
+On Wed, Mar 19, 2014 at 04:50:58PM +0000, Lorenzo Pieralisi wrote:
 
-Seeing no objections, will add to the patch tracker.
+> if (parse_dt_topology())
+> 	reset_cpu_topology();
 
-Christopher
+> If you want to leave ret there I do not care, I flag what I notice.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Oh, right.  I was confused because you said it was unused when it
+clearly had a use.  I find that ugly since it looks like the test is the
+wrong way around but whatever...
+
+> parse_cluster() return value issue I flagged up must be fixed though.
+
+Already done along with the other stylistic stuff.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/466cb53b/attachment.sig>
