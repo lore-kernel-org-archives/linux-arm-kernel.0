@@ -1,79 +1,40 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 19 Mar 2014 17:22:43 +0100
-Subject: [PATCH v3 4/6] sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
+Date: Wed, 19 Mar 2014 17:22:45 +0100
+Subject: [PATCH v3 6/6] sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT level
 In-Reply-To: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
 References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1395246165-31150-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1395246165-31150-7-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new flag SD_SHARE_POWERDOMAIN is created to reflect whether groups of CPUs
-in a sched_domain level can or not reach different power state. As an example,
-the flag should be cleared at CPU level if groups of cores can be power gated
-independently. This information can be used in the load balance decision or to
-add load balancing level between group of CPUs that can power gate
-independantly.
-This flag is part of the topology flags that can be set by arch.
+Set the power domain dependency at SMT level of Power8 but keep the flag
+clear at CPU level. The goal is to consolidate tasks on the threads of a
+core up to a level as explained by Preeti:
+"On powerpc we would want to clear the SD_SHARE_POWERDOMAIN flag at the CPU
+domain. On Power8, considering we have 8 threads per core, we would want to
+consolidate tasks atleast upto 4 threads without significant performance
+impact before spilling over to the other cores. By doing so, besides making
+use of the higher power of the core we could do cpuidle management at the
+core level for the remaining idle cores as a result of this consolidation."
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
 ---
- include/linux/sched.h |  1 +
- kernel/sched/core.c   | 10 +++++++---
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ arch/powerpc/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 6479de4..7048369 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -861,6 +861,7 @@ enum cpu_idle_type {
- #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
- #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
- #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
-+#define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
- #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
- #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
- #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 0b51ee3..29b0c90 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -5298,7 +5298,8 @@ static int sd_degenerate(struct sched_domain *sd)
- 			 SD_BALANCE_FORK |
- 			 SD_BALANCE_EXEC |
- 			 SD_SHARE_CPUPOWER |
--			 SD_SHARE_PKG_RESOURCES)) {
-+			 SD_SHARE_PKG_RESOURCES |
-+			 SD_SHARE_POWERDOMAIN)) {
- 		if (sd->groups != sd->groups->next)
- 			return 0;
- 	}
-@@ -5329,7 +5330,8 @@ sd_parent_degenerate(struct sched_domain *sd, struct sched_domain *parent)
- 				SD_BALANCE_EXEC |
- 				SD_SHARE_CPUPOWER |
- 				SD_SHARE_PKG_RESOURCES |
--				SD_PREFER_SIBLING);
-+				SD_PREFER_SIBLING |
-+				SD_SHARE_POWERDOMAIN);
- 		if (nr_node_ids == 1)
- 			pflags &= ~SD_SERIALIZE;
- 	}
-@@ -5938,6 +5940,7 @@ static int sched_domains_curr_level;
-  * SD_SHARE_CPUPOWER      - describes SMT topologies
-  * SD_SHARE_PKG_RESOURCES - describes shared caches
-  * SD_NUMA                - describes NUMA topologies
-+ * SD_SHARE_POWERDOMAIN   - describes shared power domain
-  *
-  * Odd one out:
-  * SD_ASYM_PACKING        - describes SMT quirks
-@@ -5946,7 +5949,8 @@ static int sched_domains_curr_level;
- 	(SD_SHARE_CPUPOWER |		\
- 	 SD_SHARE_PKG_RESOURCES |	\
- 	 SD_NUMA |			\
--	 SD_ASYM_PACKING)
-+	 SD_ASYM_PACKING |		\
-+	 SD_SHARE_POWERDOMAIN)
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index c9cade5..fbbac3c 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -759,7 +759,7 @@ int setup_profiling_timer(unsigned int multiplier)
+ /* cpumask of CPUs with asymetric SMT dependancy */
+ static const int powerpc_smt_flags(void)
+ {
+-	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
++	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES | SD_SHARE_POWERDOMAIN;
  
- static struct sched_domain *
- sd_init(struct sched_domain_topology_level *tl, int cpu)
+ 	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
+ 		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
 -- 
 1.9.0
