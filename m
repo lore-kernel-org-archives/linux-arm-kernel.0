@@ -1,40 +1,166 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 19 Mar 2014 22:22:30 +0100
-Subject: PL310 errata workarounds
-In-Reply-To: <CAL_JsqL02dw7B+GEL4921f_7m=RRUokW0n64TxSJnMWN3MMfrQ@mail.gmail.com>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140314175701.GR21483@n2100.arm.linux.org.uk>
- <CAL_JsqL02dw7B+GEL4921f_7m=RRUokW0n64TxSJnMWN3MMfrQ@mail.gmail.com>
-Message-ID: <201403192222.30622.marex@denx.de>
+From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
+Date: Wed, 19 Mar 2014 16:28:57 -0500
+Subject: [PATCH v3 1/1] ARM: sun4i: spi: Allow transfers larger than FIFO size
+In-Reply-To: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
+References: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
+Message-ID: <1395264538-29158-1-git-send-email-mr.nuke.me@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 14, 2014 at 08:14:06 PM, Rob Herring wrote:
-> On Fri, Mar 14, 2014 at 12:57 PM, Russell King - ARM Linux
-> 
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
-> >> The obvious fix is to convert l2x0_flush_line to a function ptr which
-> >> just further complicates the code.
-> > 
-> > I currently regard this code as unmaintainable, so right now I'm in the
-> > process of completely rewriting it, going back to the specs and checking
-> > what is required.  Sharing code between the L210, L220 and L310 looks
-> > good from the point of view of keeping the line count down, but actually
-> > they're quite different and have various different requirements.
-> > 
-> > Out of those, L220 is the odd one out: all operations are background
-> > operations there, which means they have to be waited for.  Currently,
-> > if you have one of these, and you build a multiplatform kernel which
-> > includes PL310 support, you don't wait for any of these and you probably
-> > see a lot of data corruption as a result.
-> 
-> Oops. I guess there are not many users as the L220 was primarily used
-> with the 1176 (and 11MP?) IIRC. I guess one of the primary 1176 based
-> platforms currently used is RPi, but it appears the BCM2835 doesn't
-> have an L2 (other than some custom L2 for the GPU).
+SPI transfers were limited to one FIFO depth, which is 64 bytes.
+This was an artificial limitation, however, as the hardware can handle
+much larger bursts. To accommodate this, we enable the interrupt when
+the Rx FIFO is 3/4 full, and drain the FIFO within the interrupt
+handler. The 3/4 ratio was chosen arbitrarily, with the intention to
+reduce the potential number of interrupts.
 
-Won't Freescale i.MX35 help here ? It's 1136JF-S core and has some L2 cache.
+Since the SUN4I_CTL_TP bit is set, the hardware will pause
+transmission whenever the FIFO is full, so there is no risk of losing
+data if we can't service the interrupt in time.
 
-Best regards,
-Marek Vasut
+For the Tx side, enable and use the Tx FIFO 3/4 empty interrupt to
+replenish the FIFO on large SPI bursts. This requires more care in
+when the interrupt is left enabled, as this interrupt will continually
+trigger when the FIFO is less than 1/4 full, even though we
+acknowledge it.
+
+Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
+---
+ drivers/spi/spi-sun4i.c | 67 +++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 62 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 3f82705..9dd55d3 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -47,6 +47,8 @@
+ #define SUN4I_CTL_TP				BIT(18)
+
+ #define SUN4I_INT_CTL_REG		0x0c
++#define SUN4I_INT_CTL_RF_F34			BIT(4)
++#define SUN4I_INT_CTL_TF_E34			BIT(12)
+ #define SUN4I_INT_CTL_TC			BIT(16)
+
+ #define SUN4I_INT_STA_REG		0x10
+@@ -68,6 +70,8 @@
+ #define SUN4I_XMIT_CNT_REG		0x24
+ #define SUN4I_XMIT_CNT(cnt)			((cnt) & 0xffffff)
+
++#define SUN4I_MAX_XFER_SIZE			0xffffff
++
+ #define SUN4I_FIFO_STA_REG		0x28
+ #define SUN4I_FIFO_STA_RF_CNT_MASK		0x7f
+ #define SUN4I_FIFO_STA_RF_CNT_BITS		0
+@@ -97,6 +101,28 @@ static inline void sun4i_spi_write(struct sun4i_spi *sspi, u32 reg, u32 value)
+ 	writel(value, sspi->base_addr + reg);
+ }
+
++static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
++{
++	u32 reg;
++	reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
++	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
++}
++
++static inline void sun4i_spi_enable_interrupt(struct sun4i_spi *sspi, u32 mask)
++{
++	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	reg |= mask;
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++}
++
++static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 mask)
++{
++	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	reg &= ~mask;
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++}
++
+ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+ {
+ 	u32 reg, cnt;
+@@ -119,8 +145,15 @@ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+
+ static inline void sun4i_spi_fill_fifo(struct sun4i_spi *sspi, int len)
+ {
++	u32 cnt;
+ 	u8 byte;
+
++	/* See how much data we can fit */
++	cnt = SUN4I_FIFO_DEPTH - sun4i_spi_get_tx_fifo_count(sspi);
++
++	if (len > cnt)
++		len = cnt;
++
+ 	if (len > sspi->len)
+ 		len = sspi->len;
+
+@@ -175,8 +208,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	int ret = 0;
+ 	u32 reg;
+
+-	/* We don't support transfer larger than the FIFO */
+-	if (tfr->len > SUN4I_FIFO_DEPTH)
++	if (tfr->len > SUN4I_MAX_XFER_SIZE)
+ 		return -EINVAL;
+
+ 	reinit_completion(&sspi->done);
+@@ -274,7 +306,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
+
+ 	/* Enable the interrupts */
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
++	reg = SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34;
++	/* Only enable Tx FIFO interrupt if we really need it */
++	if (tx_len > SUN4I_FIFO_DEPTH)
++		reg |= SUN4I_INT_CTL_TF_E34;
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
+
+ 	/* Start the transfer */
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+@@ -287,8 +323,6 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 		goto out;
+ 	}
+
+-	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+-
+ out:
+ 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, 0);
+
+@@ -303,10 +337,33 @@ static irqreturn_t sun4i_spi_handler(int irq, void *dev_id)
+ 	/* Transfer complete */
+ 	if (status & SUN4I_INT_CTL_TC) {
+ 		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TC);
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 		complete(&sspi->done);
+ 		return IRQ_HANDLED;
+ 	}
+
++	/* Receive FIFO 3/4 full */
++	if (status & SUN4I_INT_CTL_RF_F34) {
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
++		/* Only clear the interrupt _after_ draining the FIFO */
++		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_RF_F34);
++		return IRQ_HANDLED;
++	}
++
++	/* Transmit FIFO 3/4 empty */
++	if (status & SUN4I_INT_CTL_TF_E34) {
++		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
++
++		if(!sspi->len)
++			/* nothing left to transmit */
++			sun4i_spi_disable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
++
++		/* Only clear the interrupt _after_ re-seeding the FIFO */
++		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TF_E34);
++
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+
+--
+1.8.5.3
