@@ -1,66 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Mar 2014 10:35:21 +0000
-Subject: [PATCH v2 11/15] arm64: add EFI stub
-In-Reply-To: <20140318222105.GA11178@obsidianresearch.com>
-References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
- <1394750828-16351-12-git-send-email-leif.lindholm@linaro.org>
- <20140318120919.GG13200@arm.com>
- <1395153629.2967.10.camel@deneb.redhat.com>
- <20140318182826.GC20497@arm.com>
- <1395178831.2967.29.camel@deneb.redhat.com>
- <CAFECyb_NuHBQD3zPouDde3WTyz8RrUu1OWFOt6VWX_U5n1g8MA@mail.gmail.com>
- <20140318222105.GA11178@obsidianresearch.com>
-Message-ID: <20140319103521.GD2214@arm.com>
+From: yegor.yefremov@visionsystems.de (Yegor Yefremov)
+Date: Wed, 19 Mar 2014 11:39:12 +0100
+Subject: [PATCHv2] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x
+ EV-MSK
+In-Reply-To: <op.xcxlvsl42s3iss@ecaz>
+References: <1393837376-25779-1-git-send-email-kaloz@openwrt.org>
+ <5326BB1B.8030900@visionsystems.de> <op.xcxlvsl42s3iss@ecaz>
+Message-ID: <532973D0.8010405@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 10:21:05PM +0000, Jason Gunthorpe wrote:
-> On Tue, Mar 18, 2014 at 02:48:30PM -0700, Roy Franz wrote:
+On 18.03.2014 20:03, Imre Kaloz wrote:
+> Hi Yegor,
 > 
-> > > It isn't clear to me if UEFI does cache flushing at ExitBootServices
-> > > time, but even so, at least stack use will get cached between then and
-> > > the kernel entry point. The stub could conceivably get its hands on the
-> > > EFI memmap and invalidate dcache using address ranges from UEFI memory
-> > > descriptors so maybe that is the way we should do it.
+> On Mon, 17 Mar 2014 10:06:35 +0100, Yegor Yefremov <yegor.yefremov@visionsystems.de> wrote:
 > 
-> > I looked at the UEFI spec and there is no mention of cache flushing
-> > in ExitBootServices(), so it seems it is up to the OS to do any
-> > cache management.
+>> I have some trouble with WLAN. If I make extensive scanning (just start NetworkManager and wait a minute or so) I get following errors over and over again:
+>>
+>> [  717.608550] wlcore: Scan completed due to error.
+>> [  717.613422] ------------[ cut here ]------------
+>> [  717.618405] WARNING: CPU: 0 PID: 940 at drivers/net/wireless/ti/wlcore/main.c:789 wl12xx_queue_recovery_work+0x60/0x6c()
+>> [  717.629832] Modules linked in:
+>> [  717.633055] CPU: 0 PID: 940 Comm: kworker/u2:2 Tainted: G        W    3.14.0-rc4-12737-gefb78a0-dirty #214
+>> [  717.643264] Workqueue: phy0 wl1271_scan_complete_work
+>> [  717.648649] [<c00151e0>] (unwind_backtrace) from [<c0011e38>] (show_stack+0x10/0x14)
+>> [  717.656762] [<c0011e38>] (show_stack) from [<c05a1944>] (dump_stack+0x7c/0x94)
+>> [  717.664372] [<c05a1944>] (dump_stack) from [<c00402bc>] (warn_slowpath_common+0x6c/0x90)
+>> [  717.672876] [<c00402bc>] (warn_slowpath_common) from [<c004037c>] (warn_slowpath_null+0x1c/0x24)
+>> [  717.682110] [<c004037c>] (warn_slowpath_null) from [<c035be0c>] (wl12xx_queue_recovery_work+0x60/0x6c)
+>> [  717.691889] [<c035be0c>] (wl12xx_queue_recovery_work) from [<c036d804>] (wl1271_scan_complete_work+0xf8/0x108)
+>> [  717.702391] [<c036d804>] (wl1271_scan_complete_work) from [<c0058ff4>] (process_one_work+0x1ac/0x4c4)
+>> [  717.712110] [<c0058ff4>] (process_one_work) from [<c0059e88>] (worker_thread+0x114/0x3b4)
+>> [  717.720707] [<c0059e88>] (worker_thread) from [<c005fa44>] (kthread+0xcc/0xe8)
+>> [  717.728306] [<c005fa44>] (kthread) from [<c000e388>] (ret_from_fork+0x14/0x2c)
+>> [  717.735856] ---[ end trace f4d374bb2ca37664 ]---
+>> [  717.743587] wlcore: Hardware recovery in progress. FW ver: Rev 6.3.10.0.133
+>> [  717.752600] wlcore: pc: 0x0, hint_sts: 0x00000020 count: 6
+>> [  717.759609] wlcore: down
+>> [  717.764108] ieee80211 phy0: Hardware restart was requested
+>> [  718.250930] wlcore: firmware booted (Rev 6.3.10.0.133)
+>>
+>> Have you experienced such behavior?
 > 
-> Something to think about: On mvebu we recently confirmed a situation
-> where turning off the L1 cache is not sufficient for booting. The L2
-> cache must also be completely off and disabled prior to jumping in to
-> the kernel.
-> 
-> The issue is the decompressor turns the L1 cache back on, and if the
-> L2 is also enabled at this point then it gets filled with
-> decompression data. Things go wrong from here because after
-> decompression the L1 dcache is switched off, but the L2 isn't
-> flush-invalidated.
-> 
-> So now the L2 holds writeback data and uncached reads return garbage,
-> and/or the L2 misses the uncached writes (eg relocation fixup) and
-> becomes inconsistent with memory. Either case gives a black screen
-> crash at boot.
-> 
-> Fundementally if the L2 doesn't monitor uncached read/writes then it
-> will cause a big problem.
+> With older firmwares, quite often. 6.3.10.0.133 sounds amazingly old, the latest is 8.8.0.0.13. What kernel are you on?
 
-Yes, that's a problem on (ARMv7) SoCs booting in non-secure mode with
-external L2 already enabled. For ARMv8 at least, the SoCs I've seen with
-external caches detect the data cache by MVA ops.
+I'm using Jorjin WG7311-2A on my custom board and I also have EVMSK with LBEE5ZSTNC-523(WL1271L). My kernel version is 3.14.0-rc4-12737-gefb78a0-dirty. Where do I get 8.8.0.0.13? AFAIK I'm using the latest firmware from here: https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/tree/ti-connectivity
 
-> Thus, if the UEFI calls the sub with the caches on, and the stub
-> doesn't know enough to turn off the L2 then you might not be able to
-> turn the dcache off at all. :(
-> 
-> On ARM64 at least the L1 cache ops are standardized so maybe ARM64
-> could keep the mmu+caches enabled during boot and do the L1
-> d-flush/i-inval required for instruction coherency?
+This is either wl127x-fw-5-sr.bin or wl127x-fw-5-mr.bin
 
-We thought about keeping the MMU on from EFI_STUB into the kernel but it
-gets messier since UEFI has different MMU settings. So with some sane
-external cache, we could get away with flushing a range.
-
--- 
-Catalin
+Yegor
