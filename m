@@ -1,107 +1,52 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Wed, 19 Mar 2014 12:43:12 +0530
-Subject: [PATCH v6 0/4] Exynos5 Series SCALER Driver
-Message-ID: <1395213196-25972-1-git-send-email-shaik.ameer@samsung.com>
+Date: Wed, 19 Mar 2014 12:43:13 +0530
+Subject: [PATCH v6 1/4] [media] exynos-scaler: Add DT bindings for SCALER
+ driver
+In-Reply-To: <1395213196-25972-1-git-send-email-shaik.ameer@samsung.com>
+References: <1395213196-25972-1-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1395213196-25972-2-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SCALER device which is a
-new device for scaling, blending, color fill  and color space
-conversion on EXYNOS5410/5420 SoCs.
+This patch adds the DT binding documentation for the Exynos5420/5410
+based SCALER device driver.
 
-This device supports the following as key features.
-    input image format
-        - YCbCr420 2P(UV/VU), 3P
-        - YCbCr422 1P(YUYV/UYVY/YVYU), 2P(UV,VU), 3P
-        - YCbCr444 2P(UV,VU), 3P
-        - RGB565, ARGB1555, ARGB4444, ARGB8888, RGBA8888
-        - Pre-multiplexed ARGB8888, L8A8 and L8
-    output image format
-        - YCbCr420 2P(UV/VU), 3P
-        - YCbCr422 1P(YUYV/UYVY/YVYU), 2P(UV,VU), 3P
-        - YCbCr444 2P(UV,VU), 3P
-        - RGB565, ARGB1555, ARGB4444, ARGB8888, RGBA8888
-        - Pre-multiplexed ARGB8888
-    input rotation
-        - 0/90/180/270 degree, X/Y/XY Flip
-    scale ratio
-        - 1/4 scale down to 16 scale up
-    color space conversion
-        - RGB to YUV / YUV to RGB
-    Size - Exynos5420
-        - Input : 16x16 to 8192x8192
-        - Output:   4x4 to 8192x8192
-    Size - Exynos5410
-        - Input/Output: 4x4 to 4096x4096
-    alpha blending, color fill
-
-Rebased on:
------------
-git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git:master
-
-Changes from v5:
----------------
-Addressed review comments from, Bartlomiej Zolnierkiewicz and Tomasz Figa
-Links to the review comments:
-	1] https://linuxtv.org/patch/21512/
-	2] https://linuxtv.org/patch/21513/
-	3] https://linuxtv.org/patch/21514/
-
-Changes from v4:
----------------
-Addressed review comments from, Sylwester Nawrocki and Mauro Carvalho Chehab
-Links to the review comments:
-        1] https://linuxtv.org/patch/20307/
-        2] https://linuxtv.org/patch/20308/
-        3] https://linuxtv.org/patch/20451/
-
-Changes from v3:
----------------
-Addressed review comments from, Sylwester Nawrocki and Hans Verkuil.
-Links to the review comments:
-        1] https://linuxtv.org/patch/20072/
-        2] https://linuxtv.org/patch/20073/
-
-Changes from v2:
----------------
-Addressed review comments from, Inki Dae, Hans Verkuil and Sylwester Nawrocki.
-Links to the review comments:
-        1] https://linuxtv.org/patch/19783/
-        2] https://linuxtv.org/patch/19784/
-        3] https://linuxtv.org/patch/19785/
-        4] https://linuxtv.org/patch/19786/
-        5] https://linuxtv.org/patch/19787/
-
-Changes from v1:
----------------
-1] Split the previous single patch into multiple patches.
-2] Added DT binding documentation.
-3] Removed the unnecessary header file inclusions.
-4] Fix the condition check in mscl_prepare_address for swapping cb/cr addresses.
-
-Shaik Ameer Basha (4):
-  [media] exynos-scaler: Add DT bindings for SCALER driver
-  [media] exynos-scaler: Add new driver for Exynos5 SCALER
-  [media] exynos-scaler: Add m2m functionality for the SCALER driver
-  [media] exynos-scaler: Add core functionality for the SCALER driver
-
- .../devicetree/bindings/media/exynos5-scaler.txt   |   24 +
- drivers/media/platform/Kconfig                     |    8 +
- drivers/media/platform/Makefile                    |    1 +
- drivers/media/platform/exynos-scaler/Makefile      |    3 +
- drivers/media/platform/exynos-scaler/scaler-m2m.c  |  788 +++++++++++++
- drivers/media/platform/exynos-scaler/scaler-regs.c |  337 ++++++
- drivers/media/platform/exynos-scaler/scaler-regs.h |  331 ++++++
- drivers/media/platform/exynos-scaler/scaler.c      | 1235 ++++++++++++++++++++
- drivers/media/platform/exynos-scaler/scaler.h      |  376 ++++++
- 9 files changed, 3103 insertions(+)
+Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ .../devicetree/bindings/media/exynos5-scaler.txt   |   24 ++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/exynos5-scaler.txt
- create mode 100644 drivers/media/platform/exynos-scaler/Makefile
- create mode 100644 drivers/media/platform/exynos-scaler/scaler-m2m.c
- create mode 100644 drivers/media/platform/exynos-scaler/scaler-regs.c
- create mode 100644 drivers/media/platform/exynos-scaler/scaler-regs.h
- create mode 100644 drivers/media/platform/exynos-scaler/scaler.c
- create mode 100644 drivers/media/platform/exynos-scaler/scaler.h
 
+diff --git a/Documentation/devicetree/bindings/media/exynos5-scaler.txt b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
+new file mode 100644
+index 0000000..e1dd465
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
+@@ -0,0 +1,24 @@
++* Samsung Exynos5 SCALER device
++
++SCALER is used for scaling, blending, color fill and color space
++conversion on EXYNOS[5420/5410] SoCs.
++
++Required properties:
++- compatible: should be "samsung,exynos5420-scaler" or
++			"samsung,exynos5410-scaler"
++- reg: should contain SCALER physical address location and length
++- interrupts: should contain SCALER interrupt specifier
++- clocks: should contain the SCALER clock phandle and specifier pair for
++		each clock listed in clock-names property, according to
++		the common clock bindings
++- clock-names: should contain exactly one entry
++		- "scaler" - IP bus clock
++
++Example:
++	scaler_0: scaler at 12800000 {
++		compatible = "samsung,exynos5420-scaler";
++		reg = <0x12800000 0x1000>;
++		interrupts = <0 220 0>;
++		clocks = <&clock 381>;
++		clock-names = "scaler";
++	};
 -- 
 1.7.9.5
