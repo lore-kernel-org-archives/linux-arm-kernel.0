@@ -1,40 +1,22 @@
-From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
-Date: Wed, 19 Mar 2014 15:41:07 -0500
-Subject: [PATCH v2 0/1] ARM: sun4i: spi: Allow transfers larger than FIFO size
-Message-ID: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Mar 2014 20:49:47 +0000
+Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
+In-Reply-To: <1395257399-359545-45-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-45-git-send-email-arnd@arndb.de>
+Message-ID: <20140319204946.GK7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second iteration of the patches sent yesterday. Per
-Maxime's request, I have squashed them into one single patch, and
-applied most of the suggestion he made.
+On Wed, Mar 19, 2014 at 08:29:41PM +0100, Arnd Bergmann wrote:
+> This adds a new Kconfig option for the Integrator platform to
+> choose between ARMv4/ARMv5 based CPUs and those based on ARMv6/ARMv7,
+> which is required because we cannot have both classes enabled in the
+> same kernel at compile time.
 
-As far as only clearing the interrupt _after_ draining the FIFO, I
-found that we usually get one extra Rx interrupt per burst if we do
-this, so I left the comment in.
+Wouldn't it just be easier to make the older CPUs depend on
+!CPU_V6 && !CPU_V7 rather than trying to hack this for each platform?
 
->>       /* Enable the interrupts */
->> -     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
->> -                                              SUN4I_INT_CTL_RF_F34);
->> +     reg = SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34;
->> +     /* Only enable Tx FIFO interrupt if we really need it */
->> +     if (tx_len > SUN4I_FIFO_DEPTH)
->> +             reg |= SUN4I_INT_CTL_TF_E34;
->> +     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
->
-> I'd be much dumber than that. Why don't you just enable both
-> interrupts all the time if we need larger transfers ?
-
-As I've pointed out previously, this interrupt is PITA, as it triggers
-an IRQ storm if enabled without much thought. I found that
-(tx_len > SUN4I_FIFO_DEPTH) is the best check for when it's safe to
-enable this interrupt.
-
-Alexandru Gagniuc (1):
-  ARM: sun4i: spi: Allow transfers larger than FIFO size
-
- drivers/spi/spi-sun4i.c | 68 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 63 insertions(+), 5 deletions(-)
-
---
-1.8.5.3
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
