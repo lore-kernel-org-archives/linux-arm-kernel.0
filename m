@@ -1,57 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Mar 2014 20:12:55 +0000
-Subject: [PATCH 37/62] ARM: sa1100/pxa: fix MTD_XIP build
-In-Reply-To: <1395257399-359545-38-git-send-email-arnd@arndb.de>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Wed, 19 Mar 2014 20:15:36 +0000
+Subject: [PATCH 11/62] ARM: ep93xx: export ep93xx_chip_revision
+In-Reply-To: <1395257399-359545-12-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-38-git-send-email-arnd@arndb.de>
-Message-ID: <20140319201255.GI7528@n2100.arm.linux.org.uk>
+ <1395257399-359545-12-git-send-email-arnd@arndb.de>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8825DC177D@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:34PM +0100, Arnd Bergmann wrote:
-> In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
-> to IOMEM", the definition of the OSCR macro was changed to be an
-> __iomem pointer, but the same register is also used by the XIP
-> code. This patch does the corresponding change here as well.
-> 
-> Since PXA now uses a local variable for the base address of the
-> ICIP register, the xip_irqpending function has to be moved
-> into irq.c in the process.
-> 
+On Wednesday, March 19, 2014 12:29 PM, Arnd Bergmann wrote:
+> ep93xx_chip_revision is used by the pata_ep93xx driver,
+> which can be a loadable module. Exporting the symbol
+> avoids a link error in this case.
+>
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 > ---
->  arch/arm/mach-pxa/include/mach/mtd-xip.h    | 7 ++++---
->  arch/arm/mach-pxa/irq.c                     | 8 ++++++++
->  arch/arm/mach-sa1100/include/mach/mtd-xip.h | 4 ++--
->  3 files changed, 14 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
-> index 990d2bf..c4c90d1 100644
-> --- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
-> +++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
-> @@ -17,11 +17,12 @@
+>  arch/arm/mach-ep93xx/core.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 6c70547..0e571f1 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -242,6 +242,7 @@ unsigned int ep93xx_chip_revision(void)
+>  	v >>= EP93XX_SYSCON_SYSCFG_REV_SHIFT;
+>  	return v;
+>  }
+> +EXPORT_SYMBOL_GPL(ep93xx_chip_revision);
 >  
->  #include <mach/regs-ost.h>
->  
-> -#define xip_irqpending()	(ICIP & ICMR)
-> +extern bool xip_irqpending(void);
->  
->  /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
-> -#define xip_currtime()		(OSCR)
-> -#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
-> +#define xip_irqpending()	xip_irqpending()
-> +#define xip_currtime()		readl(OSCR)
-> +#define xip_elapsed_since(x)	(signed)((readl(OSCR) - (x)) / 4)
+>  /*************************************************************************
+>   * EP93xx GPIO
 
-I don't think you can do that.  I believe xip_irqpending() has to be
-inline so that the XIP code (located in RAM) can detect when an
-interrupt is pending, suspend the MTD operation, switch the MTD back
-to read mode, and then allow the kernel to run.
+Good catch. Thanks.
 
-I'd be nervous about this without Nicolas checking it, or it being
-built and the resulting assembly inspected.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
