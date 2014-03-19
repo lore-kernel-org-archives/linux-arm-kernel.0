@@ -1,87 +1,154 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Mar 2014 16:01:49 +0000
-Subject: [PATCH v2 11/15] arm64: add EFI stub
-In-Reply-To: <1395241998.2967.52.camel@deneb.redhat.com>
-References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
- <1394750828-16351-12-git-send-email-leif.lindholm@linaro.org>
- <20140318120919.GG13200@arm.com>
- <1395153629.2967.10.camel@deneb.redhat.com>
- <20140318182826.GC20497@arm.com>
- <1395178831.2967.29.camel@deneb.redhat.com>
- <20140319105706.GE2214@arm.com>
- <1395241998.2967.52.camel@deneb.redhat.com>
-Message-ID: <20140319160149.GF2214@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Mar 2014 16:04:14 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140319160414.GA19953@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 03:13:18PM +0000, Mark Salter wrote:
-> On Wed, 2014-03-19 at 10:57 +0000, Catalin Marinas wrote:
-> > On Tue, Mar 18, 2014 at 09:40:31PM +0000, Mark Salter wrote:
-> > > On Tue, 2014-03-18 at 18:28 +0000, Catalin Marinas wrote:
-> > > > If UEFI doesn't handle the caches, the only thing left to EFI_STUB is to
-> > > > flush by MVA. We don't need to flush the whole DRAM (and I would even
-> > > > recommend it) but at least the relevant kernel code/data touched with
-> > > > the MMU disabled.
-> > > 
-> > > So, it goes like this:
-> > > 
-> > >   1) UEFI calls stub with MMU/Caches on. Stub/kernel can be anywhere.
-> > >   2) Stub runs and relocates kernel to the desired runtime location
-> > >      but continues to execute from wherever UEFI loaded it until just
-> > >      after ExitBootServices().
-> > >   3) After ExitBootServices, efi_entry() returns relocated entry point
-> > >      for kernel to efi_stub_entry() in efi-entry.S where the Dcache and
-> > >      MMU are turned off, the __flush_dcache_all is called, then the
-> > >      code jumps to the kernel proper entry point.
-> > > 
-> > > It isn't clear to me if UEFI does cache flushing at ExitBootServices
-> > > time, but even so, at least stack use will get cached between then and
-> > > the kernel entry point. The stub could conceivably get its hands on the
-> > > EFI memmap and invalidate dcache using address ranges from UEFI memory
-> > > descriptors so maybe that is the way we should do it.
-> > 
-> > I think the stub just needs to flush the relocated kernel image, ensure
-> > it is sync with the memory. Additional flushing can be done by the
-> > kernel for bits it writes (like page tables, code patching etc). We can
-> > enter the kernel with the SCTLR.I bit set, so it can allocate in an
-> > unified cache already and D-cache maintenance would be needed anyway.
-> 
-> How about this?
-> 
-> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> index 83bfb72..ed480b2 100644
-> --- a/arch/arm64/kernel/efi-entry.S
-> +++ b/arch/arm64/kernel/efi-entry.S
-> @@ -52,11 +52,19 @@ ENTRY(efi_stub_entry)
->  	 * efi_entry() will have relocated the kernel image if necessary
->  	 * and we return here with device tree address in x0 and the kernel
->  	 * entry point stored at *image_addr. Save those values in registers
-> -	 * which are preserved by __flush_dcache_all.
-> +	 * which are callee preserved.
->  	 */
-> -	ldr	x1, [sp, #16]
->  	mov	x20, x0
-> -	mov	x21, x1
-> +	ldr	x0, [sp, #16]
-> +	mov	x21, x0
+Hi Mark,
 
-BTW, some comments to make it easier to review the code later about
-what's at [sp, #16].
+sorry for the delay in reviewing.
 
+On Wed, Mar 05, 2014 at 08:59:33AM +0000, Mark Brown wrote:
+
+[...]
+
+> +static int __init parse_cluster(struct device_node *cluster, int depth)
+> +{
+> +	char name[10];
+> +	bool leaf = true;
+> +	bool has_cores = false;
+> +	struct device_node *c;
+> +	static int __initdata cluster_id;
+> +	int core_id = 0;
+> +	int i, ret;
 > +
-> +	adrp	x1, _text
-> +	add	x1, x1, #:lo12:_text
-> +	adrp	x2, _edata
-> +	add	x2, x2, #:lo12:_edata
-> +	sub	x1, x2, x1
+> +	/*
+> +	 * First check for child clusters; we currently ignore any
+> +	 * information about the nesting of clusters and present the
+> +	 * scheduler with a flat list of them.
+> +	 */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "cluster%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			parse_cluster(c, depth + 1);
+
+You should check (and propagate) the return value here, otherwise we miss
+detection of bodged topology bindings and fail to reset the topology data.
+
+> +			leaf = false;
+> +		}
+> +		i++;
+> +	} while (c);
 > +
-> +	bl	__flush_dcache_area
+> +	/* Now check for cores */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "core%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			has_cores = true;
+> +
+> +			if (depth == 0)
+> +				pr_err("%s: cpu-map children should be clusters\n",
+> +				       c->full_name);
+> +
+> +			if (leaf) {
+> +				ret = parse_core(c, cluster_id, core_id++);
+> +				if (ret != 0) {
 
-Looks fine. We also need a "ic ialluis", is any other part of EFI_STUB
-invalidating the I-cache?
+Should remove braces.
 
-We need a patch to invalidate the D-cache for areas of memory that the
-kernel touches but I'll do this as a separate patch.
+> +					return ret;
+> +				}
+> +			} else {
+> +				pr_err("%s: Non-leaf cluster with core %s\n",
+> +				       cluster->full_name, name);
+> +				return -EINVAL;
+> +			}
+> +		}
+> +		i++;
+> +	} while (c);
+> +
+> +	if (leaf && !has_cores)
+> +		pr_warn("%s: empty cluster\n", cluster->full_name);
+> +
+> +	if (leaf)
+> +		cluster_id++;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init parse_dt_topology(void)
+> +{
+> +	struct device_node *cn;
+> +
+> +	cn = of_find_node_by_path("/cpus");
+> +	if (!cn) {
+> +		pr_err("No CPU information found in DT\n");
+> +		return 0;
+> +	}
+> +
+> +	/*
+> +	 * When topology is provided cpu-map is essentially a root
+> +	 * cluster with restricted subnodes.
+> +	 */
+> +	cn = of_get_child_by_name(cn, "cpu-map");
+> +	if (!cn)
+> +		return 0;
+> +	return parse_cluster(cn, 0);
+> +}
+> +
+> +#else
+> +static inline int parse_dt_topology(void) { return 0; }
+> +#endif
+> +
+>  /*
+>   * cpu topology table
+>   */
+> @@ -74,11 +225,7 @@ void store_cpu_topology(unsigned int cpuid)
+>  	update_siblings_masks(cpuid);
+>  }
+>  
+> -/*
+> - * init_cpu_topology is called at boot when only one cpu is running
+> - * which prevent simultaneous write access to cpu_topology array
+> - */
+> -void __init init_cpu_topology(void)
+> +static void __init reset_cpu_topology(void)
+>  {
+>  	unsigned int cpu;
+>  
+> @@ -93,3 +240,18 @@ void __init init_cpu_topology(void)
+>  		cpumask_clear(&cpu_topo->thread_sibling);
+>  	}
+>  }
+> +
+> +/*
+> + * init_cpu_topology is called at boot when only one cpu is running
+> + * which prevent simultaneous write access to cpu_topology array
+> + */
 
--- 
-Catalin
+Comment is stale.
+
+> +void __init init_cpu_topology(void)
+> +{
+> +	int ret;
+> +
+> +	reset_cpu_topology();
+> +
+> +	ret = parse_dt_topology();
+> +	if (ret != 0)
+> +		reset_cpu_topology();
+
+ret is unused so should be removed. You could remove the first reset call and
+use static initialization for that, it is a matter of taste though.
+
+A comment is in order, whatever approach you go for.
+
+Thanks,
+Lorenzo
