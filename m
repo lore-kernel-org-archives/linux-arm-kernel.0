@@ -1,102 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Mar 2014 01:36:13 +0300
-Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
-In-Reply-To: <4836281.0IgPinItBq@wuerfel>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-7-git-send-email-arnd@arndb.de>
- <532A03BE.3070003@cogentembedded.com> <4836281.0IgPinItBq@wuerfel>
-Message-ID: <532A1BDD.904@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Mar 2014 21:46:32 +0000
+Subject: PL310 errata workarounds
+In-Reply-To: <CAL_JsqK6+gz6u=bSUFS7qjKANd2ZSQV5bWccw85KvAA7aP0FrA@mail.gmail.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140314175701.GR21483@n2100.arm.linux.org.uk>
+ <CAL_JsqL02dw7B+GEL4921f_7m=RRUokW0n64TxSJnMWN3MMfrQ@mail.gmail.com>
+ <201403192222.30622.marex@denx.de>
+ <CAL_JsqK6+gz6u=bSUFS7qjKANd2ZSQV5bWccw85KvAA7aP0FrA@mail.gmail.com>
+Message-ID: <20140319214631.GL7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2014 11:21 PM, Arnd Bergmann wrote:
+On Wed, Mar 19, 2014 at 04:35:58PM -0500, Rob Herring wrote:
+> On Wed, Mar 19, 2014 at 4:22 PM, Marek Vasut <marex@denx.de> wrote:
+> > On Friday, March 14, 2014 at 08:14:06 PM, Rob Herring wrote:
+> >> On Fri, Mar 14, 2014 at 12:57 PM, Russell King - ARM Linux
+> >>
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Fri, Mar 14, 2014 at 11:02:17AM -0500, Rob Herring wrote:
+> >> >> The obvious fix is to convert l2x0_flush_line to a function ptr which
+> >> >> just further complicates the code.
+> >> >
+> >> > I currently regard this code as unmaintainable, so right now I'm in the
+> >> > process of completely rewriting it, going back to the specs and checking
+> >> > what is required.  Sharing code between the L210, L220 and L310 looks
+> >> > good from the point of view of keeping the line count down, but actually
+> >> > they're quite different and have various different requirements.
+> >> >
+> >> > Out of those, L220 is the odd one out: all operations are background
+> >> > operations there, which means they have to be waited for.  Currently,
+> >> > if you have one of these, and you build a multiplatform kernel which
+> >> > includes PL310 support, you don't wait for any of these and you probably
+> >> > see a lot of data corruption as a result.
+> >>
+> >> Oops. I guess there are not many users as the L220 was primarily used
+> >> with the 1176 (and 11MP?) IIRC. I guess one of the primary 1176 based
+> >> platforms currently used is RPi, but it appears the BCM2835 doesn't
+> >> have an L2 (other than some custom L2 for the GPU).
+> >
+> > Won't Freescale i.MX35 help here ? It's 1136JF-S core and has some L2 cache.
+> 
+> No. 1136 uses L210. 1176 uses L220. There was the i.MX37 which had an
+> 1176, but it was pretty short lived and never saw upstream support.
 
->>> The ohci-da8xx driver uses the DA8XX_SYSCFG0_VIRT macro to
->>> access the CFGCHIP2 register for controlling its PHY.
+Don't worry too much about the L220 - the Realview boards have one, and
+I have one Realview EB board:
 
->>> The macro in turn relies on the da8xx_syscfg0_base global
->>> variable. Since the OHCI driver can be a loadable module,
->>> this requires the symbol to be exported from platform code.
+Linux version 3.14.0-rc7+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.5.4 (GCC) ) #664 SMP Wed Mar 19 18:06:11 GMT 2014
+CPU: ARMv6-compatible processor [410fb020] revision 0 (ARMv7), cr=00c5387d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+Machine: ARM-RealView EB
+...
+CPU0: thread -1, cpu 0, socket -1, mpidr 0
+Setting up static identity map for 0x7036d130 - 0x7036d1a0
+CPU1: Booted secondary processor
+CPU1: thread -1, cpu 0, socket -1, mpidr 1
+CPU2: Booted secondary processor
+CPU2: thread -1, cpu 0, socket -1, mpidr 2
+CPU3: Booted secondary processor
+CPU3: thread -1, cpu 0, socket -1, mpidr 3
+Brought up 4 CPUs
+...
+L2C: DT/platform modifies aux control register: 0x00020fff -> 0x00790fff
+L2C-220 cache controller enabled, 8 ways, 1024 kB
+L2C-220: CACHE_ID 0x41000081, AUX_CTRL 0x00790fff
 
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>> Cc: davinci-linux-open-source at linux.davincidsp.com
->>> ---
->>>    arch/arm/mach-davinci/devices-da8xx.c | 1 +
->>>    1 file changed, 1 insertion(+)
+These need to be configured by the board code for their cache size because
+the register isn't correctly configured at reset.  Same goes for PL210.
+Only with PL310 does the register contain appropriate sizing information
+on reset.
 
->>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
->>> index 0486cdf..4da868a 100644
->>> --- a/arch/arm/mach-davinci/devices-da8xx.c
->>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
->>> @@ -66,6 +66,7 @@
->>>    #define DA850_DMA_MMCSD1_TX EDMA_CTLR_CHAN(1, 29)
->>>
->>>    void __iomem *da8xx_syscfg0_base;
->>> +EXPORT_SYMBOL_GPL(da8xx_syscfg0_base); /* used by OHCI_HCD */
-
->>      I have submitted such patch years ago and it was turned down.
-
-    I also had a pleasure of completing implementation of this driver and 
-submitting it back in 2009 when I was working for MontaVista. :-)
-
-> The question is whether there is anyone who would do this properly.
-
-    Nobody cares, it seems. As you can imagine, I stopped to care enough after 
-being switched to other projects.
-
-> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
-
-    The idea at the time was to just ioremap() this register but I was not 
-very eager.
-There was no USB PHY driver subsystem yet.
-
-> to control the clock, phy
-
-    Note that it only controls PHY clock (PLL) which could be covered by an 
-USB PHY driver.
-
-> and host/gadget mode switch.
-
-    The main mode the USB 2.0 PHY should function now is OTG. The host/gadged 
-modes are forced overrides of the ID pin. Unfortunately, the board code has to 
-force host mode when host-only driver config is selected (these MUSB's 
-host/gadget only modes were removed at one point but got reintroduced again).
-
-> In the modern world, we'd probably want to have a clock driver and
-
-    Not sure about the clock driver...
-
-> a phy driver for these,
-
-    Yes, that's what the MUSB maintainer wants too. The issue is the driver 
-should somehow differ which USB controller it's bound too and do different 
-things depending on that (at least that's how it looks now). I'm not sure it's 
-possible, so probably should be rethought.
-
-> based on a syscon driver.
-
-    I don't know what syscon is...
-
-> In all honesty I don't see that happening on davinci.
-
-    I don't think people use USB 1.1 controllers these days, especially when 
-there is USB 2.0 in the same SoC. For MUSB, there were recent attempt to get 
-the DA8xx driver out of the broken state but it was turned down as well, IIRC, 
-since it didn't offer a PHY driver.
-
-> A somewhat better approach would be to export a set of exported
-> functions to access the one register from the platform, e.g.
-
-> u32 da8xx_cfgchip2_get(void);
-> void da8xx_cfgchip2_set(u32);
-
-> That interface would still be a bit ugly, but much better than
-> what we have today, and easy to implement.
-
-    I'm leaving this idea to Sekhar...
-
-> 	Arnd
-
-WBR, Sergei
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
