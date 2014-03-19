@@ -1,87 +1,78 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 19 Mar 2014 08:22:21 -0500
-Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
-In-Reply-To: <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
-References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
- <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
-Message-ID: <CAL_JsqJqUrSD26gXL+sRVJCO8+nLL-72=MCoMDY47Woe5LON6w@mail.gmail.com>
+From: y@karo-electronics.de (y at karo-electronics.de)
+Date: Wed, 19 Mar 2014 14:23:26 +0100
+Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
+Message-ID: <1395235406-13449-1-git-send-email-y>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 5:31 AM, Anup Patel <anup.patel@linaro.org> wrote:
-> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
-> VCPUs. This patch extends current in-kernel PSCI emulation to provide
-> PSCI v0.2 interface to VCPUs.
+From: Lothar Wa?mann <LW@KARO-electronics.de>
 
-[snip]
+With a flash-based BBT there is no reason to move the Factory Bad
+Block Marker from the data area buffer (to where it is mapped by the
+GPMI NAND controller) to the OOB buffer. Thus, make this feature
+configurable via DT. This is required for the Ka-Ro electronics
+platforms.
 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index ef0c878..9c922d9 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -83,6 +83,7 @@ struct kvm_regs {
->  #define KVM_VGIC_V2_CPU_SIZE           0x2000
->
->  #define KVM_ARM_VCPU_POWER_OFF         0 /* CPU is started in OFF state */
-> +#define KVM_ARM_VCPU_PSCI_0_2          1 /* CPU uses PSCI v0.2 */
->
->  struct kvm_vcpu_init {
->         __u32 target;
-> @@ -192,7 +193,7 @@ struct kvm_arch_memory_slot {
->  /* Highest supported SPI, from VGIC_NR_IRQS */
->  #define KVM_ARM_IRQ_GIC_MAX            127
->
-> -/* PSCI interface */
-> +/* PSCI v0.1 interface */
->  #define KVM_PSCI_FN_BASE               0x95c1ba5e
->  #define KVM_PSCI_FN(n)                 (KVM_PSCI_FN_BASE + (n))
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ Documentation/devicetree/bindings/mtd/gpmi-nand.txt |    3 +++
+ arch/arm/boot/dts/imx28-tx28.dts                    |    1 +
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c              |   10 +++++++---
+ 3 files changed, 11 insertions(+), 3 deletions(-)
 
-While this is really KVM specific since the base can be anything...
-
-> @@ -201,9 +202,41 @@ struct kvm_arch_memory_slot {
->  #define KVM_PSCI_FN_CPU_ON             KVM_PSCI_FN(2)
->  #define KVM_PSCI_FN_MIGRATE            KVM_PSCI_FN(3)
->
-> +/* PSCI v0.2 interface */
-> +#define KVM_PSCI_0_2_FN_BASE           0x84000000
-> +#define KVM_PSCI_0_2_FN(n)             (KVM_PSCI_0_2_FN_BASE + (n))
-> +#define KVM_PSCI_0_2_FN64_BASE         0xC4000000
-> +#define KVM_PSCI_0_2_FN64(n)           (KVM_PSCI_0_2_FN64_BASE + (n))
-> +
-> +#define KVM_PSCI_0_2_FN_PSCI_VERSION   KVM_PSCI_0_2_FN(0)
-> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND    KVM_PSCI_0_2_FN(1)
-> +#define KVM_PSCI_0_2_FN_CPU_OFF                KVM_PSCI_0_2_FN(2)
-> +#define KVM_PSCI_0_2_FN_CPU_ON         KVM_PSCI_0_2_FN(3)
-> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO  KVM_PSCI_0_2_FN(4)
-> +#define KVM_PSCI_0_2_FN_MIGRATE                KVM_PSCI_0_2_FN(5)
-> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
-> +                                       KVM_PSCI_0_2_FN(6)
-> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
-> +                                       KVM_PSCI_0_2_FN(7)
-> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF     KVM_PSCI_0_2_FN(8)
-> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET   KVM_PSCI_0_2_FN(9)
-> +
-> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND  KVM_PSCI_0_2_FN64(1)
-> +#define KVM_PSCI_0_2_FN64_CPU_ON       KVM_PSCI_0_2_FN64(3)
-> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO        KVM_PSCI_0_2_FN64(4)
-> +#define KVM_PSCI_0_2_FN64_MIGRATE      KVM_PSCI_0_2_FN64(5)
-> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
-> +                                       KVM_PSCI_0_2_FN64(7)
-> +
-> +/* PSCI return values */
->  #define KVM_PSCI_RET_SUCCESS           0
->  #define KVM_PSCI_RET_NI                        ((unsigned long)-1)
->  #define KVM_PSCI_RET_INVAL             ((unsigned long)-2)
->  #define KVM_PSCI_RET_DENIED            ((unsigned long)-3)
-> +#define KVM_PSCI_RET_ALREADY_ON                ((unsigned long)-4)
-> +#define KVM_PSCI_RET_ON_PENDING                ((unsigned long)-5)
-> +#define KVM_PSCI_RET_INTERNAL_FAILURE  ((unsigned long)-6)
-> +#define KVM_PSCI_RET_NOT_PRESENT       ((unsigned long)-7)
-> +#define KVM_PSCI_RET_DISABLED          ((unsigned long)-8)
-
-These definitions are common across arm and arm64, baremetal and kvm
-in the kernel, and the kernel and qemu. Soon they will also be needed
-in qemu for system emulation support of PSCI. We need these in a
-common header to share.
-
-Rob
+diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+index 458d596..f28949a 100644
+--- a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+@@ -25,6 +25,9 @@ Optional properties:
+                        discoverable or this property is not enabled,
+                        the software may chooses an implementation-defined
+                        ECC scheme.
++  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
++                       area with the byte in the data area but rely on the
++                       BBT for identifying bad blocks.
+ 
+ The device tree may optionally contain sub-nodes describing partitions of the
+ address space. See partition.txt for more detail.
+diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+index e14bd86..7d2bea8 100644
+--- a/arch/arm/boot/dts/imx28-tx28.dts
++++ b/arch/arm/boot/dts/imx28-tx28.dts
+@@ -247,6 +247,7 @@
+ &gpmi {
+ 	pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+ 	nand-on-flash-bbt;
++	fsl,no-blockmark-swap;
+ 	status = "okay";
+ };
+ 
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index bb77f75..98562eb 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1632,9 +1632,6 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	struct bch_geometry *bch_geo = &this->bch_geometry;
+ 	int ret;
+ 
+-	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+-	this->swap_block_mark = !GPMI_IS_MX23(this);
+-
+ 	/* Set up the medium geometry */
+ 	ret = gpmi_set_geometry(this);
+ 	if (ret)
+@@ -1701,6 +1698,13 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+ 	if (of_get_nand_on_flash_bbt(this->dev->of_node))
+ 		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+ 
++	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
++	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
++		this->swap_block_mark = !GPMI_IS_MX23(this);
++
++	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
++		this->swap_block_mark ? "en" : "dis");
++
+ 	/*
+ 	 * Allocate a temporary DMA buffer for reading ID in the
+ 	 * nand_scan_ident().
+-- 
+1.7.10.4
