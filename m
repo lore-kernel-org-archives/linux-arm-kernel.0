@@ -1,55 +1,129 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Mar 2014 20:03:42 -0700
-Subject: [PATCH v2 1/7] ARM: KVM: switch hypervisor into BE mode in case
- of BE host
-In-Reply-To: <20140318222335.GG1297@cbox>
-References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
- <1392183693-21238-2-git-send-email-victor.kamensky@linaro.org>
- <20140318222335.GG1297@cbox>
-Message-ID: <20140319030342.GA8883@cbox>
+From: girishks2000@gmail.com (Girish KS)
+Date: Wed, 19 Mar 2014 09:19:36 +0530
+Subject: [PATCH 1/2] mailbox: samsung: added support for samsung mailbox
+In-Reply-To: <1395140208.2812.15.camel@joe-AO722>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-2-git-send-email-ks.giri@samsung.com>
+ <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
+ <1395140208.2812.15.camel@joe-AO722>
+Message-ID: <CAKrE-KcMMtFT-aL8wFeKiFkr1LCnsvcewHGK1WYSP+HnynO61A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 03:23:35PM -0700, Christoffer Dall wrote:
-> On Tue, Feb 11, 2014 at 09:41:27PM -0800, Victor Kamensky wrote:
-> > Switch hypervisor to run in BE mode if image is compiled
-> > with CONFIG_CPU_BIG_ENDIAN.
-> > 
-> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> > ---
-> >  arch/arm/kvm/init.S | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> > index 1b9844d..74f0718 100644
-> > --- a/arch/arm/kvm/init.S
-> > +++ b/arch/arm/kvm/init.S
-> > @@ -22,6 +22,7 @@
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_arm.h>
-> >  #include <asm/kvm_mmu.h>
-> > +#include <asm/assembler.h>
-> >  
-> >  /********************************************************************
-> >   * Hypervisor initialization
-> > @@ -70,6 +71,8 @@ __do_hyp_init:
-> >  	cmp	r0, #0			@ We have a SP?
-> >  	bne	phase2			@ Yes, second stage init
-> >  
-> > +ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
-> > +
-> >  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
-> >  	mcrr	p15, 4, r2, r3, c2
-> >  
-> > -- 
-> > 1.8.1.4
-> > 
-> 
-> Won't splitting up the patches this way break bisectability?
-> 
-Second thought, scratch that, because BE support is not supposed to work
-before applying these patches anyhow I guess.
+On Tue, Mar 18, 2014 at 4:26 PM, Joe Perches <joe@perches.com> wrote:
+> On Tue, 2014-03-18 at 15:52 +0530, Girish KS wrote:
+>> On Mon, Mar 17, 2014 at 5:33 PM, Girish K S <ks.giri@samsung.com> wrote:
+>
+> Hi, just some trivial notes about the patch
+>
+>> > diff --git a/drivers/mailbox/mailbox-samsung.c b/drivers/mailbox/mailbox-samsung.c
+> []
+>> > @@ -0,0 +1,354 @@
+>> > +/*
+>> > + * Copyright 2013 Samsung Electronics Co. Ltd.
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify it
+>> > + * under the terms and conditions of the GNU General Public License,
+>> > + * version 2, as published by the Free Software Foundation.
+>> > + *
+>> > + * This program is distributed in the hope it will be useful, but WITHOUT
+>> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> > + * more details.
+>> > + *
+>> > + * You should have received a copy of the GNU General Public License along with
+>> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> > + */
+>
+> Please add
+>
+> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+>
+> before any #include so that error messages are
+> prefixed in the output with "samsung-mailbox: "
+> and the reader of the log has an idea what subsystem
+> is emitting messages.
+>
+Sure will do it
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> > +#include <linux/err.h>
+>> > +#include <linux/module.h>
+>> > +#include <linux/slab.h>
+> []
+>> > +static int samsung_mbox_send_data(struct ipc_link *link, void *msg)
+>> > +{
+> []
+>> > +       /* Lock the mailbox for this transaction with the client id */
+>> > +       writel(val, ipc_base + MBOX_REG_TXLOCK);
+>> > +       do {
+>> > +               if (time_after(jiffies, timeout)) {
+>> > +                       pr_err("cannot aquire the lock\n");
+>
+> This would be prefixed appropriately via pr_fmt.
+> Also, there's a typo of aquire here: acquire
 
--Christoffer
+OK
+
+>
+>> > +static int samsung_mbox_startup(struct ipc_link *link, void *ignored)
+>> > +{
+> []
+>> > +       ret = devm_request_irq(dev, samsung_link->irq, samsung_ipc_handler,
+>> > +                                       IRQF_SHARED, link->link_name,
+>> > +                                       samsung_link);
+>> > +       if (unlikely(ret)) {
+>> > +               pr_err("failed to register mailbox interrupt:%d\n", ret);
+>
+> Here too it would be prefixed
+
+ok
+
+>
+>> > +static int samsung_mbox_probe(struct platform_device *pdev)
+>> > +{
+>> > +       struct samsung_mbox *samsung_mbox;
+>> > +       struct samsung_mlink *mbox_link;
+>> > +       struct resource res;
+>> > +       struct ipc_link **link;
+>> > +       int loop, count, ret = 0;
+>> > +       struct device_node *node = pdev->dev.of_node;
+>> > +
+>> > +       if (!node) {
+>> > +               dev_err(&pdev->dev, "driver doesnt support"
+>> > +                               "non-dt devices\n");
+>
+> Please coalesce the format fragments.
+>
+> You would notice the missing space between
+> "support" and "non-dt"
+
+ok
+
+>
+>                 dev_err(&pdev->dev, "driver does not support non-dt devices\n");
+>
+> It's OK to exceed 80 columns for these format strings.
+>
+>> > diff --git a/include/linux/mailbox-samsung.h b/include/linux/mailbox-samsung.h
+> []
+>> > +static inline unsigned long get_alligned_buffer(void)
+>
+> Typo: There's one l in aligned
+
+will do it
+
+>
+>> > +{
+>> > +       return __get_free_pages(GFP_KERNEL, REQUEST_PAGE_ORDER);
+>> > +}
+>> > +
+>> > +static inline void put_alligned_buffer(unsigned long addr)
+>> > +{
+>
+> here too
+>
+>> > +       free_pages(addr, REQUEST_PAGE_ORDER);
+>> > +}
+>> > +
+>
+>
