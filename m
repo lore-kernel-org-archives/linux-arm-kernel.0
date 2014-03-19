@@ -1,58 +1,50 @@
-From: mr.nuke.me@gmail.com (mrnuke)
-Date: Wed, 19 Mar 2014 13:03:45 -0500
-Subject: [PATCH 1/2] v1 ARM: sun4i: spi: Allow Rx transfers larger than
- FIFO size
-In-Reply-To: <20140319165507.GJ27873@lukather>
-References: <2167943.Zs1zPAMITN@nukelap.gtech>
- <20140319165507.GJ27873@lukather>
-Message-ID: <29069269.5VPQtL8a7I@nukelap.gtech>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Mar 2014 18:02:19 +0000
+Subject: [PATCH 3/3] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+Message-ID: <1395252139-16239-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 05:55:07 PM Maxime Ripard wrote:
-> Hi,
-> 
-> Thanks for working on this.
-> 
-> I have a few general comments first:
->   - Use a decent mailer for your patches. [...]
->   - The vX should be between the brackets, [...]
-OOPS
+From: Mark Brown <broonie@linaro.org>
 
->   - Those two patches should be merged together. [...]
-Sure.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-> > -	/* We don't support transfer larger than the FIFO */
-> > -	if (tfr->len > SUN4I_FIFO_DEPTH)
-> > +	if (tfr->len > SUN4I_MAX_XFER_SIZE)
-> > +		return -EINVAL;
-> 
-> Why do you still need this test?
-> 
-SUN4I_MAX_XFER_SIZE is not the FIFO size. It is the max number we can write in 
-SUN4I_BURST_CNT_REG. That's the maximum SPI burst size (16 MiB - 1) that the 
-hardware supports. Anything larger, and we'd need to break up the transfer in 
-several bursts. That's a different problem than the one I'm addressing.
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-> > -	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
-> > +	/* FIFO is drained during the interrupt handler */
-> 
-> Then don't mention it.
-> 
-Got it, boss.
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
 
-> > +	/* Receive FIFO 3/4 full */
-> > +	if (status & SUN4I_INT_CTL_RF_F34) {
-> > +		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
-> > +		/* Only clear the interrupt _after_ draining the FIFO */
-> > +		sun4i_spi_write(sspi, SUN4I_INT_STA_REG,
-> > SUN4I_INT_CTL_RF_F34);
-> 
-> Not that it's important, but it really doesn't matter to do it before
-> or after, the interrupts are disabled in the handler.
-> 
-I think this was one of those bits that keeps being set by hardware until the 
-Rx FIFO is under 48 bytes (less than 3/4 full).  I'll have to look into this 
-again.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Alex
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 6713c7de4be3..01ab52be2764 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -190,6 +190,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.9.0
