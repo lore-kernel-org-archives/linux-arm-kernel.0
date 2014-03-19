@@ -1,38 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:45 +0100
-Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
+Date: Wed, 19 Mar 2014 20:29:22 +0100
+Subject: [PATCH 25/62] ARM: mvebu: add missing header
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-49-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-26-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power domain code is only available when CONFIG_PM
-is enabled, so we must not select that unconditionally for
-s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
-mirrors what we do on other platforms, and fixes a possible
-randconfig build bug.
+The definition for SIGBUS may not be visible without including
+linux/signal.h, as I found during randconfig testing.
+
+Adding an explicit include is certainly the right thing to do.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mvebu/board-v7.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4721007..6ffcadd 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -764,7 +764,7 @@ config ARCH_S3C64XX
- 	select HAVE_TCM
- 	select NO_IOPORT
- 	select PLAT_SAMSUNG
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
- 	select S3C_DEV_NAND
- 	select S3C_GPIO_TRACK
- 	select SAMSUNG_ATAGS
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 746134e..333fca8 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -21,6 +21,7 @@
+ #include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/mbus.h>
++#include <linux/signal.h>
+ #include <linux/slab.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
 -- 
 1.8.3.2
