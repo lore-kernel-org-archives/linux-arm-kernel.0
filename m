@@ -1,133 +1,65 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Mar 2014 21:26:53 -0700
-Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
- rates
-In-Reply-To: <5326F02F.2030604@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
- <52FE1DF2.2040707@ti.com> <20140227022524.12081.32368@quantum>
- <5326F02F.2030604@ti.com>
-Message-ID: <20140319042653.30995.3101@quantum>
+Date: Tue, 18 Mar 2014 22:30:53 -0700
+Subject: [GIT PULL] clk: mvebu: Armada 3xx changes for v3.15 (incr. #2)
+In-Reply-To: <20140314142717.GC15608@titan.lakedaemon.net>
+References: <20140314142717.GC15608@titan.lakedaemon.net>
+Message-ID: <20140319053053.30995.60933@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomi Valkeinen (2014-03-17 05:53:03)
-> On 27/02/14 04:25, Mike Turquette wrote:
-> > Quoting Tero Kristo (2014-02-14 05:45:22)
-> >> On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
-> >>> clk-divider.c does not calculate the rates consistently at the moment.
-> >>>
-> >>> As an example, on OMAP3 we have a clock divider with a source clock of
-> >>> 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
-> >>>
-> >>> 6: 144000000
-> >>> 7: 123428571.428571...
-> >>> 8: 108000000
-> >>>
-> >>> Calling clk_round_rate() with the rate in the first column will give the
-> >>> rate in the second column:
-> >>>
-> >>> 144000000 -> 144000000
-> >>> 143999999 -> 123428571
-> >>> 123428572 -> 123428571
-> >>> 123428571 -> 108000000
-> >>>
-> >>> Note how clk_round_rate() returns 123428571 for rates from 123428572 to
-> >>> 143999999, which is mathematically correct, but when clk_round_rate() is
-> >>> called with 123428571, the returned value is surprisingly 108000000.
-> >>>
-> >>> This means that the following code works a bit oddly:
-> >>>
-> >>> rate = clk_round_rate(clk, 123428572);
-> >>> clk_set_rate(clk, rate);
-> >>>
-> >>> As clk_set_rate() also does clock rate rounding, the result is that the
-> >>> clock is set to the rate of 108000000, not 123428571 returned by the
-> >>> clk_round_rate.
-> >>>
-> >>> This patch changes the clk-divider.c to use DIV_ROUND_UP when
-> >>> calculating the rate. This gives the following behavior which fixes the
-> >>> inconsistency:
-> >>>
-> >>> 144000000 -> 144000000
-> >>> 143999999 -> 123428572
-> >>> 123428572 -> 123428572
-> >>> 123428571 -> 108000000
-> >>>
-> >>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> >>> Cc: Mike Turquette <mturquette@linaro.org>
-> >>> ---
-> >>>   drivers/clk/clk-divider.c | 10 +++++-----
-> >>>   1 file changed, 5 insertions(+), 5 deletions(-)
-> >>>
-> >>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> >>> index 5543b7df8e16..ec22112e569f 100644
-> >>> --- a/drivers/clk/clk-divider.c
-> >>> +++ b/drivers/clk/clk-divider.c
-> >>> @@ -24,7 +24,7 @@
-> >>>    * Traits of this clock:
-> >>>    * prepare - clk_prepare only ensures that parents are prepared
-> >>>    * enable - clk_enable only ensures that parents are enabled
-> >>> - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-> >>> + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
-> >>>    * parent - fixed parent.  No clk_set_parent support
-> >>>    */
-> >>>
-> >>> @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> >>>               return parent_rate;
-> >>>       }
-> >>>
-> >>> -     return parent_rate / div;
-> >>> +     return DIV_ROUND_UP(parent_rate, div);
-> >>>   }
-> >>>
-> >>>   /*
-> >>> @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> >>>               }
-> >>>               parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> >>>                               MULT_ROUND_UP(rate, i));
-> >>> -             now = parent_rate / i;
-> >>> +             now = DIV_ROUND_UP(parent_rate, i);
-> >>>               if (now <= rate && now > best) {
-> >>>                       bestdiv = i;
-> >>>                       best = now;
-> >>> @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-> >>>       int div;
-> >>>       div = clk_divider_bestdiv(hw, rate, prate);
-> >>>
-> >>> -     return *prate / div;
-> >>> +     return DIV_ROUND_UP(*prate, div);
-> >>>   }
-> >>>
-> >>>   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> >>> @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> >>>       unsigned long flags = 0;
-> >>>       u32 val;
-> >>>
-> >>> -     div = parent_rate / rate;
-> >>> +     div = DIV_ROUND_UP(parent_rate, rate);
-> >>>       value = _get_val(divider, div);
-> >>>
-> >>>       if (value > div_mask(divider))
-> >>>
-> >>
-> >> Basically the patch looks good to me, but it might be good to have a 
-> >> testing round of sort with this. It can potentially cause regressions on 
-> >> multiple boards if the drivers happen to rely on the "broken" clock 
-> >> rates. Same for patch #2 which is a copy paste of this one, but only 
-> >> impacts TI boards.
-> > 
-> > Agreed. I've taken patches #1 & #2 into clk-next. Let's let them stew in
-> > -next for a while and see if anyone's board catches on fire.
+Quoting Jason Cooper (2014-03-14 07:27:17)
+> Mike,
 > 
-> Are these on the way to 3.15?
+> This is a small pull request, and should be the last one for v3.15.  We
+> have a small fix for the new driver we introduced in v3.15, and we're
+> expanding the core divider to support another SoC.
+> 
+> Due to some great work by Ezequiel and others, this is a small and simple
+> change to make.
+> 
+> This pull request is an incremental pull from tags/clk-mvebu-3xx-3.15 up
+> to tags/clk-mvebu-3xx-3.15-2 in the mvebu/clk-3xx branch.
+> 
+> Please pull.
 
-Yes, they've been in -next for a couple of weeks.
+Pull into clk-next.
 
 Regards,
 Mike
 
 > 
->  Tomi
+> thx,
+> 
+> Jason.
 > 
 > 
+> The following changes since commit e9646fe1169de0162d461472df7ed19e0c729b61:
+> 
+>   dt: Update binding information for mvebu gating clocks with Armada 380/385 (2014-02-17 02:34:08 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3xx-3.15-2
+> 
+> for you to fetch changes up to e69a8543ec7730c46225c886f74f0ea57e4656c5:
+> 
+>   clk: mvebu: Update binding documentation for the core divider clock (2014-03-13 23:24:23 +0000)
+> 
+> ----------------------------------------------------------------
+> clock: mvebu new SoC changes for v3.15 (incremental pull #2)
+> 
+>  - mvebu (Armada 375)
+>     - fix ratio register offest
+> 
+>  - mvebu (Armada 380)
+>     - expand core divider clock driver to support 380 SoC (enables nand support)
+> 
+> ----------------------------------------------------------------
+> Ezequiel Garcia (3):
+>       clk: mvebu: Fix ratio register offset on A375 SoC
+>       clk: mvebu: Support Armada 380 SoC on the core divider clock
+>       clk: mvebu: Update binding documentation for the core divider clock
+> 
+>  .../bindings/clock/mvebu-corediv-clock.txt         |  5 ++++-
+>  drivers/clk/mvebu/clk-corediv.c                    | 25 +++++++++++++++++++++-
+>  2 files changed, 28 insertions(+), 2 deletions(-)
