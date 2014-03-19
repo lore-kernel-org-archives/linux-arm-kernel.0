@@ -1,33 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Mar 2014 14:36:58 +0000
-Subject: [PATCH v3 2/3] mfd: sec-core: Add of_compatible strings for
- clock MFD cells
-In-Reply-To: <1395234951.7642.1.camel@AMDC1943>
-References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
- <1395047958-17953-3-git-send-email-k.kozlowski@samsung.com>
- <20140318203159.GW25478@lee--X1> <1395234951.7642.1.camel@AMDC1943>
-Message-ID: <20140319143658.GJ31687@lee--X1>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 19 Mar 2014 15:49:23 +0100
+Subject: [PATCH 2/3] ARM: dts: i.MX53: Enable CODA7541 VPU
+In-Reply-To: <1395240564-25940-1-git-send-email-l.stach@pengutronix.de>
+References: <1395240564-25940-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1395240564-25940-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Add of_compatible strings for S5M8767 and S2MPS14 clock MFD cells.
-> > > 
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > ---
-> > >  drivers/mfd/sec-core.c |    3 +++
-> > >  1 file changed, 3 insertions(+)
-> > 
-> > Applied with Tomasz' Reviewed-by.
-> 
-> Thanks! One minor thing - I see that Tomasz' Review-by got lost when the
-> patch was applied to your tree:
-> https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/commit/?h=for-mfd-next&id=09f8c0a07044bb8ac5085fcbcf82468173a1666d.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-Thanks for the prod, but I do have it applied locally. I'll push the
-branch later today.
+This IP module is always present and has no external connections.
+There is no reason to disable it in the device tree.
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 80615dfa2177..a6f361b08439 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -667,7 +667,6 @@
+ 				         <&clks IMX5_CLK_VPU_GATE>;
+ 				clock-names = "per", "ahb";
+ 				iram = <&ocram>;
+-				status = "disabled";
+ 			};
+ 		};
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.0
