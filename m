@@ -1,112 +1,121 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 19 Mar 2014 10:42:35 +0100
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for ARM64
-In-Reply-To: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
-References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1395222155-22205-4-git-send-email-jean.pihet@linaro.org>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 19 Mar 2014 10:48:20 +0100
+Subject: [PATCH 00/11] ARM: at91: rework main and slow clk implementation
+In-Reply-To: <3485B87A-1832-4EE3-8613-B5165C282397@jcrosoft.com>
+References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
+ <3485B87A-1832-4EE3-8613-B5165C282397@jcrosoft.com>
+Message-ID: <532967E4.8090001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+Hello Jean-Christophe,
 
-Note: the libdw code needs some support for dwarf unwinding
-on ARM64, this code is submitted seperately on the elfutils
-ML.
+Le 19/03/2014 07:06, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> You must keep me in Cc
 
-The new code is contained in unwin-libdw.c object, and
-implements unwind__get_entries unwind interface function.
+I always did, this is an oversight.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-Cc: David Ahern <dsahern@gmail.com>
----
- tools/perf/arch/arm64/Makefile            |  5 +++
- tools/perf/arch/arm64/util/unwind-libdw.c | 53 +++++++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 tools/perf/arch/arm64/util/unwind-libdw.c
+>
+> first and last warning
 
-diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-index 221f21d..09d6215 100644
---- a/tools/perf/arch/arm64/Makefile
-+++ b/tools/perf/arch/arm64/Makefile
-@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+endif
-+ifndef NO_LIBDW_DWARF_UNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
-+endif
-+ifndef NO_DWARF_UNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
- endif
-diff --git a/tools/perf/arch/arm64/util/unwind-libdw.c b/tools/perf/arch/arm64/util/unwind-libdw.c
-new file mode 100644
-index 0000000..8d24958
---- /dev/null
-+++ b/tools/perf/arch/arm64/util/unwind-libdw.c
-@@ -0,0 +1,53 @@
-+#include <elfutils/libdwfl.h>
-+#include "../../util/unwind-libdw.h"
-+#include "../../util/perf_regs.h"
-+
-+bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
-+{
-+	struct unwind_info *ui = arg;
-+	struct regs_dump *user_regs = &ui->sample->user_regs;
-+	Dwarf_Word dwarf_regs[PERF_REG_ARM64_MAX];
-+
-+#define REG(r) ({						\
-+	Dwarf_Word val = 0;					\
-+	perf_reg_value(&val, user_regs, PERF_REG_ARM64_##r);	\
-+	val;							\
-+})
-+
-+	dwarf_regs[0]  = REG(X0);
-+	dwarf_regs[1]  = REG(X1);
-+	dwarf_regs[2]  = REG(X2);
-+	dwarf_regs[3]  = REG(X3);
-+	dwarf_regs[4]  = REG(X4);
-+	dwarf_regs[5]  = REG(X5);
-+	dwarf_regs[6]  = REG(X6);
-+	dwarf_regs[7]  = REG(X7);
-+	dwarf_regs[8]  = REG(X8);
-+	dwarf_regs[9]  = REG(X9);
-+	dwarf_regs[10] = REG(X10);
-+	dwarf_regs[11] = REG(X11);
-+	dwarf_regs[12] = REG(X12);
-+	dwarf_regs[13] = REG(X13);
-+	dwarf_regs[14] = REG(X14);
-+	dwarf_regs[15] = REG(X15);
-+	dwarf_regs[16] = REG(X16);
-+	dwarf_regs[17] = REG(X17);
-+	dwarf_regs[18] = REG(X18);
-+	dwarf_regs[19] = REG(X19);
-+	dwarf_regs[20] = REG(X20);
-+	dwarf_regs[21] = REG(X21);
-+	dwarf_regs[22] = REG(X22);
-+	dwarf_regs[23] = REG(X23);
-+	dwarf_regs[24] = REG(X24);
-+	dwarf_regs[25] = REG(X25);
-+	dwarf_regs[26] = REG(X26);
-+	dwarf_regs[27] = REG(X27);
-+	dwarf_regs[28] = REG(X28);
-+	dwarf_regs[29] = REG(X29);
-+	dwarf_regs[30] = REG(LR);
-+	dwarf_regs[31] = REG(SP);
-+	dwarf_regs[32] = REG(PC);
-+
-+	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM64_MAX,
-+					   dwarf_regs);
-+}
--- 
-1.7.11.7
+Now, this is my turn.
+
+I don't like to be threatened, especially when this message is only sent 
+to me.
+BTW, last warning, then what ?
+
+Now let's talk about your attitude.
+
+Regarding this specific series: I sent you several versions of the at91 
+CCF based
+clk implementation and you never fully reviewed those series (despite 
+the fact you
+told me you would do it), why are you so interested in the at91 CCF 
+implementation
+now ?
+
+Moreover, most of the time when you review a patchset your remarks are 
+far from
+constructive, and we always have to ask you several times to get a real 
+explanation.
+
+I'm not telling you're wrong when you "NACK" something, but explaining 
+the reasons
+are part of your maintainer's job.
+
+This being said, I'll take care to keep you in Cc of all at91 related 
+patches.
+
+Best Regards,
+
+Boris
+
+>
+> On Mar 19, 2014, at 4:18 AM, Boris BREZILLON <brezillonboris@gmail.com> wrote:
+>
+>> Hello,
+>>
+>> This series introduce the real clock model (as described in atmel datasheets)
+>> for slow and main clocks.
+>>
+>> The modifications introduced by this series break the DT compat, but, as the
+>> at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
+>> eval boards) I think it won't impact a lot of users.
+>>
+>> I tested it on sama5d3.
+>> Alexandre, Jean-Jacques, could you test this series on your eval boards
+>> (sam9261ek and sam9rlek) so that we can move to this new model and hopefully
+>> consider the at91 clk DT binding as (almost :-)) stable.
+>>
+>> Jean-Jacques, as you can see I reworked my first implementation as you
+>> suggested, do you want me to add your Signed-off-by in the next version ?
+>>
+>> Mike, if this series is accepted, I'd like to get it merged as soon as possible
+>> to prevent other developpers from using a deprecated DT binding.
+>>
+>> Best Regards,
+>>
+>> Boris
+>>
+>> Boris BREZILLON (11):
+>>   clk: at91: rework main clk implementation
+>>   clk: at91: update main clk documentation
+>>   clk: at91: add slow clks driver
+>>   clk: at91: add slow clk documentation
+>>   ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
+>>   ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
+>>   ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
+>>   ARM: at91/dt: move at91sam9261 SoC to the new main clock model
+>>   ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
+>>   ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
+>>   ARM: at91/dt: define sam9rlek crystal frequencies
+>>
+>> .../devicetree/bindings/clock/at91-clock.txt       |  128 ++++-
+>> arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   10 +
+>> arch/arm/boot/dts/at91sam9261.dtsi                 |   10 +-
+>> arch/arm/boot/dts/at91sam9261ek.dts                |    4 +
+>> arch/arm/boot/dts/at91sam9rl.dtsi                  |   45 +-
+>> arch/arm/boot/dts/at91sam9rlek.dts                 |    8 +
+>> arch/arm/boot/dts/sama5d3.dtsi                     |   61 +-
+>> arch/arm/boot/dts/sama5d3xcm.dtsi                  |   10 +
+>> drivers/clk/at91/Makefile                          |    4 +-
+>> drivers/clk/at91/clk-main.c                        |  581 +++++++++++++++++---
+>> drivers/clk/at91/clk-slow.c                        |  467 ++++++++++++++++
+>> drivers/clk/at91/pmc.c                             |   12 +
+>> drivers/clk/at91/pmc.h                             |    9 +
+>> drivers/clk/at91/sckc.c                            |   57 ++
+>> drivers/clk/at91/sckc.h                            |   22 +
+>> include/linux/clk/at91_pmc.h                       |    1 +
+>> 16 files changed, 1342 insertions(+), 87 deletions(-)
+>> create mode 100644 drivers/clk/at91/clk-slow.c
+>> create mode 100644 drivers/clk/at91/sckc.c
+>> create mode 100644 drivers/clk/at91/sckc.h
+>>
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
