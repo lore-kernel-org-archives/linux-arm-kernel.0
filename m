@@ -1,27 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 14:29:11 +0100
-Subject: [PATCH 0/4] Consolidate Exynos machine code
-In-Reply-To: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
-References: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <201403191429.11721.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 19 Mar 2014 14:28:39 +0100
+Subject: [PATCH 3/5] ARM: dts: tx53: fix LVDS display mappings
+In-Reply-To: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
+References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1395235721-13847-3-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Sachin Kamat wrote:
-> This patch series consolidates the Exynos machine code and common
-> code into a single file to avoid code duplication and introduces
-> generic compatible strings for Exynos4 and 5 SoC series.
-> 
-> Complete discussion and motivation for this series is found here:
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/27268
-> 
-> This series is based on the latest linux-next and depends on
-> 1. Tomasz Figa's PM consolidation series 1 and 2
-> 2. Patch: ARM: SAMSUNG: Reorganize calls to reserve memory for MFC
-> http://www.spinics.net/lists/linux-samsung-soc/msg25501.html
-> 3. Patch: ARM: EXYNOS: Add support to reserve memory for MFC-v7
-> http://www.spinics.net/lists/arm-kernel/msg315940.html
-> 4. Kconfig and CPU init Consolidation series
-> http://article.gmane.org/gmane.linux.kernel.samsung-soc/28216
+The data-mapping and data-width settings were opposite of what the
+display requires. Interestingly, these settings nevertheless produced
+correct results.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx53-tx53-x13x.dts |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+index cd3476b..26b918e 100644
+--- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
++++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+@@ -181,8 +181,8 @@
+ 	status = "okay";
+ 
+ 	lvds0: lvds-channel at 0 {
+-		fsl,data-mapping = "jeida";
+-		fsl,data-width = <24>;
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
+ 		status = "okay";
+ 
+ 		display-timings {
+@@ -206,8 +206,8 @@
+ 	};
+ 
+ 	lvds1: lvds-channel at 1 {
+-		fsl,data-mapping = "jeida";
+-		fsl,data-width = <24>;
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
+ 		status = "okay";
+ 
+ 		display-timings {
+-- 
+1.7.10.4
