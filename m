@@ -1,129 +1,52 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Wed, 19 Mar 2014 09:19:36 +0530
-Subject: [PATCH 1/2] mailbox: samsung: added support for samsung mailbox
-In-Reply-To: <1395140208.2812.15.camel@joe-AO722>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <1395057839-23871-2-git-send-email-ks.giri@samsung.com>
- <CAKrE-KcA6VUUwUjAGuW+nYsFg0qknfZwECtdVS8ZtZb4GYoCvA@mail.gmail.com>
- <1395140208.2812.15.camel@joe-AO722>
-Message-ID: <CAKrE-KcMMtFT-aL8wFeKiFkr1LCnsvcewHGK1WYSP+HnynO61A@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Mar 2014 21:01:49 -0700
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net> <531CFA28.9020600@gmail.com>
+ <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+ <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
+ <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
+Message-ID: <20140319040149.30995.80279@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 4:26 PM, Joe Perches <joe@perches.com> wrote:
-> On Tue, 2014-03-18 at 15:52 +0530, Girish KS wrote:
->> On Mon, Mar 17, 2014 at 5:33 PM, Girish K S <ks.giri@samsung.com> wrote:
->
-> Hi, just some trivial notes about the patch
->
->> > diff --git a/drivers/mailbox/mailbox-samsung.c b/drivers/mailbox/mailbox-samsung.c
-> []
->> > @@ -0,0 +1,354 @@
->> > +/*
->> > + * Copyright 2013 Samsung Electronics Co. Ltd.
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify it
->> > + * under the terms and conditions of the GNU General Public License,
->> > + * version 2, as published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope it will be useful, but WITHOUT
->> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> > + * more details.
->> > + *
->> > + * You should have received a copy of the GNU General Public License along with
->> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> > + */
->
-> Please add
->
-> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
->
-> before any #include so that error messages are
-> prefixed in the output with "samsung-mailbox: "
-> and the reader of the log has an idea what subsystem
-> is emitting messages.
->
-Sure will do it
+Quoting Olof Johansson (2014-03-10 19:52:01)
+> On Mon, Mar 10, 2014 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Olof Johansson wrote:
+> >>
+> >> >> Hi,
+> >> >>
+> >> >> I don't see a single cc or acked-by line from Mike Turquette here. I'll
+> >> >> hold
+> >> >> off until he's had a chance to take a look at these ones; I suspect
+> >> >> they'll be
+> >> >> fine since it's mostly code refactoring though.
+> >> >
+> >> >
+> >> > I guess I should have ACKed them too, but it felt kind of strange to ACK
+> >> my
+> >> > own patches. ;)
+> >> >
+> >> > Anyway, for all samsung-clk patches:
+> >> >
+> >> > Acked-by: Tomasz Figa <t.figa@samsung.com>
+> >>
+> >> Yeah, self-acking doesn't make much sense. :)
+> >>
+> >> I'm mostly worried about patches touching other subsystems without the
+> >> other maintainer being aware of it or having reviewed them. As I said,
+> >> these mostly look like refactorings but it's still good habit.
+> >>
+> > OK, agreed, I think Mike knew about that though. Let's wait for Mike's
+> > response.
+> >
+> > BTW, should I sort out the branch again if Mike gives ack on that?
+> 
+> If I hear from Mike that he's OK with it then I can merge it, no need to rebase.
 
->> > +#include <linux/err.h>
->> > +#include <linux/module.h>
->> > +#include <linux/slab.h>
-> []
->> > +static int samsung_mbox_send_data(struct ipc_link *link, void *msg)
->> > +{
-> []
->> > +       /* Lock the mailbox for this transaction with the client id */
->> > +       writel(val, ipc_base + MBOX_REG_TXLOCK);
->> > +       do {
->> > +               if (time_after(jiffies, timeout)) {
->> > +                       pr_err("cannot aquire the lock\n");
->
-> This would be prefixed appropriately via pr_fmt.
-> Also, there's a typo of aquire here: acquire
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-OK
-
->
->> > +static int samsung_mbox_startup(struct ipc_link *link, void *ignored)
->> > +{
-> []
->> > +       ret = devm_request_irq(dev, samsung_link->irq, samsung_ipc_handler,
->> > +                                       IRQF_SHARED, link->link_name,
->> > +                                       samsung_link);
->> > +       if (unlikely(ret)) {
->> > +               pr_err("failed to register mailbox interrupt:%d\n", ret);
->
-> Here too it would be prefixed
-
-ok
-
->
->> > +static int samsung_mbox_probe(struct platform_device *pdev)
->> > +{
->> > +       struct samsung_mbox *samsung_mbox;
->> > +       struct samsung_mlink *mbox_link;
->> > +       struct resource res;
->> > +       struct ipc_link **link;
->> > +       int loop, count, ret = 0;
->> > +       struct device_node *node = pdev->dev.of_node;
->> > +
->> > +       if (!node) {
->> > +               dev_err(&pdev->dev, "driver doesnt support"
->> > +                               "non-dt devices\n");
->
-> Please coalesce the format fragments.
->
-> You would notice the missing space between
-> "support" and "non-dt"
-
-ok
-
->
->                 dev_err(&pdev->dev, "driver does not support non-dt devices\n");
->
-> It's OK to exceed 80 columns for these format strings.
->
->> > diff --git a/include/linux/mailbox-samsung.h b/include/linux/mailbox-samsung.h
-> []
->> > +static inline unsigned long get_alligned_buffer(void)
->
-> Typo: There's one l in aligned
-
-will do it
-
->
->> > +{
->> > +       return __get_free_pages(GFP_KERNEL, REQUEST_PAGE_ORDER);
->> > +}
->> > +
->> > +static inline void put_alligned_buffer(unsigned long addr)
->> > +{
->
-> here too
->
->> > +       free_pages(addr, REQUEST_PAGE_ORDER);
->> > +}
->> > +
->
->
+> 
+> 
+> -Olof
