@@ -1,169 +1,161 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 19 Mar 2014 15:55:04 +0530
-Subject: [PATCH Resend 2/3] ARM: EXYNOS: Consolidate CPU init code
-In-Reply-To: <1395224705-2935-1-git-send-email-sachin.kamat@linaro.org>
-References: <1395224705-2935-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1395224705-2935-2-git-send-email-sachin.kamat@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Mar 2014 11:33:34 +0100
+Subject: [PATCH] Documentation: dt: list all compatible strings for at91
+In-Reply-To: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5329727E.40604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_table was used to distinguish between different Exynos4 and 5
-SoCs and based on the type do the initialization and io mapping.
-exynos_init is dummy and no longer needed as we do a DT based booting.
-By having a common io mapping function we can get rid of the whole
-table and avoid populating it for every SoC.
+On 19/03/2014 11:26, Alexandre Belloni :
+> Avoids getting the newly introduced warning:
+> WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> +				compatible = "atmel,at91sam9g45-adc";
+> 
+> Introduced by:
+> bff5da433525 checkpatch: add DT compatible string documentation checks
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Tested on Exynos4210, 5250 and 5420 based boards.
+Ok, if it is needed.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Tested-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/common.c |  108 +++++++++--------------------------------
- 1 file changed, 23 insertions(+), 85 deletions(-)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index e98ddadc5f74..10ed374c0744 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -48,56 +48,6 @@
- #define L2_AUX_VAL 0x7C470001
- #define L2_AUX_MASK 0xC200ffff
- 
--static const char name_exynos4210[] = "EXYNOS4210";
--static const char name_exynos4212[] = "EXYNOS4212";
--static const char name_exynos4412[] = "EXYNOS4412";
--static const char name_exynos5250[] = "EXYNOS5250";
--static const char name_exynos5420[] = "EXYNOS5420";
--static const char name_exynos5440[] = "EXYNOS5440";
--
--static void exynos4_map_io(void);
--static void exynos5_map_io(void);
--static int exynos_init(void);
--
--static struct cpu_table cpu_ids[] __initdata = {
--	{
--		.idcode		= EXYNOS4210_CPU_ID,
--		.idmask		= EXYNOS4_CPU_MASK,
--		.map_io		= exynos4_map_io,
--		.init		= exynos_init,
--		.name		= name_exynos4210,
--	}, {
--		.idcode		= EXYNOS4212_CPU_ID,
--		.idmask		= EXYNOS4_CPU_MASK,
--		.map_io		= exynos4_map_io,
--		.init		= exynos_init,
--		.name		= name_exynos4212,
--	}, {
--		.idcode		= EXYNOS4412_CPU_ID,
--		.idmask		= EXYNOS4_CPU_MASK,
--		.map_io		= exynos4_map_io,
--		.init		= exynos_init,
--		.name		= name_exynos4412,
--	}, {
--		.idcode		= EXYNOS5250_SOC_ID,
--		.idmask		= EXYNOS5_SOC_MASK,
--		.map_io		= exynos5_map_io,
--		.init		= exynos_init,
--		.name		= name_exynos5250,
--	}, {
--		.idcode		= EXYNOS5420_SOC_ID,
--		.idmask		= EXYNOS5_SOC_MASK,
--		.map_io		= exynos5_map_io,
--		.init		= exynos_init,
--		.name		= name_exynos5420,
--	}, {
--		.idcode		= EXYNOS5440_SOC_ID,
--		.idmask		= EXYNOS5_SOC_MASK,
--		.init		= exynos_init,
--		.name		= name_exynos5440,
--	},
--};
--
- /* Initial IO mappings */
- 
- static struct map_desc exynos4_iodesc[] __initdata = {
-@@ -346,6 +296,28 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
-  *
-  * register the standard cpu IO areas
-  */
-+static void __init exynos_map_io(void)
-+{
-+	if (soc_is_exynos4210() || soc_is_exynos4212() || soc_is_exynos4412())
-+		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
-+
-+	if (soc_is_exynos5250() || soc_is_exynos5420())
-+		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
-+
-+	if (soc_is_exynos4210()) {
-+		if (samsung_rev() == EXYNOS4210_REV_0)
-+			iotable_init(exynos4_iodesc0,
-+						ARRAY_SIZE(exynos4_iodesc0));
-+		else
-+			iotable_init(exynos4_iodesc1,
-+						ARRAY_SIZE(exynos4_iodesc1));
-+		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
-+	}
-+	if (soc_is_exynos4212() || soc_is_exynos4412())
-+		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
-+	if (soc_is_exynos5250())
-+		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
-+}
- 
- void __init exynos_init_io(void)
- {
-@@ -356,30 +328,7 @@ void __init exynos_init_io(void)
- 	/* detect cpu id and rev. */
- 	s5p_init_cpu(S5P_VA_CHIPID);
- 
--	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
--}
--
--static void __init exynos4_map_io(void)
--{
--	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
--
--	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_0)
--		iotable_init(exynos4_iodesc0, ARRAY_SIZE(exynos4_iodesc0));
--	else
--		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
--
--	if (soc_is_exynos4210())
--		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
--	if (soc_is_exynos4212() || soc_is_exynos4412())
--		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
--}
--
--static void __init exynos5_map_io(void)
--{
--	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
--
--	if (soc_is_exynos5250())
--		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
-+	exynos_map_io();
- }
- 
- struct bus_type exynos_subsys = {
-@@ -387,10 +336,6 @@ struct bus_type exynos_subsys = {
- 	.dev_name	= "exynos-core",
- };
- 
--static struct device exynos4_dev = {
--	.bus	= &exynos_subsys,
--};
--
- static int __init exynos_core_init(void)
- {
- 	return subsys_system_register(&exynos_subsys, NULL);
-@@ -410,10 +355,3 @@ static int __init exynos4_l2x0_cache_init(void)
- 	return 0;
- }
- early_initcall(exynos4_l2x0_cache_init);
--
--static int __init exynos_init(void)
--{
--	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
--
--	return device_register(&exynos4_dev);
--}
+BTW, I do not see the devicetree maintainers in the list of CC. If it is
+done for other architectures, I am fine with it, but if we are the only
+one to start this move, I would like them to be aware.
+
+Best regards,
+
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-aic.txt      |  3 +--
+>  Documentation/devicetree/bindings/arm/atmel-at91.txt     | 10 ++++------
+>  Documentation/devicetree/bindings/dma/atmel-dma.txt      |  2 +-
+>  Documentation/devicetree/bindings/gpio/gpio_atmel.txt    |  2 +-
+>  Documentation/devicetree/bindings/iio/adc/at91_adc.txt   |  4 ++--
+>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 10 ++++------
+>  6 files changed, 13 insertions(+), 18 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+> index 2742e9cfd6b1..95f75fd097ba 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+> @@ -1,8 +1,7 @@
+>  * Advanced Interrupt Controller (AIC)
+>  
+>  Required properties:
+> -- compatible: Should be "atmel,<chip>-aic"
+> -  <chip> can be "at91rm9200" or "sama5d3"
+> +- compatible: "atmel,at91rm9200-aic", "atmel,sama5d3-aic"
+>  - interrupt-controller: Identifies the node as an interrupt controller.
+>  - interrupt-parent: For single AIC system, it is an empty property.
+>  - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 16f60b41c147..e79a33315e4f 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -14,8 +14,7 @@ System Timer (ST) required properties:
+>    shared across all System Controller members.
+>  
+>  TC/TCLIB Timer required properties:
+> -- compatible: Should be "atmel,<chip>-tcb".
+> -  <chip> can be "at91rm9200" or "at91sam9x5"
+> +- compatible: "atmel,at91rm9200-tcb", "atmel,at91sam9x5-tcb"
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain all interrupts for the TC block
+>    Note that you can specify several interrupt cells if the TC
+> @@ -46,8 +45,7 @@ One interrupt per TC channel in a TC block:
+>  	};
+>  
+>  RSTC Reset Controller required properties:
+> -- compatible: Should be "atmel,<chip>-rstc".
+> -  <chip> can be "at91sam9260" or "at91sam9g45"
+> +- compatible: "atmel,at91sam9260-rstc", "atmel,at91sam9g45-rstc"
+>  - reg: Should contain registers location and length
+>  
+>  Example:
+> @@ -80,8 +78,8 @@ Examples:
+>  SHDWC Shutdown Controller
+>  
+>  required properties:
+> -- compatible: Should be "atmel,<chip>-shdwc".
+> -  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
+> +- compatible: "atmel,at91sam9260-shdwc", "atmel,at91sam9rl-shdwc",
+> +	"atmel,at91sam9x5-shdwc"
+>  - reg: Should contain registers location and length
+>  
+>  optional properties:
+> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+> index f69bcf5a6343..410bff989949 100644
+> --- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+> @@ -1,7 +1,7 @@
+>  * Atmel Direct Memory Access Controller (DMA)
+>  
+>  Required properties:
+> -- compatible: Should be "atmel,<chip>-dma".
+> +- compatible: "atmel,at91sam9rl-dma", "atmel,at91sam9g45-dma"
+>  - reg: Should contain DMA registers location and length.
+>  - interrupts: Should contain DMA interrupt.
+>  - #dma-cells: Must be <2>, used to represent the number of integer cells in
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+> index 85f8c0d084fa..1fa10565adcc 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+> @@ -1,7 +1,7 @@
+>  * Atmel GPIO controller (PIO)
+>  
+>  Required properties:
+> -- compatible: "atmel,<chip>-gpio", where <chip> is at91rm9200 or at91sam9x5.
+> +- compatible: "atmel,at91rm9200-gpio", "atmel,at91rm9x5-gpio"
+>  - reg: Should contain GPIO controller registers location and length
+>  - interrupts: Should be the port interrupt shared by all the pins.
+>  - #gpio-cells: Should be two.  The first cell is the pin number and
+> diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+> index 82061c7e4fea..ac26cc13dd9f 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+> @@ -1,8 +1,8 @@
+>  * AT91's Analog to Digital Converter (ADC)
+>  
+>  Required properties:
+> -  - compatible: Should be "atmel,<chip>-adc"
+> -    <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+> +  - compatible: "atmel,at91sam9260-adc", "atmel,at91sam9rl-adc",
+> +  		"atmel,at91sam9g45-adc", "atmel,at91sam9x5-adc",
+>    - reg: Should contain ADC registers location and length
+>    - interrupts: Should contain the IRQ line for the ADC
+>    - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
+> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> index 9c5d19ac935c..ebc5b0cb7669 100644
+> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> @@ -1,9 +1,7 @@
+>  * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+>  
+>  Required properties:
+> -- compatible: Should be "atmel,<chip>-usart"
+> -  The compatible <chip> indicated will be the first SoC to support an
+> -  additional mode or an USART new feature.
+> +- compatible: Should be "atmel,at91rm9200-usart", "atmel,at91sam9260-usart",
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain interrupt
+>  - clock-names: tuple listing input clock names.
+> @@ -19,9 +17,9 @@ Optional properties:
+>  		Refer to dma.txt and atmel-dma.txt for details.
+>  	- dma-names: "rx" for RX channel, "tx" for TX channel.
+>  
+> -<chip> compatible description:
+> -- at91rm9200:  legacy USART support
+> -- at91sam9260: generic USART implementation for SAM9 SoCs
+> +compatible description:
+> +- atmel,at91rm9200-usart:  legacy USART support
+> +- atmel,at91sam9260-usart: generic USART implementation for SAM9 SoCs
+>  
+>  Example:
+>  - use PDC:
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
