@@ -1,31 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Mar 2014 12:04:49 +0000
-Subject: PL310: Killing the platform specified L2 cache size
-Message-ID: <20140319120449.GB7528@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 19 Mar 2014 13:08:42 +0100
+Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
+ functions
+In-Reply-To: <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
+References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
+ <CAK9yfHw7zYaX9EYFE+m3Mh-u8Uiyubx-cS0EwPmfW+0weLiBKw@mail.gmail.com>
+ <20140318200915.7dd833ce0fddbbd6ecd8dac9@samsung.com>
+ <532862ED.8040809@samsung.com>
+ <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
+ <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
+Message-ID: <532988CA.4000008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is giving due warning that I will today kill all the code in arch/arm
-which changes bits 19:16 of the L2 cache auxiliary control register.  Bits
-19:17 set the way size, and bit 16 on PL310 sets the number of ways.
+On 19.03.2014 10:01, Sachin Kamat wrote:
+> On 19 March 2014 14:29, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>> On Tue, 18 Mar 2014 16:14:53 +0100, Tomasz Figa wrote:
+>>> On 18.03.2014 12:09, Cho KyongHo wrote:
+>>>> On Fri, 14 Mar 2014 20:52:43 +0530, Sachin Kamat wrote:
+>>>>> Hi KyongHo,
+>>>>>
+>>>>> On 14 March 2014 10:35, Cho KyongHo <pullip.cho@samsung.com> wrote:
+>>>>>> This patch uses managed device helper functions in the probe().
+>>>>>>
+>>>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+>>>>>> ---
+>>>>> [snip]
+>>>>>
+>>>>>> +       data->clk = devm_clk_get(dev, "sysmmu");
+>>>>>> +       if (IS_ERR(data->clk)) {
+>>>>>> +               dev_info(dev, "No gate clock found!\n");
+>>>>>> +               data->clk = NULL;
+>>>>>> +       }
+>>>>>
+>>>>> Why aren't you returning from here upon error?
+>>>>
+>>>> It is for the case of a System MMU which does not need clock gating.
+>>>>
+>>>
+>>> Are there really such cases?
+>>>
+>>
+>> Yes.
+>> Especially in the case of initial stage of new SoC development.
+>>
+>> I have experianced some software workaround for H/W restriction
+>> needs prevention of clock gating for some devices.
+>
+> So aren't these basically some exceptions/hacks rather than the usual way
+> of functioning of the device?
+>
 
-The bits in these registers should contain the correct value from power-up,
-and should only be changed if they are wrong or there is a desire to
-configure the cache size smaller than the hardware supports.
+This actually raises a good question, whether we really need to support 
+such early development SoC versions in mainline.
 
-So far, all the platforms which I've had my patch set run on (which
-includes Olof's build farm) indicate that these bits are always correctly
-set, so it really doesn't make sense for there to be soo much code in
-arch/arm which explicitly sets these flags.
+Another thing is that if you need to assure that a clock is ungated, you 
+must acquire it and prepare_enable explicitly, so I don't think this 
+kind of handling is correct.
 
-I will (for the time being) leave code which manipulates the other bits
-alone.
-
-If this email is mostly ignored (like all the other emails I've sent over
-the previous days) I'll just assume that no one is all that interested in
-this subject: that's fine, just don't then whinge and moan if it all
-breaks. :)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,
+Tomasz
