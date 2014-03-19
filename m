@@ -1,49 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:04 +0100
-Subject: [PATCH 07/62] ARM: davinci: make dm644x-evm phy fixup conditional
+Date: Wed, 19 Mar 2014 20:29:03 +0100
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-8-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We cannot call phy_register_fixup_for_uid() if CONFIG_PHYLIB
-is not built into the kernel, and we should not enforce that
-to be built into vmlinux either, because one might want to
-disable the entire network stack.
+The ohci-da8xx driver uses the DA8XX_SYSCFG0_VIRT macro to
+access the CFGCHIP2 register for controlling its PHY.
 
-This change uses a compile-time condition on CONFIG_PHYLIB
-to remove the call in the cases where it cannot work.
+The macro in turn relies on the da8xx_syscfg0_base global
+variable. Since the OHCI driver can be a loadable module,
+this requires the symbol to be exported from platform code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: davinci-linux-open-source at linux.davincidsp.com
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 5602957..e583e58 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -804,11 +804,12 @@ static __init void davinci_evm_init(void)
- 	/* irlml6401 switches over 1A, in under 8 msec */
- 	davinci_setup_usb(1000, 8);
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 0486cdf..4da868a 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -66,6 +66,7 @@
+ #define DA850_DMA_MMCSD1_TX	EDMA_CTLR_CHAN(1, 29)
  
--	soc_info->emac_pdata->phy_id = DM644X_EVM_PHY_ID;
--	/* Register the fixup for PHY on DaVinci */
--	phy_register_fixup_for_uid(LXT971_PHY_ID, LXT971_PHY_MASK,
--					davinci_phy_fixup);
--
-+	if (IS_BUILTIN(CONFIG_PHYLIB)) {
-+		soc_info->emac_pdata->phy_id = DM644X_EVM_PHY_ID;
-+		/* Register the fixup for PHY on DaVinci */
-+		phy_register_fixup_for_uid(LXT971_PHY_ID, LXT971_PHY_MASK,
-+						davinci_phy_fixup);
-+	}
- }
+ void __iomem *da8xx_syscfg0_base;
++EXPORT_SYMBOL_GPL(da8xx_syscfg0_base); /* used by OHCI_HCD */
+ void __iomem *da8xx_syscfg1_base;
  
- MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
+ static struct plat_serial8250_port da8xx_serial0_pdata[] = {
 -- 
 1.8.3.2
