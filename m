@@ -1,53 +1,53 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 19 Mar 2014 14:31:14 +0530
-Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
- functions
-In-Reply-To: <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
-References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
- <CAK9yfHw7zYaX9EYFE+m3Mh-u8Uiyubx-cS0EwPmfW+0weLiBKw@mail.gmail.com>
- <20140318200915.7dd833ce0fddbbd6ecd8dac9@samsung.com>
- <532862ED.8040809@samsung.com>
- <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
-Message-ID: <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Wed, 19 Mar 2014 18:06:28 +0900
+Subject: [PATCH v11 13/27] iommu/exynos: support for device tree
+In-Reply-To: <53286557.6070808@samsung.com>
+References: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
+ <53230695.9080606@samsung.com>
+ <20140318195210.14c953a70498f634032f35b7@samsung.com>
+ <53286557.6070808@samsung.com>
+Message-ID: <20140319180628.5eecd7347c24f1e697aaaa6a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2014 14:29, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> On Tue, 18 Mar 2014 16:14:53 +0100, Tomasz Figa wrote:
->> On 18.03.2014 12:09, Cho KyongHo wrote:
->> > On Fri, 14 Mar 2014 20:52:43 +0530, Sachin Kamat wrote:
->> >> Hi KyongHo,
->> >>
->> >> On 14 March 2014 10:35, Cho KyongHo <pullip.cho@samsung.com> wrote:
->> >>> This patch uses managed device helper functions in the probe().
->> >>>
->> >>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
->> >>> ---
->> >> [snip]
->> >>
->> >>> +       data->clk = devm_clk_get(dev, "sysmmu");
->> >>> +       if (IS_ERR(data->clk)) {
->> >>> +               dev_info(dev, "No gate clock found!\n");
->> >>> +               data->clk = NULL;
->> >>> +       }
->> >>
->> >> Why aren't you returning from here upon error?
->> >
->> > It is for the case of a System MMU which does not need clock gating.
->> >
->>
->> Are there really such cases?
->>
->
-> Yes.
-> Especially in the case of initial stage of new SoC development.
->
-> I have experianced some software workaround for H/W restriction
-> needs prevention of clock gating for some devices.
+On Tue, 18 Mar 2014 16:25:11 +0100, Tomasz Figa wrote:
+> On 18.03.2014 11:52, Cho KyongHo wrote:
+> > On Fri, 14 Mar 2014 14:39:33 +0100, Tomasz Figa wrote:
+> >>> @@ -557,11 +558,23 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+> >>>    	return 0;
+> >>>    }
+> >>>
+> >>> -static struct platform_driver exynos_sysmmu_driver = {
+> >>> -	.probe		= exynos_sysmmu_probe,
+> >>> -	.driver		= {
+> >>> +#ifdef CONFIG_OF
+> >>> +static struct of_device_id sysmmu_of_match[] __initconst = {
+> >>> +	{ .compatible	= "samsung,sysmmu-v1", },
+> >>> +	{ .compatible	= "samsung,sysmmu-v2", },
+> >>> +	{ .compatible	= "samsung,sysmmu-v3.1", },
+> >>> +	{ .compatible	= "samsung,sysmmu-v3.2", },
+> >>> +	{ .compatible	= "samsung,sysmmu-v3.3", },
+> >>
+> >> Do you need all these compatible strings? I mean, are there any
+> >> implementation differences that can't be identified by reading IP
+> >> registers, such as REG_MMU_VERSION?
+> >>
+> >
+> > Unfortunately, there is a SoC which overrides REG_MMU_VERSION with
+> > a value for RTL designers and it is not related to System MMU
+> > versions.
+> 
+> OK.
+> 
+> What about having a generic compatible string for Samsung SysMMU then, 
+> but an additional property that can override the version to account for 
+> such brokenness? If not provided, the version would be read from 
+> REG_MMU_VERSION.
+> 
 
-So aren't these basically some exceptions/hacks rather than the usual way
-of functioning of the device?
+Yes it is one of possible idea.
+Let me think what better way is.
 
--- 
-With warm regards,
-Sachin
+Thank you.
+
+KyongHo
