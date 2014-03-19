@@ -1,79 +1,97 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Mar 2014 21:07:15 -0700
-Subject: [GIT PULL] Samsung clock changes for v3.15
-In-Reply-To: <5328F09D.9090103@gmail.com>
-References: <1395079197-13598-1-git-send-email-t.figa@samsung.com>
- <20140319010634.30995.4609@quantum> <5328F09D.9090103@gmail.com>
-Message-ID: <20140319040715.30995.6371@quantum>
+From: girishks2000@gmail.com (Girish KS)
+Date: Wed, 19 Mar 2014 09:36:40 +0530
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <1395057839-23871-3-git-send-email-ks.giri@samsung.com>
+ <20140317140625.GJ8070@e106331-lin.cambridge.arm.com>
+Message-ID: <CAKrE-KeJPqFC__mNhFV6qexL0+E_B6Fm+u8S4iKnCR8vibCseA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-03-18 18:19:25)
-> Hi Mike,
-> 
-> On 19.03.2014 02:06, Mike Turquette wrote:
-> > Quoting Tomasz Figa (2014-03-17 10:59:57)
-> >> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> >>
-> >>    Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>    git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.15/samsung-clk
-> >>
-> >> for you to fetch changes up to 70d1cf1c85486753fec0c60a9a093bdfe42b89b4:
-> >>
-> >>    Merge branch 'for_3.15/misc' into samsung-next (2014-03-17 13:00:01 +0100)
-> >>
-> >> ----------------------------------------------------------------
-> >>
-> >> Samsung clock patches for v3.15.
-> >>
-> >> Due to dependencies, most of the patches already went through linux-samsung
-> >> tree, so this pull request is rather small.
-> >
-> > I'm a bit confused. This PR is not really small (32 patches) and it
-> > covers more stuff from arch/arm that I usually take.
-> >
-> >> It contains various patches
-> >> collected since the last merge window:
-> >>
-> >> 1) non-critical fixes (without need to push to stable):
-> >>
-> >> 220b0cc clk: samsung: Initialize clock table with error pointers
-> >> 58d83cb clk: exynos-5420: Fix VPLL lock offset
-> >> 3299bc3 clk: samsung: fixed compiler warning [-Wpointer-to-int-cast]
-> >>
-> >> 2) clock driver extensions:
-> >>
-> >> db40d0c clk: samsung exynos5250/5420: Add gate clock for SSS module
-> >> d8b9731 clk/samsung: add support for multiple clock providers
-> >> 45af130 clk/samsung: add support for pll2550xx
-> >> adec437 clk/samsung: add support for pll2650xx
-> >
-> > Right, these 7 patches would constitute a small PR. Was there a mistake
-> > when generating this pull request?
-> 
-> The problem with this pull request is that it contains patches that 
-> require quite a lot of dependencies that have been already applied into 
-> Samsung SoC tree. I'm not sure how else such situation could be handled, 
-> other than pulling respective commits into my tree as well.
+On Mon, Mar 17, 2014 at 7:36 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Mar 17, 2014 at 12:03:59PM +0000, Girish K S wrote:
+>> This patch adds the dt node for the mailbox IP
+>>
+>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>
+>> Change-Id: I35e45e9a62592887a84a909aee54f259a2f731fa
+>> ---
+>>  .../bindings/mailbox/samsung-mailbox.txt           |   24 +++++++
+>>  arch/arm64/boot/dts/samsung-gh7.dtsi               |   66 ++++++++++++++++++++
+>>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts           |    3 +
+>>  3 files changed, 93 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+>> new file mode 100644
+>> index 0000000..1908d71
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/samsung-mailbox.txt
+>> @@ -0,0 +1,24 @@
+>> +
+>> +Samsung Mailbox Driver
+>> +
+>> +Required properties:
+>> +- compatible:                Should be one of the following,
+>> +                         "samsung,gh7-mailbox" for
+>> +                             Samsung GH7 SoC series
+>> +                         "samsung,exynos-mailbox" for
+>> +                             exynosx SoC series
+>> +- reg:                       Contains the mailbox register address range (base address
+>> +                     and length)
+>> +- interrupts:                Contains the interrupt information for the mailbox
+>> +                     device.
+>
+> How many interrupts?
+just one receive interrupt
+I will update this detail in binding doc
+>
+> What are they for?
+It is only for receive from remote processor
+>
+>> +- samsung,mbox-names:        Array of the names of the mailboxes
+>
+> Juding by the code there is one name per reg entry, but the description
+> above implies a single entry (as all the dt fragments have).
+>
+> What values are expected? What is the consumer of these values? What are
+> they used for?
+These names are used to mention the links in the platform. tx and rx
+link via mailbox.
+i can mention of 2 consumers now. the ipmi driver and the cpu freq
+driver. They are used
+to exchange information with the remote processor
+>
+>> +
+>> +Example:
+>> +
+>> +/* Samsung GH7 SoC */
+>> +mailbox at 100a0000 {
+>> +     compatible = "samsung,gh7-mailbox";
+>> +     reg = <0x0 0x100a0000 0x0 0x1000>;
+>> +     interrupts = <0 310 0>;
+>> +     samsung,mbox-names = "a7q-scp";
+>> +};
+>> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+>> index c3610bd..be4cce9 100644
+>> --- a/arch/arm64/boot/dts/samsung-gh7.dtsi
+>> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+>> @@ -107,5 +107,71 @@
+>>                       interrupts = <0 420 0>;
+>>                       arm,primecell-periphid = <0x341011>; /* HACK */
+>
+> This looks odd.
+>
+> What tree is this against?
 
-There are already a fair number of clk patches going through the samsung
-tree. So in the name of consistency for this upcoming merge window it
-might be best to take these patches through there as well. Let me know
-if that creates any undo burden on you. Otherwise please add:
+Sorry this was based on a internal tree. Will base it on Kukjin's gh7 base patch
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
-
-Regards,
-Mike
-
-> 
-> I don't think this would make any problem when merging into Linus' tree, 
-> as these are exactly the same commits that will go through ARM SoC, so 
-> git should merge them just fine. Still, if you have a better idea what 
-> to do now, I will do so.
-> 
-> Best regards,
-> Tomasz
+>
+> Cheers,
+> Mark.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
