@@ -1,54 +1,108 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 19 Mar 2014 17:22:39 +0100
-Subject: [PATCH v3 0/6] rework sched_domain topology description
-Message-ID: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+Date: Wed, 19 Mar 2014 17:22:42 +0100
+Subject: [PATCH v3 3/6] sched: powerpc: create a dedicated topology table
+In-Reply-To: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1395246165-31150-4-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset was previously part of the larger tasks packing patchset [1].
-I have splitted the latter in 3 different patchsets (at least) to make the
-thing easier.
--configuration of sched_domain topology (this patchset)
--update and consolidation of cpu_power
--tasks packing algorithm
+Create a dedicated topology table for handling asymetric feature of powerpc.
 
-Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
-the sched_domain level in order to let architectures to add specific level like
-the current BOOK level or the proposed power gating level for ARM architecture.
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+---
+ arch/powerpc/kernel/smp.c | 31 +++++++++++++++++++++++--------
+ include/linux/sched.h     |  2 --
+ kernel/sched/core.c       |  6 ------
+ 3 files changed, 23 insertions(+), 16 deletions(-)
 
-[1] https://lkml.org/lkml/2013/10/18/121
-[2] https://lkml.org/lkml/2013/11/5/239
-[3] https://lkml.org/lkml/2013/11/5/449
-
-Change since v2:
-- remove patch 1 as it has been already applied to metag tree for v3.15
-- updates some commit messages
-- add new flag description in TOPOLOGY_SD_FLAGS description
-
-Change since v1:
-- move sched_domains_curr_level back under #ifdef CONFIG_NUMA
-- use function pointer to set flag instead of a plain value.
-- add list of tunable flags in the commit message of patch 2
-- add SD_SHARE_POWER_DOMAIN flag for powerpc's SMT level
-
-Vincent Guittot (6):
-  sched: rework of sched_domain topology definition
-  sched: s390: create a dedicated topology table
-  sched: powerpc: create a dedicated topology table
-  sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
-  sched: ARM: create a dedicated scheduler topology table
-  sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT level
-
- arch/arm/kernel/topology.c       |  26 +++++
- arch/ia64/include/asm/topology.h |  24 ----
- arch/powerpc/kernel/smp.c        |  31 +++--
- arch/s390/include/asm/topology.h |  13 +--
- arch/s390/kernel/topology.c      |  20 ++++
- arch/tile/include/asm/topology.h |  33 ------
- include/linux/sched.h            |  49 +++++++-
- include/linux/topology.h         | 128 +++-----------------
- kernel/sched/core.c              | 244 ++++++++++++++++++++-------------------
- 9 files changed, 255 insertions(+), 313 deletions(-)
-
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index ac2621a..c9cade5 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -755,6 +755,28 @@ int setup_profiling_timer(unsigned int multiplier)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SCHED_SMT
++/* cpumask of CPUs with asymetric SMT dependancy */
++static const int powerpc_smt_flags(void)
++{
++	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
++
++	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
++		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
++		flags |= SD_ASYM_PACKING;
++	}
++	return flags;
++}
++#endif
++
++static struct sched_domain_topology_level powerpc_topology[] = {
++#ifdef CONFIG_SCHED_SMT
++	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
++#endif
++	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
++	{ NULL, },
++};
++
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	cpumask_var_t old_mask;
+@@ -779,15 +801,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ 	dump_numa_cpu_topology();
+ 
+-}
++	set_sched_topology(powerpc_topology);
+ 
+-int arch_sd_sibling_asym_packing(void)
+-{
+-	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
+-		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
+-		return SD_ASYM_PACKING;
+-	}
+-	return 0;
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 4db592a..6479de4 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -868,8 +868,6 @@ enum cpu_idle_type {
+ #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
+ #define SD_NUMA			0x4000	/* cross-node balancing */
+ 
+-extern int __weak arch_sd_sibiling_asym_packing(void);
+-
+ #ifdef CONFIG_SCHED_SMT
+ static inline const int cpu_smt_flags(void)
+ {
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index f2bfa76..0b51ee3 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5833,11 +5833,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
+ 	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
+ }
+ 
+-int __weak arch_sd_sibling_asym_packing(void)
+-{
+-       return 0*SD_ASYM_PACKING;
+-}
+-
+ /*
+  * Initializers for schedule domains
+  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
+@@ -6018,7 +6013,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
+ 	if (sd->flags & SD_SHARE_CPUPOWER) {
+ 		sd->imbalance_pct = 110;
+ 		sd->smt_gain = 1178; /* ~15% */
+-		sd->flags |= arch_sd_sibling_asym_packing();
+ 
+ 	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
+ 		sd->imbalance_pct = 117;
 -- 
 1.9.0
