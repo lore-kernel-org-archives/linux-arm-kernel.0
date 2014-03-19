@@ -1,52 +1,79 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Mar 2014 21:01:49 -0700
-Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
-In-Reply-To: <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
-References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
- <20140309183523.GD22881@quad.lixom.net> <531CFA28.9020600@gmail.com>
- <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
- <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
- <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
-Message-ID: <20140319040149.30995.80279@quantum>
+Date: Tue, 18 Mar 2014 21:07:15 -0700
+Subject: [GIT PULL] Samsung clock changes for v3.15
+In-Reply-To: <5328F09D.9090103@gmail.com>
+References: <1395079197-13598-1-git-send-email-t.figa@samsung.com>
+ <20140319010634.30995.4609@quantum> <5328F09D.9090103@gmail.com>
+Message-ID: <20140319040715.30995.6371@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Olof Johansson (2014-03-10 19:52:01)
-> On Mon, Mar 10, 2014 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Olof Johansson wrote:
-> >>
-> >> >> Hi,
-> >> >>
-> >> >> I don't see a single cc or acked-by line from Mike Turquette here. I'll
-> >> >> hold
-> >> >> off until he's had a chance to take a look at these ones; I suspect
-> >> >> they'll be
-> >> >> fine since it's mostly code refactoring though.
-> >> >
-> >> >
-> >> > I guess I should have ACKed them too, but it felt kind of strange to ACK
-> >> my
-> >> > own patches. ;)
-> >> >
-> >> > Anyway, for all samsung-clk patches:
-> >> >
-> >> > Acked-by: Tomasz Figa <t.figa@samsung.com>
-> >>
-> >> Yeah, self-acking doesn't make much sense. :)
-> >>
-> >> I'm mostly worried about patches touching other subsystems without the
-> >> other maintainer being aware of it or having reviewed them. As I said,
-> >> these mostly look like refactorings but it's still good habit.
-> >>
-> > OK, agreed, I think Mike knew about that though. Let's wait for Mike's
-> > response.
-> >
-> > BTW, should I sort out the branch again if Mike gives ack on that?
+Quoting Tomasz Figa (2014-03-18 18:19:25)
+> Hi Mike,
 > 
-> If I hear from Mike that he's OK with it then I can merge it, no need to rebase.
+> On 19.03.2014 02:06, Mike Turquette wrote:
+> > Quoting Tomasz Figa (2014-03-17 10:59:57)
+> >> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> >>
+> >>    Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>    git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.15/samsung-clk
+> >>
+> >> for you to fetch changes up to 70d1cf1c85486753fec0c60a9a093bdfe42b89b4:
+> >>
+> >>    Merge branch 'for_3.15/misc' into samsung-next (2014-03-17 13:00:01 +0100)
+> >>
+> >> ----------------------------------------------------------------
+> >>
+> >> Samsung clock patches for v3.15.
+> >>
+> >> Due to dependencies, most of the patches already went through linux-samsung
+> >> tree, so this pull request is rather small.
+> >
+> > I'm a bit confused. This PR is not really small (32 patches) and it
+> > covers more stuff from arch/arm that I usually take.
+> >
+> >> It contains various patches
+> >> collected since the last merge window:
+> >>
+> >> 1) non-critical fixes (without need to push to stable):
+> >>
+> >> 220b0cc clk: samsung: Initialize clock table with error pointers
+> >> 58d83cb clk: exynos-5420: Fix VPLL lock offset
+> >> 3299bc3 clk: samsung: fixed compiler warning [-Wpointer-to-int-cast]
+> >>
+> >> 2) clock driver extensions:
+> >>
+> >> db40d0c clk: samsung exynos5250/5420: Add gate clock for SSS module
+> >> d8b9731 clk/samsung: add support for multiple clock providers
+> >> 45af130 clk/samsung: add support for pll2550xx
+> >> adec437 clk/samsung: add support for pll2650xx
+> >
+> > Right, these 7 patches would constitute a small PR. Was there a mistake
+> > when generating this pull request?
+> 
+> The problem with this pull request is that it contains patches that 
+> require quite a lot of dependencies that have been already applied into 
+> Samsung SoC tree. I'm not sure how else such situation could be handled, 
+> other than pulling respective commits into my tree as well.
+
+There are already a fair number of clk patches going through the samsung
+tree. So in the name of consistency for this upcoming merge window it
+might be best to take these patches through there as well. Let me know
+if that creates any undo burden on you. Otherwise please add:
 
 Acked-by: Mike Turquette <mturquette@linaro.org>
 
+Regards,
+Mike
+
 > 
+> I don't think this would make any problem when merging into Linus' tree, 
+> as these are exactly the same commits that will go through ARM SoC, so 
+> git should merge them just fine. Still, if you have a better idea what 
+> to do now, I will do so.
 > 
-> -Olof
+> Best regards,
+> Tomasz
