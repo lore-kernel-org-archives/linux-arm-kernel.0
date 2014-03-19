@@ -1,49 +1,51 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Tue, 18 Mar 2014 18:33:20 -0700
-Subject: [PATCH v11 24/27] iommu/exynos: use exynos-iommu specific typedef
-In-Reply-To: <20140314141302.393cfdf96dd7b82eee3f700e@samsung.com>
-References: <20140314141302.393cfdf96dd7b82eee3f700e@samsung.com>
-Message-ID: <CANEJEGu=yDfYi-gH7W7h7up2gd7MxBOg9bz4konLoe-UGf4RYA@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 19 Mar 2014 09:36:33 +0800
+Subject: [V2] arm: pj4: check cpu id for pj4 cp0 access
+In-Reply-To: <20140318203232.GY21483@n2100.arm.linux.org.uk>
+References: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
+ <20140318201537.GA20942@beef>
+ <CAGa+x86Nrt47eFMoH9UHwG502J+p-Q0fsc38WG13tNmpYqLE3g@mail.gmail.com>
+ <20140318203232.GY21483@n2100.arm.linux.org.uk>
+Message-ID: <CADApbegQMJORpPgtts4NiQLX7rk-S7g=8cH1Gj+HPiZTgBGTKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 10:13 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> This commit introduces sysmmu_pte_t for page table entries and
-> sysmmu_iova_t vor I/O virtual address that is manipulated by
-> exynos-iommu driver. The purpose of the typedef is to remove
-> dependencies to the driver code from the change of CPU architecture
-> from 32 bit to 64 bit.
-
-hi Cho,
-I noticed this before but understood this code was only compiled for
-ILP-32 programming model. I'm assuming that is going to change in the
-not-to-distant future. Good. :)
-
+On Wed, Mar 19, 2014 at 4:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Mar 18, 2014 at 01:19:35PM -0700, Kevin Hilman wrote:
+>> On Tue, Mar 18, 2014 at 1:15 PM, Matt Porter <mporter@linaro.org> wrote:
+>> > On Fri, Jun 14, 2013 at 05:03:57AM -0400, Chao Xie wrote:
+>> >> Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+>> >> pj4_cpu0_init just return.
+>> >> This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
+>> >> use same platform code.
+>> >>
+>> >> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> >
+>> > This patch fixes a boot failure in next now that ARCH_DOVE (and thus
+>> > CPU_PJ4) are enabled in multi_v7_defconfig. I verified that boot works
+>> > again in next with the BCM28155-AP board.
+>> >
+>> > Tested-by: Matt Porter <mporter@linaro.org>
+>>
+>> I've also verified that this fixes the boot regression on the BCM28155-AP board.
+>>
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>
+>> Chao, can you collect the acks/tested-bys and submit this to Russell's
+>> patch tracker[1] so he can apply it please?.  Thanks.
 >
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c |  103 ++++++++++++++++++++++--------------------
->  1 file changed, 54 insertions(+), 49 deletions(-)
+> Any reason not put the IDs in asm/cputype.h, where all the others are -
+> and maybe also a cpu_is_pj4() inline function too?
 >
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index e375501..6e716cc 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -56,19 +56,19 @@
->  #define lv2ent_large(pent) ((*(pent) & 3) == 1)
->
->  #define section_phys(sent) (*(sent) & SECT_MASK)
-> -#define section_offs(iova) ((iova) & 0xFFFFF)
-> +#define section_offs(iova) ((sysmmu_iova_t)(iova) & 0xFFFFF)
 
-The cast will mask abuses of iova. Define section_offs as a static
-function and GCC can type check iova parameter to make sure it's a
-sysmmu_iova_t.
-Thoughts?
+Sure, i can put it at arch/arm/asm/include/cputype.h
 
-I was thinking "((iova) & (sysmmu_iova_t) 0XFFFFF)" might do what you
-want but it doesn't warn on abuse that I tried. I believe GCC knows
-the upper bits are being ignored.
+I will send the patch later.
 
-cheers,
-grant
+Thanks.
+
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
