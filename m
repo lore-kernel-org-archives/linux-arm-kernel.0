@@ -1,93 +1,154 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 19 Mar 2014 15:20:01 +0100
-Subject: [PATCH 11/16] avr32: merisc: use generic leds_pwm driver
-In-Reply-To: <1395234209-15546-12-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395234209-15546-12-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140319142001.GC20872@samfundet.no>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 19 Mar 2014 09:20:17 -0500
+Subject: stmmac-socfpga breakage in arm-soc
+In-Reply-To: <4337501.shzGE38xmF@wuerfel>
+References: <201403191333.01095.arnd@arndb.de> <53299CA8.607@gmail.com>
+ <4337501.shzGE38xmF@wuerfel>
+Message-ID: <5329A7A1.20606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Wed 19 Mar 2014 14:03:24 +0100 or thereabout, Alexandre Belloni wrote:
-> Switch to the generic leds_pwm driver instead of leds-atmel-pwm.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 
-I do not have this board either.
+On 03/19/2014 09:05 AM, Arnd Bergmann wrote:
+> On Wednesday 19 March 2014 08:33:28 Dinh Nguyen wrote:
+>> On 03/19/2014 07:33 AM, Arnd Bergmann wrote:
+>>>
+>>> * Replaced the parent/child DT nodes with a combined node
+>>> * Renamed the device node from 'ethernet0' to 'ethernet'
+>>>     as the standard name.
+>>> * Removed interrupt-names and clock-names properties that
+>>>     are not documented in the binding and not used.
+>>> * Added a new DWMAC_SOCFPGA Kconfig symbol to control
+>>>     compilation of this driver
+>>
+>> The v1 of this patch had this had this Kconfig symbol and is
+>> similar to your proposed fix.
+>>
+>> http://marc.info/?l=linux-netdev&m=139167062725242&w=2
+>
+> I don't understand. So you got parts of it right at first, but then
+> changed it in a different way from what Peppe asked you to do?
+>
 
-> ---
->  arch/avr32/boards/merisc/setup.c | 34 +++++++++++++++++++++-------------
->  1 file changed, 21 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/avr32/boards/merisc/setup.c b/arch/avr32/boards/merisc/setup.c
-> index ed137e335796..b0980c1946a7 100644
-> --- a/arch/avr32/boards/merisc/setup.c
-> +++ b/arch/avr32/boards/merisc/setup.c
-> @@ -22,6 +22,8 @@
->  #include <linux/irq.h>
->  #include <linux/fb.h>
->  #include <linux/atmel-mci.h>
-> +#include <linux/pwm.h>
-> +#include <linux/leds_pwm.h>
->  
->  #include <asm/io.h>
->  #include <asm/setup.h>
-> @@ -167,24 +169,29 @@ static struct i2c_board_info __initdata i2c_info[] = {
->  	},
->  };
->  
-> -#ifdef CONFIG_LEDS_ATMEL_PWM
-> -static struct gpio_led stk_pwm_led[] = {
-> +#if IS_ENABLED(CONFIG_LEDS_PWM)
-> +static struct pwm_lookup pwm_lookup[] = {
-> +	PWM_LOOKUP("at91sam9rl-pwm", 0, "leds_pwm", "backlight"),
-> +};
-> +
-> +static struct led_pwm pwm_leds[] = {
->  	{
->  		.name	= "backlight",
-> -		.gpio	= 0,		/* PWM channel 0 (LCD backlight) */
-> +		.max_brightness = 255,
-> +		.pwm_period_ns  = 5000,
->  	},
->  };
->  
-> -static struct gpio_led_platform_data stk_pwm_led_data = {
-> -	.num_leds	= ARRAY_SIZE(stk_pwm_led),
-> -	.leds		= stk_pwm_led,
-> +static struct led_pwm_platform_data pwm_data = {
-> +	.num_leds       = ARRAY_SIZE(pwm_leds),
-> +	.leds           = pwm_leds,
->  };
->  
-> -static struct platform_device stk_pwm_led_dev = {
-> -	.name	= "leds-atmel-pwm",
-> -	.id	= -1,
-> -	.dev	= {
-> -		.platform_data	= &stk_pwm_led_data,
-> +static struct platform_device leds_pwm = {
-> +	.name   = "leds_pwm",
-> +	.id     = -1,
-> +	.dev    = {
-> +		.platform_data = &pwm_data,
->  	},
->  };
->  #endif
-> @@ -278,9 +285,10 @@ static int __init merisc_init(void)
->  
->  	at32_add_device_mci(0, &mci0_data);
->  
-> -#ifdef CONFIG_LEDS_ATMEL_PWM
-> +#if IS_ENABLED(CONFIG_LEDS_PWM)
-> +	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
->  	at32_add_device_pwm((1 << 0) | (1 << 2));
-> -	platform_device_register(&stk_pwm_led_dev);
-> +	platform_device_register(&leds_pwm);
->  #else
->  	at32_add_device_pwm((1 << 2));
->  #endif
--- 
-mvh
-Hans-Christian Egtvedt
+Peppe asked me to remove DWMAC_SOCFPGA Koption and take the dwmac-sti.c
+file as an example, which I did. The original patch for dwmac-sti.c had 
+just a CONFIG_ARCH_STI Kconfig option and not CONFIG_DWMAC_STI.
+
+http://marc.info/?l=linux-netdev&m=138426461307138&w=2
+
+I'm sorry I did not follow the later versions of dwmac-sti.c.
+
+>>> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+>>> index 8fb32a8..46aef510 100644
+>>> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+>>> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+>>> @@ -38,6 +38,9 @@ static const struct of_device_id stmmac_dt_ids[] = {
+>>>    	{ .compatible = "st,stih416-dwmac", .data = &sti_gmac_data},
+>>>    	{ .compatible = "st,stid127-dwmac", .data = &sti_gmac_data},
+>>>    #endif
+>>> +#ifdef CONFIG_DWMAC_SOCFPGA
+>>> +	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
+>>> +#endif
+>>>    	/* SoC specific glue layers should come before generic bindings */
+>>>    	{ .compatible = "st,spear600-gmac"},
+>>>    	{ .compatible = "snps,dwmac-3.610"},
+>>
+>>
+>> If it's okay with you Arnd, can I take this patch and add on top of it
+>> as it is also breaking dtb builds:
+>>
+>> Error: arch/arm/boot/dts/socfpga_arria5_socdk.dts:51.2-3 label or path,
+>> 'ethernet1', not found
+>> FATAL ERROR: Syntax error parsing input tree
+>> Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:44.2-3 label or
+>> path, 'ethernet1', not found
+>> FATAL ERROR: Syntax error parsing input tree
+>> make[1]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 1
+>> make[1]: *** Waiting for unfinished jobs....
+>> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 1
+>> Error: arch/arm/boot/dts/socfpga_cyclone5_sockit.dts:44.2-3 label or
+>> path, 'ethernet1', not found
+>> FATAL ERROR: Syntax error parsing input tree
+>> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb] Error 1
+>> Error: arch/arm/boot/dts/socfpga_vt.dts:92.2-3 label or path,
+>> 'ethernet0', not found
+>
+> I have found the same problems and fixed it up locally already with
+> the additional change below.
+>
+
+Thanks,
+Dinh
+
+> 	Arnd
+>
+>
+> diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> index 2d6b38b..a87ee1c 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> @@ -46,11 +46,8 @@
+>   	};
+>   };
+>
+> -&ethernet1 {
+> -	status = "okay";
+> -};
+> -
+>   &gmac1 {
+> +	status = "okay";
+>   	phy-mode = "rgmii";
+>
+>   	rxd0-skew-ps = <0>;
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> index 26c63a0..ae16d97 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> @@ -39,11 +39,8 @@
+>   	};
+>   };
+>
+> -&ethernet1 {
+> -	status = "okay";
+> -};
+> -
+>   &gmac1 {
+> +	status = "okay";
+>   	phy-mode = "rgmii";
+>
+>   	rxd0-skew-ps = <0>;
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 469bb5c..b79e2a2 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -39,11 +39,8 @@
+>   	};
+>   };
+>
+> -&ethernet1 {
+> -	status = "okay";
+> -};
+> -
+>   &gmac1 {
+> +	status = "okay";
+>   	phy-mode = "rgmii";
+>
+>   	rxd0-skew-ps = <0>;
+> diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> index 91f6ccf..0f33f2f 100644
+> --- a/arch/arm/boot/dts/socfpga_vt.dts
+> +++ b/arch/arm/boot/dts/socfpga_vt.dts
+> @@ -87,10 +87,7 @@
+>   	};
+>   };
+>
+> -&ethernet0 {
+> -        status = "okay";
+> -};
+> -
+>   &gmac0 {
+> +        status = "okay";
+>   	phy-mode = "gmii";
+>   };
+>
