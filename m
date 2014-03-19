@@ -1,136 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 15:05:57 +0100
-Subject: stmmac-socfpga breakage in arm-soc
-In-Reply-To: <53299CA8.607@gmail.com>
-References: <201403191333.01095.arnd@arndb.de> <53299CA8.607@gmail.com>
-Message-ID: <4337501.shzGE38xmF@wuerfel>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Wed, 19 Mar 2014 15:18:20 +0100
+Subject: [PATCH 09/16] avr32/at32ap: switch to the generic PWM framework
+In-Reply-To: <1395234209-15546-10-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395234209-15546-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140319141820.GA20872@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014 08:33:28 Dinh Nguyen wrote:
-> On 03/19/2014 07:33 AM, Arnd Bergmann wrote:
-> >
-> > * Replaced the parent/child DT nodes with a combined node
-> > * Renamed the device node from 'ethernet0' to 'ethernet'
-> >    as the standard name.
-> > * Removed interrupt-names and clock-names properties that
-> >    are not documented in the binding and not used.
-> > * Added a new DWMAC_SOCFPGA Kconfig symbol to control
-> >    compilation of this driver
+Around Wed 19 Mar 2014 14:03:22 +0100 or thereabout, Alexandre Belloni wrote:
+> Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
 > 
-> The v1 of this patch had this had this Kconfig symbol and is
-> similar to your proposed fix.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+
+> ---
+>  arch/avr32/mach-at32ap/at32ap700x.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
 > 
-> http://marc.info/?l=linux-netdev&m=139167062725242&w=2
+> diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+> index a1f4d1e91b52..db85b5ec3351 100644
+> --- a/arch/avr32/mach-at32ap/at32ap700x.c
+> +++ b/arch/avr32/mach-at32ap/at32ap700x.c
+> @@ -1553,7 +1553,7 @@ static struct resource atmel_pwm0_resource[] __initdata = {
+>  	IRQ(24),
+>  };
+>  static struct clk atmel_pwm0_mck = {
+> -	.name		= "pwm_clk",
+> +	.name		= "at91sam9rl-pwm",
 
-I don't understand. So you got parts of it right at first, but then
-changed it in a different way from what Peppe asked you to do?
+I found this a tiny bit weird, but found the matching instance in
+drivers/pwm/pwm-atmel.c
 
-> > diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> > index 8fb32a8..46aef510 100644
-> > --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> > +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> > @@ -38,6 +38,9 @@ static const struct of_device_id stmmac_dt_ids[] = {
-> >   	{ .compatible = "st,stih416-dwmac", .data = &sti_gmac_data},
-> >   	{ .compatible = "st,stid127-dwmac", .data = &sti_gmac_data},
-> >   #endif
-> > +#ifdef CONFIG_DWMAC_SOCFPGA
-> > +	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
-> > +#endif
-> >   	/* SoC specific glue layers should come before generic bindings */
-> >   	{ .compatible = "st,spear600-gmac"},
-> >   	{ .compatible = "snps,dwmac-3.610"},
-> 
-> 
-> If it's okay with you Arnd, can I take this patch and add on top of it 
-> as it is also breaking dtb builds:
-> 
-> Error: arch/arm/boot/dts/socfpga_arria5_socdk.dts:51.2-3 label or path, 
-> 'ethernet1', not found
-> FATAL ERROR: Syntax error parsing input tree
-> Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:44.2-3 label or 
-> path, 'ethernet1', not found
-> FATAL ERROR: Syntax error parsing input tree
-> make[1]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 1
-> make[1]: *** Waiting for unfinished jobs....
-> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 1
-> Error: arch/arm/boot/dts/socfpga_cyclone5_sockit.dts:44.2-3 label or 
-> path, 'ethernet1', not found
-> FATAL ERROR: Syntax error parsing input tree
-> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb] Error 1
-> Error: arch/arm/boot/dts/socfpga_vt.dts:92.2-3 label or path, 
-> 'ethernet0', not found
+IMHO it would initially have been better to call it atpwm_v1 or something
+similar, more generic. But I guess that is too late to change at this point.
 
-I have found the same problems and fixed it up locally already with
-the additional change below.
-
-	Arnd
-
-
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index 2d6b38b..a87ee1c 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -46,11 +46,8 @@
- 	};
- };
- 
--&ethernet1 {
--	status = "okay";
--};
--
- &gmac1 {
-+	status = "okay";
- 	phy-mode = "rgmii";
- 
- 	rxd0-skew-ps = <0>;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 26c63a0..ae16d97 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -39,11 +39,8 @@
- 	};
- };
- 
--&ethernet1 {
--	status = "okay";
--};
--
- &gmac1 {
-+	status = "okay";
- 	phy-mode = "rgmii";
- 
- 	rxd0-skew-ps = <0>;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 469bb5c..b79e2a2 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -39,11 +39,8 @@
- 	};
- };
- 
--&ethernet1 {
--	status = "okay";
--};
--
- &gmac1 {
-+	status = "okay";
- 	phy-mode = "rgmii";
- 
- 	rxd0-skew-ps = <0>;
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index 91f6ccf..0f33f2f 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -87,10 +87,7 @@
- 	};
- };
- 
--&ethernet0 {
--        status = "okay";
--};
--
- &gmac0 {
-+        status = "okay";
- 	phy-mode = "gmii";
- };
+>  	.parent		= &pbb_clk,
+>  	.mode		= pbb_clk_mode,
+>  	.get_rate	= pbb_clk_get_rate,
+> @@ -1568,7 +1568,7 @@ struct platform_device *__init at32_add_device_pwm(u32 mask)
+>  	if (!mask)
+>  		return NULL;
+>  
+> -	pdev = platform_device_alloc("atmel_pwm", 0);
+> +	pdev = platform_device_alloc("at91sam9rl-pwm", 0);
+>  	if (!pdev)
+>  		return NULL;
+>  
+> @@ -1576,9 +1576,6 @@ struct platform_device *__init at32_add_device_pwm(u32 mask)
+>  				ARRAY_SIZE(atmel_pwm0_resource)))
+>  		goto out_free_pdev;
+>  
+> -	if (platform_device_add_data(pdev, &mask, sizeof(mask)))
+> -		goto out_free_pdev;
+> -
+>  	pin_mask = 0;
+>  	if (mask & (1 << 0))
+>  		pin_mask |= (1 << 28);
+-- 
+mvh
+Hans-Christian Egtvedt
