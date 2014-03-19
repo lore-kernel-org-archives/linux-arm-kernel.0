@@ -1,56 +1,139 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 19 Mar 2014 13:18:52 +0200
-Subject: [linux-next][regression] [PATCH] percpu: add preemption checks
- to __this_cpu ops
-In-Reply-To: <20140318143759.04a892434d84a9fd3aa94262@linux-foundation.org>
-References: <53285FE7.5010203@ti.com>	<alpine.DEB.2.10.1403180922050.17965@nuc>	<53286ABF.3040408@ti.com>	<alpine.DEB.2.10.1403181053110.23935@nuc>
- <20140318143759.04a892434d84a9fd3aa94262@linux-foundation.org>
-Message-ID: <53297D1C.3000100@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Mar 2014 11:28:29 +0100
+Subject: [PATCH 3/3] [media] atmel-isi: add primary DT support
+In-Reply-To: <53296016.5030002@atmel.com>
+References: <1395141238-5948-1-git-send-email-josh.wu@atmel.com>
+ <2118978.g8dAYX7V8K@avalon> <53296016.5030002@atmel.com>
+Message-ID: <7584711.K3Gu54mB6b@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2014 11:37 PM, Andrew Morton wrote:> On Tue, 18 Mar 2014 10:54:06 -0500 (CDT) Christoph Lameter <cl@linux.com> wrote:
-> 
->> On Tue, 18 Mar 2014, Grygorii Strashko wrote:
->>
->>> Any way, I can boot and console works fine with your change :)
->>> Thanks.
->>
->> Ok here is the properly formatted patch:
->>
->>
->> Subject: preemption_checks: Avoid snprintf before checking error conditions
->>
->> snprintf can cause hangs.
-> 
-> This is weird.  How the heck can snprintf() fail if called too early?
-> All it does is shuffle chars around in memory.  The only external
-> dependency I'm seeing is a WARN_ON() which presumably didn't trigger
-> anyway.
-> 
-> I'm suspecting a misdiagnosis here.  Otherwise, we seriously need to
-> fix snprintf(), not work around it!
+Hi Josh,
 
-Not sure I can run debugger fast :(, but I'll try.
-
+On Wednesday 19 March 2014 17:15:02 Josh Wu wrote:
+> On 3/18/2014 9:36 PM, Laurent Pinchart wrote:
+> > On Tuesday 18 March 2014 19:19:54 Josh Wu wrote:
+> >> This patch add the DT support for Atmel ISI driver.
+> >> It use the same v4l2 DT interface that defined in video-interfaces.txt.
+> >> 
+> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> >> Cc: devicetree at vger.kernel.org
+> >> ---
+> >> 
+> >>  .../devicetree/bindings/media/atmel-isi.txt        |   51 ++++++++++++++
+> >>  drivers/media/platform/soc_camera/atmel-isi.c      |   33 ++++++++++++-
+> >>  2 files changed, 82 insertions(+), 2 deletions(-)
+> >>  create mode 100644
+> >>  Documentation/devicetree/bindings/media/atmel-isi.txt
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/media/atmel-isi.txt
+> >> b/Documentation/devicetree/bindings/media/atmel-isi.txt new file mode
+> >> 100644
+> >> index 0000000..07f00eb
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/media/atmel-isi.txt
+> >> @@ -0,0 +1,51 @@
+> >> +Atmel Image Sensor Interface (ISI) SoC Camera Subsystem
+> >> +----------------------------------------------
+> >> +
+> >> +Required properties:
+> >> +- compatible: must be "atmel,at91sam9g45-isi"
+> >> +- reg: physical base address and length of the registers set for the
+> >> device;
+> >> +- interrupts: should contain IRQ line for the ISI;
+> >> +- clocks: list of clock specifiers, corresponding to entries in
+> >> +          the clock-names property;
+> >> +- clock-names: must contain "isi_clk", which is the isi peripherial
+> >> clock.
+> >> +               "isi_mck" is optinal, it is the master clock output to
+> >> sensor.
+> > 
+> > The mck clock should be handled by the sensor driver instead. I know we
+> > have a legacy mode in the atmel-isi driver to manage that clock
+> > internally, but let's not propagate that to DT.
 > 
-> Also, what does "before checking error conditions" refer to?  Does this
-> mean you know why snprintf() failed??
-
-Just an assumption, May be the problem here not in snprintf, but in stack.
-Looks like if I reduce stack usage the issue is gone:
-char text[10];
-
+> I agree with you.
 > 
->> Move the string processing into the function
->> so that the string operations only occur when necessary after the
->> conditions have been checked.
->>
->> Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> I put the isi_mck as optional here because current the sensor driver
+> code only managed the v4l2 clock not the common clock.
+> There should add additional code to manager mck clock.
+> So if you want to ISI work for now, you should put the isi_mck in
+> atmel-isi DT node.
 > 
-> Grygorii, thanks for testing linux-next on unusual machines - it's most
-> helpful.
-> 
+> But for sure I can remove the isi_mck in atmel-isi DT document. In the
+> future it will be add in sensor's DT document.
 
+I think that's the way to go, yes. I know we have existing platforms that 
+require sensor clock management in the ISI driver. That should be fixed, and a 
+move to DT is a perfect opportunity to do so :-)
+
+> > I would also drop the "isi_" prefix from the isi_clk name.
+> 
+> hmm,  I think "isi_clk" indicates it is a ISI peripheral clock. And
+> which is consistent with other peripheral clock name in sama5.
+
+I believe the "isi_" prefix is redundant, given that the clock-names property 
+is inside the ISI DT node. However, if this style matches the rest of the 
+platform there's no need to change it.
+
+> > You should also describe the port node. You can just mention the related
+> > bindings document, and state that the ISI has a single port.
+> 
+> OK. will add in the v2.
+> 
+> >> +Optional properties:
+> >> +- atmel,isi-disable-preview: a boolean property to disable the preview
+> >> channel;
+> > 
+> > That doesn't really sound like a hardware property to me. Isn't it full
+> > mode related to software configuration instead, which should be performed
+> > at runtime by userspace ?
+> 
+> yes, this configuration can be disable/enable by driver according to
+> user select format.
+> I will remove it in v2. Thanks.
+> 
+> Best Regards,
+> Josh Wu
+> 
+> >> +
+> >> +Example:
+> >> +	isi: isi at f0034000 {
+> >> +		compatible = "atmel,at91sam9g45-isi";
+> >> +		reg = <0xf0034000 0x4000>;
+> >> +		interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
+> >> +
+> >> +		clocks = <&isi_clk>, <&pck1>;
+> >> +		clock-names = "isi_clk", "isi_mck";
+> >> +
+> >> +		pinctrl-names = "default";
+> >> +		pinctrl-0 = <&pinctrl_isi &pinctrl_pck1_as_isi_mck>;
+> >> +
+> >> +		port {
+> >> +			#address-cells = <1>;
+> >> +			#size-cells = <0>;
+> >> +
+> >> +			isi_0: endpoint {
+> >> +				remote-endpoint = <&ov2640_0>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +
+> >> +	i2c1: i2c at f0018000 {
+> >> +		ov2640: camera at 0x30 {
+> >> +			compatible = "omnivision,ov2640";
+> >> +			reg = <0x30>;
+> >> +
+> >> +			port {
+> >> +				ov2640_0: endpoint {
+> >> +					remote-endpoint = <&isi_0>;
+> >> +					bus-width = <8>;
+> >> +				};
+> >> +			};
+> >> +		};
+> >> +	};
+
+-- 
 Regards,
--grygorii
+
+Laurent Pinchart
