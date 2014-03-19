@@ -1,57 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Mar 2014 16:33:39 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140319160414.GA19953@red-moon>
-References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
- <20140319160414.GA19953@red-moon>
-Message-ID: <20140319163339.GP11706@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 19 Mar 2014 10:36:35 -0600
+Subject: [PATCH] ARM: tegra: fix Dalmore pinctrl configuration
+Message-ID: <1395246995-13972-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 04:04:14PM +0000, Lorenzo Pieralisi wrote:
-> On Wed, Mar 05, 2014 at 08:59:33AM +0000, Mark Brown wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> > +			if (leaf) {
-> > +				ret = parse_core(c, cluster_id, core_id++);
-> > +				if (ret != 0) {
+Remove some entries from Dalmore's device tree that attempt to set some
+options which aren't supported for the drive_gma pin group.
 
-> Should remove braces.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This should be applied on top of wherever Tegra's for-3.15/dt branch
+was merged into arm-soc.
 
-> > +					return ret;
-> > +				}
-> > +			} else {
+ arch/arm/boot/dts/tegra114-dalmore.dts | 2 --
+ 1 file changed, 2 deletions(-)
 
-They're there because it's nested inside another if statement with
-braces - yes, there is indentation but it still helps.
-
-> > +void __init init_cpu_topology(void)
-> > +{
-> > +	int ret;
-> > +
-> > +	reset_cpu_topology();
-> > +
-> > +	ret = parse_dt_topology();
-> > +	if (ret != 0)
-> > +		reset_cpu_topology();
-
-> ret is unused so should be removed. You could remove the first reset call and
-
-I'm sorry, I don't follow?  The use is quoted above...  
-
-> use static initialization for that, it is a matter of taste though.
-
-Static initialisation can't cover the calls to set_power_scale() and
-having a different thing for default and unwinding cases seems likely to
-be error prone.
-
-> A comment is in order, whatever approach you go for.
-
-I'm not sure what the confusion is here so I don't know what a comment
-would clarify.  Could you say what it is you find confusing please?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/7efeb44f/attachment.sig>
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 8de543777882..5eb11a3bba55 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -740,12 +740,10 @@
+ 				nvidia,pins = "drive_gma";
+ 				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+ 				nvidia,schmitt = <TEGRA_PIN_DISABLE>;
+-				nvidia,low-power-mode = <TEGRA_PIN_LP_DRIVE_DIV_1>;
+ 				nvidia,pull-down-strength = <2>;
+ 				nvidia,pull-up-strength = <1>;
+ 				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_FASTEST>;
+ 				nvidia,slew-rate-falling = <TEGRA_PIN_SLEW_RATE_FASTEST>;
+-				nvidia,drive-type = <1>;
+ 			};
+ 		};
+ 	};
+-- 
+1.8.1.5
