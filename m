@@ -1,48 +1,57 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 19 Mar 2014 12:29:37 -0400
-Subject: [PATCH v2] arm64: Fix __range_ok macro
-In-Reply-To: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
-References: <1394059289-3972-1-git-send-email-cov@codeaurora.org>
-Message-ID: <1395246577-22120-1-git-send-email-cov@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Mar 2014 16:33:39 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140319160414.GA19953@red-moon>
+References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
+ <20140319160414.GA19953@red-moon>
+Message-ID: <20140319163339.GP11706@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this, the following scenario is incorrectly determined
-to be invalid.
+On Wed, Mar 19, 2014 at 04:04:14PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Mar 05, 2014 at 08:59:33AM +0000, Mark Brown wrote:
 
-addr 0x7f_ffffe000 size 8192 addr_limit 0x80_00000000
+> > +			if (leaf) {
+> > +				ret = parse_core(c, cluster_id, core_id++);
+> > +				if (ret != 0) {
 
-This behavior was observed while trying to vmsplice the stack
-as part of a CRIU dump of a process on a system started with the
-norandmaps kernel parameter.
+> Should remove braces.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm64/include/asm/uaccess.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> > +					return ret;
+> > +				}
+> > +			} else {
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 7ecc2b2..5974459 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -83,7 +83,7 @@ static inline void set_fs(mm_segment_t fs)
-  * Returns 1 if the range is valid, 0 otherwise.
-  *
-  * This is equivalent to the following test:
-- * (u65)addr + (u65)size < (u65)current->addr_limit
-+ * (u65)addr + (u65)size <= current->addr_limit
-  *
-  * This needs 65-bit arithmetic.
-  */
-@@ -91,7 +91,7 @@ static inline void set_fs(mm_segment_t fs)
- ({									\
- 	unsigned long flag, roksum;					\
- 	__chk_user_ptr(addr);						\
--	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, cc"		\
-+	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
- 		: "=&r" (flag), "=&r" (roksum)				\
- 		: "1" (addr), "Ir" (size),				\
- 		  "r" (current_thread_info()->addr_limit)		\
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+They're there because it's nested inside another if statement with
+braces - yes, there is indentation but it still helps.
+
+> > +void __init init_cpu_topology(void)
+> > +{
+> > +	int ret;
+> > +
+> > +	reset_cpu_topology();
+> > +
+> > +	ret = parse_dt_topology();
+> > +	if (ret != 0)
+> > +		reset_cpu_topology();
+
+> ret is unused so should be removed. You could remove the first reset call and
+
+I'm sorry, I don't follow?  The use is quoted above...  
+
+> use static initialization for that, it is a matter of taste though.
+
+Static initialisation can't cover the calls to set_power_scale() and
+having a different thing for default and unwinding cases seems likely to
+be error prone.
+
+> A comment is in order, whatever approach you go for.
+
+I'm not sure what the confusion is here so I don't know what a comment
+would clarify.  Could you say what it is you find confusing please?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/7efeb44f/attachment.sig>
