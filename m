@@ -1,139 +1,144 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Mar 2014 11:28:29 +0100
-Subject: [PATCH 3/3] [media] atmel-isi: add primary DT support
-In-Reply-To: <53296016.5030002@atmel.com>
-References: <1395141238-5948-1-git-send-email-josh.wu@atmel.com>
- <2118978.g8dAYX7V8K@avalon> <53296016.5030002@atmel.com>
-Message-ID: <7584711.K3Gu54mB6b@avalon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Mar 2014 11:26:48 +0100
+Subject: [PATCH] Documentation: dt: list all compatible strings for at91
+Message-ID: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Avoids getting the newly introduced warning:
+WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
++				compatible = "atmel,at91sam9g45-adc";
 
-On Wednesday 19 March 2014 17:15:02 Josh Wu wrote:
-> On 3/18/2014 9:36 PM, Laurent Pinchart wrote:
-> > On Tuesday 18 March 2014 19:19:54 Josh Wu wrote:
-> >> This patch add the DT support for Atmel ISI driver.
-> >> It use the same v4l2 DT interface that defined in video-interfaces.txt.
-> >> 
-> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> >> Cc: devicetree at vger.kernel.org
-> >> ---
-> >> 
-> >>  .../devicetree/bindings/media/atmel-isi.txt        |   51 ++++++++++++++
-> >>  drivers/media/platform/soc_camera/atmel-isi.c      |   33 ++++++++++++-
-> >>  2 files changed, 82 insertions(+), 2 deletions(-)
-> >>  create mode 100644
-> >>  Documentation/devicetree/bindings/media/atmel-isi.txt
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/media/atmel-isi.txt
-> >> b/Documentation/devicetree/bindings/media/atmel-isi.txt new file mode
-> >> 100644
-> >> index 0000000..07f00eb
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/media/atmel-isi.txt
-> >> @@ -0,0 +1,51 @@
-> >> +Atmel Image Sensor Interface (ISI) SoC Camera Subsystem
-> >> +----------------------------------------------
-> >> +
-> >> +Required properties:
-> >> +- compatible: must be "atmel,at91sam9g45-isi"
-> >> +- reg: physical base address and length of the registers set for the
-> >> device;
-> >> +- interrupts: should contain IRQ line for the ISI;
-> >> +- clocks: list of clock specifiers, corresponding to entries in
-> >> +          the clock-names property;
-> >> +- clock-names: must contain "isi_clk", which is the isi peripherial
-> >> clock.
-> >> +               "isi_mck" is optinal, it is the master clock output to
-> >> sensor.
-> > 
-> > The mck clock should be handled by the sensor driver instead. I know we
-> > have a legacy mode in the atmel-isi driver to manage that clock
-> > internally, but let's not propagate that to DT.
-> 
-> I agree with you.
-> 
-> I put the isi_mck as optional here because current the sensor driver
-> code only managed the v4l2 clock not the common clock.
-> There should add additional code to manager mck clock.
-> So if you want to ISI work for now, you should put the isi_mck in
-> atmel-isi DT node.
-> 
-> But for sure I can remove the isi_mck in atmel-isi DT document. In the
-> future it will be add in sensor's DT document.
+Introduced by:
+bff5da433525 checkpatch: add DT compatible string documentation checks
 
-I think that's the way to go, yes. I know we have existing platforms that 
-require sensor clock management in the ISI driver. That should be fixed, and a 
-move to DT is a perfect opportunity to do so :-)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ Documentation/devicetree/bindings/arm/atmel-aic.txt      |  3 +--
+ Documentation/devicetree/bindings/arm/atmel-at91.txt     | 10 ++++------
+ Documentation/devicetree/bindings/dma/atmel-dma.txt      |  2 +-
+ Documentation/devicetree/bindings/gpio/gpio_atmel.txt    |  2 +-
+ Documentation/devicetree/bindings/iio/adc/at91_adc.txt   |  4 ++--
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 10 ++++------
+ 6 files changed, 13 insertions(+), 18 deletions(-)
 
-> > I would also drop the "isi_" prefix from the isi_clk name.
-> 
-> hmm,  I think "isi_clk" indicates it is a ISI peripheral clock. And
-> which is consistent with other peripheral clock name in sama5.
-
-I believe the "isi_" prefix is redundant, given that the clock-names property 
-is inside the ISI DT node. However, if this style matches the rest of the 
-platform there's no need to change it.
-
-> > You should also describe the port node. You can just mention the related
-> > bindings document, and state that the ISI has a single port.
-> 
-> OK. will add in the v2.
-> 
-> >> +Optional properties:
-> >> +- atmel,isi-disable-preview: a boolean property to disable the preview
-> >> channel;
-> > 
-> > That doesn't really sound like a hardware property to me. Isn't it full
-> > mode related to software configuration instead, which should be performed
-> > at runtime by userspace ?
-> 
-> yes, this configuration can be disable/enable by driver according to
-> user select format.
-> I will remove it in v2. Thanks.
-> 
-> Best Regards,
-> Josh Wu
-> 
-> >> +
-> >> +Example:
-> >> +	isi: isi at f0034000 {
-> >> +		compatible = "atmel,at91sam9g45-isi";
-> >> +		reg = <0xf0034000 0x4000>;
-> >> +		interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
-> >> +
-> >> +		clocks = <&isi_clk>, <&pck1>;
-> >> +		clock-names = "isi_clk", "isi_mck";
-> >> +
-> >> +		pinctrl-names = "default";
-> >> +		pinctrl-0 = <&pinctrl_isi &pinctrl_pck1_as_isi_mck>;
-> >> +
-> >> +		port {
-> >> +			#address-cells = <1>;
-> >> +			#size-cells = <0>;
-> >> +
-> >> +			isi_0: endpoint {
-> >> +				remote-endpoint = <&ov2640_0>;
-> >> +			};
-> >> +		};
-> >> +	};
-> >> +
-> >> +	i2c1: i2c at f0018000 {
-> >> +		ov2640: camera at 0x30 {
-> >> +			compatible = "omnivision,ov2640";
-> >> +			reg = <0x30>;
-> >> +
-> >> +			port {
-> >> +				ov2640_0: endpoint {
-> >> +					remote-endpoint = <&isi_0>;
-> >> +					bus-width = <8>;
-> >> +				};
-> >> +			};
-> >> +		};
-> >> +	};
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+index 2742e9cfd6b1..95f75fd097ba 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+@@ -1,8 +1,7 @@
+ * Advanced Interrupt Controller (AIC)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-aic"
+-  <chip> can be "at91rm9200" or "sama5d3"
++- compatible: "atmel,at91rm9200-aic", "atmel,sama5d3-aic"
+ - interrupt-controller: Identifies the node as an interrupt controller.
+ - interrupt-parent: For single AIC system, it is an empty property.
+ - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 16f60b41c147..e79a33315e4f 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -14,8 +14,7 @@ System Timer (ST) required properties:
+   shared across all System Controller members.
+ 
+ TC/TCLIB Timer required properties:
+-- compatible: Should be "atmel,<chip>-tcb".
+-  <chip> can be "at91rm9200" or "at91sam9x5"
++- compatible: "atmel,at91rm9200-tcb", "atmel,at91sam9x5-tcb"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain all interrupts for the TC block
+   Note that you can specify several interrupt cells if the TC
+@@ -46,8 +45,7 @@ One interrupt per TC channel in a TC block:
+ 	};
+ 
+ RSTC Reset Controller required properties:
+-- compatible: Should be "atmel,<chip>-rstc".
+-  <chip> can be "at91sam9260" or "at91sam9g45"
++- compatible: "atmel,at91sam9260-rstc", "atmel,at91sam9g45-rstc"
+ - reg: Should contain registers location and length
+ 
+ Example:
+@@ -80,8 +78,8 @@ Examples:
+ SHDWC Shutdown Controller
+ 
+ required properties:
+-- compatible: Should be "atmel,<chip>-shdwc".
+-  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
++- compatible: "atmel,at91sam9260-shdwc", "atmel,at91sam9rl-shdwc",
++	"atmel,at91sam9x5-shdwc"
+ - reg: Should contain registers location and length
+ 
+ optional properties:
+diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+index f69bcf5a6343..410bff989949 100644
+--- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
++++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+@@ -1,7 +1,7 @@
+ * Atmel Direct Memory Access Controller (DMA)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-dma".
++- compatible: "atmel,at91sam9rl-dma", "atmel,at91sam9g45-dma"
+ - reg: Should contain DMA registers location and length.
+ - interrupts: Should contain DMA interrupt.
+ - #dma-cells: Must be <2>, used to represent the number of integer cells in
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+index 85f8c0d084fa..1fa10565adcc 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+@@ -1,7 +1,7 @@
+ * Atmel GPIO controller (PIO)
+ 
+ Required properties:
+-- compatible: "atmel,<chip>-gpio", where <chip> is at91rm9200 or at91sam9x5.
++- compatible: "atmel,at91rm9200-gpio", "atmel,at91rm9x5-gpio"
+ - reg: Should contain GPIO controller registers location and length
+ - interrupts: Should be the port interrupt shared by all the pins.
+ - #gpio-cells: Should be two.  The first cell is the pin number and
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+index 82061c7e4fea..ac26cc13dd9f 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+@@ -1,8 +1,8 @@
+ * AT91's Analog to Digital Converter (ADC)
+ 
+ Required properties:
+-  - compatible: Should be "atmel,<chip>-adc"
+-    <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
++  - compatible: "atmel,at91sam9260-adc", "atmel,at91sam9rl-adc",
++  		"atmel,at91sam9g45-adc", "atmel,at91sam9x5-adc",
+   - reg: Should contain ADC registers location and length
+   - interrupts: Should contain the IRQ line for the ADC
+   - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 9c5d19ac935c..ebc5b0cb7669 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -1,9 +1,7 @@
+ * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-usart"
+-  The compatible <chip> indicated will be the first SoC to support an
+-  additional mode or an USART new feature.
++- compatible: Should be "atmel,at91rm9200-usart", "atmel,at91sam9260-usart",
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt
+ - clock-names: tuple listing input clock names.
+@@ -19,9 +17,9 @@ Optional properties:
+ 		Refer to dma.txt and atmel-dma.txt for details.
+ 	- dma-names: "rx" for RX channel, "tx" for TX channel.
+ 
+-<chip> compatible description:
+-- at91rm9200:  legacy USART support
+-- at91sam9260: generic USART implementation for SAM9 SoCs
++compatible description:
++- atmel,at91rm9200-usart:  legacy USART support
++- atmel,at91sam9260-usart: generic USART implementation for SAM9 SoCs
+ 
+ Example:
+ - use PDC:
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
