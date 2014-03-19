@@ -1,108 +1,100 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 19 Mar 2014 17:22:42 +0100
-Subject: [PATCH v3 3/6] sched: powerpc: create a dedicated topology table
+Date: Wed, 19 Mar 2014 17:22:41 +0100
+Subject: [PATCH v3 2/6] sched: s390: create a dedicated topology table
 In-Reply-To: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
 References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1395246165-31150-4-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1395246165-31150-3-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a dedicated topology table for handling asymetric feature of powerpc.
+BOOK level is only relevant for s390 so we create a dedicated topology table
+with BOOK level and remove it from default table.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
 ---
- arch/powerpc/kernel/smp.c | 31 +++++++++++++++++++++++--------
- include/linux/sched.h     |  2 --
- kernel/sched/core.c       |  6 ------
- 3 files changed, 23 insertions(+), 16 deletions(-)
+ arch/s390/include/asm/topology.h | 11 +----------
+ arch/s390/kernel/topology.c      | 20 ++++++++++++++++++++
+ kernel/sched/core.c              |  3 ---
+ 3 files changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-index ac2621a..c9cade5 100644
---- a/arch/powerpc/kernel/smp.c
-+++ b/arch/powerpc/kernel/smp.c
-@@ -755,6 +755,28 @@ int setup_profiling_timer(unsigned int multiplier)
- 	return 0;
+diff --git a/arch/s390/include/asm/topology.h b/arch/s390/include/asm/topology.h
+index 07763bd..56af530 100644
+--- a/arch/s390/include/asm/topology.h
++++ b/arch/s390/include/asm/topology.h
+@@ -26,21 +26,12 @@ extern struct cpu_topology_s390 cpu_topology[NR_CPUS];
+ 
+ #define mc_capable() 1
+ 
+-static inline const struct cpumask *cpu_coregroup_mask(int cpu)
+-{
+-	return &cpu_topology[cpu].core_mask;
+-}
+-
+-static inline const struct cpumask *cpu_book_mask(int cpu)
+-{
+-	return &cpu_topology[cpu].book_mask;
+-}
+-
+ int topology_cpu_init(struct cpu *);
+ int topology_set_cpu_management(int fc);
+ void topology_schedule_update(void);
+ void store_topology(struct sysinfo_15_1_x *info);
+ void topology_expect_change(void);
++const struct cpumask *cpu_coregroup_mask(int cpu);
+ 
+ #else /* CONFIG_SCHED_BOOK */
+ 
+diff --git a/arch/s390/kernel/topology.c b/arch/s390/kernel/topology.c
+index 4b2e3e3..ceddd77 100644
+--- a/arch/s390/kernel/topology.c
++++ b/arch/s390/kernel/topology.c
+@@ -443,6 +443,23 @@ int topology_cpu_init(struct cpu *cpu)
+ 	return sysfs_create_group(&cpu->dev.kobj, &topology_cpu_attr_group);
  }
  
-+#ifdef CONFIG_SCHED_SMT
-+/* cpumask of CPUs with asymetric SMT dependancy */
-+static const int powerpc_smt_flags(void)
++const struct cpumask *cpu_coregroup_mask(int cpu)
 +{
-+	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
-+
-+	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
-+		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
-+		flags |= SD_ASYM_PACKING;
-+	}
-+	return flags;
++	return &cpu_topology[cpu].core_mask;
 +}
-+#endif
 +
-+static struct sched_domain_topology_level powerpc_topology[] = {
-+#ifdef CONFIG_SCHED_SMT
-+	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
-+#endif
++static const struct cpumask *cpu_book_mask(int cpu)
++{
++	return &cpu_topology[cpu].book_mask;
++}
++
++static struct sched_domain_topology_level s390_topology[] = {
++	{ cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
++	{ cpu_book_mask, SD_INIT_NAME(BOOK) },
 +	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
 +	{ NULL, },
 +};
 +
- void __init smp_cpus_done(unsigned int max_cpus)
+ static int __init topology_init(void)
  {
- 	cpumask_var_t old_mask;
-@@ -779,15 +801,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
- 
- 	dump_numa_cpu_topology();
- 
--}
-+	set_sched_topology(powerpc_topology);
- 
--int arch_sd_sibling_asym_packing(void)
--{
--	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
--		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
--		return SD_ASYM_PACKING;
--	}
--	return 0;
+ 	if (!MACHINE_HAS_TOPOLOGY) {
+@@ -452,6 +469,9 @@ static int __init topology_init(void)
+ 	set_topology_timer();
+ out:
+ 	update_cpu_masks();
++
++	set_sched_topology(s390_topology);
++
+ 	return device_create_file(cpu_subsys.dev_root, &dev_attr_dispatching);
  }
- 
- #ifdef CONFIG_HOTPLUG_CPU
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4db592a..6479de4 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -868,8 +868,6 @@ enum cpu_idle_type {
- #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
- #define SD_NUMA			0x4000	/* cross-node balancing */
- 
--extern int __weak arch_sd_sibiling_asym_packing(void);
--
- #ifdef CONFIG_SCHED_SMT
- static inline const int cpu_smt_flags(void)
- {
+ device_initcall(topology_init);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index f2bfa76..0b51ee3 100644
+index 3397bcb..f2bfa76 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -5833,11 +5833,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
- 	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
- }
- 
--int __weak arch_sd_sibling_asym_packing(void)
--{
--       return 0*SD_ASYM_PACKING;
--}
--
- /*
-  * Initializers for schedule domains
-  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
-@@ -6018,7 +6013,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
- 	if (sd->flags & SD_SHARE_CPUPOWER) {
- 		sd->imbalance_pct = 110;
- 		sd->smt_gain = 1178; /* ~15% */
--		sd->flags |= arch_sd_sibling_asym_packing();
- 
- 	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
- 		sd->imbalance_pct = 117;
+@@ -6061,9 +6061,6 @@ static struct sched_domain_topology_level default_topology[] = {
+ #ifdef CONFIG_SCHED_MC
+ 	{ cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
+ #endif
+-#ifdef CONFIG_SCHED_BOOK
+-	{ cpu_book_mask, SD_INIT_NAME(BOOK) },
+-#endif
+ 	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
+ 	{ NULL, },
+ };
 -- 
 1.9.0
