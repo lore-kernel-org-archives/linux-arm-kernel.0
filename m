@@ -1,57 +1,136 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Mar 2014 13:56:19 +0000
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <20140317180525.GL6457@e106497-lin.cambridge.arm.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
- <20140314171457.GK18126@arm.com> <201403141838.08900.arnd@arndb.de>
- <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
- <20140317173821.GJ24070@arm.com>
- <20140317180525.GL6457@e106497-lin.cambridge.arm.com>
-Message-ID: <20140319135619.GC6231@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 15:05:57 +0100
+Subject: stmmac-socfpga breakage in arm-soc
+In-Reply-To: <53299CA8.607@gmail.com>
+References: <201403191333.01095.arnd@arndb.de> <53299CA8.607@gmail.com>
+Message-ID: <4337501.shzGE38xmF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 06:05:25PM +0000, Liviu Dudau wrote:
-> On Mon, Mar 17, 2014 at 05:38:21PM +0000, Catalin Marinas wrote:
-> > On Fri, Mar 14, 2014 at 06:05:27PM +0000, Liviu Dudau wrote:
-> > > On Fri, Mar 14, 2014 at 05:38:08PM +0000, Arnd Bergmann wrote:
-> > > > On Friday 14 March 2014, Catalin Marinas wrote:
-> > > > > On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
-> > > > > > --- /dev/null
-> > > > > > +++ b/arch/arm64/kernel/pci.c
-> > > > > [...]
-> > > > > > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
-> > > > > [...]
-> > > > > > +unsigned long pci_address_to_pio(phys_addr_t address)
-> > > > > [...]
-> > > > > > +void pcibios_fixup_bus(struct pci_bus *bus)
-> > > > > [ actually most of this file ]
-> > > > > 
-> > > > > Maybe it was raised before already but can we have __weak generic
-> > > > > definitions of these functions? They don't seem to be arm64 specific in
-> > > > > any way.
-> > [...]
-> > > Catalin, if you are happy to ask for ACKs from all arch maintainers that might get
-> > > affected by our custom version of pci_address_to_pio() before you can pull PCI support
-> > > for arm64 then I can propose a new patchset.
-> > 
-> > You don't need to change the other architectures, that's the point of a
-> > __weak definition, it will be automatically overridden. If you want, you
-> > can even place a GENERIC_PCI or whatever config option that is only
-> > selected by arm64 for the time being.
+On Wednesday 19 March 2014 08:33:28 Dinh Nguyen wrote:
+> On 03/19/2014 07:33 AM, Arnd Bergmann wrote:
+> >
+> > * Replaced the parent/child DT nodes with a combined node
+> > * Renamed the device node from 'ethernet0' to 'ethernet'
+> >    as the standard name.
+> > * Removed interrupt-names and clock-names properties that
+> >    are not documented in the binding and not used.
+> > * Added a new DWMAC_SOCFPGA Kconfig symbol to control
+> >    compilation of this driver
 > 
-> pci_address_to_pio() is alread __weak. My patch was adding the arm64 version of it. Adding
-> an #ifdef GENERIC_PCI to the __weak implementation is not just a temporary solution.
+> The v1 of this patch had this had this Kconfig symbol and is
+> similar to your proposed fix.
+> 
+> http://marc.info/?l=linux-netdev&m=139167062725242&w=2
 
-Ah, I start to understand what you mean, pci_address_to_pio() is already
-defined as __weak in drivers/of/address.c. So the reason we redefine it
-on arm64 is that it uses the io_list resources which are populated by
-pci_register_io_range(). Do you see any other architecture using a
-similar logic (that could be shared)?
+I don't understand. So you got parts of it right at first, but then
+changed it in a different way from what Peppe asked you to do?
 
-Any other functions in this file that could be shared (and are not
-__weak already)?
+> > diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > index 8fb32a8..46aef510 100644
+> > --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> > @@ -38,6 +38,9 @@ static const struct of_device_id stmmac_dt_ids[] = {
+> >   	{ .compatible = "st,stih416-dwmac", .data = &sti_gmac_data},
+> >   	{ .compatible = "st,stid127-dwmac", .data = &sti_gmac_data},
+> >   #endif
+> > +#ifdef CONFIG_DWMAC_SOCFPGA
+> > +	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
+> > +#endif
+> >   	/* SoC specific glue layers should come before generic bindings */
+> >   	{ .compatible = "st,spear600-gmac"},
+> >   	{ .compatible = "snps,dwmac-3.610"},
+> 
+> 
+> If it's okay with you Arnd, can I take this patch and add on top of it 
+> as it is also breaking dtb builds:
+> 
+> Error: arch/arm/boot/dts/socfpga_arria5_socdk.dts:51.2-3 label or path, 
+> 'ethernet1', not found
+> FATAL ERROR: Syntax error parsing input tree
+> Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:44.2-3 label or 
+> path, 'ethernet1', not found
+> FATAL ERROR: Syntax error parsing input tree
+> make[1]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 1
+> Error: arch/arm/boot/dts/socfpga_cyclone5_sockit.dts:44.2-3 label or 
+> path, 'ethernet1', not found
+> FATAL ERROR: Syntax error parsing input tree
+> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb] Error 1
+> Error: arch/arm/boot/dts/socfpga_vt.dts:92.2-3 label or path, 
+> 'ethernet0', not found
 
--- 
-Catalin
+I have found the same problems and fixed it up locally already with
+the additional change below.
+
+	Arnd
+
+
+diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+index 2d6b38b..a87ee1c 100644
+--- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+@@ -46,11 +46,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index 26c63a0..ae16d97 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -39,11 +39,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 469bb5c..b79e2a2 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -39,11 +39,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 91f6ccf..0f33f2f 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -87,10 +87,7 @@
+ 	};
+ };
+ 
+-&ethernet0 {
+-        status = "okay";
+-};
+-
+ &gmac0 {
++        status = "okay";
+ 	phy-mode = "gmii";
+ };
