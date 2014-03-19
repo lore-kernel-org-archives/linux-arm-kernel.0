@@ -1,154 +1,153 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 19 Mar 2014 09:20:17 -0500
-Subject: stmmac-socfpga breakage in arm-soc
-In-Reply-To: <4337501.shzGE38xmF@wuerfel>
-References: <201403191333.01095.arnd@arndb.de> <53299CA8.607@gmail.com>
- <4337501.shzGE38xmF@wuerfel>
-Message-ID: <5329A7A1.20606@gmail.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Wed, 19 Mar 2014 15:20:30 +0100
+Subject: [PATCH 12/16] avr32: favr-32: use generic pwm_bl driver
+In-Reply-To: <1395234209-15546-13-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395234209-15546-13-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140319142029.GD20872@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Around Wed 19 Mar 2014 14:03:25 +0100 or thereabout, Alexandre Belloni wrote:
+> Switch to the generic pwm_bl driver instead of atmel-pwm-bl.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 
-On 03/19/2014 09:05 AM, Arnd Bergmann wrote:
-> On Wednesday 19 March 2014 08:33:28 Dinh Nguyen wrote:
->> On 03/19/2014 07:33 AM, Arnd Bergmann wrote:
->>>
->>> * Replaced the parent/child DT nodes with a combined node
->>> * Renamed the device node from 'ethernet0' to 'ethernet'
->>>     as the standard name.
->>> * Removed interrupt-names and clock-names properties that
->>>     are not documented in the binding and not used.
->>> * Added a new DWMAC_SOCFPGA Kconfig symbol to control
->>>     compilation of this driver
->>
->> The v1 of this patch had this had this Kconfig symbol and is
->> similar to your proposed fix.
->>
->> http://marc.info/?l=linux-netdev&m=139167062725242&w=2
->
-> I don't understand. So you got parts of it right at first, but then
-> changed it in a different way from what Peppe asked you to do?
->
+I do not have this board either.
 
-Peppe asked me to remove DWMAC_SOCFPGA Koption and take the dwmac-sti.c
-file as an example, which I did. The original patch for dwmac-sti.c had 
-just a CONFIG_ARCH_STI Kconfig option and not CONFIG_DWMAC_STI.
-
-http://marc.info/?l=linux-netdev&m=138426461307138&w=2
-
-I'm sorry I did not follow the later versions of dwmac-sti.c.
-
->>> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->>> index 8fb32a8..46aef510 100644
->>> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->>> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->>> @@ -38,6 +38,9 @@ static const struct of_device_id stmmac_dt_ids[] = {
->>>    	{ .compatible = "st,stih416-dwmac", .data = &sti_gmac_data},
->>>    	{ .compatible = "st,stid127-dwmac", .data = &sti_gmac_data},
->>>    #endif
->>> +#ifdef CONFIG_DWMAC_SOCFPGA
->>> +	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
->>> +#endif
->>>    	/* SoC specific glue layers should come before generic bindings */
->>>    	{ .compatible = "st,spear600-gmac"},
->>>    	{ .compatible = "snps,dwmac-3.610"},
->>
->>
->> If it's okay with you Arnd, can I take this patch and add on top of it
->> as it is also breaking dtb builds:
->>
->> Error: arch/arm/boot/dts/socfpga_arria5_socdk.dts:51.2-3 label or path,
->> 'ethernet1', not found
->> FATAL ERROR: Syntax error parsing input tree
->> Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:44.2-3 label or
->> path, 'ethernet1', not found
->> FATAL ERROR: Syntax error parsing input tree
->> make[1]: *** [arch/arm/boot/dts/socfpga_arria5_socdk.dtb] Error 1
->> make[1]: *** Waiting for unfinished jobs....
->> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb] Error 1
->> Error: arch/arm/boot/dts/socfpga_cyclone5_sockit.dts:44.2-3 label or
->> path, 'ethernet1', not found
->> FATAL ERROR: Syntax error parsing input tree
->> make[1]: *** [arch/arm/boot/dts/socfpga_cyclone5_sockit.dtb] Error 1
->> Error: arch/arm/boot/dts/socfpga_vt.dts:92.2-3 label or path,
->> 'ethernet0', not found
->
-> I have found the same problems and fixed it up locally already with
-> the additional change below.
->
-
-Thanks,
-Dinh
-
-> 	Arnd
->
->
-> diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-> index 2d6b38b..a87ee1c 100644
-> --- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-> @@ -46,11 +46,8 @@
->   	};
->   };
->
-> -&ethernet1 {
-> -	status = "okay";
-> -};
-> -
->   &gmac1 {
-> +	status = "okay";
->   	phy-mode = "rgmii";
->
->   	rxd0-skew-ps = <0>;
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> index 26c63a0..ae16d97 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> @@ -39,11 +39,8 @@
->   	};
->   };
->
-> -&ethernet1 {
-> -	status = "okay";
-> -};
-> -
->   &gmac1 {
-> +	status = "okay";
->   	phy-mode = "rgmii";
->
->   	rxd0-skew-ps = <0>;
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 469bb5c..b79e2a2 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -39,11 +39,8 @@
->   	};
->   };
->
-> -&ethernet1 {
-> -	status = "okay";
-> -};
-> -
->   &gmac1 {
-> +	status = "okay";
->   	phy-mode = "rgmii";
->
->   	rxd0-skew-ps = <0>;
-> diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-> index 91f6ccf..0f33f2f 100644
-> --- a/arch/arm/boot/dts/socfpga_vt.dts
-> +++ b/arch/arm/boot/dts/socfpga_vt.dts
-> @@ -87,10 +87,7 @@
->   	};
->   };
->
-> -&ethernet0 {
-> -        status = "okay";
-> -};
-> -
->   &gmac0 {
-> +        status = "okay";
->   	phy-mode = "gmii";
->   };
->
+> ---
+>  arch/avr32/boards/favr-32/setup.c    | 49 +++++++++++++++++++++++-------------
+>  arch/avr32/configs/favr-32_defconfig |  6 ++---
+>  2 files changed, 34 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/avr32/boards/favr-32/setup.c b/arch/avr32/boards/favr-32/setup.c
+> index 1f121497b517..391f026705a5 100644
+> --- a/arch/avr32/boards/favr-32/setup.c
+> +++ b/arch/avr32/boards/favr-32/setup.c
+> @@ -18,7 +18,10 @@
+>  #include <linux/gpio.h>
+>  #include <linux/leds.h>
+>  #include <linux/atmel-mci.h>
+> -#include <linux/atmel-pwm-bl.h>
+> +#include <linux/pwm.h>
+> +#include <linux/pwm_backlight.h>
+> +#include <linux/regulator/fixed.h>
+> +#include <linux/regulator/machine.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/ads7846.h>
+>  
+> @@ -33,6 +36,8 @@
+>  #include <mach/board.h>
+>  #include <mach/portmux.h>
+>  
+> +#define PWM_BL_CH 2
+> +
+>  /* Oscillator frequencies. These are board-specific */
+>  unsigned long at32_board_osc_rates[3] = {
+>  	[0] = 32768,	/* 32.768 kHz on RTC osc */
+> @@ -227,29 +232,37 @@ void __init favr32_setup_leds(void)
+>  	platform_device_register(&favr32_led_dev);
+>  }
+>  
+> -static struct atmel_pwm_bl_platform_data atmel_pwm_bl_pdata = {
+> -	.pwm_channel		= 2,
+> -	.pwm_frequency		= 200000,
+> -	.pwm_compare_max	= 345,
+> -	.pwm_duty_max		= 345,
+> -	.pwm_duty_min		= 90,
+> -	.pwm_active_low		= 1,
+> -	.gpio_on		= GPIO_PIN_PA(28),
+> -	.on_active_low		= 0,
+> +static struct pwm_lookup pwm_lookup[] = {
+> +	PWM_LOOKUP("at91sam9rl-pwm", PWM_BL_CH, "pwm-backlight.0", NULL),
+>  };
+>  
+> -static struct platform_device atmel_pwm_bl_dev = {
+> -	.name		= "atmel-pwm-bl",
+> -	.id		= 0,
+> -	.dev		= {
+> -		.platform_data = &atmel_pwm_bl_pdata,
+> +static struct regulator_consumer_supply fixed_power_consumers[] = {
+> +	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
+> +};
+> +
+> +static struct platform_pwm_backlight_data pwm_bl_data = {
+> +	.enable_gpio		= GPIO_PIN_PA(28),
+> +	.pwm_period_ns		= 5000,
+> +	.max_brightness		= 255,
+> +	.dft_brightness		= 255,
+> +	.lth_brightness		= 50,
+> +	.pwm_active_low		= true,
+> +};
+> +
+> +static struct platform_device pwm_bl_device = {
+> +	.name = "pwm-backlight",
+> +	.dev = {
+> +		.platform_data = &pwm_bl_data,
+>  	},
+>  };
+>  
+>  static void __init favr32_setup_atmel_pwm_bl(void)
+>  {
+> -	platform_device_register(&atmel_pwm_bl_dev);
+> -	at32_select_gpio(atmel_pwm_bl_pdata.gpio_on, 0);
+> +	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
+> +	regulator_register_always_on(0, "fixed", fixed_power_consumers,
+> +				    ARRAY_SIZE(fixed_power_consumers), 3300000);
+> +	platform_device_register(&pwm_bl_device);
+> +	at32_select_gpio(pwm_bl_data.enable_gpio, 0);
+>  }
+>  
+>  void __init setup_board(void)
+> @@ -339,7 +352,7 @@ static int __init favr32_init(void)
+>  
+>  	set_abdac_rate(at32_add_device_abdac(0, &abdac0_data));
+>  
+> -	at32_add_device_pwm(1 << atmel_pwm_bl_pdata.pwm_channel);
+> +	at32_add_device_pwm(1 << PWM_BL_CH);
+>  	at32_add_device_spi(1, spi1_board_info, ARRAY_SIZE(spi1_board_info));
+>  	at32_add_device_mci(0, &mci0_data);
+>  	at32_add_device_usba(0, NULL);
+> diff --git a/arch/avr32/configs/favr-32_defconfig b/arch/avr32/configs/favr-32_defconfig
+> index 07bed3f7eb5e..b3eb67dc05ac 100644
+> --- a/arch/avr32/configs/favr-32_defconfig
+> +++ b/arch/avr32/configs/favr-32_defconfig
+> @@ -67,7 +67,6 @@ CONFIG_MTD_PHYSMAP=y
+>  CONFIG_BLK_DEV_LOOP=m
+>  CONFIG_BLK_DEV_NBD=m
+>  CONFIG_BLK_DEV_RAM=m
+> -CONFIG_ATMEL_PWM=m
+>  CONFIG_ATMEL_TCLIB=y
+>  CONFIG_ATMEL_SSC=m
+>  CONFIG_NETDEVICES=y
+> @@ -108,7 +107,7 @@ CONFIG_FB=y
+>  CONFIG_FB_ATMEL=y
+>  CONFIG_BACKLIGHT_LCD_SUPPORT=y
+>  # CONFIG_LCD_CLASS_DEVICE is not set
+> -CONFIG_BACKLIGHT_ATMEL_PWM=m
+> +CONFIG_BACKLIGHT_PWM=m
+>  CONFIG_SOUND=m
+>  CONFIG_SOUND_PRIME=m
+>  # CONFIG_HID_SUPPORT is not set
+> @@ -123,7 +122,6 @@ CONFIG_MMC=y
+>  CONFIG_MMC_ATMELMCI=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+> -CONFIG_LEDS_ATMEL_PWM=m
+>  CONFIG_LEDS_GPIO=y
+>  CONFIG_LEDS_TRIGGERS=y
+>  CONFIG_LEDS_TRIGGER_TIMER=y
+> @@ -132,6 +130,8 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_AT32AP700X=y
+>  CONFIG_DMADEVICES=y
+> +CONFIG_PWM=y
+> +CONFIG_PWM_ATMEL=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  # CONFIG_EXT3_FS_XATTR is not set
+-- 
+mvh
+Hans-Christian Egtvedt
