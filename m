@@ -1,42 +1,61 @@
-From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
-Date: Wed, 19 Mar 2014 15:41:09 -0500
-Subject: [PATCH v2 0/1] ARM: sun4i: spi: Allow transfers larger than FIFO size
-In-Reply-To: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
-References: <1395261670-19386-1-git-send-email-mr.nuke.me@gmail.com>
-Message-ID: <1395261670-19386-3-git-send-email-mr.nuke.me@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Mar 2014 13:46:19 -0700
+Subject: [PATCH 24/62] ARM: omap1: select I2C where needed for PMIC
+In-Reply-To: <1395257399-359545-25-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-25-git-send-email-arnd@arndb.de>
+Message-ID: <20140319204619.GB8333@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second iteration of the patches sent yesterday. Per
-Maxime's request, I have squashed them into one single patch, and
-applied most of the suggestion he made.
+* Arnd Bergmann <arnd@arndb.de> [140319 12:33]:
+> The OMAP H2, OSK and OSIRIS machines cannot build without
+> I2C and TPS65010 both enabled unconditionally.
+> 
+> In each case, failing to enable CONFIG_I2C results in a
+> build or link error, so most consistent solution is to
+> ensure that it is impossible to disable those options.
+> 
+> It would be nice to leave CONFIG_I2C as user-selectable,
+> but doing that properly would require more work.
 
-As far as only clearing the interrupt _after_ draining the FIFO, I
-found that we usually get one extra Rx interrupt per burst if we do
-this, so I left the comment in.
+We should not select drivers. How about let's just have
+the tps65010 stuff behind an ifdef CONFIG_TPS65010 for
+those boards?
 
->>       /* Enable the interrupts */
->> -     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
->> -                                              SUN4I_INT_CTL_RF_F34);
->> +     reg = SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34;
->> +     /* Only enable Tx FIFO interrupt if we really need it */
->> +     if (tx_len > SUN4I_FIFO_DEPTH)
->> +             reg |= SUN4I_INT_CTL_TF_E34;
->> +     sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
->
-> I'd be much dumber than that. Why don't you just enable both
-> interrupts all the time if we need larger transfers ?
+Regards,
 
-As I've pointed out previously, this interrupt is PITA, as it triggers
-an IRQ storm if enabled without much thought. I found that
-(tx_len > SUN4I_FIFO_DEPTH) is the best check for when it's safe to
-enable this interrupt.
-
-Alexandru Gagniuc (1):
-  ARM: sun4i: spi: Allow transfers larger than FIFO size
-
- drivers/spi/spi-sun4i.c | 68 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 63 insertions(+), 5 deletions(-)
-
---
-1.8.5.3
+Tony
+ 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  arch/arm/mach-omap1/Kconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+> index cdd05f2..23ab1d5 100644
+> --- a/arch/arm/mach-omap1/Kconfig
+> +++ b/arch/arm/mach-omap1/Kconfig
+> @@ -44,6 +44,8 @@ config MACH_OMAP_INNOVATOR
+>  config MACH_OMAP_H2
+>  	bool "TI H2 Support"
+>  	depends on ARCH_OMAP1 && ARCH_OMAP16XX
+> +	select TPS65010
+> +	select I2C
+>      	help
+>  	  TI OMAP 1610/1611B H2 board support. Say Y here if you have such
+>  	  a board.
+> @@ -64,6 +66,8 @@ config MACH_HERALD
+>  config MACH_OMAP_OSK
+>  	bool "TI OSK Support"
+>  	depends on ARCH_OMAP1 && ARCH_OMAP16XX
+> +	select TPS65010
+> +	select I2C
+>      	help
+>  	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
+>            if you have such a board.
+> -- 
+> 1.8.3.2
+> 
