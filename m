@@ -1,52 +1,34 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 19 Mar 2014 20:21:19 +0100
-Subject: [PATCH v7 3/3] ARM: sun7i/sun6i: irqchip: Update the documentation
-In-Reply-To: <1395256879-8475-1-git-send-email-carlo@caione.org>
-References: <1395256879-8475-1-git-send-email-carlo@caione.org>
-Message-ID: <1395256879-8475-4-git-send-email-carlo@caione.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 20:29:08 +0100
+Subject: [PATCH 11/62] ARM: ep93xx: export ep93xx_chip_revision
+In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added documentation for NMI irqchip.
+ep93xx_chip_revision is used by the pata_ep93xx driver,
+which can be a loadable module. Exporting the symbol
+avoids a link error in this case.
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
 ---
- .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ arch/arm/mach-ep93xx/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-new file mode 100644
-index 0000000..d1c5cda
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-@@ -0,0 +1,27 @@
-+Allwinner Sunxi NMI Controller
-+==============================
-+
-+Required properties:
-+
-+- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
-+  "allwinner,sun6i-a31-sc-nmi"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2. The first cell is the IRQ number, the
-+  second cell the trigger type as defined in interrupt.txt in this directory.
-+- interrupt-parent: Specifies the parent interrupt controller.
-+- interrupts: Specifies the interrupt line (NMI) which is handled by
-+  the interrupt controller in the parent controller's notation. This value
-+  shall be the NMI.
-+
-+Example:
-+
-+sc-nmi-intc at 01c00030 {
-+	compatible = "allwinner,sun7i-a20-sc-nmi";
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	reg = <0x01c00030 0x0c>;
-+	interrupt-parent = <&gic>;
-+	interrupts = <0 0 4>;
-+};
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 6c70547..0e571f1 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -242,6 +242,7 @@ unsigned int ep93xx_chip_revision(void)
+ 	v >>= EP93XX_SYSCON_SYSCFG_REV_SHIFT;
+ 	return v;
+ }
++EXPORT_SYMBOL_GPL(ep93xx_chip_revision);
+ 
+ /*************************************************************************
+  * EP93xx GPIO
 -- 
 1.8.3.2
