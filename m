@@ -1,37 +1,38 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 19 Mar 2014 21:05:02 +0100
-Subject: [PATCH 19/62] ARM: lpc32xx: export lpc32xx_return_iram_size
-In-Reply-To: <1395257399-359545-20-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 20:29:50 +0100
+Subject: [PATCH 53/62] ARM: samsung: fix SAMSUNG_PM_DEBUG Kconfig logic
+In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-20-git-send-email-arnd@arndb.de>
-Message-ID: <5329F86E.8040707@antcom.de>
+Message-ID: <1395257399-359545-54-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/14 20:29, Arnd Bergmann wrote:
-> This symbol is used by the lpc_eth driver, which may
-> be a loadable module.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Roland Stigge <stigge@antcom.de>
-> ---
->  arch/arm/mach-lpc32xx/common.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-> index d7aa54c..de03620 100644
-> --- a/arch/arm/mach-lpc32xx/common.c
-> +++ b/arch/arm/mach-lpc32xx/common.c
-> @@ -99,6 +99,7 @@ u32 lpc32xx_return_iram_size(void)
->  
->  	return iram_size;
->  }
-> +EXPORT_SYMBOL_GPL(lpc32xx_return_iram_size);
->  
->  /*
->   * Computes PLL rate from PLL register and input clock
-> 
+The suspend debug code for Samsung has multiple dependencies
+that we should not unconditionally enable. In particular,
+we rely on the DEBUG_S3C_UART setting, which in turn depends
+on the samsung UART driver.
 
-Of course; thanks!
+Signed-off-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/plat-samsung/Kconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Acked-by: Roland Stigge <stigge@antcom.de>
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 04974db..c72d612 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -428,8 +428,7 @@ comment "Power management"
+ 
+ config SAMSUNG_PM_DEBUG
+ 	bool "S3C2410 PM Suspend debug"
+-	depends on PM
+-	select DEBUG_LL
++	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
+ 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
+-- 
+1.8.3.2
