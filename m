@@ -1,38 +1,42 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 19 Mar 2014 16:26:52 -0700
-Subject: [PATCH v7 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <531908b6.44f8440a.03ab.0cce@mx.google.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-2-git-send-email-sebastian.capella@linaro.org>
- <531908b6.44f8440a.03ab.0cce@mx.google.com>
-Message-ID: <CADHgK6ssL=0XcM_shGmb9z1T3w5L5OWEJgs-v9VyT3=USwY4FQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Mar 2014 16:32:39 -0700
+Subject: [PATCH v3 0/4] clk: at91: better support for the PCKs
+In-Reply-To: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <20140319233239.21989.44031@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2014 15:45, Sebastian Capella <sebastian.capella@linaro.org> wrote:
-> Quoting Sebastian Capella (2014-03-05 02:50:04)
->> Use of tracers in local_irq_disable is causes recursive aborts when
->> called with irqs disabled and using a temporary stack (hibernation).
->> Replace local_irq_disable with raw_local_irq_disable instead to
->> avoid tracers.
+Quoting Boris BREZILLON (2014-03-11 02:00:31)
+> From: Boris BREZILLON <b.brezillon@overkiz.com>
+> 
+> This serie implements a better support for the Programmable Clocks.
+> The first two patch are related to changing the rate of the PCKs.
+> The 3rd patch is a fix to handle properly the PCKRDY interrupt.
+> The last patch is a small optimzation/simplification of the determine_rate
+> algorithm for the PCK.
 
-> I have not heard any feedback on this change, since V3 of the
-> patchset.
-> Is everyone ok with this as it is?
-> Thomas, thanks for proposing this, is this looking ok to you?
+Taken into clk-next.
 
-ping
+Regards,
+Mike
 
-I haven't received any further communication / acks on this particular
-patch, since Russell's ~approval below:
-
-On 26 February 2014 15:37, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Great, I'm happy with this now.  I assume that the plan is to submit this
->  to my patch system when everyone's given their fill of acks?
-
-Is this ok as it is?
-
-Thanks,
-
-Sebastian
+> 
+> Changes since v2:
+> - remove unnecessary CLK_SET_RATE_GATE flag from system clk setting
+> 
+> Boris BREZILLON (2):
+>   clk: at91: replace prog clk round_rate with determine_rate
+>   clk: at91: propagate rate change on system clks
+> 
+> Jean-Jacques Hiblot (2):
+>   clk: at91: fix programmable clk irq handling
+>   clk: at91: optimization of the set_rate callback
+> 
+>  drivers/clk/at91/clk-programmable.c |  202 +++++++++++------------------------
+>  drivers/clk/at91/clk-system.c       |   76 +++++++++++--
+>  2 files changed, 126 insertions(+), 152 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
