@@ -1,43 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:32 +0100
-Subject: [PATCH 35/62] ARM: pxa: trizeps4 and trizeps4wl use the same file
+Date: Wed, 19 Mar 2014 20:29:35 +0100
+Subject: [PATCH 38/62] ARM: footbridge: don't build floppy code for addin mode
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-36-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-39-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trizeps4 and trizeps4wl platforms are both implemented
-using the same board file. Since the trizeps4wl code is a
-superset of trizeps4, it makes no sense to enable just the
-latter, but with the current Kconfig logic, it causes the
-board file not to be built at all.
+The ARCH_EBSA285_ADDIN platform does not provide the
+ISA_DMA API, which is required by the floppy driver.
 
-Selecting MACH_TRIZEPS4 from MACH_TRIZEPS4WL ensures that
-we are actually building the board file.
-
-Found during randconfig testing.
+Let's ensure that the floppy code can only be built
+when ISA_DMA is also enabled, by moving the select
+statement into ARCH_EBSA285_HOST.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-footbridge/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 8d9f4f1..692aa5c 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -183,6 +183,7 @@ config MACH_TRIZEPS4
- config MACH_TRIZEPS4WL
- 	bool "Keith und Koep Trizeps4-WL DIMM-Module"
- 	depends on TRIZEPS_PXA
-+	select MACH_TRIZEPS4
- 	select PXA27x
- 	select TRIZEPS_PCMCIA
+diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+index fba55fb..07152d0 100644
+--- a/arch/arm/mach-footbridge/Kconfig
++++ b/arch/arm/mach-footbridge/Kconfig
+@@ -52,6 +52,7 @@ config ARCH_EBSA285_HOST
+ 	select FOOTBRIDGE_HOST
+ 	select ISA
+ 	select ISA_DMA
++	select ARCH_MAY_HAVE_PC_FDC
+ 	select PCI
+ 	help
+ 	  Say Y here if you intend to run this kernel on the EBSA285 card
+@@ -94,6 +95,5 @@ config FOOTBRIDGE_ADDIN
+ # EBSA285 board in either host or addin mode
+ config ARCH_EBSA285
+ 	bool
+-	select ARCH_MAY_HAVE_PC_FDC
  
+ endif
 -- 
 1.8.3.2
