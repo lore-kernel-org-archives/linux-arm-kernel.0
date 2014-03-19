@@ -1,58 +1,32 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Wed, 19 Mar 2014 12:43:14 +0530
-Subject: [PATCH v6 2/4] [media] exynos-scaler: Add new driver for Exynos5
- SCALER
+Date: Wed, 19 Mar 2014 12:43:15 +0530
+Subject: [PATCH v6 3/4] [media] exynos-scaler: Add m2m functionality for the
+ SCALER driver
 In-Reply-To: <1395213196-25972-1-git-send-email-shaik.ameer@samsung.com>
 References: <1395213196-25972-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1395213196-25972-3-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1395213196-25972-4-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SCALER device which is a new device
-for scaling, blending, color fill  and color space conversion
-on EXYNOS5410 and EXYNOS5420 SoCs.
+This patch adds memory to memory (m2m) interface functionality
+for the SCALER driver.
 
-This device supports the followings as key feature.
-    input image format
-        - YCbCr420 2P(UV/VU), 3P
-        - YCbCr422 1P(YUYV/UYVY/YVYU), 2P(UV,VU), 3P
-        - YCbCr444 2P(UV,VU), 3P
-        - RGB565, ARGB1555, ARGB4444, ARGB8888, RGBA8888
-        - Pre-multiplexed ARGB8888, L8A8 and L8
-    output image format
-        - YCbCr420 2P(UV/VU), 3P
-        - YCbCr422 1P(YUYV/UYVY/YVYU), 2P(UV,VU), 3P
-        - YCbCr444 2P(UV,VU), 3P
-        - RGB565, ARGB1555, ARGB4444, ARGB8888, RGBA8888
-        - Pre-multiplexed ARGB8888
-    input rotation
-        - 0/90/180/270 degree, X/Y/XY Flip
-    scale ratio
-        - 1/4 scale down to 16 scale up
-    color space conversion
-        - RGB to YUV / YUV to RGB
-    Size - Exynos5420
-        - Input : 16x16 to 8192x8192
-        - Output:   4x4 to 8192x8192
-    Size - Exynos5410
-        - Input/Output: 4x4 to 4096x4096
-    alpha blending, color fill
+[arun.kk at samsung.com: fix compilation issues]
 
 Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/media/platform/exynos-scaler/scaler-regs.c |  337 ++++++++++++++++++++
- drivers/media/platform/exynos-scaler/scaler-regs.h |  331 +++++++++++++++++++
- 2 files changed, 668 insertions(+)
- create mode 100644 drivers/media/platform/exynos-scaler/scaler-regs.c
- create mode 100644 drivers/media/platform/exynos-scaler/scaler-regs.h
+ drivers/media/platform/exynos-scaler/scaler-m2m.c |  788 +++++++++++++++++++++
+ 1 file changed, 788 insertions(+)
+ create mode 100644 drivers/media/platform/exynos-scaler/scaler-m2m.c
 
-diff --git a/drivers/media/platform/exynos-scaler/scaler-regs.c b/drivers/media/platform/exynos-scaler/scaler-regs.c
+diff --git a/drivers/media/platform/exynos-scaler/scaler-m2m.c b/drivers/media/platform/exynos-scaler/scaler-m2m.c
 new file mode 100644
-index 0000000..e9e8a60
+index 0000000..7b21a17
 --- /dev/null
-+++ b/drivers/media/platform/exynos-scaler/scaler-regs.c
-@@ -0,0 +1,337 @@
++++ b/drivers/media/platform/exynos-scaler/scaler-m2m.c
+@@ -0,0 +1,788 @@
 +/*
 + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com
@@ -64,668 +38,782 @@ index 0000000..e9e8a60
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/pm_runtime.h>
++#include <linux/slab.h>
++
++#include <media/v4l2-ioctl.h>
 +
 +#include "scaler-regs.h"
 +
-+/* Scaler reset timeout in milliseconds */
-+#define SCALER_RESET_TIMEOUT	5
++#define SCALER_DEF_PIX_FMT	V4L2_PIX_FMT_RGB32
++#define SCALER_DEF_WIDTH	1280
++#define SCALER_DEF_HEIGHT	720
 +
-+void scaler_hw_set_sw_reset(struct scaler_dev *dev)
++static int scaler_m2m_ctx_stop_req(struct scaler_ctx *ctx)
 +{
-+	u32 cfg;
++	struct scaler_ctx *curr_ctx;
++	struct scaler_dev *scaler = ctx->scaler_dev;
++	int ret;
 +
-+	cfg = scaler_read(dev, SCALER_CFG);
-+	cfg |= SCALER_CFG_SOFT_RESET;
++	curr_ctx = v4l2_m2m_get_curr_priv(scaler->m2m.m2m_dev);
++	if (!scaler_m2m_pending(scaler) || (curr_ctx != ctx))
++		return 0;
 +
-+	scaler_write(dev, SCALER_CFG, cfg);
++	scaler_ctx_state_lock_set(SCALER_CTX_STOP_REQ, ctx);
++	ret = wait_event_timeout(scaler->irq_queue,
++			!scaler_ctx_state_is_set(SCALER_CTX_STOP_REQ, ctx),
++			SCALER_SHUTDOWN_TIMEOUT);
++
++	return ret == 0 ? -ETIMEDOUT : ret;
 +}
 +
-+int scaler_wait_reset(struct scaler_dev *dev)
++static int scaler_m2m_start_streaming(struct vb2_queue *q, unsigned int count)
 +{
-+	unsigned long end = jiffies + msecs_to_jiffies(SCALER_RESET_TIMEOUT);
-+	u32 cfg, reset_done = 0;
++	struct scaler_ctx *ctx = q->drv_priv;
++	int ret;
 +
-+	while (time_is_after_jiffies(end)) {
-+		cfg = scaler_read(dev, SCALER_CFG);
-+		if (!(cfg & SCALER_CFG_SOFT_RESET)) {
-+			reset_done = 1;
-+			break;
-+		}
-+		usleep_range(100, 200);
++	ret = pm_runtime_get_sync(&ctx->scaler_dev->pdev->dev);
++
++	return ret > 0 ? 0 : ret;
++}
++
++static int scaler_m2m_stop_streaming(struct vb2_queue *q)
++{
++	struct scaler_ctx *ctx = q->drv_priv;
++	int ret;
++
++	ret = scaler_m2m_ctx_stop_req(ctx);
++	if (ret < 0)
++		scaler_m2m_job_finish(ctx, VB2_BUF_STATE_ERROR);
++
++	pm_runtime_put(&ctx->scaler_dev->pdev->dev);
++
++	return 0;
++}
++
++void scaler_m2m_job_finish(struct scaler_ctx *ctx, int vb_state)
++{
++	struct vb2_buffer *src_vb, *dst_vb;
++
++	if (!ctx || !ctx->m2m_ctx)
++		return;
++
++	src_vb = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
++	dst_vb = v4l2_m2m_dst_buf_remove(ctx->m2m_ctx);
++
++	if (src_vb && dst_vb) {
++		v4l2_m2m_buf_done(src_vb, vb_state);
++		v4l2_m2m_buf_done(dst_vb, vb_state);
++
++		v4l2_m2m_job_finish(ctx->scaler_dev->m2m.m2m_dev,
++							ctx->m2m_ctx);
++	}
++}
++
++static void scaler_m2m_job_abort(void *priv)
++{
++	struct scaler_ctx *ctx = priv;
++	int ret;
++
++	ret = scaler_m2m_ctx_stop_req(ctx);
++	if (ret < 0)
++		scaler_m2m_job_finish(ctx, VB2_BUF_STATE_ERROR);
++}
++
++static int scaler_get_bufs(struct scaler_ctx *ctx)
++{
++	struct scaler_frame *s_frame, *d_frame;
++	struct vb2_buffer *src_vb, *dst_vb;
++	int ret;
++
++	s_frame = &ctx->s_frame;
++	d_frame = &ctx->d_frame;
++
++	src_vb = v4l2_m2m_next_src_buf(ctx->m2m_ctx);
++	ret = scaler_prepare_addr(ctx, src_vb, s_frame, &s_frame->addr);
++	if (ret < 0)
++		return ret;
++
++	dst_vb = v4l2_m2m_next_dst_buf(ctx->m2m_ctx);
++	ret = scaler_prepare_addr(ctx, dst_vb, d_frame, &d_frame->addr);
++	if (ret < 0)
++		return ret;
++
++	dst_vb->v4l2_buf.timestamp = src_vb->v4l2_buf.timestamp;
++
++	return 0;
++}
++
++static void scaler_m2m_device_run(void *priv)
++{
++	struct scaler_ctx *ctx = priv;
++	struct scaler_dev *scaler;
++	unsigned long flags;
++	int ret;
++	bool is_stopped;
++
++	if (WARN(!ctx, "Null hardware context\n"))
++		return;
++
++	scaler = ctx->scaler_dev;
++	spin_lock_irqsave(&scaler->slock, flags);
++
++	set_bit(ST_M2M_PEND, &scaler->state);
++
++	/* Reconfigure hardware if the context has changed. */
++	if (scaler->m2m.ctx != ctx) {
++		scaler_dbg(scaler, "scaler->m2m.ctx = 0x%p, current_ctx = 0x%p",
++				scaler->m2m.ctx, ctx);
++		ctx->state |= SCALER_PARAMS;
++		scaler->m2m.ctx = ctx;
 +	}
 +
-+	if (!reset_done)
++	is_stopped = ctx->state & SCALER_CTX_STOP_REQ;
++	ctx->state &= ~SCALER_CTX_STOP_REQ;
++	if (is_stopped) {
++		wake_up(&scaler->irq_queue);
++		goto unlock;
++	}
++
++	ret = scaler_get_bufs(ctx);
++	if (ret < 0) {
++		scaler_dbg(scaler, "Wrong address\n");
++		goto unlock;
++	}
++
++	scaler_hw_address_queue_reset(ctx);
++	scaler_set_prefbuf(scaler, &ctx->s_frame);
++	scaler_hw_set_input_addr(scaler, &ctx->s_frame.addr);
++	scaler_hw_set_output_addr(scaler, &ctx->d_frame.addr);
++	scaler_hw_set_csc_coeff(ctx);
++
++	if (ctx->state & SCALER_PARAMS) {
++		scaler_hw_set_irq(scaler, SCALER_INT_FRAME_END, false);
++		if (scaler_set_scaler_info(ctx)) {
++			scaler_dbg(scaler, "Scaler setup error");
++			goto unlock;
++		}
++
++		scaler_hw_set_in_size(ctx);
++		scaler_hw_set_in_image_format(ctx);
++
++		scaler_hw_set_out_size(ctx);
++		scaler_hw_set_out_image_format(ctx);
++
++		scaler_hw_set_scaler_ratio(ctx);
++		scaler_hw_set_rotation(ctx);
++	}
++
++	ctx->state &= ~SCALER_PARAMS;
++	scaler_hw_enable_control(scaler, true);
++
++	spin_unlock_irqrestore(&scaler->slock, flags);
++	return;
++
++unlock:
++	ctx->state &= ~SCALER_PARAMS;
++	spin_unlock_irqrestore(&scaler->slock, flags);
++}
++
++static int scaler_m2m_queue_setup(struct vb2_queue *vq,
++			const struct v4l2_format *fmt,
++			unsigned int *num_buffers, unsigned int *num_planes,
++			unsigned int sizes[], void *allocators[])
++{
++	struct scaler_ctx *ctx = vb2_get_drv_priv(vq);
++	struct scaler_frame *frame;
++	int i;
++
++	frame = ctx_get_frame(ctx, vq->type);
++	if (IS_ERR(frame))
++		return PTR_ERR(frame);
++
++	if (!frame->fmt)
++		return -EINVAL;
++
++	*num_planes = frame->fmt->num_planes;
++	for (i = 0; i < frame->fmt->num_planes; i++) {
++		sizes[i] = frame->payload[i];
++		allocators[i] = ctx->scaler_dev->alloc_ctx;
++	}
++	return 0;
++}
++
++static int scaler_m2m_buf_prepare(struct vb2_buffer *vb)
++{
++	struct scaler_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++	struct scaler_frame *frame;
++	int i;
++
++	frame = ctx_get_frame(ctx, vb->vb2_queue->type);
++	if (IS_ERR(frame))
++		return PTR_ERR(frame);
++
++	for (i = 0; i < frame->fmt->num_planes; i++)
++		vb2_set_plane_payload(vb, i, frame->payload[i]);
++
++	return 0;
++}
++
++static void scaler_m2m_buf_queue(struct vb2_buffer *vb)
++{
++	struct scaler_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
++
++	scaler_dbg(ctx->scaler_dev, "ctx: %p, ctx->state: 0x%x",
++				     ctx, ctx->state);
++
++	if (ctx->m2m_ctx)
++		v4l2_m2m_buf_queue(ctx->m2m_ctx, vb);
++}
++
++static void scaler_lock(struct vb2_queue *vq)
++{
++	struct scaler_ctx *ctx = vb2_get_drv_priv(vq);
++	mutex_lock(&ctx->scaler_dev->lock);
++}
++
++static void scaler_unlock(struct vb2_queue *vq)
++{
++	struct scaler_ctx *ctx = vb2_get_drv_priv(vq);
++	mutex_unlock(&ctx->scaler_dev->lock);
++}
++
++static struct vb2_ops scaler_m2m_qops = {
++	.queue_setup	 = scaler_m2m_queue_setup,
++	.buf_prepare	 = scaler_m2m_buf_prepare,
++	.buf_queue	 = scaler_m2m_buf_queue,
++	.wait_prepare	 = scaler_unlock,
++	.wait_finish	 = scaler_lock,
++	.stop_streaming	 = scaler_m2m_stop_streaming,
++	.start_streaming = scaler_m2m_start_streaming,
++};
++
++static int scaler_m2m_querycap(struct file *file, void *fh,
++			   struct v4l2_capability *cap)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	struct scaler_dev *scaler = ctx->scaler_dev;
++
++	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE;
++	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
++
++	strlcpy(cap->driver, scaler->pdev->name, sizeof(cap->driver));
++	strlcpy(cap->card, scaler->pdev->name, sizeof(cap->card));
++	strlcpy(cap->bus_info, "platform:exynos5-scaler",
++					sizeof(cap->bus_info));
++
++	return 0;
++}
++
++static int scaler_m2m_enum_fmt_mplane(struct file *file, void *priv,
++				struct v4l2_fmtdesc *f)
++{
++	return scaler_enum_fmt_mplane(f);
++}
++
++static int scaler_m2m_g_fmt_mplane(struct file *file, void *fh,
++			     struct v4l2_format *f)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++
++	return scaler_g_fmt_mplane(ctx, f);
++}
++
++static int scaler_m2m_try_fmt_mplane(struct file *file, void *fh,
++				  struct v4l2_format *f)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++
++	return scaler_try_fmt_mplane(ctx, f);
++}
++
++static int scaler_m2m_set_default_format(struct scaler_ctx *ctx)
++{
++	struct scaler_frame *frame;
++	u32 def_pixformat = SCALER_DEF_PIX_FMT;
++	int i;
++
++	frame = &ctx->s_frame;
++
++	frame->colorspace = V4L2_COLORSPACE_REC709;
++	frame->fmt = scaler_find_fmt(&def_pixformat, -1);
++	if (!frame->fmt)
++		return -EINVAL;
++
++	scaler_set_frame_size(frame, SCALER_DEF_WIDTH, SCALER_DEF_HEIGHT);
++	for (i = 0; i < frame->fmt->num_planes; i++)
++		frame->payload[i] = SCALER_DEF_WIDTH * SCALER_DEF_HEIGHT *
++					(frame->fmt->depth[i] / 8);
++
++	scaler_ctx_state_lock_set(SCALER_PARAMS, ctx);
++
++	/* Apply the same src frame settings to dst frame */
++	ctx->d_frame = ctx->s_frame;
++
++	return 0;
++}
++
++
++static int scaler_m2m_s_fmt_mplane(struct file *file, void *fh,
++				 struct v4l2_format *f)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	struct vb2_queue *vq;
++	struct scaler_frame *frame;
++	struct v4l2_pix_format_mplane *pix;
++	int i, ret = 0;
++
++	ret = scaler_m2m_try_fmt_mplane(file, fh, f);
++	if (ret < 0)
++		return ret;
++
++	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
++
++	if (vb2_is_streaming(vq)) {
++		scaler_dbg(ctx->scaler_dev, "queue (%d) busy", f->type);
 +		return -EBUSY;
++	}
 +
-+	/*
-+	 * Write any value to read/write register and read it back.
-+	 * If the write and read value matches, then the reset process is
-+	 * succeeded.
-+	 */
-+	end = jiffies + msecs_to_jiffies(SCALER_RESET_TIMEOUT);
-+	while (time_is_after_jiffies(end)) {
-+		scaler_write(dev, SCALER_CFG_SOFT_RESET_CHECK_REG,
-+				SCALER_CFG_SOFT_RESET_CHECK_VAL);
-+		if (SCALER_CFG_SOFT_RESET_CHECK_VAL ==
-+			scaler_read(dev, SCALER_CFG_SOFT_RESET_CHECK_REG))
++	if (V4L2_TYPE_IS_OUTPUT(f->type))
++		frame = &ctx->s_frame;
++	else
++		frame = &ctx->d_frame;
++
++	pix = &f->fmt.pix_mp;
++	frame->colorspace = pix->colorspace;
++	frame->fmt = scaler_find_fmt(&pix->pixelformat, -1);
++	if (!frame->fmt)
++		return -EINVAL;
++
++	for (i = 0; i < frame->fmt->num_planes; i++)
++		frame->payload[i] = pix->plane_fmt[i].sizeimage;
++
++	scaler_set_frame_size(frame, pix->width, pix->height);
++	scaler_ctx_state_lock_set(SCALER_PARAMS, ctx);
++
++	scaler_dbg(ctx->scaler_dev, "f_w: %d, f_h: %d",
++				frame->f_width, frame->f_height);
++
++	return 0;
++}
++
++static int scaler_m2m_reqbufs(struct file *file, void *fh,
++			  struct v4l2_requestbuffers *reqbufs)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	struct scaler_dev *scaler = ctx->scaler_dev;
++	u32 max_cnt;
++
++	if (reqbufs->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
++		max_cnt = scaler->variant->in_buf_cnt;
++	else
++		max_cnt = scaler->variant->out_buf_cnt;
++
++	if (reqbufs->count > max_cnt) {
++		/* Adjust the count value as per driver supports */
++		reqbufs->count = max_cnt;
++	}
++
++	return v4l2_m2m_reqbufs(file, ctx->m2m_ctx, reqbufs);
++}
++
++static int scaler_m2m_expbuf(struct file *file, void *fh,
++				struct v4l2_exportbuffer *eb)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_expbuf(file, ctx->m2m_ctx, eb);
++}
++
++static int scaler_m2m_querybuf(struct file *file, void *fh,
++					struct v4l2_buffer *buf)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_querybuf(file, ctx->m2m_ctx, buf);
++}
++
++static int scaler_m2m_qbuf(struct file *file, void *fh,
++			  struct v4l2_buffer *buf)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_qbuf(file, ctx->m2m_ctx, buf);
++}
++
++static int scaler_m2m_dqbuf(struct file *file, void *fh,
++			   struct v4l2_buffer *buf)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_dqbuf(file, ctx->m2m_ctx, buf);
++}
++
++static int scaler_m2m_streamon(struct file *file, void *fh,
++			   enum v4l2_buf_type type)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_streamon(file, ctx->m2m_ctx, type);
++}
++
++static int scaler_m2m_streamoff(struct file *file, void *fh,
++			    enum v4l2_buf_type type)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	return v4l2_m2m_streamoff(file, ctx->m2m_ctx, type);
++}
++
++/* Return 1 if rectangle a is enclosed in rectangle b, or 0 otherwise. */
++static int is_rectangle_enclosed(struct v4l2_rect *a, struct v4l2_rect *b)
++{
++	return !((a->left < b->left) ||
++		 (a->top < b->top) ||
++		 (a->left + a->width > b->left + b->width) ||
++		 (a->top + a->height > b->top + b->height));
++}
++
++static int scaler_m2m_g_selection(struct file *file, void *fh,
++			struct v4l2_selection *s)
++{
++	struct scaler_frame *frame;
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++
++	if ((s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) &&
++	    (s->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE))
++		return -EINVAL;
++
++	frame = ctx_get_frame(ctx, s->type);
++	if (IS_ERR(frame))
++		return PTR_ERR(frame);
++
++	if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
++		if ((s->target == V4L2_SEL_TGT_CROP_DEFAULT) ||
++		    (s->target == V4L2_SEL_TGT_CROP_BOUNDS)) {
++			s->r.left = 0;
++			s->r.top = 0;
++			s->r.width = frame->f_width;
++			s->r.height = frame->f_height;
 +			return 0;
-+		usleep_range(9000, 10000);
-+	}
++		}
 +
-+	return -EBUSY;
-+}
-+
-+void scaler_hw_set_irq(struct scaler_dev *dev, int irq_num, bool enable)
-+{
-+	u32 cfg;
-+
-+	if ((irq_num < SCALER_INT_FRAME_END) ||
-+	    (irq_num > SCALER_INT_TIMEOUT))
-+		return;
-+
-+	cfg = scaler_read(dev, SCALER_INT_EN);
-+	if (enable)
-+		cfg |= 1 << irq_num;
-+	else
-+		cfg &= ~(1 << irq_num);
-+	scaler_write(dev, SCALER_INT_EN, cfg);
-+}
-+
-+void scaler_hw_set_input_addr(struct scaler_dev *dev, struct scaler_addr *addr)
-+{
-+	scaler_dbg(dev, "src_buf: 0x%x, cb: 0x%x, cr: 0x%x",
-+				addr->y, addr->cb, addr->cr);
-+	scaler_write(dev, SCALER_SRC_Y_BASE, addr->y);
-+	scaler_write(dev, SCALER_SRC_CB_BASE, addr->cb);
-+	scaler_write(dev, SCALER_SRC_CR_BASE, addr->cr);
-+}
-+
-+void scaler_hw_set_output_addr(struct scaler_dev *dev,
-+			     struct scaler_addr *addr)
-+{
-+	scaler_dbg(dev, "dst_buf: 0x%x, cb: 0x%x, cr: 0x%x",
-+			addr->y, addr->cb, addr->cr);
-+	scaler_write(dev, SCALER_DST_Y_BASE, addr->y);
-+	scaler_write(dev, SCALER_DST_CB_BASE, addr->cb);
-+	scaler_write(dev, SCALER_DST_CR_BASE, addr->cr);
-+}
-+
-+void scaler_hw_set_in_size(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	struct scaler_frame *frame = &ctx->s_frame;
-+	u32 cfg;
-+
-+	/* set input pixel offset */
-+	cfg = (frame->selection.left & SCALER_SRC_YH_POS_MASK) <<
-+				  SCALER_SRC_YH_POS_SHIFT;
-+	cfg |= (frame->selection.top & SCALER_SRC_YV_POS_MASK) <<
-+				   SCALER_SRC_YV_POS_SHIFT;
-+	scaler_write(dev, SCALER_SRC_Y_POS, cfg);
-+
-+	/* TODO: calculate 'C' plane h/v offset using 'Y' plane h/v offset */
-+
-+	/* Set input span */
-+	cfg = (frame->f_width & SCALER_SRC_Y_SPAN_MASK) <<
-+				SCALER_SRC_Y_SPAN_SHIFT;
-+	if (is_yuv420_2p(frame->fmt))
-+		cfg |= (frame->f_width & SCALER_SRC_C_SPAN_MASK) <<
-+					  SCALER_SRC_C_SPAN_SHIFT;
-+	else /* TODO: Verify */
-+		cfg |= (frame->f_width & SCALER_SRC_C_SPAN_MASK) <<
-+					  SCALER_SRC_C_SPAN_SHIFT;
-+
-+	scaler_write(dev, SCALER_SRC_SPAN, cfg);
-+
-+	/* Set input cropped size */
-+	cfg = (frame->selection.width & SCALER_SRC_WIDTH_MASK) <<
-+				   SCALER_SRC_WIDTH_SHIFT;
-+	cfg |= (frame->selection.height & SCALER_SRC_HEIGHT_MASK) <<
-+				      SCALER_SRC_HEIGHT_SHIFT;
-+	scaler_write(dev, SCALER_SRC_WH, cfg);
-+
-+	scaler_dbg(dev, "src: posx: %d, posY: %d, spanY: %d, spanC: %d\n",
-+			frame->selection.left, frame->selection.top,
-+			frame->f_width, frame->f_width);
-+	scaler_dbg(dev, "cropX: %d, cropY: %d\n",
-+			frame->selection.width,	frame->selection.height);
-+}
-+
-+void scaler_hw_set_in_image_format(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	struct scaler_frame *frame = &ctx->s_frame;
-+	u32 cfg;
-+
-+	cfg = scaler_read(dev, SCALER_SRC_CFG);
-+	cfg &= ~(SCALER_SRC_COLOR_FORMAT_MASK << SCALER_SRC_COLOR_FORMAT_SHIFT);
-+	cfg |= (frame->fmt->scaler_color & SCALER_SRC_COLOR_FORMAT_MASK) <<
-+					   SCALER_SRC_COLOR_FORMAT_SHIFT;
-+
-+	/* Setting tiled/linear format */
-+	if (is_tiled_fmt(frame->fmt))
-+		cfg |= SCALER_SRC_TILE_EN;
-+	else
-+		cfg &= ~SCALER_SRC_TILE_EN;
-+
-+	scaler_write(dev, SCALER_SRC_CFG, cfg);
-+}
-+
-+void scaler_hw_set_out_size(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	struct scaler_frame *frame = &ctx->d_frame;
-+	u32 cfg;
-+
-+	/* Set output pixel offset */
-+	cfg = (frame->selection.left & SCALER_DST_H_POS_MASK) <<
-+				  SCALER_DST_H_POS_SHIFT;
-+	cfg |= (frame->selection.top & SCALER_DST_V_POS_MASK) <<
-+				  SCALER_DST_V_POS_SHIFT;
-+	scaler_write(dev, SCALER_DST_POS, cfg);
-+
-+	/* Set output span */
-+	cfg = (frame->f_width & SCALER_DST_Y_SPAN_MASK) <<
-+				SCALER_DST_Y_SPAN_SHIFT;
-+	if (is_yuv420_2p(frame->fmt))
-+		cfg |= ((frame->f_width / 2) & SCALER_DST_C_SPAN_MASK) <<
-+					     SCALER_DST_C_SPAN_SHIFT;
-+	else
-+		cfg |= (frame->f_width & SCALER_DST_C_SPAN_MASK) <<
-+					     SCALER_DST_C_SPAN_SHIFT;
-+	scaler_write(dev, SCALER_DST_SPAN, cfg);
-+
-+	/* Set output scaled size */
-+	cfg = (frame->selection.width & SCALER_DST_WIDTH_MASK) <<
-+				   SCALER_DST_WIDTH_SHIFT;
-+	cfg |= (frame->selection.height & SCALER_DST_HEIGHT_MASK) <<
-+				     SCALER_DST_HEIGHT_SHIFT;
-+	scaler_write(dev, SCALER_DST_WH, cfg);
-+
-+	scaler_dbg(dev, "dst: pos X: %d, pos Y: %d, span Y: %d, span C: %d\n",
-+			frame->selection.left, frame->selection.top,
-+			frame->f_width, frame->f_width);
-+	scaler_dbg(dev, "crop X: %d, crop Y: %d\n",
-+			frame->selection.width,	frame->selection.height);
-+}
-+
-+void scaler_hw_set_out_image_format(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	struct scaler_frame *frame = &ctx->d_frame;
-+	u32 cfg;
-+
-+	cfg = scaler_read(dev, SCALER_DST_CFG);
-+	cfg &= ~SCALER_DST_COLOR_FORMAT_MASK;
-+	cfg |= (frame->fmt->scaler_color & SCALER_DST_COLOR_FORMAT_MASK);
-+
-+	scaler_write(dev, SCALER_DST_CFG, cfg);
-+}
-+
-+void scaler_hw_set_scaler_ratio(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	struct scaler_scaler *sc = &ctx->scaler;
-+	u32 cfg;
-+
-+	cfg = (sc->hratio & SCALER_H_RATIO_MASK) << SCALER_H_RATIO_SHIFT;
-+	scaler_write(dev, SCALER_H_RATIO, cfg);
-+
-+	cfg = (sc->vratio & SCALER_V_RATIO_MASK) << SCALER_V_RATIO_SHIFT;
-+	scaler_write(dev, SCALER_V_RATIO, cfg);
-+}
-+
-+void scaler_hw_set_rotation(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	u32 cfg = 0;
-+
-+	cfg = ((ctx->ctrls_scaler.rotate->val / 90) & SCALER_ROTMODE_MASK) <<
-+						      SCALER_ROTMODE_SHIFT;
-+
-+	if (ctx->ctrls_scaler.hflip->val)
-+		cfg |= SCALER_FLIP_X_EN;
-+
-+	if (ctx->ctrls_scaler.vflip->val)
-+		cfg |= SCALER_FLIP_Y_EN;
-+
-+	scaler_write(dev, SCALER_ROT_CFG, cfg);
-+}
-+
-+void scaler_hw_set_csc_coeff(struct scaler_ctx *ctx)
-+{
-+	struct scaler_dev *dev = ctx->scaler_dev;
-+	enum scaler_csc_coeff type;
-+	u32 cfg = 0;
-+	int i, j;
-+	static const u32 csc_coeff[SCALER_CSC_COEFF_MAX][3][3] = {
-+		{ /* YCbCr to RGB */
-+			{0x254, 0x000, 0x331},
-+			{0x254, 0xec8, 0xFA0},
-+			{0x254, 0x409, 0x000}
-+		},
-+		{ /* RGB to YCbCr */
-+			{0x084, 0x102, 0x032},
-+			{0xe4c, 0xe95, 0x0e1},
-+			{0x0e1, 0xebc, 0xe24}
-+		} };
-+
-+	/* TODO: add check for BT.601,BT.709 narrow/wide ranges */
-+	if (is_rgb(ctx->s_frame.fmt) == is_rgb(ctx->d_frame.fmt)) {
-+		type = SCALER_CSC_COEFF_NONE;
-+	} else if (is_rgb(ctx->d_frame.fmt)) {
-+		type = SCALER_CSC_COEFF_YCBCR_TO_RGB;
-+		scaler_hw_src_y_offset_en(ctx->scaler_dev, true);
++		if (s->target == V4L2_SEL_TGT_CROP) {
++			s->r.left = frame->selection.left;
++			s->r.top = frame->selection.top;
++			s->r.width = frame->selection.width;
++			s->r.height = frame->selection.height;
++			return 0;
++		}
 +	} else {
-+		type = SCALER_CSC_COEFF_RGB_TO_YCBCR;
-+		scaler_hw_src_y_offset_en(ctx->scaler_dev, true);
-+	}
++		if ((s->target == V4L2_SEL_TGT_COMPOSE_DEFAULT) ||
++		    (s->target == V4L2_SEL_TGT_COMPOSE_BOUNDS)) {
++			s->r.left = 0;
++			s->r.top = 0;
++			s->r.width = frame->f_width;
++			s->r.height = frame->f_height;
++			return 0;
++		}
 +
-+	if (type == ctx->scaler_dev->coeff_type || type >= SCALER_CSC_COEFF_MAX)
-+		return;
-+
-+	for (i = 0; i < 3; i++) {
-+		for (j = 0; j < 3; j++) {
-+			cfg = csc_coeff[type][i][j];
-+			scaler_write(dev, SCALER_CSC_COEF(i, j), cfg);
++		if (s->target == V4L2_SEL_TGT_COMPOSE) {
++			s->r.left = frame->selection.left;
++			s->r.top = frame->selection.top;
++			s->r.width = frame->selection.width;
++			s->r.height = frame->selection.height;
++			return 0;
 +		}
 +	}
 +
-+	ctx->scaler_dev->coeff_type = type;
++	return -EINVAL;
 +}
 +
-+void scaler_hw_src_y_offset_en(struct scaler_dev *dev, bool on)
++static int scaler_m2m_s_selection(struct file *file, void *fh,
++				struct v4l2_selection *s)
 +{
-+	u32 cfg;
++	struct scaler_frame *frame;
++	struct scaler_ctx *ctx = fh_to_ctx(fh);
++	struct v4l2_crop cr;
++	struct scaler_variant *variant = ctx->scaler_dev->variant;
++	int ret;
 +
-+	cfg = scaler_read(dev, SCALER_CFG);
-+	if (on)
-+		cfg |= SCALER_CFG_CSC_Y_OFFSET_SRC_EN;
++	cr.type = s->type;
++	cr.c = s->r;
++
++	if (!(((s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) &&
++	       (s->target == V4L2_SEL_TGT_CROP)) ||
++	      ((s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) &&
++	       (s->target == V4L2_SEL_TGT_COMPOSE))))
++		return -EINVAL;
++
++	frame = ctx_get_frame(ctx, s->type);
++
++	ret = scaler_try_crop(ctx, &cr);
++	if (ret < 0)
++		return ret;
++
++	if (s->flags & V4L2_SEL_FLAG_LE &&
++	    !is_rectangle_enclosed(&cr.c, &s->r))
++		return -ERANGE;
++
++	if (s->flags & V4L2_SEL_FLAG_GE &&
++	    !is_rectangle_enclosed(&s->r, &cr.c))
++		return -ERANGE;
++
++	s->r = cr.c;
++
++	/* Check to see if scaling ratio is within supported range */
++	if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
++		ret = scaler_check_scaler_ratio(variant,
++			cr.c.width, cr.c.height,
++			ctx->d_frame.selection.width,
++			ctx->d_frame.selection.height,
++			ctx->ctrls_scaler.rotate->val);
 +	else
-+		cfg &= ~SCALER_CFG_CSC_Y_OFFSET_SRC_EN;
++		ret = scaler_check_scaler_ratio(variant,
++			ctx->s_frame.selection.width,
++			ctx->s_frame.selection.height,
++			cr.c.width, cr.c.height,
++			ctx->ctrls_scaler.rotate->val);
 +
-+	scaler_write(dev, SCALER_CFG, cfg);
++	if (ret < 0) {
++		scaler_dbg(ctx->scaler_dev, "Out of scaler range");
++		return -EINVAL;
++	}
++
++	frame->selection = cr.c;
++
++	scaler_ctx_state_lock_set(SCALER_PARAMS, ctx);
++	return 0;
 +}
 +
-+void scaler_hw_dst_y_offset_en(struct scaler_dev *dev, bool on)
-+{
-+	u32 cfg;
-+
-+	cfg = scaler_read(dev, SCALER_CFG);
-+	if (on)
-+		cfg |= SCALER_CFG_CSC_Y_OFFSET_DST_EN;
-+	else
-+		cfg &= ~SCALER_CFG_CSC_Y_OFFSET_DST_EN;
-+
-+	scaler_write(dev, SCALER_CFG, cfg);
-+}
-+
-+void scaler_hw_enable_control(struct scaler_dev *dev, bool on)
-+{
-+	u32 cfg;
-+
-+	if (on)
-+		scaler_write(dev, SCALER_INT_EN, 0xffffffff);
-+
-+	cfg = scaler_read(dev, SCALER_CFG);
-+	cfg |= SCALER_CFG_16_BURST_MODE;
-+	if (on)
-+		cfg |= SCALER_CFG_START_CMD;
-+	else
-+		cfg &= ~SCALER_CFG_START_CMD;
-+
-+	scaler_dbg(dev, "%s: SCALER_CFG:0x%x\n", __func__, cfg);
-+
-+	scaler_write(dev, SCALER_CFG, cfg);
-+}
-+
-+unsigned int scaler_hw_get_irq_status(struct scaler_dev *dev)
-+{
-+	return scaler_read(dev, SCALER_INT_STATUS);
-+}
-+
-+void scaler_hw_clear_irq(struct scaler_dev *dev, unsigned int irq)
-+{
-+	scaler_write(dev, SCALER_INT_STATUS, irq);
-+}
-diff --git a/drivers/media/platform/exynos-scaler/scaler-regs.h b/drivers/media/platform/exynos-scaler/scaler-regs.h
-new file mode 100644
-index 0000000..5b697ae
---- /dev/null
-+++ b/drivers/media/platform/exynos-scaler/scaler-regs.h
-@@ -0,0 +1,331 @@
-+/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Samsung EXYNOS5 SoC series SCALER driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef REGS_SCALER_H_
-+#define REGS_SCALER_H_
-+
-+#include "scaler.h"
-+
-+/* SCALER status */
-+#define SCALER_STATUS				0x00
-+#define SCALER_STATUS_RUNNING			(1 << 1)
-+#define SCALER_STATUS_READY_CLK_DOWN		(1 << 0)
-+
-+/* SCALER config */
-+#define SCALER_CFG				0x04
-+#define SCALER_CFG_FILL_EN			(1 << 24)
-+#define SCALER_CFG_BLEND_CLR_DIV_ALPHA_EN	(1 << 17)
-+#define SCALER_CFG_BLEND_EN			(1 << 16)
-+#define SCALER_CFG_CSC_Y_OFFSET_SRC_EN		(1 << 10)
-+#define SCALER_CFG_CSC_Y_OFFSET_DST_EN		(1 << 9)
-+#define SCALER_CFG_16_BURST_MODE		(1 << 8)
-+#define SCALER_CFG_SOFT_RESET			(1 << 1)
-+#define SCALER_CFG_START_CMD			(1 << 0)
-+
-+/* SCALER interrupts */
-+#define SCALER_INT_TIMEOUT			31
-+#define SCALER_INT_ILLEGAL_BLEND		24
-+#define SCALER_INT_ILLEGAL_RATIO		23
-+#define SCALER_INT_ILLEGAL_DST_HEIGHT		22
-+#define SCALER_INT_ILLEGAL_DST_WIDTH		21
-+#define SCALER_INT_ILLEGAL_DST_V_POS		20
-+#define SCALER_INT_ILLEGAL_DST_H_POS		19
-+#define SCALER_INT_ILLEGAL_DST_C_SPAN		18
-+#define SCALER_INT_ILLEGAL_DST_Y_SPAN		17
-+#define SCALER_INT_ILLEGAL_DST_CR_BASE		16
-+#define SCALER_INT_ILLEGAL_DST_CB_BASE		15
-+#define SCALER_INT_ILLEGAL_DST_Y_BASE		14
-+#define SCALER_INT_ILLEGAL_DST_COLOR		13
-+#define SCALER_INT_ILLEGAL_SRC_HEIGHT		12
-+#define SCALER_INT_ILLEGAL_SRC_WIDTH		11
-+#define SCALER_INT_ILLEGAL_SRC_CV_POS		10
-+#define SCALER_INT_ILLEGAL_SRC_CH_POS		9
-+#define SCALER_INT_ILLEGAL_SRC_YV_POS		8
-+#define SCALER_INT_ILLEGAL_SRC_YH_POS		7
-+#define SCALER_INT_ILLEGAL_SRC_C_SPAN		6
-+#define SCALER_INT_ILLEGAL_SRC_Y_SPAN		5
-+#define SCALER_INT_ILLEGAL_SRC_CR_BASE		4
-+#define SCALER_INT_ILLEGAL_SRC_CB_BASE		3
-+#define SCALER_INT_ILLEGAL_SRC_Y_BASE		2
-+#define SCALER_INT_ILLEGAL_SRC_COLOR		1
-+#define SCALER_INT_FRAME_END			0
-+
-+/* SCALER interrupt enable */
-+#define SCALER_INT_EN				0x08
-+#define SCALER_INT_EN_DEFAULT			0x81ffffff
-+
-+/* SCALER interrupt status */
-+#define SCALER_INT_STATUS			0x0c
-+#define SCALER_INT_STATUS_CLEAR			0xffffffff
-+#define SCALER_INT_STATUS_ERROR			0x81fffffe
-+
-+/* SCALER source format configuration */
-+#define SCALER_SRC_CFG				0x10
-+#define SCALER_SRC_TILE_EN			(0x1 << 10)
-+#define SCALER_SRC_BYTE_SWAP_MASK		0x3
-+#define SCALER_SRC_BYTE_SWAP_SHIFT		5
-+#define SCALER_SRC_COLOR_FORMAT_MASK		0xf
-+#define SCALER_SRC_COLOR_FORMAT_SHIFT		0
-+
-+/* SCALER source y-base */
-+#define SCALER_SRC_Y_BASE			0x14
-+
-+/* SCALER source cb-base */
-+#define SCALER_SRC_CB_BASE			0x18
-+
-+/* SCALER source cr-base */
-+#define SCALER_SRC_CR_BASE			0x294
-+
-+/* SCALER source span */
-+#define SCALER_SRC_SPAN				0x1c
-+#define SCALER_SRC_C_SPAN_MASK			0x3fff
-+#define SCALER_SRC_C_SPAN_SHIFT			16
-+#define SCALER_SRC_Y_SPAN_MASK			0x3fff
-+#define SCALER_SRC_Y_SPAN_SHIFT			0
-+
-+/*
-+ * SCALER source y-position
-+ * 14.2 fixed-point format
-+ *      - 14 bits at the MSB are for the integer part.
-+ *      - 2 bits at LSB are for fractional part and always has to be set to 0.
-+ */
-+#define SCALER_SRC_Y_POS			0x20
-+#define SCALER_SRC_YH_POS_MASK			0xfffc
-+#define SCALER_SRC_YH_POS_SHIFT			16
-+#define SCALER_SRC_YV_POS_MASK			0xfffc
-+#define SCALER_SRC_YV_POS_SHIFT			0
-+
-+/* SCALER source width/height */
-+#define SCALER_SRC_WH				0x24
-+#define SCALER_SRC_WIDTH_MASK			0x3fff
-+#define SCALER_SRC_WIDTH_SHIFT			16
-+#define SCALER_SRC_HEIGHT_MASK			0x3fff
-+#define SCALER_SRC_HEIGHT_SHIFT			0
-+
-+/*
-+ * SCALER source c-position
-+ * 14.2 fixed-point format
-+ *      - 14 bits at the MSB are for the integer part.
-+ *      - 2 bits@LSB are for fractional part and always has to be set to 0.
-+ */
-+#define SCALER_SRC_C_POS			0x28
-+#define SCALER_SRC_CH_POS_MASK			0xfffc
-+#define SCALER_SRC_CH_POS_SHIFT			16
-+#define SCALER_SRC_CV_POS_MASK			0xfffc
-+#define SCALER_SRC_CV_POS_SHIFT			0
-+
-+/* SCALER destination format configuration */
-+#define SCALER_DST_CFG				0x30
-+#define SCALER_DST_BYTE_SWAP_MASK		0x3
-+#define SCALER_DST_BYTE_SWAP_SHIFT		5
-+#define SCALER_DST_COLOR_FORMAT_MASK		0xf
-+
-+/* SCALER destination y-base */
-+#define SCALER_DST_Y_BASE			0x34
-+
-+/* SCALER destination cb-base */
-+#define SCALER_DST_CB_BASE			0x38
-+
-+/* SCALER destination cr-base */
-+#define SCALER_DST_CR_BASE			0x298
-+
-+/* SCALER destination span */
-+#define SCALER_DST_SPAN				0x3c
-+#define SCALER_DST_C_SPAN_MASK			0x3fff
-+#define SCALER_DST_C_SPAN_SHIFT			16
-+#define SCALER_DST_Y_SPAN_MASK			0x3fff
-+#define SCALER_DST_Y_SPAN_SHIFT			0
-+
-+/* SCALER destination width/height */
-+#define SCALER_DST_WH				0x40
-+#define SCALER_DST_WIDTH_MASK			0x3fff
-+#define SCALER_DST_WIDTH_SHIFT			16
-+#define SCALER_DST_HEIGHT_MASK			0x3fff
-+#define SCALER_DST_HEIGHT_SHIFT			0
-+
-+/* SCALER destination position */
-+#define SCALER_DST_POS				0x44
-+#define SCALER_DST_H_POS_MASK			0x3fff
-+#define SCALER_DST_H_POS_SHIFT			16
-+#define SCALER_DST_V_POS_MASK			0x3fff
-+#define SCALER_DST_V_POS_SHIFT			0
-+
-+/* SCALER horizontal scale ratio */
-+#define SCALER_H_RATIO				0x50
-+#define SCALER_H_RATIO_MASK			0x7ffff
-+#define SCALER_H_RATIO_SHIFT			0
-+
-+/* SCALER vertical scale ratio */
-+#define SCALER_V_RATIO				0x54
-+#define SCALER_V_RATIO_MASK			0x7ffff
-+#define SCALER_V_RATIO_SHIFT			0
-+
-+/* SCALER rotation config */
-+#define SCALER_ROT_CFG				0x58
-+#define SCALER_FLIP_X_EN			(1 << 3)
-+#define SCALER_FLIP_Y_EN			(1 << 2)
-+#define SCALER_ROTMODE_MASK			0x3
-+#define SCALER_ROTMODE_SHIFT			0
-+
-+/* SCALER csc coefficients */
-+#define SCALER_CSC_COEF(x, y)			(0x220 + ((x * 12) + (y * 4)))
-+
-+/* SCALER dither config */
-+#define SCALER_DITH_CFG				0x250
-+#define SCALER_DITHER_R_TYPE_MASK		0x7
-+#define SCALER_DITHER_R_TYPE_SHIFT		6
-+#define SCALER_DITHER_G_TYPE_MASK		0x7
-+#define SCALER_DITHER_G_TYPE_SHIFT		3
-+#define SCALER_DITHER_B_TYPE_MASK		0x7
-+#define SCALER_DITHER_B_TYPE_SHIFT		0
-+
-+/* SCALER src blend color */
-+#define SCALER_SRC_BLEND_COLOR			0x280
-+#define SCALER_SRC_COLOR_SEL_INV		(1 << 31)
-+#define SCALER_SRC_COLOR_SEL_MASK		0x3
-+#define SCALER_SRC_COLOR_SEL_SHIFT		29
-+#define SCALER_SRC_COLOR_OP_SEL_INV		(1 << 28)
-+#define SCALER_SRC_COLOR_OP_SEL_MASK		0xf
-+#define SCALER_SRC_COLOR_OP_SEL_SHIFT		24
-+#define SCALER_SRC_GLOBAL_COLOR0_MASK		0xff
-+#define SCALER_SRC_GLOBAL_COLOR0_SHIFT		16
-+#define SCALER_SRC_GLOBAL_COLOR1_MASK		0xff
-+#define SCALER_SRC_GLOBAL_COLOR1_SHIFT		8
-+#define SCALER_SRC_GLOBAL_COLOR2_MASK		0xff
-+#define SCALER_SRC_GLOBAL_COLOR2_SHIFT		0
-+
-+/* SCALER src blend alpha */
-+#define SCALER_SRC_BLEND_ALPHA			0x284
-+#define SCALER_SRC_ALPHA_SEL_INV		(1 << 31)
-+#define SCALER_SRC_ALPHA_SEL_MASK		0x3
-+#define SCALER_SRC_ALPHA_SEL_SHIFT		29
-+#define SCALER_SRC_ALPHA_OP_SEL_INV		(1 << 28)
-+#define SCALER_SRC_ALPHA_OP_SEL_MASK		0xf
-+#define SCALER_SRC_ALPHA_OP_SEL_SHIFT		24
-+#define SCALER_SRC_GLOBAL_ALPHA_MASK		0xff
-+#define SCALER_SRC_GLOBAL_ALPHA_SHIFT		0
-+
-+/* SCALER dst blend color */
-+#define SCALER_DST_BLEND_COLOR			0x288
-+#define SCALER_DST_COLOR_SEL_INV		(1 << 31)
-+#define SCALER_DST_COLOR_SEL_MASK		0x3
-+#define SCALER_DST_COLOR_SEL_SHIFT		29
-+#define SCALER_DST_COLOR_OP_SEL_INV		(1 << 28)
-+#define SCALER_DST_COLOR_OP_SEL_MASK		0xf
-+#define SCALER_DST_COLOR_OP_SEL_SHIFT		24
-+#define SCALER_DST_GLOBAL_COLOR0_MASK		0xff
-+#define SCALER_DST_GLOBAL_COLOR0_SHIFT		16
-+#define SCALER_DST_GLOBAL_COLOR1_MASK		0xff
-+#define SCALER_DST_GLOBAL_COLOR1_SHIFT		8
-+#define SCALER_DST_GLOBAL_COLOR2_MASK		0xff
-+#define SCALER_DST_GLOBAL_COLOR2_SHIFT		0
-+
-+/* SCALER dst blend alpha */
-+#define SCALER_DST_BLEND_ALPHA			0x28c
-+#define SCALER_DST_ALPHA_SEL_INV		(1 << 31)
-+#define SCALER_DST_ALPHA_SEL_MASK		0x3
-+#define SCALER_DST_ALPHA_SEL_SHIFT		29
-+#define SCALER_DST_ALPHA_OP_SEL_INV		(1 << 28)
-+#define SCALER_DST_ALPHA_OP_SEL_MASK		0xf
-+#define SCALER_DST_ALPHA_OP_SEL_SHIFT		24
-+#define SCALER_DST_GLOBAL_ALPHA_MASK		0xff
-+#define SCALER_DST_GLOBAL_ALPHA_SHIFT		0
-+
-+/* SCALER fill color */
-+#define SCALER_FILL_COLOR			0x290
-+#define SCALER_FILL_ALPHA_MASK			0xff
-+#define SCALER_FILL_ALPHA_SHIFT			24
-+#define SCALER_FILL_COLOR0_MASK			0xff
-+#define SCALER_FILL_COLOR0_SHIFT		16
-+#define SCALER_FILL_COLOR1_MASK			0xff
-+#define SCALER_FILL_COLOR1_SHIFT		8
-+#define SCALER_FILL_COLOR2_MASK			0xff
-+#define SCALER_FILL_COLOR2_SHIFT		0
-+
-+/* SCALER address queue config */
-+#define SCALER_ADDR_QUEUE_CONFIG		0x2a0
-+#define SCALER_ADDR_QUEUE_RST			0x1
-+
-+/* Arbitrary R/W register and value to check if soft reset succeeded */
-+#define SCALER_CFG_SOFT_RESET_CHECK_REG		SCALER_SRC_CFG
-+#define SCALER_CFG_SOFT_RESET_CHECK_VAL		0x3
-+
-+struct scaler_error {
-+	u32 irq_num;
-+	const char * const name;
++static const struct v4l2_ioctl_ops scaler_m2m_ioctl_ops = {
++	.vidioc_querycap		= scaler_m2m_querycap,
++	.vidioc_enum_fmt_vid_cap_mplane	= scaler_m2m_enum_fmt_mplane,
++	.vidioc_enum_fmt_vid_out_mplane	= scaler_m2m_enum_fmt_mplane,
++	.vidioc_g_fmt_vid_cap_mplane	= scaler_m2m_g_fmt_mplane,
++	.vidioc_g_fmt_vid_out_mplane	= scaler_m2m_g_fmt_mplane,
++	.vidioc_try_fmt_vid_cap_mplane	= scaler_m2m_try_fmt_mplane,
++	.vidioc_try_fmt_vid_out_mplane	= scaler_m2m_try_fmt_mplane,
++	.vidioc_s_fmt_vid_cap_mplane	= scaler_m2m_s_fmt_mplane,
++	.vidioc_s_fmt_vid_out_mplane	= scaler_m2m_s_fmt_mplane,
++	.vidioc_reqbufs			= scaler_m2m_reqbufs,
++	.vidioc_expbuf                  = scaler_m2m_expbuf,
++	.vidioc_querybuf		= scaler_m2m_querybuf,
++	.vidioc_qbuf			= scaler_m2m_qbuf,
++	.vidioc_dqbuf			= scaler_m2m_dqbuf,
++	.vidioc_streamon		= scaler_m2m_streamon,
++	.vidioc_streamoff		= scaler_m2m_streamoff,
++	.vidioc_g_selection		= scaler_m2m_g_selection,
++	.vidioc_s_selection		= scaler_m2m_s_selection
 +};
 +
-+static const struct scaler_error scaler_errors[] = {
-+	{ SCALER_INT_TIMEOUT,			"Timeout" },
-+	{ SCALER_INT_ILLEGAL_BLEND,		"Blend setting" },
-+	{ SCALER_INT_ILLEGAL_RATIO,		"Scale ratio setting" },
-+	{ SCALER_INT_ILLEGAL_DST_HEIGHT,	"Dst Height" },
-+	{ SCALER_INT_ILLEGAL_DST_WIDTH,		"Dst Width" },
-+	{ SCALER_INT_ILLEGAL_DST_V_POS,		"Dst V-Pos" },
-+	{ SCALER_INT_ILLEGAL_DST_H_POS,		"Dst H-Pos" },
-+	{ SCALER_INT_ILLEGAL_DST_C_SPAN,	"Dst C-Span" },
-+	{ SCALER_INT_ILLEGAL_DST_Y_SPAN,	"Dst Y-span" },
-+	{ SCALER_INT_ILLEGAL_DST_CR_BASE,	"Dst Cr-base" },
-+	{ SCALER_INT_ILLEGAL_DST_CB_BASE,	"Dst Cb-base" },
-+	{ SCALER_INT_ILLEGAL_DST_Y_BASE,	"Dst Y-base" },
-+	{ SCALER_INT_ILLEGAL_DST_COLOR,		"Dst Color" },
-+	{ SCALER_INT_ILLEGAL_SRC_HEIGHT,	"Src Height" },
-+	{ SCALER_INT_ILLEGAL_SRC_WIDTH,		"Src Width" },
-+	{ SCALER_INT_ILLEGAL_SRC_CV_POS,	"Src Chroma V-pos" },
-+	{ SCALER_INT_ILLEGAL_SRC_CH_POS,	"Src Chroma H-pos" },
-+	{ SCALER_INT_ILLEGAL_SRC_YV_POS,	"Src Luma V-pos" },
-+	{ SCALER_INT_ILLEGAL_SRC_YH_POS,	"Src Luma H-pos" },
-+	{ SCALER_INT_ILLEGAL_SRC_C_SPAN,	"Src C-span" },
-+	{ SCALER_INT_ILLEGAL_SRC_Y_SPAN,	"Src Y-span" },
-+	{ SCALER_INT_ILLEGAL_SRC_CR_BASE,	"Src Cr-base" },
-+	{ SCALER_INT_ILLEGAL_SRC_CB_BASE,	"Src Cb-base" },
-+	{ SCALER_INT_ILLEGAL_SRC_Y_BASE,	"Src Y-base" },
-+	{ SCALER_INT_ILLEGAL_SRC_COLOR,		"Src Color setting" },
++static int queue_init(void *priv, struct vb2_queue *src_vq,
++			struct vb2_queue *dst_vq)
++{
++	struct scaler_ctx *ctx = priv;
++	int ret;
++
++	memset(src_vq, 0, sizeof(*src_vq));
++	src_vq->type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
++	src_vq->io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
++	src_vq->drv_priv = ctx;
++	src_vq->ops = &scaler_m2m_qops;
++	src_vq->mem_ops = &vb2_dma_contig_memops;
++	src_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
++
++	ret = vb2_queue_init(src_vq);
++	if (ret < 0)
++		return ret;
++
++	memset(dst_vq, 0, sizeof(*dst_vq));
++	dst_vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
++	dst_vq->io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
++	dst_vq->drv_priv = ctx;
++	dst_vq->ops = &scaler_m2m_qops;
++	dst_vq->mem_ops = &vb2_dma_contig_memops;
++	dst_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
++
++	return vb2_queue_init(dst_vq);
++}
++
++static int scaler_m2m_open(struct file *file)
++{
++	struct scaler_dev *scaler = video_drvdata(file);
++	struct scaler_ctx *ctx = NULL;
++	int ret;
++
++	scaler_dbg(scaler, "pid: %d, state: 0x%lx",
++			task_pid_nr(current), scaler->state);
++
++	if (mutex_lock_interruptible(&scaler->lock))
++		return -ERESTARTSYS;
++
++	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
++	if (!ctx) {
++		ret = -ENOMEM;
++		goto unlock;
++	}
++
++	v4l2_fh_init(&ctx->fh, scaler->m2m.vfd);
++	ret = scaler_ctrls_create(ctx);
++	if (ret < 0)
++		goto error_fh;
++
++	/* Use separate control handler per file handle */
++	ctx->fh.ctrl_handler = &ctx->ctrl_handler;
++	file->private_data = &ctx->fh;
++	v4l2_fh_add(&ctx->fh);
++
++	ctx->scaler_dev = scaler;
++	/* Default color format */
++	ctx->s_frame.fmt = scaler_get_format(0);
++	ctx->d_frame.fmt = scaler_get_format(0);
++	ctx->flags = 0;
++
++	ctx->m2m_ctx = v4l2_m2m_ctx_init(scaler->m2m.m2m_dev, ctx, queue_init);
++	if (IS_ERR(ctx->m2m_ctx)) {
++		scaler_dbg(scaler, "Failed to initialize m2m context");
++		ret = PTR_ERR(ctx->m2m_ctx);
++		goto error_ctrls;
++	}
++
++	/* Apply default format settings */
++	ret = scaler_m2m_set_default_format(ctx);
++	if (ret < 0) {
++		scaler_dbg(scaler, "Failed to set default format settings");
++		goto error_ctrls;
++	}
++
++	if (v4l2_fh_is_singular_file(file))
++		set_bit(ST_M2M_OPEN, &scaler->state);
++
++	scaler_dbg(scaler, "scaler m2m driver is opened, ctx(0x%p)", ctx);
++
++	mutex_unlock(&scaler->lock);
++	return 0;
++
++error_ctrls:
++	scaler_ctrls_delete(ctx);
++error_fh:
++	v4l2_fh_del(&ctx->fh);
++	v4l2_fh_exit(&ctx->fh);
++	kfree(ctx);
++unlock:
++	mutex_unlock(&scaler->lock);
++	return ret;
++}
++
++static int scaler_m2m_release(struct file *file)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(file->private_data);
++	struct scaler_dev *scaler = ctx->scaler_dev;
++
++	scaler_dbg(scaler, "pid: %d, state: 0x%lx",
++			task_pid_nr(current), scaler->state);
++
++	mutex_lock(&scaler->lock);
++
++	if (v4l2_fh_is_singular_file(file))
++		clear_bit(ST_M2M_OPEN, &scaler->state);
++
++	v4l2_m2m_ctx_release(ctx->m2m_ctx);
++	scaler_ctrls_delete(ctx);
++	v4l2_fh_del(&ctx->fh);
++	v4l2_fh_exit(&ctx->fh);
++
++	kfree(ctx);
++
++	mutex_unlock(&scaler->lock);
++	return 0;
++}
++
++static unsigned int scaler_m2m_poll(struct file *file,
++					struct poll_table_struct *wait)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(file->private_data);
++	struct scaler_dev *scaler = ctx->scaler_dev;
++	int ret;
++
++	if (mutex_lock_interruptible(&scaler->lock))
++		return -ERESTARTSYS;
++
++	ret = v4l2_m2m_poll(file, ctx->m2m_ctx, wait);
++	mutex_unlock(&scaler->lock);
++
++	return ret;
++}
++
++static int scaler_m2m_mmap(struct file *file, struct vm_area_struct *vma)
++{
++	struct scaler_ctx *ctx = fh_to_ctx(file->private_data);
++	struct scaler_dev *scaler = ctx->scaler_dev;
++	int ret;
++
++	if (mutex_lock_interruptible(&scaler->lock))
++		return -ERESTARTSYS;
++
++	ret = v4l2_m2m_mmap(file, ctx->m2m_ctx, vma);
++	mutex_unlock(&scaler->lock);
++
++	return ret;
++}
++
++static const struct v4l2_file_operations scaler_m2m_fops = {
++	.owner		= THIS_MODULE,
++	.open		= scaler_m2m_open,
++	.release	= scaler_m2m_release,
++	.poll		= scaler_m2m_poll,
++	.unlocked_ioctl	= video_ioctl2,
++	.mmap		= scaler_m2m_mmap,
 +};
 +
-+#define SCALER_NUM_ERRORS	ARRAY_SIZE(scaler_errors)
++static struct v4l2_m2m_ops scaler_m2m_ops = {
++	.device_run	= scaler_m2m_device_run,
++	.job_abort	= scaler_m2m_job_abort,
++};
 +
-+static inline u32 scaler_read(struct scaler_dev *dev, u32 offset)
++int scaler_register_m2m_device(struct scaler_dev *scaler)
 +{
-+	return readl(dev->regs + offset);
++	struct platform_device *pdev;
++	int ret;
++
++	if (!scaler)
++		return -ENODEV;
++
++	pdev = scaler->pdev;
++
++	scaler->vdev.fops	= &scaler_m2m_fops;
++	scaler->vdev.ioctl_ops	= &scaler_m2m_ioctl_ops;
++	scaler->vdev.release	= video_device_release_empty;
++	scaler->vdev.lock	= &scaler->lock;
++	scaler->vdev.vfl_dir	= VFL_DIR_M2M;
++	scaler->vdev.v4l2_dev	= &scaler->v4l2_dev;
++	snprintf(scaler->vdev.name, sizeof(scaler->vdev.name), "%s:m2m",
++					SCALER_MODULE_NAME);
++
++	video_set_drvdata(&scaler->vdev, scaler);
++
++	scaler->m2m.vfd = &scaler->vdev;
++	scaler->m2m.m2m_dev = v4l2_m2m_init(&scaler_m2m_ops);
++	if (IS_ERR(scaler->m2m.m2m_dev)) {
++		dev_err(&pdev->dev, "failed to initialize v4l2-m2m device\n");
++		return PTR_ERR(scaler->m2m.m2m_dev);
++	}
++
++	ret = video_register_device(&scaler->vdev, VFL_TYPE_GRABBER, -1);
++	if (ret < 0) {
++		dev_err(&pdev->dev,
++			 "%s(): failed to register video device\n", __func__);
++		v4l2_m2m_release(scaler->m2m.m2m_dev);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "scaler m2m driver registered as /dev/video%d",
++			     scaler->vdev.num);
++	return 0;
 +}
 +
-+static inline void scaler_write(struct scaler_dev *dev, u32 offset, u32 value)
++void scaler_unregister_m2m_device(struct scaler_dev *scaler)
 +{
-+	writel(value, dev->regs + offset);
++	if (scaler) {
++		video_unregister_device(scaler->m2m.vfd);
++		v4l2_m2m_release(scaler->m2m.m2m_dev);
++	}
 +}
-+
-+static inline void scaler_hw_address_queue_reset(struct scaler_ctx *ctx)
-+{
-+	scaler_write(ctx->scaler_dev, SCALER_ADDR_QUEUE_CONFIG,
-+					SCALER_ADDR_QUEUE_RST);
-+}
-+
-+void scaler_hw_set_sw_reset(struct scaler_dev *dev);
-+int scaler_wait_reset(struct scaler_dev *dev);
-+void scaler_hw_set_irq(struct scaler_dev *dev, int interrupt, bool mask);
-+void scaler_hw_set_input_addr(struct scaler_dev *dev, struct scaler_addr *addr);
-+void scaler_hw_set_output_addr(struct scaler_dev *dev,
-+				struct scaler_addr *addr);
-+void scaler_hw_set_in_size(struct scaler_ctx *ctx);
-+void scaler_hw_set_in_image_format(struct scaler_ctx *ctx);
-+void scaler_hw_set_out_size(struct scaler_ctx *ctx);
-+void scaler_hw_set_out_image_format(struct scaler_ctx *ctx);
-+void scaler_hw_set_scaler_ratio(struct scaler_ctx *ctx);
-+void scaler_hw_set_rotation(struct scaler_ctx *ctx);
-+void scaler_hw_set_csc_coeff(struct scaler_ctx *ctx);
-+void scaler_hw_src_y_offset_en(struct scaler_dev *dev, bool on);
-+void scaler_hw_dst_y_offset_en(struct scaler_dev *dev, bool on);
-+void scaler_hw_enable_control(struct scaler_dev *dev, bool on);
-+unsigned int scaler_hw_get_irq_status(struct scaler_dev *dev);
-+void scaler_hw_clear_irq(struct scaler_dev *dev, unsigned int irq);
-+
-+#endif /* REGS_SCALER_H_ */
 -- 
 1.7.9.5
