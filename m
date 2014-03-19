@@ -1,40 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:26 +0100
-Subject: [PATCH 29/62] ARM: pxa: don't "select" SMC91X on MACH_XCEP
+Date: Wed, 19 Mar 2014 20:29:38 +0100
+Subject: [PATCH 41/62] ARM: realview: fix sparsemem build
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-30-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-42-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We normally don't hard-enable Kconfig options just because
-a board contains a specific piece of hardware. In this case,
-selecting SMC91X causes a build error, if we don't also enable
-basic network device driver support.
+Commit b713aa0b15 "ARM: fix asm/memory.h build error" broke some
+configurations on mach-realview with sparsemem enabled, which
+is missing a definition of PHYS_OFFSET:
 
-Since the platform has no direct dependency on this driver
-at link time, we can just remove the 'select' statement.
+arch/arm/include/asm/memory.h:268:42: error: 'PHYS_OFFSET' undeclared (first use in this function)
+ #define PHYS_PFN_OFFSET ((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+arch/arm/include/asm/dma-mapping.h:104:9: note: in expansion of macro 'PHYS_PFN_OFFSET'
+  return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
+
+An easy workaround is for realview to define PHYS_OFFSET itself,
+in the same way we define it for platforms that don't have a private
+__virt_to_phys function.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Daniel Mack <zonque@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-pxa/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-realview/include/mach/memory.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 562b17f..2c7498a 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -164,7 +164,6 @@ config MACH_XCEP
- 	select MTD_CFI_INTELEXT
- 	select MTD_PHYSMAP
- 	select PXA25x
--	select SMC91X
- 	help
- 	  PXA255 based Single Board Computer with SMC 91C111 ethernet chip and 64 MB of flash.
- 	  Tuned for usage in Libera instruments for particle accelerators.
+diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
+index 2022e09..db09170 100644
+--- a/arch/arm/mach-realview/include/mach/memory.h
++++ b/arch/arm/mach-realview/include/mach/memory.h
+@@ -56,6 +56,8 @@
+ #define PAGE_OFFSET1	(PAGE_OFFSET + 0x10000000)
+ #define PAGE_OFFSET2	(PAGE_OFFSET + 0x30000000)
+ 
++#define PHYS_OFFSET PLAT_PHYS_OFFSET
++
+ #define __phys_to_virt(phys)						\
+ 	((phys) >= 0x80000000 ?	(phys) - 0x80000000 + PAGE_OFFSET2 :	\
+ 	 (phys) >= 0x20000000 ?	(phys) - 0x20000000 + PAGE_OFFSET1 :	\
 -- 
 1.8.3.2
