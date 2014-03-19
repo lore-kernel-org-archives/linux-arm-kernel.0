@@ -1,8 +1,8 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 19 Mar 2014 12:46:16 +1100 (EST)
+From: joe@perches.com (Joe Perches)
+Date: Tue, 18 Mar 2014 18:54:41 -0700
 Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
  structure
-In-Reply-To: <1395190072.8649.2.camel@joe-AO722>
+In-Reply-To: <alpine.LNX.2.00.1403191240001.23002@nippy.intranet>
 References: <20140318002822.372705594@telegraphics.com.au>
  <1395112756.20860.1.camel@joe-AO722>
  <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
@@ -11,37 +11,47 @@ References: <20140318002822.372705594@telegraphics.com.au>
  <1395148051.2812.51.camel@joe-AO722>
  <alpine.LNX.2.00.1403190925550.6652@nippy.intranet>
  <1395190072.8649.2.camel@joe-AO722>
-Message-ID: <alpine.LNX.2.00.1403191240001.23002@nippy.intranet>
+ <alpine.LNX.2.00.1403191240001.23002@nippy.intranet>
+Message-ID: <1395194081.8649.7.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2014-03-19 at 12:46 +1100, Finn Thain wrote:
+> On Tue, 18 Mar 2014, Joe Perches wrote:
+> 
+> > But using "if (0)" prevents the no_printk from occurring at all so there 
+> > would be no side-effects and the format & args would still be verified 
+> > by the compiler.
+> 
+> I'd prefer this (for symmetry and clarity):
+> 
+> #if NDEBUG
+> #define dprintk(flg, fmt, ...) \
+>         do { if ((NDEBUG) & (flg)) pr_debug(fmt, ## __VA_ARGS__); } while (0)
+> #else
+> #define dprintk(flg, fmt, ...) \
+>         do { if (0) pr_debug(fmt, ## __VA_ARGS__); } while (0)
+> #endif
+> 
+> But you seem to be asking for this instead:
+> 
+> #if NDEBUG
+> #define dprintk(flg, fmt, ...) \
+>         do { if ((NDEBUG) & (flg)) pr_debug(fmt, ## __VA_ARGS__); } while (0)
+> #else
+> #define dprintk(flg, fmt, ...) \
+>         do { if (0) no_printk(fmt, ## __VA_ARGS__); } while (0)
+> #endif
+> 
+> Why is that better?
 
-On Tue, 18 Mar 2014, Joe Perches wrote:
+It's not to me.
 
-> But using "if (0)" prevents the no_printk from occurring at all so there 
-> would be no side-effects and the format & args would still be verified 
-> by the compiler.
+I suggested exactly your first block with if (0) pr_debug...
+in the first thing I wrote.
 
-I'd prefer this (for symmetry and clarity):
+https://lkml.org/lkml/2014/3/18/216
 
-#if NDEBUG
-#define dprintk(flg, fmt, ...) \
-        do { if ((NDEBUG) & (flg)) pr_debug(fmt, ## __VA_ARGS__); } while (0)
-#else
-#define dprintk(flg, fmt, ...) \
-        do { if (0) pr_debug(fmt, ## __VA_ARGS__); } while (0)
-#endif
+Geert suggested no_printk.
 
-But you seem to be asking for this instead:
-
-#if NDEBUG
-#define dprintk(flg, fmt, ...) \
-        do { if ((NDEBUG) & (flg)) pr_debug(fmt, ## __VA_ARGS__); } while (0)
-#else
-#define dprintk(flg, fmt, ...) \
-        do { if (0) no_printk(fmt, ## __VA_ARGS__); } while (0)
-#endif
-
-Why is that better?
-
--- 
+cheers, Joe
