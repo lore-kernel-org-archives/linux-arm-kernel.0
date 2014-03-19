@@ -1,55 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Mar 2014 18:30:14 +0100
-Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
- functions
-In-Reply-To: <CANEJEGuYz28dGT+264CYtG+Tk6htOq=u-t4PWMtsij32X0vJFA@mail.gmail.com>
-References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
- <5322FD14.5090602@samsung.com>
- <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
- <532861BE.7020601@samsung.com>
- <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
- <532997D7.6090608@samsung.com>
- <CANEJEGuYz28dGT+264CYtG+Tk6htOq=u-t4PWMtsij32X0vJFA@mail.gmail.com>
-Message-ID: <5329D426.9020706@samsung.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 19 Mar 2014 13:35:19 -0400
+Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
+Message-ID: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On an LPAE system, the physical addresses used by VirtIO-MMIO may
+be larger than 32 bits, even if the header and configuration space
+addresses fit into 32 bits. For example with the Versatile Express
+memory map using 4G memory, the following error occured when trying
+to use a VirtIO-MMIO block device.
 
-On 19.03.2014 18:03, Grant Grundler wrote:
-> On Wed, Mar 19, 2014 at 6:12 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> ...
->> No. Proper Linux drivers must support deferred probing mechanism and there
->> should be no assumptions about probing orders. Using other initcall level
->> than module_initcall for particular drivers is strongly discouraged.
->
-> That's true for "end-point" devices. It's not true for
-> "infrastructure": Memory, CPU, DMA, Interrupt handling, etc. Those
-> need to be in place before "normal" drivers get called. This SysMMU
-> driver provides DMA services for "normal" device drivers. Or do I see
-> that wrong?
+EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: : unaligned directory entry - offset=0, inode=3755990991, rec_len=57311, name_len=223
 
-Of course using an early initcall level would give you some kind of 
-guarantees, but it wouldn't guarantee that someone couldn't lower 
-initcall level for some MMU client driver and break the ordering anyway.
+To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
+VIRTIO_MMIO are selected.
 
-As I said, AFAIK the trend is to get rid of ordering by initcalls and 
-make sure that drivers can handle missing dependencies properly, even 
-for "services" such as DMA, GPIO, clocks and so on, which after all are 
-provided by normal drivers like other.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ arch/arm/mm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->
-> thanks,
-> grant
->
-> ps. I've written IOMMU support for four different IOMMUs on three
-> operating systems (See drivers/parisc for two linux examples). But I
-> still feel like I at best have 80% understanding of how this one is
-> organized/works. Abstract descriptions and convoluted code have been
-> handicapping me (and lack of time to dig further).
-
-Well, this is one of my concerns with this driver. It isn't easy to read 
-(and so review, maintain, extend and debug found issues).
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 1f8fed9..a62bcc9 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -617,6 +617,7 @@ config ARM_LPAE
+ 	bool "Support for the Large Physical Address Extension"
+ 	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
+ 		!CPU_32v4 && !CPU_32v3
++	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
+ 	help
+ 	  Say Y if you have an ARMv7 processor supporting the LPAE page
+ 	  table format and you would like to access memory beyond the
+-- 
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
