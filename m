@@ -1,109 +1,33 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 19 Mar 2014 11:34:34 +0530
-Subject: [PATCH v2 4/7] sched: powerpc: create a dedicated topology table
-In-Reply-To: <1395165409-18055-5-git-send-email-vincent.guittot@linaro.org>
-References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
- <1395165409-18055-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <53293372.1000601@linux.vnet.ibm.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Mar 2014 07:08:14 +0100
+Subject: [RESEND PATCH 2/3] ARM: OMAP2+: Remove unnecesary include in GPMC
+ driver
+In-Reply-To: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1395209295-24399-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2014 11:26 PM, Vincent Guittot wrote:
-> Create a dedicated topology table for handling asymetric feature of powerpc.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  arch/powerpc/kernel/smp.c | 31 +++++++++++++++++++++++--------
->  include/linux/sched.h     |  2 --
->  kernel/sched/core.c       |  6 ------
->  3 files changed, 23 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-> index ac2621a..c9cade5 100644
-> --- a/arch/powerpc/kernel/smp.c
-> +++ b/arch/powerpc/kernel/smp.c
-> @@ -755,6 +755,28 @@ int setup_profiling_timer(unsigned int multiplier)
->  	return 0;
->  }
-> 
-> +#ifdef CONFIG_SCHED_SMT
-> +/* cpumask of CPUs with asymetric SMT dependancy */
-> +static const int powerpc_smt_flags(void)
-> +{
-> +	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
-> +
-> +	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
-> +		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
-> +		flags |= SD_ASYM_PACKING;
-> +	}
-> +	return flags;
-> +}
-> +#endif
-> +
-> +static struct sched_domain_topology_level powerpc_topology[] = {
-> +#ifdef CONFIG_SCHED_SMT
-> +	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
-> +#endif
-> +	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
-> +	{ NULL, },
-> +};
-> +
->  void __init smp_cpus_done(unsigned int max_cpus)
->  {
->  	cpumask_var_t old_mask;
-> @@ -779,15 +801,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
-> 
->  	dump_numa_cpu_topology();
-> 
-> -}
-> +	set_sched_topology(powerpc_topology);
-> 
-> -int arch_sd_sibling_asym_packing(void)
-> -{
-> -	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
-> -		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
-> -		return SD_ASYM_PACKING;
-> -	}
-> -	return 0;
->  }
-> 
->  #ifdef CONFIG_HOTPLUG_CPU
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index 4db592a..6479de4 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -868,8 +868,6 @@ enum cpu_idle_type {
->  #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
->  #define SD_NUMA			0x4000	/* cross-node balancing */
-> 
-> -extern int __weak arch_sd_sibiling_asym_packing(void);
-> -
->  #ifdef CONFIG_SCHED_SMT
->  static inline const int cpu_smt_flags(void)
->  {
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index f2bfa76..0b51ee3 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -5833,11 +5833,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
->  	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
->  }
-> 
-> -int __weak arch_sd_sibling_asym_packing(void)
-> -{
-> -       return 0*SD_ASYM_PACKING;
-> -}
-> -
->  /*
->   * Initializers for schedule domains
->   * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
-> @@ -6018,7 +6013,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
->  	if (sd->flags & SD_SHARE_CPUPOWER) {
->  		sd->imbalance_pct = 110;
->  		sd->smt_gain = 1178; /* ~15% */
-> -		sd->flags |= arch_sd_sibling_asym_packing();
-> 
->  	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
->  		sd->imbalance_pct = 117;
-> 
-Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+The GPMC driver includes arch/arm/mach-omap2/common.h but
+does not use anything on that header so it can be removed.
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/gpmc.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index ab43755..b637c96 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -37,7 +37,6 @@
+ #include <asm/mach-types.h>
+ 
+ #include "soc.h"
+-#include "common.h"
+ #include "omap_device.h"
+ #include "gpmc.h"
+ #include "gpmc-nand.h"
+-- 
+1.9.0
