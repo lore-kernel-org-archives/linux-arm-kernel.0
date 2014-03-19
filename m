@@ -1,43 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:18 +0100
-Subject: [PATCH 21/62] ARM: msm: avoid calling debug_ll_addr on !MMU
+Date: Wed, 19 Mar 2014 20:29:29 +0100
+Subject: [PATCH 32/62] ARM: pxa: fix pxa_ssp_* declarations
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-22-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-33-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSM7X00A has an open-coded version of debug_ll_io_init so it
-can use MT_DEVICE_NONSHARED as required by the platform.
+The functions declared in include/linux/pxa2xx_ssp.h are
+defined in plat-pxa/ssp.c, which can also be built for
+PLAT_MMP, but may be disabled there. This can lead to
+both unresolved symbols at link time and to duplicate
+symbols at compile time for random configurations.
 
-However, this fails to build on no-MMU kernels because the
-debug_ll_addr function is not available. Since the iotable_init
-function doesn't actually do anyting in this configuration,
-we can simply get away by enclosing the broken function call
-in an #ifdef, which seems to be the least ugly workaround.
+Changing the #ifdef in the header file to match the
+Kconfig symbol that decides if the file is built solves
+both problems.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/mach-msm/io.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/pxa2xx_ssp.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index adc8971..34e0947 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -78,8 +78,10 @@ void __init msm_map_common_io(void)
- 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
- #if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
- 		defined(CONFIG_DEBUG_MSM_UART3)
-+#ifdef CONFIG_MMU
- 	debug_ll_addr(&msm_io_desc[size - 1].pfn,
- 		      &msm_io_desc[size - 1].virtual);
-+#endif
- 	msm_io_desc[size - 1].pfn = __phys_to_pfn(msm_io_desc[size - 1].pfn);
- #endif
- 	iotable_init(msm_io_desc, size);
+diff --git a/include/linux/pxa2xx_ssp.h b/include/linux/pxa2xx_ssp.h
+index 4944420..f2b4051 100644
+--- a/include/linux/pxa2xx_ssp.h
++++ b/include/linux/pxa2xx_ssp.h
+@@ -219,7 +219,7 @@ static inline u32 pxa_ssp_read_reg(struct ssp_device *dev, u32 reg)
+ 	return __raw_readl(dev->mmio_base + reg);
+ }
+ 
+-#ifdef CONFIG_ARCH_PXA
++#if IS_ENABLED(CONFIG_PXA_SSP)
+ struct ssp_device *pxa_ssp_request(int port, const char *label);
+ void pxa_ssp_free(struct ssp_device *);
+ struct ssp_device *pxa_ssp_request_of(const struct device_node *of_node,
 -- 
 1.8.3.2
