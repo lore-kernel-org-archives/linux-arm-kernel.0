@@ -1,61 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:57 +0100
-Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
+Date: Wed, 19 Mar 2014 20:29:53 +0100
+Subject: [PATCH 56/62] ARM: samsung: select I2C where needed for PMIC
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-61-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-57-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When phylib is set to be built as a module, the lager and koelsch
-boards fail to build:
+The OSIRIS machine cannot build without I2C and
+TPS65010 both enabled unconditionally.
 
-arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
-:(.text+0x738): undefined reference to `mdiobus_read'
-:(.text+0x73c): undefined reference to `mdiobus_write'
-arch/arm/mach-shmobile/built-in.o: In function `koelsch_ksz8041_fixup':
-:(.text+0x7e8): undefined reference to `mdiobus_read'
-:(.text+0x7ec): undefined reference to `mdiobus_write'
+The SMDK6410_WM1190_EV1 and SMDK6410_WM1192_EV1 add-on
+cards already select MFD_WM*_I2C.
 
-To work around that problem, this changes the code to check for
-IS_BUILTIN rather than IS_ENABLED, turning the error into a runtime
-problem. It's now possible to build random configurations, but the
-phy may be set up incorrectly in this case.
+In each case, failing to enable CONFIG_I2C results in a
+build or link error, so most consistent solution is to
+ensure that it is impossible to disable those options.
+
+It would be nice to leave CONFIG_I2C as user-selectable,
+but doing that properly would require more work.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: linux-sh at vger.kernel.org
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-shmobile/board-koelsch.c | 2 +-
- arch/arm/mach-shmobile/board-lager.c   | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c24xx/Kconfig | 1 +
+ arch/arm/mach-s3c64xx/Kconfig | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 5a034ff..b724f33 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -510,7 +510,7 @@ static void __init koelsch_init(void)
- 
- 	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
- 
--	if (IS_ENABLED(CONFIG_PHYLIB))
-+	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_id("r8a7791-ether-ff:01",
- 					  koelsch_ksz8041_fixup);
- }
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index f0104bf..67b1069 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -869,7 +869,7 @@ static void __init lager_init(void)
- 
- 	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
- 
--	if (IS_ENABLED(CONFIG_PHYLIB))
-+	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_id("r8a7790-ether-ff:01",
- 					  lager_ksz8041_fixup);
- }
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index a6060d0..1272647 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -572,6 +572,7 @@ config MACH_OSIRIS_DVS
+ 	tristate "Simtec IM2440D20 (OSIRIS) Dynamic Voltage Scaling driver"
+ 	depends on MACH_OSIRIS
+ 	select TPS65010
++	select I2C
+ 	help
+ 	  Say Y/M here if you want to have dynamic voltage scaling support
+ 	  on the Simtec IM2440D20 (OSIRIS) module via the TPS65011.
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 92885d7..0148112 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -191,6 +191,7 @@ endchoice
+ config SMDK6410_WM1190_EV1
+ 	bool "Support Wolfson Microelectronics 1190-EV1 PMIC card"
+ 	depends on MACH_SMDK6410
++	select I2C
+ 	select MFD_WM8350_I2C
+ 	select REGULATOR
+ 	select REGULATOR_WM8350
+@@ -205,6 +206,7 @@ config SMDK6410_WM1190_EV1
+ config SMDK6410_WM1192_EV1
+ 	bool "Support Wolfson Microelectronics 1192-EV1 PMIC card"
+ 	depends on MACH_SMDK6410
++	select I2C
+ 	select MFD_WM831X
+ 	select MFD_WM831X_I2C
+ 	select REGULATOR
 -- 
 1.8.3.2
