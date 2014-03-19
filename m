@@ -1,21 +1,24 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 19 Mar 2014 10:42:33 +0100
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+Date: Wed, 19 Mar 2014 10:42:35 +0100
+Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for ARM64
 In-Reply-To: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
 References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1395222155-22205-4-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing perf_regs_load function, which is going
-to be used for dwarf unwind test in following patches.
+Adding libdw DWARF post unwind support, which is part
+of elfutils-devel/libdw-dev package from version 0.158.
 
-It takes single argument as a pointer to the regs dump
-buffer and populates it with current registers values, as
-expected by the perf built-in unwinding test.
+Note: the libdw code needs some support for dwarf unwinding
+on ARM64, this code is submitted seperately on the elfutils
+ML.
+
+The new code is contained in unwin-libdw.c object, and
+implements unwind__get_entries unwind interface function.
 
 Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Jiri Olsa <jolsa@redhat.com>
 Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
 Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Cc: Ingo Molnar <mingo@kernel.org>
@@ -24,81 +27,86 @@ Cc: Paul Mackerras <paulus@samba.org>
 Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
 Cc: David Ahern <dsahern@gmail.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
 ---
- tools/perf/arch/arm64/Makefile            |  1 +
- tools/perf/arch/arm64/include/perf_regs.h |  2 ++
- tools/perf/arch/arm64/tests/regs_load.S   | 39 +++++++++++++++++++++++++++++++
- 3 files changed, 42 insertions(+)
- create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+ tools/perf/arch/arm64/Makefile            |  5 +++
+ tools/perf/arch/arm64/util/unwind-libdw.c | 53 +++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/util/unwind-libdw.c
 
 diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-index 67e9b3d..9b8f87e 100644
+index 221f21d..09d6215 100644
 --- a/tools/perf/arch/arm64/Makefile
 +++ b/tools/perf/arch/arm64/Makefile
-@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
  endif
  ifndef NO_LIBUNWIND
  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
++endif
++ifndef NO_LIBDW_DWARF_UNWIND
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
++endif
++ifndef NO_DWARF_UNWIND
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
  endif
-diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
-index 2359546..1e052f1 100644
---- a/tools/perf/arch/arm64/include/perf_regs.h
-+++ b/tools/perf/arch/arm64/include/perf_regs.h
-@@ -9,6 +9,8 @@
- #define PERF_REG_IP	PERF_REG_ARM64_PC
- #define PERF_REG_SP	PERF_REG_ARM64_SP
- 
-+void perf_regs_load(u64 *regs);
-+
- static inline const char *perf_reg_name(int id)
- {
- 	switch (id) {
-diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+diff --git a/tools/perf/arch/arm64/util/unwind-libdw.c b/tools/perf/arch/arm64/util/unwind-libdw.c
 new file mode 100644
-index 0000000..92ab968
+index 0000000..8d24958
 --- /dev/null
-+++ b/tools/perf/arch/arm64/tests/regs_load.S
-@@ -0,0 +1,39 @@
-+#include <linux/linkage.h>
++++ b/tools/perf/arch/arm64/util/unwind-libdw.c
+@@ -0,0 +1,53 @@
++#include <elfutils/libdwfl.h>
++#include "../../util/unwind-libdw.h"
++#include "../../util/perf_regs.h"
 +
-+/*
-+ * Implementation of void perf_regs_load(u64 *regs);
-+ *
-+ * This functions fills in the 'regs' buffer from the actual registers values,
-+ * in the way the perf built-in unwinding test expects them:
-+ * - the PC at the time at the call to this function. Since this function
-+ *   is called using a bl instruction, the PC value is taken from LR,
-+ * - the current SP (not touched by this function),
-+ * - the current value of LR is merely retrieved and stored because the
-+ *   value before the call to this function is unknown at this time; it will
-+ *   be unwound from the dwarf information in unwind__get_entries.
-+ */
++bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
++{
++	struct unwind_info *ui = arg;
++	struct regs_dump *user_regs = &ui->sample->user_regs;
++	Dwarf_Word dwarf_regs[PERF_REG_ARM64_MAX];
 +
-+.text
-+.type perf_regs_load,%function
-+ENTRY(perf_regs_load)
-+	stp x0,  x1,  [x0], #16	// store x0..x29
-+	stp x2,  x3,  [x0], #16
-+	stp x4,  x5,  [x0], #16
-+	stp x6,  x7,  [x0], #16
-+	stp x8,  x9,  [x0], #16
-+	stp x10, x11, [x0], #16
-+	stp x12, x13, [x0], #16
-+	stp x14, x15, [x0], #16
-+	stp x16, x17, [x0], #16
-+	stp x18, x19, [x0], #16
-+	stp x20, x21, [x0], #16
-+	stp x22, x23, [x0], #16
-+	stp x24, x25, [x0], #16
-+	stp x26, x27, [x0], #16
-+	stp x28, x29, [x0], #16
-+	mov x1,  sp
-+	stp x30, x1,  [x0], #16	// store lr and sp
-+	str x30, [x0]		// store pc as lr in order to skip the call
-+				//  to this function
-+	ret
-+ENDPROC(perf_regs_load)
++#define REG(r) ({						\
++	Dwarf_Word val = 0;					\
++	perf_reg_value(&val, user_regs, PERF_REG_ARM64_##r);	\
++	val;							\
++})
++
++	dwarf_regs[0]  = REG(X0);
++	dwarf_regs[1]  = REG(X1);
++	dwarf_regs[2]  = REG(X2);
++	dwarf_regs[3]  = REG(X3);
++	dwarf_regs[4]  = REG(X4);
++	dwarf_regs[5]  = REG(X5);
++	dwarf_regs[6]  = REG(X6);
++	dwarf_regs[7]  = REG(X7);
++	dwarf_regs[8]  = REG(X8);
++	dwarf_regs[9]  = REG(X9);
++	dwarf_regs[10] = REG(X10);
++	dwarf_regs[11] = REG(X11);
++	dwarf_regs[12] = REG(X12);
++	dwarf_regs[13] = REG(X13);
++	dwarf_regs[14] = REG(X14);
++	dwarf_regs[15] = REG(X15);
++	dwarf_regs[16] = REG(X16);
++	dwarf_regs[17] = REG(X17);
++	dwarf_regs[18] = REG(X18);
++	dwarf_regs[19] = REG(X19);
++	dwarf_regs[20] = REG(X20);
++	dwarf_regs[21] = REG(X21);
++	dwarf_regs[22] = REG(X22);
++	dwarf_regs[23] = REG(X23);
++	dwarf_regs[24] = REG(X24);
++	dwarf_regs[25] = REG(X25);
++	dwarf_regs[26] = REG(X26);
++	dwarf_regs[27] = REG(X27);
++	dwarf_regs[28] = REG(X28);
++	dwarf_regs[29] = REG(X29);
++	dwarf_regs[30] = REG(LR);
++	dwarf_regs[31] = REG(SP);
++	dwarf_regs[32] = REG(PC);
++
++	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM64_MAX,
++					   dwarf_regs);
++}
 -- 
 1.7.11.7
