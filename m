@@ -1,63 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 19 Mar 2014 23:50:43 +0300
-Subject: [PATCH 59/62] ARM: shmobile: ak4642 needs i2c support
-In-Reply-To: <1395257399-359545-60-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 20:51:05 +0100
+Subject: [PATCH 62/62] ARM: tegra: make debug_ll code build for ARMv6
+In-Reply-To: <5329F296.6030308@wwwdotorg.org>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-60-git-send-email-arnd@arndb.de>
-Message-ID: <532A0323.3080305@cogentembedded.com>
+ <1395257399-359545-63-git-send-email-arnd@arndb.de>
+ <5329F296.6030308@wwwdotorg.org>
+Message-ID: <6268308.cWSbPODKo9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 19 March 2014 13:40:06 Stephen Warren wrote:
+> Hmmm. This code is guaranteed to only execute on Tegra (well, perhaps
+> someone can turn on the wrong debug option and run it on non-Tegra, but
+> then it's guaranteed not to work since the HW it touches doesn't exist).
+> As such, the code ought to be able to use ARMv7 instructions.
+> 
+> As a fix for similar issues in assembly code in arch/arm/mach-tegra/*.S,
+> Makefile there does:
+> 
+> asflags-y                               += -march=armv7-a
+> 
+> (I think you added that? Yes, in 408e713545ca "ARM: tegra: build
+> assembly files with -march=armv7-a")
+> 
+> Shouldn't we use the same fix in this case too?
 
-On 03/19/2014 10:29 PM, Arnd Bergmann wrote:
+That was my first idea, but I couldn't come up with a nice way to do this
+for arch/arm/kernel/debug.S, which #includes the specific implementation.
 
-> We cannot select SND_SOC_AK4642 if the I2C core layer
-> is disabled. Making the select statement conditional
-> ensures that we can build all configurations.
+I'd rather not put lots of per-platform hacks into arch/arm/kernel/Makefile.
 
-    Yes, but you also touch WM8978 selects. Is it the same as AK4642 or you 
-just forgot to mention that?
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: linux-sh at vger.kernel.org
-> ---
->   arch/arm/mach-shmobile/Kconfig | 12 ++++++------
->   1 file changed, 6 insertions(+), 6 deletions(-)
-
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 5249ff0..6e3904e 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -170,7 +170,7 @@ config MACH_MACKEREL
->   	select ARCH_REQUIRE_GPIOLIB
->   	select REGULATOR_FIXED_VOLTAGE if REGULATOR
->   	select SMSC_PHY if SMSC911X
-> -	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-> +	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C=y
->   	select USE_OF
->
->   config MACH_ARMADILLO800EVA
-> @@ -179,7 +179,7 @@ config MACH_ARMADILLO800EVA
->   	select ARCH_REQUIRE_GPIOLIB
->   	select REGULATOR_FIXED_VOLTAGE if REGULATOR
->   	select SMSC_PHY if SH_ETH
-> -	select SND_SOC_WM8978 if SND_SIMPLE_CARD
-> +	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C=y
->   	select USE_OF
->
->   config MACH_ARMADILLO800EVA_REFERENCE
-> @@ -188,7 +188,7 @@ config MACH_ARMADILLO800EVA_REFERENCE
->   	select ARCH_REQUIRE_GPIOLIB
->   	select REGULATOR_FIXED_VOLTAGE if REGULATOR
->   	select SMSC_PHY if SH_ETH
-> -	select SND_SOC_WM8978 if SND_SIMPLE_CARD
-> +	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C=y
->   	select USE_OF
->   	---help---
->   	   Use reference implementation of Aramdillo800 EVA board support
-[...]
-
-WBR, Sergei
+	Arnd
