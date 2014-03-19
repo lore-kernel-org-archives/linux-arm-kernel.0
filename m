@@ -1,221 +1,55 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 19 Mar 2014 10:03:04 +0900
-Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
- functions
-In-Reply-To: <532861BE.7020601@samsung.com>
-References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
- <5322FD14.5090602@samsung.com>
- <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
- <532861BE.7020601@samsung.com>
-Message-ID: <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Tue, 18 Mar 2014 18:06:03 -0700
+Subject: [PATCH v3 2/5] pwm: kona: Introduce Kona PWM controller support
+In-Reply-To: <CAAYSxhri0evgrbCPew6-MTXVmpzm7Oa6TpmJTSGZpTcV=876HQ@mail.gmail.com>
+References: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
+ <1394655346-30048-3-git-send-email-tim.kryger@linaro.org>
+ <20140318215231.GH5917@mithrandir>
+ <CAAYSxhri0evgrbCPew6-MTXVmpzm7Oa6TpmJTSGZpTcV=876HQ@mail.gmail.com>
+Message-ID: <CAAYSxhpW-N7UdpsGE7JHvOJxQcvURRPdAOhiVkK=4EHc7E03gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Mar 2014 16:09:50 +0100, Tomasz Figa wrote:
-> On 18.03.2014 10:56, Cho KyongHo wrote:
-> > On Fri, 14 Mar 2014 13:59:00 +0100, Tomasz Figa wrote:
-> >> Hi KyongHo,
-> >>
-> >> On 14.03.2014 06:08, Cho KyongHo wrote:
-> 
-> [snip]
-> 
-> >>> -static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
-> >>> +static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
-> >>
-> >> If you are changing the names anyway, it would be probably a good idea
-> >> to reduce code obfuscation a bit and drop the underscores from
-> >> beginnings of function names. Also I'd suggest keeping the "exynos_" prefix.
-> >
-> > Thanks for the suggestion.
-> > __exynos_sysmmu_disable is splitted into 2 functions: __sysmmu_disable
-> > and __sysmmu_disable_nocount.
-> > I agree with you that it is good idea to reduce code obfuscation but
-> > I don't think dropping beginning underscores of function names reduces
-> > obfuscation.
-> >
-> 
-> Well, if you are ending up with a function like 
-> __sysmmu_enable_nocount() below with every line starting with two 
-> underscores, do you think this improves code readability?
-> 
-> Of course this is a minor issue, but let's keep some code quality level 
-> in Linux kernel.
-> 
+On Tue, Mar 18, 2014 at 4:47 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> On Tue, Mar 18, 2014 at 2:52 PM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+>> On Wed, Mar 12, 2014 at 01:15:43PM -0700, Tim Kryger wrote:
 
-Ok. understood what your are concerning about.
+>>> +
+>>> +     /* There is polarity support in HW but it is easier to manage in SW */
+>>> +     if (pwm->polarity == PWM_POLARITY_INVERSED)
+>>> +             duty_ns = period_ns - duty_ns;
+>>
+>> No, this is wrong. You're not actually changing the *polarity* here.
+>
+> Please elaborate.  I don't understand what is wrong here.
+>
+> Does polarity influence the output while a PWM is disabled?
+>
 
-> >>
-> >>>    {
-> >>> -	unsigned long flags;
-> >>> -	bool disabled = false;
-> >>> -
-> >>> -	write_lock_irqsave(&data->lock, flags);
-> 
-> [snip]
-> 
-> Here's the function mentioned above:
-> 
-> >>> +
-> >>> +static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
-> >>> +{
-> >>> +	__master_clk_enable(data);
-> >>> +	__sysmmu_clk_enable(data);
-> >>> +
-> >>> +	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
-> >>> +
-> >>> +	__sysmmu_init_config(data);
-> >>> +
-> >>> +	__sysmmu_set_ptbase(data->sfrbase, data->pgtable);
-> >>> +
-> >>> +	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
-> >>> +
-> >>> +	__master_clk_disable(data);
-> >>> +}
-> >>> +
-> 
-> [snip]
-> 
-> >>>
-> >>> @@ -629,7 +700,7 @@ err_pgtable:
-> >>>    static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> >>>    {
-> >>>    	struct exynos_iommu_domain *priv = domain->priv;
-> >>> -	struct sysmmu_drvdata *data;
-> >>> +	struct exynos_iommu_owner *owner;
-> >>>    	unsigned long flags;
-> >>>    	int i;
-> >>>
-> >>> @@ -637,11 +708,14 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-> >>>
-> >>>    	spin_lock_irqsave(&priv->lock, flags);
-> >>>
-> >>> -	list_for_each_entry(data, &priv->clients, node) {
-> >>> -		while (!exynos_sysmmu_disable(data->dev))
-> >>> +	list_for_each_entry(owner, &priv->clients, client) {
-> >>> +		while (!exynos_sysmmu_disable(owner->dev))
-> >>>    			; /* until System MMU is actually disabled */
-> >>
-> >> What about using list_for_each_entry_safe() and calling list_del_init()
-> >> here directly?
-> >>
-> >
-> > That require another variable to be defined.
-> 
-> Is it a problem?
-> 
-That is not a problem.
-But I think using list_for_each_entry() is not a problem likewise.
+>>> +static int kona_pwmc_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+>>> +                               enum pwm_polarity polarity)
+>>> +{
+>>> +     /*
+>>> +      * The framework only allows the polarity to be changed when a PWM is
+>>> +      * disabled so no immediate action is required here.  When a channel is
+>>> +      * enabled, the polarity gets handled as part of the re-config step.
+>>> +      */
+>>> +
+>>> +     return 0;
+>>> +}
+>>
+>> See above. If you don't want to implement the hardware support for
+>> inversed polarity, then simply don't implement this.
+>
+> I had originally planned to omit polarity support but because it
+> affects the binding (which is treated as ABI), it wouldn't be possible
+> to add it in later without defining a new compatible string.
 
-> > I just wanted to avoid that because I think it is prettier.
-> > Moreover, list_del_init() below the empty while() clause may make
-> > the source code readers misunderstood..
-> 
-> This raises another question, why the loop above is even needed. 
-> exynos_sysmmu_disable() should make sure that SYSMMU is actually 
-> disabled, without any need for looping like this.
+I would like to get this right but it occurred to me that there may be
+a way to defer the implementation of this feature without disrupting
+the binding.
 
-Some driver needs enabling sysmmu to be counted due to its complex structure.
-It can be also removed by the driver with an extra effort
-but the reality is important.
-Device driver is not only for the scholarship but also for the real use.
-
-> >>>    	}
-> >>>
-> >>> +	while (!list_empty(&priv->clients))
-> >>> +		list_del_init(priv->clients.next);
-> >>> +
-> >>>    	spin_unlock_irqrestore(&priv->lock, flags);
-> >>>
-> >>>    	for (i = 0; i < NUM_LV1ENTRIES; i++)
-> 
-> [snip]
-> 
-> >>> +static int sysmmu_hook_driver_register(struct notifier_block *nb,
-> >>> +					unsigned long val,
-> >>> +					void *p)
-> >>> +{
-> >>> +	struct device *dev = p;
-> >>> +
-> >>> +	switch (val) {
-> >>> +	case BUS_NOTIFY_BIND_DRIVER:
-> >>> +	{
-> >>> +		struct exynos_iommu_owner *owner;
-> >>
-> >> Please move this variable to the top of the function and drop the braces
-> >> around case blocks.
-> >
-> > I don't think it is required because this function is modified
-> > by the following patches.
-> 
-> OK, if so, and similar issue is not present after further patches.
-> 
-> >
-> >>
-> >>> +
-> >>> +		/* No System MMU assigned. See exynos_sysmmu_probe(). */
-> >>> +		if (dev->archdata.iommu == NULL)
-> >>> +			break;
-> >>
-> >> This looks strange... (see below)
-> >>
-> >> Also this looks racy. There are no guarantees about device probing
-> >> order, so you may end up with master devices being probed before the
-> >> IOMMUs. Deferred probing should be used to handle this correctly.
-> >
-> > System MMU driver must be probed earlier than the drivers of master devices
-> > because the drivers may want to use System MMU for their initial task.
-> 
-> As I said, there are no guarantees about platform device probe order in 
-> Linux kernel. Code must be designed to check whether required 
-> dependencies are met and if not, deferred probing must be used.
-> 
-
-I told that System MMU driver must be probed earlier.
-That's why exynos_iommu_init() is called by subsys_initcall level.
-I also noticed that it must be promoted to arch_initcall for some driver.
-
-> >>
-> >>> +
-> >>> +		owner = devm_kzalloc(dev, sizeof(*owner), GFP_KERNEL);
-> >>> +		if (!owner) {
-> >>> +			dev_err(dev, "No Memory for exynos_iommu_owner\n");
-> >>> +			return -ENOMEM;
-> >>> +		}
-> >>> +
-> >>> +		owner->dev = dev;
-> >>> +		INIT_LIST_HEAD(&owner->client);
-> >>> +		owner->sysmmu = dev->archdata.iommu;
-> >>> +
-> >>> +		dev->archdata.iommu = owner;
-> >>
-> >> I don't understand what is happening here in this case statement. There
-> >> is already something assigned to dev->archdata.iommu, but this code
-> >> reassigns something else to this field. This means that you attempt to
-> >> use the same field to store pointers to objects of different types,
-> >> which I believe is broken, because you have no way to check what kind of
-> >> object is currently pointed by such (void *) pointer.
-> >>
-> >
-> > exynos_sysmmu_probe() assigns the device descriptor of the probing System MMU
-> > to archdata.iommu of its master device. The assignment is just a marker that
-> > the device is a master device of a System MMU.
-> > If dev->archdata.iommu has a value in the case of BUS_NOTIFY_BIND_DRIVER,
-> > the 'dev' is a master devices of a System MMU. Then sysmmu_hook_driver_register()
-> > assigns the data structure to handle System MMU to dev->archdata.iommu.
-> 
-> Which is wrong (or even if you don't consider it wrong, it is ugly), 
-> because one (void *) pointer in the same object is used to store 
-> pointers to two completely different types.
-
-archdata.iommu has a pointer to sysmmu descriptor for a very short time
-during booting time to build complete data structure to handle System MMU.
-It is it also a matter?
-
-Anyway, this style of initialization just maintained to make the driver work
-with the old design. It is changed with the following patches.
-
-
-Regards,
-
-KyongHo
+Would it be acceptable to continue using #pwm-cells = <3> and
+of_pwm_xlate_with_flags but return -EINVAL from kona_pwmc_set_polarity
+if PWM_POLARITY_INVERSED is specified?
