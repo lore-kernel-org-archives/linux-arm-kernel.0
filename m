@@ -1,36 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:06 +0100
-Subject: [PATCH 09/62] ARM: efm32: allow uncompress debug output
+Date: Wed, 19 Mar 2014 20:29:30 +0100
+Subject: [PATCH 33/62] ARM: pxa: remove broken balloon3_gpio_vbus reference
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-10-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-34-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-efm32 has no mach/uncompress.h, but we can trivially use
-the fallback to the ll_debug code by just allowing this
-option in Kconfig.
-
-Found during randconfig testing.
+balloon3_udc_init() tries to register a balloon3_gpio_vbus
+device, but this has never been defined in the mainline
+kernel. To avoid the obvious build failure when this function
+is enabled, remove the bogus reference here.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Uwe Kleine-K?nig <kernel@pengutronix.de>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/Kconfig.debug | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-pxa/balloon3.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index dbb6f15..8983919 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1158,7 +1158,7 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					ARCH_EXYNOS
-+					ARCH_EXYNOS || ARCH_EFM32
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
+diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+index 2f71b3f..43596e0 100644
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -331,7 +331,6 @@ static struct pxa2xx_udc_mach_info balloon3_udc_info __initdata = {
+ static void __init balloon3_udc_init(void)
+ {
+ 	pxa_set_udc_info(&balloon3_udc_info);
+-	platform_device_register(&balloon3_gpio_vbus);
+ }
+ #else
+ static inline void balloon3_udc_init(void) {}
 -- 
 1.8.3.2
