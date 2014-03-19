@@ -1,48 +1,45 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Wed, 19 Mar 2014 15:19:31 -0300
-Subject: [PATCH 2/4] ARM: sun7i: fix PLL4 clock and add PLL8
+Date: Wed, 19 Mar 2014 15:19:30 -0300
+Subject: [PATCH 1/4] clk: sunxi: fix A20 PLL4 calculation
 In-Reply-To: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
 References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1395253173-30437-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1395253173-30437-2-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner reworked the PLL4 clock in sun7i; so we need to change the
-compatible. Additionally, PLL8 is compatible with this new PLL4
-implementation, so let's add a node for it as well.
+Allwinner actually reworked the PLL4 on A20; now it's compatible with
+the sun4i PLL5/6 design previous to any divisions, as well as to the new
+PLL8 in sun7i.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi/clk-sunxi.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index e766c6a..4e58ee5 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -71,7 +71,7 @@
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 7ca9ed9..a393df1 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -621,6 +621,12 @@ static const struct factors_data sun6i_a31_pll1_data __initconst = {
+ 	.getter = sun6i_a31_get_pll1_factors,
+ };
  
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-pll1-clk";
-+			compatible = "allwinner,sun7i-a20-pll4-clk";
- 			reg = <0x01c20018 0x4>;
- 			clocks = <&osc24M>;
- 			clock-output-names = "pll4";
-@@ -93,6 +93,14 @@
- 			clock-output-names = "pll6_sata", "pll6_other", "pll6";
- 		};
- 
-+		pll8: clk at 01c20040 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun7i-a20-pll4-clk";
-+			reg = <0x01c20040 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll8";
-+		};
++static const struct factors_data sun7i_a20_pll4_data __initconst = {
++	.enable = 31,
++	.table = &sun4i_pll5_config,
++	.getter = sun4i_get_pll5_factors,
++};
 +
- 		cpu: cpu at 01c20054 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-cpu-clk";
+ static const struct factors_data sun4i_pll5_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll5_config,
+@@ -1244,6 +1250,7 @@ free_clkdata:
+ static const struct of_device_id clk_factors_match[] __initconst = {
+ 	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
+ 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
++	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
+ 	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
+ 	{.compatible = "allwinner,sun5i-a13-ahb-clk", .data = &sun5i_a13_ahb_data,},
+ 	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
 -- 
 1.9.0
