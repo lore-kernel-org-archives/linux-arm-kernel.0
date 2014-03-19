@@ -1,38 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:50 +0100
-Subject: [PATCH 53/62] ARM: samsung: fix SAMSUNG_PM_DEBUG Kconfig logic
-In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 19 Mar 2014 14:12:08 -0600
+Subject: [PATCH 62/62] ARM: tegra: make debug_ll code build for ARMv6
+In-Reply-To: <6268308.cWSbPODKo9@wuerfel>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-54-git-send-email-arnd@arndb.de>
+ <1395257399-359545-63-git-send-email-arnd@arndb.de>
+ <5329F296.6030308@wwwdotorg.org> <6268308.cWSbPODKo9@wuerfel>
+Message-ID: <5329FA18.6090208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suspend debug code for Samsung has multiple dependencies
-that we should not unconditionally enable. In particular,
-we rely on the DEBUG_S3C_UART setting, which in turn depends
-on the samsung UART driver.
+On 03/19/2014 01:51 PM, Arnd Bergmann wrote:
+> On Wednesday 19 March 2014 13:40:06 Stephen Warren wrote:
+>> Hmmm. This code is guaranteed to only execute on Tegra (well, perhaps
+>> someone can turn on the wrong debug option and run it on non-Tegra, but
+>> then it's guaranteed not to work since the HW it touches doesn't exist).
+>> As such, the code ought to be able to use ARMv7 instructions.
+>>
+>> As a fix for similar issues in assembly code in arch/arm/mach-tegra/*.S,
+>> Makefile there does:
+>>
+>> asflags-y                               += -march=armv7-a
+>>
+>> (I think you added that? Yes, in 408e713545ca "ARM: tegra: build
+>> assembly files with -march=armv7-a")
+>>
+>> Shouldn't we use the same fix in this case too?
+> 
+> That was my first idea, but I couldn't come up with a nice way to do this
+> for arch/arm/kernel/debug.S, which #includes the specific implementation.
+> 
+> I'd rather not put lots of per-platform hacks into arch/arm/kernel/Makefile.
 
-Signed-off-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/plat-samsung/Kconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Oh, I guess the fact it's include makes it a bit more painful.
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 04974db..c72d612 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -428,8 +428,7 @@ comment "Power management"
- 
- config SAMSUNG_PM_DEBUG
- 	bool "S3C2410 PM Suspend debug"
--	depends on PM
--	select DEBUG_LL
-+	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
- 	help
- 	  Say Y here if you want verbose debugging from the PM Suspend and
- 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
--- 
-1.8.3.2
+You could deal with it in Kconfig reasonably easily by having each of
+DEBUG_*_UART select a config option indicating how to compile code that
+includes DEBUG_LL_INCLUDE, and then have the Makefiles set up asflags
+based on those. Still, that would be a lot of work and this patch is
+simpler.
+
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
