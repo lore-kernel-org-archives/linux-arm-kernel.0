@@ -1,53 +1,52 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 19 Mar 2014 18:06:28 +0900
-Subject: [PATCH v11 13/27] iommu/exynos: support for device tree
-In-Reply-To: <53286557.6070808@samsung.com>
-References: <20140314140935.e0652b58ce16591b54d0e10b@samsung.com>
- <53230695.9080606@samsung.com>
- <20140318195210.14c953a70498f634032f35b7@samsung.com>
- <53286557.6070808@samsung.com>
-Message-ID: <20140319180628.5eecd7347c24f1e697aaaa6a@samsung.com>
+Date: Wed, 19 Mar 2014 18:07:57 +0900
+Subject: [PATCH v11 19/27] iommu/exynos: add support for power management
+ subsystems.
+In-Reply-To: <53286730.1060807@samsung.com>
+References: <20140314141028.4b0b62d895905988ab5dda88@samsung.com>
+ <53232959.7020306@samsung.com>
+ <20140318202320.a3101304bbc51cc9f169cdaa@samsung.com>
+ <53286730.1060807@samsung.com>
+Message-ID: <20140319180757.a1552386b81e698914d4bcc6@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Mar 2014 16:25:11 +0100, Tomasz Figa wrote:
-> On 18.03.2014 11:52, Cho KyongHo wrote:
-> > On Fri, 14 Mar 2014 14:39:33 +0100, Tomasz Figa wrote:
-> >>> @@ -557,11 +558,23 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
-> >>>    	return 0;
-> >>>    }
-> >>>
-> >>> -static struct platform_driver exynos_sysmmu_driver = {
-> >>> -	.probe		= exynos_sysmmu_probe,
-> >>> -	.driver		= {
-> >>> +#ifdef CONFIG_OF
-> >>> +static struct of_device_id sysmmu_of_match[] __initconst = {
-> >>> +	{ .compatible	= "samsung,sysmmu-v1", },
-> >>> +	{ .compatible	= "samsung,sysmmu-v2", },
-> >>> +	{ .compatible	= "samsung,sysmmu-v3.1", },
-> >>> +	{ .compatible	= "samsung,sysmmu-v3.2", },
-> >>> +	{ .compatible	= "samsung,sysmmu-v3.3", },
+On Tue, 18 Mar 2014 16:33:04 +0100, Tomasz Figa wrote:
+> On 18.03.2014 12:23, Cho KyongHo wrote:
+> > On Fri, 14 Mar 2014 17:07:53 +0100, Tomasz Figa wrote:
+> >> Hi KyongHo,
 > >>
-> >> Do you need all these compatible strings? I mean, are there any
-> >> implementation differences that can't be identified by reading IP
-> >> registers, such as REG_MMU_VERSION?
+> >> On 14.03.2014 06:10, Cho KyongHo wrote:
+> 
+> [snip]
+> 
+> >>> @@ -677,11 +679,40 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+> >>>    	platform_set_drvdata(pdev, data);
+> >>>
+> >>>    	pm_runtime_enable(dev);
+> >>> +	data->runtime_active = !pm_runtime_enabled(dev);
+> >>
+> >> Hmm, this seems to be a bit misleading. The field is named
+> >> runtime_active, but the assignment makes it true if PM runtime is _not_
+> >> enabled (i.e. inactive). Is this correct?
 > >>
 > >
-> > Unfortunately, there is a SoC which overrides REG_MMU_VERSION with
-> > a value for RTL designers and it is not related to System MMU
-> > versions.
+> > I agree that it may lead misunderstood.
+> > data->runtime_active actually indicates if electric power is asserted
+> > to the System MMU. pm_runtime_enable() call must enable runtime pm
+> > for the given device. If runtime pm is not enabled although pm_runtime_enable()
+> > is called, CONFIG_PM_RUNTIME is not configured.
+> >
+> > Actually, it is replacible with
+> > if (IS_ENABLED(CONFIG_PM_RUNTIME))
+> >      data->runtime_active = true;
 > 
-> OK.
-> 
-> What about having a generic compatible string for Samsung SysMMU then, 
-> but an additional property that can override the version to account for 
-> such brokenness? If not provided, the version would be read from 
-> REG_MMU_VERSION.
+> I would keep it as !pm_runtime_enabled(dev), but rename the field to 
+> something more meaningful, like data->is_powered_on.
 > 
 
-Yes it is one of possible idea.
-Let me think what better way is.
+That is good idea.
 
-Thank you.
+thanks for advice.
 
-KyongHo
+KyongHo.
