@@ -1,35 +1,36 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 19 Mar 2014 17:55:54 +0530
-Subject: [PATCH 1/4] ARM: SAMSUNG: Introduce generic Exynos4 and 5 helpers
+Date: Wed, 19 Mar 2014 17:55:56 +0530
+Subject: [PATCH 3/4] ARM: EXYNOS: Add generic compatible strings
 In-Reply-To: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
 References: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1395231957-22032-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1395231957-22032-4-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helpers to check for Exynos4 and 5 family of SoCs.
-This will eliminate comparing long list of SoCs and make
-code simpler.
+Add generic compatible strings for Exynos4 and 5 platforms so that
+future SoCs can use them if there is nothing extra/specific to be
+differentiated.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/plat-samsung/include/plat/cpu.h |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-exynos/exynos.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index d762533b856f..b9ae39ca1b7f 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -166,6 +166,10 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
- # define soc_is_exynos5440()	0
- #endif
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index b6fd40e76936..07884efd3a48 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -343,9 +343,11 @@ static void __init exynos_dt_machine_init(void)
+ }
  
-+#define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
-+				soc_is_exynos4412())
-+#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5420())
-+
- #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
- 
- #ifndef KHZ
+ static char const *exynos_dt_compat[] __initconst = {
++	"samsung,exynos4",
+ 	"samsung,exynos4210",
+ 	"samsung,exynos4212",
+ 	"samsung,exynos4412",
++	"samsung,exynos5",
+ 	"samsung,exynos5250",
+ 	"samsung,exynos5420",
+ 	"samsung,exynos5440",
 -- 
 1.7.9.5
