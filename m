@@ -1,34 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:44 +0100
-Subject: [PATCH 47/62] ARM: s3c64xx: MACH_SMDK6400 needs HSMMC1
+Date: Wed, 19 Mar 2014 20:29:23 +0100
+Subject: [PATCH 26/62] ARM: mvebu: don't select CONFIG_NEON
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-48-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-27-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board uses both MMC controllers, so we need to enable
-the Kconfig option to define the platform data.
+CONFIG_NEON is meant to be user-selectable. Turning it on
+unconditionally means we can't build a smaller kernel when
+we don't need it, and causes build errors if CONFIG_VFP
+is not also enabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-mvebu/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 64f04e6..92885d7 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -87,6 +87,7 @@ config MACH_SMDK6400
- 	select CPU_S3C6400
- 	select S3C64XX_SETUP_SDHCI
- 	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
- 	select S3C_DEV_NAND
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 485513cb..b24a082 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -39,7 +39,6 @@ config MACH_ARMADA_375
+ 	select ARMADA_375_CLK
+ 	select CPU_V7
+ 	select MACH_MVEBU_V7
+-	select NEON
+ 	select PINCTRL_ARMADA_375
  	help
- 	  Machine support for the Samsung SMDK6400
+ 	  Say 'Y' here if you want your kernel to support boards based
+@@ -53,7 +52,6 @@ config MACH_ARMADA_38X
+ 	select ARMADA_38X_CLK
+ 	select CPU_V7
+ 	select MACH_MVEBU_V7
+-	select NEON
+ 	select PINCTRL_ARMADA_38X
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
 -- 
 1.8.3.2
