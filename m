@@ -1,26 +1,33 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 19 Mar 2014 13:31:58 +0100
-Subject: [PATCH v4 3/3] ARM: dts: berlin2q: add the Marvell BG2-Q DMP
- device tree
-In-Reply-To: <1395153167-21029-4-git-send-email-antoine.tenart@free-electrons.com>
-References: <1395153167-21029-1-git-send-email-antoine.tenart@free-electrons.com>
- <1395153167-21029-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53298E3E.5060803@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 19 Mar 2014 13:28:50 +0100
+Subject: [PATCH v2 5/7] sched: add a new SD_SHARE_POWERDOMAIN for
+ sched_domain
+In-Reply-To: <20140319115904.GJ27632@laptop.programming.kicks-ass.net>
+References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
+ <1395165409-18055-6-git-send-email-vincent.guittot@linaro.org>
+ <20140319115904.GJ27632@laptop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtD-_u6WsiV_NJmJxe3iqL_Vw6Xu8wtkgGsB3yAFpbdbKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2014 03:32 PM, Antoine T?nart wrote:
-> Adds initial support for the Marvell BG2-Q DMP. The board has 2GB of
-> memory, an uart activated and what's initially supported by the Marvell
-> Armada 1500 pro dtsi.
+On 19 March 2014 12:59, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Mar 18, 2014 at 06:56:47PM +0100, Vincent Guittot wrote:
 >
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/boot/dts/Makefile                 |  3 ++-
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 28 ++++++++++++++++++++++++++++
->   2 files changed, 30 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+>
+>> @@ -5946,7 +5948,8 @@ static int sched_domains_curr_level;
+>>       (SD_SHARE_CPUPOWER |            \
+>>        SD_SHARE_PKG_RESOURCES |       \
+>>        SD_NUMA |                      \
+>> -      SD_ASYM_PACKING)
+>> +      SD_ASYM_PACKING |              \
+>> +      SD_SHARE_POWERDOMAIN)
+>
+> You forgot to update the pretty comment above that :-)
 
-Applied to berlin/dt.
+yes, i'm going to update it
 
-Sebastian
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
