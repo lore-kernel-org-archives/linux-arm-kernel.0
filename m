@@ -1,41 +1,64 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Mar 2014 17:47:52 -0700
-Subject: [PATCH 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <alpine.LNX.2.00.1403190925550.6652@nippy.intranet>
-References: <20140318002822.372705594@telegraphics.com.au>
- <1395112756.20860.1.camel@joe-AO722>
- <alpine.LNX.2.00.1403182208590.2018@nippy.intranet>
- <1395146702.2812.47.camel@joe-AO722>
- <CAMuHMdUMpdp7deL5zC4hUVTHjyNbtkZ2bNFupo5JiDyuyc345w@mail.gmail.com>
- <1395148051.2812.51.camel@joe-AO722>
- <alpine.LNX.2.00.1403190925550.6652@nippy.intranet>
-Message-ID: <1395190072.8649.2.camel@joe-AO722>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 18 Mar 2014 17:52:57 -0700
+Subject: [PATCH v2 1/7] ARM: KVM: switch hypervisor into BE mode in case
+ of BE host
+In-Reply-To: <20140318222335.GG1297@cbox>
+References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
+ <1392183693-21238-2-git-send-email-victor.kamensky@linaro.org>
+ <20140318222335.GG1297@cbox>
+Message-ID: <CAA3XUr1Zk0jzM74wakbOCiRwWqHjPDusnFXzxU+dJZ63mOEQiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18 March 2014 15:23, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Tue, Feb 11, 2014 at 09:41:27PM -0800, Victor Kamensky wrote:
+>> Switch hypervisor to run in BE mode if image is compiled
+>> with CONFIG_CPU_BIG_ENDIAN.
+>>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> ---
+>>  arch/arm/kvm/init.S | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>> index 1b9844d..74f0718 100644
+>> --- a/arch/arm/kvm/init.S
+>> +++ b/arch/arm/kvm/init.S
+>> @@ -22,6 +22,7 @@
+>>  #include <asm/kvm_asm.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_mmu.h>
+>> +#include <asm/assembler.h>
+>>
+>>  /********************************************************************
+>>   * Hypervisor initialization
+>> @@ -70,6 +71,8 @@ __do_hyp_init:
+>>       cmp     r0, #0                  @ We have a SP?
+>>       bne     phase2                  @ Yes, second stage init
+>>
+>> +ARM_BE8(setend       be) @ Switch to Big Endian mode if needed
+>> +
+>>       @ Set the HTTBR to point to the hypervisor PGD pointer passed
+>>       mcrr    p15, 4, r2, r3, c2
+>>
+>> --
+>> 1.8.1.4
+>>
+>
+> Won't splitting up the patches this way break bisectability?
 
-On Wed, 2014-03-19 at 10:14 +1100, Finn Thain wrote:
-> As for side-effects, chip register accesses would be affected if dprintk() 
-> expanded to no_printk() when NDEBUG & flg == 0.
-> 
-> E.g. NCR5380.c line 1213:
-> dprintk(NDEBUG_INTR, "scsi : unknown interrupt, BASR 0x%X, MR 0x%X, SR 0x%x\n",
->                      basr, NCR5380_read(MODE_REG), NCR5380_read(STATUS_REG));
-> 
-> I don't want to re-introduce side-effects into a dozen different NCR5380 
-> drivers on three different architectures when I can test only one of those 
-> drivers. It's difficult to get good code coverage even for one driver.
+I don't think so. I think if just only this patch applied BE image
+built with CONFIG_VIRTUALIZATION=y and CONFIG_KVM=y will at
+least boot. KVM will not work of course without remaining patches.
 
-Hi again Finn.
+Currently for BE image CONFIG_VIRTUALIZATION and CONFIG_KVM
+should be explicitly turned off - otherwise image won't boot.
 
-If dprintk expanded directly to no_printk, then true.
+As far as LE image concerned it is NOP change.
 
-But using "if (0)" prevents the no_printk from
-occurring at all so there would be no side-effects
-and the format & args would still be verified by the
-compiler.
+Or do you have any specific idea how it could break bisectability?
 
-So I believe you shouldn't worry about side-effects.
+Thanks,
+Victor
 
-cheers, Joe
+> -Christoffer
