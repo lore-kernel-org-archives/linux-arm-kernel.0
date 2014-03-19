@@ -1,65 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:20 +0100
-Subject: [PATCH 23/62] ARM: omap1: fix building without 32K_TIMER
+Date: Wed, 19 Mar 2014 20:29:19 +0100
+Subject: [PATCH 22/62] ARM: msm: export legacy DMA interfaces
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-24-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-23-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we enable CONFIG_OMAP_MPU_TIMER and CONFIG_OMAP_DM_TIMER but
-not CONFIG_OMAP_32K_TIMER on OMAP1, we currently get this build error:
+The msm_sdcc MMC driver and the msm_serial_hs uart driver both
+use the pre-dmaengine interfaces provided by the MSM platform.
 
-mach-omap1/pm.c: In function 'omap1_pm_idle':
-mach-omap1/pm.c:123:9: error: 'enable_dyn_sleep' undeclared (first use in this function)
-  while (enable_dyn_sleep) {
-         ^
-mach-omap1/pm.c:123:9: note: each undeclared identifier is reported only once for each function it appears in
-
-This attempts to fix the #ifdef logic to deal with all combinations
-of timers.
+Since these drivers can be loadable modules, we should export
+the functions used in the drivers.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-omap at vger.kernel.org
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
 ---
- arch/arm/mach-omap1/pm.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-msm/dma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-index 40a1ae3..7dff68e 100644
---- a/arch/arm/mach-omap1/pm.c
-+++ b/arch/arm/mach-omap1/pm.c
-@@ -71,10 +71,10 @@ static unsigned int mpui7xx_sleep_save[MPUI7XX_SLEEP_SAVE_SIZE];
- static unsigned int mpui1510_sleep_save[MPUI1510_SLEEP_SAVE_SIZE];
- static unsigned int mpui1610_sleep_save[MPUI1610_SLEEP_SAVE_SIZE];
- 
--#ifdef CONFIG_OMAP_32K_TIMER
--
- static unsigned short enable_dyn_sleep = 1;
- 
-+#if defined(CONFIG_OMAP_32K_TIMER) || defined(CONFIG_OMAP_MPU_TIMER)
-+
- static ssize_t idle_show(struct kobject *kobj, struct kobj_attribute *attr,
- 			 char *buf)
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+index ba62f02..fb976246 100644
+--- a/arch/arm/mach-msm/dma.c
++++ b/arch/arm/mach-msm/dma.c
+@@ -78,6 +78,7 @@ void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
  {
-@@ -643,7 +643,7 @@ static const struct platform_suspend_ops omap_pm_ops = {
- static int __init omap_pm_init(void)
+ 	writel((graceful << 31), DMOV_FLUSH0(id));
+ }
++EXPORT_SYMBOL_GPL(msm_dmov_stop_cmd);
+ 
+ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
  {
+@@ -116,6 +117,7 @@ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
+ 	}
+ 	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+ }
++EXPORT_SYMBOL_GPL(msm_dmov_enqueue_cmd);
  
--#ifdef CONFIG_OMAP_32K_TIMER
-+#if defined(CONFIG_OMAP_32K_TIMER) || defined(CONFIG_OMAP_MPU_TIMER)
- 	int error;
- #endif
- 
-@@ -700,7 +700,7 @@ static int __init omap_pm_init(void)
- 	omap_pm_init_debugfs();
- #endif
- 
--#ifdef CONFIG_OMAP_32K_TIMER
-+#if defined(CONFIG_OMAP_32K_TIMER) || defined(CONFIG_OMAP_MPU_TIMER)
- 	error = sysfs_create_file(power_kobj, &sleep_while_idle_attr.attr);
- 	if (error)
- 		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+ struct msm_dmov_exec_cmdptr_cmd {
+ 	struct msm_dmov_cmd dmov_cmd;
 -- 
 1.8.3.2
