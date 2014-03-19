@@ -1,40 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Mar 2014 09:05:13 -0700
-Subject: [RESEND PATCH 0/3] ARM: OMAP2+: Remove remaining unused legacy
- code
-In-Reply-To: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140319160513.GC12934@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Mar 2014 11:14:43 -0500
+Subject: [PATCH] Documentation: dt: list all compatible strings for at91
+In-Reply-To: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <CAL_Jsq+sctq85ZhqKyVa7=r5A0FEDKu36692rRJufyca1gzF6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [140318 23:12]:
-> Once OMAP2+ board files are removed, there is unused code that was only used
-> by legacy platform code and can be removed.
-> 
-> This patch-set depends on the series:
-> 
-> [PATCH 00/12] Drop omap3 board files and make mach-omap2 boot in DT only mode [0]
-> 
-> and is composed of the following patches:
-> 
-> [RESEND PATCH 1/3] ARM: OMAP2+: Remove legacy smsc911x and smc91x
-> [RESEND PATCH 2/3] ARM: OMAP2+: Remove unnecesary include in GPMC
-> [RESEND PATCH 3/3] ARM: OMAP2+: Remove legacy board-flash.c
-> 
-> Tony,
-> 
-> I don't know what is your new schedule for board files removal but in case it is
-> 3.16, I forward ported this patch-set on top of 3.14-rc7 and fixed some conflicts.
+On Wed, Mar 19, 2014 at 5:26 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Avoids getting the newly introduced warning:
+> WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> +                               compatible = "atmel,at91sam9g45-adc";
+>
+> Introduced by:
+> bff5da433525 checkpatch: add DT compatible string documentation checks
 
-Thanks, I'll also rebase my changes in omap-for-v3.14/omap3-board-removal
-at some point. Probably a good target is v3.16 if the DSS changes go
-in. Then we just need displays enabled for omap3 and pandora supported
-to drop the legacy data AFAIK.
+We should fix checkpatch instead. There are some fixes in progress,
+but I don't think it covers this issue. I'm puzzled by this one as I
+thought I checked for this case.
 
-Regards,
-
-Tony
- 
-> [0]: http://marc.info/?t=138542504600001&r=1&w=2
-> 
+Rob
