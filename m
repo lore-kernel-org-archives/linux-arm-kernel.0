@@ -1,37 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:22 +0100
-Subject: [PATCH 25/62] ARM: mvebu: add missing header
+Date: Wed, 19 Mar 2014 20:29:06 +0100
+Subject: [PATCH 09/62] ARM: efm32: allow uncompress debug output
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-26-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition for SIGBUS may not be visible without including
-linux/signal.h, as I found during randconfig testing.
+efm32 has no mach/uncompress.h, but we can trivially use
+the fallback to the ll_debug code by just allowing this
+option in Kconfig.
 
-Adding an explicit include is certainly the right thing to do.
+Found during randconfig testing.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Uwe Kleine-K?nig <kernel@pengutronix.de>
 ---
- arch/arm/mach-mvebu/board-v7.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 746134e..333fca8 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -21,6 +21,7 @@
- #include <linux/clocksource.h>
- #include <linux/dma-mapping.h>
- #include <linux/mbus.h>
-+#include <linux/signal.h>
- #include <linux/slab.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index dbb6f15..8983919 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1158,7 +1158,7 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					ARCH_EXYNOS
++					ARCH_EXYNOS || ARCH_EFM32
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
 -- 
 1.8.3.2
