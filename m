@@ -1,53 +1,82 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 14:03:21 +0100
-Subject: [PATCH 08/16] backlight: pwm_bl: set pwm polarity when using platform
- data
+Date: Wed, 19 Mar 2014 14:03:23 +0100
+Subject: [PATCH 10/16] avr32: MRMT: use generic leds_pwm driver
 In-Reply-To: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395234209-15546-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395234209-15546-11-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set inversed polarity when .pwm_active_low is set in the platform_data. With
-device tree, this is taken care of by of_pwm_xlate_with_flags(), called from
-of_pwm_get().
+Switch to the generic leds_pwm driver instead of leds-atmel-pwm.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/video/backlight/pwm_bl.c | 8 ++++++++
- include/linux/pwm_backlight.h    | 1 +
- 2 files changed, 9 insertions(+)
+ arch/avr32/boards/atngw100/mrmt.c | 35 +++++++++++++++++++++++------------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index b75201ff46f6..ffdd3b2b2742 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -309,6 +309,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	if (data->pwm_period_ns > 0)
- 		pwm_set_period(pb->pwm, data->pwm_period_ns);
+diff --git a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt.c
+index 1ba09e4c02b1..134e94c3d504 100644
+--- a/arch/avr32/boards/atngw100/mrmt.c
++++ b/arch/avr32/boards/atngw100/mrmt.c
+@@ -17,6 +17,8 @@
+ #include <linux/types.h>
+ #include <linux/fb.h>
+ #include <linux/leds.h>
++#include <linux/pwm.h>
++#include <linux/leds_pwm.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/atmel_serial.h>
+@@ -155,21 +157,29 @@ static struct platform_device rmt_ts_device = {
  
-+	/*
-+	 * The DT case is taking care of polarity in of_pwm_get(). For the
-+	 * non-DT case, set the polarity from platform data.
-+	 */
-+	if (data->pwm_active_low)
-+		if (pwm_set_polarity(pb->pwm, PWM_POLARITY_INVERSED))
-+			dev_err(&pdev->dev, "impossible to invert polarity\n");
+ #ifdef CONFIG_BOARD_MRMT_BL_PWM
+ /* PWM LEDs: LCD Backlight, etc */
+-static struct gpio_led rmt_pwm_led[] = {
+-	/* here the "gpio" is actually a PWM channel */
+-	{ .name = "backlight",	.gpio = PWM_CH_BL, },
++static struct pwm_lookup pwm_lookup[] = {
++	PWM_LOOKUP("at91sam9rl-pwm", PWM_CH_BL, "leds_pwm", "ds1"),
+ };
+ 
+-static struct gpio_led_platform_data rmt_pwm_led_data = {
+-	.num_leds	= ARRAY_SIZE(rmt_pwm_led),
+-	.leds		= rmt_pwm_led,
++static struct led_pwm pwm_leds[] = {
++	{
++		.name = "backlight",
++		.max_brightness = 255,
++		.pwm_period_ns  = 5000,
++		.active_low = 1,
++	},
++};
 +
- 	pb->period = pwm_get_period(pb->pwm);
- 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
++static struct led_pwm_platform_data pwm_data = {
++	.num_leds       = ARRAY_SIZE(pwm_leds),
++	.leds           = pwm_leds,
+ };
  
-diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
-index 2de2e275b2cb..b924fce5c97a 100644
---- a/include/linux/pwm_backlight.h
-+++ b/include/linux/pwm_backlight.h
-@@ -15,6 +15,7 @@ struct platform_pwm_backlight_data {
- 	unsigned int dft_brightness;
- 	unsigned int lth_brightness;
- 	unsigned int pwm_period_ns;
-+	bool pwm_active_low;
- 	unsigned int *levels;
- 	int enable_gpio;
- 	unsigned long enable_gpio_flags;
+-static struct platform_device rmt_pwm_led_dev = {
+-	.name		= "leds-atmel-pwm",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &rmt_pwm_led_data,
++static struct platform_device leds_pwm = {
++	.name   = "leds_pwm",
++	.id     = -1,
++	.dev    = {
++		.platform_data = &pwm_data,
+ 	},
+ };
+ #endif
+@@ -325,7 +335,8 @@ static int __init mrmt1_init(void)
+ #ifdef CONFIG_BOARD_MRMT_BL_PWM
+ 	/* Use PWM for Backlight controls */
+ 	at32_add_device_pwm(1 << PWM_CH_BL);
+-	platform_device_register(&rmt_pwm_led_dev);
++	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
++	platform_device_register(&leds_pwm);
+ #else
+ 	/* Backlight always on */
+ 	udelay( 1 );
 -- 
 1.8.3.2
