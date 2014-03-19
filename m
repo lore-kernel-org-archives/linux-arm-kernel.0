@@ -1,64 +1,221 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 18 Mar 2014 17:52:57 -0700
-Subject: [PATCH v2 1/7] ARM: KVM: switch hypervisor into BE mode in case
- of BE host
-In-Reply-To: <20140318222335.GG1297@cbox>
-References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
- <1392183693-21238-2-git-send-email-victor.kamensky@linaro.org>
- <20140318222335.GG1297@cbox>
-Message-ID: <CAA3XUr1Zk0jzM74wakbOCiRwWqHjPDusnFXzxU+dJZ63mOEQiA@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Wed, 19 Mar 2014 10:03:04 +0900
+Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
+ functions
+In-Reply-To: <532861BE.7020601@samsung.com>
+References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
+ <5322FD14.5090602@samsung.com>
+ <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
+ <532861BE.7020601@samsung.com>
+Message-ID: <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2014 15:23, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Tue, Feb 11, 2014 at 09:41:27PM -0800, Victor Kamensky wrote:
->> Switch hypervisor to run in BE mode if image is compiled
->> with CONFIG_CPU_BIG_ENDIAN.
->>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> ---
->>  arch/arm/kvm/init.S | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->> index 1b9844d..74f0718 100644
->> --- a/arch/arm/kvm/init.S
->> +++ b/arch/arm/kvm/init.S
->> @@ -22,6 +22,7 @@
->>  #include <asm/kvm_asm.h>
->>  #include <asm/kvm_arm.h>
->>  #include <asm/kvm_mmu.h>
->> +#include <asm/assembler.h>
->>
->>  /********************************************************************
->>   * Hypervisor initialization
->> @@ -70,6 +71,8 @@ __do_hyp_init:
->>       cmp     r0, #0                  @ We have a SP?
->>       bne     phase2                  @ Yes, second stage init
->>
->> +ARM_BE8(setend       be) @ Switch to Big Endian mode if needed
->> +
->>       @ Set the HTTBR to point to the hypervisor PGD pointer passed
->>       mcrr    p15, 4, r2, r3, c2
->>
->> --
->> 1.8.1.4
->>
->
-> Won't splitting up the patches this way break bisectability?
+On Tue, 18 Mar 2014 16:09:50 +0100, Tomasz Figa wrote:
+> On 18.03.2014 10:56, Cho KyongHo wrote:
+> > On Fri, 14 Mar 2014 13:59:00 +0100, Tomasz Figa wrote:
+> >> Hi KyongHo,
+> >>
+> >> On 14.03.2014 06:08, Cho KyongHo wrote:
+> 
+> [snip]
+> 
+> >>> -static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+> >>> +static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
+> >>
+> >> If you are changing the names anyway, it would be probably a good idea
+> >> to reduce code obfuscation a bit and drop the underscores from
+> >> beginnings of function names. Also I'd suggest keeping the "exynos_" prefix.
+> >
+> > Thanks for the suggestion.
+> > __exynos_sysmmu_disable is splitted into 2 functions: __sysmmu_disable
+> > and __sysmmu_disable_nocount.
+> > I agree with you that it is good idea to reduce code obfuscation but
+> > I don't think dropping beginning underscores of function names reduces
+> > obfuscation.
+> >
+> 
+> Well, if you are ending up with a function like 
+> __sysmmu_enable_nocount() below with every line starting with two 
+> underscores, do you think this improves code readability?
+> 
+> Of course this is a minor issue, but let's keep some code quality level 
+> in Linux kernel.
+> 
 
-I don't think so. I think if just only this patch applied BE image
-built with CONFIG_VIRTUALIZATION=y and CONFIG_KVM=y will at
-least boot. KVM will not work of course without remaining patches.
+Ok. understood what your are concerning about.
 
-Currently for BE image CONFIG_VIRTUALIZATION and CONFIG_KVM
-should be explicitly turned off - otherwise image won't boot.
+> >>
+> >>>    {
+> >>> -	unsigned long flags;
+> >>> -	bool disabled = false;
+> >>> -
+> >>> -	write_lock_irqsave(&data->lock, flags);
+> 
+> [snip]
+> 
+> Here's the function mentioned above:
+> 
+> >>> +
+> >>> +static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
+> >>> +{
+> >>> +	__master_clk_enable(data);
+> >>> +	__sysmmu_clk_enable(data);
+> >>> +
+> >>> +	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
+> >>> +
+> >>> +	__sysmmu_init_config(data);
+> >>> +
+> >>> +	__sysmmu_set_ptbase(data->sfrbase, data->pgtable);
+> >>> +
+> >>> +	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+> >>> +
+> >>> +	__master_clk_disable(data);
+> >>> +}
+> >>> +
+> 
+> [snip]
+> 
+> >>>
+> >>> @@ -629,7 +700,7 @@ err_pgtable:
+> >>>    static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
+> >>>    {
+> >>>    	struct exynos_iommu_domain *priv = domain->priv;
+> >>> -	struct sysmmu_drvdata *data;
+> >>> +	struct exynos_iommu_owner *owner;
+> >>>    	unsigned long flags;
+> >>>    	int i;
+> >>>
+> >>> @@ -637,11 +708,14 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
+> >>>
+> >>>    	spin_lock_irqsave(&priv->lock, flags);
+> >>>
+> >>> -	list_for_each_entry(data, &priv->clients, node) {
+> >>> -		while (!exynos_sysmmu_disable(data->dev))
+> >>> +	list_for_each_entry(owner, &priv->clients, client) {
+> >>> +		while (!exynos_sysmmu_disable(owner->dev))
+> >>>    			; /* until System MMU is actually disabled */
+> >>
+> >> What about using list_for_each_entry_safe() and calling list_del_init()
+> >> here directly?
+> >>
+> >
+> > That require another variable to be defined.
+> 
+> Is it a problem?
+> 
+That is not a problem.
+But I think using list_for_each_entry() is not a problem likewise.
 
-As far as LE image concerned it is NOP change.
+> > I just wanted to avoid that because I think it is prettier.
+> > Moreover, list_del_init() below the empty while() clause may make
+> > the source code readers misunderstood..
+> 
+> This raises another question, why the loop above is even needed. 
+> exynos_sysmmu_disable() should make sure that SYSMMU is actually 
+> disabled, without any need for looping like this.
 
-Or do you have any specific idea how it could break bisectability?
+Some driver needs enabling sysmmu to be counted due to its complex structure.
+It can be also removed by the driver with an extra effort
+but the reality is important.
+Device driver is not only for the scholarship but also for the real use.
 
-Thanks,
-Victor
+> >>>    	}
+> >>>
+> >>> +	while (!list_empty(&priv->clients))
+> >>> +		list_del_init(priv->clients.next);
+> >>> +
+> >>>    	spin_unlock_irqrestore(&priv->lock, flags);
+> >>>
+> >>>    	for (i = 0; i < NUM_LV1ENTRIES; i++)
+> 
+> [snip]
+> 
+> >>> +static int sysmmu_hook_driver_register(struct notifier_block *nb,
+> >>> +					unsigned long val,
+> >>> +					void *p)
+> >>> +{
+> >>> +	struct device *dev = p;
+> >>> +
+> >>> +	switch (val) {
+> >>> +	case BUS_NOTIFY_BIND_DRIVER:
+> >>> +	{
+> >>> +		struct exynos_iommu_owner *owner;
+> >>
+> >> Please move this variable to the top of the function and drop the braces
+> >> around case blocks.
+> >
+> > I don't think it is required because this function is modified
+> > by the following patches.
+> 
+> OK, if so, and similar issue is not present after further patches.
+> 
+> >
+> >>
+> >>> +
+> >>> +		/* No System MMU assigned. See exynos_sysmmu_probe(). */
+> >>> +		if (dev->archdata.iommu == NULL)
+> >>> +			break;
+> >>
+> >> This looks strange... (see below)
+> >>
+> >> Also this looks racy. There are no guarantees about device probing
+> >> order, so you may end up with master devices being probed before the
+> >> IOMMUs. Deferred probing should be used to handle this correctly.
+> >
+> > System MMU driver must be probed earlier than the drivers of master devices
+> > because the drivers may want to use System MMU for their initial task.
+> 
+> As I said, there are no guarantees about platform device probe order in 
+> Linux kernel. Code must be designed to check whether required 
+> dependencies are met and if not, deferred probing must be used.
+> 
 
-> -Christoffer
+I told that System MMU driver must be probed earlier.
+That's why exynos_iommu_init() is called by subsys_initcall level.
+I also noticed that it must be promoted to arch_initcall for some driver.
+
+> >>
+> >>> +
+> >>> +		owner = devm_kzalloc(dev, sizeof(*owner), GFP_KERNEL);
+> >>> +		if (!owner) {
+> >>> +			dev_err(dev, "No Memory for exynos_iommu_owner\n");
+> >>> +			return -ENOMEM;
+> >>> +		}
+> >>> +
+> >>> +		owner->dev = dev;
+> >>> +		INIT_LIST_HEAD(&owner->client);
+> >>> +		owner->sysmmu = dev->archdata.iommu;
+> >>> +
+> >>> +		dev->archdata.iommu = owner;
+> >>
+> >> I don't understand what is happening here in this case statement. There
+> >> is already something assigned to dev->archdata.iommu, but this code
+> >> reassigns something else to this field. This means that you attempt to
+> >> use the same field to store pointers to objects of different types,
+> >> which I believe is broken, because you have no way to check what kind of
+> >> object is currently pointed by such (void *) pointer.
+> >>
+> >
+> > exynos_sysmmu_probe() assigns the device descriptor of the probing System MMU
+> > to archdata.iommu of its master device. The assignment is just a marker that
+> > the device is a master device of a System MMU.
+> > If dev->archdata.iommu has a value in the case of BUS_NOTIFY_BIND_DRIVER,
+> > the 'dev' is a master devices of a System MMU. Then sysmmu_hook_driver_register()
+> > assigns the data structure to handle System MMU to dev->archdata.iommu.
+> 
+> Which is wrong (or even if you don't consider it wrong, it is ugly), 
+> because one (void *) pointer in the same object is used to store 
+> pointers to two completely different types.
+
+archdata.iommu has a pointer to sysmmu descriptor for a very short time
+during booting time to build complete data structure to handle System MMU.
+It is it also a matter?
+
+Anyway, this style of initialization just maintained to make the driver work
+with the old design. It is changed with the following patches.
+
+
+Regards,
+
+KyongHo
