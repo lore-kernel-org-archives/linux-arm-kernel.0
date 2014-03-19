@@ -1,53 +1,155 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Mar 2014 10:57:06 +0000
-Subject: [PATCH v2 11/15] arm64: add EFI stub
-In-Reply-To: <1395178831.2967.29.camel@deneb.redhat.com>
-References: <1394750828-16351-1-git-send-email-leif.lindholm@linaro.org>
- <1394750828-16351-12-git-send-email-leif.lindholm@linaro.org>
- <20140318120919.GG13200@arm.com>
- <1395153629.2967.10.camel@deneb.redhat.com>
- <20140318182826.GC20497@arm.com>
- <1395178831.2967.29.camel@deneb.redhat.com>
-Message-ID: <20140319105706.GE2214@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Mar 2014 11:59:20 +0100
+Subject: [PATCH v2] Documentation: dt: list all compatible strings for at91
+Message-ID: <1395226760-11446-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 09:40:31PM +0000, Mark Salter wrote:
-> On Tue, 2014-03-18 at 18:28 +0000, Catalin Marinas wrote:
-> > If UEFI doesn't handle the caches, the only thing left to EFI_STUB is to
-> > flush by MVA. We don't need to flush the whole DRAM (and I would even
-> > recommend it) but at least the relevant kernel code/data touched with
-> > the MMU disabled.
-> 
-> So, it goes like this:
-> 
->   1) UEFI calls stub with MMU/Caches on. Stub/kernel can be anywhere.
->   2) Stub runs and relocates kernel to the desired runtime location
->      but continues to execute from wherever UEFI loaded it until just
->      after ExitBootServices().
->   3) After ExitBootServices, efi_entry() returns relocated entry point
->      for kernel to efi_stub_entry() in efi-entry.S where the Dcache and
->      MMU are turned off, the __flush_dcache_all is called, then the
->      code jumps to the kernel proper entry point.
-> 
-> It isn't clear to me if UEFI does cache flushing at ExitBootServices
-> time, but even so, at least stack use will get cached between then and
-> the kernel entry point. The stub could conceivably get its hands on the
-> EFI memmap and invalidate dcache using address ranges from UEFI memory
-> descriptors so maybe that is the way we should do it.
+Avoids getting the newly introduced warning:
+WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
++				compatible = "atmel,at91sam9g45-adc";
 
-I think the stub just needs to flush the relocated kernel image, ensure
-it is sync with the memory. Additional flushing can be done by the
-kernel for bits it writes (like page tables, code patching etc). We can
-enter the kernel with the SCTLR.I bit set, so it can allocate in an
-unified cache already and D-cache maintenance would be needed anyway.
+Introduced by:
+bff5da433525 checkpatch: add DT compatible string documentation checks
 
-Another aspect in the booting document is that we require any external
-cache to be disabled. I think on ARMv8 with a more transparent external
-cache we can relax this (Applied's SoC already does this). Otherwise,
-since external cache enabling is usually a secure operation, we would
-need some SoC specific code just for this early during boot and I'd like
-to avoid it.
+Cc: Rob Herring <robh@kernel.org>
+Cc: Joe Perches <joe@perches.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Andy Whitcroft <apw@canonical.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+---
+
+Changes in v2:
+ - add the devicetree maintainers in copy
+ - acked by Nicolas
+
+ Documentation/devicetree/bindings/arm/atmel-aic.txt      |  3 +--
+ Documentation/devicetree/bindings/arm/atmel-at91.txt     | 10 ++++------
+ Documentation/devicetree/bindings/dma/atmel-dma.txt      |  2 +-
+ Documentation/devicetree/bindings/gpio/gpio_atmel.txt    |  2 +-
+ Documentation/devicetree/bindings/iio/adc/at91_adc.txt   |  4 ++--
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 10 ++++------
+ 6 files changed, 13 insertions(+), 18 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+index 2742e9cfd6b1..95f75fd097ba 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+@@ -1,8 +1,7 @@
+ * Advanced Interrupt Controller (AIC)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-aic"
+-  <chip> can be "at91rm9200" or "sama5d3"
++- compatible: "atmel,at91rm9200-aic", "atmel,sama5d3-aic"
+ - interrupt-controller: Identifies the node as an interrupt controller.
+ - interrupt-parent: For single AIC system, it is an empty property.
+ - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 16f60b41c147..e79a33315e4f 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -14,8 +14,7 @@ System Timer (ST) required properties:
+   shared across all System Controller members.
+ 
+ TC/TCLIB Timer required properties:
+-- compatible: Should be "atmel,<chip>-tcb".
+-  <chip> can be "at91rm9200" or "at91sam9x5"
++- compatible: "atmel,at91rm9200-tcb", "atmel,at91sam9x5-tcb"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain all interrupts for the TC block
+   Note that you can specify several interrupt cells if the TC
+@@ -46,8 +45,7 @@ One interrupt per TC channel in a TC block:
+ 	};
+ 
+ RSTC Reset Controller required properties:
+-- compatible: Should be "atmel,<chip>-rstc".
+-  <chip> can be "at91sam9260" or "at91sam9g45"
++- compatible: "atmel,at91sam9260-rstc", "atmel,at91sam9g45-rstc"
+ - reg: Should contain registers location and length
+ 
+ Example:
+@@ -80,8 +78,8 @@ Examples:
+ SHDWC Shutdown Controller
+ 
+ required properties:
+-- compatible: Should be "atmel,<chip>-shdwc".
+-  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
++- compatible: "atmel,at91sam9260-shdwc", "atmel,at91sam9rl-shdwc",
++	"atmel,at91sam9x5-shdwc"
+ - reg: Should contain registers location and length
+ 
+ optional properties:
+diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+index f69bcf5a6343..410bff989949 100644
+--- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
++++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+@@ -1,7 +1,7 @@
+ * Atmel Direct Memory Access Controller (DMA)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-dma".
++- compatible: "atmel,at91sam9rl-dma", "atmel,at91sam9g45-dma"
+ - reg: Should contain DMA registers location and length.
+ - interrupts: Should contain DMA interrupt.
+ - #dma-cells: Must be <2>, used to represent the number of integer cells in
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+index 85f8c0d084fa..1fa10565adcc 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+@@ -1,7 +1,7 @@
+ * Atmel GPIO controller (PIO)
+ 
+ Required properties:
+-- compatible: "atmel,<chip>-gpio", where <chip> is at91rm9200 or at91sam9x5.
++- compatible: "atmel,at91rm9200-gpio", "atmel,at91rm9x5-gpio"
+ - reg: Should contain GPIO controller registers location and length
+ - interrupts: Should be the port interrupt shared by all the pins.
+ - #gpio-cells: Should be two.  The first cell is the pin number and
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+index 82061c7e4fea..ac26cc13dd9f 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+@@ -1,8 +1,8 @@
+ * AT91's Analog to Digital Converter (ADC)
+ 
+ Required properties:
+-  - compatible: Should be "atmel,<chip>-adc"
+-    <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
++  - compatible: "atmel,at91sam9260-adc", "atmel,at91sam9rl-adc",
++  		"atmel,at91sam9g45-adc", "atmel,at91sam9x5-adc",
+   - reg: Should contain ADC registers location and length
+   - interrupts: Should contain the IRQ line for the ADC
+   - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 9c5d19ac935c..ebc5b0cb7669 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -1,9 +1,7 @@
+ * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+ 
+ Required properties:
+-- compatible: Should be "atmel,<chip>-usart"
+-  The compatible <chip> indicated will be the first SoC to support an
+-  additional mode or an USART new feature.
++- compatible: Should be "atmel,at91rm9200-usart", "atmel,at91sam9260-usart",
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt
+ - clock-names: tuple listing input clock names.
+@@ -19,9 +17,9 @@ Optional properties:
+ 		Refer to dma.txt and atmel-dma.txt for details.
+ 	- dma-names: "rx" for RX channel, "tx" for TX channel.
+ 
+-<chip> compatible description:
+-- at91rm9200:  legacy USART support
+-- at91sam9260: generic USART implementation for SAM9 SoCs
++compatible description:
++- atmel,at91rm9200-usart:  legacy USART support
++- atmel,at91sam9260-usart: generic USART implementation for SAM9 SoCs
+ 
+ Example:
+ - use PDC:
 -- 
-Catalin
+1.8.3.2
