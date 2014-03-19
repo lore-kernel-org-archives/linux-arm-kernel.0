@@ -1,28 +1,50 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 19 Mar 2014 16:15:26 -0300
-Subject: [PATCH 0/4] sunxi clock fixes
-In-Reply-To: <20140319190418.30995.17661@quantum>
-References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
- <20140319190418.30995.17661@quantum>
-Message-ID: <5329ECCE.7010700@elopez.com.ar>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 19 Mar 2014 20:21:16 +0100
+Subject: [PATCH v7 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
+ controller
+Message-ID: <1395256879-8475-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
+Three register are present to (un)mask, control and acknowledge NMI.
+These two patches add a new irqchip driver in cascade with GIC.
 
-El 19/03/14 16:04, Mike Turquette escribi?:
-> Quoting Emilio L?pez (2014-03-19 11:19:29)
->> Hi everyone,
->>
->> This is a small series of patches fixing a couple of bugs that are
->> present on the sunxi clock driver. Mike, are there any chances we can
->> take these during the 3.15 merge window or -rc period?
->
-> I can take these towards 3.15. Do you want me to take the dts patch too?
+Changes since v1:
+        - added binding document
 
-I'd rather have Maxime take it to avoid potential conflicts. That patch 
-can wait in any case; there's no actual pll4 consumer in tree just yet.
+Changes since v2:
+        - fixed trigger type in DTS
+        - new explanations in binding documentation
+        - added support for A31 (sun6i)
 
-Cheers,
+Changes since v3:
+        - changed compatibles
 
-Emilio
+Changes since v4:
+        - fixed binding documentation
+
+Changes since v5:
+        - switched to handle_fasteoi_irq handler to avoid the double
+          interrupts issue
+
+Changes since v6:
+	- changed node name
+	- deleted defaulted interrupt-parent property
+
+Carlo Caione (3):
+  ARM: sun7i/sun6i: irqchip: Add irqchip driver for NMI controller
+  ARM: sun7i/sun6i: dts: Add NMI irqchip support
+  ARM: sun7i/sun6i: irqchip: Update the documentation
+
+ .../allwinner,sun67i-sc-nmi.txt                    |  27 +++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   8 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   8 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-sunxi-nmi.c                    | 208 +++++++++++++++++++++
+ 5 files changed, 252 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ create mode 100644 drivers/irqchip/irq-sunxi-nmi.c
+
+-- 
+1.8.3.2
