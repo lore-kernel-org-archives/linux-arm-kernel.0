@@ -1,38 +1,25 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Wed, 19 Mar 2014 20:15:36 +0000
-Subject: [PATCH 11/62] ARM: ep93xx: export ep93xx_chip_revision
-In-Reply-To: <1395257399-359545-12-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-12-git-send-email-arnd@arndb.de>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8825DC177D@P3PWEX4MB008.ex4.secureserver.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Mar 2014 20:16:42 +0000
+Subject: [GIT PULL] uprobes: Add uprobes support for ARM
+In-Reply-To: <5328C585.6070100@linaro.org>
+References: <1394223040-17129-1-git-send-email-dave.long@linaro.org>
+ <531F5799.2070302@linaro.org> <20140317235229.GQ21483@n2100.arm.linux.org.uk>
+ <5328C585.6070100@linaro.org>
+Message-ID: <20140319201642.GJ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 12:29 PM, Arnd Bergmann wrote:
-> ep93xx_chip_revision is used by the pata_ep93xx driver,
-> which can be a loadable module. Exporting the symbol
-> avoids a link error in this case.
+On Tue, Mar 18, 2014 at 06:15:33PM -0400, David Long wrote:
+> OK, I consulted with a couple coworkers and the fix for this was  
+> particularly easy.  The respun branch is in place now.  Same repo, same  
+> branch name, based on v3.14-rc5.  Sorry for the newbie mistake.
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> ---
->  arch/arm/mach-ep93xx/core.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 6c70547..0e571f1 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -242,6 +242,7 @@ unsigned int ep93xx_chip_revision(void)
->  	v >>= EP93XX_SYSCON_SYSCFG_REV_SHIFT;
->  	return v;
->  }
-> +EXPORT_SYMBOL_GPL(ep93xx_chip_revision);
->  
->  /*************************************************************************
->   * EP93xx GPIO
+> I'm assuming a new git-pull request is not required (until I hear  
+> otherwise).
 
-Good catch. Thanks.
+That's fine, I've re-pulled it and it all looks perfect now.  Thanks
+for the quick response.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
