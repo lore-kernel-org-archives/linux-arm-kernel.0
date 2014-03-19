@@ -1,81 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 18:46:28 +0100
-Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
-In-Reply-To: <CABb+yY0XXMQaEuDV0FeURjOijYEUKyqU9Dr6XTDRcxc1qaBu9g@mail.gmail.com>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <5346848.pBsh8NcQja@wuerfel>
- <CABb+yY0XXMQaEuDV0FeURjOijYEUKyqU9Dr6XTDRcxc1qaBu9g@mail.gmail.com>
-Message-ID: <201403191846.28563.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Mar 2014 12:53:11 -0500
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140319172140.GA16328@e106497-lin.cambridge.arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140314171457.GK18126@arm.com> <201403141838.08900.arnd@arndb.de>
+ <20140314180527.GZ6457@e106497-lin.cambridge.arm.com>
+ <20140317173821.GJ24070@arm.com>
+ <20140317180525.GL6457@e106497-lin.cambridge.arm.com>
+ <20140319135619.GC6231@localhost>
+ <20140319172140.GA16328@e106497-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqJCa6kz8H_W7vz4YW5eOrOZ43kwxQq9Uh-M0qpCtW_pQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 March 2014, Jassi Brar wrote:
-> On Mon, Mar 17, 2014 at 5:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 17 March 2014 17:33:59 Girish K S wrote:
-> >> +Samsung Mailbox Driver
-> >> +
-> >> +Required properties:
-> >> +- compatible:          Should be one of the following,
-> >> +                           "samsung,gh7-mailbox" for
-> >> +                               Samsung GH7 SoC series
-> >> +                           "samsung,exynos-mailbox" for
-> >> +                               exynosx SoC series
-> >> +- reg:                 Contains the mailbox register address range (base address
-> >> +                       and length)
-> >> +- interrupts:          Contains the interrupt information for the mailbox
-> >> +                       device.
-> >> +- samsung,mbox-names:  Array of the names of the mailboxes
-> >>
-> >
-> > I think we should not allow new mailbox drivers that don't conform to
-> > the framework that is currently under discussion. In particular, this
-> > means don't do a "samsung,mbox-names" property. The current consensus
-> > seems to be to have a #mbox-cells" property that allows to pass extra
-> > parameters from the client driver, and uses an "mboxes" property
-> > to reference the mailbox provided.
-> >
-> > It would be good if you follow up for the subsystem discussion and
-> > ensure it gets merged in time, and supports all the use cases you are
-> > interested in. The interface is not entirely nailed down yet, so
-> > it's a good time to contribute. However, I can already promise that
-> > it won't use matching by strings.
-> >
-> I was just about to submit next revision of framework that this
-> Samsung driver conforms to. Now I think I need some expert opinion ...
-> (sorry if following is repetition)
-> 
->   As Kumar Gala pointed out in the other thread, the mailbox/ipc chain
-> is going to be _very_ platform specific so much so that one rethinks
-> if a common api is even warranted : because the client driver will be
-> different even if just the remote api(which is going to be
-> proprietary) changes, keeping everything else same. For example, a
-> client driver for Highbank is highly unlikely to be reusable on
-> Exynos, even if both used the same mailbox controller. By my limited
-> foresight, mailbox assignment via DT doesn't bring us much benefit but
-> only ritual code.
+On Wed, Mar 19, 2014 at 12:21 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Wed, Mar 19, 2014 at 01:56:19PM +0000, Catalin Marinas wrote:
+>> On Mon, Mar 17, 2014 at 06:05:25PM +0000, Liviu Dudau wrote:
+>> > On Mon, Mar 17, 2014 at 05:38:21PM +0000, Catalin Marinas wrote:
+>> > > On Fri, Mar 14, 2014 at 06:05:27PM +0000, Liviu Dudau wrote:
+>> > > > On Fri, Mar 14, 2014 at 05:38:08PM +0000, Arnd Bergmann wrote:
+>> > > > > On Friday 14 March 2014, Catalin Marinas wrote:
+>> > > > > > On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
+>> > > > > > > --- /dev/null
+>> > > > > > > +++ b/arch/arm64/kernel/pci.c
+>> > > > > > [...]
+>> > > > > > > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
+>> > > > > > [...]
+>> > > > > > > +unsigned long pci_address_to_pio(phys_addr_t address)
+>> > > > > > [...]
+>> > > > > > > +void pcibios_fixup_bus(struct pci_bus *bus)
+>> > > > > > [ actually most of this file ]
+>> > > > > >
+>> > > > > > Maybe it was raised before already but can we have __weak generic
+>> > > > > > definitions of these functions? They don't seem to be arm64 specific in
+>> > > > > > any way.
+>> > > [...]
+>> > > > Catalin, if you are happy to ask for ACKs from all arch maintainers that might get
+>> > > > affected by our custom version of pci_address_to_pio() before you can pull PCI support
+>> > > > for arm64 then I can propose a new patchset.
+>> > >
+>> > > You don't need to change the other architectures, that's the point of a
+>> > > __weak definition, it will be automatically overridden. If you want, you
+>> > > can even place a GENERIC_PCI or whatever config option that is only
+>> > > selected by arm64 for the time being.
+>> >
+>> > pci_address_to_pio() is alread __weak. My patch was adding the arm64 version of it. Adding
+>> > an #ifdef GENERIC_PCI to the __weak implementation is not just a temporary solution.
+>>
+>> Ah, I start to understand what you mean, pci_address_to_pio() is already
+>> defined as __weak in drivers/of/address.c. So the reason we redefine it
+>> on arm64 is that it uses the io_list resources which are populated by
+>> pci_register_io_range(). Do you see any other architecture using a
+>> similar logic (that could be shared)?
+>
+> All architectures that memory map the PCI IO range should be supported by my version of
+> pci_address_to_pio(). But that still leaves the x86 and those architectures that have
+> separate IO space or map it 1:1 into CPU address space to carry a different version (which
+> the current "generic" weak version catters for).
+>
+>>
+>> Any other functions in this file that could be shared (and are not
+>> __weak already)?
+>
+> A version of the pci_register_io_range() that uses part of pci_ioremap_io() (the calculation
+> of io_offset part).
+>
+> My ultimate point is that no matter how long we argue about the shape of the functions that
+> I've added into arch/arm64/kernel/pci.c I don't think we can get away without having that
+> file, or at least not in the first phase if we want speedy integration into mainline.
 
-I don't see what that would change. Doing a cross-device binding in DT
-is hard, as we see by lots of people (e.g. the above "samsung,mbox-names"
-crap) getting it wrong. If we do it properly once, everyone can use the
-same binding, and common code to parse the connection between the
-mailbox driver and the user.
+"Speedy integration into mainline" is another way to say "leave it for
+others to deal with and clean up later."
 
->   Perhaps the mailbox controller driver should name its links as it
-> wants. By how the remote works with the mailbox links, the client
-> driver asks for a specific mailbox link (which maybe a hardcoded
-> string in the driver or be gotten alongside other data via client's
-> DT) ?
+I've successfully used the preceeding series on ARM converting the
+Versatile PCI support to use it. The main part of the process was just
+copying this arm64 code to arm which tells me the code is in the wrong
+place. There are still some differences in pcibios_fixup_bus, and it
+is not clear to me whether the arm version should be doing all the
+things the arm64 version does and vice-versa. Certainly that should be
+sorted out. The other issues I see is pci_ioremap_io still has to be
+called by the driver and is not aligned at least for the prototype as
+I pointed out. Seems all these issues could be fixed with a simple
+CONFIG_ARCH_HAS_MMIO_IOSPACE kconfig option.
 
-I don't see why we should do it any different from the other bindings.
-Let's just stick with mboxes/mbox-names or mailboxes/mailbox-names
-if you prefer.
-
->   IOW we can't have a generic API/DT-bindings that could get us
-> reusable client drivers. But only common framework/code that would
-> otherwise be duplicated by every platform.
-
-That is a major benefit though.
-Also even if most drivers won't work across multiple platforms, there
-is still a reasonable chance that /some/ drivers will.
-
-	Arnd
+Rob
