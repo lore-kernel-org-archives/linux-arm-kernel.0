@@ -1,42 +1,26 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Mar 2014 16:32:39 -0700
-Subject: [PATCH v3 0/4] clk: at91: better support for the PCKs
-In-Reply-To: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
-References: <1394528435-23734-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <20140319233239.21989.44031@quantum>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Mar 2014 16:38:45 -0700
+Subject: Forcing DEBUG_UART_{PHYS,
+ VIRT} changes when switching between v7 platforms?
+Message-ID: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-03-11 02:00:31)
-> From: Boris BREZILLON <b.brezillon@overkiz.com>
-> 
-> This serie implements a better support for the Programmable Clocks.
-> The first two patch are related to changing the rate of the PCKs.
-> The 3rd patch is a fix to handle properly the PCKRDY interrupt.
-> The last patch is a small optimzation/simplification of the determine_rate
-> algorithm for the PCK.
+Hi,
 
-Taken into clk-next.
+When switching between different Multi v7 platform which all select
+DEBUG_UART_8250, whichever platform managed to set
+DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
+others.
 
-Regards,
-Mike
+What I am seeing at the moment is for instance enabling BCM_MOBILE
+will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
+enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
+re-computed.
 
-> 
-> Changes since v2:
-> - remove unnecessary CLK_SET_RATE_GATE flag from system clk setting
-> 
-> Boris BREZILLON (2):
->   clk: at91: replace prog clk round_rate with determine_rate
->   clk: at91: propagate rate change on system clks
-> 
-> Jean-Jacques Hiblot (2):
->   clk: at91: fix programmable clk irq handling
->   clk: at91: optimization of the set_rate callback
-> 
->  drivers/clk/at91/clk-programmable.c |  202 +++++++++++------------------------
->  drivers/clk/at91/clk-system.c       |   76 +++++++++++--
->  2 files changed, 126 insertions(+), 152 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+Should we add some sort of specific annotation to the Kconfig symbol
+to force a recalculation of the UART PHYS address?
+
+Thanks!
+-- 
+Florian
