@@ -1,61 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Mar 2014 13:46:19 -0700
-Subject: [PATCH 24/62] ARM: omap1: select I2C where needed for PMIC
-In-Reply-To: <1395257399-359545-25-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-25-git-send-email-arnd@arndb.de>
-Message-ID: <20140319204619.GB8333@atomide.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 19 Mar 2014 13:47:38 -0700
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140319154434.GA3488@arch.cereza>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140316070917.GA3094@arch.cereza>
+ <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
+ <20140317204410.GA1118@arch.cereza>
+ <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
+ <20140319154434.GA3488@arch.cereza>
+Message-ID: <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140319 12:33]:
-> The OMAP H2, OSK and OSIRIS machines cannot build without
-> I2C and TPS65010 both enabled unconditionally.
-> 
-> In each case, failing to enable CONFIG_I2C results in a
-> build or link error, so most consistent solution is to
-> ensure that it is impossible to disable those options.
-> 
-> It would be nice to leave CONFIG_I2C as user-selectable,
-> but doing that properly would require more work.
+On 19 March 2014 08:44, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Thanks!
+> On the other side, this board has no pm_power_off() support, which means
+> kernel_halt() is called after kernel_power_off().
+>
+> I'm not sure if a NULL pm_power_off() is supported, but this makes my kernel
+> crash in a reboot notifier that's called twice (first in kernel_power_off
+> and then in kernel_halt):
 
-We should not select drivers. How about let's just have
-the tps65010 stuff behind an ifdef CONFIG_TPS65010 for
-those boards?
+The omap board I'm using has a null pm_power_off.  I added code to
+bypass kernel_power_off in the event pm_power_off is null like this:
 
-Regards,
 
-Tony
- 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> ---
->  arch/arm/mach-omap1/Kconfig | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
-> index cdd05f2..23ab1d5 100644
-> --- a/arch/arm/mach-omap1/Kconfig
-> +++ b/arch/arm/mach-omap1/Kconfig
-> @@ -44,6 +44,8 @@ config MACH_OMAP_INNOVATOR
->  config MACH_OMAP_H2
->  	bool "TI H2 Support"
->  	depends on ARCH_OMAP1 && ARCH_OMAP16XX
-> +	select TPS65010
-> +	select I2C
->      	help
->  	  TI OMAP 1610/1611B H2 board support. Say Y here if you have such
->  	  a board.
-> @@ -64,6 +66,8 @@ config MACH_HERALD
->  config MACH_OMAP_OSK
->  	bool "TI OSK Support"
->  	depends on ARCH_OMAP1 && ARCH_OMAP16XX
-> +	select TPS65010
-> +	select I2C
->      	help
->  	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
->            if you have such a board.
-> -- 
-> 1.8.3.2
-> 
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index a5f702a..d96b910 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -594,7 +594,8 @@ static void power_down(void)
+        case HIBERNATION_PLATFORM:
+                hibernation_platform_enter();
+        case HIBERNATION_SHUTDOWN:
+-               kernel_power_off();
++               if (pm_power_off)
++                       kernel_power_off();
+                break;
+ #ifdef CONFIG_SUSPEND
+        case HIBERNATION_SUSPEND:
+
+
+This follows the behavior in the reboot syscall which does it this way
+also.  I'm testing this now, and it seems work fine.  If this looks
+good, I can add it as an additional patch.
+
+Thanks,
+
+Sebastian
