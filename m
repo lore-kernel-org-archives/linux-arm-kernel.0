@@ -1,35 +1,68 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 19 Mar 2014 13:49:57 +0100
-Subject: [PATCH v6 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
- controller
-In-Reply-To: <alpine.DEB.2.02.1403191341070.18573@ionos.tec.linutronix.de>
-References: <1394890861-18347-1-git-send-email-carlo@caione.org>
- <alpine.DEB.2.02.1403191213240.18573@ionos.tec.linutronix.de>
- <20140319123241.GI27873@lukather>
- <alpine.DEB.2.02.1403191341070.18573@ionos.tec.linutronix.de>
-Message-ID: <CAOQ7t2ZBayBmKL2O+__u-1zJ2tfoSn0f+0nEBpifTUf7wwLXwQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Mar 2014 14:03:16 +0100
+Subject: [PATCH 03/16] ARM: at91: at91sam9263: switch to generic PWM framework
+In-Reply-To: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395234209-15546-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 1:41 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Wed, 19 Mar 2014, Maxime Ripard wrote:
->
->> On Wed, Mar 19, 2014 at 12:13:56PM +0100, Thomas Gleixner wrote:
->> > On Sat, 15 Mar 2014, Carlo Caione wrote:
->> >
->> > > Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
->> > > Three register are present to (un)mask, control and acknowledge NMI.
->> > > These two patches add a new irqchip driver in cascade with GIC.
->> >
->> > If I get an ack for the DT parts, I'll pick it up.
->>
->> I had some comments on it, so Carlo will probably resubmit it.
->
-> That's the resubmit as far as I can tell.
+Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
 
-I'll submit a v7 addressing the Maxime's comments on DT part.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/at91sam9263.c         |  1 +
+ arch/arm/mach-at91/at91sam9263_devices.c | 11 ++---------
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
-Regards,
-
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 37b90f4b990c..d0c2d4955cd7 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -198,6 +198,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 4aeadddbc181..160acd96cdda 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -1129,9 +1129,7 @@ static void __init at91_add_device_watchdog(void) {}
+  *  PWM
+  * --------------------------------------------------------------------*/
+ 
+-#if defined(CONFIG_ATMEL_PWM)
+-static u32 pwm_mask;
+-
++#if IS_ENABLED(CONFIG_PWM_ATMEL)
+ static struct resource pwm_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9263_BASE_PWMC,
+@@ -1146,11 +1144,8 @@ static struct resource pwm_resources[] = {
+ };
+ 
+ static struct platform_device at91sam9263_pwm0_device = {
+-	.name	= "atmel_pwm",
++	.name	= "at91sam9rl-pwm",
+ 	.id	= -1,
+-	.dev	= {
+-		.platform_data		= &pwm_mask,
+-	},
+ 	.resource	= pwm_resources,
+ 	.num_resources	= ARRAY_SIZE(pwm_resources),
+ };
+@@ -1169,8 +1164,6 @@ void __init at91_add_device_pwm(u32 mask)
+ 	if (mask & (1 << AT91_PWM3))
+ 		at91_set_B_periph(AT91_PIN_PB29, 1);	/* enable PWM3 */
+ 
+-	pwm_mask = mask;
+-
+ 	platform_device_register(&at91sam9263_pwm0_device);
+ }
+ #else
 -- 
-Carlo Caione
+1.8.3.2
