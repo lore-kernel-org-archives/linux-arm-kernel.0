@@ -1,39 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 19 Mar 2014 08:50:08 +0100
-Subject: [PATCH v3 1/3] clk: s2mps11: Add support for S2MPS14 clocks
-In-Reply-To: <20140319001643.30995.46947@quantum>
-References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
- <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
- <20140319001643.30995.46947@quantum>
-Message-ID: <1395215408.18730.2.camel@AMDC1943>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 19 Mar 2014 15:51:22 +0800
+Subject: pull request on hisilicon clock driver
+Message-ID: <CAN1soZxL61veKXCqB1r4Vjy3RcLOQDJK9qDpm6-Dog6jH_v1UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-18 at 17:16 -0700, Mike Turquette wrote:
-> Quoting Krzysztof Kozlowski (2014-03-17 02:19:16)
-> > This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
-> > s2mps11 clock driver.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> This does not apply cleanly to to clk tree trip, nor does it compile
-> after manually merging due to changes introducing
-> linux/mfd/samsung/s2mps14.h.
-> 
-> The changes look OK to me so maybe Lee can take it with my Ack?
-> 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-> 
+Hi Mike,
 
-Hi,
+Please help to merge the pull request on hisilicon clock driver.
 
-Thanks for the Ack. The patch depends on Tushar Behera's patches:
- - [PATCH V2 0/2] Add support for clocks in S5M8767
-   http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27264
-which are waiting for some time. Both patchsets should be pulled
-together.
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-Best regards,
-Krzysztof
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+tags/clk-hisi
+
+for you to fetch changes up to 75af25f581b1ffc63e06cb01547b3141d4cd5f58:
+
+  clk: hisi: remove static variable (2014-03-19 15:31:27 +0800)
+
+----------------------------------------------------------------
+updating clock drivers for Hisilicon
+
+----------------------------------------------------------------
+Haojian Zhuang (3):
+      clk: hisi: assign missing clk to table
+      clk: hip04: add clock driver
+      clk: hisi: remove static variable
+
+ drivers/clk/Makefile                    |  1 +
+ drivers/clk/hisilicon/Makefile          |  5 ++++-
+ drivers/clk/hisilicon/clk-hi3620.c      | 25 ++++++++-----------------
+ drivers/clk/hisilicon/clk-hip04.c       | 58
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/hisilicon/clk.c             | 62
++++++++++++++++++++++++++++++++++++++++++++++++---------------
+ drivers/clk/hisilicon/clk.h             | 17 +++++++++++------
+ include/dt-bindings/clock/hip04-clock.h | 35
++++++++++++++++++++++++++++++++++++
+ 7 files changed, 164 insertions(+), 39 deletions(-)
+ create mode 100644 drivers/clk/hisilicon/clk-hip04.c
+ create mode 100644 include/dt-bindings/clock/hip04-clock.h
+
+Best Regards
+Haojian
