@@ -1,155 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Mar 2014 11:59:20 +0100
-Subject: [PATCH v2] Documentation: dt: list all compatible strings for at91
-Message-ID: <1395226760-11446-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 19 Mar 2014 13:04:42 +0200
+Subject: [PATCH] Video: atmel: avoid the id of fix screen info is
+ overwritten
+In-Reply-To: <1395215275-14345-1-git-send-email-voice.shen@atmel.com>
+References: <1395215275-14345-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <532979CA.6040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoids getting the newly introduced warning:
-WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
-+				compatible = "atmel,at91sam9g45-adc";
+On 19/03/14 09:47, Bo Shen wrote:
+> Correct passing parameter sequence, which will avoid the id of
+> fix screen info is overwritten.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+>  drivers/video/atmel_lcdfb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index cd96162..695f28a 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -1190,12 +1190,12 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>  	if (!sinfo->config)
+>  		goto free_info;
+>  
+> -	strcpy(info->fix.id, sinfo->pdev->name);
+>  	info->flags = ATMEL_LCDFB_FBINFO_DEFAULT;
+>  	info->pseudo_palette = sinfo->pseudo_palette;
+>  	info->fbops = &atmel_lcdfb_ops;
+>  
+>  	info->fix = atmel_lcdfb_fix;
+> +	strcpy(info->fix.id, sinfo->pdev->name);
+>  
+>  	/* Enable LCDC Clocks */
+>  	sinfo->bus_clk = clk_get(dev, "hclk");
+> 
 
-Introduced by:
-bff5da433525 checkpatch: add DT compatible string documentation checks
+Thanks, queued for 3.15.
 
-Cc: Rob Herring <robh@kernel.org>
-Cc: Joe Perches <joe@perches.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Andy Whitcroft <apw@canonical.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+ Tomi
 
----
 
-Changes in v2:
- - add the devicetree maintainers in copy
- - acked by Nicolas
-
- Documentation/devicetree/bindings/arm/atmel-aic.txt      |  3 +--
- Documentation/devicetree/bindings/arm/atmel-at91.txt     | 10 ++++------
- Documentation/devicetree/bindings/dma/atmel-dma.txt      |  2 +-
- Documentation/devicetree/bindings/gpio/gpio_atmel.txt    |  2 +-
- Documentation/devicetree/bindings/iio/adc/at91_adc.txt   |  4 ++--
- Documentation/devicetree/bindings/serial/atmel-usart.txt | 10 ++++------
- 6 files changed, 13 insertions(+), 18 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-index 2742e9cfd6b1..95f75fd097ba 100644
---- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-@@ -1,8 +1,7 @@
- * Advanced Interrupt Controller (AIC)
- 
- Required properties:
--- compatible: Should be "atmel,<chip>-aic"
--  <chip> can be "at91rm9200" or "sama5d3"
-+- compatible: "atmel,at91rm9200-aic", "atmel,sama5d3-aic"
- - interrupt-controller: Identifies the node as an interrupt controller.
- - interrupt-parent: For single AIC system, it is an empty property.
- - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 16f60b41c147..e79a33315e4f 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -14,8 +14,7 @@ System Timer (ST) required properties:
-   shared across all System Controller members.
- 
- TC/TCLIB Timer required properties:
--- compatible: Should be "atmel,<chip>-tcb".
--  <chip> can be "at91rm9200" or "at91sam9x5"
-+- compatible: "atmel,at91rm9200-tcb", "atmel,at91sam9x5-tcb"
- - reg: Should contain registers location and length
- - interrupts: Should contain all interrupts for the TC block
-   Note that you can specify several interrupt cells if the TC
-@@ -46,8 +45,7 @@ One interrupt per TC channel in a TC block:
- 	};
- 
- RSTC Reset Controller required properties:
--- compatible: Should be "atmel,<chip>-rstc".
--  <chip> can be "at91sam9260" or "at91sam9g45"
-+- compatible: "atmel,at91sam9260-rstc", "atmel,at91sam9g45-rstc"
- - reg: Should contain registers location and length
- 
- Example:
-@@ -80,8 +78,8 @@ Examples:
- SHDWC Shutdown Controller
- 
- required properties:
--- compatible: Should be "atmel,<chip>-shdwc".
--  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
-+- compatible: "atmel,at91sam9260-shdwc", "atmel,at91sam9rl-shdwc",
-+	"atmel,at91sam9x5-shdwc"
- - reg: Should contain registers location and length
- 
- optional properties:
-diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-index f69bcf5a6343..410bff989949 100644
---- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-@@ -1,7 +1,7 @@
- * Atmel Direct Memory Access Controller (DMA)
- 
- Required properties:
--- compatible: Should be "atmel,<chip>-dma".
-+- compatible: "atmel,at91sam9rl-dma", "atmel,at91sam9g45-dma"
- - reg: Should contain DMA registers location and length.
- - interrupts: Should contain DMA interrupt.
- - #dma-cells: Must be <2>, used to represent the number of integer cells in
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-index 85f8c0d084fa..1fa10565adcc 100644
---- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-@@ -1,7 +1,7 @@
- * Atmel GPIO controller (PIO)
- 
- Required properties:
--- compatible: "atmel,<chip>-gpio", where <chip> is at91rm9200 or at91sam9x5.
-+- compatible: "atmel,at91rm9200-gpio", "atmel,at91rm9x5-gpio"
- - reg: Should contain GPIO controller registers location and length
- - interrupts: Should be the port interrupt shared by all the pins.
- - #gpio-cells: Should be two.  The first cell is the pin number and
-diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-index 82061c7e4fea..ac26cc13dd9f 100644
---- a/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/at91_adc.txt
-@@ -1,8 +1,8 @@
- * AT91's Analog to Digital Converter (ADC)
- 
- Required properties:
--  - compatible: Should be "atmel,<chip>-adc"
--    <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
-+  - compatible: "atmel,at91sam9260-adc", "atmel,at91sam9rl-adc",
-+  		"atmel,at91sam9g45-adc", "atmel,at91sam9x5-adc",
-   - reg: Should contain ADC registers location and length
-   - interrupts: Should contain the IRQ line for the ADC
-   - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 9c5d19ac935c..ebc5b0cb7669 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -1,9 +1,7 @@
- * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
- 
- Required properties:
--- compatible: Should be "atmel,<chip>-usart"
--  The compatible <chip> indicated will be the first SoC to support an
--  additional mode or an USART new feature.
-+- compatible: Should be "atmel,at91rm9200-usart", "atmel,at91sam9260-usart",
- - reg: Should contain registers location and length
- - interrupts: Should contain interrupt
- - clock-names: tuple listing input clock names.
-@@ -19,9 +17,9 @@ Optional properties:
- 		Refer to dma.txt and atmel-dma.txt for details.
- 	- dma-names: "rx" for RX channel, "tx" for TX channel.
- 
--<chip> compatible description:
--- at91rm9200:  legacy USART support
--- at91sam9260: generic USART implementation for SAM9 SoCs
-+compatible description:
-+- atmel,at91rm9200-usart:  legacy USART support
-+- atmel,at91sam9260-usart: generic USART implementation for SAM9 SoCs
- 
- Example:
- - use PDC:
--- 
-1.8.3.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/50ae446a/attachment.sig>
