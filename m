@@ -1,29 +1,65 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 19 Mar 2014 13:30:26 +0100
-Subject: [PATCH v2 7/7] sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT
- level
-In-Reply-To: <20140319120555.GL27632@laptop.programming.kicks-ass.net>
-References: <1395165409-18055-1-git-send-email-vincent.guittot@linaro.org>
- <1395165409-18055-8-git-send-email-vincent.guittot@linaro.org>
- <20140319120555.GL27632@laptop.programming.kicks-ass.net>
-Message-ID: <CAKfTPtAMVoZbdqafwCmU3mGeO+UiXEamtwqF-MMLsEqQnSc8FQ@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 19 Mar 2014 17:55:53 +0530
+Subject: [PATCH 0/4] Consolidate Exynos machine code
+Message-ID: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2014 13:05, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, Mar 18, 2014 at 06:56:49PM +0100, Vincent Guittot wrote:
->> Set the power domain dependency at SMT level of Power8 but keep the flag
->> clear at CPU level. The goal is to consolidate tasks on the threads of a
->> core up to a level as decribed in the link below:
->> https://lkml.org/lkml/2014/3/12/16
->
-> I've not yet looked at the link; but its best to avoid references and
-> have a Changelog that can stand on its own.
+This patch series consolidates the Exynos machine code and common
+code into a single file to avoid code duplication and introduces
+generic compatible strings for Exynos4 and 5 SoC series.
 
-I can copy/paste Preeti's explanation in the commit message
+Complete discussion and motivation for this series is found here:
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/27268
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This series is based on the latest linux-next and depends on
+1. Tomasz Figa's PM consolidation series 1 and 2
+2. Patch: ARM: SAMSUNG: Reorganize calls to reserve memory for MFC
+http://www.spinics.net/lists/linux-samsung-soc/msg25501.html
+3. Patch: ARM: EXYNOS: Add support to reserve memory for MFC-v7
+http://www.spinics.net/lists/arm-kernel/msg315940.html
+4. Kconfig and CPU init Consolidation series
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/28216
+
+Sachin Kamat (4):
+  ARM: SAMSUNG: Introduce generic Exynos4 and 5 helpers
+  ARM: EXYNOS: Consolidate Exynos4 and 5 machine files
+  ARM: EXYNOS: Add generic compatible strings
+  ARM: dts: Update Exynos DT files with generic compatible strings
+
+ arch/arm/boot/dts/exynos4210-origen.dts         |    2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |    2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts          |    2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi               |    2 +-
+ arch/arm/boot/dts/exynos4212.dtsi               |    2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts         |    2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |    2 +-
+ arch/arm/boot/dts/exynos4412-tiny4412.dts       |    2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts         |    2 +-
+ arch/arm/boot/dts/exynos4412.dtsi               |    2 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts           |    2 +-
+ arch/arm/boot/dts/exynos5250.dtsi               |    2 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts   |    2 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |    2 +-
+ arch/arm/boot/dts/exynos5420.dtsi               |    2 +-
+ arch/arm/boot/dts/exynos5440-sd5v1.dts          |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts       |    2 +-
+ arch/arm/boot/dts/exynos5440.dtsi               |    2 +-
+ arch/arm/mach-exynos/Makefile                   |    7 +-
+ arch/arm/mach-exynos/common.h                   |    3 +-
+ arch/arm/mach-exynos/{common.c => exynos.c}     |  135 ++++++++++++++++-------
+ arch/arm/mach-exynos/mach-exynos4-dt.c          |   53 ---------
+ arch/arm/mach-exynos/mach-exynos5-dt.c          |   83 --------------
+ arch/arm/mach-exynos/regs-pmu.h                 |    1 -
+ arch/arm/plat-samsung/include/plat/cpu.h        |    4 +
+ 29 files changed, 121 insertions(+), 209 deletions(-)
+ rename arch/arm/mach-exynos/{common.c => exynos.c} (75%)
+ delete mode 100644 arch/arm/mach-exynos/mach-exynos4-dt.c
+ delete mode 100644 arch/arm/mach-exynos/mach-exynos5-dt.c
+
+-- 
+1.7.9.5
