@@ -1,22 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Mar 2014 20:49:47 +0000
-Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
-In-Reply-To: <1395257399-359545-45-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Mar 2014 21:57:42 +0100
+Subject: [PATCH 24/62] ARM: omap1: select I2C where needed for PMIC
+In-Reply-To: <20140319204619.GB8333@atomide.com>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-45-git-send-email-arnd@arndb.de>
-Message-ID: <20140319204946.GK7528@n2100.arm.linux.org.uk>
+ <1395257399-359545-25-git-send-email-arnd@arndb.de>
+ <20140319204619.GB8333@atomide.com>
+Message-ID: <19769201.1MOf3JVGbC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:41PM +0100, Arnd Bergmann wrote:
-> This adds a new Kconfig option for the Integrator platform to
-> choose between ARMv4/ARMv5 based CPUs and those based on ARMv6/ARMv7,
-> which is required because we cannot have both classes enabled in the
-> same kernel at compile time.
+On Wednesday 19 March 2014 13:46:19 Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [140319 12:33]:
+> > The OMAP H2, OSK and OSIRIS machines cannot build without
+> > I2C and TPS65010 both enabled unconditionally.
+> > 
+> > In each case, failing to enable CONFIG_I2C results in a
+> > build or link error, so most consistent solution is to
+> > ensure that it is impossible to disable those options.
+> > 
+> > It would be nice to leave CONFIG_I2C as user-selectable,
+> > but doing that properly would require more work.
+> 
+> We should not select drivers. How about let's just have
+> the tps65010 stuff behind an ifdef CONFIG_TPS65010 for
+> those boards?
 
-Wouldn't it just be easier to make the older CPUs depend on
-!CPU_V6 && !CPU_V7 rather than trying to hack this for each platform?
+Good idea. Like this?
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+	Arnd
+
+
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index fd90caf..65d2acb 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -318,6 +318,9 @@ static void __init h2_init_smc91x(void)
+ 
+ static int tps_setup(struct i2c_client *client, void *context)
+ {
++	if (!IS_BUILTIN(CONFIG_TPS65010))
++		return -ENOSYS;
++	
+ 	tps65010_config_vregs1(TPS_LDO2_ENABLE | TPS_VLDO2_3_0V |
+ 				TPS_LDO1_ENABLE | TPS_VLDO1_3_0V);
+ 
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index d68909b..3a02621 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -191,6 +191,9 @@ static struct platform_device osk5912_tps_leds = {
+ 
+ static int osk_tps_setup(struct i2c_client *client, void *context)
+ {
++	if (!IS_BUILTIN(CONFIG_TPS65010))
++		return -ENOSYS;
++
+ 	/* Set GPIO 1 HIGH to disable VBUS power supply;
+ 	 * OHCI driver powers it up/down as needed.
+ 	 */
