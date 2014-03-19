@@ -1,33 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Mar 2014 17:03:18 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140319165058.GA21513@red-moon>
-References: <1394009975-28655-1-git-send-email-broonie@kernel.org>
- <20140319160414.GA19953@red-moon>
- <20140319163339.GP11706@sirena.org.uk>
- <20140319165058.GA21513@red-moon>
-Message-ID: <20140319170318.GS11706@sirena.org.uk>
+From: grundler@chromium.org (Grant Grundler)
+Date: Wed, 19 Mar 2014 10:03:33 -0700
+Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
+ functions
+In-Reply-To: <532997D7.6090608@samsung.com>
+References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
+ <5322FD14.5090602@samsung.com>
+ <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
+ <532861BE.7020601@samsung.com>
+ <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
+ <532997D7.6090608@samsung.com>
+Message-ID: <CANEJEGuYz28dGT+264CYtG+Tk6htOq=u-t4PWMtsij32X0vJFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 04:50:58PM +0000, Lorenzo Pieralisi wrote:
+On Wed, Mar 19, 2014 at 6:12 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+...
+> No. Proper Linux drivers must support deferred probing mechanism and there
+> should be no assumptions about probing orders. Using other initcall level
+> than module_initcall for particular drivers is strongly discouraged.
 
-> if (parse_dt_topology())
-> 	reset_cpu_topology();
+That's true for "end-point" devices. It's not true for
+"infrastructure": Memory, CPU, DMA, Interrupt handling, etc. Those
+need to be in place before "normal" drivers get called. This SysMMU
+driver provides DMA services for "normal" device drivers. Or do I see
+that wrong?
 
-> If you want to leave ret there I do not care, I flag what I notice.
+thanks,
+grant
 
-Oh, right.  I was confused because you said it was unused when it
-clearly had a use.  I find that ugly since it looks like the test is the
-wrong way around but whatever...
-
-> parse_cluster() return value issue I flagged up must be fixed though.
-
-Already done along with the other stylistic stuff.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140319/466cb53b/attachment.sig>
+ps. I've written IOMMU support for four different IOMMUs on three
+operating systems (See drivers/parisc for two linux examples). But I
+still feel like I at best have 80% understanding of how this one is
+organized/works. Abstract descriptions and convoluted code have been
+handicapping me (and lack of time to dig further).
