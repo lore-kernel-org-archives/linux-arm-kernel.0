@@ -1,53 +1,81 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:25 +0100
-Subject: [PATCH 28/62] ARM: pxa: FB_W100 must be built-in
+Date: Wed, 19 Mar 2014 20:29:34 +0100
+Subject: [PATCH 37/62] ARM: sa1100/pxa: fix MTD_XIP build
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-29-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-38-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxa platform code directly calls into the W100 framebuffer
-driver for eseries. This means it cannot be a loadable module
-and we also have to ensure that the core framebuffer code
-is built-in.
+In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
+to IOMEM", the definition of the OSCR macro was changed to be an
+__iomem pointer, but the same register is also used by the XIP
+code. This patch does the corresponding change here as well.
+
+Since PXA now uses a local variable for the base address of the
+ICIP register, the xip_irqpending function has to be moved
+into irq.c in the process.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig | 1 +
- drivers/video/Kconfig     | 4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/include/mach/mtd-xip.h    | 7 ++++---
+ arch/arm/mach-pxa/irq.c                     | 8 ++++++++
+ arch/arm/mach-sa1100/include/mach/mtd-xip.h | 4 ++--
+ 3 files changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 96100db..562b17f 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -556,6 +556,7 @@ config MACH_ICONTROL
- config ARCH_PXA_ESERIES
- 	bool "PXA based Toshiba e-series PDAs"
- 	select FB_W100
-+	select FB
- 	select PXA25x
+diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+index 990d2bf..c4c90d1 100644
+--- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
++++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+@@ -17,11 +17,12 @@
  
- config MACH_E330
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index dade5b7..86873ff 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1996,8 +1996,8 @@ config FB_FSL_DIU
- 	  Framebuffer driver for the Freescale SoC DIU
+ #include <mach/regs-ost.h>
  
- config FB_W100
--	tristate "W100 frame buffer support"
--	depends on FB && ARCH_PXA
-+	bool "W100 frame buffer support"
-+	depends on FB=y && ARCH_PXA
-  	select FB_CFB_FILLRECT
-  	select FB_CFB_COPYAREA
-  	select FB_CFB_IMAGEBLIT
+-#define xip_irqpending()	(ICIP & ICMR)
++extern bool xip_irqpending(void);
+ 
+ /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+-#define xip_currtime()		(OSCR)
+-#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
++#define xip_irqpending()	xip_irqpending()
++#define xip_currtime()		readl(OSCR)
++#define xip_elapsed_since(x)	(signed)((readl(OSCR) - (x)) / 4)
+ 
+ /*
+  * xip_cpu_idle() is used when waiting for a delay equal or larger than
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 0eecd83..dcc8522 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -81,6 +81,14 @@ void pxa_unmask_irq(struct irq_data *d)
+ 	__raw_writel(icmr, base + ICMR);
+ }
+ 
++#ifdef CONFIG_MTD_XIP
++bool xip_irqpending(void)
++{
++	return readl(pxa_irq_base + ICIP) & readl(pxa_irq_base + ICMR);
++}
++EXPORT_SYMBOL_GPL(xip_irqpending);
++#endif
++
+ static struct irq_chip pxa_internal_irq_chip = {
+ 	.name		= "SC",
+ 	.irq_ack	= pxa_mask_irq,
+diff --git a/arch/arm/mach-sa1100/include/mach/mtd-xip.h b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
+index b3d6840..cb76096 100644
+--- a/arch/arm/mach-sa1100/include/mach/mtd-xip.h
++++ b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
+@@ -20,7 +20,7 @@
+ #define xip_irqpending()	(ICIP & ICMR)
+ 
+ /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+-#define xip_currtime()		(OSCR)
+-#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
++#define xip_currtime()		readl_relaxed(OSCR)
++#define xip_elapsed_since(x)	(signed)((readl_relaxed(OSCR) - (x)) / 4)
+ 
+ #endif /* __ARCH_SA1100_MTD_XIP_H__ */
 -- 
 1.8.3.2
