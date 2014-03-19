@@ -1,50 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Mar 2014 20:29:21 +0100
-Subject: [PATCH 24/62] ARM: omap1: select I2C where needed for PMIC
+Date: Wed, 19 Mar 2014 20:29:07 +0100
+Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
 In-Reply-To: <1395257399-359545-1-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
-Message-ID: <1395257399-359545-25-git-send-email-arnd@arndb.de>
+Message-ID: <1395257399-359545-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP H2, OSK and OSIRIS machines cannot build without
-I2C and TPS65010 both enabled unconditionally.
-
-In each case, failing to enable CONFIG_I2C results in a
-build or link error, so most consistent solution is to
-ensure that it is impossible to disable those options.
-
-It would be nice to leave CONFIG_I2C as user-selectable,
-but doing that properly would require more work.
+The efm32 platform does not provide a zreladdr-y line its Makefile.boot,
+so we always have to use CONFIG_AUTO_ZRELADDR in order to successfully
+build and link a zImage.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
+Cc: Uwe Kleine-K?nig <kernel@pengutronix.de>
 ---
- arch/arm/mach-omap1/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
-index cdd05f2..23ab1d5 100644
---- a/arch/arm/mach-omap1/Kconfig
-+++ b/arch/arm/mach-omap1/Kconfig
-@@ -44,6 +44,8 @@ config MACH_OMAP_INNOVATOR
- config MACH_OMAP_H2
- 	bool "TI H2 Support"
- 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
-+	select TPS65010
-+	select I2C
-     	help
- 	  TI OMAP 1610/1611B H2 board support. Say Y here if you have such
- 	  a board.
-@@ -64,6 +66,8 @@ config MACH_HERALD
- config MACH_OMAP_OSK
- 	bool "TI OSK Support"
- 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
-+	select TPS65010
-+	select I2C
-     	help
- 	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
-           if you have such a board.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 62ede9b..5776c12 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -422,6 +422,7 @@ config ARCH_EFM32
+ 	bool "Energy Micro efm32"
+ 	depends on !MMU
+ 	select ARCH_REQUIRE_GPIOLIB
++	select AUTO_ZRELADDR
+ 	select ARM_NVIC
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
 -- 
 1.8.3.2
