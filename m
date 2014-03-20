@@ -1,260 +1,76 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Mar 2014 13:41:28 +0530
-Subject: [PATCH 3/4] ata: add new-style AHCI platform driver for DaVinci
- DA850 AHCI controller
-In-Reply-To: <1395081118-15248-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
- <1395081118-15248-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <532AA2B0.1060103@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Mar 2014 17:22:41 +0900
+Subject: please revert: regulator: dbx500: use seq_puts() instead of
+ seq_printf()
+In-Reply-To: <6651295.YIkvtDO9zo@wuerfel>
+References: <6651295.YIkvtDO9zo@wuerfel>
+Message-ID: <001001cf4415$902bdf30$b0839d90$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
-
-On Tuesday 18 March 2014 12:01 AM, Bartlomiej Zolnierkiewicz wrote:
-> The new driver is named ahci_da850 and is only compile tested.  Once it
-> is tested on the real hardware and verified to work correctly, the legacy
-> platform code (which depends on the deprecated struct ahci_platform_data)
-> can be removed.
+On Thursday, March 20, 2014 4:57 PM, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> This patch has shown up in linux-next yesterday, breaking a randconfig
+> build:
 
-Thanks for the patch. I have been able to use your patch and verify SATA
-functionality on DA850 EVM. I have some comments though.
+(+cc Fengguang Wu)
 
-> ---
->  drivers/ata/Kconfig      |   9 +++
->  drivers/ata/Makefile     |   1 +
->  drivers/ata/ahci_da850.c | 178 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 188 insertions(+)
->  create mode 100644 drivers/ata/ahci_da850.c
+Hi Arnd,
+
+I really appreciate your report.
+However, it was already reported by Fengguang Wu 2 days ago.
+And, a modified patch was already merged to the current regulator
+next tree. 
+
+Thus, today's linux-next (20140320) cannot make the problem
+anymore. As presented above, the modified patch was merged
+to today's linux-next. [1]
+
+I will be more careful next time. Sorry for annoying you.
+Thank you.
+
+[1] http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=80c48e72f831bbfea4bf58d8e78ff2b18c90ec17)
+
+Best regards,
+Jingoo Han
+
 > 
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index 371e8890..6379a00 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -97,6 +97,15 @@ config SATA_AHCI_PLATFORM
->  
->  	  If unsure, say N.
->  
-> +config AHCI_DA850
-> +	tristate "DaVinci DA850 AHCI SATA support (experimental)"
-> +	depends on ARCH_DAVINCI_DA850
-> +	help
-> +	  This option enables support for the DaVinci DA850 SoC's
-> +	  onboard AHCI SATA.
-> +
-> +	  If unsure, say N.
-> +
->  config AHCI_ST
->  	tristate "ST AHCI SATA support"
->  	depends on ARCH_STI
-> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-> index 6123e64..0646d83 100644
-> --- a/drivers/ata/Makefile
-> +++ b/drivers/ata/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
->  obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
->  obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
->  obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
-> +obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
-> diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-> new file mode 100644
-> index 0000000..da874699
-> --- /dev/null
-> +++ b/drivers/ata/ahci_da850.c
-> @@ -0,0 +1,178 @@
-> +/*
-> + * DaVinci DA850 AHCI SATA platform driver
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2, or (at your option)
-> + * any later version.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/pm.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/libata.h>
-> +#include <linux/ahci_platform.h>
-> +#include "ahci.h"
-> +
-> +extern void __iomem *da8xx_syscfg1_base;
-
-This platform specific extern symbol should not be used in drivers and
-in fact checkpatch complains about it too. Can you instead get the
-addresses you need as part of the device resources?
-
-> +#define DA8XX_SYSCFG1_VIRT(x)	(da8xx_syscfg1_base + (x))
-> +#define DA8XX_PWRDN_REG		0x18
-> +
-> +/* SATA PHY Control Register offset from AHCI base */
-> +#define SATA_P0PHYCR_REG	0x178
-> +
-> +#define SATA_PHY_MPY(x)		((x) << 0)
-> +#define SATA_PHY_LOS(x)		((x) << 6)
-> +#define SATA_PHY_RXCDR(x)	((x) << 10)
-> +#define SATA_PHY_RXEQ(x)	((x) << 13)
-> +#define SATA_PHY_TXSWING(x)	((x) << 19)
-> +#define SATA_PHY_ENPLL(x)	((x) << 31)
-
-These can be replaced with BIT(N)
-
-> +
-> +static struct clk *da850_sata_clk;
-> +static unsigned long da850_sata_refclkpn = 100 * 1000 * 1000;
-
-This should ideally be platform data. Since we are not going to add
-anymore board files, I am not going to ask you to add one.
-
-However, with the input value hard coded in driver, it does not make
-sense to have the frequencies table and its traversal. Instead, I
-suggest you hard-code the multiplier itself with a porting warning
-comment. Later when the DT conversion happens and this becomes a DT
-property, we can add back the logic for multiple multiplier settings.
-The way it is now, the code looks superfluous.
-
-> +
-> +/* Supported DA850 SATA crystal frequencies */
-> +#define KHZ_TO_HZ(freq) ((freq) * 1000)
-> +static unsigned long da850_sata_xtal[] = {
-> +	KHZ_TO_HZ(300000),
-> +	KHZ_TO_HZ(250000),
-> +	0,			/* Reserved */
-> +	KHZ_TO_HZ(187500),
-> +	KHZ_TO_HZ(150000),
-> +	KHZ_TO_HZ(125000),
-> +	KHZ_TO_HZ(120000),
-> +	KHZ_TO_HZ(100000),
-> +	KHZ_TO_HZ(75000),
-> +	KHZ_TO_HZ(60000),
-> +};
-> +
-> +static int da850_sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	int i, ret;
-> +	unsigned int val;
-> +
-> +	da850_sata_clk = clk_get(dev, NULL);
-> +	if (IS_ERR(da850_sata_clk))
-> +		return PTR_ERR(da850_sata_clk);
-> +
-> +	ret = clk_prepare_enable(da850_sata_clk);
-> +	if (ret)
-> +		goto err0;
-
-Please switch to pm_runtime instead of using the clock APIs directly.
-
-> +
-> +	/* Enable SATA clock receiver */
-> +	val = __raw_readl(DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-
-Use readl() or readl_relaxed() for endian-neutrality.
-
-> +	val &= ~BIT(0);
-> +	__raw_writel(val, DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-> +
-> +	/* Get the multiplier needed for 1.5GHz PLL output */
-> +	for (i = 0; i < ARRAY_SIZE(da850_sata_xtal); i++)
-> +		if (da850_sata_xtal[i] == da850_sata_refclkpn)
-> +			break;
-> +
-> +	if (i == ARRAY_SIZE(da850_sata_xtal)) {
-> +		ret = -EINVAL;
-> +		goto err1;
-> +	}
-> +
-> +	val = SATA_PHY_MPY(i + 1) |
-> +		SATA_PHY_LOS(1) |
-> +		SATA_PHY_RXCDR(4) |
-> +		SATA_PHY_RXEQ(1) |
-> +		SATA_PHY_TXSWING(3) |
-> +		SATA_PHY_ENPLL(1);
-> +
-> +	__raw_writel(val, addr + SATA_P0PHYCR_REG);
-> +
-> +	return 0;
-> +
-> +err1:
-> +	clk_disable_unprepare(da850_sata_clk);
-> +err0:
-> +	clk_put(da850_sata_clk);
-> +	return ret;
-> +}
-> +
-> +static void da850_sata_exit(struct device *dev)
-> +{
-> +	clk_disable_unprepare(da850_sata_clk);
-> +	clk_put(da850_sata_clk);
-> +}
-> +
-> +static void ahci_da850_host_stop(struct ata_host *host)
-> +{
-> +	struct device *dev = host->dev;
-> +	struct ahci_host_priv *hpriv = host->private_data;
-> +
-> +	da850_sata_exit(dev);
-> +
-> +	ahci_platform_disable_resources(hpriv);
-> +}
-> +
-> +static struct ata_port_operations ahci_da850_port_ops = {
-> +	.inherits	= &ahci_platform_ops,
-> +	.host_stop	= ahci_da850_host_stop,
-> +};
-> +
-> +static const struct ata_port_info ahci_da850_port_info = {
-> +	.flags		= AHCI_FLAG_COMMON,
-> +	.pio_mask	= ATA_PIO4,
-> +	.udma_mask	= ATA_UDMA6,
-> +	.port_ops	= &ahci_da850_port_ops,
-> +};
-> +
-> +static int ahci_da850_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct ahci_host_priv *hpriv;
-> +	int rc;
-> +
-> +	hpriv = ahci_platform_get_resources(pdev);
-> +	if (IS_ERR(hpriv))
-> +		return PTR_ERR(hpriv);
-> +
-> +	rc = ahci_platform_enable_resources(hpriv);
-> +	if (rc)
-> +		return rc;
-> +
-> +	rc = da850_sata_init(dev, hpriv->mmio);
-> +	if (rc)
-> +		goto disable_resources;
-> +
-> +	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info, 0, 0);
-> +	if (rc)
-> +		goto sata_exit;
-> +
-> +	return 0;
-> +sata_exit:
-> +	da850_sata_exit(dev);
-> +disable_resources:
-> +	ahci_platform_disable_resources(hpriv);
-> +	return rc;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(ahci_da850_pm_ops, ahci_platform_suspend,
-> +			 ahci_platform_resume);
-> +
-> +static struct platform_device_id ahci_da850_platform_ids[] = {
-> +	{ .name = "ahci" },
-
-I was not able to get this driver probed with this name (I guess that
-was because the generic driver was picked instead?). Can you please
-change it to "da850-sata"?
-
-Thanks,
-Sekhar
+> commit d5d2ced88dc2690cf28fd531c83a53f0ba132f27
+> Author: Jingoo Han <jg1.han@samsung.com>
+> Date:   Wed Feb 26 10:21:01 2014 +0900
+> 
+>     regulator: dbx500: use seq_puts() instead of seq_printf()
+> 
+>     For a constant format without additional arguments, use seq_puts()
+>     instead of seq_printf(). Also, it fixes the following checkpatch
+>     warning.
+> 
+>       WARNING: Prefer seq_puts to seq_printf
+> 
+>     Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+>     Signed-off-by: Mark Brown <broonie@linaro.org>
+> 
+> diff --git a/drivers/regulator/dbx500-prcmu.c b/drivers/regulator/dbx500-prcmu.c
+> index f111dfb..3dd1096 100644
+> --- a/drivers/regulator/dbx500-prcmu.c
+> +++ b/drivers/regulator/dbx500-prcmu.c
+> @@ -97,10 +97,10 @@ static int ux500_regulator_power_state_cnt_print(struct seq_file *s, void *p)
+>         int err;
+> 
+>         /* print power state count */
+> -       err = seq_printf(s, "ux500-regulator power state count: %i\n",
+> -               power_state_active_get());
+> +       err = seq_puts(s, "ux500-regulator power state count: %i\n",
+> +                       power_state_active_get());
+>         if (err < 0)
+> -               dev_err(dev, "seq_printf overflow\n");
+> +               dev_err(dev, "seq_puts overflow\n");
+> 
+>         return 0;
+>  }
+> 
+> drivers/regulator/dbx500-prcmu.c:103:4: error: too many arguments to function 'seq_puts'
+> 
+> The other half of the patch is ok though.
+> 
+> 	Arnd
