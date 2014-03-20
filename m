@@ -1,129 +1,64 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 20 Mar 2014 17:18:07 +0000
-Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
-In-Reply-To: <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
-References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
- <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
- <532AE216.3080106@arm.com>
- <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
-Message-ID: <532B22CF.1030504@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Mar 2014 17:19:32 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140320134357.GE11706@sirena.org.uk>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+ <20140320134357.GE11706@sirena.org.uk>
+Message-ID: <20140320171930.GA28238@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/14 17:02, Vincent Guittot wrote:
-> On 20 March 2014 13:41, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->> On 19/03/14 16:22, Vincent Guittot wrote:
->>> We replace the old way to configure the scheduler topology with a new method
->>> which enables a platform to declare additionnal level (if needed).
->>>
->>> We still have a default topology table definition that can be used by platform
->>> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
->>> be overwritten by an arch which either wants to add new level where a load balance
->>> make sense like BOOK or powergating level or wants to change the flags
->>> configuration of some levels.
->>>
->>> For each level, we need a function pointer that returns cpumask for each cpu,
->>> a function pointer that returns the flags for the level and a name. Only flags
->>> that describe topology, can be set by an architecture. The current topology
->>> flags are:
->>>  SD_SHARE_CPUPOWER
->>>  SD_SHARE_PKG_RESOURCES
->>>  SD_NUMA
->>>  SD_ASYM_PACKING
->>>
->>> Then, each level must be a subset on the next one. The build sequence of the
->>> sched_domain will take care of removing useless levels like those with 1 CPU
->>> and those with the same CPU span and relevant information for load balancing
->>> than its child.
->>
->> The paragraph above contains important information to set this up
->> correctly, that's why it might be worth clarifying:
->>
->> - "next one" of sd means "child of sd" ?
+On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
+> On Thu, Mar 20, 2014 at 11:26:50AM +0000, Lorenzo Pieralisi wrote:
+> > On Wed, Mar 19, 2014 at 06:02:17PM +0000, Mark Brown wrote:
+> > > +#ifdef CONFIG_OF
 > 
-> It's the next one in the table so the parent in the sched_domain
-
-Right, it's this way around. DIE is parent of MC is parent of GMC. Maybe
-you could be more explicit about the parent of relation here?
-
+> > This ifdef can be removed, CONFIG_OF is always selected for arm64 and
+> > the !CONFIG_OF path
 > 
->> - "subset" means really "subset" and not "proper subset" ?
+> This has been present since the very first time these patches were
+> posted but hasn't been mentioned as being a problem previously.
+
+I recall I mentioned the unneeded CONFIG_OF in the past but I can't
+really tell whether it was for this set of patches or not.
+
+> > > +#else
+> > > +static inline int parse_dt_topology(void) { return 0; }
+> > > +#endif
 > 
-> yes, it's really "subset" and not "proper subset"
+> > is wrong, it should return failure. You should remove the CONFIG_OF
+> > ifdeffery.
 > 
-> Vincent
+> Yup.  It actually won't affect the behaviour at present though - since
+> it won't do anything the result will be just the same as if we return an
+> error and reset.
 > 
->>
->> On TC2 w/ the following change in cpu_corepower_mask()
->>
->>  const struct cpumask *cpu_corepower_mask(int cpu)
->>  {
->> -       return &cpu_topology[cpu].thread_sibling;
->> +       return cpu_topology[cpu].socket_id ?
->> &cpu_topology[cpu].thread_sibling :
->> +                       &cpu_topology[cpu].core_sibling;
->>  }
->>
->> I get this e.g. for CPU0,2:
->>
->> CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
->> CPU0: cpu_coregroup_mask=0-1
->> CPU0: cpu_cpu_mask=0-4
->>
->> CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
->> CPU2: cpu_coregroup_mask=2-4
->> CPU2: cpu_cpu_mask=0-4
->>
->> I assume here that this is a correct set-up.
+> Given ACPI (which really looks like it's going to happen at some point
+> and presumably make OF optional) I'm not sure removing the handling of
+> OF is actually constructive but whatever, it's done now...
 
-So this is a correct setup?
+CONFIG_OF will always be enabled in the kernel even when we get ACPI. We
+still use the chosen DT node to tell the kernel about ACPI.
 
->>
->> The domain degenerate part:
->>
->> "useless levels like those with 1 CPU" ... that's the case for GMC level
->> for CPU2,3,4
->>
->> The GMC level is destroyed because of the following code snippet in
->> sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
->>
->> so that's fine.
->>
->> In case of CPU0,1 since GMC and MC have the same span, the code in
->> build_sched_groups() creates only one group for MC  and that's why
->> pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
->> the if condition 'if (~cflags & pflags)' is not hit and
->> sd_parent_degenerate() finally returns 1 for MC.
->>
->> So the "those with the same CPU span and relevant information for load
->> balancing than its child." is not so easy to understand for me. Because
->> both levels have the same span we actually don't take the flags of the
->> parent into consideration which require at least 2 groups.
->>
->> So the TC2 example covers for me two corner cases: (1) The level I want
->> to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
->> the parent level I want to get rid of (MC for CPU0,1) of is the same as
->> the span of the level which should stay.
->>
->> Are these two corner cases the only one supported here? If yes this has
->> to be stated somewhere, otherwise if somebody will try this approach on
->> a different topology, (s)he might be surprised.
-
-Could you please comment on the paragraph above too?
-
-Thanks,
-
--- Dietmar
-
->>
->> If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
->> this works fine.
->>
->> I would like to test this on more platforms but I only have my TC2
->> available :-)
->>
->> -- Dietmar
->>
->> [...]
->>
+> > We still have a problem here. If the topology does not contain bindings
+> > for some cpu nodes, parse_cluster() does not fail and we end up with an
+> > incomplete topology. We have two choices: either we check the topology
 > 
+> Hrm, looking at the topology binding it doesn't specificially require
+> that the topology be complete.  I can see why you would want that.
+> 
+> > I'd rather do it here, in preparation for MPIDR_EL1 fallback solution
+> > (where there will always be topology information configured and the register
+> > will always be there in all its glory).
+> 
+> To be honest at this point I think what I want to do is go back to the
+> original approach of layering DT on top of MPIDR.  MPIDR is smaller and
+> simpler code so seems more likely to make progress.  I really do expect
+> that for a very large proportion of systems it'll be sufficient.
+
+Do you mean the physical MPIDR_EL1 or the DT representation of
+MPIDR_EL1?
+
+-- 
+Catalin
