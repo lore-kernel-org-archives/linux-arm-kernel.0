@@ -1,29 +1,78 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 20 Mar 2014 10:26:17 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <532A5A62.5020303@gmail.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140316070917.GA3094@arch.cereza>
- <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
- <20140317204410.GA1118@arch.cereza>
- <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
- <20140319154434.GA3488@arch.cereza> <532A5A62.5020303@gmail.com>
-Message-ID: <CADHgK6uDEb88P-r_7CnYAOBxkNF9yd7ir6WqEPFZrbGdc1tHOQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 20 Mar 2014 10:29:12 -0700
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <532B2183.2080309@ti.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B2183.2080309@ti.com>
+Message-ID: <20140320172912.GW31517@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
+> Boris,
 
-I have not used the tux-on-ice solution.  The patchset I've sent is to
-add initial support for swsusp based hibernation for ARM.
+Who's Boris? And why should Boris be taking this patch? It's an MTD
+patch.
 
-Can you please begin a new, separate thread for this?  Ie. separate
-from the review for the swsusp hibernation patches I've submitted?
-I'm not sure where the right list/forum is for this, perhaps someone
-can make a recommendation, but I am not sure it should go on LKML.
-Please copy me on your new thread.
+> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
+> > From: Murali Karicheri <m-karicheri2@ti.com>
+> > 
+> > After testing NAND flash with ubifs for k2hk-emv board were committed
+> > that flash doesn't support subpage writing, so we can fix it by
+> > adding a property to disable subpage write.
 
-Thanks!
+What flash? We try to autodetect NAND as much as possible. Perhaps we
+should be adding infrastructure support instead of hacking it with a DT
+property.
 
-Sebastian
+> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> > Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> > ---
+> Can you please pick this up for 3.15 fixes ? Ofcourse assuming DT folks
+> are ok with the patch.
+> 
+> I can then take patch 1/3 and 3/3 in my 3.15 fixes queue.
+> 
+> >  Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
+> >  drivers/mtd/nand/davinci_nand.c                        | 3 +++
+> >  2 files changed, 5 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> > index cfb18ab..50af930 100644
+> > --- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> > @@ -53,6 +53,8 @@ Recommended properties :
+> >  				identifier is saved in OOB area. If not present
+> >  				false.
+> >  
+> > +- ti,davinci-nosubpage-write:	disable subpage write for the device
+
+If we really need the DT property, I'd prefer a generic
+"nand-numer-of-partial-programs" or something like that, and if it's
+equal to 1, then the flash doesn't support partial page programming.
+
+But I'd prefer not to encode that in DT if possible.
+
+> >  Deprecated properties:
+> >  
+> >  - ti,davinci-ecc-mode:		operation mode of the NAND ecc mode. ECC mode
+> > diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> > index 4615d79..3ba058d 100644
+> > --- a/drivers/mtd/nand/davinci_nand.c
+> > +++ b/drivers/mtd/nand/davinci_nand.c
+> > @@ -581,6 +581,9 @@ static struct davinci_nand_pdata
+> >  		    of_property_read_bool(pdev->dev.of_node,
+> >  			"ti,davinci-nand-use-bbt"))
+> >  			pdata->bbt_options = NAND_BBT_USE_FLASH;
+> > +		if (of_property_read_bool(pdev->dev.of_node,
+> > +			"ti,davinci-no-subpage-write"))
+> > +			pdata->options |= NAND_NO_SUBPAGE_WRITE;
+> >  	}
+> >  
+> >  	return dev_get_platdata(&pdev->dev);
+> > 
+> 
+
+Brian
