@@ -1,43 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 20 Mar 2014 21:15:09 +0800
-Subject: [PATCH 05/62] ARM: at91: sama5 always uses DT
-In-Reply-To: <1395257399-359545-6-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-6-git-send-email-arnd@arndb.de>
-Message-ID: <BB996A46-32C9-4713-B44C-B19336F00C49@jcrosoft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 13:26:33 +0000
+Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
+ documentation
+In-Reply-To: <20140320140156.5d768b1f@armhf>
+References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
+ <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
+Message-ID: <20140320132633.GT7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 20, 2014 at 02:01:56PM +0100, Jean-Francois Moine wrote:
+> On Thu, 20 Mar 2014 13:32:24 +0100
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> 
+> > > +  - reg: I2C address - must be <0x70>  
+> > 
+> > TDA9983b datasheet says:
+> > 
+> > "Bits A0 and A1 of the I2C-bus device address are externally selected
+> > by pins A0 and A1."
+> > 
+> > Therefore, 0x70, 0x71, 0x72, and 0x73 are valid i2c addresses.
+> 
+> Sebastian,
+> 
+> That's interesting!
+> 
+> For the Cubox and the AMX33XX boards, the I2C address of the HDMI
+> registers is 0x70, and the I2C address of the CEC registers is 0x34.
+> 
+> For other boards using the TDA998x family, if the I2C address is
+> different from 0x70, have you an idea about what can be the CEC I2C
+> address? (this value is actually hard-coded in the TDA998x driver)
 
-On Mar 20, 2014, at 3:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+For the TDA9983, it's configurable as Sebastian says.  For the TDA19988,
+they're fixed at 0x70 and 0x34.
 
-> 
-> It makes no sense for sama5 support to be enabled if we don't
-> also enable USE_OF. Making this automatic in Kconfig avoids
-> a possible randconfig conflict between the old and new clock
-> support code.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> 
-> ---
-> arch/arm/mach-at91/Kconfig | 1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 7209c5b..5ec1da1 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -57,6 +57,7 @@ config SOC_SAMA5
-> 	select GENERIC_CLOCKEVENTS
-> 	select MULTI_IRQ_HANDLER
-> 	select SPARSE_IRQ
-> +	select USE_OF
-> 
-> menu "Atmel AT91 System-on-Chip"
-> 
-> -- 
-> 1.8.3.2
-> 
+To put it another way: it is chip specific, and is specified by the
+data sheet, not by the software, and should not be specified as an
+"required value" with any particular value in the DT binding
+specification.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
