@@ -1,54 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 20 Mar 2014 10:59:57 -0700
-Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <1395132017-15928-3-git-send-email-zhangfei.gao@linaro.org>
- <CAGVrzcY4SBKFfTvjB0TTvgpAOwCt30C6LjYf9e9E4ciMDVmp-w@mail.gmail.com>
- <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
-Message-ID: <CAGVrzcZ4K2gvQ8f=uMTf4+jm29e3FQXL-a-wc9xgumyHpH6+UA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Mar 2014 03:01:12 +0900
+Subject: [PATCH v2 3/6] ARM: EXYNOS: Fix compilation error in cpuidle.c
+In-Reply-To: <1395162964-5916-3-git-send-email-t.figa@samsung.com>
+References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
+ <1395162964-5916-3-git-send-email-t.figa@samsung.com>
+Message-ID: <532B2CE8.9090206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-20 3:53 GMT-07:00 Zhangfei Gao <zhangfei.gao@gmail.com>:
-> Dear Florian
+On 03/19/14 02:16, Tomasz Figa wrote:
+> The big series refactoring Exynos suspend to RAM handling missed the
+> cpuidle driver that is disabled in exynos_defconfig, leaving it
+> including old mach/pm_core.h header and using old s3c_cpu_resume symbol
+> instead of new exynos_cpu_resume, resulting in compilation failures with
+> CONFIG_ARCH_EXYNOS and CONFIG_CPU_IDLE enabled.
 >
-> On Wed, Mar 19, 2014 at 1:28 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> 2014-03-18 1:40 GMT-07:00 Zhangfei Gao <zhangfei.gao@linaro.org>:
+> This patch fixes that silly mistake and performs necessary modification
+> to arhc/arm/exynos/cpuidle.c to make it compile again.
 >
->>> +static int hip04_mdio_reset(struct mii_bus *bus)
->>> +{
->>> +       int temp, err, i;
->>> +
->>> +       for (i = 0; i < 2; i++) {
->>> +               hip04_mdio_write(bus, i, 22, 0);
->>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
->>> +               temp |= BMCR_RESET;
->>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
->>> +               if (err < 0)
->>> +                       return err;
->>> +       }
->>> +
->>> +       mdelay(500);
->>
->> This does not look correct, you should iterate over all possible PHYs:
->> PHY_MAX_ADDR instead of hardcoding the loop to 2.
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/mach-exynos/cpuidle.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> OK, got it.
-> Use 2 is since only have 2 phy in the board, will use PHY_MAX_ADDR instead.
->>
->> I think we might want to remove the mdio bus reset callback in general
->> as the PHY library should already take care of software resetting the
->> PHY to put it in a sane state, as well as waiting for the appropriate
->> delay before using, unlike here, where you do not poll for BMCR_RESET
->> to be cleared by the PHY.
->>
-> Do you mean will move BMCR_RESET to common code, that's would be great.
-> The mdio_reset is added here to get phy_id, otherwise the phy_id can
-> not be read as well as detection.
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index f57cb91..b530231 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -26,7 +26,6 @@
+>   #include<plat/cpu.h>
+>   #include<plat/pm.h>
+>
+> -#include<mach/pm-core.h>
+>   #include<mach/map.h>
+>
+>   #include "common.h"
+> @@ -127,7 +126,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+>   	/* Set value of power down register for aftr mode */
+>   	exynos_sys_powerdown_conf(SYS_AFTR);
+>
+> -	__raw_writel(virt_to_phys(s3c_cpu_resume), REG_DIRECTGO_ADDR);
+> +	__raw_writel(virt_to_phys(exynos_cpu_resume), REG_DIRECTGO_ADDR);
+>   	__raw_writel(S5P_CHECK_AFTR, REG_DIRECTGO_FLAG);
+>
+>   	save_cpu_arch_register();
 
-Oh I see, thanks for mentioning that, this is not properly covered
-here today as we need to get the PHY id before we assign it a
-phy_device structure, let me cook a patch for this.
--- 
-Florian
+OK, applied into s2r-pm-samsung-2 branch, thanks.
+
+- Kukjin
