@@ -1,68 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 09:21:07 +0000
-Subject: [PATCH v6 35/36] mtd: st_spi_fsm: Convert ST SPI FSM (NOR) Flash
- driver to new DT partitions
-In-Reply-To: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
-References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395307268-12721-36-git-send-email-lee.jones@linaro.org>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Thu, 20 Mar 2014 10:34:40 +0100
+Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
+ common, correct implementation
+In-Reply-To: <20140320090330.49a1d372@marrow.netinsight.se> ("Simon
+ =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Thu, 20 Mar 2014 09:03:30
+ +0100")
+References: <20140317144016.0508cc4d@marrow.netinsight.se>
+ <20140317144235.546d2e19@marrow.netinsight.se>
+ <201403181558.37094.arnd@arndb.de>
+ <20140320090330.49a1d372@marrow.netinsight.se>
+Message-ID: <m31txxjjrj.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old API expected a "partitions" property provided a phandle to a
-separate partitions node, which itself contained yet more nodes each
-representing one partition. The new API rids the requirement for the
-superfluous intermediary partitions node. This patch provides the
-added information required for automatic parsing by the core.
+Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+> Thanks. However, Krzysztof thinks that this implementation is
+> incorrect. It certainly fixes my ixp4xx issues, but might not be good
+> for everyone.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index dccbac0..aefd48d 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
- #include <linux/sched.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-@@ -1997,6 +1998,7 @@ boot_device_fail:
- static int stfsm_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct mtd_part_parser_data ppdata;
- 	struct flash_info *info;
- 	struct resource *res;
- 	struct stfsm *fsm;
-@@ -2006,6 +2008,7 @@ static int stfsm_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "No DT found\n");
- 		return -EINVAL;
- 	}
-+	ppdata.of_node = np;
- 
- 	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
- 	if (!fsm)
-@@ -2062,6 +2065,7 @@ static int stfsm_probe(struct platform_device *pdev)
- 			return ret;
- 	}
- 
-+	fsm->mtd.name		= info->name;
- 	fsm->mtd.dev.parent	= &pdev->dev;
- 	fsm->mtd.type		= MTD_NORFLASH;
- 	fsm->mtd.writesize	= 4;
-@@ -2081,7 +2085,7 @@ static int stfsm_probe(struct platform_device *pdev)
- 		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
- 		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
- 
--	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
-+	return mtd_device_parse_register(&fsm->mtd, NULL, &ppdata, NULL, 0);
- }
- 
- static int stfsm_remove(struct platform_device *pdev)
+It because you don't have PCI devices setting coherent mask to 32-bits
+(and that's what normal PCI devices do).
+
+BTW PCI (and other) devices requesting 32-bit coherent allocs don't care
+if they're given 26-bit memory. 26 bits fit perfectly in 32 bits. It's
+the streaming mapping which is (may be) constrained by hardware.
 -- 
-1.8.3.2
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
