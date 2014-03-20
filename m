@@ -1,23 +1,29 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Mar 2014 13:16:21 +0900
-Subject: [PATCH 55/62] ARM: samsung: select CRC32 for SAMSUNG_PM_CHECK
-In-Reply-To: <1395257399-359545-56-git-send-email-arnd@arndb.de>
+Date: Thu, 20 Mar 2014 13:18:13 +0900
+Subject: [PATCH 56/62] ARM: samsung: select I2C where needed for PMIC
+In-Reply-To: <1395257399-359545-57-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-56-git-send-email-arnd@arndb.de>
-Message-ID: <023801cf43f3$2682bd50$738837f0$@samsung.com>
+ <1395257399-359545-57-git-send-email-arnd@arndb.de>
+Message-ID: <024201cf43f3$6920b9a0$3b622ce0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann wrote:
 > 
-> The Samsung pm_check code uses the crc32 library code, which can
-> be built as a loadable module, in which case we get a link error
-> building the kernel.
+> The OSIRIS machine cannot build without I2C and
+> TPS65010 both enabled unconditionally.
 > 
-> A better solution is to use 'select CRC32', which is what all
-> other users of this code do, as it ensures it is always built-in.
+> The SMDK6410_WM1190_EV1 and SMDK6410_WM1192_EV1 add-on
+> cards already select MFD_WM*_I2C.
 > 
-Agreed.
+> In each case, failing to enable CONFIG_I2C results in a
+> build or link error, so most consistent solution is to
+> ensure that it is impossible to disable those options.
+> 
+> It would be nice to leave CONFIG_I2C as user-selectable,
+> but doing that properly would require more work.
+> 
+Yes, OK.
 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Cc: Tomasz Figa <tomasz.figa@gmail.com>
@@ -30,22 +36,41 @@ Kukjin
 
 > Cc: Ben Dooks <ben-linux@fluff.org>
 > ---
->  arch/arm/plat-samsung/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm/mach-s3c24xx/Kconfig | 1 +
+>  arch/arm/mach-s3c64xx/Kconfig | 2 ++
+>  2 files changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index c72d612..98f223c 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -445,7 +445,8 @@ config S3C_PM_DEBUG_LED_SMDK
-> 
->  config SAMSUNG_PM_CHECK
->  	bool "S3C2410 PM Suspend Memory CRC"
-> -	depends on PM && CRC32
-> +	depends on PM
-> +	select CRC32
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index a6060d0..1272647 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -572,6 +572,7 @@ config MACH_OSIRIS_DVS
+>  	tristate "Simtec IM2440D20 (OSIRIS) Dynamic Voltage Scaling driver"
+>  	depends on MACH_OSIRIS
+>  	select TPS65010
+> +	select I2C
 >  	help
->  	  Enable the PM code's memory area checksum over sleep. This option
->  	  will generate CRCs of all blocks of memory, and store them before
+>  	  Say Y/M here if you want to have dynamic voltage scaling support
+>  	  on the Simtec IM2440D20 (OSIRIS) module via the TPS65011.
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index 92885d7..0148112 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -191,6 +191,7 @@ endchoice
+>  config SMDK6410_WM1190_EV1
+>  	bool "Support Wolfson Microelectronics 1190-EV1 PMIC card"
+>  	depends on MACH_SMDK6410
+> +	select I2C
+>  	select MFD_WM8350_I2C
+>  	select REGULATOR
+>  	select REGULATOR_WM8350
+> @@ -205,6 +206,7 @@ config SMDK6410_WM1190_EV1
+>  config SMDK6410_WM1192_EV1
+>  	bool "Support Wolfson Microelectronics 1192-EV1 PMIC card"
+>  	depends on MACH_SMDK6410
+> +	select I2C
+>  	select MFD_WM831X
+>  	select MFD_WM831X_I2C
+>  	select REGULATOR
 > --
 > 1.8.3.2
