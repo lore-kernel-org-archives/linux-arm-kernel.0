@@ -1,61 +1,48 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 20 Mar 2014 13:27:11 +0900
-Subject: [PATCH v2 1/4] clk: samsung: add new Kconfig for Samsung common
- clock options
-In-Reply-To: <53298B63.40005@samsung.com>
-References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
- <1394598781-3848-2-git-send-email-pankaj.dubey@samsung.com>
- <53298B63.40005@samsung.com>
-Message-ID: <532A6E1F.3040700@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Mar 2014 13:11:03 +0900
+Subject: [PATCH 52/62] ARM: samsung: disable decompressor watchdog on
+ exynos
+In-Reply-To: <1395257399-359545-53-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-53-git-send-email-arnd@arndb.de>
+Message-ID: <021d01cf43f2$687999a0$396ccce0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2014 09:19 PM, Tomasz Figa wrote:
-> Hi Pankaj,
->
-> On 12.03.2014 05:32, Pankaj Dubey wrote:
->> This patch adds new Kconfig file for adding new config option
->> as COMMON_CLK_SAMSUNG for Samsung common clock. This patch also
->> moves S3C24XX specific clock options here in this file.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/clk/samsung/Kconfig |   11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>   create mode 100644 drivers/clk/samsung/Kconfig
->>
->> diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
->> new file mode 100644
->> index 0000000..26eb446
->> --- /dev/null
->> +++ b/drivers/clk/samsung/Kconfig
->> @@ -0,0 +1,11 @@
->> +config COMMON_CLK_SAMSUNG
->> +    bool
->> +    select COMMON_CLK
->> +
->> +config S3C2412_COMMON_CLK
->> +    bool
->> +    select COMMON_CLK_SAMSUNG
->> +
->> +config S3C2443_COMMON_CLK
->> +    bool
->> +    select COMMON_CLK_SAMSUNG
->>
->
-> This patch adds S3C2412_COMMON_CLK and S3C2443_COMMON_CLK to 
-> drivers/clk/samsung/Kconfig, but they are still present in 
-> arch/arm/mach-s3c24xx/Kconfig, so after this patch there are duplicate 
-> definitions.
->
-> Best regards,
-> Tomasz
->
+Arnd Bergmann wrote:
+> 
+> The S3C_BOOT_ERROR_RESET option only works when using the
+> samsung specific mach/uncompress.h implementation. The
+> Exynos platform has now moved on to using the generic
+> implementation instead, which does not support this.
+> 
+Yeah, correct and I've applied to use the generic uncompress for other
+Samsung SoCs into samsung tree and I sent to arm-soc a couple of days ago.
+Even though it is not cleaned for regarding configs e.g.,
+S3C_BOOT_ERROR_RESET yet, this is not used more.
 
-OK, In that case I will club change in arm/mach-s3c24xx/Kconfig and 
-clk/samsung/Kconfig together
-  and resubmit once again.
+Thanks,
+Kukjin
 
--- 
-Best Regards,
-Pankaj Dubey
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/plat-samsung/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 58645a5..04974db 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -42,6 +42,7 @@ comment "Boot options"
+> 
+>  config S3C_BOOT_ERROR_RESET
+>  	bool "S3C Reboot on decompression error"
+> +	depends on PLAT_S5P || PLAT_S3C24XX || ARCH_S3C64XX
+>  	help
+>  	  Say y here to use the watchdog to reset the system if the
+>  	  kernel decompressor detects an error during decompression.
+> --
+> 1.8.3.2
