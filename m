@@ -1,54 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Mar 2014 16:08:45 +0100
-Subject: [PATCH 1/2] v1 ARM: sun4i: spi: Allow Rx transfers larger than
- FIFO size
-In-Reply-To: <29069269.5VPQtL8a7I@nukelap.gtech>
-References: <2167943.Zs1zPAMITN@nukelap.gtech>
- <20140319165507.GJ27873@lukather>
- <29069269.5VPQtL8a7I@nukelap.gtech>
-Message-ID: <20140320150845.GM27873@lukather>
+From: timur@tabi.org (Timur Tabi)
+Date: Thu, 20 Mar 2014 10:10:09 -0500
+Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-17-git-send-email-mpa@pengutronix.de>
+ <1394894616.578942243@f331.i.mail.ru> <20140318081019.GJ11360@pengutronix.de>
+ <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <532B04D1.9000405@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 01:03:45PM -0500, mrnuke wrote:
-> > > -	/* We don't support transfer larger than the FIFO */
-> > > -	if (tfr->len > SUN4I_FIFO_DEPTH)
-> > > +	if (tfr->len > SUN4I_MAX_XFER_SIZE)
-> > > +		return -EINVAL;
-> > 
-> > Why do you still need this test?
-> > 
-> SUN4I_MAX_XFER_SIZE is not the FIFO size. It is the max number we can write in 
-> SUN4I_BURST_CNT_REG. That's the maximum SPI burst size (16 MiB - 1) that the 
-> hardware supports. Anything larger, and we'd need to break up the transfer in 
-> several bursts. That's a different problem than the one I'm addressing.
+On 03/20/2014 01:07 AM, Li.Xiubo at freescale.com wrote:
+> While for the scenario like our LS1(ARM) platform.
+> CPU		SSI
+> LE		BE	then should we set the .val_format_endian to
+> 			REGMAP_ENDIAN_BIG
+>
+>
+> And so not only for PowerPC, but also maybe for ARM platforms.
+> So here how about just adding one Boolean property like 'big-endian' in DT node
+> to learn the endianness of the devices dynamically ?
 
-Ok, it makes sense.
-
-> > > +	/* Receive FIFO 3/4 full */
-> > > +	if (status & SUN4I_INT_CTL_RF_F34) {
-> > > +		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
-> > > +		/* Only clear the interrupt _after_ draining the FIFO */
-> > > +		sun4i_spi_write(sspi, SUN4I_INT_STA_REG,
-> > > SUN4I_INT_CTL_RF_F34);
-> > 
-> > Not that it's important, but it really doesn't matter to do it before
-> > or after, the interrupts are disabled in the handler.
-> > 
-> I think this was one of those bits that keeps being set by hardware until the 
-> Rx FIFO is under 48 bytes (less than 3/4 full).  I'll have to look into this 
-> again.
-
-Ok, it would deserve to be in the comments then :)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/ef35c9fe/attachment-0001.sig>
+That's not a bad idea.  The property should be something like, 
+"fsl,ssi-endian" and is should be set to "big", "little", or "native". 
+In the absence of the property, it should default to native endian.
