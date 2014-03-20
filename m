@@ -1,65 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Mar 2014 09:51:59 +0100
-Subject: [PATCH 03/62] ARM: at91: export sam9_smc interfaces
-In-Reply-To: <1395257399-359545-4-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-4-git-send-email-arnd@arndb.de>
-Message-ID: <532AAC2F.5000807@atmel.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Thu, 20 Mar 2014 14:25:09 +0530
+Subject: [PATCH RESEND] ARM: SPEAr1340: static-ize SATA functions
+In-Reply-To: <CAOh2x=nr1mrkcFk8nQFwNXxCqMPiN1Hq4=f1wwN=i65StawJ1Q@mail.gmail.com>
+References: <1678906.b5uh0Nm7QE@amdc1032>
+ <CAOh2x=nr1mrkcFk8nQFwNXxCqMPiN1Hq4=f1wwN=i65StawJ1Q@mail.gmail.com>
+Message-ID: <20140320085509.GB4607@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/2014 20:29, Arnd Bergmann :
-> The pata_at91 driver uses interfaces defined in the sam9_smc
-> platform code. Since the pata driver can be a loadable module,
-> we have to export those symbols in order to link cleanly.
+On Tue, Mar 18, 2014 at 07:00:08PM +0800, Viresh Kumar wrote:
+> On Tue, Mar 18, 2014 at 4:28 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > Make sata_miphy_exit(), sata_suspend() and sata_resume() static.
+> >
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > Previous submission:
+> > https://lkml.org/lkml/2013/10/4/369
+> >
+> >  arch/arm/mach-spear/spear1340.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+> > index 3fb6834..e0e4251 100644
+> > --- a/arch/arm/mach-spear/spear1340.c
+> > +++ b/arch/arm/mach-spear/spear1340.c
+> > @@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
+> >         return 0;
+> >  }
+> >
+> > -void sata_miphy_exit(struct device *dev)
+> > +static void sata_miphy_exit(struct device *dev)
+> >  {
+> >         writel(0, SPEAR1340_PCIE_SATA_CFG);
+> >         writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+> > @@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
+> >         msleep(20);
+> >  }
+> >
+> > -int sata_suspend(struct device *dev)
+> > +static int sata_suspend(struct device *dev)
+> >  {
+> >         if (dev->power.power_state.event == PM_EVENT_FREEZE)
+> >                 return 0;
+> > @@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
+> >         return 0;
+> >  }
+> >
+> > -int sata_resume(struct device *dev)
+> > +static int sata_resume(struct device *dev)
+> >  {
+> >         if (dev->power.power_state.event == PM_EVENT_THAW)
+> >                 return 0;
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-SMC may change in the near future (Cf. Jean-Jacques' patches sent some
-weeks ago). But I do not think this patch conflicts with the ongoing
-initiative...
+This patch will not be needed any more, since sata platform code has
+already been cleaned up.
 
-So:
+See:
+https://lkml.org/lkml/2014/2/28/174
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/sam9_smc.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
-> index b26156b..826315a 100644
-> --- a/arch/arm/mach-at91/sam9_smc.c
-> +++ b/arch/arm/mach-at91/sam9_smc.c
-> @@ -36,6 +36,7 @@ void sam9_smc_write_mode(int id, int cs,
->  {
->  	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
->  }
-> +EXPORT_SYMBOL_GPL(sam9_smc_write_mode);
->  
->  static void sam9_smc_cs_configure(void __iomem *base,
->  					struct sam9_smc_config *config)
-> @@ -69,6 +70,7 @@ void sam9_smc_configure(int id, int cs,
->  {
->  	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
->  }
-> +EXPORT_SYMBOL_GPL(sam9_smc_configure);
->  
->  static void sam9_smc_cs_read_mode(void __iomem *base,
->  					struct sam9_smc_config *config)
-> @@ -84,6 +86,7 @@ void sam9_smc_read_mode(int id, int cs,
->  {
->  	sam9_smc_cs_read_mode(AT91_SMC_CS(id, cs), config);
->  }
-> +EXPORT_SYMBOL_GPL(sam9_smc_read_mode);
->  
->  static void sam9_smc_cs_read(void __iomem *base,
->  					struct sam9_smc_config *config)
-> 
-
-
--- 
-Nicolas Ferre
+Regards
+Pratyush
