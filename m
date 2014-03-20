@@ -1,36 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 20 Mar 2014 10:09:31 -0700
-Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
- versions of spec
-In-Reply-To: <CAL_JsqLbNnkyg9pnjROBEeqmPRYerq52GK6yPOLTXgKbk6e0yg@mail.gmail.com>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
- <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
- <20140320142623.GD23372@e106331-lin.cambridge.arm.com>
- <CAL_JsqLbNnkyg9pnjROBEeqmPRYerq52GK6yPOLTXgKbk6e0yg@mail.gmail.com>
-Message-ID: <20140320170931.GV1297@cbox>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Thu, 20 Mar 2014 10:12:51 -0700
+Subject: [PATCH v3 2/5] pwm: kona: Introduce Kona PWM controller support
+In-Reply-To: <20140320155732.GB25092@ulmo>
+References: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
+ <1394655346-30048-3-git-send-email-tim.kryger@linaro.org>
+ <20140318215231.GH5917@mithrandir>
+ <CAAYSxhri0evgrbCPew6-MTXVmpzm7Oa6TpmJTSGZpTcV=876HQ@mail.gmail.com>
+ <20140320155732.GB25092@ulmo>
+Message-ID: <CAAYSxhrMxjFNr-z1qQQRK88B2_GcWo_5MhQrwsht=zRWpp4SQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 12:04:45PM -0500, Rob Herring wrote:
+On Thu, Mar 20, 2014 at 8:57 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Tue, Mar 18, 2014 at 04:47:36PM -0700, Tim Kryger wrote:
 
-[...]
+> Perhaps the comment for enum pwm_polarity in include/linux/pwm.h makes
+> this more obvious. What you do here is invert the duty cycle, rather
+> than the polarity. While it is true that the result is the same for
+> things like LEDs or backlight (because the signal power remains the
+> same), but there's a slight difference to what the PWM signal looks
+> like.
 
-> >>
-> >> With the KVM patches[1], this makes 4 copies of these defines in the
-> >> kernel (and then QEMU has more). This needs to go into a common header
-> >> under include/linux. Probably under uapi so QEMU can use. There is
-> >> some sync of headers between the kernel and QEMU I think.
-> >
-> > I agree we should have a common header, but I don't think this is uapi
-> > material. This is most definitely _not_ part of the user API, and it's
-> > from an external spec that we're not in control of -- I don't see why we
-> > should have to export a set of numbers forever because it happens to be
-> > marginally useful at this point in time.
-> 
-> I mention uapi only in that it is expected to be stable (in an ABI
-> sense) from kernel release to release, and I would assume that QEMU
-> would only sync ABI stable headers. Someone familiar with the QEMU
-> import process should comment on where this stuff should live.
-> 
+Thanks, I missed that comment before.
 
-AFAIK, only uapi headers are imported to QEMU.
+>> Does polarity influence the output while a PWM is disabled?
+>
+> Yes, there is apparently hardware where the polarity causes the PWM pin
+> to be 1 when the PWM is disabled. But that's really a separate issue.
+
+Do you have a preference on how this should be handled?
+
+
+> Things are starting to get confusing here. Looking at the register
+> definitions, there's PWM_CONTROL_ENABLE_SHIFT(chan), which I suspect
+> controls whether or not a channel is enabled (if that's not the case
+> then please add a comment that explains what it does).
+
+I've tried to do this but the unfortunate name for these bits and
+their nuanced behavior makes it difficult.
+
+>
+> But a little further up you said that the hardware does only support a
+> configure operation and not an enable/disable.
+
+If you define disabled as zero duty output, then this is true.
+
+When the smooth bit is off and the "enable" bit is off output is 100% duty.
+
+>
+> The comment above further confuses me. What I read from it is that you
+> can in fact disable a channel by clearing the "enable" bit in the
+> control register. But the reason why you don't do it that way is because
+> that change won't take effect until "settings start to take effect". So
+> in order to disable the PWM immediately you resort to writing a 0 duty
+> cycle.
+
+Sorry if my comments were confusing.  New settings are only applied on
+a rising edge of the "enable" bit.  You should think of it more as a
+trigger bit than an enable.
+
+>
+> Perhaps I misunderstood, in which case it might be good to revise that
+> comment to be more explicit or accurate.
+
+Perhaps it would be clearest to deviate from the hw docs and rename
+PWM_CONTROL_ENABLE_SHIFT to PWM_CONTROL_TRIGGER_SHIFT to more closely
+match its function.  What do you think of the following?
+
+/*
+* New duty and period settings are only reflected in the PWM output
+* after a rising edge of the trigger bit.  After a rising edge, if the
+* smooth bit is set, the settings are also delayed until the current
+* period has completed. Furthermore, if the smooth bit is set, the PWM
+* continues to output a waveform based on the old settings during the
+* time that the trigger bit is low.  Otherwise the output is a constant
+* high signal while the trigger bit is low.
+*/
