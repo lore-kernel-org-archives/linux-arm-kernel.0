@@ -1,36 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 11:10:17 +0000
-Subject: [PATCH RESEND v2 2/2] ixp4xx_eth: Setup coherent_dma_mask
-In-Reply-To: <m3eh20j6k2.fsf@t19.piap.pl>
-References: <20140317144016.0508cc4d@marrow.netinsight.se>
- <20140317144244.6d2e09f9@marrow.netinsight.se> <m3eh20j6k2.fsf@t19.piap.pl>
-Message-ID: <20140320111017.GO7528@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Mar 2014 11:11:43 +0000
+Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
+ arguments
+In-Reply-To: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
+References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 08:43:09AM +0100, Krzysztof Ha?asa wrote:
-> Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
-> 
-> > +++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-> > @@ -1426,6 +1426,10 @@ static int eth_init_one(struct platform_device *pdev)
-> >  	port->netdev = dev;
-> >  	port->id = pdev->id;
-> >  
-> > +	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-> > +	if (err < 0)
-> > +		goto err_free;
-> > +
-> 
-> Yeah. One could also set both masks with the new single call. The driver
-> uses both streaming and coherent mapping.
+Reported-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-The other issue with this patch set is (from DMA-API-HOWTO.txt):
-
-  The coherent coherent mask will always be able to set the same or a
-  smaller mask as the streaming mask.
-
-and code in places assumes that's true.
-
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index aefd48d..dcc1dc3 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -785,8 +785,7 @@ static void stfsm_wait_seq(struct stfsm *fsm)
+ 	dev_err(fsm->dev, "timeout on sequence completion\n");
+ }
+ 
+-static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+-			    const uint32_t size)
++static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
+ {
+ 	uint32_t remaining = size >> 2;
+ 	uint32_t avail;
+@@ -811,8 +810,7 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
+ }
+ 
+-static int stfsm_write_fifo(struct stfsm *fsm,
+-			    const uint32_t *buf, const uint32_t size)
++static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
+ {
+ 	uint32_t words = size >> 2;
+ 
+@@ -1544,8 +1542,8 @@ static int stfsm_read(struct stfsm *fsm, uint8_t *buf, uint32_t size,
+ 	return 0;
+ }
+ 
+-static int stfsm_write(struct stfsm *fsm, const uint8_t *const buf,
+-		       const uint32_t size, const uint32_t offset)
++static int stfsm_write(struct stfsm *fsm, const uint8_t *buf,
++		       uint32_t size, uint32_t offset)
+ {
+ 	struct stfsm_seq *seq = &fsm->stfsm_seq_write;
+ 	uint32_t data_pads;
+@@ -1670,7 +1668,7 @@ static int stfsm_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	return 0;
+ }
+ 
+-static int stfsm_erase_sector(struct stfsm *fsm, const uint32_t offset)
++static int stfsm_erase_sector(struct stfsm *fsm, uint32_t offset)
+ {
+ 	struct stfsm_seq *seq = &stfsm_seq_erase_sector;
+ 	int ret;
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.2
