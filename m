@@ -1,117 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 15:55:20 +0000
-Subject: [PATCH] ARM: STi: Add support for the FSM Serial Flash Controller
-Message-ID: <1395330920-10559-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 20 Mar 2014 15:51:19 +0000
+Subject: [PATCH v6 36/36] ARM: STi: Add support for the FSM Serial Flash
+ Controller
+In-Reply-To: <20140320112703.GS31517@norris-Latitude-E6410>
+References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
+ <1395307268-12721-37-git-send-email-lee.jones@linaro.org>
+ <20140320112703.GS31517@norris-Latitude-E6410>
+Message-ID: <20140320155119.GG8207@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we add the necessary device nodes required for successful device
-probing and Pinctrl setup for the FSM.
+> > Here we add the necessary device nodes required for successful device
+> > probing and Pinctrl setup for the FSM.
+> > 
+> > Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > Acked-by Angus Clark <angus.clark@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stih416-pinctrl.dtsi | 13 +++++++++++++
+> >  arch/arm/boot/dts/stih416.dtsi         | 13 +++++++++++++
+> >  arch/arm/boot/dts/stih41x-b2020.dtsi   |  1 +
+> >  arch/arm/boot/dts/stih41x-b2020x.dtsi  | 28 ++++++++++++++++++++++++++++
+> >  4 files changed, 55 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/stih41x-b2020x.dtsi
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Acked-by Angus Clark <angus.clark@st.com>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/stih416.dtsi         | 13 +++++++++++++
- arch/arm/boot/dts/stih41x-b2020.dtsi   |  1 +
- arch/arm/boot/dts/stih41x-b2020x.dtsi  | 28 ++++++++++++++++++++++++++++
- 4 files changed, 55 insertions(+)
- create mode 100644 arch/arm/boot/dts/stih41x-b2020x.dtsi
+[...]
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index b29ff4b..81df8e7 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -210,6 +210,19 @@
- 					};
- 				};
- 			};
-+
-+			fsm {
-+				pinctrl_fsm: fsm {
-+					st,pins {
-+						spi-fsm-clk  = <&PIO12 2 ALT1 OUT>;
-+						spi-fsm-cs   = <&PIO12 3 ALT1 OUT>;
-+						spi-fsm-mosi = <&PIO12 4 ALT1 OUT>;
-+						spi-fsm-miso = <&PIO12 5 ALT1 IN>;
-+						spi-fsm-hol  = <&PIO12 6 ALT1 OUT>;
-+						spi-fsm-wp   = <&PIO12 7 ALT1 OUT>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-rear {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index b7ab47b..1e24b9e 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -145,5 +145,18 @@
- 
- 			status		= "disabled";
- 		};
-+
-+		/* FSM */
-+		spifsm: spifsm at fe902000 {
-+			compatible	   = "st,spi-fsm";
-+			reg		   = <0xfe902000 0x1000>;
-+			pinctrl-0	   = <&pinctrl_fsm>;
-+
-+			st,syscfg	   = <&syscfg_rear>;
-+			st,boot-device-reg = <0x958>;
-+			st,boot-device-spi = <0x1a>;
-+
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-index 0ef0a69..01487e0 100644
---- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -6,6 +6,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * publishhed by the Free Software Foundation.
-  */
-+#include "stih41x-b2020x.dtsi"
- / {
- 	memory{
- 		device_type = "memory";
-diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
-new file mode 100644
-index 0000000..df01c12
---- /dev/null
-+++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-+ * Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/ {
-+	soc {
-+		spifsm: spifsm at fe902000 {
-+			#address-cells = <1>;
-+			#size-cells    = <1>;
-+
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "SerialFlash1";
-+				reg   = <0x00000000 0x00500000>;
-+			};
-+
-+			partition at 500000 {
-+				label = "SerialFlash2";
-+				reg   = <0x00500000 0x00b00000>;
-+			};
-+		};
-+	};
-+};
+> > +	soc {
+> > +		spifsm: spifsm at fe902000 {
+> > +			#address-cells = <1>;
+> > +			#size-cells    = <1>;
+> > +
+> > +			status = "okay";
+> > +
+> > +			partition at 0 {
+> > +				label = "Serial Flash 1";
+> 
+> Are you sure you want spaces in the partition label? I suppose MTD can
+> probably handle this fine, but it doesn't seem standard, and it may
+> prevent you from using the partition name in certain ways. For instance,
+> it might make it harder to use with the "ubi.mtd=" module parameter.
+> 
+> But otherwise:
+> 
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+
+Code fixed and Ack applied.
+
+Thanks Brian.
+
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
