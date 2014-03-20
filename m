@@ -1,33 +1,55 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 20 Mar 2014 11:19:40 -0700
-Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
- infrastructure
-In-Reply-To: <20140319172338.GA31368@e102568-lin.cambridge.arm.com>
-References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
- <20140318180856.GB792@e102568-lin.cambridge.arm.com>
- <CADHgK6uwUDndVHQaWU=3R7A16hc4PYJCAfMLi3uBnrDjYidPXg@mail.gmail.com>
- <20140319172338.GA31368@e102568-lin.cambridge.arm.com>
-Message-ID: <CADHgK6vGf0gfVoAWO2FiXzCf-Sf_P_u+d7Dg04xn1O5t2LeKwg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Mar 2014 03:20:09 +0900
+Subject: [PATCH v2 5/6] ARM: s3c64xx: Fix incorrect selection of PM-related
+ symbols
+In-Reply-To: <1395162964-5916-5-git-send-email-t.figa@samsung.com>
+References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
+ <1395162964-5916-5-git-send-email-t.figa@samsung.com>
+Message-ID: <532B3159.60609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2014 10:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> Rob is asking a property describing hw, and honestly unless we define
-> a power consumption property value (defining what it means will be rather
-> complicated though) I'd rather remove index altogether and use min_residency
-> as a comparison value instead.
+On 03/19/14 02:16, Tomasz Figa wrote:
+> This patch modifies ARCH_S3C64XX Kconfig entry to select
+> SAMSUNG_WAKEMASK and PM_GENERIC_DOMAINS conditionally if PM_SLEEP and
+> PM_RUNTIME are enabled respectively to avoid introducing unmet
+> dependenies such as
+>
+> warning: (ARCH_S3C64XX&&  S3C2412_PM&&  CPU_S5P6440&&  CPU_S5P6450)
+> selects SAMSUNG_WAKEMASK which has unmet direct dependencies
+> (PLAT_SAMSUNG&&  PM)
+>
+> warning: (ARCH_S3C64XX&&  ARCH_EXYNOS4&&  SOC_EXYNOS5250&&
+> SOC_EXYNOS5420) selects PM_GENERIC_DOMAINS which has unmet direct
+> dependencies (PM)
+>
+> and related compilation errors, when PM_SLEEP or PM_RUNTIME is not
+> enabled.
+>
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/Kconfig | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index afc751f..0608177 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -757,11 +757,11 @@ config ARCH_S3C64XX
+>   	select HAVE_TCM
+>   	select NO_IOPORT_MAP
+>   	select PLAT_SAMSUNG
+> -	select PM_GENERIC_DOMAINS
+> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
+>   	select S3C_DEV_NAND
+>   	select S3C_GPIO_TRACK
+>   	select SAMSUNG_ATAGS
+> -	select SAMSUNG_WAKEMASK
+> +	select SAMSUNG_WAKEMASK if PM_SLEEP
+>   	select SAMSUNG_WDT_RESET
+>   	help
+>   	  Samsung S3C64XX series based systems
 
-I like having a separate ranking for power to sort the states.  To me
-it seems that min residency could be ambiguous for this.  We could
-have states with inverted min_residencies: where a lower consumption
-state has a lower target residency because the cost is recovered more
-quickly.  Such a state might have higher latency for exit, so even
-though the lower min_residency/lower power state is clearly
-preferable, selection of the lower power state may be prevented by
-kernel latency constraints.
+Applied, thanks.
 
-Thanks,
-
-Sebastian
+- Kukjin
