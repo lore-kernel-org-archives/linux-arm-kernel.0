@@ -1,55 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Mar 2014 16:47:15 +0000
-Subject: [PATCH v2] KVM: ARM: vgic: plug irq injection race
-Message-ID: <1395334035-15454-1-git-send-email-marc.zyngier@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 20 Mar 2014 09:58:07 -0700
+Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
+ arguments
+In-Reply-To: <1395319485.7776.32.camel@joe-AO722>
+References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
+ <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
+ <1395314713.7776.17.camel@joe-AO722>
+ <20140320114123.GE21349@lee--X1>
+ <1395316090.7776.24.camel@joe-AO722>
+ <20140320115412.GU31517@norris-Latitude-E6410>
+ <20140320120307.GA9240@lee--X1>
+ <1395317630.7776.29.camel@joe-AO722>
+ <CAN8TOE9g2VwVgVx1Sj3OcguuwP_A9pJS+WpgTAL49KyN9r1CiA@mail.gmail.com>
+ <1395319485.7776.32.camel@joe-AO722>
+Message-ID: <20140320165807.GV31517@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it stands, nothing prevents userspace from injecting an interrupt
-before the guest's GIC is actually initialized.
+On Thu, Mar 20, 2014 at 05:44:45AM -0700, Joe Perches wrote:
+> On Thu, 2014-03-20 at 05:41 -0700, Brian Norris wrote:
+> > I also don't think that a function parameter is the right place to
+> > mark const like this. Function arguments are always pass-by-value, so
+> > this 'const' tells users (callers) nothing useful. It only provides
+> > useless constraints on what the function can do with its copy of the
+> > parameter.
+> 
+> Again, that's not useless information.
 
-This goes unnoticed so far (as everything is pretty much statically
-allocated), but ends up exploding in a spectacular way once we switch
-to a more dynamic allocation (the GIC data structure isn't there yet).
+For local, pass-by-value function arguments (i.e., constant data, or
+constant pointers to data), I respectfully disagree. (For "pointers to
+constant data", I completely agree that the 'const' info is useful.)
 
-The fix is to test for the "ready" flag in the VGIC distributor before
-trying to inject the interrupt. Note that in order to avoid breaking
-userspace, we have to ignore what is essentially an error.
+> And as you've seen, just making these changes
+> can be error prone.
 
-Also, move the setting of the flag out of the critical section,
-which will ensure the visibility of the initialized data-structure
-before the flag is actually set.
+Thank you for catching our mistake now. But I don't think that is
+relevant; just because you caught an error doesn't mean that the change
+(primarily for consistency's sake) should be avoided entirely.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Unless you have a more convincing argument, this code will remain as-is.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index f29761b..4850e87 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1431,7 +1431,8 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-+	if (likely(vgic_initialized(kvm)) &&
-+	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
- 
- 	return 0;
-@@ -1581,9 +1582,10 @@ int kvm_vgic_init(struct kvm *kvm)
- 	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
- 		vgic_set_target_reg(kvm, 0, i);
- 
--	kvm->arch.vgic.ready = true;
- out:
- 	mutex_unlock(&kvm->lock);
-+	if (!ret)
-+		kvm->arch.vgic.ready = true;
- 	return ret;
- }
- 
--- 
-1.8.3.4
+Regards,
+Brian
