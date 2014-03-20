@@ -1,27 +1,37 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 20 Mar 2014 10:45:27 +0100
-Subject: Common clock: function clock and bus clock
-In-Reply-To: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
-References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
-Message-ID: <532AB8B7.6060608@codethink.co.uk>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 20 Mar 2014 17:47:57 +0800
+Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <20140320102153.7106f915@ipc1.ka-ro>
+References: <1395235406-13449-1-git-send-email-y>	<532AB1A2.9010702@freescale.com>
+ <20140320102153.7106f915@ipc1.ka-ro>
+Message-ID: <532AB94D.1050406@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/14 03:06, Chao Xie wrote:
-> hi
+? 2014?03?20? 17:21, Lothar Wa?mann ??:
+> Hi,
 >
-> I can not find any examples for handling function clock and bus clock
-> in drivers/clk/.
+> Huang Shijie wrote:
+>> ? 2014?03?19? 21:23, y at karo-electronics.de ??:
+>>> configurable via DT. This is required for the Ka-Ro electronics
+>>> platforms.
+>>>
+>> If you disable the swapping, you will disable the NAND boot in actually.
+>>
+> No. All our modules do boot from NAND and none of them does the
+> swapping.
+>
+>
+It seems the NAND boot runs well by luck.
 
-The convention is that clk_get(dev, NULL) will get the bus clock
-for the device and that any other clocks are appropriately named.
+The ROM will do the swapping when it reads the BBT table written by the 
+kobs-ng (or something else?).
 
-In the device tree case, the bus clock is first, and can generally
-be named anything you like, such as "bus".
+If the BBT table is small, not bigger then a page, the NAND boot may 
+runs well when you disable the swapping;
+But it the BBT table is bigger, the ROM will get a corrupted BBT table.
 
-If the module does not have one, then you can always supply a dummy
-clock.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+
+thanks
+Huang Shijie
