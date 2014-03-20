@@ -1,44 +1,53 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 20 Mar 2014 10:10:00 +0000
-Subject: [stable 3.10.y] Please backport a56a5cf1f2ec "ARM: highbank:
- avoid L2 cache smc calls when PL310 is not present"
-In-Reply-To: <20140319235425.GA22080@kroah.com>
-References: <1394332548.13270.74.camel@hastur.hellion.org.uk>
- <20140319235425.GA22080@kroah.com>
-Message-ID: <1395310200.16974.35.camel@kazak.uk.xensource.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 20 Mar 2014 11:09:14 +0100
+Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <532AB94D.1050406@freescale.com>
+References: <1395235406-13449-1-git-send-email-y>
+ <532AB1A2.9010702@freescale.com>
+ <20140320102153.7106f915@ipc1.ka-ro>
+ <532AB94D.1050406@freescale.com>
+Message-ID: <20140320110914.731db7cf@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-19 at 23:54 +0000, Greg KH wrote:
-> On Sun, Mar 09, 2014 at 02:35:48AM +0000, Ian Campbell wrote:
-[...]
-> > I thought it might require 0b53c11d533a "ARM: move outer_cache
-> [...] 
-> > commit a56a5cf1f2ec895599eace0ac6eba1e4a489e4bf
+Hi,
 
-> This doesn't apply to the 3.10 stable tree, so if you want it there, can
-> you provide a backported version?
+Huang Shijie wrote:
+> ? 2014?03?20? 17:21, Lothar Wa?mann ??:
+> > Hi,
+> >
+> > Huang Shijie wrote:
+> >> ? 2014?03?19? 21:23, y at karo-electronics.de ??:
+> >>> configurable via DT. This is required for the Ka-Ro electronics
+> >>> platforms.
+> >>>
+> >> If you disable the swapping, you will disable the NAND boot in actually.
+> >>
+> > No. All our modules do boot from NAND and none of them does the
+> > swapping.
+> >
+> >
+> It seems the NAND boot runs well by luck.
+> 
+> The ROM will do the swapping when it reads the BBT table written by the 
+> kobs-ng (or something else?).
+> 
+This can be disabled by parameter in the FCB (at least according to
+the i.MX6 reference Manual):
+|DISBBM 172 4 If 0 ROM will swap BadBlockMarkerByte with
+|             metadata[0] after reading a page using BCH40.
+|             If the value set is 1 then ROM will not do
+|             swapping
 
-Strange, they both cherry-picked cleanly onto v3.10.33 for me. I've
-pushed the resulting tree.
 
-The following changes since commit 6969595f011b46b49c3f1b9e0bd7da27768c1fd9:
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-  Linux 3.10.33 (2014-03-06 21:58:45 -0800)
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-are available in the git repository at:
-
-  git://xenbits.xen.org/people/ianc/linux.git for-greg/3.10.y-arm-smc-backport
-
-for you to fetch changes up to ac416026f5abb1da41b19ea725f5c1a114702756:
-
-  ARM: highbank: avoid L2 cache smc calls when PL310 is not present (2014-03-20 10:07:22 +0000)
-
-----------------------------------------------------------------
-Rob Herring (2):
-      ARM: move outer_cache declaration out of ifdef
-      ARM: highbank: avoid L2 cache smc calls when PL310 is not present
-
- arch/arm/include/asm/outercache.h |    4 ++--
- arch/arm/mach-highbank/highbank.c |   13 ++++++-------
- 2 files changed, 8 insertions(+), 9 deletions(-)
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
