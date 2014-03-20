@@ -1,161 +1,135 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 20 Mar 2014 10:28:37 -0500
-Subject: [PATCH 1/1] regulator: Add new driver for ST's PWM controlled
- voltage regulators
-In-Reply-To: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
-References: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140320152837.GW18529@joshc.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Mar 2014 12:31:48 -0300
+Subject: [RFC PATCH] staging: imx-drm: add suspend / resume
+In-Reply-To: <20140320151712.22089.59230.stgit@localhost>
+References: <20140320151712.22089.59230.stgit@localhost>
+Message-ID: <CAOMZO5CN9gwxK42gctkEarT+jiqAOmVCKJ=X30cXtg5dS0Fumg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Lee-
+Hi Martin,
 
-A few minor things below.
+On Thu, Mar 20, 2014 at 12:17 PM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+> Currently i.MX53 boards with the imx-drm display driver active
+> fail an intensive suspend to ram / resume test.
+>
+> After around 5 - 50 cycles it is no longer possible to resume
+> the board.
+>
+> The culprit is the imx-drm driver which does not stop DMA
+> before suspending. Removing the driver "fixes" the problem.
+>
+> This patch provides a minimal suspend / resume implementation
+> enabling the intensive test to work (500 cycles ok).
+>
+> I am only sending this as RFC for the moment since I don't
+> really know the hardware or driver code well enough to be
+> sure this is the "right" way of doing it.
 
-On Thu, Mar 20, 2014 at 02:10:54PM +0000, Lee Jones wrote:
-> On some STMicroelectronics hardware reside regulators consisting
-> partly of a PWM input connected to the feedback loop. As the PWM
-> duty-cycle is varied the output voltage adapts. This driver
-> allows us to vary the output voltage by adapting the PWM input
-> duty-cycle.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> --- /dev/null
-> +++ b/drivers/regulator/st-pwm.c
-> +static int st_pwm_regulator_set_voltage(struct regulator_dev *dev,
-> +					int min_uV, int max_uV,
-> +					unsigned *selector)
+Does this patch still cause the visual artifacts you mentioned earlier?
+
+Regards,
+
+Fabio Estevam
+
+>
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> ---
+>  drivers/staging/imx-drm/ipu-v3/ipu-common.c |   47 +++++++++++++++++++++++++++
+>  drivers/staging/imx-drm/ipu-v3/ipu-prv.h    |    1 +
+>  2 files changed, 48 insertions(+)
+>
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+> index 97ca692..484a90a 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+> @@ -692,6 +692,8 @@ int ipu_idmac_enable_channel(struct ipuv3_channel *channel)
+>         val |= idma_mask(channel->num);
+>         ipu_idmac_write(ipu, val, IDMAC_CHA_EN(channel->num));
+>
+> +       channel->enabled = true;
+> +
+>         spin_unlock_irqrestore(&ipu->lock, flags);
+>
+>         return 0;
+> @@ -750,6 +752,8 @@ int ipu_idmac_disable_channel(struct ipuv3_channel *channel)
+>         val &= ~idma_mask(channel->num);
+>         ipu_cm_write(ipu, val, IPU_CHA_DB_MODE_SEL(channel->num));
+>
+> +       channel->enabled = false;
+> +
+>         spin_unlock_irqrestore(&ipu->lock, flags);
+>
+>         return 0;
+> @@ -1245,10 +1249,53 @@ static int ipu_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +#ifdef CONFIG_PM_SLEEP
+> +
+> +static int ipu_suspend(struct device *dev)
 > +{
-> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-> +	int dutycycle, best_val = INT_MAX;
-> +	int sel, ret;
+> +       struct ipu_soc *ipu = dev_get_drvdata(dev);
+> +       struct ipuv3_channel *channel;
+> +       int i;
 > +
-> +	for (sel = 0; sel < dev->desc->n_voltages; sel++) {
-> +		if (drvdata->duty_cycle_table[sel].uV < best_val &&
-> +		    drvdata->duty_cycle_table[sel].uV >= min_uV &&
-> +		    drvdata->duty_cycle_table[sel].uV <= max_uV) {
-> +			best_val = drvdata->duty_cycle_table[sel].uV;
-> +			if (selector)
-> +				*selector = sel;
-> +		}
-> +	}
-
-If you implement .set_voltage_sel() instead and set map_voltage to
-regulator_map_voltage_iterate, the core can take care of this.
-
-> +
-> +	if (best_val == INT_MAX)
-> +		return -EINVAL;
-> +
-> +	dutycycle = (ST_PWM_REG_PERIOD / 100) *
-> +		drvdata->duty_cycle_table[sel].dutycycle;
-
-Considering (ST_PWM_REG_PERIOD / 100) is constant, could you get away
-with dropping this calculation by just putting the already-adjusted
-values into your duty cycle table?
-
-> +
-> +	ret = pwm_config(drvdata->pwm, dutycycle, ST_PWM_REG_PERIOD);
-> +	if (ret) {
-> +		dev_err(&dev->dev, "Failed to configure PWM\n");
-> +		return ret;
-> +	}
-> +
-> +	drvdata->state = sel;
-> +
-> +	if (!drvdata->enabled) {
-> +		ret = pwm_enable(drvdata->pwm);
-> +		if (ret) {
-> +			dev_err(&dev->dev, "Failed to enable PWM\n");
-> +			return ret;
-> +		}
-> +		drvdata->enabled = true;
-> +	}
-> +
-> +	return 0;
+> +       channel = ipu->channel;
+> +       for (i = 0; i < ARRAY_SIZE(ipu->channel); i++, channel++) {
+> +               channel->suspended = false;
+> +               if (channel->enabled) {
+> +                       if (ipu_idmac_wait_busy(channel, 50))
+> +                               dev_warn(dev,
+> +                                       "%s: Timeout channel %d idle\n",
+> +                                       __func__, i);
+> +                       ipu_idmac_disable_channel(channel);
+> +                       channel->suspended = true;
+> +               }
+> +       }
+> +       return 0;
 > +}
 > +
-> +static int st_pwm_regulator_list_voltage(struct regulator_dev *dev,
-> +					 unsigned selector)
+> +static int ipu_resume(struct device *dev)
 > +{
-> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+> +       struct ipu_soc *ipu = dev_get_drvdata(dev);
+> +       struct ipuv3_channel *channel;
+> +       int i;
 > +
-> +	if (selector >= dev->desc->n_voltages)
-> +		return -EINVAL;
-> +
-> +	return drvdata->duty_cycle_table[selector].uV;
+> +       channel = ipu->channel;
+> +       for (i = 0; i < ARRAY_SIZE(ipu->channel); i++, channel++) {
+> +               if (channel->suspended) {
+> +                       ipu_idmac_enable_channel(channel);
+> +                       channel->suspended = false;
+> +               }
+> +       }
+> +       return 0;
 > +}
+> +#endif
 > +
-> +static struct regulator_ops st_pwm_regulator_voltage_ops = {
-> +	.get_voltage  = st_pwm_regulator_get_voltage,
-> +	.set_voltage  = st_pwm_regulator_set_voltage,
-> +	.list_voltage = st_pwm_regulator_list_voltage,
-> +};
+> +static SIMPLE_DEV_PM_OPS(ipu_pm_ops, ipu_suspend, ipu_resume);
 > +
-> +static struct st_pwm_voltages b2105_duty_cycle_table[] = {
-> +	{ .uV = 1114000, .dutycycle = 0,  },
-> +	{ .uV = 1095000, .dutycycle = 10, },
-> +	{ .uV = 1076000, .dutycycle = 20, },
-> +	{ .uV = 1056000, .dutycycle = 30, },
-> +	{ .uV = 1036000, .dutycycle = 40, },
-> +	{ .uV =  996000, .dutycycle = 50, },
-> +	/* WARNING: Values above 50% duty-cycle cause boot failures. */
-> +};
-> +
-> +static struct regulator_desc b2105_desc = {
-> +	.name		= "b2105-pwm-regulator",
-> +	.ops		= &st_pwm_regulator_voltage_ops,
-> +	.type		= REGULATOR_VOLTAGE,
-> +	.owner		= THIS_MODULE,
-> +	.n_voltages	= ARRAY_SIZE(b2105_duty_cycle_table),
-> +	.supply_name    = "pwm",
-> +};
-> +
-> +static struct st_pwm_regulator_data b2105_info = {
-> +	.desc		  = &b2105_desc,
-> +	.duty_cycle_table = b2105_duty_cycle_table,
-> +};
-> +
-> +static struct of_device_id st_pwm_of_match[] = {
-
-const.  At least the regulator_desc and duty cycle table should be const
-as well. (see my comments below about b2105_info).
-
-> +	{ .compatible = "st,b2105-pwm-regulator", .data = &b2105_info, },
-> +	{ },
-> +};
-
-You may want a MODULE_DEVICE_TABLE(of, ...); here if you want to be able
-to be autoloaded.
-
-> +
-> +static int st_pwm_regulator_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct st_pwm_regulator_data *drvdata;
-> +	const struct of_device_id *of_match;
-> +	struct regulator_dev *regulator;
-> +	struct regulator_config config = { };
-> +
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "Device Tree node missing\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	of_match = of_match_device(st_pwm_of_match, &pdev->dev);
-> +	if (!of_match) {
-> +		dev_err(&pdev->dev, "failed to match of device\n");
-> +		return -ENODEV;
-> +	}
-> +	drvdata =  (struct st_pwm_regulator_data *) of_match->data;
-
-Hrm, I typed "cast not necessary here", but then I realized it is
-necessary since you using it to cast away constness.
-
-Are you safe assuming that there will only be one of these devices in a
-system?  It doesn't seem like much a burden to just allocate a new
-object and use it instead of a statically allocated one.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>  static struct platform_driver imx_ipu_driver = {
+>         .driver = {
+>                 .name = "imx-ipuv3",
+>                 .of_match_table = imx_ipu_dt_ids,
+> +               .pm = &ipu_pm_ops,
+>         },
+>         .probe = ipu_probe,
+>         .remove = ipu_remove,
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-prv.h b/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
+> index 4df0050..233749a 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
+> @@ -144,6 +144,7 @@ struct ipuv3_channel {
+>
+>         bool enabled;
+>         bool busy;
+> +       bool suspended;
+>
+>         struct ipu_soc *ipu;
+>  };
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
