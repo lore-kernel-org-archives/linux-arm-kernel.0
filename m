@@ -1,32 +1,46 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 20 Mar 2014 10:34:40 +0100
-Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
- common, correct implementation
-In-Reply-To: <20140320090330.49a1d372@marrow.netinsight.se> ("Simon
- =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Thu, 20 Mar 2014 09:03:30
- +0100")
-References: <20140317144016.0508cc4d@marrow.netinsight.se>
- <20140317144235.546d2e19@marrow.netinsight.se>
- <201403181558.37094.arnd@arndb.de>
- <20140320090330.49a1d372@marrow.netinsight.se>
-Message-ID: <m31txxjjrj.fsf@t19.piap.pl>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Mar 2014 15:06:48 +0530
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <9096065.aGCg8yZblW@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <4836281.0IgPinItBq@wuerfel> <532A1BDD.904@cogentembedded.com>
+ <9096065.aGCg8yZblW@wuerfel>
+Message-ID: <532AB6B0.7010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
+On Thursday 20 March 2014 12:12 PM, Arnd Bergmann wrote:
+> On Thursday 20 March 2014 01:36:13 Sergei Shtylyov wrote:
+>> On 03/19/2014 11:21 PM, Arnd Bergmann wrote:
+>>> The question is whether there is anyone who would do this properly.
+>>
+>>     Nobody cares, it seems. As you can imagine, I stopped to care enough after 
+>> being switched to other projects.
+> 
+> I only care about it because I have the intention to get all 'randconfig'
+> kernels to build eventually. For stuff that is definitely 'legacy'
+> and won't get cleaned up properly, I'm fine with a hack.
+> 
+>>> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
+>>
+>>     The idea at the time was to just ioremap() this register but I was not 
+>> very eager.
+> 
+> Yes, that would work, too. However, that would cause problems later
+> if we ever try to make the davinci platform "multiplatform", unless we also
+> pass the physical address in a platform resource and make this a larger
 
-> Thanks. However, Krzysztof thinks that this implementation is
-> incorrect. It certainly fixes my ixp4xx issues, but might not be good
-> for everyone.
+Some SATA driver work done by Bartlomiej Zolnierkiewicz needed driver
+access to syscfg registers too and I just asked him to pass the physical
+addresses using platform resource. I think thats the best bet we have in
+the absence of a modern interface.
 
-It because you don't have PCI devices setting coherent mask to 32-bits
-(and that's what normal PCI devices do).
+> The syscon (system controller) framework helps share a set of registers
+> across multiple drivers. If all accesses to the CFGCHIP2 register are
+> in a single PHY driver, we wouldn't need it.
 
-BTW PCI (and other) devices requesting 32-bit coherent allocs don't care
-if they're given 26-bit memory. 26 bits fit perfectly in 32 bits. It's
-the streaming mapping which is (may be) constrained by hardware.
--- 
-Krzysztof Halasa
+CFGCHIP2 has controls both for USB 1.1 (OHCI) and USB 2.0 (MUSB). Not
+sure if there can be a single PHY driver for both.
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Thanks,
+Sekhar
