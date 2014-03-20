@@ -1,66 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 13:42:19 +0000
-Subject: [PATCH v3 1/3] clk: s2mps11: Add support for S2MPS14 clocks
-In-Reply-To: <1395319557.22979.1.camel@AMDC1943>
-References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
- <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
- <20140319001643.30995.46947@quantum>
- <1395215408.18730.2.camel@AMDC1943>
- <20140319191117.30995.13715@quantum>
- <1395319557.22979.1.camel@AMDC1943>
-Message-ID: <20140320134219.GB6816@lee--X1>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Mar 2014 13:43:57 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140320112650.GA1408@red-moon>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+Message-ID: <20140320134357.GE11706@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > > This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
-> > > > > s2mps11 clock driver.
-> > > > > 
-> > > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > > > Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> > > > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > > > 
-> > > > This does not apply cleanly to to clk tree trip, nor does it compile
-> > > > after manually merging due to changes introducing
-> > > > linux/mfd/samsung/s2mps14.h.
-> > > > 
-> > > > The changes look OK to me so maybe Lee can take it with my Ack?
-> > > > 
-> > > > Acked-by: Mike Turquette <mturquette@linaro.org>
-> > > > 
-> > > 
-> > > Hi,
-> > > 
-> > > Thanks for the Ack. The patch depends on Tushar Behera's patches:
-> > >  - [PATCH V2 0/2] Add support for clocks in S5M8767
-> > >    http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27264
-> > > which are waiting for some time. Both patchsets should be pulled
-> > > together.
-> > 
-> > I took those patches in yesterday. So we have three options:
-> 
-> Great! Thanks.
-> 
-> > 
-> > 1) MFD tree can pull a stable commit from the clk tree. I'm happy to
-> > make a topic branch for this. Then these patches can be applied.
-> > 
-> > 2) clk tree can pull a stable commit from the mfd tree if the mfd folks
-> > can provide one.
-> > 
-> > 3) Wait until after the merge window to apply this one to the clk tree.
-> > I don't currently plan to send 2 PRs during the merge window, so this
-> > could either go in 3.16 or maybe into 3.15 if a split PR is sent.
-> 
-> Dear Lee,
-> 
-> How do you wish to proceed? The patchset depends on changes in sec-core
-> MFD driver.
+On Thu, Mar 20, 2014 at 11:26:50AM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Mar 19, 2014 at 06:02:17PM +0000, Mark Brown wrote:
+> > +#ifdef CONFIG_OF
 
-The MFD tree is betting pretty complicated with sec-core stuff at the
-minuite. Can I vote for option 3?
+> This ifdef can be removed, CONFIG_OF is always selected for arm64 and
+> the !CONFIG_OF path
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This has been present since the very first time these patches were
+posted but hasn't been mentioned as being a problem previously.
+
+> > +#else
+> > +static inline int parse_dt_topology(void) { return 0; }
+> > +#endif
+
+> is wrong, it should return failure. You should remove the CONFIG_OF
+> ifdeffery.
+
+Yup.  It actually won't affect the behaviour at present though - since
+it won't do anything the result will be just the same as if we return an
+error and reset.
+
+Given ACPI (which really looks like it's going to happen at some point
+and presumably make OF optional) I'm not sure removing the handling of
+OF is actually constructive but whatever, it's done now...
+
+> > +			if (leaf) {
+> > +				ret = parse_core(c, cluster_id, core_id++);
+> > +				if (ret != 0) {
+> > +					return ret;
+> > +				}
+
+> WARNING: braces {} are not necessary for single statement blocks
+> #139: FILE: arch/arm64/kernel/topology.c:132:
+
+Like I say I don't think checkpatch is being helpful on this one, the
+code looks worse.  Again, whatever.
+
+> We still have a problem here. If the topology does not contain bindings
+> for some cpu nodes, parse_cluster() does not fail and we end up with an
+> incomplete topology. We have two choices: either we check the topology
+
+Hrm, looking at the topology binding it doesn't specificially require
+that the topology be complete.  I can see why you would want that.
+
+> I'd rather do it here, in preparation for MPIDR_EL1 fallback solution
+> (where there will always be topology information configured and the register
+> will always be there in all its glory).
+
+To be honest at this point I think what I want to do is go back to the
+original approach of layering DT on top of MPIDR.  MPIDR is smaller and
+simpler code so seems more likely to make progress.  I really do expect
+that for a very large proportion of systems it'll be sufficient.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/b2e4e969/attachment-0001.sig>
