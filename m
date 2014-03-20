@@ -1,135 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Mar 2014 12:31:48 -0300
-Subject: [RFC PATCH] staging: imx-drm: add suspend / resume
-In-Reply-To: <20140320151712.22089.59230.stgit@localhost>
-References: <20140320151712.22089.59230.stgit@localhost>
-Message-ID: <CAOMZO5CN9gwxK42gctkEarT+jiqAOmVCKJ=X30cXtg5dS0Fumg@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 20 Mar 2014 16:36:52 +0100
+Subject: DMABOUNCE in pci-rcar
+In-Reply-To: <20140320152640.GW7528@n2100.arm.linux.org.uk>
+References: <201402241200.21944.arnd@arndb.de>
+ <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
+ <5165962.7bqj51B15Z@wuerfel> <532B0384.1000400@codethink.co.uk>
+ <20140320152640.GW7528@n2100.arm.linux.org.uk>
+Message-ID: <532B0B14.7040600@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On 20/03/14 16:26, Russell King - ARM Linux wrote:
+> On Thu, Mar 20, 2014 at 04:04:36PM +0100, Ben Dooks wrote:
+>> On 26/02/14 20:57, Arnd Bergmann wrote:
+>>> On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
+>>>> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>> Hi Magnus,
+>>>>>
+>>>>> I noticed during randconfig testing that you enabled DMABOUNCE for the
+>>>>> pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
+>>>>>
+>>>>> I didn't see the original post unfortunately, but I fear we have to
+>>>>> revert it and come up with a better solution, ...
+>>>>
+>>>> Sounds like I should drop the following patches from my pci/host-rcar
+>>>> branch for now?
+>>>>
+>>>>     PCI: rcar: Add DMABOUNCE support
+>>>>     PCI: rcar: Enable BOUNCE in case of HIGHMEM
+>>>>     PCI: rcar: Make the Kconfig dependencies more generic
+>>>
+>>> Sounds good to me. The last patch is actually fine, but you'll have to
+>>> fix the context to apply it without the other two.
+>>
+>> As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
+>> controllers no longer work with full 2GiB RAM enabled in the device
+>> tree.
+>>
+>> Could we work around this by having 1GiB of memory defined in the
+>> 32bit memory and then add the rest of the 3GiB from the >32bit
+>> area via LPAE? Will the kernel ever try to allocate DMA memory from
+>> anything >32bit?
+>
+> Ignore highmem.  What is the actual hardware restriction concerning memory
+> it can access?
 
-On Thu, Mar 20, 2014 at 12:17 PM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> Currently i.MX53 boards with the imx-drm display driver active
-> fail an intensive suspend to ram / resume test.
->
-> After around 5 - 50 cycles it is no longer possible to resume
-> the board.
->
-> The culprit is the imx-drm driver which does not stop DMA
-> before suspending. Removing the driver "fixes" the problem.
->
-> This patch provides a minimal suspend / resume implementation
-> enabling the intensive test to work (500 cycles ok).
->
-> I am only sending this as RFC for the moment since I don't
-> really know the hardware or driver code well enough to be
-> sure this is the "right" way of doing it.
+If the window is set to 2GiB it can only access 2GiB aligned to 2GiB
+boundary, however DRAM spans a 2GiB boundary (being at 1-3GiB)
 
-Does this patch still cause the visual artifacts you mentioned earlier?
 
-Regards,
-
-Fabio Estevam
-
->
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-> ---
->  drivers/staging/imx-drm/ipu-v3/ipu-common.c |   47 +++++++++++++++++++++++++++
->  drivers/staging/imx-drm/ipu-v3/ipu-prv.h    |    1 +
->  2 files changed, 48 insertions(+)
->
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-> index 97ca692..484a90a 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-> @@ -692,6 +692,8 @@ int ipu_idmac_enable_channel(struct ipuv3_channel *channel)
->         val |= idma_mask(channel->num);
->         ipu_idmac_write(ipu, val, IDMAC_CHA_EN(channel->num));
->
-> +       channel->enabled = true;
-> +
->         spin_unlock_irqrestore(&ipu->lock, flags);
->
->         return 0;
-> @@ -750,6 +752,8 @@ int ipu_idmac_disable_channel(struct ipuv3_channel *channel)
->         val &= ~idma_mask(channel->num);
->         ipu_cm_write(ipu, val, IPU_CHA_DB_MODE_SEL(channel->num));
->
-> +       channel->enabled = false;
-> +
->         spin_unlock_irqrestore(&ipu->lock, flags);
->
->         return 0;
-> @@ -1245,10 +1249,53 @@ static int ipu_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +#ifdef CONFIG_PM_SLEEP
-> +
-> +static int ipu_suspend(struct device *dev)
-> +{
-> +       struct ipu_soc *ipu = dev_get_drvdata(dev);
-> +       struct ipuv3_channel *channel;
-> +       int i;
-> +
-> +       channel = ipu->channel;
-> +       for (i = 0; i < ARRAY_SIZE(ipu->channel); i++, channel++) {
-> +               channel->suspended = false;
-> +               if (channel->enabled) {
-> +                       if (ipu_idmac_wait_busy(channel, 50))
-> +                               dev_warn(dev,
-> +                                       "%s: Timeout channel %d idle\n",
-> +                                       __func__, i);
-> +                       ipu_idmac_disable_channel(channel);
-> +                       channel->suspended = true;
-> +               }
-> +       }
-> +       return 0;
-> +}
-> +
-> +static int ipu_resume(struct device *dev)
-> +{
-> +       struct ipu_soc *ipu = dev_get_drvdata(dev);
-> +       struct ipuv3_channel *channel;
-> +       int i;
-> +
-> +       channel = ipu->channel;
-> +       for (i = 0; i < ARRAY_SIZE(ipu->channel); i++, channel++) {
-> +               if (channel->suspended) {
-> +                       ipu_idmac_enable_channel(channel);
-> +                       channel->suspended = false;
-> +               }
-> +       }
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(ipu_pm_ops, ipu_suspend, ipu_resume);
-> +
->  static struct platform_driver imx_ipu_driver = {
->         .driver = {
->                 .name = "imx-ipuv3",
->                 .of_match_table = imx_ipu_dt_ids,
-> +               .pm = &ipu_pm_ops,
->         },
->         .probe = ipu_probe,
->         .remove = ipu_remove,
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-prv.h b/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
-> index 4df0050..233749a 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-prv.h
-> @@ -144,6 +144,7 @@ struct ipuv3_channel {
->
->         bool enabled;
->         bool busy;
-> +       bool suspended;
->
->         struct ipu_soc *ipu;
->  };
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
