@@ -1,143 +1,71 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 07:36:48 +0900
-Subject: [GIT PULL 4/4] Samsung Exynos cleanup/consolidate for v3.15
-Message-ID: <532B6D80.9070302@samsung.com>
+Date: Fri, 21 Mar 2014 07:39:41 +0900
+Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
+In-Reply-To: <532B3010.80101@samsung.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-49-git-send-email-arnd@arndb.de>
+ <01f801cf43f0$62e7bc80$28b73580$@samsung.com> <532B3010.80101@samsung.com>
+Message-ID: <532B6E2D.7000207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On 03/21/14 03:14, Kukjin Kim wrote:
+> On 03/20/14 12:56, Kukjin Kim wrote:
+>> Arnd Bergmann wrote:
+>>>
+>>> The power domain code is only available when CONFIG_PM
+>>> is enabled, so we must not select that unconditionally for
+>>> s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
+>>> mirrors what we do on other platforms, and fixes a possible
+>>> randconfig build bug.
+>>>
+>>> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+>>> Cc: Tomasz Figa<tomasz.figa@gmail.com>
+>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>
+>> Acked-by: Kukjin Kim<kgene.kim@samsung.com>
+>>
+>
+> Arnd,
+>
+> Please drop this patch in your tree because there is a fix before this
+> and it fixes SAMSUNG_WAKEMASK dependency together for S3C64XX.
+>
+> [PATCH v2 5/6] ARM: s3c64xx: Fix incorrect selection of PM-related
+> symbols <http://www.spinics.net/lists/arm-kernel/msg316391.html>
+>
+> Note, I'll take above into 2nd fixes for v3.15 in samsung tree.
+>
+> If any problems, please kindly let me know.
+>
+Oops, Arnd sorry.
 
-   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+Please go ahead with my ack on this because the fix, "[PATCH v2 5/6] 
+ARM: s3c64xx: Fix incorrect selection of PM-related symbols" makes a 
+build error...I'll look at the problem.
 
-are available in the git repository at:
+Thanks,
+Kukjin
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-cleanup
 
-for you to fetch changes up to 602408e3de70d132c115670a366f4c5ae657080c:
-
-   dt-bindings: clock: Move exynos-audss-clk.h to dt-bindings/clock 
-(2014-03-21 04:31:30 +0900)
-
-----------------------------------------------------------------
-Exynos cleanup for v3.15
-
-- reorganize code for
-- add support reserve memory for mfc-v7
-- consolidate exynos4 and exynos5 machine codes
-- add generic compatible strings for exynos4 and exynos5
-- update DT with generic compatible strings
-- move clk related dt-binding header file in dt-bindings/clock
-
-----------------------------------------------------------------
-Sachin Kamat (6):
-       ARM: EXYNOS: Add support to reserve memory for MFC-v7
-       ARM: SAMSUNG: Introduce generic Exynos4 and 5 helpers
-       ARM: EXYNOS: Consolidate CPU init code
-       ARM: EXYNOS: Consolidate exynos4 and exynos5 machine files
-       ARM: EXYNOS: Add generic compatible strings
-       ARM: dts: Update Exynos DT files with generic compatible strings
-
-Tushar Behera (2):
-       ARM: SAMSUNG: Reorganize calls to reserve memory for MFC
-       dt-bindings: clock: Move exynos-audss-clk.h to dt-bindings/clock
-
-  arch/arm/boot/dts/exynos4210-origen.dts            |   2 +-
-  arch/arm/boot/dts/exynos4210-smdkv310.dts          |   2 +-
-  arch/arm/boot/dts/exynos4210-trats.dts             |   2 +-
-  arch/arm/boot/dts/exynos4210-universal_c210.dts    |   2 +-
-  arch/arm/boot/dts/exynos4210.dtsi                  |   2 +-
-  arch/arm/boot/dts/exynos4212.dtsi                  |   2 +-
-  arch/arm/boot/dts/exynos4412-odroidx.dts           |   2 +-
-  arch/arm/boot/dts/exynos4412-origen.dts            |   2 +-
-  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   2 +-
-  arch/arm/boot/dts/exynos4412-tiny4412.dts          |   2 +-
-  arch/arm/boot/dts/exynos4412-trats2.dts            |   2 +-
-  arch/arm/boot/dts/exynos4412.dtsi                  |   2 +-
-  arch/arm/boot/dts/exynos5250-arndale.dts           |   2 +-
-  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   2 +-
-  arch/arm/boot/dts/exynos5250-snow.dts              |   2 +-
-  arch/arm/boot/dts/exynos5250.dtsi                  |   4 +-
-  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   2 +-
-  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   2 +-
-  arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
-  arch/arm/boot/dts/exynos5440-sd5v1.dts             |   2 +-
-  arch/arm/boot/dts/exynos5440-ssdk5440.dts          |   2 +-
-  arch/arm/boot/dts/exynos5440.dtsi                  |   2 +-
-  arch/arm/mach-exynos/Makefile                      |   7 +-
-  arch/arm/mach-exynos/common.h                      |   3 +-
-  arch/arm/mach-exynos/{common.c => exynos.c}        | 228 
-++++++++++-----------
-  arch/arm/mach-exynos/mach-exynos4-dt.c             |  59 ------
-  arch/arm/mach-exynos/mach-exynos5-dt.c             |  81 --------
-  arch/arm/mach-exynos/mfc.h                         |  16 ++
-  arch/arm/mach-exynos/regs-pmu.h                    |   1 -
-  arch/arm/plat-samsung/include/plat/cpu.h           |   4 +
-  arch/arm/plat-samsung/include/plat/mfc.h           |   3 -
-  arch/arm/plat-samsung/s5p-dev-mfc.c                |  17 +-
-  drivers/clk/samsung/clk-exynos-audss.c             |   2 +-
-  .../dt-bindings/{clk => clock}/exynos-audss-clk.h  |   0
-  34 files changed, 166 insertions(+), 303 deletions(-)
-  rename arch/arm/mach-exynos/{common.c => exynos.c} (71%)
-  delete mode 100644 arch/arm/mach-exynos/mach-exynos4-dt.c
-  delete mode 100644 arch/arm/mach-exynos/mach-exynos5-dt.c
-  create mode 100644 arch/arm/mach-exynos/mfc.h
-  rename include/dt-bindings/{clk => clock}/exynos-audss-clk.h (100%)
-
-One more note, following is resolution for merge conflict. Sorry.
-
-diff --cc arch/arm/mach-exynos/exynos.c
-index e98ddad,fd3664f..b567361
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@@ -9,40 -9,27 +9,27 @@@
-    * published by the Free Software Foundation.
-    */
-
-- #include <linux/kernel.h>
-- #include <linux/bitops.h>
-- #include <linux/interrupt.h>
-- #include <linux/irq.h>
-- #include <linux/irqchip.h>
-+ #include <linux/init.h>
-   #include <linux/io.h>
-- #include <linux/device.h>
-- #include <linux/gpio.h>
-- #include <clocksource/samsung_pwm.h>
-- #include <linux/sched.h>
-- #include <linux/serial_core.h>
-  +#include <linux/serial_s3c.h>
-+ #include <linux/kernel.h>
-   #include <linux/of.h>
-- #include <linux/of_fdt.h>
-- #include <linux/of_irq.h>
-- #include <linux/pm_domain.h>
-- #include <linux/export.h>
-- #include <linux/irqdomain.h>
-   #include <linux/of_address.h>
-- #include <linux/irqchip/arm-gic.h>
-- #include <linux/irqchip/chained_irq.h>
-+ #include <linux/of_fdt.h>
-+ #include <linux/of_platform.h>
-   #include <linux/platform_device.h>
-+ #include <linux/pm_domain.h>
-
-- #include <asm/proc-fns.h>
-- #include <asm/exception.h>
-+ #include <asm/cacheflush.h>
-   #include <asm/hardware/cache-l2x0.h>
-+ #include <asm/mach/arch.h>
-   #include <asm/mach/map.h>
-- #include <asm/mach/irq.h>
-- #include <asm/cacheflush.h>
-+ #include <asm/memory.h>
-
-   #include <plat/cpu.h>
-- #include <plat/pm.h>
-  -#include <plat/regs-serial.h>
-
-   #include "common.h"
-+ #include "mfc.h"
-   #include "regs-pmu.h"
-
-   #define L2_AUX_VAL 0x7C470001
+>>
+>>> Cc: Ben Dooks<ben-linux@fluff.org>
+>>> ---
+>>> arch/arm/Kconfig | 2 +-
+>>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>>> index 4721007..6ffcadd 100644
+>>> --- a/arch/arm/Kconfig
+>>> +++ b/arch/arm/Kconfig
+>>> @@ -764,7 +764,7 @@ config ARCH_S3C64XX
+>>> select HAVE_TCM
+>>> select NO_IOPORT
+>>> select PLAT_SAMSUNG
+>>> - select PM_GENERIC_DOMAINS
+>>> + select PM_GENERIC_DOMAINS if PM
+>>> select S3C_DEV_NAND
+>>> select S3C_GPIO_TRACK
+>>> select SAMSUNG_ATAGS
+>>> --
+>>> 1.8.3.2
