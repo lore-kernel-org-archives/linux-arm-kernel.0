@@ -1,44 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Mar 2014 09:57:20 +0100
-Subject: [PATCH 05/62] ARM: at91: sama5 always uses DT
-In-Reply-To: <1395257399-359545-6-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-6-git-send-email-arnd@arndb.de>
-Message-ID: <532AAD70.5080701@atmel.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Thu, 20 Mar 2014 14:27:17 +0530
+Subject: [PATCH 4/4] ata: add new-style AHCI platform driver for ST
+ SPEAr1340 AHCI controller
+In-Reply-To: <1395081118-15248-5-git-send-email-b.zolnierkie@samsung.com>
+References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
+ <1395081118-15248-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20140320085717.GC4607@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/2014 20:29, Arnd Bergmann :
-> It makes no sense for sama5 support to be enabled if we don't
-> also enable USE_OF. Making this automatic in Kconfig avoids
-> a possible randconfig conflict between the old and new clock
-> support code.
+On Tue, Mar 18, 2014 at 02:31:58AM +0800, Bartlomiej Zolnierkiewicz wrote:
+> The new driver is named ahci_spear1340 and is only compile tested.  Once
+> it is tested on the real hardware and verified to work correctly, the legacy
+> platform code (which depends on the deprecated struct ahci_platform_data)
+> can be removed.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This patch will not be needed any more, since SPEAr sata platform code has
+already been cleaned up.
 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 7209c5b..5ec1da1 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -57,6 +57,7 @@ config SOC_SAMA5
->  	select GENERIC_CLOCKEVENTS
->  	select MULTI_IRQ_HANDLER
->  	select SPARSE_IRQ
-> +	select USE_OF
->  
->  menu "Atmel AT91 System-on-Chip"
->  
-> 
+See:
+https://lkml.org/lkml/2014/2/28/174
 
-
--- 
-Nicolas Ferre
+Regards
+Pratyush
