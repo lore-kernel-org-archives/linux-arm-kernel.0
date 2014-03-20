@@ -1,72 +1,41 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 20 Mar 2014 19:03:33 +0900
-Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
- functions
-In-Reply-To: <532988CA.4000008@samsung.com>
-References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
- <CAK9yfHw7zYaX9EYFE+m3Mh-u8Uiyubx-cS0EwPmfW+0weLiBKw@mail.gmail.com>
- <20140318200915.7dd833ce0fddbbd6ecd8dac9@samsung.com>
- <532862ED.8040809@samsung.com>
- <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
- <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
- <532988CA.4000008@samsung.com>
-Message-ID: <20140320190333.9c3555b097e97d593faddbdd@samsung.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 20 Mar 2014 03:08:20 -0700
+Subject: [PATCH] checkpatch.pl: Add check for Change-Id
+In-Reply-To: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
+References: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
+Message-ID: <1395310100.7776.3.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Mar 2014 13:08:42 +0100, Tomasz Figa wrote:
-> On 19.03.2014 10:01, Sachin Kamat wrote:
-> > On 19 March 2014 14:29, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> >> On Tue, 18 Mar 2014 16:14:53 +0100, Tomasz Figa wrote:
-> >>> On 18.03.2014 12:09, Cho KyongHo wrote:
-> >>>> On Fri, 14 Mar 2014 20:52:43 +0530, Sachin Kamat wrote:
-> >>>>> Hi KyongHo,
-> >>>>>
-> >>>>> On 14 March 2014 10:35, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> >>>>>> This patch uses managed device helper functions in the probe().
-> >>>>>>
-> >>>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> >>>>>> ---
-> >>>>> [snip]
-> >>>>>
-> >>>>>> +       data->clk = devm_clk_get(dev, "sysmmu");
-> >>>>>> +       if (IS_ERR(data->clk)) {
-> >>>>>> +               dev_info(dev, "No gate clock found!\n");
-> >>>>>> +               data->clk = NULL;
-> >>>>>> +       }
-> >>>>>
-> >>>>> Why aren't you returning from here upon error?
-> >>>>
-> >>>> It is for the case of a System MMU which does not need clock gating.
-> >>>>
-> >>>
-> >>> Are there really such cases?
-> >>>
-> >>
-> >> Yes.
-> >> Especially in the case of initial stage of new SoC development.
-> >>
-> >> I have experianced some software workaround for H/W restriction
-> >> needs prevention of clock gating for some devices.
-> >
-> > So aren't these basically some exceptions/hacks rather than the usual way
-> > of functioning of the device?
-> >
-> 
-> This actually raises a good question, whether we really need to support 
-> such early development SoC versions in mainline.
-> 
-> Another thing is that if you need to assure that a clock is ungated, you 
-> must acquire it and prepare_enable explicitly, so I don't think this 
-> kind of handling is correct.
-> 
-On early development step of a new SoC, clock related stuffs and
-some device drivers like display controller are usually developed in parallel.
+On Wed, 2014-03-19 at 14:54 -0400, Christopher Covington wrote:
+> A commit hook for the Gerrit code review server inserts change
+> identifiers so Gerrit can track patches through multiple revisions.
+> These identifiers are noise in the context of the upstream kernel.
+> (Many Gerrit servers are private. Even given a public instance,
+> given only a Change-Id, one must guess which server a change was
+> tracked on. Patches submitted to the Linux kernel mailing lists
+> should be able to stand on their own. If it's truly useful to
+> reference code review on a Gerrit server, a URL is a much clearer
+> way to do so.) Thus, issue an error when a Change-Id: line is
+> encountered.
+[]
+> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+[]
+> @@ -1891,6 +1891,12 @@ sub process {
+>  			}
+>  		}
+>  
+> +# Check for unwanted Gerrit info
+> +		if ($line =~ /^\s*change-id:/i) {
+> +			ERROR("BAD_SIGN_OFF",
+> +			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
+> +		}
+> +
 
-In that case, -ENOENT from clk_get() must not treated as an error.
-"[PATCH v11 20/17] iommu/exynos: allow having multiple System MMUs for a master H/W"
-patch distinguishes -ENOENT from other error values returned by devm_clk_get().
+I think this needs an "$in_commit_log" test added
 
-Regards,
+		if ($in_commit_log &&
+		    $line =~ /^\s*change-id:/i) {
 
-KyongHo
+And maybe use a separate "TYPE", not "BAD_SIGN_OFF".
+Maybe "GERRIT_CHANGE_ID"
