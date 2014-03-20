@@ -1,34 +1,51 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 20 Mar 2014 10:21:53 +0100
-Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <532AB1A2.9010702@freescale.com>
-References: <1395235406-13449-1-git-send-email-y>
- <532AB1A2.9010702@freescale.com>
-Message-ID: <20140320102153.7106f915@ipc1.ka-ro>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 20 Mar 2014 10:22:51 +0100
+Subject: [PATCH 08/11] ARM: at91/dt: move at91sam9261 SoC to the new main
+ clock model
+In-Reply-To: <1395173924-3648-9-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1395173924-3648-9-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <CACh+v5Ngvdt=FnyzMz4Q0i1U7kNmrgXWDavzi4xvLDJR0qh0WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
+>  arch/arm/boot/dts/at91sam9261.dtsi |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+> index e21dda0..e00fabc 100644
+> --- a/arch/arm/boot/dts/at91sam9261.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
+> @@ -45,6 +45,14 @@
+>                 reg = <0x20000000 0x08000000>;
+>         };
+>
+> +       clocks {
+> +               main_xtal: main_xtal {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <0>;
+> +               };
+> +       };
+> +
+>         ahb {
+>                 compatible = "simple-bus";
+>                 #address-cells = <1>;
+> @@ -534,7 +542,7 @@
+>                                         compatible = "atmel,at91rm9200-clk-main";
+>                                         #clock-cells = <0>;
+>                                         interrupts-extended = <&pmc AT91_PMC_MOSCS>;
+> -                                       clocks = <&clk32k>;
+> +                                       clocks = <&main_xtal>;
+>                                 };
+>
+>                                 plla: pllack {
+> --
+> 1.7.9.5
+>
 
-Huang Shijie wrote:
-> ? 2014?03?19? 21:23, y at karo-electronics.de ??:
-> > configurable via DT. This is required for the Ka-Ro electronics
-> > platforms.
-> >
-> If you disable the swapping, you will disable the NAND boot in actually.
-> 
-No. All our modules do boot from NAND and none of them does the
-swapping.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Acked-by: Jean-Jacques HIBLOT <jjhiblot@traphandler.com>
