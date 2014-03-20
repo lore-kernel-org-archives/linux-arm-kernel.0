@@ -1,28 +1,22 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 20 Mar 2014 11:42:37 -0700
-Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
- NAND_NO_SUBPAGE_WRITE option
-In-Reply-To: <532B2766.6090506@ti.com>
-References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
- <532B2183.2080309@ti.com>
- <20140320172912.GW31517@norris-Latitude-E6410>
- <532B2766.6090506@ti.com>
-Message-ID: <20140320184237.GA21018@ld-irv-0074>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Mar 2014 22:42:52 +0300
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <532B155F.9020605@cogentembedded.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <4836281.0IgPinItBq@wuerfel> <532A1BDD.904@cogentembedded.com>
+ <9096065.aGCg8yZblW@wuerfel> <532B155F.9020605@cogentembedded.com>
+Message-ID: <532B44BC.1080807@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 01:37:42PM -0400, Santosh Shilimkar wrote:
-> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
-> > On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
-> >> Boris,
-> >
-> > Who's Boris? And why should Boris be taking this patch? It's an MTD
-> > patch.
-> > 
-> I got your name completely wrong. Sorry....
+On 03/20/2014 07:20 PM, Sergei Shtylyov wrote:
 
-I see. Maybe you were just dropping letters from "BrianNorris" :)
+>> The syscon (system controller) framework helps share a set of registers
+>> across multiple drivers. If all accesses to the CFGCHIP2 register are
+>> in a single PHY driver, we wouldn't need it.
 
-Regards,
-Brian
+>     Where can I find it in the kernel tree?
+
+    Found it.
+
+WBR, Sergei
