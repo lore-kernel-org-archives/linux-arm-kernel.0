@@ -1,59 +1,47 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Mar 2014 12:55:28 +0900
-Subject: [PATCH 47/62] ARM: s3c64xx: MACH_SMDK6400 needs HSMMC1
-In-Reply-To: <1395257399-359545-48-git-send-email-arnd@arndb.de>
+Date: Thu, 20 Mar 2014 12:56:34 +0900
+Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
+In-Reply-To: <1395257399-359545-49-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-48-git-send-email-arnd@arndb.de>
-Message-ID: <01ee01cf43f0$3b436bc0$b1ca4340$@samsung.com>
+ <1395257399-359545-49-git-send-email-arnd@arndb.de>
+Message-ID: <01f801cf43f0$62e7bc80$28b73580$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann wrote:
 > 
-> This board uses both MMC controllers, so we need to enable
-> the Kconfig option to define the platform data.
+> The power domain code is only available when CONFIG_PM
+> is enabled, so we must not select that unconditionally for
+> s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
+> mirrors what we do on other platforms, and fixes a possible
+> randconfig build bug.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Cc: Tomasz Figa <tomasz.figa@gmail.com>
 > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/mach-s3c64xx/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-> index 64f04e6..92885d7 100644
-> --- a/arch/arm/mach-s3c64xx/Kconfig
-> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> @@ -87,6 +87,7 @@ config MACH_SMDK6400
->  	select CPU_S3C6400
->  	select S3C64XX_SETUP_SDHCI
->  	select S3C_DEV_HSMMC
-> +	select S3C_DEV_HSMMC1
->  	select S3C_DEV_NAND
 
-Well, only HSMMC ch1 is used on smdk6400 and S3C_DEV_NAND is not needed.
-
-So should be following:
-
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 64f04e6..3136d86 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -86,8 +86,7 @@ config MACH_SMDK6400
-        bool "SMDK6400"
- 	select CPU_S3C6400
- 	select S3C64XX_SETUP_SDHCI
--	select S3C_DEV_HSMMC
--	select S3C_DEV_NAND
-+	select S3C_DEV_HSMMC1
- 	help
- 	  Machine support for the Samsung SMDK6400
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks,
 Kukjin
 
->  	help
->  	  Machine support for the Samsung SMDK6400
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4721007..6ffcadd 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -764,7 +764,7 @@ config ARCH_S3C64XX
+>  	select HAVE_TCM
+>  	select NO_IOPORT
+>  	select PLAT_SAMSUNG
+> -	select PM_GENERIC_DOMAINS
+> +	select PM_GENERIC_DOMAINS if PM
+>  	select S3C_DEV_NAND
+>  	select S3C_GPIO_TRACK
+>  	select SAMSUNG_ATAGS
 > --
 > 1.8.3.2
