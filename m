@@ -1,81 +1,64 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 20 Mar 2014 11:44:50 +0100
-Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
- functions
-In-Reply-To: <20140320190333.9c3555b097e97d593faddbdd@samsung.com>
-References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
- <CAK9yfHw7zYaX9EYFE+m3Mh-u8Uiyubx-cS0EwPmfW+0weLiBKw@mail.gmail.com>
- <20140318200915.7dd833ce0fddbbd6ecd8dac9@samsung.com>
- <532862ED.8040809@samsung.com>
- <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
- <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
- <532988CA.4000008@samsung.com>
- <20140320190333.9c3555b097e97d593faddbdd@samsung.com>
-Message-ID: <532AC6A2.9070307@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 11:48:15 +0100
+Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
+In-Reply-To: <8120199.tJr1GuP6ec@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <20140319204946.GK7528@n2100.arm.linux.org.uk> <8120199.tJr1GuP6ec@wuerfel>
+Message-ID: <201403201148.16239.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.03.2014 11:03, Cho KyongHo wrote:
-> On Wed, 19 Mar 2014 13:08:42 +0100, Tomasz Figa wrote:
->> On 19.03.2014 10:01, Sachin Kamat wrote:
->>> On 19 March 2014 14:29, Cho KyongHo <pullip.cho@samsung.com> wrote:
->>>> On Tue, 18 Mar 2014 16:14:53 +0100, Tomasz Figa wrote:
->>>>> On 18.03.2014 12:09, Cho KyongHo wrote:
->>>>>> On Fri, 14 Mar 2014 20:52:43 +0530, Sachin Kamat wrote:
->>>>>>> Hi KyongHo,
->>>>>>>
->>>>>>> On 14 March 2014 10:35, Cho KyongHo <pullip.cho@samsung.com> wrote:
->>>>>>>> This patch uses managed device helper functions in the probe().
->>>>>>>>
->>>>>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
->>>>>>>> ---
->>>>>>> [snip]
->>>>>>>
->>>>>>>> +       data->clk = devm_clk_get(dev, "sysmmu");
->>>>>>>> +       if (IS_ERR(data->clk)) {
->>>>>>>> +               dev_info(dev, "No gate clock found!\n");
->>>>>>>> +               data->clk = NULL;
->>>>>>>> +       }
->>>>>>>
->>>>>>> Why aren't you returning from here upon error?
->>>>>>
->>>>>> It is for the case of a System MMU which does not need clock gating.
->>>>>>
->>>>>
->>>>> Are there really such cases?
->>>>>
->>>>
->>>> Yes.
->>>> Especially in the case of initial stage of new SoC development.
->>>>
->>>> I have experianced some software workaround for H/W restriction
->>>> needs prevention of clock gating for some devices.
->>>
->>> So aren't these basically some exceptions/hacks rather than the usual way
->>> of functioning of the device?
->>>
->>
->> This actually raises a good question, whether we really need to support
->> such early development SoC versions in mainline.
->>
->> Another thing is that if you need to assure that a clock is ungated, you
->> must acquire it and prepare_enable explicitly, so I don't think this
->> kind of handling is correct.
->>
-> On early development step of a new SoC, clock related stuffs and
-> some device drivers like display controller are usually developed in parallel.
->
-> In that case, -ENOENT from clk_get() must not treated as an error.
-> "[PATCH v11 20/17] iommu/exynos: allow having multiple System MMUs for a master H/W"
-> patch distinguishes -ENOENT from other error values returned by devm_clk_get().
+On Wednesday 19 March 2014, Arnd Bergmann wrote:
+> On Wednesday 19 March 2014 20:49:47 Russell King - ARM Linux wrote:
+> > On Wed, Mar 19, 2014 at 08:29:41PM +0100, Arnd Bergmann wrote:
+> > > This adds a new Kconfig option for the Integrator platform to
+> > > choose between ARMv4/ARMv5 based CPUs and those based on ARMv6/ARMv7,
+> > > which is required because we cannot have both classes enabled in the
+> > > same kernel at compile time.
+> > 
+> > Wouldn't it just be easier to make the older CPUs depend on
+> > !CPU_V6 && !CPU_V7 rather than trying to hack this for each platform?
+> 
+> It's only two platforms: integrator and realview. Actually I took two
+> different approaches on these, and wanted to make up my mind first
+> which one is better. Any suggestion?
+> 
+> I have a mild preference to always using 'select' on the CPU_* symbol
+> from the platform, mostly for consistency. The downside is that it
+> gets a little messy for Integrator, but that's just one platform in
+> the end.
+> 
+> At some point, I think I got into circular dependencies when one CPU
+> depended on another one being disabled, but I don't remember exactly
+> what case that was.
+> 
 
-I still don't think upstream is right place for such development hacks 
-and such assumption will mask potential errors caused by clocks 
-unspecified in DT.
+Nevermind, I'll drop this patch for now, I just had an idea to do it
+better: Since Linus and I are trying to get Integrator and Realview
+moved over into ARCH_MULTIPLATFORM anyway, I'll defer the CPU selection
+question until that's done.
 
-If such thing is needed for development, an extra patch might be kept in 
-development tree, until clock driver is implemented or a dummy 
-fixed-rate clock might be specified in DT.
+Within ARCH_MULTIPLATFORM, we already want to deal with booting machines
+that are described entirely in DT and have no platform specific code,
+but we also want to be able to select the CPU types built into the
+kernel for them.
 
-Best regards,
-Tomasz
+For the v6/v6k/v7 selection, we can do this through the top-level
+multiplatform options we already have, as we don't expose the
+differences between the individual core implementations for the most
+part. We can potentially leave PJ4 and PJ4B as user-selectable.
+
+For the v4/v4t/v5 selection, I would allow any CPU to be manually
+enabled with a dependency on the ARCH_MULTI_V* option. Platforms
+that know what they have should obviously keep selecting the one
+they want. I would leave strongarm and xscale out of the selection,
+because I don't expect any platform based on those cores to ever
+become enabled for ARCH_MULTIPLATFORM, but all the others should
+be selectable.
+
+For the moment, I'll keep using my patches locally in order to
+keep randconfig building, and I'll follow up with a new patch
+after integrator and realview are part of multiplatform. That
+may take a while, but I'm sure we'll get there eventually.
+
+	Arnd
