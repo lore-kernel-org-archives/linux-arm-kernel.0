@@ -1,79 +1,72 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 20 Mar 2014 15:24:41 +0100
-Subject: [PATCH 3/4] ata: add new-style AHCI platform driver for DaVinci
- DA850 AHCI controller
-In-Reply-To: <532AEBBD.80707@ti.com>
-References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
- <2662651.GJX9HVKij5@amdc1032> <532AEBBD.80707@ti.com>
-Message-ID: <4579887.D6KcuxH2bm@amdc1032>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Mar 2014 14:26:23 +0000
+Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
+ versions of spec
+In-Reply-To: <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
+References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+ <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
+Message-ID: <20140320142623.GD23372@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 20, 2014 06:53:09 PM Sekhar Nori wrote:
-> On Thursday 20 March 2014 06:27 PM, Bartlomiej Zolnierkiewicz wrote:
+On Thu, Mar 20, 2014 at 01:25:53AM +0000, Rob Herring wrote:
+> On Wed, Mar 19, 2014 at 7:54 PM, Ashwin Chaugule
+> <ashwin.chaugule@linaro.org> wrote:
+> > The PSCI v0.2+ spec mandates specific values of Function IDs
+> > for ARM32 and ARM64. Use DT bindings of Function IDs only
+> > when using older versions. Use static values otherwise.
+> > This patch also prepares the code to easily use the ACPI API
+> > which is based off of PSCI v0.2+.
+> >
+> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > ---
+> >  arch/arm/include/asm/psci.h   |  15 ++++++
+> >  arch/arm/kernel/psci.c        | 110 +++++++++++++++++++++++++++++++++++++-----
+> >  arch/arm64/include/asm/psci.h |  12 +++++
+> >  arch/arm64/kernel/psci.c      | 106 +++++++++++++++++++++++++++++++++++-----
+> >  4 files changed, 218 insertions(+), 25 deletions(-)
+> >
+> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> > index c4ae171..3f8ebf9 100644
+> > --- a/arch/arm/include/asm/psci.h
+> > +++ b/arch/arm/include/asm/psci.h
+> > @@ -17,6 +17,19 @@
+> >  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+> >  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+> >
+> > +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
+> > +
+> > +#define PSCI_ID_VERSION                                0x84000000
+> > +#define PSCI_ID_CPU_SUSPEND                    0x84000001
+> > +#define PSCI_ID_CPU_OFF                                0x84000002
+> > +#define PSCI_ID_CPU_ON                         0x84000003
+> > +#define PSCI_ID_AFFINITY_INFO          0x84000004
+> > +#define PSCI_ID_CPU_MIGRATE                    0x84000005
+> > +#define PSCI_ID_MIGRATE_INFO_TYPE      0x84000006
+> > +#define PSCI_ID_MIGRATE_INFO_UP_CPU    0x84000007
+> > +#define PSCI_ID_SYSTEM_OFF                     0x84000008
+> > +#define PSCI_ID_SYSTEM_RESET           0x84000009
 > 
-> >>> diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+> With the KVM patches[1], this makes 4 copies of these defines in the
+> kernel (and then QEMU has more). This needs to go into a common header
+> under include/linux. Probably under uapi so QEMU can use. There is
+> some sync of headers between the kernel and QEMU I think.
+
+I agree we should have a common header, but I don't think this is uapi
+material. This is most definitely _not_ part of the user API, and it's
+from an external spec that we're not in control of -- I don't see why we
+should have to export a set of numbers forever because it happens to be
+marginally useful at this point in time.
+
+Having the IDs handled by the kernel and those used by hypervisors also
+encourages people to validate the use of the correct IDs rather than
+everyone making the same mistake.
+
+Cheers,
+Mark.
+
 > 
-> >>> +extern void __iomem *da8xx_syscfg1_base;
-> >>
-> >> This platform specific extern symbol should not be used in drivers and
-> >> in fact checkpatch complains about it too. Can you instead get the
-> >> addresses you need as part of the device resources?
-> > 
-> > This is problematic because it is system resource not particular device
-> > resource.  I would prefer to wait with fixing it until the conversion to
-> > the device tree.
+> Rob
 > 
-> The way you have it now, module build will fail because the symbol isn't
-> exported from platform code (and it should not be). The register is
-> "system level" but it is SATA specific and I see no problem in passing
-> it to the driver.
-
-OK, I'll try to fix it.
-
-> Conversion to device tree will not change anything until we throw out
-> the platform device code. That may or may not ever happen.
+> [1] https://patches.linaro.org/23918/
 > 
-> >>> +static int da850_sata_init(struct device *dev, void __iomem *addr)
-> >>> +{
-> >>> +	int i, ret;
-> >>> +	unsigned int val;
-> >>> +
-> >>> +	da850_sata_clk = clk_get(dev, NULL);
-> >>> +	if (IS_ERR(da850_sata_clk))
-> >>> +		return PTR_ERR(da850_sata_clk);
-> >>> +
-> >>> +	ret = clk_prepare_enable(da850_sata_clk);
-> >>> +	if (ret)
-> >>> +		goto err0;
-> >>
-> >> Please switch to pm_runtime instead of using the clock APIs directly.
-> > 
-> > Could you please elaborate a bit more on this?
-> 
-> I meant using pm_runtime_get_sync() to enable the clocks. There are many
-> examples in the kernel. drivers/watchdog/omap_wdt.c is one.
-> Documentation is available in Documentation/power/runtime_pm.txt
-
-What would be benefit of adding runtime PM methods (->runtime_suspend
-and ->runtime_resume) just for enabling/disabling this clock on driver
-->probe and ->remove methods?  Wouldn't it add complexity and additonal
-dependency (on runtime PM) just for no gain?
-
-Is the driver specific clock control even needed given the resource
-handling in the generic AHCI platform library code (please see
-ahci_platform_get_resources(),  ahci_platform_enable_resources() and
-ahci_platform_disable_resources())?
-
-[ Please also take a look at commit f1e70c2 ("ata/ahci_platform: Add
-  clock framework support") which on Aug 27 2012 added generic clock
-  control to ahci_platform driver but forgot to cleanup DA850 AHCI
-  platform code.  The DA850 AHCI support was added much earlier by
-  commit cbb2c961 ("davinci: da850: add support for SATA interface")
-  on Jul 6 2011. ]
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
