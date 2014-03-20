@@ -1,50 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 08:56:55 +0100
-Subject: please revert: regulator: dbx500: use seq_puts() instead of
- seq_printf()
-Message-ID: <6651295.YIkvtDO9zo@wuerfel>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Thu, 20 Mar 2014 09:03:30 +0100
+Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
+ common, correct implementation
+In-Reply-To: <201403181558.37094.arnd@arndb.de>
+References: <20140317144016.0508cc4d@marrow.netinsight.se>
+ <20140317144235.546d2e19@marrow.netinsight.se>
+ <201403181558.37094.arnd@arndb.de>
+Message-ID: <20140320090330.49a1d372@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch has shown up in linux-next yesterday, breaking a randconfig
-build:
+On Tue, 18 Mar 2014 15:58:36 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-commit d5d2ced88dc2690cf28fd531c83a53f0ba132f27
-Author: Jingoo Han <jg1.han@samsung.com>
-Date:   Wed Feb 26 10:21:01 2014 +0900
+> On Monday 17 March 2014, Simon K?gstr?m wrote:
+> > Non-PCI devices can use the entire 32-bit range, PCI dittos are
+> > limited to the first 64MiB.
+> > 
+> > Also actually setup coherent_dma_mask.
+> > 
+> > The patch has been verified on a board with 128MiB memory, one
+> > ipx4xx_eth device and a e100 PCI device.
+> 
+> I've applied this patch to the next/fixes-non-critical branch of arm-soc.
+> Please let me know if you need to have it backported to older kernels
+> as well.
 
-    regulator: dbx500: use seq_puts() instead of seq_printf()
-    
-    For a constant format without additional arguments, use seq_puts()
-    instead of seq_printf(). Also, it fixes the following checkpatch
-    warning.
-    
-      WARNING: Prefer seq_puts to seq_printf
-    
-    Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-    Signed-off-by: Mark Brown <broonie@linaro.org>
+Thanks. However, Krzysztof thinks that this implementation is
+incorrect. It certainly fixes my ixp4xx issues, but might not be good
+for everyone.
 
-diff --git a/drivers/regulator/dbx500-prcmu.c b/drivers/regulator/dbx500-prcmu.c
-index f111dfb..3dd1096 100644
---- a/drivers/regulator/dbx500-prcmu.c
-+++ b/drivers/regulator/dbx500-prcmu.c
-@@ -97,10 +97,10 @@ static int ux500_regulator_power_state_cnt_print(struct seq_file *s, void *p)
-        int err;
- 
-        /* print power state count */
--       err = seq_printf(s, "ux500-regulator power state count: %i\n",
--               power_state_active_get());
-+       err = seq_puts(s, "ux500-regulator power state count: %i\n",
-+                       power_state_active_get());
-        if (err < 0)
--               dev_err(dev, "seq_printf overflow\n");
-+               dev_err(dev, "seq_puts overflow\n");
- 
-        return 0;
- }
-
-drivers/regulator/dbx500-prcmu.c:103:4: error: too many arguments to function 'seq_puts'
-
-The other half of the patch is ok though.
-
-	Arnd
+// Simon
