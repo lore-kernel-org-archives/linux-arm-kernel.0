@@ -1,60 +1,68 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Mar 2014 17:13:45 +0530
-Subject: [GIT PULL] DaVinci SoC fixes for v3.15
-Message-ID: <532AD471.5030305@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 12:45:33 +0100
+Subject: Forcing DEBUG_UART_{PHYS,
+ VIRT} changes when switching between v7 platforms?
+In-Reply-To: <20140320101127.GN7528@n2100.arm.linux.org.uk>
+References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
+ <8099777.qvOx0M5YBS@wuerfel> <20140320101127.GN7528@n2100.arm.linux.org.uk>
+Message-ID: <201403201245.34108.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 20 March 2014, Russell King - ARM Linux wrote:
+> On Thu, Mar 20, 2014 at 08:07:52AM +0100, Arnd Bergmann wrote:
+> > On Wednesday 19 March 2014 16:38:45 Florian Fainelli wrote:
+> > > Hi,
+> > > 
+> > > When switching between different Multi v7 platform which all select
+> > > DEBUG_UART_8250, whichever platform managed to set
+> > > DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
+> > > others.
+> > > 
+> > > What I am seeing at the moment is for instance enabling BCM_MOBILE
+> > > will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
+> > > enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
+> > > re-computed.
+> > > 
+> > > Should we add some sort of specific annotation to the Kconfig symbol
+> > > to force a recalculation of the UART PHYS address?
+> > 
+> > Russell has plans to change the Konfig logic in the future, removing the
+> > platform specific options. With the current code, you could probably
+> > do something along the lines of
+> 
+> The only reason the default values are there is to provide an easy way
+> for people to locate the values they need for the time being.  The
+> plan is to kill them off, so you have to enter them manually.  The
+> issue with that is it becomes quite painful if you have to keep searching
+> around for the right values when something breaks.
+> 
+> (Personally, I've ended up a number of times searching around for the
+> right address to generate uImage's for various target platforms which
+> can only load uImages... but I've now ended up with a script which has
+> that information stored in it...)
+> 
+> So yes, eventually these will have to be specified manually.  I'm
+> probably going to move them into file(s) in Documentation/arm/
+> so that we retain the information in an easily accessible form.
 
-Here is a fix from Kevin over the soc pull request
-sent earlier.
+Ok, thanks for the clarification. On a semi-related topic, we have
+(once more) discussed adding an early printk implementation during
+the Linaro Connect meeting this month. I think this would all become
+much less painful if we had a way to handle console output in a
+platform independent way before the regular console kicks in, like
+a few other architectures do.
 
-Thanks,
-Sekhar
+debug_ll is great for debugging the extremely early code, since
+it works basically from the first instruction on, but a lot of
+problems actually happen much later. The early console code
+runs from parse_early_param(), which comes after setup_arch(),
+so we can't use to debug that part but it means we already
+have an unflattened device tree to work with for finding typical
+8250 or pl011 ports. At the moment, pl011 doesn't even have a
+console_initcall, so it comes up only at arch_initcall time,
+which is about the earliest a normal tty driver can get registered,
+and a lot can go wrong between parse_early_param() and
+arch_initcall().
 
-The following changes since commit 4b9e44f8d7c9cd166d8304b8f619741c1d59b836:
-
-  ARM: davinci: remove da8xx_omapl_defconfig (2014-03-06 19:08:30 +0530)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.15/soc-2
-
-for you to fetch changes up to b737f51d423861399079a1f66647e7a416de3318:
-
-  ARM: davinci: fix DT booting with default defconfig (2014-03-20 15:39:38 +0530)
-
-----------------------------------------------------------------
-Includes a patch to enable appended
-DTB support for DT booting on DA850
-boards with older bootloaders.
-
-----------------------------------------------------------------
-Kevin Hilman (1):
-      ARM: davinci: fix DT booting with default defconfig
-
- arch/arm/configs/davinci_all_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index fff4eb6..2df72ff 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -40,6 +40,8 @@ CONFIG_LEDS=y
- CONFIG_USE_OF=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_AUTO_ZRELADDR=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE=y
-@@ -70,6 +72,7 @@ CONFIG_MTD_CFI_AMDSTD=m
- CONFIG_MTD_PHYSMAP=m
- CONFIG_MTD_NAND=m
- CONFIG_MTD_NAND_DAVINCI=m
-+CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=1
+	Arnd
