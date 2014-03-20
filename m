@@ -1,35 +1,29 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Mar 2014 12:34:23 +0100
-Subject: [PATCH v3 1/2] i2c: Add driver for Cadence I2C controller
-In-Reply-To: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <96ea5cd7-0873-4352-b835-5c5a0dbad685@TX2EHSMHS037.ehs.local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 11:35:31 +0000
+Subject: Common clock: function clock and bus clock
+In-Reply-To: <532AB8B7.6060608@codethink.co.uk>
+References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
+ <532AB8B7.6060608@codethink.co.uk>
+Message-ID: <20140320113531.GP7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2014 05:50 PM, Soren Brinkmann wrote:
-> Add a driver for the Cadence I2C controller. This controller is for
-> example found in Xilinx Zynq.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v3:
->  - incorporate signal handling changes from Mike Looijmans
->    <mike.looijmans@topic.nl> (https://lkml.org/lkml/2014/3/11/64)
-> v2:
->  - make driver depend on COMMON_CLK instead of ARCH_ZYNQ
-> ---
->  .../devicetree/bindings/i2c/i2c-cadence.txt        |  21 +
->  MAINTAINERS                                        |   1 +
->  drivers/i2c/busses/Kconfig                         |   7 +
->  drivers/i2c/busses/Makefile                        |   1 +
->  drivers/i2c/busses/i2c-cadence.c                   | 898 +++++++++++++++++++++
->  5 files changed, 928 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
->  create mode 100644 drivers/i2c/busses/i2c-cadence.c
+On Thu, Mar 20, 2014 at 10:45:27AM +0100, Ben Dooks wrote:
+> On 11/03/14 03:06, Chao Xie wrote:
+>> hi
+>>
+>> I can not find any examples for handling function clock and bus clock
+>> in drivers/clk/.
+>
+> The convention is that clk_get(dev, NULL) will get the bus clock
+> for the device and that any other clocks are appropriately named.
 
-For boot test on zynq zc702 3.14.0-rc6.
-Tested-by: Michal Simek <michal.simek@xilinx.com>
+There is no such convention.  clk_get(dev, NULL) with clkdev (the
+reference) will find a clock in the table for the device also with
+a NULL connection ID.  That's the only "limitation".
 
-Thanks,
-Michal
+There's no implication that NULL is some kind of bus clock.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
