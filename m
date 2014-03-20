@@ -1,78 +1,55 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 20 Mar 2014 04:54:12 -0700
-Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
- arguments
-In-Reply-To: <1395316090.7776.24.camel@joe-AO722>
-References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
- <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
- <1395314713.7776.17.camel@joe-AO722>
- <20140320114123.GE21349@lee--X1>
- <1395316090.7776.24.camel@joe-AO722>
-Message-ID: <20140320115412.GU31517@norris-Latitude-E6410>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Thu, 20 Mar 2014 20:55:41 +0900
+Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
+ functions
+In-Reply-To: <CANEJEGtK-XfTef3ko+Yq2RNFXohhuQjgamr-DRBmxR-SNzgkJg@mail.gmail.com>
+References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
+ <5322FD14.5090602@samsung.com>
+ <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
+ <532861BE.7020601@samsung.com>
+ <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
+ <532997D7.6090608@samsung.com>
+ <CANEJEGtK-XfTef3ko+Yq2RNFXohhuQjgamr-DRBmxR-SNzgkJg@mail.gmail.com>
+Message-ID: <20140320205541.d7ef53fd15d9dcd3cadfd13f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 04:48:10AM -0700, Joe Perches wrote:
-> On Thu, 2014-03-20 at 11:41 +0000, Lee Jones wrote:
-> > On Thu, 20 Mar 2014, Joe Perches wrote:
-> > > On Thu, 2014-03-20 at 11:11 +0000, Lee Jones wrote:
-> > > > Reported-by: Brian Norris <computersforpeace@gmail.com>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Why are these useless?
-> > > 
-> > > Even if the object code produced is the same,
-> > > these serve as information to the human reader
-> > > about how the arguments are used.
-> > 
-> > https://lkml.org/lkml/2014/3/20/69
-> > 
+On Wed, 19 Mar 2014 09:54:39 -0700, Grant Grundler wrote:
+> On Wed, Mar 19, 2014 at 6:12 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> ...
+> >> Device driver is not only for the scholarship but also for the real use.
+> >
+> > Huh? I'm not sure what kind of comment is this.
 > 
-> From that email:
-> 
-> suggestion:
-> 
-> 	const uint8_t *const buf  => const uint8_t *buf
-> 	const uint32_t size       => uint32_t size
-> 	const uint32_t offset     => uint32_t offset
-> 
-> What was done:
-> 
-> -static int stfsm_write_fifo(struct stfsm *fsm,
-> -                           const uint32_t *buf, const uint32_t size)
-> +static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
-> 
-> Note the removal of the const from uint32_t *buf
+> I'm guessing Cho meant: "This isn't an academic exercise - I have a
+> real use case that requires reference counting."
 
-Good catch. That wasn't my intention.
+That is what I meant; Sorry for my poor English :-)
 
-> Why?
+> Cho needs to be more specific about his "Some driver needs enabling
+> sysmmu" example. Then others would understand why/when the reference
+> counting is needed. Ie walk through a real driver that exists today
+> that depends on reference counting.
+>
 
-I can let Lee speak for himself. But I'm thinking I'll squash this diff
-in, if no one minds:
+One of my recent experience is that a display controller (FIMD) driver
+of a SoC manages two different context of power management:
+One is turning on and off display screen (LCD) (which is as usual as previous SoCs)
+and the other is gating its internal clock including System MMU very
+frequently to reduce power consumption.
+Because System MMU driver holds its clock ungated while it is enabled,
+FIMD driver explicitely disable System MMU.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Yes, well designed FIMD driver must care about balancing of
+disabling and enabling System MMU between different contexts.
+But the design of some complex driver may be poor in few features due to
+agressive development schedule sometimes.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index bea1416aad07..1957d7c8e185 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -810,7 +810,8 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
- 	}
- }
- 
--static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
-+static int stfsm_write_fifo(struct stfsm *fsm, const uint32_t *buf,
-+			    uint32_t size)
- {
- 	uint32_t words = size >> 2;
- 
-@@ -1806,7 +1807,7 @@ out1:
- 	return ret;
- }
- 
--static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
-+static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *jedec)
- {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
- 	uint32_t tmp[2];
+Please let me think about the counting.
+
+Now I also think the system mmu driver does not need to make
+an extra effort for some special cases.
+
+Regards,
+
+KyongHo
