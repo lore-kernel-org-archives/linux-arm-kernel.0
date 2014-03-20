@@ -1,55 +1,69 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Mar 2014 18:15:13 +0100
-Subject: [PATCH] ASoC: tda998x: Change the compatible strings
-Message-ID: <20140320173240.A1152A61AD@smtp3-g21.free.fr>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 20 Mar 2014 13:37:42 -0400
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <20140320172912.GW31517@norris-Latitude-E6410>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B2183.2080309@ti.com> <20140320172912.GW31517@norris-Latitude-E6410>
+Message-ID: <532B2766.6090506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tda998x driver accepts 3 chips only from the TDA998x family.
-This patch changes the driver to accept only these chips.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 4 ++--
- drivers/gpu/drm/i2c/tda998x_drv.c                     | 4 +++-
- 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index fc7effa..e3f3d65 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -1,7 +1,7 @@
- Device-Tree bindings for the NXP TDA998x HDMI transmitter
+On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
+> On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
+>> Boris,
+>
+> Who's Boris? And why should Boris be taking this patch? It's an MTD
+> patch.
+> 
+I got your name completely wrong. Sorry....
+
+>> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
+>>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>>
+>>> After testing NAND flash with ubifs for k2hk-emv board were committed
+>>> that flash doesn't support subpage writing, so we can fix it by
+>>> adding a property to disable subpage write.
+> 
+> What flash? We try to autodetect NAND as much as possible. Perhaps we
+> should be adding infrastructure support instead of hacking it with a DT
+> property.
+>
+We can't auto detect it and thats why the DT approach was taken. We
+will double check that.
+
+>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>> Can you please pick this up for 3.15 fixes ? Ofcourse assuming DT folks
+>> are ok with the patch.
+>>
+>> I can then take patch 1/3 and 3/3 in my 3.15 fixes queue.
+>>
+>>>  Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
+>>>  drivers/mtd/nand/davinci_nand.c                        | 3 +++
+>>>  2 files changed, 5 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>>> index cfb18ab..50af930 100644
+>>> --- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>>> +++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+>>> @@ -53,6 +53,8 @@ Recommended properties :
+>>>  				identifier is saved in OOB area. If not present
+>>>  				false.
+>>>  
+>>> +- ti,davinci-nosubpage-write:	disable subpage write for the device
+> 
+> If we really need the DT property, I'd prefer a generic
+> "nand-numer-of-partial-programs" or something like that, and if it's
+> equal to 1, then the flash doesn't support partial page programming.
+>
+OK. It can be updated as you suggested.
  
- Required properties;
--  - compatible: must be "nxp,tda998x"
-+  - compatible: may be "nxp,tda9989", "nxp,tda19988" or "nxp,tda19989"
- 
-   - reg: I2C address
- 
-@@ -20,7 +20,7 @@ Optional properties:
- Example:
- 
- 	tda998x: hdmi-encoder {
--		compatible = "nxp,tda998x";
-+		compatible = "nxp,tda19988";
- 		reg = <0x70>;
- 		interrupt-parent = <&gpio0>;
- 		interrupts = <27 2>;		/* falling edge */
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 48af5ca..fd6751c 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1367,7 +1367,9 @@ fail:
- 
- #ifdef CONFIG_OF
- static const struct of_device_id tda998x_dt_ids[] = {
--	{ .compatible = "nxp,tda998x", },
-+	{ .compatible = "nxp,tda9989", },
-+	{ .compatible = "nxp,tda19988", },
-+	{ .compatible = "nxp,tda19989", },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
--- 
-1.9.1
+Thanks for quick response and sorry for the rename
+
+Regards,
+Santosh
