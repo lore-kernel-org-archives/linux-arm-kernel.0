@@ -1,79 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Mar 2014 14:22:42 +0000
-Subject: [PATCH v1 2/2] Documentation: devicetree: Add new binding for
- PSCIv0.2
-In-Reply-To: <20140320030319.GO1297@cbox>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
- <1395276865-6868-2-git-send-email-ashwin.chaugule@linaro.org>
- <20140320030319.GO1297@cbox>
-Message-ID: <20140320142242.GC23372@e106331-lin.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 20 Mar 2014 15:24:41 +0100
+Subject: [PATCH 3/4] ata: add new-style AHCI platform driver for DaVinci
+ DA850 AHCI controller
+In-Reply-To: <532AEBBD.80707@ti.com>
+References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
+ <2662651.GJX9HVKij5@amdc1032> <532AEBBD.80707@ti.com>
+Message-ID: <4579887.D6KcuxH2bm@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 03:03:19AM +0000, Christoffer Dall wrote:
-> On Wed, Mar 19, 2014 at 08:54:25PM -0400, Ashwin Chaugule wrote:
-> > The PSCI v0.2+ spec defines static values for PSCI function IDs.
-> > Add a new binding entry so that pre v0.2 implementations can
-> > use DT entries for function IDs and v0.2+ implementations use
-> > static entries as defined by the PSCIv0.2 specification.
+On Thursday, March 20, 2014 06:53:09 PM Sekhar Nori wrote:
+> On Thursday 20 March 2014 06:27 PM, Bartlomiej Zolnierkiewicz wrote:
+> 
+> >>> diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+> 
+> >>> +extern void __iomem *da8xx_syscfg1_base;
+> >>
+> >> This platform specific extern symbol should not be used in drivers and
+> >> in fact checkpatch complains about it too. Can you instead get the
+> >> addresses you need as part of the device resources?
 > > 
-> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/arm/psci.txt | 6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> > This is problematic because it is system resource not particular device
+> > resource.  I would prefer to wait with fixing it until the conversion to
+> > the device tree.
+> 
+> The way you have it now, module build will fail because the symbol isn't
+> exported from platform code (and it should not be). The register is
+> "system level" but it is SATA specific and I see no problem in passing
+> it to the driver.
+
+OK, I'll try to fix it.
+
+> Conversion to device tree will not change anything until we throw out
+> the platform device code. That may or may not ever happen.
+> 
+> >>> +static int da850_sata_init(struct device *dev, void __iomem *addr)
+> >>> +{
+> >>> +	int i, ret;
+> >>> +	unsigned int val;
+> >>> +
+> >>> +	da850_sata_clk = clk_get(dev, NULL);
+> >>> +	if (IS_ERR(da850_sata_clk))
+> >>> +		return PTR_ERR(da850_sata_clk);
+> >>> +
+> >>> +	ret = clk_prepare_enable(da850_sata_clk);
+> >>> +	if (ret)
+> >>> +		goto err0;
+> >>
+> >> Please switch to pm_runtime instead of using the clock APIs directly.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> > index 433afe9..a808284 100644
-> > --- a/Documentation/devicetree/bindings/arm/psci.txt
-> > +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> > @@ -21,7 +21,11 @@ to #0.
-> >  
-> >  Main node required properties:
-> >  
-> > - - compatible    : Must be "arm,psci"
-> > + - compatible    : "arm,psci" : pre PSCIv0.2 spec implementations use this
-> > +                   to get the function IDs from DT entries.
-> > +
-> > +                   "arm,psci-0.2": PSCIv0.2+ spec implementations use static
-> > +                   values for function IDs as defined in the spec.
+> > Could you please elaborate a bit more on this?
+> 
+> I meant using pm_runtime_get_sync() to enable the clocks. There are many
+> examples in the kernel. drivers/watchdog/omap_wdt.c is one.
+> Documentation is available in Documentation/power/runtime_pm.txt
 
-How about:
+What would be benefit of adding runtime PM methods (->runtime_suspend
+and ->runtime_resume) just for enabling/disabling this clock on driver
+->probe and ->remove methods?  Wouldn't it add complexity and additonal
+dependency (on runtime PM) just for no gain?
 
-- compatible: should contain at least one of:
+Is the driver specific clock control even needed given the resource
+handling in the generic AHCI platform library code (please see
+ahci_platform_get_resources(),  ahci_platform_enable_resources() and
+ahci_platform_disable_resources())?
 
-  * "arm,psci" : for implementations complying to PSCI versions prior to
-    0.2. For these cases function IDs must be provided.
+[ Please also take a look at commit f1e70c2 ("ata/ahci_platform: Add
+  clock framework support") which on Aug 27 2012 added generic clock
+  control to ahci_platform driver but forgot to cleanup DA850 AHCI
+  platform code.  The DA850 AHCI support was added much earlier by
+  commit cbb2c961 ("davinci: da850: add support for SATA interface")
+  on Jul 6 2011. ]
 
-  * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-    IDs are not required and should be ignored by an OS with PSCI 0.2
-    support, but are permitted to be present for compatibility with
-    existing software when "arm,psci" is later in the compatible list.
-
-> Maybe specify that in this case no function IDs are passed in the device
-> tree?
-
-As described above, for compatibility with existing kernels, the
-hypervisor will likely want to provide IDs, e.g.
-
-psci {
-	compatible = "arm,psci-0.2", "arm,psci";
-	method = "hvc";
-
-	cpu_on = < arbitrary value >;
-	cpu_off = < arbitrary value >;
-
-	...
-};
-
-In this case I'd expect an OS with PSCI 0.2 support to use the PSCI 0.2
-IDs, but an older OS would use the IDs from the DT (which may or may not
-match the PSCI 0.2 IDs).
-
-So while we should say is any function IDs should be ignored for
-"arm,psci-0.2", we shouldn't say that they are disallowed in the node.
-
-The document should have examples of "arm,psci" only, "arm,psci-0.2"
-only, and the compatibility case.
-
-Cheers,
-Mark.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
