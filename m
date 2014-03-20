@@ -1,58 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 02:52:31 +0900
-Subject: [PATCH v2 1/6] serial: s3c: Fix build of header without
- serial_core.h preinclusion
-In-Reply-To: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
-References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
-Message-ID: <532B2ADF.1000207@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Mar 2014 17:52:53 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140320171930.GA28238@arm.com>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+ <20140320134357.GE11706@sirena.org.uk>
+ <20140320171930.GA28238@arm.com>
+Message-ID: <20140320175253.GH11706@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/14 02:15, Tomasz Figa wrote:
-> From: Mark Brown<broonie@linaro.org>
->
-> serial_s3c.h uses upf_t which is defined in serial_core.h but does not
-> include that itself meaning that users which include serial_s3c.h by
-> itself don't build.
->
-Oops yeah, When we replace inclusion of <plat/regs-serial.h> with 
-serial_s3c.h, maybe we missed inclusion of serial_core.h in the 
-following files:
+On Thu, Mar 20, 2014 at 05:19:32PM +0000, Catalin Marinas wrote:
+> On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
 
-arch/arm/include/debug/samsung.S
-arch/arm/mach-s3c24xx/include/mach/debug-macro.S
-arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
-arch/arm/mach-s3c24xx/mach-vr1000.c
-arch/arm/mach-s3c24xx/sleep-s3c2410.S
-arch/arm/mach-s3c24xx/sleep.S
-arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-arch/arm/mach-s5p64x0/include/mach/debug-macro.S
-arch/arm/mach-s5pc100/include/mach/debug-macro.S
-arch/arm/mach-s5pv210/include/mach/debug-macro.S
+> > To be honest at this point I think what I want to do is go back to the
+> > original approach of layering DT on top of MPIDR.  MPIDR is smaller and
+> > simpler code so seems more likely to make progress.  I really do expect
+> > that for a very large proportion of systems it'll be sufficient.
 
-So, this fix looks good to me. BTW, we need to cleanup inclusion of 
-serial_core.h later because it is useless with this.
+> Do you mean the physical MPIDR_EL1 or the DT representation of
+> MPIDR_EL1?
 
-Applied, thanks.
-- Kukjin
-
-> Signed-off-by: Mark Brown<broonie@linaro.org>
-> [t.figa: Moved inclusion under #ifndef __ASSEMBLY__ to fix mach-exynos.]
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> ---
->   include/linux/serial_s3c.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/include/linux/serial_s3c.h b/include/linux/serial_s3c.h
-> index 907d9d1..e6fc956 100644
-> --- a/include/linux/serial_s3c.h
-> +++ b/include/linux/serial_s3c.h
-> @@ -233,6 +233,8 @@
->
->   #ifndef __ASSEMBLY__
->
-> +#include<linux/serial_core.h>
-> +
->   /* configuration structure for per-machine configurations for the
->    * serial port
->    *
+Well, the affinities need to be the same anyway (so we can tie the
+hardware to the description in DT) though we need to use the physical
+register to get the MT bit since the binding requires that this be
+omitted from the value stored in DT.  Lorenzo was keen on paying
+attention to the MT bit which does seem like a reasonable thing to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/366f8a28/attachment.sig>
