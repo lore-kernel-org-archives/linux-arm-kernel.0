@@ -1,29 +1,24 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 20 Mar 2014 11:31:07 -0600
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <532B2485.6010005@codethink.co.uk>
-References: <201402241200.21944.arnd@arndb.de> <5527822.QYtFYiIpiW@wuerfel>
- <532B137B.7010900@codethink.co.uk> <4884083.IuNl44Y6XD@wuerfel>
- <532B2485.6010005@codethink.co.uk>
-Message-ID: <20140320173106.GA19395@obsidianresearch.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Mar 2014 17:31:55 +0000
+Subject: [PATCH 1/1] regulator: Add new driver for ST's PWM controlled
+ voltage regulators
+In-Reply-To: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
+References: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140320173155.GG11706@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 06:25:25PM +0100, Ben Dooks wrote:
-> So doing:
-> 
-> static void pci_rcar_fixup(struct pci_dev *dev)
-> {
-> 	if (dev->bus->ops == &rcar_pci_ops) {
-> 		dev_info(&dev->dev, "applying new dma mask\n");
-> 		dev->dma_mask = DMA_BIT_MASK(31);
-> 	}
-> }
-> 
-> DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
-> 
-> Did not work for me :(
+On Thu, Mar 20, 2014 at 02:10:54PM +0000, Lee Jones wrote:
 
-Seems like it should work, do you have CONFIG_PCI_QUIRKS turned on?
+> +	dev_info(&pdev->dev, "ST PWM Regulator registered\n");
 
-Jason
+Remove this, it's not adding anything really (the core is pretty chatty
+already).  Otherwise this all seems fine modulo the issues Josh
+mentioned.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/adbe3db3/attachment.sig>
