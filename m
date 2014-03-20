@@ -1,112 +1,77 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 20 Mar 2014 18:02:58 +0100
-Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
-In-Reply-To: <532AE216.3080106@arm.com>
-References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
- <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
- <532AE216.3080106@arm.com>
-Message-ID: <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 20 Mar 2014 12:04:45 -0500
+Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
+ versions of spec
+In-Reply-To: <20140320142623.GD23372@e106331-lin.cambridge.arm.com>
+References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+ <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
+ <20140320142623.GD23372@e106331-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqLbNnkyg9pnjROBEeqmPRYerq52GK6yPOLTXgKbk6e0yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2014 13:41, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 19/03/14 16:22, Vincent Guittot wrote:
->> We replace the old way to configure the scheduler topology with a new method
->> which enables a platform to declare additionnal level (if needed).
+On Thu, Mar 20, 2014 at 9:26 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Mar 20, 2014 at 01:25:53AM +0000, Rob Herring wrote:
+>> On Wed, Mar 19, 2014 at 7:54 PM, Ashwin Chaugule
+>> <ashwin.chaugule@linaro.org> wrote:
+>> > The PSCI v0.2+ spec mandates specific values of Function IDs
+>> > for ARM32 and ARM64. Use DT bindings of Function IDs only
+>> > when using older versions. Use static values otherwise.
+>> > This patch also prepares the code to easily use the ACPI API
+>> > which is based off of PSCI v0.2+.
+>> >
+>> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> > ---
+>> >  arch/arm/include/asm/psci.h   |  15 ++++++
+>> >  arch/arm/kernel/psci.c        | 110 +++++++++++++++++++++++++++++++++++++-----
+>> >  arch/arm64/include/asm/psci.h |  12 +++++
+>> >  arch/arm64/kernel/psci.c      | 106 +++++++++++++++++++++++++++++++++++-----
+>> >  4 files changed, 218 insertions(+), 25 deletions(-)
+>> >
+>> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+>> > index c4ae171..3f8ebf9 100644
+>> > --- a/arch/arm/include/asm/psci.h
+>> > +++ b/arch/arm/include/asm/psci.h
+>> > @@ -17,6 +17,19 @@
+>> >  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+>> >  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+>> >
+>> > +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
+>> > +
+>> > +#define PSCI_ID_VERSION                                0x84000000
+>> > +#define PSCI_ID_CPU_SUSPEND                    0x84000001
+>> > +#define PSCI_ID_CPU_OFF                                0x84000002
+>> > +#define PSCI_ID_CPU_ON                         0x84000003
+>> > +#define PSCI_ID_AFFINITY_INFO          0x84000004
+>> > +#define PSCI_ID_CPU_MIGRATE                    0x84000005
+>> > +#define PSCI_ID_MIGRATE_INFO_TYPE      0x84000006
+>> > +#define PSCI_ID_MIGRATE_INFO_UP_CPU    0x84000007
+>> > +#define PSCI_ID_SYSTEM_OFF                     0x84000008
+>> > +#define PSCI_ID_SYSTEM_RESET           0x84000009
 >>
->> We still have a default topology table definition that can be used by platform
->> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
->> be overwritten by an arch which either wants to add new level where a load balance
->> make sense like BOOK or powergating level or wants to change the flags
->> configuration of some levels.
->>
->> For each level, we need a function pointer that returns cpumask for each cpu,
->> a function pointer that returns the flags for the level and a name. Only flags
->> that describe topology, can be set by an architecture. The current topology
->> flags are:
->>  SD_SHARE_CPUPOWER
->>  SD_SHARE_PKG_RESOURCES
->>  SD_NUMA
->>  SD_ASYM_PACKING
->>
->> Then, each level must be a subset on the next one. The build sequence of the
->> sched_domain will take care of removing useless levels like those with 1 CPU
->> and those with the same CPU span and relevant information for load balancing
->> than its child.
+>> With the KVM patches[1], this makes 4 copies of these defines in the
+>> kernel (and then QEMU has more). This needs to go into a common header
+>> under include/linux. Probably under uapi so QEMU can use. There is
+>> some sync of headers between the kernel and QEMU I think.
 >
-> The paragraph above contains important information to set this up
-> correctly, that's why it might be worth clarifying:
->
-> - "next one" of sd means "child of sd" ?
+> I agree we should have a common header, but I don't think this is uapi
+> material. This is most definitely _not_ part of the user API, and it's
+> from an external spec that we're not in control of -- I don't see why we
+> should have to export a set of numbers forever because it happens to be
+> marginally useful at this point in time.
 
-It's the next one in the table so the parent in the sched_domain
+I mention uapi only in that it is expected to be stable (in an ABI
+sense) from kernel release to release, and I would assume that QEMU
+would only sync ABI stable headers. Someone familiar with the QEMU
+import process should comment on where this stuff should live.
 
-> - "subset" means really "subset" and not "proper subset" ?
+Wouldn't this fall into the same category as something like
+include/uapi/linux/pci_regs.h?
 
-yes, it's really "subset" and not "proper subset"
+> Having the IDs handled by the kernel and those used by hypervisors also
+> encourages people to validate the use of the correct IDs rather than
+> everyone making the same mistake.
 
-Vincent
+Duplicate copies seems like a poor way to validate correctness.
 
->
-> On TC2 w/ the following change in cpu_corepower_mask()
->
->  const struct cpumask *cpu_corepower_mask(int cpu)
->  {
-> -       return &cpu_topology[cpu].thread_sibling;
-> +       return cpu_topology[cpu].socket_id ?
-> &cpu_topology[cpu].thread_sibling :
-> +                       &cpu_topology[cpu].core_sibling;
->  }
->
-> I get this e.g. for CPU0,2:
->
-> CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
-> CPU0: cpu_coregroup_mask=0-1
-> CPU0: cpu_cpu_mask=0-4
->
-> CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
-> CPU2: cpu_coregroup_mask=2-4
-> CPU2: cpu_cpu_mask=0-4
->
-> I assume here that this is a correct set-up.
->
-> The domain degenerate part:
->
-> "useless levels like those with 1 CPU" ... that's the case for GMC level
-> for CPU2,3,4
->
-> The GMC level is destroyed because of the following code snippet in
-> sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
->
-> so that's fine.
->
-> In case of CPU0,1 since GMC and MC have the same span, the code in
-> build_sched_groups() creates only one group for MC  and that's why
-> pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
-> the if condition 'if (~cflags & pflags)' is not hit and
-> sd_parent_degenerate() finally returns 1 for MC.
->
-> So the "those with the same CPU span and relevant information for load
-> balancing than its child." is not so easy to understand for me. Because
-> both levels have the same span we actually don't take the flags of the
-> parent into consideration which require at least 2 groups.
->
-> So the TC2 example covers for me two corner cases: (1) The level I want
-> to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
-> the parent level I want to get rid of (MC for CPU0,1) of is the same as
-> the span of the level which should stay.
->
-> Are these two corner cases the only one supported here? If yes this has
-> to be stated somewhere, otherwise if somebody will try this approach on
-> a different topology, (s)he might be surprised.
->
-> If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
-> this works fine.
->
-> I would like to test this on more platforms but I only have my TC2
-> available :-)
->
-> -- Dietmar
->
-> [...]
->
+Rob
