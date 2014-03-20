@@ -1,35 +1,42 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 19 Mar 2014 22:03:22 -0400
-Subject: [RFC] PSCI: Use DT Function ID values only for old versions of
- spec
-In-Reply-To: <CAJ5Y-eZMWr0rGZnEXo3N0+aLAMLaYqA3-GCDT6oNcqZtBMxNFQ@mail.gmail.com>
-References: <1394772816-8078-1-git-send-email-ashwin.chaugule@linaro.org>
- <20140314095246.GH25870@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eZMWr0rGZnEXo3N0+aLAMLaYqA3-GCDT6oNcqZtBMxNFQ@mail.gmail.com>
-Message-ID: <CAJ5Y-eYBLS7pDhWoFov2djs9Ld_i9y0bW2nWzS+Q=9z4wFudOA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Mar 2014 11:06:48 +0900
+Subject: [PATCH 0/4] Consolidate Exynos machine code
+In-Reply-To: <201403191429.11721.arnd@arndb.de>
+References: <1395231957-22032-1-git-send-email-sachin.kamat@linaro.org>
+ <201403191429.11721.arnd@arndb.de>
+Message-ID: <018701cf43e1$0ef65140$2ce2f3c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Arnd Bergmann wrote:
+> 
+> On Wednesday 19 March 2014, Sachin Kamat wrote:
+> > This patch series consolidates the Exynos machine code and common
+> > code into a single file to avoid code duplication and introduces
+> > generic compatible strings for Exynos4 and 5 SoC series.
+> >
+> > Complete discussion and motivation for this series is found here:
+> > http://comments.gmane.org/gmane.linux.kernel.samsung-soc/27268
+> >
+> > This series is based on the latest linux-next and depends on
+> > 1. Tomasz Figa's PM consolidation series 1 and 2
+> > 2. Patch: ARM: SAMSUNG: Reorganize calls to reserve memory for MFC
+> > http://www.spinics.net/lists/linux-samsung-soc/msg25501.html
+> > 3. Patch: ARM: EXYNOS: Add support to reserve memory for MFC-v7
+> > http://www.spinics.net/lists/arm-kernel/msg315940.html
+> > 4. Kconfig and CPU init Consolidation series
+> > http://article.gmane.org/gmane.linux.kernel.samsung-soc/28216
+> 
+Hi Sachin,
 
-> On 14 March 2014 05:52, Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> > +     psci_function_id[PSCI_FN_MIGRATE] = PSCI_ID_CPU_MIGRATE;
->> > +     psci_ops.migrate = psci_migrate;
->>
->> It would also be a good idea to hook up AFFINITY_INFO to a cpu_kill
->> callback from the start, to ensure implementors bother to implement it,
->> and such that we can make kexec safe(r).
->>
->> If we rely on it from the start it's more likely that it will actually
->> get implemented, and it will highlight any dodgy PSCI 0.2
->> implementations while there's a chance they can be fixed.
->>
->
+Looks good to me.
 
-Although I sent v1 of this patch, I haven't forgotten about this part.
-Had a go at it, but it turned out quite messy for ARM32. I was trying
-to get cpu_kill via smp_ops.
-I'll revisit this again hopefully tomorrow and see if there's anything better.
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Ashwin
+Arnd, thanks.
+
+Let me sort this series out for v3.15 then I'll send pull-request to arm-soc with other
+dependencies tonight.
+
+Thanks,
+Kukjin
