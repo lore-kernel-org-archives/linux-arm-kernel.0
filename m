@@ -1,54 +1,65 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Thu, 20 Mar 2014 12:09:00 -0600
-Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
- NAND_NO_SUBPAGE_WRITE option
-In-Reply-To: <532B2D3F.6050004@ti.com>
-References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
- <532B2183.2080309@ti.com> <20140320172912.GW31517@norris-Latitude-E6410>
- <532B2766.6090506@ti.com> <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
- <532B2D3F.6050004@ti.com>
-Message-ID: <3A49495A-CE1E-46DA-A003-7863C982CA81@bsdimp.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Mar 2014 03:14:40 +0900
+Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
+In-Reply-To: <01f801cf43f0$62e7bc80$28b73580$@samsung.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-49-git-send-email-arnd@arndb.de>
+ <01f801cf43f0$62e7bc80$28b73580$@samsung.com>
+Message-ID: <532B3010.80101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/20/14 12:56, Kukjin Kim wrote:
+> Arnd Bergmann wrote:
+>>
+>> The power domain code is only available when CONFIG_PM
+>> is enabled, so we must not select that unconditionally for
+>> s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
+>> mirrors what we do on other platforms, and fixes a possible
+>> randconfig build bug.
+>>
+>> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+>> Cc: Tomasz Figa<tomasz.figa@gmail.com>
+>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>
+> Acked-by: Kukjin Kim<kgene.kim@samsung.com>
+>
 
-On Mar 20, 2014, at 12:02 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Arnd,
 
-> On Thursday 20 March 2014 01:44 PM, Warner Losh wrote:
->> 
->> On Mar 20, 2014, at 11:37 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->> 
->>> 
->>> 
->>> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
->>>> On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
->>>>> Boris,
->>>> 
->>>> Who's Boris? And why should Boris be taking this patch? It's an MTD
->>>> patch.
->>>> 
->>> I got your name completely wrong. Sorry....
->>> 
->>>>> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
->>>>>> From: Murali Karicheri <m-karicheri2@ti.com>
->>>>>> 
->>>>>> After testing NAND flash with ubifs for k2hk-emv board were committed
->>>>>> that flash doesn't support subpage writing, so we can fix it by
->>>>>> adding a property to disable subpage write.
->>>> 
->>>> What flash? We try to autodetect NAND as much as possible. Perhaps we
->>>> should be adding infrastructure support instead of hacking it with a DT
->>>> property.
->>>> 
->>> We can't auto detect it and thats why the DT approach was taken. We
->>> will double check that.
->> 
->> I though sub page writing was one of the fields in the onfi and/or jedec(toggle) meta data structures. Have you looked there?
->> 
-> Am not sure if I follow you. The limitation is from the TI NAND controller(AEMIF) and
-> not the NAND memory. 
+Please drop this patch in your tree because there is a fix before this 
+and it fixes SAMSUNG_WAKEMASK dependency together for S3C64XX.
 
-Then never mind. I thought it was the other side of things.
+[PATCH v2 5/6] ARM: s3c64xx: Fix incorrect selection of PM-related 
+symbols <http://www.spinics.net/lists/arm-kernel/msg316391.html>
 
-Warner
+Note, I'll take above into 2nd fixes for v3.15 in samsung tree.
+
+If any problems, please kindly let me know.
+
+Thanks,
+Kukjin
+
+> Thanks,
+> Kukjin
+>
+>> Cc: Ben Dooks<ben-linux@fluff.org>
+>> ---
+>>   arch/arm/Kconfig | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 4721007..6ffcadd 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -764,7 +764,7 @@ config ARCH_S3C64XX
+>>   	select HAVE_TCM
+>>   	select NO_IOPORT
+>>   	select PLAT_SAMSUNG
+>> -	select PM_GENERIC_DOMAINS
+>> +	select PM_GENERIC_DOMAINS if PM
+>>   	select S3C_DEV_NAND
+>>   	select S3C_GPIO_TRACK
+>>   	select SAMSUNG_ATAGS
+>> --
+>> 1.8.3.2
