@@ -1,69 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Mar 2014 13:43:57 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140320112650.GA1408@red-moon>
-References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
- <20140320112650.GA1408@red-moon>
-Message-ID: <20140320134357.GE11706@sirena.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 20 Mar 2014 14:52:21 +0100
+Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
+ documentation
+In-Reply-To: <532AEDE2.3080306@gmail.com>
+References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
+ <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
+ <532AEDE2.3080306@gmail.com>
+Message-ID: <20140320145221.09252bf6@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 11:26:50AM +0000, Lorenzo Pieralisi wrote:
-> On Wed, Mar 19, 2014 at 06:02:17PM +0000, Mark Brown wrote:
-> > +#ifdef CONFIG_OF
+On Thu, 20 Mar 2014 14:32:18 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> This ifdef can be removed, CONFIG_OF is always selected for arm64 and
-> the !CONFIG_OF path
+> Ok, I had another round of google'ing and found this:
+> http://hipstercircuits.com/wp-content/uploads/2013/05/TDA19988.pdf
+> 
+> There, the datasheet specifically for TDA19988 only states 0x70 and
+> 0x34 as the two i2c addresses. Therefore, TDA19988 has fixed i2c
+> addresses while TDA9983b has configurable (main) i2c address.
+> 
+> Not as easy as we thought ;)
+> 
+> I suggest reword the reg property to:
+> "- reg: shall be set to the I2C address"
+> 
+> and optionally list all known addresses for each TDA[1]998x in the
+> binding.
 
-This has been present since the very first time these patches were
-posted but hasn't been mentioned as being a problem previously.
+Thanks for the link.
 
-> > +#else
-> > +static inline int parse_dt_topology(void) { return 0; }
-> > +#endif
+OK, then, as the linux tda998x driver handles only the tda 19988 and
+19989 chips, the HDMI I2C address is always 0x70.
 
-> is wrong, it should return failure. You should remove the CONFIG_OF
-> ifdeffery.
+So, question: Russell and Sebastian, do you still want an other patch?
 
-Yup.  It actually won't affect the behaviour at present though - since
-it won't do anything the result will be just the same as if we return an
-error and reset.
+Other question: the CEC address is hard-coded to 0x34 in the driver.
+Should it be configurable in the DT?
 
-Given ACPI (which really looks like it's going to happen at some point
-and presumably make OF optional) I'm not sure removing the handling of
-OF is actually constructive but whatever, it's done now...
-
-> > +			if (leaf) {
-> > +				ret = parse_core(c, cluster_id, core_id++);
-> > +				if (ret != 0) {
-> > +					return ret;
-> > +				}
-
-> WARNING: braces {} are not necessary for single statement blocks
-> #139: FILE: arch/arm64/kernel/topology.c:132:
-
-Like I say I don't think checkpatch is being helpful on this one, the
-code looks worse.  Again, whatever.
-
-> We still have a problem here. If the topology does not contain bindings
-> for some cpu nodes, parse_cluster() does not fail and we end up with an
-> incomplete topology. We have two choices: either we check the topology
-
-Hrm, looking at the topology binding it doesn't specificially require
-that the topology be complete.  I can see why you would want that.
-
-> I'd rather do it here, in preparation for MPIDR_EL1 fallback solution
-> (where there will always be topology information configured and the register
-> will always be there in all its glory).
-
-To be honest at this point I think what I want to do is go back to the
-original approach of layering DT on top of MPIDR.  MPIDR is smaller and
-simpler code so seems more likely to make progress.  I really do expect
-that for a very large proportion of systems it'll be sufficient.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/b2e4e969/attachment-0001.sig>
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
