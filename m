@@ -1,131 +1,122 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 20 Mar 2014 04:27:03 -0700
-Subject: [PATCH v6 36/36] ARM: STi: Add support for the FSM Serial Flash
- Controller
-In-Reply-To: <1395307268-12721-37-git-send-email-lee.jones@linaro.org>
-References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
- <1395307268-12721-37-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140320112703.GS31517@norris-Latitude-E6410>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Thu, 20 Mar 2014 19:29:28 +0800
+Subject: [PATCH 1/3] Documentation: add Device tree bindings for Hisilicon
+ hip04 ethernet
+In-Reply-To: <CAGVrzcZY4Z6kFRUP54PtaZUAX0+cEmYfnunJQFN8TC66xooLeg@mail.gmail.com>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395132017-15928-2-git-send-email-zhangfei.gao@linaro.org>
+ <CAGVrzcZY4Z6kFRUP54PtaZUAX0+cEmYfnunJQFN8TC66xooLeg@mail.gmail.com>
+Message-ID: <CAMj5Bki27+uO9tafp1fF7K8vfE8=F-01zRdU7BAtmF7-D7H0XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 09:21:08AM +0000, Lee Jones wrote:
-> Here we add the necessary device nodes required for successful device
-> probing and Pinctrl setup for the FSM.
-> 
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Acked-by Angus Clark <angus.clark@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih416-pinctrl.dtsi | 13 +++++++++++++
->  arch/arm/boot/dts/stih416.dtsi         | 13 +++++++++++++
->  arch/arm/boot/dts/stih41x-b2020.dtsi   |  1 +
->  arch/arm/boot/dts/stih41x-b2020x.dtsi  | 28 ++++++++++++++++++++++++++++
->  4 files changed, 55 insertions(+)
->  create mode 100644 arch/arm/boot/dts/stih41x-b2020x.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> index b29ff4b..81df8e7 100644
-> --- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> @@ -210,6 +210,19 @@
->  					};
->  				};
->  			};
-> +
-> +			fsm {
-> +				pinctrl_fsm: fsm {
-> +					st,pins {
-> +						spi-fsm-clk  = <&PIO12 2 ALT1 OUT>;
-> +						spi-fsm-cs   = <&PIO12 3 ALT1 OUT>;
-> +						spi-fsm-mosi = <&PIO12 4 ALT1 OUT>;
-> +						spi-fsm-miso = <&PIO12 5 ALT1 IN>;
-> +						spi-fsm-hol  = <&PIO12 6 ALT1 OUT>;
-> +						spi-fsm-wp   = <&PIO12 7 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pin-controller-rear {
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index b7ab47b..1e24b9e 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -145,5 +145,18 @@
->  
->  			status		= "disabled";
->  		};
-> +
-> +		/* FSM */
-> +		spifsm: spifsm at fe902000 {
-> +			compatible	   = "st,spi-fsm";
-> +			reg		   = <0xfe902000 0x1000>;
-> +			pinctrl-0	   = <&pinctrl_fsm>;
-> +
-> +			st,syscfg	   = <&syscfg_rear>;
-> +			st,boot-device-reg = <0x958>;
-> +			st,boot-device-spi = <0x1a>;
-> +
-> +			status = "disabled";
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-> index 0ef0a69..01487e0 100644
-> --- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-> +++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-> @@ -6,6 +6,7 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * publishhed by the Free Software Foundation.
->   */
-> +#include "stih41x-b2020x.dtsi"
->  / {
->  	memory{
->  		device_type = "memory";
-> diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
-> new file mode 100644
-> index 0000000..d9af63d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
-> + * Author: Lee Jones <lee.jones@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +/ {
-> +	soc {
-> +		spifsm: spifsm at fe902000 {
-> +			#address-cells = <1>;
-> +			#size-cells    = <1>;
-> +
-> +			status = "okay";
-> +
-> +			partition at 0 {
-> +				label = "Serial Flash 1";
+Dear Florian
 
-Are you sure you want spaces in the partition label? I suppose MTD can
-probably handle this fine, but it doesn't seem standard, and it may
-prevent you from using the partition name in certain ways. For instance,
-it might make it harder to use with the "ubi.mtd=" module parameter.
+On Wed, Mar 19, 2014 at 1:39 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2014-03-18 1:40 GMT-07:00 Zhangfei Gao <zhangfei.gao@linaro.org>:
 
-But otherwise:
+>> +Example:
+>> +       mdio {
+>> +               compatible = "hisilicon,hip04-mdio";
+>> +               reg = <0x28f1000 0x1000>;
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               phy0: ethernet-phy at 0 {
+>> +                       reg = <0>;
+>> +                       marvell,reg-init = <18 0x14 0 0x8001>;
+>> +                       device_type = "ethernet-phy";
+>
+> You are missing a compatible string such as
+> "ethernet-phy-ieee802.3-c22", please take a look at
+> Documentation/devicetree/bindings/net/phy.txt for an example.
+>
+> device_type is deprecated and should be removed.
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Thanks for the info, will update.
 
-> +				reg   = <0x00000000 0x00500000>;
-> +			};
-> +
-> +			partition at 500000 {
-> +				label = "Serial Flash 2";
-> +				reg   = <0x00500000 0x00b00000>;
-> +			};
-> +		};
-> +	};
-> +};
+>
+>> +               };
+>> +
+>> +               phy1: ethernet-phy at 1 {
+>> +                       reg = <1>;
+>> +                       marvell,reg-init = <18 0x14 0 0x8001>;
+>> +                       device_type = "ethernet-phy";
+>> +               };
+>> +       };
+>> +
+>> +       ppebase: ppebase at 28c0000 {
+>> +               compatible = "hisilicon,hip04-ppebase";
+>> +               reg = <0x28c0000 0x10000>;
+>
+> This should probably look like:
+>
+>                     #address-cells = <0>;
+>                     #size-cells = <0>;
+>
+>                     eth0_port: port at 0 {
+>                          reg = <0>;
+>                     };
+>
+>                     eth1_port: port at 1f {
+>                          reg = <31>;
+>                     };
+>
+> This looks like something similar to mv643xx_eth, you should see
+> Documentation/devicetree/bindings/marvell.txt for hints on how to
+> model the representation in a similar fashion.
 
-Brian
+Perfect, this looks more professional, just like the phy description.
+
+The ppe is common device with 2048 channels shared by all the
+controllers, only if channels are not overlapped.
+Two inputs required,
+One is port number, currently use reg=<>,
+The other is start channel, I used id before.
+Each controller use start channel as RX_DESC_NUM * priv->id.
+Do you think still use id from of_alias_get_id(), or add another
+property like start_chan etc.
+                        eth0_port: port at 1f {
+                                reg = <31>;
+                                start-chan = <0>;
+                        };
+
+                        eth1_port: port at 0 {
+                                reg = <0>;
+                                start-chan = <1>;
+                        };
+
+>
+>> +       };
+>> +
+>> +       fe: ethernet at 28b0000 {
+>> +               compatible = "hisilicon,hip04-mac";
+>> +               reg = <0x28b0000 0x10000>;
+>> +               interrupts = <0 413 4>;
+>> +               port = <31>;
+>
+> I do not think this is the right way to expose that, port should be
+> specialized to e.g: hisilicon,port, or you should use a phandle to the
+> "ppebase" node which exposes differents ports as subnodes:
+>
+>                     hisilicon,port-handle = <&eth0_port>;
+OK, perfect.
+
+>
+>> +               speed = <100>;
+>
+> max-speed is the standard property for this
+The speed can be removed now, and the info can be get from phy-mode = "sgmii"
+
+>
+>> +               id = <0>;
+>
+> id here is a software concept, either you create properly numbered
+> aliases for these nodes, and use of_alias_get_id(), or you do not use
+> these identifiers at all.
+
+Still not not sure whether use of_alias_get_id() or add property in
+the eth_port subnode.
+The id is used for specify the start channel.
+
+Thanks
