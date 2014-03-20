@@ -1,55 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 19 Mar 2014 20:25:53 -0500
-Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
- versions of spec
-In-Reply-To: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 20 Mar 2014 09:49:00 +0800
+Subject: [PATCH 12/62] ARM: hisi: fix building without CONFIG_HOTPLUG_CPU
+In-Reply-To: <1395257399-359545-13-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-13-git-send-email-arnd@arndb.de>
+Message-ID: <CAN1soZyj_e9LBf3H6nBGGYRT5at7ZeY_Dr4QJeoQKSpMHPePhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 7:54 PM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> The PSCI v0.2+ spec mandates specific values of Function IDs
-> for ARM32 and ARM64. Use DT bindings of Function IDs only
-> when using older versions. Use static values otherwise.
-> This patch also prepares the code to easily use the ACPI API
-> which is based off of PSCI v0.2+.
+On Thu, Mar 20, 2014 at 3:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The hisi SMP code always uses the hi3xxx_set_cpu() function
+> defined in the hotplug.c file, so we cannot build without
+> this when CONFIG_SMP is enabled. This patch slightly restructures
+> the code so we always build the parts of hotplug.c that we need
+> but just leave out the CPU disable logic if CONFIG_HOTPLUG_CPU
+> is turned off.
 >
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 > ---
->  arch/arm/include/asm/psci.h   |  15 ++++++
->  arch/arm/kernel/psci.c        | 110 +++++++++++++++++++++++++++++++++++++-----
->  arch/arm64/include/asm/psci.h |  12 +++++
->  arch/arm64/kernel/psci.c      | 106 +++++++++++++++++++++++++++++++++++-----
->  4 files changed, 218 insertions(+), 25 deletions(-)
+>  arch/arm/mach-hisi/Makefile  | 3 +--
+>  arch/arm/mach-hisi/hotplug.c | 2 ++
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> index c4ae171..3f8ebf9 100644
-> --- a/arch/arm/include/asm/psci.h
-> +++ b/arch/arm/include/asm/psci.h
-> @@ -17,6 +17,19 @@
->  #define PSCI_POWER_STATE_TYPE_STANDBY          0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+> diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+> index 6870058..2ae1b59 100644
+> --- a/arch/arm/mach-hisi/Makefile
+> +++ b/arch/arm/mach-hisi/Makefile
+> @@ -3,5 +3,4 @@
+>  #
 >
-> +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
-> +
-> +#define PSCI_ID_VERSION                                0x84000000
-> +#define PSCI_ID_CPU_SUSPEND                    0x84000001
-> +#define PSCI_ID_CPU_OFF                                0x84000002
-> +#define PSCI_ID_CPU_ON                         0x84000003
-> +#define PSCI_ID_AFFINITY_INFO          0x84000004
-> +#define PSCI_ID_CPU_MIGRATE                    0x84000005
-> +#define PSCI_ID_MIGRATE_INFO_TYPE      0x84000006
-> +#define PSCI_ID_MIGRATE_INFO_UP_CPU    0x84000007
-> +#define PSCI_ID_SYSTEM_OFF                     0x84000008
-> +#define PSCI_ID_SYSTEM_RESET           0x84000009
+>  obj-y  += hisilicon.o
+> -obj-$(CONFIG_SMP)              += platsmp.o
+> -obj-$(CONFIG_HOTPLUG_CPU)      += hotplug.o
+> +obj-$(CONFIG_SMP)              += platsmp.o hotplug.o
+> diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
+> index b909854..abd441b 100644
+> --- a/arch/arm/mach-hisi/hotplug.c
+> +++ b/arch/arm/mach-hisi/hotplug.c
+> @@ -178,6 +178,7 @@ static inline void cpu_enter_lowpower(void)
+>           : "cc");
+>  }
+>
+> +#ifdef CONFIG_HOTPLUG_CPU
+>  void hi3xxx_cpu_die(unsigned int cpu)
+>  {
+>         cpu_enter_lowpower();
+> @@ -198,3 +199,4 @@ int hi3xxx_cpu_kill(unsigned int cpu)
+>         hi3xxx_set_cpu(cpu, false);
+>         return 1;
+>  }
+> +#endif
+> --
+> 1.8.3.2
+>
 
-With the KVM patches[1], this makes 4 copies of these defines in the
-kernel (and then QEMU has more). This needs to go into a common header
-under include/linux. Probably under uapi so QEMU can use. There is
-some sync of headers between the kernel and QEMU I think.
-
-Rob
-
-[1] https://patches.linaro.org/23918/
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
