@@ -1,32 +1,57 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Mar 2014 09:58:10 +0100
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT documentation
-Message-ID: <20140320092639.48F68A6279@smtp3-g21.free.fr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Mar 2014 09:20:32 +0000
+Subject: [PATCH v6 00/36] mtd: st_spi_fsm: Add new driver
+Message-ID: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C address (reg) is required for the TDA998x driver to be loaded
-and initialized.
+This should be the final version (again) :)
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-This patch applies to linux-next.
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 2 ++
- 1 file changed, 2 insertions(+)
+Version 6:
+  Serviced 3 nits picked up by Brian during final review.
+  
+Version 5:
+  Tended to Christophe, Ludovic and Angus' comments.
+  
+Version 4:
+  Tended to Brian's review comments
+    - Checkpatch acceptance
+    - MODULE_DEVICE_TABLE() name slip correction
+    - Timeout issue(s) resolved
+    - Potential infinite loop mitigated
+    - Code clarity suggests heeded
+    - Duplication with MTD core code removed
+    - Upgraded to using ROUND_UP() helper
+    - Moved non-shared header code into main driver
+    - Relocated dynamic msg sequence stores into main struct
+    - Averted adaption of static (table) data
+    - Basic whitespace/spelling/data type/dev_err suggestions applied
+  
+Version 3:
+  Okay, this thing should be fully functional now. Identify a chip
+  based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+  Support for various chip quirks added too.
+  
+Version 2:
+  The first bunch of these patches have been on the MLs before, but
+  didn't receive a great deal of attention for the most part. We are
+  a little more featureful this time however. We can now successfully
+  setup and configure the N25Q256. We still can't read/write/erase
+  it though. I'll start work on that next week and will provide it in
+  the next instalment.
 
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index d7df01c..fc7effa 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -3,6 +3,8 @@ Device-Tree bindings for the NXP TDA998x HDMI transmitter
- Required properties;
-   - compatible: must be "nxp,tda998x"
- 
-+  - reg: I2C address - must be <0x70>
-+
- Optional properties:
-   - interrupts: interrupt number and trigger type
- 	default: polling
--- 
-1.9.1
+Version 1:
+  First stab at getting this thing Mainlined. It doesn't do a great deal
+  yet, but we are able to initialise the device and dynamically set it up
+  correctly based on an extracted JEDEC ID.
+
+ Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   13 +
+ arch/arm/boot/dts/stih416.dtsi                   |   13 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi             |    1 +
+ arch/arm/boot/dts/stih41x-b2020x.dtsi            |   28 ++
+ drivers/mtd/devices/Kconfig                      |    8 +
+ drivers/mtd/devices/Makefile                     |    1 +
+ drivers/mtd/devices/serial_flash_cmds.h          |   81 +++++
+ drivers/mtd/devices/st_spi_fsm.c                 | 2122 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 9 files changed, 2293 insertions(+)
