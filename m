@@ -1,39 +1,25 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Mar 2014 18:06:11 +0100
-Subject: [PATCH v2] ASoC: tda998x: Fix lack of required reg in DT documentation
-Message-ID: <20140320180611.6c42bc9e@armhf>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 20 Mar 2014 19:06:21 +0200
+Subject: [PATCH 0/3] Fix NAND propeties for k2hk-evm
+Message-ID: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C address (reg) is required for the TDA998x driver to be loaded
-and initialized.
+This series is intedent to fix problems founded when checked NAND flash
+for k2hk-emv board rev2.0. Whithout this series we cannot use ubifs and
+whole volume of present NAND memory.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-- v2
-	- don't force the I2C address to be 0x70
-This patch applies to linux-next.
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 2 ++
- 1 file changed, 2 insertions(+)
+Based on linux-next tag: next-20140320
 
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index d7df01c..fc7effa 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -3,6 +3,8 @@ Device-Tree bindings for the NXP TDA998x HDMI transmitter
- Required properties;
-   - compatible: must be "nxp,tda998x"
- 
-+  - reg: I2C address
-+
- Optional properties:
-   - interrupts: interrupt number and trigger type
- 	default: polling
--- 
-1.9.1
+Murali Karicheri (3):
+  ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
+  mtd: davinci-nand: add dts property for NAND_NO_SUBPAGE_WRITE option
+  ARM: dts: k2hk-evm: disable subpage write for davinci nand device
 
+ Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
+ arch/arm/boot/dts/k2hk-evm.dts                         | 3 ++-
+ drivers/mtd/nand/davinci_nand.c                        | 3 +++
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.3.2
