@@ -1,43 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 19:29:13 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <532B2628.5080305@codethink.co.uk>
-References: <201402241200.21944.arnd@arndb.de>
- <20140320173106.GA19395@obsidianresearch.com>
- <532B2628.5080305@codethink.co.uk>
-Message-ID: <201403201929.13633.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Mar 2014 22:34:57 +0300
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <5091055.xba9009NTn@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <201403201250.45005.arnd@arndb.de> <532B3A91.6000800@cogentembedded.com>
+ <5091055.xba9009NTn@wuerfel>
+Message-ID: <532B42E1.6080804@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014, Ben Dooks wrote:
-> On 20/03/14 18:31, Jason Gunthorpe wrote:
-> > On Thu, Mar 20, 2014 at 06:25:25PM +0100, Ben Dooks wrote:
-> >> So doing:
-> >>
-> >> static void pci_rcar_fixup(struct pci_dev *dev)
-> >> {
-> >>      if (dev->bus->ops == &rcar_pci_ops) {
-> >>              dev_info(&dev->dev, "applying new dma mask\n");
-> >>              dev->dma_mask = DMA_BIT_MASK(31);
-> >>      }
-> >> }
-> >>
-> >> DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
-> >>
-> >> Did not work for me :(
-> >
-> > Seems like it should work, do you have CONFIG_PCI_QUIRKS turned on?
-> 
-> Yes, see the print happening, just still PCI OHCI dies horribly.
+Hello.
 
-Shouldn't that mask be 30 instead of 31 when you only support DMA
-to the first GB?
+On 03/20/2014 09:22 PM, Arnd Bergmann wrote:
 
-Another possibility is that 'EARLY' means it gets applied before
-the normal mask is set.
+>>      Yes, it does. The issue is that the PHY code is different in MUSB and OHCI
+>> drivers. I don't think the PHY driver knows what device binds to it.
 
-Finally, setting the mask itself is not enough. As I mentioned you
-also need to use the swiotlb_dma_ops. Did you already implement
-those?
+> At least in the DT case, it can get that information from DT, when you
+> set #phy-cells=<1>. I don't know how it would be done for platform_data,
+> but I assume one could find a way too.
 
-	Arnd
+    #phy-cells is only defined for drivers/phy/ bindings IIRC, and I was 
+thinking a drivers/usb/phy/ driver so far. Probably you have a point and we 
+should go for the generic PHY framework instead. I'm just not very familiar 
+with it...
+
+> 	Arnd
+
+WBR, Sergei
