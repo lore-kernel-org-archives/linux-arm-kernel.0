@@ -1,47 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Mar 2014 09:35:19 -0700
-Subject: [PATCH 0/4] sunxi clock fixes
-In-Reply-To: <20140320151551.GO27873@lukather>
-References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
- <20140319190418.30995.17661@quantum> <5329ECCE.7010700@elopez.com.ar>
- <20140320151551.GO27873@lukather>
-Message-ID: <20140320163519.21989.42741@quantum>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 20 Mar 2014 09:39:03 -0700
+Subject: ARM memset fixes for 3.8.y.x extended
+Message-ID: <CAGVrzcbR=o9Maj9YxFs2=-K0E21AWn9dDpSgHMFiGU-GjhLaWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-03-20 08:15:51)
-> Hi,
-> 
-> On Wed, Mar 19, 2014 at 04:15:26PM -0300, Emilio L?pez wrote:
-> > Hi Mike,
-> > 
-> > El 19/03/14 16:04, Mike Turquette escribi?:
-> > >Quoting Emilio L?pez (2014-03-19 11:19:29)
-> > >>Hi everyone,
-> > >>
-> > >>This is a small series of patches fixing a couple of bugs that are
-> > >>present on the sunxi clock driver. Mike, are there any chances we can
-> > >>take these during the 3.15 merge window or -rc period?
-> > >
-> > >I can take these towards 3.15. Do you want me to take the dts patch too?
-> > 
-> > I'd rather have Maxime take it to avoid potential conflicts. That
-> > patch can wait in any case; there's no actual pll4 consumer in tree
-> > just yet.
-> 
-> I sent my last pull request for the merge window, but I can queue it
-> up as a fix for a later 3.15-rc*
+Hi Kamal,
 
-Just FYI, I took the three clock patches into clk-next yesterday so they
-should land in linux-next soon.
+Could you schedule the following two patches for the upcoming
+3.8.13.20 stable release:
 
-Regards,
-Mike
+418df63adac5 ARM: 7670/1: fix the memset fix
+455bd4c430b0 ARM: 7668/1: fix memset-related crashes caused by recent
+GCC (4.7.2) optimizations
 
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+These two patches apply cleanly to linux-3.8.y-queue on top of
+259e6d8c076a ("ACPI / video: Filter the _BCL table for duplicate
+brightness values").
+
+Thanks!
+-- 
+Florian
