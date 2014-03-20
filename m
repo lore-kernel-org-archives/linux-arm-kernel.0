@@ -1,42 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 17:12:46 +0100
-Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
-In-Reply-To: <CABb+yY1rvozkGS34CHt8YEJqvGRXuHV09=AdS3=zQBx=DjFDCQ@mail.gmail.com>
-References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
- <201403191846.28563.arnd@arndb.de>
- <CABb+yY1rvozkGS34CHt8YEJqvGRXuHV09=AdS3=zQBx=DjFDCQ@mail.gmail.com>
-Message-ID: <7073716.9YBOcHOu36@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 20 Mar 2014 17:14:22 +0100
+Subject: [PATCH] ARM: at91: panic when the mck rate is zero
+Message-ID: <1395332062-4967-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014 21:39:56 Jassi Brar wrote:
-> On Wed, Mar 19, 2014 at 11:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 17 March 2014, Jassi Brar wrote:
-> 
-> >>   Perhaps the mailbox controller driver should name its links as it
-> >> wants. By how the remote works with the mailbox links, the client
-> >> driver asks for a specific mailbox link (which maybe a hardcoded
-> >> string in the driver or be gotten alongside other data via client's
-> >> DT) ?
-> >
-> > I don't see why we should do it any different from the other bindings.
-> > Let's just stick with mboxes/mbox-names or mailboxes/mailbox-names
-> > if you prefer.
-> >
-> >>   IOW we can't have a generic API/DT-bindings that could get us
-> >> reusable client drivers. But only common framework/code that would
-> >> otherwise be duplicated by every platform.
-> >
-> > That is a major benefit though.
-> > Also even if most drivers won't work across multiple platforms, there
-> > is still a reasonable chance that /some/ drivers will.
-> >
-> It seems those /some/ drivers will have to work with everything same
-> but the channel name (which the client could get from its DT node when
-> the second platform appears).
+If the mck rate is zero, we'll hit the following warning:
 
-Why would you ever have varying channel names? I would expect that
-the name is always fixed in the binding of the client driver, like
-we do for clocks or interrupts for instance.
+WARNING: CPU: 0 PID: 0 at arch/arm/mach-at91/at91sam926x_time.c:257 at91sam926x_pit_init+0x13c/0x260()
 
-	Arnd
+But the kernel will continue to try booting and face a lot of divisions by zero
+when trying to handle the various clocks.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/at91sam926x_time.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index 0f04ffe9c5a8..f060f6371392 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -250,6 +250,8 @@ void __init at91sam926x_pit_init(void)
+ 	if (IS_ERR(mck))
+ 		panic("AT91: PIT: Unable to get mck clk\n");
+ 	pit_rate = clk_get_rate(mck) / 16;
++	if (pit_rate == 0)
++		panic("AT91: PIT: can't continue, mck rate is zero\n");
+ 	pit_cycle = (pit_rate + HZ/2) / HZ;
+ 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+ 
+-- 
+1.8.3.2
