@@ -1,31 +1,69 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 20 Mar 2014 22:25:11 +0400
-Subject: [PATCH] ARM: nspire: Fix compiler warning
-Message-ID: <1395339911-30009-1-git-send-email-shc_work@mail.ru>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 18:26:21 +0000
+Subject: Forcing DEBUG_UART_{PHYS, VIRT} changes when switching between
+ v7 platforms?
+In-Reply-To: <CAGVrzcYTnW7mSqwL9sy61mg6EU6jJbUgCRUHjrdPvTgZ=eDZhg@mail.gmail.com>
+References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
+ <8099777.qvOx0M5YBS@wuerfel>
+ <CAGVrzcYTnW7mSqwL9sy61mg6EU6jJbUgCRUHjrdPvTgZ=eDZhg@mail.gmail.com>
+Message-ID: <20140320182621.GZ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC      arch/arm/mach-nspire/nspire.o
-arch/arm/mach-nspire/nspire.c:79:2: warning: initialization from incompatible pointer type [enabled by default]
-arch/arm/mach-nspire/nspire.c:79:2: warning: (near initialization for '__mach_desc_NSPIRE.restart') [enabled by default]
+On Thu, Mar 20, 2014 at 11:22:22AM -0700, Florian Fainelli wrote:
+> 2014-03-20 0:07 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 19 March 2014 16:38:45 Florian Fainelli wrote:
+> >> Hi,
+> >>
+> >> When switching between different Multi v7 platform which all select
+> >> DEBUG_UART_8250, whichever platform managed to set
+> >> DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
+> >> others.
+> >>
+> >> What I am seeing at the moment is for instance enabling BCM_MOBILE
+> >> will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
+> >> enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
+> >> re-computed.
+> >>
+> >> Should we add some sort of specific annotation to the Kconfig symbol
+> >> to force a recalculation of the UART PHYS address?
+> >
+> > Russell has plans to change the Konfig logic in the future, removing the
+> > platform specific options. With the current code, you could probably
+> > do something along the lines of
+> >
+> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > index f72147f..aa20929 100644
+> > --- a/arch/arm/Kconfig.debug
+> > +++ b/arch/arm/Kconfig.debug
+> > @@ -1013,7 +1013,7 @@ config DEBUG_UART_8250
+> >                 ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
+> >
+> >  config DEBUG_UART_PHYS
+> > -       hex "Physical base address of debug UART"
+> > +       hex
+> >         default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
+> >         default 0x01c28000 if DEBUG_SUNXI_UART0
+> >         default 0x01c28400 if DEBUG_SUNXI_UART1
+> > @@ -1074,7 +1074,7 @@ config DEBUG_UART_PHYS
+> >                 DEBUG_UART_8250 || DEBUG_UART_PL01X
+> >
+> >  config DEBUG_UART_VIRT
+> > -       hex "Virtual base address of debug UART"
+> > +       hex
+> >         default 0xe0010fe0 if ARCH_RPC
+> >         default 0xf0000be0 if ARCH_EBSA110
+> >         default 0xf0009000 if DEBUG_CNS3XXX
+> >
+> > with some extra logic to still allow you to enter the values
+> > manually if not set by default, but that probably wouldn't work
+> > any more when the rework is done.
+> 
+> Your change works great, thanks! Should we make that the current
+> behavior until Russell revamps the Kconfig logic?
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-nspire/nspire.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+No, because it takes away the ability to change it manually.
 
-diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
-index 4b2ed2e..3d24ebf 100644
---- a/arch/arm/mach-nspire/nspire.c
-+++ b/arch/arm/mach-nspire/nspire.c
-@@ -63,7 +63,7 @@ static void __init nspire_init(void)
- 			nspire_auxdata, NULL);
- }
- 
--static void nspire_restart(char mode, const char *cmd)
-+static void nspire_restart(enum reboot_mode mode, const char *cmd)
- {
- 	void __iomem *base = ioremap(NSPIRE_MISC_PHYS_BASE, SZ_4K);
- 	if (!base)
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
