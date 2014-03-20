@@ -1,60 +1,129 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 20 Mar 2014 13:12:35 -0400
-Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
- NAND_NO_SUBPAGE_WRITE option
-In-Reply-To: <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <532B2183.2080309@ti.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 20 Mar 2014 17:18:07 +0000
+Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
+In-Reply-To: <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
+References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+ <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
+ <532AE216.3080106@arm.com>
+ <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
+Message-ID: <532B22CF.1030504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
-
-On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
-> From: Murali Karicheri <m-karicheri2@ti.com>
+On 20/03/14 17:02, Vincent Guittot wrote:
+> On 20 March 2014 13:41, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>> On 19/03/14 16:22, Vincent Guittot wrote:
+>>> We replace the old way to configure the scheduler topology with a new method
+>>> which enables a platform to declare additionnal level (if needed).
+>>>
+>>> We still have a default topology table definition that can be used by platform
+>>> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
+>>> be overwritten by an arch which either wants to add new level where a load balance
+>>> make sense like BOOK or powergating level or wants to change the flags
+>>> configuration of some levels.
+>>>
+>>> For each level, we need a function pointer that returns cpumask for each cpu,
+>>> a function pointer that returns the flags for the level and a name. Only flags
+>>> that describe topology, can be set by an architecture. The current topology
+>>> flags are:
+>>>  SD_SHARE_CPUPOWER
+>>>  SD_SHARE_PKG_RESOURCES
+>>>  SD_NUMA
+>>>  SD_ASYM_PACKING
+>>>
+>>> Then, each level must be a subset on the next one. The build sequence of the
+>>> sched_domain will take care of removing useless levels like those with 1 CPU
+>>> and those with the same CPU span and relevant information for load balancing
+>>> than its child.
+>>
+>> The paragraph above contains important information to set this up
+>> correctly, that's why it might be worth clarifying:
+>>
+>> - "next one" of sd means "child of sd" ?
 > 
-> After testing NAND flash with ubifs for k2hk-emv board were committed
-> that flash doesn't support subpage writing, so we can fix it by
-> adding a property to disable subpage write.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
-Can you please pick this up for 3.15 fixes ? Ofcourse assuming DT folks
-are ok with the patch.
+> It's the next one in the table so the parent in the sched_domain
 
-I can then take patch 1/3 and 3/3 in my 3.15 fixes queue.
+Right, it's this way around. DIE is parent of MC is parent of GMC. Maybe
+you could be more explicit about the parent of relation here?
 
->  Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
->  drivers/mtd/nand/davinci_nand.c                        | 3 +++
->  2 files changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-> index cfb18ab..50af930 100644
-> --- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
-> @@ -53,6 +53,8 @@ Recommended properties :
->  				identifier is saved in OOB area. If not present
->  				false.
->  
-> +- ti,davinci-nosubpage-write:	disable subpage write for the device
-> +
->  Deprecated properties:
->  
->  - ti,davinci-ecc-mode:		operation mode of the NAND ecc mode. ECC mode
-> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-> index 4615d79..3ba058d 100644
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -581,6 +581,9 @@ static struct davinci_nand_pdata
->  		    of_property_read_bool(pdev->dev.of_node,
->  			"ti,davinci-nand-use-bbt"))
->  			pdata->bbt_options = NAND_BBT_USE_FLASH;
-> +		if (of_property_read_bool(pdev->dev.of_node,
-> +			"ti,davinci-no-subpage-write"))
-> +			pdata->options |= NAND_NO_SUBPAGE_WRITE;
->  	}
->  
->  	return dev_get_platdata(&pdev->dev);
+>> - "subset" means really "subset" and not "proper subset" ?
+> 
+> yes, it's really "subset" and not "proper subset"
+> 
+> Vincent
+> 
+>>
+>> On TC2 w/ the following change in cpu_corepower_mask()
+>>
+>>  const struct cpumask *cpu_corepower_mask(int cpu)
+>>  {
+>> -       return &cpu_topology[cpu].thread_sibling;
+>> +       return cpu_topology[cpu].socket_id ?
+>> &cpu_topology[cpu].thread_sibling :
+>> +                       &cpu_topology[cpu].core_sibling;
+>>  }
+>>
+>> I get this e.g. for CPU0,2:
+>>
+>> CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
+>> CPU0: cpu_coregroup_mask=0-1
+>> CPU0: cpu_cpu_mask=0-4
+>>
+>> CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
+>> CPU2: cpu_coregroup_mask=2-4
+>> CPU2: cpu_cpu_mask=0-4
+>>
+>> I assume here that this is a correct set-up.
+
+So this is a correct setup?
+
+>>
+>> The domain degenerate part:
+>>
+>> "useless levels like those with 1 CPU" ... that's the case for GMC level
+>> for CPU2,3,4
+>>
+>> The GMC level is destroyed because of the following code snippet in
+>> sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
+>>
+>> so that's fine.
+>>
+>> In case of CPU0,1 since GMC and MC have the same span, the code in
+>> build_sched_groups() creates only one group for MC  and that's why
+>> pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
+>> the if condition 'if (~cflags & pflags)' is not hit and
+>> sd_parent_degenerate() finally returns 1 for MC.
+>>
+>> So the "those with the same CPU span and relevant information for load
+>> balancing than its child." is not so easy to understand for me. Because
+>> both levels have the same span we actually don't take the flags of the
+>> parent into consideration which require at least 2 groups.
+>>
+>> So the TC2 example covers for me two corner cases: (1) The level I want
+>> to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
+>> the parent level I want to get rid of (MC for CPU0,1) of is the same as
+>> the span of the level which should stay.
+>>
+>> Are these two corner cases the only one supported here? If yes this has
+>> to be stated somewhere, otherwise if somebody will try this approach on
+>> a different topology, (s)he might be surprised.
+
+Could you please comment on the paragraph above too?
+
+Thanks,
+
+-- Dietmar
+
+>>
+>> If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
+>> this works fine.
+>>
+>> I would like to test this on more platforms but I only have my TC2
+>> available :-)
+>>
+>> -- Dietmar
+>>
+>> [...]
+>>
 > 
