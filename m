@@ -1,27 +1,62 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 20 Mar 2014 05:44:45 -0700
-Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from
- function arguments
-In-Reply-To: <CAN8TOE9g2VwVgVx1Sj3OcguuwP_A9pJS+WpgTAL49KyN9r1CiA@mail.gmail.com>
-References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
- <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
- <1395314713.7776.17.camel@joe-AO722> <20140320114123.GE21349@lee--X1>
- <1395316090.7776.24.camel@joe-AO722>
- <20140320115412.GU31517@norris-Latitude-E6410>
- <20140320120307.GA9240@lee--X1> <1395317630.7776.29.camel@joe-AO722>
- <CAN8TOE9g2VwVgVx1Sj3OcguuwP_A9pJS+WpgTAL49KyN9r1CiA@mail.gmail.com>
-Message-ID: <1395319485.7776.32.camel@joe-AO722>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 20 Mar 2014 13:45:57 +0100
+Subject: [PATCH v3 1/3] clk: s2mps11: Add support for S2MPS14 clocks
+In-Reply-To: <20140319191117.30995.13715@quantum>
+References: <1395047958-17953-1-git-send-email-k.kozlowski@samsung.com>
+ <1395047958-17953-2-git-send-email-k.kozlowski@samsung.com>
+ <20140319001643.30995.46947@quantum> <1395215408.18730.2.camel@AMDC1943>
+ <20140319191117.30995.13715@quantum>
+Message-ID: <1395319557.22979.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-20 at 05:41 -0700, Brian Norris wrote:
-> I also don't think that a function parameter is the right place to
-> mark const like this. Function arguments are always pass-by-value, so
-> this 'const' tells users (callers) nothing useful. It only provides
-> useless constraints on what the function can do with its copy of the
-> parameter.
+On Wed, 2014-03-19 at 12:11 -0700, Mike Turquette wrote:
+> Quoting Krzysztof Kozlowski (2014-03-19 00:50:08)
+> > On Tue, 2014-03-18 at 17:16 -0700, Mike Turquette wrote:
+> > > Quoting Krzysztof Kozlowski (2014-03-17 02:19:16)
+> > > > This patch adds support for S2MPS14 PMIC clocks (BT and AP) to the
+> > > > s2mps11 clock driver.
+> > > > 
+> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > > Reviewed-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> > > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > > 
+> > > This does not apply cleanly to to clk tree trip, nor does it compile
+> > > after manually merging due to changes introducing
+> > > linux/mfd/samsung/s2mps14.h.
+> > > 
+> > > The changes look OK to me so maybe Lee can take it with my Ack?
+> > > 
+> > > Acked-by: Mike Turquette <mturquette@linaro.org>
+> > > 
+> > 
+> > Hi,
+> > 
+> > Thanks for the Ack. The patch depends on Tushar Behera's patches:
+> >  - [PATCH V2 0/2] Add support for clocks in S5M8767
+> >    http://thread.gmane.org/gmane.linux.kernel.samsung-soc/27264
+> > which are waiting for some time. Both patchsets should be pulled
+> > together.
+> 
+> I took those patches in yesterday. So we have three options:
 
-Again, that's not useless information.
+Great! Thanks.
 
-And as you've seen, just making these changes
-can be error prone.
+> 
+> 1) MFD tree can pull a stable commit from the clk tree. I'm happy to
+> make a topic branch for this. Then these patches can be applied.
+> 
+> 2) clk tree can pull a stable commit from the mfd tree if the mfd folks
+> can provide one.
+> 
+> 3) Wait until after the merge window to apply this one to the clk tree.
+> I don't currently plan to send 2 PRs during the merge window, so this
+> could either go in 3.16 or maybe into 3.15 if a split PR is sent.
+
+Dear Lee,
+
+How do you wish to proceed? The patchset depends on changes in sec-core
+MFD driver.
+
+Best regards,
+Krzysztof
