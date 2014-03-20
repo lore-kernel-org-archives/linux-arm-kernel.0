@@ -1,25 +1,36 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 20 Mar 2014 19:06:21 +0200
-Subject: [PATCH 0/3] Fix NAND propeties for k2hk-evm
-Message-ID: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+Date: Thu, 20 Mar 2014 19:06:22 +0200
+Subject: [PATCH 1/3] ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
+In-Reply-To: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1395335184-4745-2-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is intedent to fix problems founded when checked NAND flash
-for k2hk-emv board rev2.0. Whithout this series we cannot use ubifs and
-whole volume of present NAND memory.
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-Based on linux-next tag: next-20140320
+The UBIFS partition size was incorrectly defined as for 128M NAND,
+but on k2hk-evm installed NAND flash size is 512M.
+Hence, correct it.
 
-Murali Karicheri (3):
-  ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
-  mtd: davinci-nand: add dts property for NAND_NO_SUBPAGE_WRITE option
-  ARM: dts: k2hk-evm: disable subpage write for davinci nand device
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/boot/dts/k2hk-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
- arch/arm/boot/dts/k2hk-evm.dts                         | 3 ++-
- drivers/mtd/nand/davinci_nand.c                        | 3 +++
- 3 files changed, 7 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+index 1a1335b..949ef7d 100644
+--- a/arch/arm/boot/dts/k2hk-evm.dts
++++ b/arch/arm/boot/dts/k2hk-evm.dts
+@@ -133,7 +133,7 @@
+ 
+ 			partition at 180000 {
+ 				label = "ubifs";
+-				reg = <0x180000 0x7E80000>;
++				reg = <0x180000 0x1fe80000>;
+ 			};
+ 		};
+ 	};
 -- 
 1.8.3.2
