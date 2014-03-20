@@ -1,44 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Mar 2014 14:35:33 +0000
-Subject: [RFC] PSCI: Use DT Function ID values only for old versions of
- spec
-In-Reply-To: <CAJ5Y-eYBLS7pDhWoFov2djs9Ld_i9y0bW2nWzS+Q=9z4wFudOA@mail.gmail.com>
-References: <1394772816-8078-1-git-send-email-ashwin.chaugule@linaro.org>
- <20140314095246.GH25870@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eZMWr0rGZnEXo3N0+aLAMLaYqA3-GCDT6oNcqZtBMxNFQ@mail.gmail.com>
- <CAJ5Y-eYBLS7pDhWoFov2djs9Ld_i9y0bW2nWzS+Q=9z4wFudOA@mail.gmail.com>
-Message-ID: <20140320143533.GE23372@e106331-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 20 Mar 2014 07:34:47 -0700
+Subject: arm64: mainline with foundation model: hang in arm64_device_init
+In-Reply-To: <532AE066.5010809@arm.com> (Sudeep Holla's message of "Thu, 20
+ Mar 2014 12:34:46 +0000")
+References: <7h7g7pen2c.fsf@paris.lan> <532AE066.5010809@arm.com>
+Message-ID: <7hzjklc514.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 02:03:22AM +0000, Ashwin Chaugule wrote:
-> Hi Mark,
-> 
-> > On 14 March 2014 05:52, Mark Rutland <mark.rutland@arm.com> wrote:
-> >>
-> >> > +     psci_function_id[PSCI_FN_MIGRATE] = PSCI_ID_CPU_MIGRATE;
-> >> > +     psci_ops.migrate = psci_migrate;
-> >>
-> >> It would also be a good idea to hook up AFFINITY_INFO to a cpu_kill
-> >> callback from the start, to ensure implementors bother to implement it,
-> >> and such that we can make kexec safe(r).
-> >>
-> >> If we rely on it from the start it's more likely that it will actually
-> >> get implemented, and it will highlight any dodgy PSCI 0.2
-> >> implementations while there's a chance they can be fixed.
-> >>
-> >
-> 
-> Although I sent v1 of this patch, I haven't forgotten about this part.
-> Had a go at it, but it turned out quite messy for ARM32. I was trying
-> to get cpu_kill via smp_ops.
+Hi Sudeep,
 
-I'm not sure I follow. Do you have an example patch or tree that would
-highlight the difficulty?
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
-> I'll revisit this again hopefully tomorrow and see if there's anything better.
+> Hi Kevin,
+>
+> On 20/03/14 00:22, Kevin Hilman wrote:
+>> Hi Catalin,
+>>
+>> Should I expect vanilla mainline (v3.14-rc7) to work with the current
+>> aarch64 foundation model r0p0 (model build 0.8.5206)?  I'm also using
+>> the master branch of your boot-wrapper-aarch64 configured to point at
+>> the mainline tree.
+>>
+>> I've gotten as far as adding initcall_debug to the cmdline and noticing
+>> that arm64_device_init never returns, but have to call it a day so have
+>> to wait til tomorrow to debug further.  In the mean time wanted to check
+>> with you on whether it should work.
+>>
+>
+> This is not due to any kernel bug, but due to bootwrapper picking up
+> wrong device tree. I will work on fixing it in the
+> boot-wrapper-aarch64 repo.
+>
+> Meanwhile could change KERN_DTB in configure.ac to point to
+> foundation-v8.dtb and give it a try.
 
-Good to hear!
+Yup, that works.  Now the kernel is getting all the way to userspace.
+Thanks.
 
-Cheers,
-Mark.
+Kevin
