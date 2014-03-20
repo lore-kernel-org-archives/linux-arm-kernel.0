@@ -1,35 +1,49 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 20 Mar 2014 18:56:16 +0800
-Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <20140320110914.731db7cf@ipc1.ka-ro>
-References: <1395235406-13449-1-git-send-email-y>	<532AB1A2.9010702@freescale.com>	<20140320102153.7106f915@ipc1.ka-ro>	<532AB94D.1050406@freescale.com>
- <20140320110914.731db7cf@ipc1.ka-ro>
-Message-ID: <532AC950.6070108@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 11:59:35 +0100
+Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
+In-Reply-To: <CAL_JsqKaL4W_bjozC_hTmZ9439pqh8f8pHU25H5CNdf8hQZtOg@mail.gmail.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-62-git-send-email-arnd@arndb.de>
+ <CAL_JsqKaL4W_bjozC_hTmZ9439pqh8f8pHU25H5CNdf8hQZtOg@mail.gmail.com>
+Message-ID: <201403201159.35842.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?03?20? 18:09, Lothar Wa?mann ??:
-> This can be disabled by parameter in the FCB (at least according to
-> the i.MX6 reference Manual):
-from imx28's reference manual, there is not such bit in the FCB to 
-disable the
-swapping. But you are disabling the swapping in the imx28's DTS file, 
-isn't it?
+On Wednesday 19 March 2014, Rob Herring wrote:
 
-I think it is dangerous.
+> > --- a/arch/arm/mach-sunxi/headsmp.S
+> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > @@ -4,6 +4,7 @@
+> >          .section ".text.head", "ax"
+> >
+> >  ENTRY(sun6i_secondary_startup)
+> > -       msr     cpsr_fsxc, #0xd3
+> > +       mov     r0, #0xd3
+> > +       msr     cpsr_fsxc, r0
+> >         b       secondary_startup
+> 
+> Secondary cores should always enter the kernel in ARM mode like the
+> primary core, right? So we need the same switching to Thumb2 as
+> head.S, but even secondary_startup doesn't do any switching. So either
+> platforms jump into the kernel with a bx and happen to work or
+> secondary boot is broken for Thumb2 kernels.
 
+Makes sense. So should we instead do this?
 
+.arm
+ENTRY(sun6i_secondary_startup)
+	ARM_BE8(setend   be ) /* I suppose we need this too */
+	msr     cpsr_fsxc, #0xd3
+	ldr	r0, =secondary_startup
+	bx	r0
 
-> |DISBBM 172 4 If 0 ROM will swap BadBlockMarkerByte with
-> |             metadata[0] after reading a page using BCH40.
-> |             If the value set is 1 then ROM will not do
-> |             swapping
->
->
-I will consult with our ROM colleague about this DISBBM bit.
+(I'm a bit confused about when to use what branch instruction, so
+forgive me if the above doesn't make sense)
 
-I am not sure if the ROM still do the swapping for the uboot when we set 
-DISBBM bit.
+> Also, secondary_startup takes care of making sure the core is in SVC
+> mode, so this function shouldn't be needed in the first place.
 
-thanks
-Huang Shijie
+I'd rather not change this part, unless Maxime can confirm that it's
+not necessary. I would assume that it's there for a reason otherwise.
+
+	Arnd
