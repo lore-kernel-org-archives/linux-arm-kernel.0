@@ -1,41 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 09:28:49 +0100
-Subject: please revert: regulator: dbx500: use seq_puts() instead of
- seq_printf()
-In-Reply-To: <001001cf4415$902bdf30$b0839d90$%han@samsung.com>
-References: <6651295.YIkvtDO9zo@wuerfel>
- <001001cf4415$902bdf30$b0839d90$%han@samsung.com>
-Message-ID: <34465260.biJ0eJ2oKB@wuerfel>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 20 Mar 2014 09:33:39 +0100
+Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <1395235406-13449-1-git-send-email-y>
+References: <1395235406-13449-1-git-send-email-y>
+Message-ID: <201403200933.39382.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014 17:22:41 Jingoo Han wrote:
-> On Thursday, March 20, 2014 4:57 PM, Arnd Bergmann wrote:
-> > 
-> > This patch has shown up in linux-next yesterday, breaking a randconfig
-> > build:
-> 
-> (+cc Fengguang Wu)
-> 
-> Hi Arnd,
-> 
-> I really appreciate your report.
-> However, it was already reported by Fengguang Wu 2 days ago.
-> And, a modified patch was already merged to the current regulator
-> next tree. 
-> 
-> Thus, today's linux-next (20140320) cannot make the problem
-> anymore. As presented above, the modified patch was merged
-> to today's linux-next. [1]
-> 
-> I will be more careful next time. Sorry for annoying you.
-> Thank you.
-> 
-> [1] http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=80c48e72f831bbfea4bf58d8e78ff2b18c90ec17)
-> 
+Hi Lothar,
 
-Ok, very good. Thanks for the reply. I probably should have
-rebased on today's linux-next before looking for last night's
-build errors.
+On Wednesday 19 March 2014 14:23:26 y at karo-electronics.de wrote:
+> With a flash-based BBT there is no reason to move the Factory Bad
+> Block Marker from the data area buffer (to where it is mapped by the
+> GPMI NAND controller) to the OOB buffer. Thus, make this feature
+> configurable via DT. This is required for the Ka-Ro electronics
+> platforms.
+> [...]
 
-	Arnd
+How do you create the BBT the very first time with valuable data when the NAND 
+already contains factory bad blocks?
+
+jbe
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
