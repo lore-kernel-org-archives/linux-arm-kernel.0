@@ -1,66 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Mar 2014 14:36:03 +1100
-Subject: linux-next: manual merge of the tip tree with the arm-soc tree
-Message-ID: <20140320143603.a2f82d77be61c09a7852cfe9@canb.auug.org.au>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 19 Mar 2014 20:41:15 -0700
+Subject: [PATCH 1/5] ARM64: KVM: MMIO support BE host running LE code
+In-Reply-To: <1392184643-6108-2-git-send-email-victor.kamensky@linaro.org>
+References: <1392184643-6108-1-git-send-email-victor.kamensky@linaro.org>
+ <1392184643-6108-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140320034115.GQ1297@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Feb 11, 2014 at 09:57:19PM -0800, Victor Kamensky wrote:
+> In case of guest CPU running in LE mode and host runs in
+> BE mode we need byteswap data, so read/write is emulated correctly.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index dd8ecfc..fdc3e21 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -213,6 +213,17 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+>  		default:
+>  			return be64_to_cpu(data);
+>  		}
+> +	} else {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return le16_to_cpu(data & 0xffff);
+> +		case 4:
+> +			return le32_to_cpu(data & 0xffffffff);
+> +		default:
+> +			return le64_to_cpu(data);
+> +		}
+>  	}
+>  
+>  	return data;		/* Leave LE untouched */
+> @@ -233,6 +244,17 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>  		default:
+>  			return cpu_to_be64(data);
+>  		}
+> +	} else {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return cpu_to_le16(data & 0xffff);
+> +		case 4:
+> +			return cpu_to_le32(data & 0xffffffff);
+> +		default:
+> +			return cpu_to_le64(data);
+> +		}
+>  	}
+>  
+>  	return data;		/* Leave LE untouched */
+> -- 
+> 1.8.1.4
+> 
 
-Today's linux-next merge of the tip tree got a conflict in
-arch/arm/mach-imx/pm-imx6q.c between commit 9cdde7217e92 ("ARM: imx6:
-rename pm-imx6q.c to pm-imx6.c") from the arm-soc tree and commit
-8435cf757632 ("arm: Replace various irq_desc accesses") from the tip tree.
+Again, given the ABI merge:
 
-I fixed it up (by applying the tip tree patch to the renamed file -
-arch/arm/mach-imx/pm-imx6.c - see patch below) and can carry the fix as
-necessary (no action is required).
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Thu, 20 Mar 2014 14:33:26 +1100
-Subject: [PATCH] arm: Replace various irq_desc accesses fix for file move
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-imx/pm-imx6.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 16f0d249f6a7..9392a8f4ef24 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -241,7 +241,7 @@ static void imx6q_enable_wb(bool enable)
- 
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- {
--	struct irq_desc *iomuxc_irq_desc;
-+	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
- 	u32 val = readl_relaxed(ccm_base + CLPCR);
- 
- 	val &= ~BM_CLPCR_LPM;
-@@ -288,10 +288,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
- 	 *    is set (set bits 0-1 of CCM_CLPCR).
- 	 */
--	iomuxc_irq_desc = irq_to_desc(32);
--	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
-+	imx_gpc_irq_unmask(iomuxc_irq_data);
- 	writel_relaxed(val, ccm_base + CLPCR);
--	imx_gpc_irq_mask(&iomuxc_irq_desc->irq_data);
-+	imx_gpc_irq_mask(iomuxc_irq_data);
- 
- 	return 0;
- }
--- 
-1.9.0
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/111e4ace/attachment-0001.sig>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
