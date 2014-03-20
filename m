@@ -1,71 +1,158 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 07:39:41 +0900
-Subject: [PATCH 48/62] ARM: s3c64xx: select power domains only when used
-In-Reply-To: <532B3010.80101@samsung.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-49-git-send-email-arnd@arndb.de>
- <01f801cf43f0$62e7bc80$28b73580$@samsung.com> <532B3010.80101@samsung.com>
-Message-ID: <532B6E2D.7000207@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 22:50:48 +0000
+Subject: DMABOUNCE in pci-rcar
+In-Reply-To: <14479462.PmG77WeO2J@wuerfel>
+References: <201402241200.21944.arnd@arndb.de>
+ <201403201929.13633.arnd@arndb.de>
+ <20140320183932.GA7528@n2100.arm.linux.org.uk> <14479462.PmG77WeO2J@wuerfel>
+Message-ID: <20140320225048.GE7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/14 03:14, Kukjin Kim wrote:
-> On 03/20/14 12:56, Kukjin Kim wrote:
->> Arnd Bergmann wrote:
->>>
->>> The power domain code is only available when CONFIG_PM
->>> is enabled, so we must not select that unconditionally for
->>> s3c64xx. Changing it to 'select PM_GENERIC_DOMAINS if PM'
->>> mirrors what we do on other platforms, and fixes a possible
->>> randconfig build bug.
->>>
->>> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
->>> Cc: Tomasz Figa<tomasz.figa@gmail.com>
->>> Cc: Kukjin Kim<kgene.kim@samsung.com>
->>
->> Acked-by: Kukjin Kim<kgene.kim@samsung.com>
->>
->
-> Arnd,
->
-> Please drop this patch in your tree because there is a fix before this
-> and it fixes SAMSUNG_WAKEMASK dependency together for S3C64XX.
->
-> [PATCH v2 5/6] ARM: s3c64xx: Fix incorrect selection of PM-related
-> symbols <http://www.spinics.net/lists/arm-kernel/msg316391.html>
->
-> Note, I'll take above into 2nd fixes for v3.15 in samsung tree.
->
-> If any problems, please kindly let me know.
->
-Oops, Arnd sorry.
+On Thu, Mar 20, 2014 at 11:11:04PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 March 2014 18:39:32 Russell King - ARM Linux wrote:
+> > Yes, OHCI's PCI driver doesn't do that at the moment, but that's not
+> > to say that it won't in the future - at which point hacks like the
+> > above suddenly stop working.
+> 
+> If the OHCI-PCI driver is changed to call
+> dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))), what do you
+> think should happen? The way I read it, that call must fail on
+> this platform, causing the probe() function to bail out and not
+> use the hardware, which is clearly not what we want here.
 
-Please go ahead with my ack on this because the fix, "[PATCH v2 5/6] 
-ARM: s3c64xx: Fix incorrect selection of PM-related symbols" makes a 
-build error...I'll look at the problem.
+That depends how you interpret what's going on here.  It's saying
+"I may allocate and try and map memory which result in 32-bits
+of DMA address".  Under normal situations where there is a 1:1
+relationship and a simple mapping done by the DMA API, then yes,
+such memory would end up with 32-bits of DMA address.
 
-Thanks,
-Kukjin
+Now, if the DMA implementation has a way to cope with providing a
+restricted DMA address to the device due to bus limitations which
+the DMA implementation knows about, then the answer to "can you
+cope with memory which would normally result in 32-bits of DMA
+address" is yes, even if you can only handle 30 bits.
 
+The reason being is that you're agreeing to the driver using
+memory which would be 32-bits, but internally you're guaranteeing
+not to violate the bus limitation of 30 bits.
 
->>
->>> Cc: Ben Dooks<ben-linux@fluff.org>
->>> ---
->>> arch/arm/Kconfig | 2 +-
->>> 1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index 4721007..6ffcadd 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -764,7 +764,7 @@ config ARCH_S3C64XX
->>> select HAVE_TCM
->>> select NO_IOPORT
->>> select PLAT_SAMSUNG
->>> - select PM_GENERIC_DOMAINS
->>> + select PM_GENERIC_DOMAINS if PM
->>> select S3C_DEV_NAND
->>> select S3C_GPIO_TRACK
->>> select SAMSUNG_ATAGS
->>> --
->>> 1.8.3.2
+Things get harder with the coherent API, and that's where IXP4xx
+has to intercept the call and limit the coherent mask, so the
+coherent allocator knows to restrict the memory returned - there's
+no way that such memory could be fixed up after the fact.
+
+> IXP uses defines a ixp4xx_pci_platform_notify() function that basically
+> does the same thing that Ben tried adding here, and then it has a
+> dma_set_coherent_mask function that checks whether the mask that the
+> device tries to set is even smaller than that, in which case it returns
+> a failure, but it returns success if the device tries to set a larger
+> mask.
+
+Yes, IXP has a two-pronged approach because of problem drivers like
+OHCI which don't call the DMA mask setting functions.  If everyone
+did, then the hooks in the mask setting functions would be all that
+it needs, since it could apply its restriction there rather than via
+notifiers.
+
+So, what IXP does is it overrides dma_set_coherent_mask() to be a
+function which just validates the mask, and doesn't actually allow
+the mask to be changed.  This coupled with the notifier sets the
+coherent mask to 64M, and ensures that it isn't changed (except by
+buggy drivers which access it directly.)
+
+An alternative approach for that would be to accept 64M or larger
+masks in dma_set_coherent_mask() but always set the actual coherent
+DMA mask to no larger than 64M - but that's only possible where all
+drivers properly call dma_set_coherent_mask().
+
+The streaming DMA mask has become more convoluted - it's now set
+such that any device which has dmabounce attached to it will ignore
+attempts to change the streaming DMA mask value - just like the
+above.
+
+> In no case does it try to actually set the mask. While this seems
+> like a practical approach, I don't see how that actually matches up
+> with the documentation, e.g. "dma_set_coherent_mask will always be able
+> to set the same or a smaller mask as the streaming mask." and
+> "When dma_set_mask() or dma_set_mask_and_coherent() is successful, and
+> returns zero, the kernel saves away this mask you have provided."
+
+IXP4xx used to conform - 6fee48cd330c:
+
+-int
+-pci_set_dma_mask(struct pci_dev *dev, u64 mask)
+-{
+-       if (mask >= SZ_64M - 1 )
+-               return 0;
+-
+-       return -EIO;
+-}
+-    
+-int
+-pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
+-{
+-       if (mask >= SZ_64M - 1 )
+-               return 0;
+-
+-       return -EIO;
+-}
+
+Here, both functions have the same behaviour.  The bit about "smaller
+mask" is slightly bogus - you can never set a mask that is smaller
+than the system's DMA memory pool, because the system never has a way
+to guarantee you memory below GFP_DMA allocations.  In this case on
+IXP4xx, that is 64MB of memory, so thse functions reject on 64MB or
+smaller allocations.
+
+However, because of the bouncing that is implemented, it can accept
+drivers asking for larger DMA masks, and because it limits the
+coherent memory allocations to 64MB internally within the DMA API,
+larger coherent masks are permissible.
+
+So.. there's no problem here.  What is a problem is:
+
+static int dmabounce_set_mask(struct device *dev, u64 dma_mask)
+{
+        if (dev->archdata.dmabounce)
+                return 0;
+
+        return arm_dma_ops.set_dma_mask(dev, dma_mask);
+}
+
+which says "I'll accept anything if I'm a DMA bounce-hindered device"
+which isn't actually correct, since we should still be rejecting
+masks smaller than the system can allocate for.
+
+That's checked for by dma_supported() which should really be in 
+the above.
+
+The remaining gotcha for multiplatform is the coherent mask, which
+doesn't have a way for it to be intercepted by the platform.  That
+means any /good/ driver which calls dma_set_coherent_mask() results
+in resetting the coherent mask to the driver specified mask.
+
+> The majority of the platforms we support today are fine with
+> always assuming that all of memory can be reached at the physical
+> address,
+
+That's only because they're now all fine with 32-bit addresses.
+
+> and the exceptions are either the legacy non-multiplatform
+> ones, or very new platforms with LPAE that can only be probed using
+> devicetree.
+
+Remember with LPAE and its strange memory setups, physical address !=
+DMA address, and that's going to be something that everyone is going
+to /have/ to learn to get used to.  No longer will it be possible to
+assume that the two are the same, or you can just crop the bits above
+32-bit off to make it fit in a 32-bit controller - consider 8G of
+memory on LPAE with a 32-bit DMA controller.
+
+That's where dealing with the DMA mask correctly (representing the number
+of bits the /device/ can accept rather than the number of physical address
+bits) matters, and thankfully that should now be solved.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
