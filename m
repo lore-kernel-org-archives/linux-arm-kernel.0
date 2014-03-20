@@ -1,38 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 20 Mar 2014 20:19:27 +0100
-Subject: [PATCH v2 0/3] ata: ahci_platform related cleanups
-In-Reply-To: <1395340026-3969-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1395340026-3969-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <532B3F3F.1050508@redhat.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Thu, 20 Mar 2014 12:22:03 -0700
+Subject: ARM memset fixes for 3.8.y.x extended
+In-Reply-To: <CAGVrzcbR=o9Maj9YxFs2=-K0E21AWn9dDpSgHMFiGU-GjhLaWg@mail.gmail.com>
+References: <CAGVrzcbR=o9Maj9YxFs2=-K0E21AWn9dDpSgHMFiGU-GjhLaWg@mail.gmail.com>
+Message-ID: <1395343323.2770.79.camel@fourier>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/20/2014 07:27 PM, Bartlomiej Zolnierkiewicz wrote:
-> [ v1 was named "ata: add remaining new-style AHCI platform drivers"
->   but we are down from 2 drivers to 1 driver so the title of the patch
->   series no longer was valid :) ]
+On Thu, 2014-03-20 at 09:39 -0700, Florian Fainelli wrote:
+> Hi Kamal,
 > 
-> Hi,
+> Could you schedule the following two patches for the upcoming
+> 3.8.13.20 stable release:
 > 
-> This patch series:
-> - fixes ahci_platform_data->suspend() handling
-> - moves library AHCI platform code to its own file
-> - adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
+> 418df63adac5 ARM: 7670/1: fix the memset fix
+> 455bd4c430b0 ARM: 7668/1: fix memset-related crashes caused by recent
+> GCC (4.7.2) optimizations
+
+
+Sure.  These are now queued-up for 3.8.13.20.  Thanks Florian!
+
+ -Kamal
+
+
+> These two patches apply cleanly to linux-3.8.y-queue on top of
+> 259e6d8c076a ("ACPI / video: Filter the _BCL table for duplicate
+> brightness values").
 > 
-> Changes since v1:
-> - dropped no longer needed patch #4 (ST SPEAr1340 AHCI controller driver)
-> - adressed review comments for patch #3 from Sekhar Nori
-> - updated patch descriptions
+> Thanks!
 
-I assume that the spear patch has been dropped since the spear code has
-already been converted now and thus is no longer using ahci_platform_data ?
-
-In that case I think it would best to replace patch 1 with a patch just dropping
-the suspend and resume callbacks from ahci_platform_data, as they then no
-longer have any users.
-
-Regards,
-
-Hans
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/d523a81b/attachment.sig>
