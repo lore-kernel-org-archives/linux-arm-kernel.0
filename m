@@ -1,63 +1,101 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 20 Mar 2014 19:07:59 -0400
-Subject: [GIT PULL] Keystone DTS fixes for 3.15
-Message-ID: <1395356879-3009-1-git-send-email-santosh.shilimkar@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 00:33:33 +0100
+Subject: [PATCH 1/2] ARM: berlin: add scu and chipctrl device nodes for
+ BG2/BG2Q
+In-Reply-To: <1395347986-30203-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1395347986-30203-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1395347986-30203-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140320233333.GY12021@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arm-soc folks,
+On 20/03/2014 at 21:39:45 +0100, Sebastian Hesselbarth wrote :
+> This adds scu and general purpose registers device nodes required for
+> SMP on Berlin BG2 and BG2Q SoCs. The secondary CPUs will pick their jump
+> address from general purpose (SW generic) register 1.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Please pull below keystone DTS fixes for 3.15. It merges ok with 'next/dt'
-heads with a trivial makefile conflict. For the dependencies it is based
-on top of the previous Keystone 3.15 pull request [1]
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-The following changes since commit 3babe30608dcfec811d64268bd9dc30b7c638e69:
-
-  ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-fixes
-
-for you to fetch changes up to 3babe30608dcfec811d64268bd9dc30b7c638e69:
-
-  ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
-
-----------------------------------------------------------------
-Keystone DTS fixes for 3.15
-
-- Few fixes found during NAND ubifs testing
-- Fix to build all dtbs together with dtbs
-- Last patch is follow up comment from previous pull request
-
-----------------------------------------------------------------
-
-Ivan Khoronzhuk (3):
-  ARM: dts: keystone: Fix domain register range for clkfftc1
-  ARM: dts: keystone: Fix control register range for clktsip
-  ARM: dts: keystone: use common "ti,keystone" compatible instead of
-    -evm
-
-Murali Karicheri (1):
-  ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
-
-Santosh Shilimkar (1):
-  ARM: dts: Build all keystone dt blobs
-
- .../devicetree/bindings/arm/keystone/keystone.txt  |    6 +++---
- arch/arm/boot/dts/Makefile                         |    3 +++
- arch/arm/boot/dts/k2e-evm.dts                      |    2 +-
- arch/arm/boot/dts/k2hk-clocks.dtsi                 |    4 ++--
- arch/arm/boot/dts/k2hk-evm.dts                     |    4 ++--
- arch/arm/boot/dts/k2l-evm.dts                      |    2 +-
- arch/arm/mach-keystone/keystone.c                  |    5 +----
- 7 files changed, 13 insertions(+), 13 deletions(-)
-
-Regards,
-Santosh
-
-[1] http://www.spinics.net/lists/arm-kernel/msg313078.html
-
+> ---
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/berlin2.dtsi  | 10 ++++++++++
+>  arch/arm/boot/dts/berlin2q.dtsi | 10 ++++++++++
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+> index 56a1af2f1052..4d85312dc17a 100644
+> --- a/arch/arm/boot/dts/berlin2.dtsi
+> +++ b/arch/arm/boot/dts/berlin2.dtsi
+> @@ -72,6 +72,11 @@
+>  			cache-level = <2>;
+>  		};
+>  
+> +		scu: snoop-control-unit at ad0000 {
+> +			compatible = "arm,cortex-a9-scu";
+> +			reg = <0xad0000 0x58>;
+> +		};
+> +
+>  		gic: interrupt-controller at ad1000 {
+>  			compatible = "arm,cortex-a9-gic";
+>  			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
+> @@ -176,6 +181,11 @@
+>  			};
+>  		};
+>  
+> +		generic-regs at ea0184 {
+> +			compatible = "marvell,berlin-generic-regs", "syscon";
+> +			reg = <0xea0184 0x10>;
+> +		};
+> +
+>  		apb at fc0000 {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 07452a7483fa..86d8a2c49f38 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -87,6 +87,11 @@
+>  			cache-level = <2>;
+>  		};
+>  
+> +		scu: snoop-control-unit at ad0000 {
+> +			compatible = "arm,cortex-a9-scu";
+> +			reg = <0xad0000 0x58>;
+> +		};
+> +
+>  		local-timer at ad0600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0xad0600 0x20>;
+> @@ -183,6 +188,11 @@
+>  			};
+>  		};
+>  
+> +		generic-regs at ea0110 {
+> +			compatible = "marvell,berlin-generic-regs", "syscon";
+> +			reg = <0xea0110 0x10>;
+> +		};
+> +
+>  		apb at fc0000 {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
+> -- 
+> 1.9.0
+> 
 
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
