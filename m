@@ -1,101 +1,55 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 20 Mar 2014 12:41:58 +0000
-Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
-In-Reply-To: <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
-References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
- <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <532AE216.3080106@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 20 Mar 2014 13:42:33 +0100
+Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents and
+ rates
+In-Reply-To: <53187C13.3040202@st.com>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <53187C13.3040202@st.com>
+Message-ID: <532AE239.9000800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/14 16:22, Vincent Guittot wrote:
-> We replace the old way to configure the scheduler topology with a new method
-> which enables a platform to declare additionnal level (if needed).
+Hi Maxime,
+
+On 06/03/14 14:45, Maxime Coquelin wrote:
+> Hi Sylwester,
 > 
-> We still have a default topology table definition that can be used by platform
-> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
-> be overwritten by an arch which either wants to add new level where a load balance
-> make sense like BOOK or powergating level or wants to change the flags
-> configuration of some levels.
-> 
-> For each level, we need a function pointer that returns cpumask for each cpu,
-> a function pointer that returns the flags for the level and a name. Only flags
-> that describe topology, can be set by an architecture. The current topology
-> flags are:
->  SD_SHARE_CPUPOWER
->  SD_SHARE_PKG_RESOURCES
->  SD_NUMA
->  SD_ASYM_PACKING
-> 
-> Then, each level must be a subset on the next one. The build sequence of the
-> sched_domain will take care of removing useless levels like those with 1 CPU
-> and those with the same CPU span and relevant information for load balancing
-> than its child.
+> 	I like the principle of your implementation, but I have two questions:
+> 	1 - How can we manage PM with this solution, as the parent/rate will be 
+> set only once at probe time?
+> 	2 - How to set the parent of a parent clock (which can be shared with 
+> other devices)? Same question about the parent rates.
 
-The paragraph above contains important information to set this up
-correctly, that's why it might be worth clarifying:
+Thanks for your feedback and apologies for late reply.
 
-- "next one" of sd means "child of sd" ?
-- "subset" means really "subset" and not "proper subset" ?
+IIUC your first concern is about a situation when clocks need to be
+reconfigured upon each resume from system sleep or runtime PM resume ?
+As I mentioned in v1 of the RFC I was considering having individual
+drivers calling explicitly the clocks set up routine. Presumably this
+would allow to resolve the power management related issue.
+One example I'm aware the approach as in this RFC wouldn't work is
+when a device in a SoC belongs to a power domain, which needs to be
+first switched on before we can start setting up and the clocks'
+configuration get lost after the power domain switch off.
 
-On TC2 w/ the following change in cpu_corepower_mask()
+OTOH I suspect devices for which one-time clocks setup is sufficient
+will be quite common. And for these there would need to be a single
+call to the setup routine in probe() I guess, since it wouldn't be
+possible to figure out just from the DT data when the actual call
+should be made.
 
- const struct cpumask *cpu_corepower_mask(int cpu)
- {
--       return &cpu_topology[cpu].thread_sibling;
-+       return cpu_topology[cpu].socket_id ?
-&cpu_topology[cpu].thread_sibling :
-+                       &cpu_topology[cpu].core_sibling;
- }
+For a global clocks configuration, I thought about specifying that
+in the clocks controller node, and then to have the setup routine
+called e.g. from of_clk_init(). I think that could work well enough,
+together with the patch [1], adding clock dependencies handling.
+But then the clock frequency set up function would need to be
+modified to respect the clock parent relationships, similarly as
+in patch series [2]. A just noticed [2] recently, after posting
+this RFC (adding Tero at Cc).
 
-I get this e.g. for CPU0,2:
+--
+Regards,
+Sylwester
 
-CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
-CPU0: cpu_coregroup_mask=0-1
-CPU0: cpu_cpu_mask=0-4
-
-CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
-CPU2: cpu_coregroup_mask=2-4
-CPU2: cpu_cpu_mask=0-4
-
-I assume here that this is a correct set-up.
-
-The domain degenerate part:
-
-"useless levels like those with 1 CPU" ... that's the case for GMC level
-for CPU2,3,4
-
-The GMC level is destroyed because of the following code snippet in
-sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
-
-so that's fine.
-
-In case of CPU0,1 since GMC and MC have the same span, the code in
-build_sched_groups() creates only one group for MC  and that's why
-pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
-the if condition 'if (~cflags & pflags)' is not hit and
-sd_parent_degenerate() finally returns 1 for MC.
-
-So the "those with the same CPU span and relevant information for load
-balancing than its child." is not so easy to understand for me. Because
-both levels have the same span we actually don't take the flags of the
-parent into consideration which require at least 2 groups.
-
-So the TC2 example covers for me two corner cases: (1) The level I want
-to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
-the parent level I want to get rid of (MC for CPU0,1) of is the same as
-the span of the level which should stay.
-
-Are these two corner cases the only one supported here? If yes this has
-to be stated somewhere, otherwise if somebody will try this approach on
-a different topology, (s)he might be surprised.
-
-If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
-this works fine.
-
-I would like to test this on more platforms but I only have my TC2
-available :-)
-
--- Dietmar
-
-[...]
+[1] http://www.spinics.net/lists/arm-kernel/msg310507.html
+[2] http://www.spinics.net/lists/linux-omap/msg103069.html
