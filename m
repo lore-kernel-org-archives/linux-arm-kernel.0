@@ -1,52 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 17:41:49 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <532B137B.7010900@codethink.co.uk>
-References: <201402241200.21944.arnd@arndb.de> <5527822.QYtFYiIpiW@wuerfel>
- <532B137B.7010900@codethink.co.uk>
-Message-ID: <4884083.IuNl44Y6XD@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Mar 2014 16:47:15 +0000
+Subject: [PATCH v2] KVM: ARM: vgic: plug irq injection race
+Message-ID: <1395334035-15454-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014 17:12:43 Ben Dooks wrote:
-> On 20/03/14 17:09, Arnd Bergmann wrote:
-> > On Thursday 20 March 2014 16:04:36 Ben Dooks wrote:
+As it stands, nothing prevents userspace from injecting an interrupt
+before the guest's GIC is actually initialized.
 
-> >> As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
-> >> controllers no longer work with full 2GiB RAM enabled in the device
-> >> tree.
-> >
-> > Did it work before these patches got applied initially?
-> 
-> It did, but I cannot remember if we where limiting DRAM to 1GiB
-> or not.
+This goes unnoticed so far (as everything is pretty much statically
+allocated), but ends up exploding in a spectacular way once we switch
+to a more dynamic allocation (the GIC data structure isn't there yet).
 
-I would assume you did, or you happened to never actually use
-memory higher than that for DMA during tests.
+The fix is to test for the "ready" flag in the VGIC distributor before
+trying to inject the interrupt. Note that in order to avoid breaking
+userspace, we have to ignore what is essentially an error.
 
-> >> Could we work around this by having 1GiB of memory defined in the
-> >> 32bit memory and then add the rest of the 3GiB from the >32bit
-> >> area via LPAE? Will the kernel ever try to allocate DMA memory from
-> >> anything >32bit?
-> >
-> > You can solve the case for dma_alloc_coherent() this way, or by
-> > setting the mask correctly. It won't help you for dma_map_* though,
-> > which still requires someone to add support for swiotlb or using
-> > an IOMMU if present.
-> 
-> We do not have an IOMMU present at the moment. Not sure how
-> to go about setting a mask on a pci-probed device.
+Also, move the setting of the flag out of the critical section,
+which will ensure the visibility of the initialized data-structure
+before the flag is actually set.
 
-Ah, right. The mask is a problem because PCI devices assume that
-they can do DMA to any 32-bit masked address without calling
-dma_set_mask. Your trick to describe the system memory at a different
-physical alias would solve this part. Another option might be to
-add a quirk in the OHCI/EHCI drivers, if you are able to detect
-this special case from the PCI IDs. Whether we can allow the PCI host
-controller to just set a mask is an open question. If we decide to go
-that route, you should be able to do it using the add_bus() callback
-in the host controller driver. However, it would be a departure from
-the normal way of doing PCI DMA, and I can't foresee what the implications
-would be.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index f29761b..4850e87 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1431,7 +1431,8 @@ out:
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level)
+ {
+-	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
++	if (likely(vgic_initialized(kvm)) &&
++	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
+ 		vgic_kick_vcpus(kvm);
+ 
+ 	return 0;
+@@ -1581,9 +1582,10 @@ int kvm_vgic_init(struct kvm *kvm)
+ 	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
+ 		vgic_set_target_reg(kvm, 0, i);
+ 
+-	kvm->arch.vgic.ready = true;
+ out:
+ 	mutex_unlock(&kvm->lock);
++	if (!ret)
++		kvm->arch.vgic.ready = true;
+ 	return ret;
+ }
+ 
+-- 
+1.8.3.4
