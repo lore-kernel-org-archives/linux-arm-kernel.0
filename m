@@ -1,119 +1,139 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 20 Mar 2014 11:39:30 -0400
-Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
- versions of spec
-In-Reply-To: <20140320145742.GF23372@e106331-lin.cambridge.arm.com>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
- <20140320145742.GF23372@e106331-lin.cambridge.arm.com>
-Message-ID: <CAJ5Y-eYwMKXWiuAx_Kbv8XJ2Ym_jbStuNaNjtWe1RP8Xz+j-Rg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Mar 2014 15:48:27 +0000
+Subject: [PATCH 1/1] regulator: Add new driver for ST's PWM controlled
+ voltage regulators
+In-Reply-To: <20140320152837.GW18529@joshc.qualcomm.com>
+References: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
+ <20140320152837.GW18529@joshc.qualcomm.com>
+Message-ID: <20140320154827.GE8207@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+> > On some STMicroelectronics hardware reside regulators consisting
+> > partly of a PWM input connected to the feedback loop. As the PWM
+> > duty-cycle is varied the output voltage adapts. This driver
+> > allows us to vary the output voltage by adapting the PWM input
+> > duty-cycle.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > --- /dev/null
+> > +++ b/drivers/regulator/st-pwm.c
+> > +static int st_pwm_regulator_set_voltage(struct regulator_dev *dev,
+> > +					int min_uV, int max_uV,
+> > +					unsigned *selector)
+> > +{
+> > +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+> > +	int dutycycle, best_val = INT_MAX;
+> > +	int sel, ret;
+> > +
+> > +	for (sel = 0; sel < dev->desc->n_voltages; sel++) {
+> > +		if (drvdata->duty_cycle_table[sel].uV < best_val &&
+> > +		    drvdata->duty_cycle_table[sel].uV >= min_uV &&
+> > +		    drvdata->duty_cycle_table[sel].uV <= max_uV) {
+> > +			best_val = drvdata->duty_cycle_table[sel].uV;
+> > +			if (selector)
+> > +				*selector = sel;
+> > +		}
+> > +	}
+> 
+> If you implement .set_voltage_sel() instead and set map_voltage to
+> regulator_map_voltage_iterate, the core can take care of this.
 
-On 20 March 2014 10:57, Mark Rutland <mark.rutland@arm.com> wrote:
+I'll do that, thanks.
 
->>
->> +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
->
-> Please drop the superfluous apostrophes, we aren't greengrocers [1].
->
-> %s/ID's/IDs/
+> > +
+> > +	if (best_val == INT_MAX)
+> > +		return -EINVAL;
+> > +
+> > +	dutycycle = (ST_PWM_REG_PERIOD / 100) *
+> > +		drvdata->duty_cycle_table[sel].dutycycle;
+> 
+> Considering (ST_PWM_REG_PERIOD / 100) is constant, could you get away
+> with dropping this calculation by just putting the already-adjusted
+> values into your duty cycle table?
 
-Ok. Will fix all the uncouth bacilli. ;)
+I thought about this, but I settled on this way for clarity. Also,
+this is only a constant if no one decides to change the period, so the
+calculation needs to be done somewhere. Did you have something better
+in mind?
 
->> +     fn = PSCI_ID_VERSION;
->> +     err = invoke_psci_fn(fn, 0, 0, 0);
->
-> Do we need fn here? Can't we pass PSCI_ID_VERSION directly?
->
+[...] 
 
-yep.
+> > +static struct st_pwm_voltages b2105_duty_cycle_table[] = {
+> > +	{ .uV = 1114000, .dutycycle = 0,  },
+> > +	{ .uV = 1095000, .dutycycle = 10, },
+> > +	{ .uV = 1076000, .dutycycle = 20, },
+> > +	{ .uV = 1056000, .dutycycle = 30, },
+> > +	{ .uV = 1036000, .dutycycle = 40, },
+> > +	{ .uV =  996000, .dutycycle = 50, },
+> > +	/* WARNING: Values above 50% duty-cycle cause boot failures. */
+> > +};
+> > +
+> > +static struct regulator_desc b2105_desc = {
+> > +	.name		= "b2105-pwm-regulator",
+> > +	.ops		= &st_pwm_regulator_voltage_ops,
+> > +	.type		= REGULATOR_VOLTAGE,
+> > +	.owner		= THIS_MODULE,
+> > +	.n_voltages	= ARRAY_SIZE(b2105_duty_cycle_table),
+> > +	.supply_name    = "pwm",
+> > +};
+> > +
+> > +static struct st_pwm_regulator_data b2105_info = {
+> > +	.desc		  = &b2105_desc,
+> > +	.duty_cycle_table = b2105_duty_cycle_table,
+> > +};
+> > +
+> > +static struct of_device_id st_pwm_of_match[] = {
+> 
+> const.  At least the regulator_desc and duty cycle table should be const
+> as well. (see my comments below about b2105_info).
+> 
+> > +	{ .compatible = "st,b2105-pwm-regulator", .data = &b2105_info, },
+> > +	{ },
+> > +};
+> 
+> You may want a MODULE_DEVICE_TABLE(of, ...); here if you want to be able
+> to be autoloaded.
 
+Right, good catch.
 
->> -void __init psci_init(void)
->> +     pr_info("Using static PSCIv0.2+ function IDs\n");
->
-> How about "Using standard PSCI 0.2 function IDs"?
->
-> We're not using anything beyond PSCI 0.2 (yet), and "static" implies
-> that there are dynamic IDs also.
+> > +static int st_pwm_regulator_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	struct st_pwm_regulator_data *drvdata;
+> > +	const struct of_device_id *of_match;
+> > +	struct regulator_dev *regulator;
+> > +	struct regulator_config config = { };
+> > +
+> > +	if (!np) {
+> > +		dev_err(&pdev->dev, "Device Tree node missing\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	of_match = of_match_device(st_pwm_of_match, &pdev->dev);
+> > +	if (!of_match) {
+> > +		dev_err(&pdev->dev, "failed to match of device\n");
+> > +		return -ENODEV;
+> > +	}
+> > +	drvdata =  (struct st_pwm_regulator_data *) of_match->data;
+> 
+> Hrm, I typed "cast not necessary here", but then I realized it is
+> necessary since you using it to cast away constness.
 
-Ok.
+This is remnant from when I was doing something unessersariy
+complcated in a previous (unpublished/personal) revision. I'll take a
+look at this too, thanks.
 
->
->> +     psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_ID_CPU_SUSPEND;
->> +     psci_ops.cpu_suspend = psci_cpu_suspend;
->> +
->> +     psci_function_id[PSCI_FN_CPU_OFF] = PSCI_ID_CPU_OFF;
->> +     psci_ops.cpu_off = psci_cpu_off;
->> +
->> +     psci_function_id[PSCI_FN_CPU_ON] = PSCI_ID_CPU_ON;
->> +     psci_ops.cpu_on = psci_cpu_on;
->> +
->> +     psci_function_id[PSCI_FN_MIGRATE] = PSCI_ID_CPU_MIGRATE;
->> +     psci_ops.migrate = psci_migrate;
->> +
->> +out_put_node:
->> +     of_node_put(np);
->> +     return err;
->> +}
->
-> I'd very much like to see us use AFFINITY_INFO from the start, or we've
-> got a racy down path (as we have for all PSCI implementations prior to
-> 0.2), and implementors are likely to skip implementing it if Linux seems
-> to work, so we'll never be able to rely on it.
->
-> Additionally it'd be nice to check what MIGRATE_INFO_TYPE returns. If it
-> returns a value other than 2 (MP or not present), then there's some
-> additional work that we need to perform around a down path or we might
-> not be able to shut down some CPUs.
+> Are you safe assuming that there will only be one of these devices in a
+> system?  It doesn't seem like much a burden to just allocate a new
+> object and use it instead of a statically allocated one.
 
-The main intention of this patch is to separate function ID detection
-depending on PSCI versions.
-So, I think the additional functionality of AFFINITY_INFO and
-MIGRATE_INFO_TYPE should go in as separate patches. Do you agree?
+I have written this driver to be expandable. We have new systems
+coming out which contain more than one of these regulators. Unless I'm
+missing your meaning?
 
->
->> +
->> +/*
->> + * PSCI < v0.2 can override PSCI function ID's via DT.
->> + */
->> +static int psci_of_init(struct device_node *np)
->>  {
->> -     struct device_node *np;
->>       const char *method;
->>       u32 id;
->> -
->> -     np = of_find_matching_node(NULL, psci_of_match);
->> -     if (!np)
->> -             return;
->> +     int err = 0;
->>
->>       pr_info("probing function IDs from device-tree\n");
->>
->>       if (of_property_read_string(np, "method", &method)) {
->> -             pr_warning("missing \"method\" property\n");
->> +             pr_warn("missing \"method\" property\n");
->> +             err = -EINVAL;
->>               goto out_put_node;
->>       }
->>
->> @@ -180,7 +235,8 @@ void __init psci_init(void)
->>       } else if (!strcmp("smc", method)) {
->>               invoke_psci_fn = __invoke_psci_fn_smc;
->>       } else {
->> -             pr_warning("invalid \"method\" property: %s\n", method);
->> +             pr_warn("invalid \"method\" property: %s\n", method);
->> +             err = -ENXIO;
->>               goto out_put_node;
->>       }
->
-> We should definitely factor this into a helper rather than duplicating
-> it.
->
-
-Ok I'll look into this.
-
-Cheers,
-Ashwin
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
