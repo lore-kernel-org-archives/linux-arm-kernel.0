@@ -1,66 +1,54 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 20 Mar 2014 14:25:09 +0530
-Subject: [PATCH RESEND] ARM: SPEAr1340: static-ize SATA functions
-In-Reply-To: <CAOh2x=nr1mrkcFk8nQFwNXxCqMPiN1Hq4=f1wwN=i65StawJ1Q@mail.gmail.com>
-References: <1678906.b5uh0Nm7QE@amdc1032>
- <CAOh2x=nr1mrkcFk8nQFwNXxCqMPiN1Hq4=f1wwN=i65StawJ1Q@mail.gmail.com>
-Message-ID: <20140320085509.GB4607@pratyush-vbox>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Mar 2014 09:56:50 +0100
+Subject: [PATCH 04/62] ARM: at91: fix broken "if () else" statement
+In-Reply-To: <1395257399-359545-5-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-5-git-send-email-arnd@arndb.de>
+Message-ID: <532AAD52.9050400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 07:00:08PM +0800, Viresh Kumar wrote:
-> On Tue, Mar 18, 2014 at 4:28 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > Make sata_miphy_exit(), sata_suspend() and sata_resume() static.
-> >
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > Previous submission:
-> > https://lkml.org/lkml/2013/10/4/369
-> >
-> >  arch/arm/mach-spear/spear1340.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-> > index 3fb6834..e0e4251 100644
-> > --- a/arch/arm/mach-spear/spear1340.c
-> > +++ b/arch/arm/mach-spear/spear1340.c
-> > @@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
-> >         return 0;
-> >  }
-> >
-> > -void sata_miphy_exit(struct device *dev)
-> > +static void sata_miphy_exit(struct device *dev)
-> >  {
-> >         writel(0, SPEAR1340_PCIE_SATA_CFG);
-> >         writel(0, SPEAR1340_PCIE_MIPHY_CFG);
-> > @@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
-> >         msleep(20);
-> >  }
-> >
-> > -int sata_suspend(struct device *dev)
-> > +static int sata_suspend(struct device *dev)
-> >  {
-> >         if (dev->power.power_state.event == PM_EVENT_FREEZE)
-> >                 return 0;
-> > @@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
-> >         return 0;
-> >  }
-> >
-> > -int sata_resume(struct device *dev)
-> > +static int sata_resume(struct device *dev)
-> >  {
-> >         if (dev->power.power_state.event == PM_EVENT_THAW)
-> >                 return 0;
+On 19/03/2014 20:29, Arnd Bergmann :
+> If CONFIG_PATA_AT91 is disabled, the code in at91_add_device_cf
+> is turned into invalid C statements due to the lack of an
+> expression before the 'else' clause.
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> This moves the first half of the condition inside of the #ifdef,
+> which seems to be what the author intended.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This patch will not be needed any more, since sata platform code has
-already been cleaned up.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-See:
-https://lkml.org/lkml/2014/2/28/174
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>  arch/arm/mach-at91/at91sam9260_devices.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 2ae7715..4222a7d 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -1263,13 +1263,13 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+>  	at91_set_A_periph(AT91_PIN_PC10, 0);    /* CFRNW */
+>  	at91_set_A_periph(AT91_PIN_PC15, 1);    /* NWAIT */
+>  
+> -	if (data->flags & AT91_CF_TRUE_IDE)
+>  #if defined(CONFIG_PATA_AT91) || defined(CONFIG_PATA_AT91_MODULE)
+> +	if (data->flags & AT91_CF_TRUE_IDE)
+>  		pdev->name = "pata_at91";
+> +	else
+>  #else
+>  #warning "board requires AT91_CF_TRUE_IDE: enable pata_at91"
+>  #endif
+> -	else
+>  		pdev->name = "at91_cf";
+>  
+>  	platform_device_register(pdev);
+> 
 
-Regards
-Pratyush
+
+-- 
+Nicolas Ferre
