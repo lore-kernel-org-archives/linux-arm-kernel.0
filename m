@@ -1,44 +1,75 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 20 Mar 2014 13:32:24 +0100
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320092639.48F68A6279@smtp3-g21.free.fr>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
-Message-ID: <532ADFD8.80301@gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 20 Mar 2014 13:28:19 +0100
+Subject: [PATCH v6 04/18] ahci-platform: Add support for devices with
+ more then 1 clock
+In-Reply-To: <20140219145203.GC10134@htj.dyndns.org>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <1392811320-3132-5-git-send-email-hdegoede@redhat.com>
+ <20140219145203.GC10134@htj.dyndns.org>
+Message-ID: <532ADEE3.6070901@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2014 09:58 AM, Jean-Francois Moine wrote:
-> The I2C address (reg) is required for the TDA998x driver to be loaded
-> and initialized.
+On 19/02/14 15:52, Tejun Heo wrote:
+> On Wed, Feb 19, 2014 at 01:01:46PM +0100, Hans de Goede wrote:
+>> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+>> index 434ab89..aaa0c08 100644
+>> --- a/drivers/ata/ahci_platform.c
+>> +++ b/drivers/ata/ahci_platform.c
+>> @@ -87,6 +87,44 @@ static struct scsi_host_template ahci_platform_sht = {
+>>   	AHCI_SHT("ahci_platform"),
+>>   };
+>>
+>> +
+>> +int ahci_platform_enable_clks(struct ahci_host_priv *hpriv)
 >
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
-> This patch applies to linux-next.
-> ---
->   Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 2 ++
->   1 file changed, 2 insertions(+)
+> Throughout the series, there are mixtures of one and two blank lines
+> in front of functions, let's just do one consistently.  Also, can you
+> please add proper function comments on top of the exported functions?
 >
-> diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-> index d7df01c..fc7effa 100644
-> --- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-> +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-> @@ -3,6 +3,8 @@ Device-Tree bindings for the NXP TDA998x HDMI transmitter
->   Required properties;
->     - compatible: must be "nxp,tda998x"
+>> +{
+>> +	int c, rc;
+>> +
+>> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++) {
+>> +		rc = clk_prepare_enable(hpriv->clks[c]);
+>> +		if (rc)
+>> +			goto disable_unprepare_clk;
+>> +	}
+>> +	return 0;
+>> +
+>> +disable_unprepare_clk:
+>> +	while (--c >= 0)
+>> +		clk_disable_unprepare(hpriv->clks[c]);
+>> +	return rc;
+>> +}
+>> +EXPORT_SYMBOL_GPL(ahci_platform_enable_clks);
+>> +
+>> +void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
+>> +{
+>> +	int c;
+>> +
+>> +	for (c = AHCI_MAX_CLKS - 1; c >= 0; c--)
+>> +		if (hpriv->clks[c])
+>> +			clk_disable_unprepare(hpriv->clks[c]);
+>> +}
+>> +EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
+>> +
+>> +
+>> +static void ahci_put_clks(struct ahci_host_priv *hpriv)
+>> +{
+>> +	int c;
+>> +
+>> +	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
+>> +		clk_put(hpriv->clks[c]);
+>> +}
 >
-> +  - reg: I2C address - must be <0x70>
+> Urgh, clk can't do devm?  ahci_platform itself should be able to build
+> devmized interface using devres_alloc() or devm_add_action().
+> Eh.... maybe later.
 
-TDA9983b datasheet says:
+There is devm_clk_get()
 
-"Bits A0 and A1 of the I2C-bus device address are externally selected
-by pins A0 and A1."
 
-Therefore, 0x70, 0x71, 0x72, and 0x73 are valid i2c addresses.
-
-Sebastian
-
->   Optional properties:
->     - interrupts: interrupt number and trigger type
->   	default: polling
->
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
