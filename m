@@ -1,22 +1,132 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Mar 2014 22:42:52 +0300
-Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
-In-Reply-To: <532B155F.9020605@cogentembedded.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <4836281.0IgPinItBq@wuerfel> <532A1BDD.904@cogentembedded.com>
- <9096065.aGCg8yZblW@wuerfel> <532B155F.9020605@cogentembedded.com>
-Message-ID: <532B44BC.1080807@cogentembedded.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 20 Mar 2014 19:47:50 +0100
+Subject: [PATCH] ARM: STi: Add support for the FSM Serial Flash Controller
+In-Reply-To: <1395330920-10559-1-git-send-email-lee.jones@linaro.org>
+References: <1395330920-10559-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <532B37D6.6070400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2014 07:20 PM, Sergei Shtylyov wrote:
 
->> The syscon (system controller) framework helps share a set of registers
->> across multiple drivers. If all accesses to the CFGCHIP2 register are
->> in a single PHY driver, we wouldn't need it.
 
->     Where can I find it in the kernel tree?
+On 03/20/2014 04:55 PM, Lee Jones wrote:
+> Here we add the necessary device nodes required for successful device
+> probing and Pinctrl setup for the FSM.
+>
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Acked-by Angus Clark <angus.clark@st.com>
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih416-pinctrl.dtsi | 13 +++++++++++++
+>   arch/arm/boot/dts/stih416.dtsi         | 13 +++++++++++++
+>   arch/arm/boot/dts/stih41x-b2020.dtsi   |  1 +
+>   arch/arm/boot/dts/stih41x-b2020x.dtsi  | 28 ++++++++++++++++++++++++++++
+Could you please split this patch in two ?
+	1 - stih416-pinctrl.dtsi and stih416.dtsi
+	2 - stih41x-b2020.dtsi and stih41x-b2020x.dtsi
 
-    Found it.
+Once these changes done, you can add
 
-WBR, Sergei
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Thanks,
+Maxime
+
+>   4 files changed, 55 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/stih41x-b2020x.dtsi
+>
+> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+> index b29ff4b..81df8e7 100644
+> --- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+> @@ -210,6 +210,19 @@
+>   					};
+>   				};
+>   			};
+> +
+> +			fsm {
+> +				pinctrl_fsm: fsm {
+> +					st,pins {
+> +						spi-fsm-clk  = <&PIO12 2 ALT1 OUT>;
+> +						spi-fsm-cs   = <&PIO12 3 ALT1 OUT>;
+> +						spi-fsm-mosi = <&PIO12 4 ALT1 OUT>;
+> +						spi-fsm-miso = <&PIO12 5 ALT1 IN>;
+> +						spi-fsm-hol  = <&PIO12 6 ALT1 OUT>;
+> +						spi-fsm-wp   = <&PIO12 7 ALT1 OUT>;
+> +					};
+> +				};
+> +			};
+>   		};
+>
+>   		pin-controller-rear {
+> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+> index b7ab47b..1e24b9e 100644
+> --- a/arch/arm/boot/dts/stih416.dtsi
+> +++ b/arch/arm/boot/dts/stih416.dtsi
+> @@ -145,5 +145,18 @@
+>
+>   			status		= "disabled";
+>   		};
+> +
+> +		/* FSM */
+> +		spifsm: spifsm at fe902000 {
+> +			compatible	   = "st,spi-fsm";
+> +			reg		   = <0xfe902000 0x1000>;
+> +			pinctrl-0	   = <&pinctrl_fsm>;
+> +
+> +			st,syscfg	   = <&syscfg_rear>;
+> +			st,boot-device-reg = <0x958>;
+> +			st,boot-device-spi = <0x1a>;
+> +
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> index 0ef0a69..01487e0 100644
+> --- a/arch/arm/boot/dts/stih41x-b2020.dtsi
+> +++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> @@ -6,6 +6,7 @@
+>    * it under the terms of the GNU General Public License version 2 as
+>    * publishhed by the Free Software Foundation.
+>    */
+> +#include "stih41x-b2020x.dtsi"
+>   / {
+>   	memory{
+>   		device_type = "memory";
+> diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+> new file mode 100644
+> index 0000000..df01c12
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
+> + * Author: Lee Jones <lee.jones@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + */
+> +/ {
+> +	soc {
+> +		spifsm: spifsm at fe902000 {
+> +			#address-cells = <1>;
+> +			#size-cells    = <1>;
+> +
+> +			status = "okay";
+> +
+> +			partition at 0 {
+> +				label = "SerialFlash1";
+> +				reg   = <0x00000000 0x00500000>;
+> +			};
+> +
+> +			partition at 500000 {
+> +				label = "SerialFlash2";
+> +				reg   = <0x00500000 0x00b00000>;
+> +			};
+> +		};
+> +	};
+> +};
+>
