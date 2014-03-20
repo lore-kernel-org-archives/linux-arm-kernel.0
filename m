@@ -1,93 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 09:20:41 +0000
-Subject: [PATCH v6 09/36] mtd: st_spi_fsm: Dynamically setup flash device
- based on JEDEC ID
+Date: Thu, 20 Mar 2014 09:20:43 +0000
+Subject: [PATCH v6 11/36] mtd: st_spi_fsm: Use device size to determine
+ address width
 In-Reply-To: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
 References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395307268-12721-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395307268-12721-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using previously added infrastructure we can now extract a device's JEDEC
-ID, compare it to a list of known and supported devices and make assumptions
-based on known characteristics of a given chip.
+Take some known parameters, namely size and number of sectors and use
+them to determine weather a device can support 32bit addressing or not.
+If it can, set the associated flash capability flag for latter use.
 
 Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/mtd/devices/st_spi_fsm.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 29da522..9467585 100644
+index 2740ae1..5a1b470 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -204,6 +204,7 @@ struct stfsm {
- 	struct resource		*region;
- 	struct mtd_info		mtd;
- 	struct mutex		lock;
-+	struct flash_info       *info;
+@@ -671,6 +671,10 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	fsm->info = info;
  
- 	uint32_t                fifo_dir_delay;
- };
-@@ -477,6 +478,7 @@ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
- 
- static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
- {
-+	struct flash_info	*info;
- 	u16                     ext_jedec;
- 	u32			jedec;
- 	u8			id[5];
-@@ -494,6 +496,15 @@ static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
- 	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
- 		jedec, id[0], id[1], id[2], id[3], id[4]);
- 
-+	for (info = flash_types; info->name; info++) {
-+		if (info->jedec_id == jedec) {
-+			if (info->ext_id && info->ext_id != ext_jedec)
-+				continue;
-+			return info;
-+		}
-+	}
-+	dev_err(fsm->dev, "Unrecognized JEDEC id %06x\n", jedec);
++	/* Use device size to determine address width */
++	if (info->sector_size * info->n_sectors > 0x1000000)
++		info->flags |= FLASH_FLAG_32BIT_ADDR;
 +
- 	return NULL;
- }
- 
-@@ -588,6 +599,7 @@ static int stfsm_init(struct stfsm *fsm)
- static int stfsm_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct flash_info *info;
- 	struct resource *res;
- 	struct stfsm *fsm;
- 	int ret;
-@@ -627,13 +639,25 @@ static int stfsm_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Detect SPI FLASH device */
--	stfsm_jedec_probe(fsm);
-+	info = stfsm_jedec_probe(fsm);
-+	if (!info)
-+		return -ENODEV;
-+	fsm->info = info;
- 
  	fsm->mtd.dev.parent	= &pdev->dev;
  	fsm->mtd.type		= MTD_NORFLASH;
  	fsm->mtd.writesize	= 4;
- 	fsm->mtd.writebufsize	= fsm->mtd.writesize;
- 	fsm->mtd.flags		= MTD_CAP_NORFLASH;
-+	fsm->mtd.size		= info->sector_size * info->n_sectors;
-+	fsm->mtd.erasesize	= info->sector_size;
-+
-+	dev_err(&pdev->dev,
-+		"Found serial flash device: %s\n"
-+		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
-+		info->name,
-+		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
-+		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
- 
- 	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
- }
 -- 
 1.8.3.2
