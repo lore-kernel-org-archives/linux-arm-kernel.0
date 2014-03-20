@@ -1,34 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Mar 2014 17:14:22 +0100
-Subject: [PATCH] ARM: at91: panic when the mck rate is zero
-Message-ID: <1395332062-4967-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 20 Mar 2014 17:21:00 +0100
+Subject: [PATCH] Documentation: dt: list all compatible strings for at91
+In-Reply-To: <CAL_Jsq+sctq85ZhqKyVa7=r5A0FEDKu36692rRJufyca1gzF6g@mail.gmail.com>
+References: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAL_Jsq+sctq85ZhqKyVa7=r5A0FEDKu36692rRJufyca1gzF6g@mail.gmail.com>
+Message-ID: <20140320162100.GU12021@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the mck rate is zero, we'll hit the following warning:
+Hi Rob,
 
-WARNING: CPU: 0 PID: 0 at arch/arm/mach-at91/at91sam926x_time.c:257 at91sam926x_pit_init+0x13c/0x260()
+On 19/03/2014 at 11:14:43 -0500, Rob Herring wrote :
+> On Wed, Mar 19, 2014 at 5:26 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > Avoids getting the newly introduced warning:
+> > WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> > +                               compatible = "atmel,at91sam9g45-adc";
+> >
+> > Introduced by:
+> > bff5da433525 checkpatch: add DT compatible string documentation checks
+> 
+> We should fix checkpatch instead. There are some fixes in progress,
+> but I don't think it covers this issue. I'm puzzled by this one as I
+> thought I checked for this case.
+> 
 
-But the kernel will continue to try booting and face a lot of divisions by zero
-when trying to handle the various clocks.
+Will someone take care of it ? I'm not sure how you want to handle that
+as <chip> is replacing different values depending on the context. Also,
+while for atmel and freescale, it is replacing the full chip name, that
+is not the case for nvidia...
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91sam926x_time.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 0f04ffe9c5a8..f060f6371392 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -250,6 +250,8 @@ void __init at91sam926x_pit_init(void)
- 	if (IS_ERR(mck))
- 		panic("AT91: PIT: Unable to get mck clk\n");
- 	pit_rate = clk_get_rate(mck) / 16;
-+	if (pit_rate == 0)
-+		panic("AT91: PIT: can't continue, mck rate is zero\n");
- 	pit_cycle = (pit_rate + HZ/2) / HZ;
- 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
- 
 -- 
-1.8.3.2
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
