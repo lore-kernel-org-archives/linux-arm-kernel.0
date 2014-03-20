@@ -1,175 +1,58 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 04:33:43 +0900
-Subject: [PATCH Resend 2/3] ARM: EXYNOS: Consolidate CPU init code
-In-Reply-To: <1395224705-2935-2-git-send-email-sachin.kamat@linaro.org>
-References: <1395224705-2935-1-git-send-email-sachin.kamat@linaro.org>
- <1395224705-2935-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <532B4297.6060902@samsung.com>
+Date: Fri, 21 Mar 2014 04:39:37 +0900
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <20140319040149.30995.80279@quantum>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net> <531CFA28.9020600@gmail.com>
+ <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+ <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
+ <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
+ <20140319040149.30995.80279@quantum>
+Message-ID: <532B43F9.9060001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/14 19:25, Sachin Kamat wrote:
-> cpu_table was used to distinguish between different Exynos4 and 5
-> SoCs and based on the type do the initialization and io mapping.
-> exynos_init is dummy and no longer needed as we do a DT based booting.
-> By having a common io mapping function we can get rid of the whole
-> table and avoid populating it for every SoC.
+On 03/19/14 13:01, Mike Turquette wrote:
+> Quoting Olof Johansson (2014-03-10 19:52:01)
+>> On Mon, Mar 10, 2014 at 6:50 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>> Olof Johansson wrote:
+>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> I don't see a single cc or acked-by line from Mike Turquette here. I'll
+>>>>>> hold
+>>>>>> off until he's had a chance to take a look at these ones; I suspect
+>>>>>> they'll be
+>>>>>> fine since it's mostly code refactoring though.
+>>>>>
+>>>>>
+>>>>> I guess I should have ACKed them too, but it felt kind of strange to ACK
+>>>> my
+>>>>> own patches. ;)
+>>>>>
+>>>>> Anyway, for all samsung-clk patches:
+>>>>>
+>>>>> Acked-by: Tomasz Figa<t.figa@samsung.com>
+>>>>
+>>>> Yeah, self-acking doesn't make much sense. :)
+>>>>
+>>>> I'm mostly worried about patches touching other subsystems without the
+>>>> other maintainer being aware of it or having reviewed them. As I said,
+>>>> these mostly look like refactorings but it's still good habit.
+>>>>
+>>> OK, agreed, I think Mike knew about that though. Let's wait for Mike's
+>>> response.
+>>>
+>>> BTW, should I sort out the branch again if Mike gives ack on that?
+>>
+>> If I hear from Mike that he's OK with it then I can merge it, no need to rebase.
 >
-> Tested on Exynos4210, 5250 and 5420 based boards.
->
-> Signed-off-by: Sachin Kamat<sachin.kamat@linaro.org>
-> Tested-by: Tomasz Figa<t.figa@samsung.com>
-> ---
->   arch/arm/mach-exynos/common.c |  108 +++++++++--------------------------------
->   1 file changed, 23 insertions(+), 85 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index e98ddadc5f74..10ed374c0744 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -48,56 +48,6 @@
->   #define L2_AUX_VAL 0x7C470001
->   #define L2_AUX_MASK 0xC200ffff
->
-> -static const char name_exynos4210[] = "EXYNOS4210";
-> -static const char name_exynos4212[] = "EXYNOS4212";
-> -static const char name_exynos4412[] = "EXYNOS4412";
-> -static const char name_exynos5250[] = "EXYNOS5250";
-> -static const char name_exynos5420[] = "EXYNOS5420";
-> -static const char name_exynos5440[] = "EXYNOS5440";
-> -
-> -static void exynos4_map_io(void);
-> -static void exynos5_map_io(void);
-> -static int exynos_init(void);
-> -
-> -static struct cpu_table cpu_ids[] __initdata = {
-> -	{
-> -		.idcode		= EXYNOS4210_CPU_ID,
-> -		.idmask		= EXYNOS4_CPU_MASK,
-> -		.map_io		= exynos4_map_io,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos4210,
-> -	}, {
-> -		.idcode		= EXYNOS4212_CPU_ID,
-> -		.idmask		= EXYNOS4_CPU_MASK,
-> -		.map_io		= exynos4_map_io,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos4212,
-> -	}, {
-> -		.idcode		= EXYNOS4412_CPU_ID,
-> -		.idmask		= EXYNOS4_CPU_MASK,
-> -		.map_io		= exynos4_map_io,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos4412,
-> -	}, {
-> -		.idcode		= EXYNOS5250_SOC_ID,
-> -		.idmask		= EXYNOS5_SOC_MASK,
-> -		.map_io		= exynos5_map_io,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos5250,
-> -	}, {
-> -		.idcode		= EXYNOS5420_SOC_ID,
-> -		.idmask		= EXYNOS5_SOC_MASK,
-> -		.map_io		= exynos5_map_io,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos5420,
-> -	}, {
-> -		.idcode		= EXYNOS5440_SOC_ID,
-> -		.idmask		= EXYNOS5_SOC_MASK,
-> -		.init		= exynos_init,
-> -		.name		= name_exynos5440,
-> -	},
-> -};
-> -
->   /* Initial IO mappings */
->
->   static struct map_desc exynos4_iodesc[] __initdata = {
-> @@ -346,6 +296,28 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
->    *
->    * register the standard cpu IO areas
->    */
-> +static void __init exynos_map_io(void)
-> +{
-> +	if (soc_is_exynos4210() || soc_is_exynos4212() || soc_is_exynos4412())
-> +		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
-> +
-> +	if (soc_is_exynos5250() || soc_is_exynos5420())
-> +		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
-> +
-> +	if (soc_is_exynos4210()) {
-> +		if (samsung_rev() == EXYNOS4210_REV_0)
-> +			iotable_init(exynos4_iodesc0,
-> +						ARRAY_SIZE(exynos4_iodesc0));
-> +		else
-> +			iotable_init(exynos4_iodesc1,
-> +						ARRAY_SIZE(exynos4_iodesc1));
-> +		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
-> +	}
-> +	if (soc_is_exynos4212() || soc_is_exynos4412())
-> +		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
-> +	if (soc_is_exynos5250())
-> +		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
-> +}
->
->   void __init exynos_init_io(void)
->   {
-> @@ -356,30 +328,7 @@ void __init exynos_init_io(void)
->   	/* detect cpu id and rev. */
->   	s5p_init_cpu(S5P_VA_CHIPID);
->
-> -	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
-> -}
-> -
-> -static void __init exynos4_map_io(void)
-> -{
-> -	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
-> -
-> -	if (soc_is_exynos4210()&&  samsung_rev() == EXYNOS4210_REV_0)
-> -		iotable_init(exynos4_iodesc0, ARRAY_SIZE(exynos4_iodesc0));
-> -	else
-> -		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
-> -
-> -	if (soc_is_exynos4210())
-> -		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
-> -	if (soc_is_exynos4212() || soc_is_exynos4412())
-> -		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
-> -}
-> -
-> -static void __init exynos5_map_io(void)
-> -{
-> -	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
-> -
-> -	if (soc_is_exynos5250())
-> -		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
-> +	exynos_map_io();
->   }
->
->   struct bus_type exynos_subsys = {
-> @@ -387,10 +336,6 @@ struct bus_type exynos_subsys = {
->   	.dev_name	= "exynos-core",
->   };
->
-> -static struct device exynos4_dev = {
-> -	.bus	=&exynos_subsys,
-> -};
-> -
->   static int __init exynos_core_init(void)
->   {
->   	return subsys_system_register(&exynos_subsys, NULL);
-> @@ -410,10 +355,3 @@ static int __init exynos4_l2x0_cache_init(void)
->   	return 0;
->   }
->   early_initcall(exynos4_l2x0_cache_init);
-> -
-> -static int __init exynos_init(void)
-> -{
-> -	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
-> -
-> -	return device_register(&exynos4_dev);
-> -}
+Thanks :-)
 
-OK, applied this into consolidation exynos4/5 machine codes because of 
-dependency.
+> Acked-by: Mike Turquette<mturquette@linaro.org>
+>
+It's time. Please pull this [5/6] and "[GIT PULL 6/6] Samsung 
+clk-s3c24xx updates for v3.15".
 
 Thanks,
 Kukjin
