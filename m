@@ -1,59 +1,42 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 20 Mar 2014 17:12:43 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <5527822.QYtFYiIpiW@wuerfel>
-References: <201402241200.21944.arnd@arndb.de> <5165962.7bqj51B15Z@wuerfel>
- <532B0384.1000400@codethink.co.uk> <5527822.QYtFYiIpiW@wuerfel>
-Message-ID: <532B137B.7010900@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 17:12:46 +0100
+Subject: [PATCH 2/2] arm64: dts: exynos: added mailbox node
+In-Reply-To: <CABb+yY1rvozkGS34CHt8YEJqvGRXuHV09=AdS3=zQBx=DjFDCQ@mail.gmail.com>
+References: <1395057839-23871-1-git-send-email-ks.giri@samsung.com>
+ <201403191846.28563.arnd@arndb.de>
+ <CABb+yY1rvozkGS34CHt8YEJqvGRXuHV09=AdS3=zQBx=DjFDCQ@mail.gmail.com>
+Message-ID: <7073716.9YBOcHOu36@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/14 17:09, Arnd Bergmann wrote:
-> On Thursday 20 March 2014 16:04:36 Ben Dooks wrote:
->> On 26/02/14 20:57, Arnd Bergmann wrote:
->>> On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
->>>> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>>> Hi Magnus,
->>>>>
->>>>> I noticed during randconfig testing that you enabled DMABOUNCE for the
->>>>> pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
->>>>>
->>>>> I didn't see the original post unfortunately, but I fear we have to
->>>>> revert it and come up with a better solution, ...
->>>>
->>>> Sounds like I should drop the following patches from my pci/host-rcar
->>>> branch for now?
->>>>
->>>>     PCI: rcar: Add DMABOUNCE support
->>>>     PCI: rcar: Enable BOUNCE in case of HIGHMEM
->>>>     PCI: rcar: Make the Kconfig dependencies more generic
->>>
->>> Sounds good to me. The last patch is actually fine, but you'll have to
->>> fix the context to apply it without the other two.
->>
->> As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
->> controllers no longer work with full 2GiB RAM enabled in the device
->> tree.
->
-> Did it work before these patches got applied initially?
+On Thursday 20 March 2014 21:39:56 Jassi Brar wrote:
+> On Wed, Mar 19, 2014 at 11:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 17 March 2014, Jassi Brar wrote:
+> 
+> >>   Perhaps the mailbox controller driver should name its links as it
+> >> wants. By how the remote works with the mailbox links, the client
+> >> driver asks for a specific mailbox link (which maybe a hardcoded
+> >> string in the driver or be gotten alongside other data via client's
+> >> DT) ?
+> >
+> > I don't see why we should do it any different from the other bindings.
+> > Let's just stick with mboxes/mbox-names or mailboxes/mailbox-names
+> > if you prefer.
+> >
+> >>   IOW we can't have a generic API/DT-bindings that could get us
+> >> reusable client drivers. But only common framework/code that would
+> >> otherwise be duplicated by every platform.
+> >
+> > That is a major benefit though.
+> > Also even if most drivers won't work across multiple platforms, there
+> > is still a reasonable chance that /some/ drivers will.
+> >
+> It seems those /some/ drivers will have to work with everything same
+> but the channel name (which the client could get from its DT node when
+> the second platform appears).
 
-It did, but I cannot remember if we where limiting DRAM to 1GiB
-or not.
+Why would you ever have varying channel names? I would expect that
+the name is always fixed in the binding of the client driver, like
+we do for clocks or interrupts for instance.
 
->> Could we work around this by having 1GiB of memory defined in the
->> 32bit memory and then add the rest of the 3GiB from the >32bit
->> area via LPAE? Will the kernel ever try to allocate DMA memory from
->> anything >32bit?
->
-> You can solve the case for dma_alloc_coherent() this way, or by
-> setting the mask correctly. It won't help you for dma_map_* though,
-> which still requires someone to add support for swiotlb or using
-> an IOMMU if present.
-
-We do not have an IOMMU present at the moment. Not sure how
-to go about setting a mask on a pci-probed device.
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+	Arnd
