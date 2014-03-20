@@ -1,61 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 20 Mar 2014 09:50:27 +0000
-Subject: [RESEND PATCH] mm: hugetlb: Introduce
- huge_pte_{page,present,young}
-In-Reply-To: <20140317150730.156a3325ff96dfc6e1352902@linux-foundation.org>
-References: <1395082318-7703-1-git-send-email-steve.capper@linaro.org>
- <20140317150730.156a3325ff96dfc6e1352902@linux-foundation.org>
-Message-ID: <20140320095027.GA23180@linaro.org>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 20 Mar 2014 10:50:36 +0100
+Subject: [PATCH 09/11] ARM: at91/dt: define main xtal frequency of the
+ at91sam9261ek board
+In-Reply-To: <CACh+v5OF52ZuDBpkqpev1Jxv0DJ1ckRR+DjcX500i3o0o4HE9A@mail.gmail.com>
+References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>	<1395173924-3648-10-git-send-email-b.brezillon.dev@gmail.com>
+ <CACh+v5OF52ZuDBpkqpev1Jxv0DJ1ckRR+DjcX500i3o0o4HE9A@mail.gmail.com>
+Message-ID: <532AB9EC.1030507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 17, 2014 at 03:07:30PM -0700, Andrew Morton wrote:
-> On Mon, 17 Mar 2014 18:51:58 +0000 Steve Capper <steve.capper@linaro.org> wrote:
-> 
-> > Introduce huge pte versions of pte_page, pte_present and pte_young.
-> > This allows ARM (without LPAE) to use alternative pte processing logic
-> > for huge ptes.
-> > 
-> > Where these functions are not defined by architectural code they
-> > fallback to the standard functions.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
-> > Hi,
-> > I'm resending this patch to provoke some discussion.
-> > 
-> > We already have some huge_pte_ style functions, and this patch adds a
-> > few more (that simplify to the pte_ equivalents where unspecified).
-> > 
-> > Having separate hugetlb versions of pte_page, present and mkyoung
-> > allows for a greatly simplified huge page implementation for ARM with
-> > the classical MMU (which has a different bit layout for huge ptes).
-> 
-> Looks OK to me.  One thing...
-> 
-> > --- a/include/linux/hugetlb.h
-> > +++ b/include/linux/hugetlb.h
-> > @@ -353,6 +353,18 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
-> >  }
-> >  #endif
-> >  
-> > +#ifndef huge_pte_page
-> > +#define huge_pte_page(pte)	pte_page(pte)
-> > +#endif
-> 
-> This #ifndef x #define x thing works well, but it is 100% unclear which
-> arch header file is supposed to define x if it wishes to override the
-> definition.  We've had problems with that in the past where different
-> architectures put it in different files and various breakages ensued.
-> 
-> So can we decide which arch header file is responsible for defining
-> these, then document that right here in a comment and add an explicit
-> #include <asm/that-file.h>?
+Le 20/03/2014 10:24, Jean-Jacques Hiblot a ?crit :
+> 2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
+>> Define at91sam9261ek main crystal frequency.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>> ---
+>>   arch/arm/boot/dts/at91sam9261ek.dts |    4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+>> index 2ce527e..7175986 100644
+>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+>> @@ -29,6 +29,10 @@
+>>                          compatible = "atmel,osc", "fixed-clock";
+>>                          clock-frequency = <18432000>;
+>>                  };
+>> +
+>> +               main_xtal: main_xtal {
+>> +                       clock-frequency = <18432000>;
+>> +               };
+>>          };
+>>
+>>          ahb {
+>> --
+>> 1.7.9.5
+>>
+> You forgot to remove the old fixed-clock definition for the main_clock: clock at 0
 
-Thanks Andrew,
-Yes I see your point, this could quickly become unstable.
-I'll see how these look in include/asm-generic/hugetlb.h instead.
+We need this clock when CCF is disabled (when using the old at91 clk 
+implementation).
+I'm afraid we'll have to keep it until we move all sam9 SoCs and boards 
+to CCF (and DT).
 
-Cheers,
--- 
-Steve
+Best Regards,
+
+Boris
+>
+> Otherwise:
+> Acked-by: Jean-Jacques HIBLOT <jjhiblot@traphandler.com>
