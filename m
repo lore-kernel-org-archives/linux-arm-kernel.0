@@ -1,35 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Mar 2014 17:52:53 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140320171930.GA28238@arm.com>
-References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
- <20140320112650.GA1408@red-moon>
- <20140320134357.GE11706@sirena.org.uk>
- <20140320171930.GA28238@arm.com>
-Message-ID: <20140320175253.GH11706@sirena.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 20 Mar 2014 10:59:57 -0700
+Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
+In-Reply-To: <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395132017-15928-3-git-send-email-zhangfei.gao@linaro.org>
+ <CAGVrzcY4SBKFfTvjB0TTvgpAOwCt30C6LjYf9e9E4ciMDVmp-w@mail.gmail.com>
+ <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
+Message-ID: <CAGVrzcZ4K2gvQ8f=uMTf4+jm29e3FQXL-a-wc9xgumyHpH6+UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 05:19:32PM +0000, Catalin Marinas wrote:
-> On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
+2014-03-20 3:53 GMT-07:00 Zhangfei Gao <zhangfei.gao@gmail.com>:
+> Dear Florian
+>
+> On Wed, Mar 19, 2014 at 1:28 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> 2014-03-18 1:40 GMT-07:00 Zhangfei Gao <zhangfei.gao@linaro.org>:
+>
+>>> +static int hip04_mdio_reset(struct mii_bus *bus)
+>>> +{
+>>> +       int temp, err, i;
+>>> +
+>>> +       for (i = 0; i < 2; i++) {
+>>> +               hip04_mdio_write(bus, i, 22, 0);
+>>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
+>>> +               temp |= BMCR_RESET;
+>>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
+>>> +               if (err < 0)
+>>> +                       return err;
+>>> +       }
+>>> +
+>>> +       mdelay(500);
+>>
+>> This does not look correct, you should iterate over all possible PHYs:
+>> PHY_MAX_ADDR instead of hardcoding the loop to 2.
+>
+> OK, got it.
+> Use 2 is since only have 2 phy in the board, will use PHY_MAX_ADDR instead.
+>>
+>> I think we might want to remove the mdio bus reset callback in general
+>> as the PHY library should already take care of software resetting the
+>> PHY to put it in a sane state, as well as waiting for the appropriate
+>> delay before using, unlike here, where you do not poll for BMCR_RESET
+>> to be cleared by the PHY.
+>>
+> Do you mean will move BMCR_RESET to common code, that's would be great.
+> The mdio_reset is added here to get phy_id, otherwise the phy_id can
+> not be read as well as detection.
 
-> > To be honest at this point I think what I want to do is go back to the
-> > original approach of layering DT on top of MPIDR.  MPIDR is smaller and
-> > simpler code so seems more likely to make progress.  I really do expect
-> > that for a very large proportion of systems it'll be sufficient.
-
-> Do you mean the physical MPIDR_EL1 or the DT representation of
-> MPIDR_EL1?
-
-Well, the affinities need to be the same anyway (so we can tie the
-hardware to the description in DT) though we need to use the physical
-register to get the MT bit since the binding requires that this be
-omitted from the value stored in DT.  Lorenzo was keen on paying
-attention to the MT bit which does seem like a reasonable thing to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/366f8a28/attachment.sig>
+Oh I see, thanks for mentioning that, this is not properly covered
+here today as we need to get the PHY id before we assign it a
+phy_device structure, let me cook a patch for this.
+-- 
+Florian
