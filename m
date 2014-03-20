@@ -1,157 +1,115 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 22:50:48 +0000
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <14479462.PmG77WeO2J@wuerfel>
-References: <201402241200.21944.arnd@arndb.de>
- <201403201929.13633.arnd@arndb.de>
- <20140320183932.GA7528@n2100.arm.linux.org.uk> <14479462.PmG77WeO2J@wuerfel>
-Message-ID: <20140320225048.GE7528@n2100.arm.linux.org.uk>
+Date: Thu, 20 Mar 2014 23:06:00 +0000
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <201403200005.56334.marex@denx.de> <201403200501.16881.marex@denx.de>
+ <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+Message-ID: <20140320230559.GF7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 11:11:04PM +0100, Arnd Bergmann wrote:
-> On Thursday 20 March 2014 18:39:32 Russell King - ARM Linux wrote:
-> > Yes, OHCI's PCI driver doesn't do that at the moment, but that's not
-> > to say that it won't in the future - at which point hacks like the
-> > above suddenly stop working.
-> 
-> If the OHCI-PCI driver is changed to call
-> dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))), what do you
-> think should happen? The way I read it, that call must fail on
-> this platform, causing the probe() function to bail out and not
-> use the hardware, which is clearly not what we want here.
+On Thu, Mar 20, 2014 at 07:27:43PM -0300, Fabio Estevam wrote:
+> "I tried the patch and it seems a little better but still has problems.
+> When I first started the test I saw dropped packets.  After about 2 minutes
+> I got the pause again with the accompanying kernel backtrace.  It looks
+> like I got some more debug information from the backtrace however (I think
+> that was part of the patch.)
 
-That depends how you interpret what's going on here.  It's saying
-"I may allocate and try and map memory which result in 32-bits
-of DMA address".  Under normal situations where there is a 1:1
-relationship and a simple mapping done by the DMA API, then yes,
-such memory would end up with 32-bits of DMA address.
+Thanks.  Now that we can see the ring, we can see what's going on.
+Every entry with a non-NULL skb is a packet which has been queued up
+for transmission, but which hasn't been reaped.  Any entry with a "SC"
+value of 0x1c00 has been transmitted.
 
-Now, if the DMA implementation has a way to cope with providing a
-restricted DMA address to the device due to bus limitations which
-the DMA implementation knows about, then the answer to "can you
-cope with memory which would normally result in 32-bits of DMA
-address" is yes, even if you can only handle 30 bits.
+S marks the ring entry where the next packet to be transmitted would
+be placed into the ring.  H points at the previous entry which was
+reaped - in other words, the next packet which would be reaped if it
+were transmitted would be ring entry 14.
 
-The reason being is that you're agreeing to the driver using
-memory which would be 32-bits, but internally you're guaranteeing
-not to violate the bus limitation of 30 bits.
+However, this hasn't happened, because that packet is still marked for
+the FEC to transmit it.  The really odd thing is, it has transmitted
+the subsequent packets from 15 to 63, and 0 to 12.
 
-Things get harder with the coherent API, and that's where IXP4xx
-has to intercept the call and limit the coherent mask, so the
-coherent allocator knows to restrict the memory returned - there's
-no way that such memory could be fixed up after the fact.
+The obvious question is: was the packet at 14 actually transmitted,
+and has the update to the descriptor been lost somehow - that would
+require a log of the last 64-ish transmitted packets, and knowledge
+of what those packets should contain to really confirm - just wondering
+whether we could transmit an additional byte containing the ring index
+on these small packets which we could then capture.  We would have to
+be certain that the capture itself hasn't dropped any packets.
 
-> IXP uses defines a ixp4xx_pci_platform_notify() function that basically
-> does the same thing that Ben tried adding here, and then it has a
-> dma_set_coherent_mask function that checks whether the mask that the
-> device tries to set is even smaller than that, in which case it returns
-> a failure, but it returns success if the device tries to set a larger
-> mask.
+I'll look into some further patches which would allow that to be
+confirmed - I can't do that immediately as I've rather a lot to deal
+with at the moment.
 
-Yes, IXP has a two-pronged approach because of problem drivers like
-OHCI which don't call the DMA mask setting functions.  If everyone
-did, then the hooks in the mask setting functions would be all that
-it needs, since it could apply its restriction there rather than via
-notifiers.
-
-So, what IXP does is it overrides dma_set_coherent_mask() to be a
-function which just validates the mask, and doesn't actually allow
-the mask to be changed.  This coupled with the notifier sets the
-coherent mask to 64M, and ensures that it isn't changed (except by
-buggy drivers which access it directly.)
-
-An alternative approach for that would be to accept 64M or larger
-masks in dma_set_coherent_mask() but always set the actual coherent
-DMA mask to no larger than 64M - but that's only possible where all
-drivers properly call dma_set_coherent_mask().
-
-The streaming DMA mask has become more convoluted - it's now set
-such that any device which has dmabounce attached to it will ignore
-attempts to change the streaming DMA mask value - just like the
-above.
-
-> In no case does it try to actually set the mask. While this seems
-> like a practical approach, I don't see how that actually matches up
-> with the documentation, e.g. "dma_set_coherent_mask will always be able
-> to set the same or a smaller mask as the streaming mask." and
-> "When dma_set_mask() or dma_set_mask_and_coherent() is successful, and
-> returns zero, the kernel saves away this mask you have provided."
-
-IXP4xx used to conform - 6fee48cd330c:
-
--int
--pci_set_dma_mask(struct pci_dev *dev, u64 mask)
--{
--       if (mask >= SZ_64M - 1 )
--               return 0;
--
--       return -EIO;
--}
--    
--int
--pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
--{
--       if (mask >= SZ_64M - 1 )
--               return 0;
--
--       return -EIO;
--}
-
-Here, both functions have the same behaviour.  The bit about "smaller
-mask" is slightly bogus - you can never set a mask that is smaller
-than the system's DMA memory pool, because the system never has a way
-to guarantee you memory below GFP_DMA allocations.  In this case on
-IXP4xx, that is 64MB of memory, so thse functions reject on 64MB or
-smaller allocations.
-
-However, because of the bouncing that is implemented, it can accept
-drivers asking for larger DMA masks, and because it limits the
-coherent memory allocations to 64MB internally within the DMA API,
-larger coherent masks are permissible.
-
-So.. there's no problem here.  What is a problem is:
-
-static int dmabounce_set_mask(struct device *dev, u64 dma_mask)
-{
-        if (dev->archdata.dmabounce)
-                return 0;
-
-        return arm_dma_ops.set_dma_mask(dev, dma_mask);
-}
-
-which says "I'll accept anything if I'm a DMA bounce-hindered device"
-which isn't actually correct, since we should still be rejecting
-masks smaller than the system can allocate for.
-
-That's checked for by dma_supported() which should really be in 
-the above.
-
-The remaining gotcha for multiplatform is the coherent mask, which
-doesn't have a way for it to be intercepted by the platform.  That
-means any /good/ driver which calls dma_set_coherent_mask() results
-in resetting the coherent mask to the driver specified mask.
-
-> The majority of the platforms we support today are fine with
-> always assuming that all of memory can be reached at the physical
-> address,
-
-That's only because they're now all fine with 32-bit addresses.
-
-> and the exceptions are either the legacy non-multiplatform
-> ones, or very new platforms with LPAE that can only be probed using
-> devicetree.
-
-Remember with LPAE and its strange memory setups, physical address !=
-DMA address, and that's going to be something that everyone is going
-to /have/ to learn to get used to.  No longer will it be possible to
-assume that the two are the same, or you can just crop the bits above
-32-bit off to make it fit in a 32-bit controller - consider 8G of
-memory on LPAE with a 32-bit DMA controller.
-
-That's where dealing with the DMA mask correctly (representing the number
-of bits the /device/ can accept rather than the number of physical address
-bits) matters, and thankfully that should now be solved.
+> fec 63fec000.ethernet eth0: TX ring dump
+> Nr    SC     addr       len  SKB
+>  0    0x1c00 0xce485000  106 de5db480
+>  1    0x1c00 0xce485800  106 de5b7540
+>  2    0x1c00 0xce486000  106 de5b7300
+>  3    0x1c00 0xce486800  106 de5b73c0
+>  4    0x1c00 0xce487000  106 de5b7e40
+>  5    0x1c00 0xce487800  106 de5b7840
+>  6    0x1c00 0xce500000  106 de5b7b40
+>  7    0x1c00 0xce500800  106 de5b7600
+>  8    0x1c00 0xce501000  106 de5b7d80
+>  9    0x1c00 0xce501800  106 de5b7180
+> 10    0x1c00 0xce502000  106 de5b7a80
+> 11    0x1c00 0xce502800  106 de5b7240
+> 12    0x1c00 0xce503000  106 de5b7000
+> 13 SH 0x1c00 0x00000000   66   (null)
+> 14    0x9c00 0xce504000   66 de5b90c0
+> 15    0x1c00 0xce504800   66 de5b9a80
+> 16    0x1c00 0xce505000   66 de5b9840
+> 17    0x1c00 0xce505800   66 de5b9000
+> 18    0x1c00 0xce506000   66 de5b9480
+> 19    0x1c00 0xce506800   66 de5b9b40
+> 20    0x1c00 0xce507000   66 de5b9600
+> 21    0x1c00 0xce507800   66 de5b9900
+> 22    0x1c00 0xce508000   66 de5b9180
+> 23    0x1c00 0xce508800   66 de5b9240
+> 24    0x1c00 0xce509000   66 de5b93c0
+> 25    0x1c00 0xce509800   66 de5b9540
+> 26    0x1c00 0xce50a000  106 de5b9780
+> 27    0x1c00 0xce50a800   66 de5b9d80
+> 28    0x1c00 0xce50b000  106 de5b9cc0
+> 29    0x1c00 0xce50b800   66 de5b99c0
+> 30    0x1c00 0xce50c000  106 de5b9300
+> 31    0x1c00 0xce50c800  106 de7e9900
+> 32    0x1c00 0xce50d000   66 de7e9e40
+> 33    0x1c00 0xce50d800  106 de7e96c0
+> 34    0x1c00 0xce50e000   66 de7e9c00
+> 35    0x1c00 0xce50e800  106 de7e9d80
+> 36    0x1c00 0xce50f000  106 de7e9cc0
+> 37    0x1c00 0xce50f800   66 de7e9f00
+> 38    0x1c00 0xce510000  106 de7e9a80
+> 39    0x1c00 0xce510800  106 de7e90c0
+> 40    0x1c00 0xce511000   66 de7e9240
+> 41    0x1c00 0xce511800  106 de7e9000
+> 42    0x1c00 0xce512000  106 de7e9780
+> 43    0x1c00 0xce512800   66 de7e9300
+> 44    0x1c00 0xce513000  106 de7e9840
+> 45    0x1c00 0xce513800  106 de5dbd80
+> 46    0x1c00 0xce514000   66 de5dbb40
+> 47    0x1c00 0xce514800  106 de5db780
+> 48    0x1c00 0xce515000  106 de5db9c0
+> 49    0x1c00 0xce515800   66 de5db600
+> 50    0x1c00 0xce516000  106 de5db540
+> 51    0x1c00 0xce516800  106 de5db000
+> 52    0x1c00 0xce517000   66 de5dbc00
+> 53    0x1c00 0xce517800  106 de5db6c0
+> 54    0x1c00 0xce518000   66 de5db3c0
+> 55    0x1c00 0xce518800  106 de5db300
+> 56    0x1c00 0xce519000  106 de5dbf00
+> 57    0x1c00 0xce519800   66 de5db0c0
+> 58    0x1c00 0xce51a000  106 de5db900
+> 59    0x1c00 0xce51a800  106 de5db240
+> 60    0x1c00 0xce51b000   66 de5dbe40
+> 61    0x1c00 0xce51b800  106 de5db840
+> 62    0x1c00 0xce51c000  106 de5dbcc0
+> 63    0x3c00 0xce51c800  106 de5db180
+> "
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
