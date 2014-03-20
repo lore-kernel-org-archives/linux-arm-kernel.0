@@ -1,55 +1,74 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 20 Mar 2014 20:55:41 +0900
-Subject: [PATCH v11 17/27] iommu/exynos: remove calls to Runtime PM API
- functions
-In-Reply-To: <CANEJEGtK-XfTef3ko+Yq2RNFXohhuQjgamr-DRBmxR-SNzgkJg@mail.gmail.com>
-References: <20140314140843.ba055f28dd7ed59c46088029@samsung.com>
- <5322FD14.5090602@samsung.com>
- <20140318185605.0380c8dfe6559c06183092e5@samsung.com>
- <532861BE.7020601@samsung.com>
- <20140319100304.5e26fa43ccdfc29178b058e1@samsung.com>
- <532997D7.6090608@samsung.com>
- <CANEJEGtK-XfTef3ko+Yq2RNFXohhuQjgamr-DRBmxR-SNzgkJg@mail.gmail.com>
-Message-ID: <20140320205541.d7ef53fd15d9dcd3cadfd13f@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 12:57:55 +0100
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <532AB3CF.30806@ti.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <4836281.0IgPinItBq@wuerfel> <532AB3CF.30806@ti.com>
+Message-ID: <201403201257.56090.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Mar 2014 09:54:39 -0700, Grant Grundler wrote:
-> On Wed, Mar 19, 2014 at 6:12 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> ...
-> >> Device driver is not only for the scholarship but also for the real use.
-> >
-> > Huh? I'm not sure what kind of comment is this.
-> 
-> I'm guessing Cho meant: "This isn't an academic exercise - I have a
-> real use case that requires reference counting."
+On Thursday 20 March 2014, Sekhar Nori wrote:
+> There is another thing we can do albeit in the driver (see patch).
+> Not sure how the USB maintainer will feel about it but I think this
+> has the advantage of not creating any hacky interfaces. And it
+> leaves me with the hope that someone will find the time to convert
+> to phy driver based on syscon at some point.
 
-That is what I meant; Sorry for my poor English :-)
+Interesting hack.
 
-> Cho needs to be more specific about his "Some driver needs enabling
-> sysmmu" example. Then others would understand why/when the reference
-> counting is needed. Ie walk through a real driver that exists today
-> that depends on reference counting.
->
+> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+> index 3586460..c807d3f 100644
+> --- a/drivers/usb/host/ohci-hcd.c
+> +++ b/drivers/usb/host/ohci-hcd.c
+> @@ -1178,7 +1178,8 @@ MODULE_LICENSE ("GPL");
+>  #define SA1111_DRIVER          ohci_hcd_sa1111_driver
+>  #endif
+>  
+> -#ifdef CONFIG_ARCH_DAVINCI_DA8XX
+> +/* DA8XX uses platform internal symbols. Cannot be built as module. */
+> +#if defined(CONFIG_ARCH_DAVINCI_DA8XX) && !defined(CONFIG_USB_OHCI_HCD_MODULE)
+>  #include "ohci-da8xx.c"
+>  #define DAVINCI_PLATFORM_DRIVER        ohci_hcd_da8xx_driver
+>  #endif
 
-One of my recent experience is that a display controller (FIMD) driver
-of a SoC manages two different context of power management:
-One is turning on and off display screen (LCD) (which is as usual as previous SoCs)
-and the other is gating its internal clock including System MMU very
-frequently to reduce power consumption.
-Because System MMU driver holds its clock ungated while it is enabled,
-FIMD driver explicitely disable System MMU.
+I wouldn't want to submit that patch to GregKH ;-)
 
-Yes, well designed FIMD driver must care about balancing of
-disabling and enabling System MMU between different contexts.
-But the design of some complex driver may be poor in few features due to
-agressive development schedule sometimes.
+How about doing the same thing in a somewhat less sneaky way?
 
-Please let me think about the counting.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Now I also think the system mmu driver does not need to make
-an extra effort for some special cases.
-
-Regards,
-
-KyongHo
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 0fe936c..857250a 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -417,6 +417,16 @@ config USB_OHCI_HCD_OMAP3
+ 	  Enables support for the on-chip OHCI controller on
+ 	  OMAP3 and later chips.
+ 
++config USB_OHCI_HCD_DAVINCI
++	bool "OHCI support for TI DaVinci DA8xx"
++	depends on ARCH_DAVINCI_DA8XX
++	depends on USB_OHCI_HCD=y
++	default y
++	help
++	  Enables support for the DaVinci DA8xx integrated OHCI
++	  controller. This driver cannot currently be a loadable
++	  module because it lacks a proper PHY abstraction.
++
+ config USB_OHCI_ATH79
+ 	bool "USB OHCI support for the Atheros AR71XX/AR7240 SoCs (DEPRECATED)"
+ 	depends on (SOC_AR71XX || SOC_AR724X)
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 3586460..f98d03f 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1178,7 +1178,7 @@ MODULE_LICENSE ("GPL");
+ #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+ #endif
+ 
+-#ifdef CONFIG_ARCH_DAVINCI_DA8XX
++#ifdef CONFIG_USB_OHCI_HCD_DAVINCI
+ #include "ohci-da8xx.c"
+ #define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
+ #endif
