@@ -1,45 +1,50 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 20 Mar 2014 04:48:10 -0700
-Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from
- function arguments
-In-Reply-To: <20140320114123.GE21349@lee--X1>
-References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
- <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
- <1395314713.7776.17.camel@joe-AO722> <20140320114123.GE21349@lee--X1>
-Message-ID: <1395316090.7776.24.camel@joe-AO722>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 12:50:44 +0100
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <532AB6B0.7010108@ti.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <9096065.aGCg8yZblW@wuerfel> <532AB6B0.7010108@ti.com>
+Message-ID: <201403201250.45005.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-20 at 11:41 +0000, Lee Jones wrote:
-> On Thu, 20 Mar 2014, Joe Perches wrote:
-> 
-> > On Thu, 2014-03-20 at 11:11 +0000, Lee Jones wrote:
-> > > Reported-by: Brian Norris <computersforpeace@gmail.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Thursday 20 March 2014, Sekhar Nori wrote:
+> On Thursday 20 March 2014 12:12 PM, Arnd Bergmann wrote:
+> > On Thursday 20 March 2014 01:36:13 Sergei Shtylyov wrote:
+> >> On 03/19/2014 11:21 PM, Arnd Bergmann wrote:
+> >>> The question is whether there is anyone who would do this properly.
+> >>
+> >>     Nobody cares, it seems. As you can imagine, I stopped to care enough after 
+> >> being switched to other projects.
 > > 
-> > Why are these useless?
+> > I only care about it because I have the intention to get all 'randconfig'
+> > kernels to build eventually. For stuff that is definitely 'legacy'
+> > and won't get cleaned up properly, I'm fine with a hack.
 > > 
-> > Even if the object code produced is the same,
-> > these serve as information to the human reader
-> > about how the arguments are used.
+> >>> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
+> >>
+> >>     The idea at the time was to just ioremap() this register but I was not 
+> >> very eager.
+> > 
+> > Yes, that would work, too. However, that would cause problems later
+> > if we ever try to make the davinci platform "multiplatform", unless we also
+> > pass the physical address in a platform resource and make this a larger
 > 
-> https://lkml.org/lkml/2014/3/20/69
+> Some SATA driver work done by Bartlomiej Zolnierkiewicz needed driver
+> access to syscfg registers too and I just asked him to pass the physical
+> addresses using platform resource. I think thats the best bet we have in
+> the absence of a modern interface.
+
+Ok.
+
+> > The syscon (system controller) framework helps share a set of registers
+> > across multiple drivers. If all accesses to the CFGCHIP2 register are
+> > in a single PHY driver, we wouldn't need it.
 > 
+> CFGCHIP2 has controls both for USB 1.1 (OHCI) and USB 2.0 (MUSB). Not
+> sure if there can be a single PHY driver for both.
 
->From that email:
+The phy infrastructure explicitly supports multiple consumers for one
+phy, if I'm reading the code correctly.
 
-suggestion:
-
-	const uint8_t *const buf  => const uint8_t *buf
-	const uint32_t size       => uint32_t size
-	const uint32_t offset     => uint32_t offset
-
-What was done:
-
--static int stfsm_write_fifo(struct stfsm *fsm,
--                           const uint32_t *buf, const uint32_t size)
-+static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
-
-Note the removal of the const from uint32_t *buf
-
-Why?
+	Arnd
