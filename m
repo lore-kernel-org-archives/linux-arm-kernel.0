@@ -1,30 +1,44 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Mar 2014 15:59:35 +0100
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320143110.GU7528@n2100.arm.linux.org.uk>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
- <532AEDE2.3080306@gmail.com> <20140320145221.09252bf6@armhf>
- <20140320143110.GU7528@n2100.arm.linux.org.uk>
-Message-ID: <20140320155935.7a474173@armhf>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 20 Mar 2014 16:04:36 +0100
+Subject: DMABOUNCE in pci-rcar
+In-Reply-To: <5165962.7bqj51B15Z@wuerfel>
+References: <201402241200.21944.arnd@arndb.de>
+ <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
+ <5165962.7bqj51B15Z@wuerfel>
+Message-ID: <532B0384.1000400@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Mar 2014 14:31:10 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 26/02/14 20:57, Arnd Bergmann wrote:
+> On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
+>> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> Hi Magnus,
+>>>
+>>> I noticed during randconfig testing that you enabled DMABOUNCE for the
+>>> pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
+>>>
+>>> I didn't see the original post unfortunately, but I fear we have to
+>>> revert it and come up with a better solution, ...
+>>
+>> Sounds like I should drop the following patches from my pci/host-rcar
+>> branch for now?
+>>
+>>    PCI: rcar: Add DMABOUNCE support
+>>    PCI: rcar: Enable BOUNCE in case of HIGHMEM
+>>    PCI: rcar: Make the Kconfig dependencies more generic
+>
+> Sounds good to me. The last patch is actually fine, but you'll have to
+> fix the context to apply it without the other two.
 
-> 1. change the DT compatible strings the driver has to accept both
->    nxp,tda19988 and nxp,tda19989, and set the appropriate device
->    in the DT file (tda19988).  I'm a bit nervous about using
->    "nxp,tda1998x" in case we're clashing with devices with different
->    characteristics.
+As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
+controllers no longer work with full 2GiB RAM enabled in the device
+tree.
 
-The Cubox is sold with either the TDA19988 or the TDA19989 (I don't
-know about the AMX33XX boards). Then, setting the exact type in the DT
-would ask for 2 differents DTs or for having two tda998x definitions in
-a same DT...
+Could we work around this by having 1GiB of memory defined in the
+32bit memory and then add the rest of the 3GiB from the >32bit
+area via LPAE? Will the kernel ever try to allocate DMA memory from
+anything >32bit?
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
