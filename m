@@ -1,29 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 11:35:31 +0000
-Subject: Common clock: function clock and bus clock
-In-Reply-To: <532AB8B7.6060608@codethink.co.uk>
-References: <CADApbej768d0z_SwSOAK8WcrxZOMMs3mFNzJ76Bewmi_-UU-PA@mail.gmail.com>
- <532AB8B7.6060608@codethink.co.uk>
-Message-ID: <20140320113531.GP7528@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 20 Mar 2014 12:35:45 +0100
+Subject: [PATCH v3 2/2] ARM: zynq: dt: Add I2C nodes to Zynq device tree
+In-Reply-To: <1394556613-11692-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1394556613-11692-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <ff9e2fa6-5202-4b2a-967c-a9cb14463276@CH1EHSMHS003.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 10:45:27AM +0100, Ben Dooks wrote:
-> On 11/03/14 03:06, Chao Xie wrote:
->> hi
->>
->> I can not find any examples for handling function clock and bus clock
->> in drivers/clk/.
->
-> The convention is that clk_get(dev, NULL) will get the bus clock
-> for the device and that any other clocks are appropriately named.
+On 03/11/2014 05:50 PM, Soren Brinkmann wrote:
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> v3:
+>  - no changes
+> v2:
+>  - replace 'pmbus' with 'ti' in compatibility strings of UCD devices
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
+>  arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 166 insertions(+)
 
-There is no such convention.  clk_get(dev, NULL) with clkdev (the
-reference) will find a clock in the table for the device also with
-a NULL connection ID.  That's the only "limitation".
+Rob, Mark: Any problem with binding?
 
-There's no implication that NULL is some kind of bus clock.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks,
+Michal
