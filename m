@@ -1,40 +1,34 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 20 Mar 2014 22:20:13 +0200
-Subject: [PATCH v2] ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
-Message-ID: <1395346813-13439-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: pelcan@codeaurora.org (Philip Elcan)
+Date: Thu, 20 Mar 2014 16:28:52 -0400
+Subject: [PATCH v5 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <1394762863-12154-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1394762863-12154-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1394762863-12154-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <532B4F84.7030801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+On 03/13/2014 10:07 PM, Bjorn Andersson wrote:
+> This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
+> The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
+> engine with input/output FIFOs and an embedded i2c mini-core. The driver
+> supports FIFO mode (for low bandwidth applications) and block mode (interrupt
+> generated for each block-size data transfer).
+> 
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
 
-The UBIFS partition size was incorrectly defined as for 128M NAND,
-but on k2hk-evm installed NAND flash size is 512M.
-Hence, correct it.
+[...]
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
+Worked with an EEPROM.
 
-Just cut from series
-v1:
-[PATCH 1/3] ARM: dts: k2hk-evm: set ubifs partition size for 512M NAND
-https://lkml.org/lkml/2014/3/20/462
+Tested-by: Philip Elcan <pelcan@codeaurora.org>
 
- arch/arm/boot/dts/k2hk-evm.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 1a1335b..949ef7d 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -133,7 +133,7 @@
- 
- 			partition at 180000 {
- 				label = "ubifs";
--				reg = <0x180000 0x7E80000>;
-+				reg = <0x180000 0x1fe80000>;
- 			};
- 		};
- 	};
 -- 
-1.8.3.2
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
