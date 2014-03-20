@@ -1,69 +1,29 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 20 Mar 2014 18:25:25 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <4884083.IuNl44Y6XD@wuerfel>
-References: <201402241200.21944.arnd@arndb.de> <5527822.QYtFYiIpiW@wuerfel>
- <532B137B.7010900@codethink.co.uk> <4884083.IuNl44Y6XD@wuerfel>
-Message-ID: <532B2485.6010005@codethink.co.uk>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu, 20 Mar 2014 10:26:17 -0700
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <532A5A62.5020303@gmail.com>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140316070917.GA3094@arch.cereza>
+ <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
+ <20140317204410.GA1118@arch.cereza>
+ <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
+ <20140319154434.GA3488@arch.cereza> <532A5A62.5020303@gmail.com>
+Message-ID: <CADHgK6uDEb88P-r_7CnYAOBxkNF9yd7ir6WqEPFZrbGdc1tHOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/14 17:41, Arnd Bergmann wrote:
-> On Thursday 20 March 2014 17:12:43 Ben Dooks wrote:
->> On 20/03/14 17:09, Arnd Bergmann wrote:
->>> On Thursday 20 March 2014 16:04:36 Ben Dooks wrote:
->
->>>> As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
->>>> controllers no longer work with full 2GiB RAM enabled in the device
->>>> tree.
->>>
->>> Did it work before these patches got applied initially?
->>
->> It did, but I cannot remember if we where limiting DRAM to 1GiB
->> or not.
->
-> I would assume you did, or you happened to never actually use
-> memory higher than that for DMA during tests.
->
->>>> Could we work around this by having 1GiB of memory defined in the
->>>> 32bit memory and then add the rest of the 3GiB from the >32bit
->>>> area via LPAE? Will the kernel ever try to allocate DMA memory from
->>>> anything >32bit?
->>>
->>> You can solve the case for dma_alloc_coherent() this way, or by
->>> setting the mask correctly. It won't help you for dma_map_* though,
->>> which still requires someone to add support for swiotlb or using
->>> an IOMMU if present.
->>
->> We do not have an IOMMU present at the moment. Not sure how
->> to go about setting a mask on a pci-probed device.
->
-> Ah, right. The mask is a problem because PCI devices assume that
-> they can do DMA to any 32-bit masked address without calling
-> dma_set_mask. Your trick to describe the system memory at a different
-> physical alias would solve this part. Another option might be to
-> add a quirk in the OHCI/EHCI drivers, if you are able to detect
-> this special case from the PCI IDs. Whether we can allow the PCI host
-> controller to just set a mask is an open question. If we decide to go
-> that route, you should be able to do it using the add_bus() callback
-> in the host controller driver. However, it would be a departure from
-> the normal way of doing PCI DMA, and I can't foresee what the implications
-> would be.
+Hi Tony,
 
-So doing:
+I have not used the tux-on-ice solution.  The patchset I've sent is to
+add initial support for swsusp based hibernation for ARM.
 
-static void pci_rcar_fixup(struct pci_dev *dev)
-{
-	if (dev->bus->ops == &rcar_pci_ops) {
-		dev_info(&dev->dev, "applying new dma mask\n");
-		dev->dma_mask = DMA_BIT_MASK(31);
-	}
-}
+Can you please begin a new, separate thread for this?  Ie. separate
+from the review for the swsusp hibernation patches I've submitted?
+I'm not sure where the right list/forum is for this, perhaps someone
+can make a recommendation, but I am not sure it should go on LKML.
+Please copy me on your new thread.
 
-DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
+Thanks!
 
-Did not work for me :(
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Sebastian
