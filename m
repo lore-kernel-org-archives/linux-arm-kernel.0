@@ -1,79 +1,60 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 20 Mar 2014 10:12:51 -0700
-Subject: [PATCH v3 2/5] pwm: kona: Introduce Kona PWM controller support
-In-Reply-To: <20140320155732.GB25092@ulmo>
-References: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
- <1394655346-30048-3-git-send-email-tim.kryger@linaro.org>
- <20140318215231.GH5917@mithrandir>
- <CAAYSxhri0evgrbCPew6-MTXVmpzm7Oa6TpmJTSGZpTcV=876HQ@mail.gmail.com>
- <20140320155732.GB25092@ulmo>
-Message-ID: <CAAYSxhrMxjFNr-z1qQQRK88B2_GcWo_5MhQrwsht=zRWpp4SQw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 20 Mar 2014 13:12:35 -0400
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <532B2183.2080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 8:57 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Tue, Mar 18, 2014 at 04:47:36PM -0700, Tim Kryger wrote:
+Boris,
 
-> Perhaps the comment for enum pwm_polarity in include/linux/pwm.h makes
-> this more obvious. What you do here is invert the duty cycle, rather
-> than the polarity. While it is true that the result is the same for
-> things like LEDs or backlight (because the signal power remains the
-> same), but there's a slight difference to what the PWM signal looks
-> like.
+On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> After testing NAND flash with ubifs for k2hk-emv board were committed
+> that flash doesn't support subpage writing, so we can fix it by
+> adding a property to disable subpage write.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+Can you please pick this up for 3.15 fixes ? Ofcourse assuming DT folks
+are ok with the patch.
 
-Thanks, I missed that comment before.
+I can then take patch 1/3 and 3/3 in my 3.15 fixes queue.
 
->> Does polarity influence the output while a PWM is disabled?
->
-> Yes, there is apparently hardware where the polarity causes the PWM pin
-> to be 1 when the PWM is disabled. But that's really a separate issue.
-
-Do you have a preference on how this should be handled?
-
-
-> Things are starting to get confusing here. Looking at the register
-> definitions, there's PWM_CONTROL_ENABLE_SHIFT(chan), which I suspect
-> controls whether or not a channel is enabled (if that's not the case
-> then please add a comment that explains what it does).
-
-I've tried to do this but the unfortunate name for these bits and
-their nuanced behavior makes it difficult.
-
->
-> But a little further up you said that the hardware does only support a
-> configure operation and not an enable/disable.
-
-If you define disabled as zero duty output, then this is true.
-
-When the smooth bit is off and the "enable" bit is off output is 100% duty.
-
->
-> The comment above further confuses me. What I read from it is that you
-> can in fact disable a channel by clearing the "enable" bit in the
-> control register. But the reason why you don't do it that way is because
-> that change won't take effect until "settings start to take effect". So
-> in order to disable the PWM immediately you resort to writing a 0 duty
-> cycle.
-
-Sorry if my comments were confusing.  New settings are only applied on
-a rising edge of the "enable" bit.  You should think of it more as a
-trigger bit than an enable.
-
->
-> Perhaps I misunderstood, in which case it might be good to revise that
-> comment to be more explicit or accurate.
-
-Perhaps it would be clearest to deviate from the hw docs and rename
-PWM_CONTROL_ENABLE_SHIFT to PWM_CONTROL_TRIGGER_SHIFT to more closely
-match its function.  What do you think of the following?
-
-/*
-* New duty and period settings are only reflected in the PWM output
-* after a rising edge of the trigger bit.  After a rising edge, if the
-* smooth bit is set, the settings are also delayed until the current
-* period has completed. Furthermore, if the smooth bit is set, the PWM
-* continues to output a waveform based on the old settings during the
-* time that the trigger bit is low.  Otherwise the output is a constant
-* high signal while the trigger bit is low.
-*/
+>  Documentation/devicetree/bindings/mtd/davinci-nand.txt | 2 ++
+>  drivers/mtd/nand/davinci_nand.c                        | 3 +++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/davinci-nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> index cfb18ab..50af930 100644
+> --- a/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+> @@ -53,6 +53,8 @@ Recommended properties :
+>  				identifier is saved in OOB area. If not present
+>  				false.
+>  
+> +- ti,davinci-nosubpage-write:	disable subpage write for the device
+> +
+>  Deprecated properties:
+>  
+>  - ti,davinci-ecc-mode:		operation mode of the NAND ecc mode. ECC mode
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index 4615d79..3ba058d 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -581,6 +581,9 @@ static struct davinci_nand_pdata
+>  		    of_property_read_bool(pdev->dev.of_node,
+>  			"ti,davinci-nand-use-bbt"))
+>  			pdata->bbt_options = NAND_BBT_USE_FLASH;
+> +		if (of_property_read_bool(pdev->dev.of_node,
+> +			"ti,davinci-no-subpage-write"))
+> +			pdata->options |= NAND_NO_SUBPAGE_WRITE;
+>  	}
+>  
+>  	return dev_get_platdata(&pdev->dev);
+> 
