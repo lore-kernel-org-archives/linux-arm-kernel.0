@@ -1,41 +1,65 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 20 Mar 2014 03:08:20 -0700
-Subject: [PATCH] checkpatch.pl: Add check for Change-Id
-In-Reply-To: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
-References: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
-Message-ID: <1395310100.7776.3.camel@joe-AO722>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 20 Mar 2014 11:09:53 +0100
+Subject: [PATCH 09/11] ARM: at91/dt: define main xtal frequency of the
+ at91sam9261ek board
+In-Reply-To: <532AB9EC.1030507@gmail.com>
+References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1395173924-3648-10-git-send-email-b.brezillon.dev@gmail.com>
+ <CACh+v5OF52ZuDBpkqpev1Jxv0DJ1ckRR+DjcX500i3o0o4HE9A@mail.gmail.com>
+ <532AB9EC.1030507@gmail.com>
+Message-ID: <CACh+v5Psjgs=v2feP3oETXgxUXw6JsVDXBKhEG4OPCP1-YM1aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-19 at 14:54 -0400, Christopher Covington wrote:
-> A commit hook for the Gerrit code review server inserts change
-> identifiers so Gerrit can track patches through multiple revisions.
-> These identifiers are noise in the context of the upstream kernel.
-> (Many Gerrit servers are private. Even given a public instance,
-> given only a Change-Id, one must guess which server a change was
-> tracked on. Patches submitted to the Linux kernel mailing lists
-> should be able to stand on their own. If it's truly useful to
-> reference code review on a Gerrit server, a URL is a much clearer
-> way to do so.) Thus, issue an error when a Change-Id: line is
-> encountered.
-[]
-> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-[]
-> @@ -1891,6 +1891,12 @@ sub process {
->  			}
->  		}
->  
-> +# Check for unwanted Gerrit info
-> +		if ($line =~ /^\s*change-id:/i) {
-> +			ERROR("BAD_SIGN_OFF",
-> +			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
-> +		}
-> +
+That's right. I keep forgetting this.
 
-I think this needs an "$in_commit_log" test added
-
-		if ($in_commit_log &&
-		    $line =~ /^\s*change-id:/i) {
-
-And maybe use a separate "TYPE", not "BAD_SIGN_OFF".
-Maybe "GERRIT_CHANGE_ID"
+2014-03-20 10:50 GMT+01:00 Boris BREZILLON <b.brezillon.dev@gmail.com>:
+>
+> Le 20/03/2014 10:24, Jean-Jacques Hiblot a ?crit :
+>
+>> 2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
+>>>
+>>> Define at91sam9261ek main crystal frequency.
+>>>
+>>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>>> ---
+>>>   arch/arm/boot/dts/at91sam9261ek.dts |    4 ++++
+>>>   1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts
+>>> b/arch/arm/boot/dts/at91sam9261ek.dts
+>>> index 2ce527e..7175986 100644
+>>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+>>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+>>> @@ -29,6 +29,10 @@
+>>>                          compatible = "atmel,osc", "fixed-clock";
+>>>                          clock-frequency = <18432000>;
+>>>                  };
+>>> +
+>>> +               main_xtal: main_xtal {
+>>> +                       clock-frequency = <18432000>;
+>>> +               };
+>>>          };
+>>>
+>>>          ahb {
+>>> --
+>>> 1.7.9.5
+>>>
+>> You forgot to remove the old fixed-clock definition for the main_clock:
+>> clock at 0
+>
+>
+> We need this clock when CCF is disabled (when using the old at91 clk
+> implementation).
+> I'm afraid we'll have to keep it until we move all sam9 SoCs and boards to
+> CCF (and DT).
+>
+> Best Regards,
+>
+> Boris
+>
+>>
+>> Otherwise:
+>> Acked-by: Jean-Jacques HIBLOT <jjhiblot@traphandler.com>
+>
+>
