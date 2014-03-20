@@ -1,95 +1,143 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 07:32:16 +0900
-Subject: [GIT PULL 3/4] Samsung PM updates for v3.15
-Message-ID: <532B6C70.6060002@samsung.com>
+Date: Fri, 21 Mar 2014 07:36:48 +0900
+Subject: [GIT PULL 4/4] Samsung Exynos cleanup/consolidate for v3.15
+Message-ID: <532B6D80.9070302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8460dc7f2777d564b4cf094721e9de6e6657e11c:
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-   Merge branch 'v3.15-next/cleanup-samsung-2' into 
-v3.15-next/s2r-pm-samsung-2 (2014-03-21 04:04:15 +0900)
+   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
 are available in the git repository at:
 
-
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-pm-2
+tags/exynos-cleanup
 
-for you to fetch changes up to 8dec067dc9c59f9fdcaf4357c22994cde3647eb8:
+for you to fetch changes up to 602408e3de70d132c115670a366f4c5ae657080c:
 
-   ARM: EXYNOS: Fix compilation error in cpuidle.c (2014-03-21 07:17:17 
-+0900)
-
-----------------------------------------------------------------
-Samsung PM related 2nd updates for v3.15
-
- From Tomasz Figa <t.figa@samsung.com>:
-Current Samsung PM code is heavily unprepared for multiplatform
-systems. The design implies accessing functions and global
-variables defined in particular mach- subdirectory from common
-code in plat-, which is not allowed when building ARCH_MULTIPLATFORM.
-In addition there is a lot of forced code unification, which makes
-common function handle any possible quirks of all supported SoCs.
-In the end this design turned out to not work too well, ending with
-a lot of empty functions exported from mach-, just because code in
-common pm.c calls them. Moreover, recent trend of moving lower level
-suspend/resume code to proper drivers, like pinctrl or clk, made a
-lot of code there redundant, especially on DT-only platforms like
-Exynos.
-
-Note that this branch is based on previous tags/samsung-pm-1 and merge
-tags/samsung-cleanup-2 because of fix build error from recent changes
-of <linux/serial_s3c.h>
+   dt-bindings: clock: Move exynos-audss-clk.h to dt-bindings/clock 
+(2014-03-21 04:31:30 +0900)
 
 ----------------------------------------------------------------
-Mark Brown (2):
-       serial: s3c: Fix build of header without serial_core.h preinclusion
-       ARM: S3C64XX: Fix build for implicit serial_s3c.h inclusion
+Exynos cleanup for v3.15
 
-Tomasz Figa (14):
-       ARM: EXYNOS: Do not resume l2x0 if not enabled before suspend
-       ARM: SAMSUNG: Add soc_is_s3c2410() helper
-       ARM: SAMSUNG: Save UART DIVSLOT register based on SoC type
-       ARM: SAMSUNG: Use debug_ll_addr() to get UART base address
-       ARM: SAMSUNG: Consolidate PM debug functions
-       ARM: SAMSUNG: Move Samsung PM debug code into separate file
-       ARM: SAMSUNG: Move common save/restore helpers to separate file
-       ARM: SAMSUNG: Move s3c_pm_check_* prototypes to plat/pm-common.h
-       ARM: EXYNOS: Fix abuse of CONFIG_PM
-       ARM: EXYNOS: Remove PM initcalls and useless indirection
-       ARM: EXYNOS: Stop using legacy Samsung PM code
-       ARM: EXYNOS: Allow wake-up using GIC interrupts
-       ARM: S5P64X0: Explicitly include linux/serial_s3c.h in mach/pm-core.h
-       ARM: EXYNOS: Fix compilation error in cpuidle.c
+- reorganize code for
+- add support reserve memory for mfc-v7
+- consolidate exynos4 and exynos5 machine codes
+- add generic compatible strings for exynos4 and exynos5
+- update DT with generic compatible strings
+- move clk related dt-binding header file in dt-bindings/clock
 
-  arch/arm/mach-exynos/Kconfig                   |  16 +--
-  arch/arm/mach-exynos/Makefile                  |   2 +-
-  arch/arm/mach-exynos/common.c                  |   1 +
-  arch/arm/mach-exynos/common.h                  |  14 ++
-  arch/arm/mach-exynos/cpuidle.c                 |   3 +-
-  arch/arm/mach-exynos/include/mach/pm-core.h    |  75 -----------
-  arch/arm/mach-exynos/pm.c                      | 172 
-+++++++++++++++++++------
-  arch/arm/mach-exynos/regs-pmu.h                |   2 +
-  arch/arm/mach-exynos/sleep.S                   |  85 ++++++++++++
-  arch/arm/mach-s3c64xx/include/mach/pm-core.h   |   2 +
-  arch/arm/mach-s3c64xx/pm.c                     |   1 -
-  arch/arm/mach-s5p64x0/include/mach/pm-core.h   |   2 +
-  arch/arm/mach-s5p64x0/pm.c                     |   1 -
-  arch/arm/plat-samsung/Makefile                 |   2 +
-  arch/arm/plat-samsung/include/plat/cpu.h       |   6 +
-  arch/arm/plat-samsung/include/plat/pm-common.h | 110 ++++++++++++++++
-  arch/arm/plat-samsung/include/plat/pm.h        |  80 +-----------
-  arch/arm/plat-samsung/pm-check.c               |   2 +-
-  arch/arm/plat-samsung/pm-common.c              |  75 +++++++++++
-  arch/arm/plat-samsung/pm-debug.c               |  97 ++++++++++++++
-  arch/arm/plat-samsung/pm.c                     | 144 ---------------------
-  arch/arm/plat-samsung/s5p-sleep.S              |  43 -------
-  include/linux/serial_s3c.h                     |   2 +
-  23 files changed, 537 insertions(+), 400 deletions(-)
-  delete mode 100644 arch/arm/mach-exynos/include/mach/pm-core.h
-  create mode 100644 arch/arm/mach-exynos/sleep.S
-  create mode 100644 arch/arm/plat-samsung/include/plat/pm-common.h
-  create mode 100644 arch/arm/plat-samsung/pm-common.c
-  create mode 100644 arch/arm/plat-samsung/pm-debug.c
+----------------------------------------------------------------
+Sachin Kamat (6):
+       ARM: EXYNOS: Add support to reserve memory for MFC-v7
+       ARM: SAMSUNG: Introduce generic Exynos4 and 5 helpers
+       ARM: EXYNOS: Consolidate CPU init code
+       ARM: EXYNOS: Consolidate exynos4 and exynos5 machine files
+       ARM: EXYNOS: Add generic compatible strings
+       ARM: dts: Update Exynos DT files with generic compatible strings
+
+Tushar Behera (2):
+       ARM: SAMSUNG: Reorganize calls to reserve memory for MFC
+       dt-bindings: clock: Move exynos-audss-clk.h to dt-bindings/clock
+
+  arch/arm/boot/dts/exynos4210-origen.dts            |   2 +-
+  arch/arm/boot/dts/exynos4210-smdkv310.dts          |   2 +-
+  arch/arm/boot/dts/exynos4210-trats.dts             |   2 +-
+  arch/arm/boot/dts/exynos4210-universal_c210.dts    |   2 +-
+  arch/arm/boot/dts/exynos4210.dtsi                  |   2 +-
+  arch/arm/boot/dts/exynos4212.dtsi                  |   2 +-
+  arch/arm/boot/dts/exynos4412-odroidx.dts           |   2 +-
+  arch/arm/boot/dts/exynos4412-origen.dts            |   2 +-
+  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   2 +-
+  arch/arm/boot/dts/exynos4412-tiny4412.dts          |   2 +-
+  arch/arm/boot/dts/exynos4412-trats2.dts            |   2 +-
+  arch/arm/boot/dts/exynos4412.dtsi                  |   2 +-
+  arch/arm/boot/dts/exynos5250-arndale.dts           |   2 +-
+  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   2 +-
+  arch/arm/boot/dts/exynos5250-snow.dts              |   2 +-
+  arch/arm/boot/dts/exynos5250.dtsi                  |   4 +-
+  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   2 +-
+  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   2 +-
+  arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
+  arch/arm/boot/dts/exynos5440-sd5v1.dts             |   2 +-
+  arch/arm/boot/dts/exynos5440-ssdk5440.dts          |   2 +-
+  arch/arm/boot/dts/exynos5440.dtsi                  |   2 +-
+  arch/arm/mach-exynos/Makefile                      |   7 +-
+  arch/arm/mach-exynos/common.h                      |   3 +-
+  arch/arm/mach-exynos/{common.c => exynos.c}        | 228 
+++++++++++-----------
+  arch/arm/mach-exynos/mach-exynos4-dt.c             |  59 ------
+  arch/arm/mach-exynos/mach-exynos5-dt.c             |  81 --------
+  arch/arm/mach-exynos/mfc.h                         |  16 ++
+  arch/arm/mach-exynos/regs-pmu.h                    |   1 -
+  arch/arm/plat-samsung/include/plat/cpu.h           |   4 +
+  arch/arm/plat-samsung/include/plat/mfc.h           |   3 -
+  arch/arm/plat-samsung/s5p-dev-mfc.c                |  17 +-
+  drivers/clk/samsung/clk-exynos-audss.c             |   2 +-
+  .../dt-bindings/{clk => clock}/exynos-audss-clk.h  |   0
+  34 files changed, 166 insertions(+), 303 deletions(-)
+  rename arch/arm/mach-exynos/{common.c => exynos.c} (71%)
+  delete mode 100644 arch/arm/mach-exynos/mach-exynos4-dt.c
+  delete mode 100644 arch/arm/mach-exynos/mach-exynos5-dt.c
+  create mode 100644 arch/arm/mach-exynos/mfc.h
+  rename include/dt-bindings/{clk => clock}/exynos-audss-clk.h (100%)
+
+One more note, following is resolution for merge conflict. Sorry.
+
+diff --cc arch/arm/mach-exynos/exynos.c
+index e98ddad,fd3664f..b567361
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@@ -9,40 -9,27 +9,27 @@@
+    * published by the Free Software Foundation.
+    */
+
+- #include <linux/kernel.h>
+- #include <linux/bitops.h>
+- #include <linux/interrupt.h>
+- #include <linux/irq.h>
+- #include <linux/irqchip.h>
++ #include <linux/init.h>
+   #include <linux/io.h>
+- #include <linux/device.h>
+- #include <linux/gpio.h>
+- #include <clocksource/samsung_pwm.h>
+- #include <linux/sched.h>
+- #include <linux/serial_core.h>
+  +#include <linux/serial_s3c.h>
++ #include <linux/kernel.h>
+   #include <linux/of.h>
+- #include <linux/of_fdt.h>
+- #include <linux/of_irq.h>
+- #include <linux/pm_domain.h>
+- #include <linux/export.h>
+- #include <linux/irqdomain.h>
+   #include <linux/of_address.h>
+- #include <linux/irqchip/arm-gic.h>
+- #include <linux/irqchip/chained_irq.h>
++ #include <linux/of_fdt.h>
++ #include <linux/of_platform.h>
+   #include <linux/platform_device.h>
++ #include <linux/pm_domain.h>
+
+- #include <asm/proc-fns.h>
+- #include <asm/exception.h>
++ #include <asm/cacheflush.h>
+   #include <asm/hardware/cache-l2x0.h>
++ #include <asm/mach/arch.h>
+   #include <asm/mach/map.h>
+- #include <asm/mach/irq.h>
+- #include <asm/cacheflush.h>
++ #include <asm/memory.h>
+
+   #include <plat/cpu.h>
+- #include <plat/pm.h>
+  -#include <plat/regs-serial.h>
+
+   #include "common.h"
++ #include "mfc.h"
+   #include "regs-pmu.h"
+
+   #define L2_AUX_VAL 0x7C470001
