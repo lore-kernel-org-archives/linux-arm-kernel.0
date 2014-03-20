@@ -1,69 +1,79 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 20 Mar 2014 15:19:45 +0100
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320145221.09252bf6@armhf>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
- <532AEDE2.3080306@gmail.com> <20140320145221.09252bf6@armhf>
-Message-ID: <532AF901.3050402@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Mar 2014 14:22:42 +0000
+Subject: [PATCH v1 2/2] Documentation: devicetree: Add new binding for
+ PSCIv0.2
+In-Reply-To: <20140320030319.GO1297@cbox>
+References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1395276865-6868-2-git-send-email-ashwin.chaugule@linaro.org>
+ <20140320030319.GO1297@cbox>
+Message-ID: <20140320142242.GC23372@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2014 02:52 PM, Jean-Francois Moine wrote:
-> On Thu, 20 Mar 2014 14:32:18 +0100
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->
->> Ok, I had another round of google'ing and found this:
->> http://hipstercircuits.com/wp-content/uploads/2013/05/TDA19988.pdf
->>
->> There, the datasheet specifically for TDA19988 only states 0x70 and
->> 0x34 as the two i2c addresses. Therefore, TDA19988 has fixed i2c
->> addresses while TDA9983b has configurable (main) i2c address.
->>
->> Not as easy as we thought ;)
->>
->> I suggest reword the reg property to:
->> "- reg: shall be set to the I2C address"
->>
->> and optionally list all known addresses for each TDA[1]998x in the
->> binding.
->
-> Thanks for the link.
->
-> OK, then, as the linux tda998x driver handles only the tda 19988 and
-> 19989 chips, the HDMI I2C address is always 0x70.
->
-> So, question: Russell and Sebastian, do you still want an other patch?
+On Thu, Mar 20, 2014 at 03:03:19AM +0000, Christoffer Dall wrote:
+> On Wed, Mar 19, 2014 at 08:54:25PM -0400, Ashwin Chaugule wrote:
+> > The PSCI v0.2+ spec defines static values for PSCI function IDs.
+> > Add a new binding entry so that pre v0.2 implementations can
+> > use DT entries for function IDs and v0.2+ implementations use
+> > static entries as defined by the PSCIv0.2 specification.
+> > 
+> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/psci.txt | 6 +++++-
+> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+> > index 433afe9..a808284 100644
+> > --- a/Documentation/devicetree/bindings/arm/psci.txt
+> > +++ b/Documentation/devicetree/bindings/arm/psci.txt
+> > @@ -21,7 +21,11 @@ to #0.
+> >  
+> >  Main node required properties:
+> >  
+> > - - compatible    : Must be "arm,psci"
+> > + - compatible    : "arm,psci" : pre PSCIv0.2 spec implementations use this
+> > +                   to get the function IDs from DT entries.
+> > +
+> > +                   "arm,psci-0.2": PSCIv0.2+ spec implementations use static
+> > +                   values for function IDs as defined in the spec.
 
-Up to Russell, but reg property is required for i2c slaves and should
-be documented.
+How about:
 
-> Other question: the CEC address is hard-coded to 0x34 in the driver.
-> Should it be configurable in the DT?
+- compatible: should contain at least one of:
 
-Looking at nxp's website, detailed information about TDA[1]998x have
-vanished. Luckily, there are some hints in the parametric search:
+  * "arm,psci" : for implementations complying to PSCI versions prior to
+    0.2. For these cases function IDs must be provided.
 
-There is TDA998[14] without any CEC support and
-TDA1998[89] with CEC support. Both TDA19988 and TDA19989 have
-fixed i2c addresses 0x70 and 0x34 respectively.
+  * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
+    IDs are not required and should be ignored by an OS with PSCI 0.2
+    support, but are permitted to be present for compatibility with
+    existing software when "arm,psci" is later in the compatible list.
 
-So, the answer is:
+> Maybe specify that in this case no function IDs are passed in the device
+> tree?
 
-Let the driver access CEC i2c slave only if it is TDA1998[89]. The
-HDMI part should be quite compatible with TDA998x, so if anyone
-has it on his board, he is invited to add proper support.
+As described above, for compatibility with existing kernels, the
+hypervisor will likely want to provide IDs, e.g.
 
-For the binding, reg address should contain reg property to the
-HDMI i2c slave. Add proper compatibles/i2c_ids for nxp,tda19988 and
-nxp,tda19989 and check that to add the CEC i2c slave on 0x34.
+psci {
+	compatible = "arm,psci-0.2", "arm,psci";
+	method = "hvc";
 
-If, someday there will be a tda19990 with configurable addresses,
-I am sure you can derive it from i2c main address, e.g. 0x70<>0x34,
-0x71<>0x35, aso.
+	cpu_on = < arbitrary value >;
+	cpu_off = < arbitrary value >;
 
-No need to take care of configurable CEC slave address now, neither
-in the driver nor binding.
+	...
+};
 
-Sebastian
+In this case I'd expect an OS with PSCI 0.2 support to use the PSCI 0.2
+IDs, but an older OS would use the IDs from the DT (which may or may not
+match the PSCI 0.2 IDs).
+
+So while we should say is any function IDs should be ignored for
+"arm,psci-0.2", we shouldn't say that they are disallowed in the node.
+
+The document should have examples of "arm,psci" only, "arm,psci-0.2"
+only, and the compatibility case.
+
+Cheers,
+Mark.
