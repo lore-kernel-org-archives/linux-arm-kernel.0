@@ -1,36 +1,55 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 20 Mar 2014 18:32:24 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <20140320173106.GA19395@obsidianresearch.com>
-References: <201402241200.21944.arnd@arndb.de> <5527822.QYtFYiIpiW@wuerfel>
- <532B137B.7010900@codethink.co.uk> <4884083.IuNl44Y6XD@wuerfel>
- <532B2485.6010005@codethink.co.uk>
- <20140320173106.GA19395@obsidianresearch.com>
-Message-ID: <532B2628.5080305@codethink.co.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 20 Mar 2014 18:15:13 +0100
+Subject: [PATCH] ASoC: tda998x: Change the compatible strings
+Message-ID: <20140320173240.A1152A61AD@smtp3-g21.free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/14 18:31, Jason Gunthorpe wrote:
-> On Thu, Mar 20, 2014 at 06:25:25PM +0100, Ben Dooks wrote:
->> So doing:
->>
->> static void pci_rcar_fixup(struct pci_dev *dev)
->> {
->> 	if (dev->bus->ops == &rcar_pci_ops) {
->> 		dev_info(&dev->dev, "applying new dma mask\n");
->> 		dev->dma_mask = DMA_BIT_MASK(31);
->> 	}
->> }
->>
->> DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
->>
->> Did not work for me :(
->
-> Seems like it should work, do you have CONFIG_PCI_QUIRKS turned on?
+The tda998x driver accepts 3 chips only from the TDA998x family.
+This patch changes the driver to accept only these chips.
 
-Yes, see the print happening, just still PCI OHCI dies horribly.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 4 ++--
+ drivers/gpu/drm/i2c/tda998x_drv.c                     | 4 +++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-
+diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+index fc7effa..e3f3d65 100644
+--- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
++++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+@@ -1,7 +1,7 @@
+ Device-Tree bindings for the NXP TDA998x HDMI transmitter
+ 
+ Required properties;
+-  - compatible: must be "nxp,tda998x"
++  - compatible: may be "nxp,tda9989", "nxp,tda19988" or "nxp,tda19989"
+ 
+   - reg: I2C address
+ 
+@@ -20,7 +20,7 @@ Optional properties:
+ Example:
+ 
+ 	tda998x: hdmi-encoder {
+-		compatible = "nxp,tda998x";
++		compatible = "nxp,tda19988";
+ 		reg = <0x70>;
+ 		interrupt-parent = <&gpio0>;
+ 		interrupts = <27 2>;		/* falling edge */
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 48af5ca..fd6751c 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1367,7 +1367,9 @@ fail:
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id tda998x_dt_ids[] = {
+-	{ .compatible = "nxp,tda998x", },
++	{ .compatible = "nxp,tda9989", },
++	{ .compatible = "nxp,tda19988", },
++	{ .compatible = "nxp,tda19989", },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.9.1
