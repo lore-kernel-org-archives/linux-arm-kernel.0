@@ -1,41 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 03:08:21 +0900
-Subject: [PATCH v2 4/6] ARM: SAMSUNG: Fix rebase error in pm-debug.c
-In-Reply-To: <1395162964-5916-4-git-send-email-t.figa@samsung.com>
-References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
- <1395162964-5916-4-git-send-email-t.figa@samsung.com>
-Message-ID: <532B2E95.50608@samsung.com>
+From: imp@bsdimp.com (Warner Losh)
+Date: Thu, 20 Mar 2014 12:09:00 -0600
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <532B2D3F.6050004@ti.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B2183.2080309@ti.com> <20140320172912.GW31517@norris-Latitude-E6410>
+ <532B2766.6090506@ti.com> <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
+ <532B2D3F.6050004@ti.com>
+Message-ID: <3A49495A-CE1E-46DA-A003-7863C982CA81@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/14 02:16, Tomasz Figa wrote:
-> Recent Samsung header clean-up series did heavy reorganization of
-> various Samsung-specific headers, unfortunately causing a conflict with
-> Samsung PM consolidation series part 2 - multiplatform) and resulting
-> with a merge error that caused a build failure, due to a missing header
-> being included.
->
-> This patch fixes this by removing incorrect header inclusion.
->
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> ---
->   arch/arm/plat-samsung/pm-debug.c | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
-> index 602998b..88bb4cf 100644
-> --- a/arch/arm/plat-samsung/pm-debug.c
-> +++ b/arch/arm/plat-samsung/pm-debug.c
-> @@ -20,7 +20,6 @@
->
->   #include<plat/cpu.h>
->   #include<plat/pm-common.h>
-> -#include<plat/regs-serial.h>
->
->   #ifdef CONFIG_SAMSUNG_ATAGS
->   #include<mach/pm-core.h>
 
-OK, applied into s2r-pm-samsung-2 branch.
+On Mar 20, 2014, at 12:02 PM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-Thanks,
-Kukjin
+> On Thursday 20 March 2014 01:44 PM, Warner Losh wrote:
+>> 
+>> On Mar 20, 2014, at 11:37 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>> 
+>>> 
+>>> 
+>>> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
+>>>> On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
+>>>>> Boris,
+>>>> 
+>>>> Who's Boris? And why should Boris be taking this patch? It's an MTD
+>>>> patch.
+>>>> 
+>>> I got your name completely wrong. Sorry....
+>>> 
+>>>>> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
+>>>>>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>>>>> 
+>>>>>> After testing NAND flash with ubifs for k2hk-emv board were committed
+>>>>>> that flash doesn't support subpage writing, so we can fix it by
+>>>>>> adding a property to disable subpage write.
+>>>> 
+>>>> What flash? We try to autodetect NAND as much as possible. Perhaps we
+>>>> should be adding infrastructure support instead of hacking it with a DT
+>>>> property.
+>>>> 
+>>> We can't auto detect it and thats why the DT approach was taken. We
+>>> will double check that.
+>> 
+>> I though sub page writing was one of the fields in the onfi and/or jedec(toggle) meta data structures. Have you looked there?
+>> 
+> Am not sure if I follow you. The limitation is from the TI NAND controller(AEMIF) and
+> not the NAND memory. 
+
+Then never mind. I thought it was the other side of things.
+
+Warner
