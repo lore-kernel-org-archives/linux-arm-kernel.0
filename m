@@ -1,44 +1,119 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 16:22:58 +0000
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320165440.195cd2ea@armhf>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
- <532AEDE2.3080306@gmail.com> <20140320145221.09252bf6@armhf>
- <20140320143110.GU7528@n2100.arm.linux.org.uk>
- <20140320155935.7a474173@armhf>
- <20140320151934.GV7528@n2100.arm.linux.org.uk>
- <20140320165440.195cd2ea@armhf>
-Message-ID: <20140320162258.GX7528@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Mar 2014 20:20:47 +0400
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <9096065.aGCg8yZblW@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <4836281.0IgPinItBq@wuerfel> <532A1BDD.904@cogentembedded.com>
+ <9096065.aGCg8yZblW@wuerfel>
+Message-ID: <532B155F.9020605@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 04:54:40PM +0100, Jean-Francois Moine wrote:
-> On Thu, 20 Mar 2014 15:19:34 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > I'm not saying that it has to match the physical device fitted - I'm
-> > merely suggesting not using nxp,tda1998x which could (and as Sebastian
-> > has found, does) conflict with other devices with different properties.
-> > 
-> > We still auto-detect the exact device type by reading the ID register
-> > because that's the most reliable way to detect exactly what kind of
-> > device is fitted to the board.
-> 
-> I don't see the problem.
-> 
-> Actually the driver handles the tda9989, tda19988 and tda19989 (2
-> variants). If some board has, for example, the tda9983 and if the
-> driver is extended to handle this chip (i.e. mainly ignore the CEC
-> part), setting 'nxp,tda998x' in the associated DT will still work.
+Hello.
 
-So you have to encode in the driver that if you see a tda9983 device,
-you don't touch the CEC part.
+On 20-03-2014 10:42, Arnd Bergmann wrote:
 
-Now think about how you'd handle a tda998x compatible device but with
-the CEC stuff at a different I2C address.
+>>> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>>      The idea at the time was to just ioremap() this register but I was not
+>> very eager.
+
+    ... also it was suggested to pass the CFGCHIP2 address as a resource. I 
+certainly wasn't eager to do that since if done for both MUSB and OHCI, it 
+would cause sort of a resource conflict (platform device resources are 
+automatically registered in the resource tree, although without marking them 
+exclusive), even if we don't call request_mem_region() on them (we can't do 
+that since in this case the resource would be registered as exclusive, and the 
+second call would fail).
+
+> Yes, that would work, too. However, that would cause problems later
+> if we ever try to make the davinci platform "multiplatform", unless we also
+> pass the physical address in a platform resource and make this a larger
+> driver.
+
+    In my opinion, we don't have to pass CFGCHIP2 as a resource and could just 
+ioremap() the raw physical address.
+
+> I think we can reasonably have an exported set of functions
+> declared in the platform data header file for these drivers, but passing
+> the physical address through a header file
+
+    That's how it's passed today (however, thru <mach/da8xx.h>).
+
+> wouldn't be much of an improvement
+> over passing the virtual address.
+
+    Not sure I understood about passing virtual address.
+
+>> There was no USB PHY driver subsystem yet.
+
+>>> to control the clock, phy
+
+>>      Note that it only controls PHY clock (PLL) which could be covered by an
+>> USB PHY driver.
+
+> Good point.
+
+>>> and host/gadget mode switch.
+
+>>      The main mode the USB 2.0 PHY should function now is OTG. The host/gadged
+>> modes are forced overrides of the ID pin. Unfortunately, the board code has to
+>> force host mode when host-only driver config is selected (these MUSB's
+>> host/gadget only modes were removed at one point but got reintroduced again).
+
+> I think they are also required for 'randconfig' builds to some degree, because
+> you can build a kernel without host mode for instance.
+
+    Yes.
+
+>>> In the modern world, we'd probably want to have a clock driver and
+
+>>      Not sure about the clock driver...
+
+>>> a phy driver for these,
+
+>>      Yes, that's what the MUSB maintainer wants too. The issue is the driver
+>> should somehow differ which USB controller it's bound too and do different
+>> things depending on that (at least that's how it looks now). I'm not sure it's
+>> possible, so probably should be rethought.
+
+> Yes, a phy driver seems the right approach if we can find someone to do it.
+
+    Perhaps a person that tried to unbreak the DA8xx MUSB driver could be 
+interested (and competent) enough to do it...
+
+> Ideally that should let us use generic versions of the ohci and musb drivers
+> even, if that's the only davinci specific part of these drivers.
+
+    No, not really. MUSB ceratinly has DaVinci specific register set mapped in 
+its register space. OHCI has up to 2 clocks to enable since USB 1.1 PHY can be 
+clocked from USB 2.0 PHY clock.
+
+>>> based on a syscon driver.
+
+>>      I don't know what syscon is...
+
+> The syscon (system controller) framework helps share a set of registers
+> across multiple drivers. If all accesses to the CFGCHIP2 register are
+> in a single PHY driver, we wouldn't need it.
+
+    Where can I find it in the kernel tree?
+
+>>> In all honesty I don't see that happening on davinci.
+
+>>      I don't think people use USB 1.1 controllers these days, especially when
+>> there is USB 2.0 in the same SoC. For MUSB, there were recent attempt to get
+>> the DA8xx driver out of the broken state but it was turned down as well, IIRC,
+>> since it didn't offer a PHY driver.
+
+> For USB 2.0 compliance you actually need to provide something to handle the
+> low speed modes. A lot of people use a hub to do that nowadays rather than
+> an OHCI or UHCI, but I don't know if that works with OTG.
+
+    MUSB handles all speeds. I think the reason TI also included USB 1.1 
+controller lies in the somewhat dubious reputation of both MUSB hardware and 
+the Linux driver.
+
+> 	Arnd
+
+WBR, Sergei
