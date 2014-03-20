@@ -1,80 +1,58 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 20 Mar 2014 14:50:13 +0800
-Subject: [PATCH 14/62] ARM: imx: imx6q_set_lpm is only defined for
- CONFIG_PM=y
-In-Reply-To: <1395257399-359545-15-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-15-git-send-email-arnd@arndb.de>
-Message-ID: <20140320065011.GA2408@dragon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 08:07:52 +0100
+Subject: Forcing DEBUG_UART_{PHYS,
+ VIRT} changes when switching between v7 platforms?
+In-Reply-To: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
+References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
+Message-ID: <8099777.qvOx0M5YBS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:11PM +0100, Arnd Bergmann wrote:
-> This ensures that we only call imx6q_set_lpm if CONFIG_PM
-> is enabled and we are building the pm-imx6q.c file.
+On Wednesday 19 March 2014 16:38:45 Florian Fainelli wrote:
+> Hi,
 > 
-> Another fix that has been suggested for this is to always
-> build this file conditionally build only the parts of it
-> that are relevant only to CONFIG_PM.
+> When switching between different Multi v7 platform which all select
+> DEBUG_UART_8250, whichever platform managed to set
+> DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
+> others.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+> What I am seeing at the moment is for instance enabling BCM_MOBILE
+> will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
+> enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
+> re-computed.
+> 
+> Should we add some sort of specific annotation to the Kconfig symbol
+> to force a recalculation of the UART PHYS address?
 
-I think this should have been fixed by commit 28a9f3b (ARM: imx6: build
-pm-imx6q.c independently of CONFIG_PM) on mainline.
+Russell has plans to change the Konfig logic in the future, removing the
+platform specific options. With the current code, you could probably
+do something along the lines of
 
-Shawn
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f72147f..aa20929 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1013,7 +1013,7 @@ config DEBUG_UART_8250
+ 		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
+ 
+ config DEBUG_UART_PHYS
+-	hex "Physical base address of debug UART"
++	hex
+ 	default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
+ 	default 0x01c28000 if DEBUG_SUNXI_UART0
+ 	default 0x01c28400 if DEBUG_SUNXI_UART1
+@@ -1074,7 +1074,7 @@ config DEBUG_UART_PHYS
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X
+ 
+ config DEBUG_UART_VIRT
+-	hex "Virtual base address of debug UART"
++	hex
+ 	default 0xe0010fe0 if ARCH_RPC
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf0009000 if DEBUG_CNS3XXX
 
-> ---
->  arch/arm/mach-imx/clk-imx6q.c      | 3 ++-
->  arch/arm/mach-imx/clk-imx6sl.c     | 3 ++-
->  arch/arm/mach-imx/cpuidle-imx6sl.c | 3 +++
->  3 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index b0e7f9d..133b23e 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -478,7 +478,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
->  
->  	/* Set initial power mode */
-> -	imx6q_set_lpm(WAIT_CLOCKED);
-> +	if (IS_ENABLED(CONFIG_PM))
-> +		imx6q_set_lpm(WAIT_CLOCKED);
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
->  	base = of_iomap(np, 0);
-> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-> index f7073c0..a882bdf 100644
-> --- a/arch/arm/mach-imx/clk-imx6sl.c
-> +++ b/arch/arm/mach-imx/clk-imx6sl.c
-> @@ -382,7 +382,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
->  	clk_set_parent(clks[IMX6SL_CLK_SPDIF0_SEL], clks[IMX6SL_CLK_PLL3_PFD3]);
->  
->  	/* Set initial power mode */
-> -	imx6q_set_lpm(WAIT_CLOCKED);
-> +	if (IS_ENABLED(CONFIG_PM))
-> +		imx6q_set_lpm(WAIT_CLOCKED);
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
->  	base = of_iomap(np, 0);
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-> index d4b6b81..c9a6aa8 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6sl.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-> @@ -53,5 +53,8 @@ static struct cpuidle_driver imx6sl_cpuidle_driver = {
->  
->  int __init imx6sl_cpuidle_init(void)
->  {
-> +	if (!IS_ENABLED(CONFIG_PM))
-> +		return -ENOSYS;
-> +
->  	return cpuidle_register(&imx6sl_cpuidle_driver, NULL);
->  }
-> -- 
-> 1.8.3.2
-> 
-> 
-> 
+with some extra logic to still allow you to enter the values
+manually if not set by default, but that probably wouldn't work
+any more when the rework is done.
+
+	Arnd
