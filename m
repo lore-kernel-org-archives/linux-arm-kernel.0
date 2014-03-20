@@ -1,31 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 11:11:45 +0000
-Subject: [PATCH 3/5] mtd: st_spi_fsm: Correct vendor name spelling issue -
- missing "M"
-In-Reply-To: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
-References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395313907-25318-4-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 12:17:22 +0100
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140320094654.GZ6457@e106497-lin.cambridge.arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <8312584.jdZZuHGAjg@wuerfel>
+ <20140320094654.GZ6457@e106497-lin.cambridge.arm.com>
+Message-ID: <201403201217.22339.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reported-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thursday 20 March 2014, Liviu Dudau wrote:
+> On Wed, Mar 19, 2014 at 06:37:51PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 19 March 2014 17:21:41 Liviu Dudau wrote:
+> > > 
+> > > My ultimate point is that no matter how long we argue about the shape of the functions that
+> > > I've added into arch/arm64/kernel/pci.c I don't think we can get away without having that
+> > > file, or at least not in the first phase if we want speedy integration into mainline.
+> > 
+> > Let me simplify the discussion here:
+> > 
+> > NAK to adding yet another architecture specific implementation.
+> 
+> So what would be your approach for handling pci_address_to_pio() in a non-arch specific way?
+> 
+> unsigned long __weak pci_address_to_pio(phys_addr_t address)
+> {
+> #ifdef ARCH_HAS_IOSPACE
+>         if (address > IO_SPACE_LIMIT)
+>                 return (unsigned long)-1;
+> 
+>         return (unsigned long) address;
+> #else
+>         struct ioresource *res;
+> 
+>         list_for_each_entry(res, &io_list, list) {
+>                 if (address >= res->start &&
+>                         address < res->start + res->size) {
+>                         return res->start - address;
+>                 }
+>         }
+> 
+>         return (unsigned long)-1;
+> #endif
+> }
+> 
+> 
+> Either that, or you have more magic rabbits than me.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 27f9ec9..9de753d 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -3,7 +3,7 @@
-  *
-  * Author: Angus Clark <angus.clark@st.com>
-  *
-- * Copyright (C) 2010-2014 STicroelectronics Limited
-+ * Copyright (C) 2010-2014 STMicroelectronics Limited
-  *
-  * JEDEC probe based on drivers/mtd/devices/m25p80.c
-  *
--- 
-1.8.3.2
+I don't even understand why you want to create a generic pci_address_to_pio
+implementation, when we don't need that for arm64 at all. Unless I'm
+missing something important, that function is only called in case of
+PCI_PROBE_DEVTREE with pci_of_scan on PowerPC. I don't expect any
+architecture to do the same thing, and the only other architecture that
+needs something like it (sparc) has a different implementation.
+
+The regular (non-DEVTREE) PCI bus scan should just be able to translate
+the BUS I/O addresses into Linux I/O port numbers using io_offset,
+without going through an intermediate step of translating into a CPU
+physical address first, so the entire lookup method won't get used.
+
+The reason why PowerPC needs it is that they traditionally don't
+use PCI config space access to assign or look at resources, but
+instead rely on the firmware to have set it up in advance and then
+put matching information into DT and the BARs. For Solaris and AIX,
+it's probably easier to use the information from DT, but in Linux,
+we already need to implement the manual bus scan, e.g. to do
+PCI device hotplugging if nothing else.
+
+	Arnd
