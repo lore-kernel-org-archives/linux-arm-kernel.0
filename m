@@ -1,49 +1,59 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 20 Mar 2014 14:02:39 -0400
-Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
- NAND_NO_SUBPAGE_WRITE option
-In-Reply-To: <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
-References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
- <532B2183.2080309@ti.com> <20140320172912.GW31517@norris-Latitude-E6410>
- <532B2766.6090506@ti.com> <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
-Message-ID: <532B2D3F.6050004@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Mar 2014 21:59:29 +0300
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <201403201250.45005.arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <9096065.aGCg8yZblW@wuerfel> <532AB6B0.7010108@ti.com>
+ <201403201250.45005.arnd@arndb.de>
+Message-ID: <532B3A91.6000800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014 01:44 PM, Warner Losh wrote:
-> 
-> On Mar 20, 2014, at 11:37 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> 
->>
->>
->> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
->>> On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
->>>> Boris,
->>>
->>> Who's Boris? And why should Boris be taking this patch? It's an MTD
->>> patch.
->>>
->> I got your name completely wrong. Sorry....
->>
->>>> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
->>>>> From: Murali Karicheri <m-karicheri2@ti.com>
->>>>>
->>>>> After testing NAND flash with ubifs for k2hk-emv board were committed
->>>>> that flash doesn't support subpage writing, so we can fix it by
->>>>> adding a property to disable subpage write.
->>>
->>> What flash? We try to autodetect NAND as much as possible. Perhaps we
->>> should be adding infrastructure support instead of hacking it with a DT
->>> property.
->>>
->> We can't auto detect it and thats why the DT approach was taken. We
->> will double check that.
-> 
-> I though sub page writing was one of the fields in the onfi and/or jedec(toggle) meta data structures. Have you looked there?
-> 
-Am not sure if I follow you. The limitation is from the TI NAND controller(AEMIF) and
-not the NAND memory. 
+Hello.
 
-regards,
-Santosh
+On 03/20/2014 02:50 PM, Arnd Bergmann wrote:
+
+>>>>> The question is whether there is anyone who would do this properly.
+
+>>>>      Nobody cares, it seems. As you can imagine, I stopped to care enough after
+>>>> being switched to other projects.
+
+>>> I only care about it because I have the intention to get all 'randconfig'
+>>> kernels to build eventually. For stuff that is definitely 'legacy'
+>>> and won't get cleaned up properly, I'm fine with a hack.
+
+>>>>> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
+
+>>>>      The idea at the time was to just ioremap() this register but I was not
+>>>> very eager.
+
+>>> Yes, that would work, too. However, that would cause problems later
+>>> if we ever try to make the davinci platform "multiplatform", unless we also
+>>> pass the physical address in a platform resource and make this a larger
+
+>> Some SATA driver work done by Bartlomiej Zolnierkiewicz needed driver
+>> access to syscfg registers too and I just asked him to pass the physical
+>> addresses using platform resource. I think thats the best bet we have in
+>> the absence of a modern interface.
+
+> Ok.
+
+    Depends on what SYSCFG register it uses. It wouldn't be good if that 
+register range includes CFGCHIP2.
+
+>>> The syscon (system controller) framework helps share a set of registers
+>>> across multiple drivers. If all accesses to the CFGCHIP2 register are
+>>> in a single PHY driver, we wouldn't need it.
+
+>> CFGCHIP2 has controls both for USB 1.1 (OHCI) and USB 2.0 (MUSB). Not
+>> sure if there can be a single PHY driver for both.
+
+> The phy infrastructure explicitly supports multiple consumers for one
+> phy, if I'm reading the code correctly.
+
+    Yes, it does. The issue is that the PHY code is different in MUSB and OHCI 
+drivers. I don't think the PHY driver knows what device binds to it.
+
+> 	Arnd
+
+WBR, Sergei
