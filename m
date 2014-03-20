@@ -1,32 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Mar 2014 05:01:16 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <201403200005.56334.marex@denx.de>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <201403200005.56334.marex@denx.de>
-Message-ID: <201403200501.16881.marex@denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Mar 2014 13:01:26 +0900
+Subject: [PATCH 50/62] ARM: s5pv210: enable IDE support in MACH_TORBRECK
+In-Reply-To: <1395257399-359545-51-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-51-git-send-email-arnd@arndb.de>
+Message-ID: <020901cf43f1$10b991d0$322cb570$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 20, 2014 at 12:05:56 AM, Marek Vasut wrote:
-> On Wednesday, March 19, 2014 at 11:51:38 PM, Russell King - ARM Linux wrote:
-
-[...]
-
-> > As far as the 600Mbps receive - you need the right conditions for that.
-> > I select the performance cpufreq governor after boot, and let the boot
-> > quiesce.  It doesn't take much for it to drop back to 460Mbps - another
-> > running process other than iperf -s is sufficient to do that.
-> > 
-> > Let me know how you get on with this.
+Arnd Bergmann wrote:
 > 
-> Roger that, will do, thank you very much !
+> Building MACH_TORBRECK by itself results in a build error
+> because we try to reference the s3c_device_cfcon definition
+> that is hidden inside CONFIG_SAMSUNG_DEV_IDE. This changes
+> the Kconfig logic to ensure that option is enabled when we
+> need it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-I did some test and I observe no dips in the speed, nice work. Thanks !
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-I will try to get feedback from more boards and get back to you with the 
-results.
+Thanks,
+Kukjin
 
-Best regards,
-Marek Vasut
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index caaedaf..8c3abe5 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -189,6 +189,7 @@ config MACH_TORBRECK
+>  	select S5PV210_SETUP_I2C1
+>  	select S5PV210_SETUP_I2C2
+>  	select S5PV210_SETUP_SDHCI
+> +	select SAMSUNG_DEV_IDE
+>  	help
+>  	  Machine support for aESOP Torbreck
+> 
+> --
+> 1.8.3.2
