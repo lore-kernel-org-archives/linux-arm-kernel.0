@@ -1,49 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 11:59:35 +0100
-Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
-In-Reply-To: <CAL_JsqKaL4W_bjozC_hTmZ9439pqh8f8pHU25H5CNdf8hQZtOg@mail.gmail.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-62-git-send-email-arnd@arndb.de>
- <CAL_JsqKaL4W_bjozC_hTmZ9439pqh8f8pHU25H5CNdf8hQZtOg@mail.gmail.com>
-Message-ID: <201403201159.35842.arnd@arndb.de>
+Date: Thu, 20 Mar 2014 12:02:36 +0100
+Subject: [PATCH RESEND v2 1/2] ARM: ixp4xx: Make dma_set_coherent_mask
+ common, correct implementation
+In-Reply-To: <m31txxjjrj.fsf@t19.piap.pl>
+References: <20140317144016.0508cc4d@marrow.netinsight.se>
+ <20140320090330.49a1d372@marrow.netinsight.se> <m31txxjjrj.fsf@t19.piap.pl>
+Message-ID: <201403201202.37065.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Rob Herring wrote:
-
-> > --- a/arch/arm/mach-sunxi/headsmp.S
-> > +++ b/arch/arm/mach-sunxi/headsmp.S
-> > @@ -4,6 +4,7 @@
-> >          .section ".text.head", "ax"
-> >
-> >  ENTRY(sun6i_secondary_startup)
-> > -       msr     cpsr_fsxc, #0xd3
-> > +       mov     r0, #0xd3
-> > +       msr     cpsr_fsxc, r0
-> >         b       secondary_startup
+On Thursday 20 March 2014, Krzysztof Ha?asa wrote:
+> Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
 > 
-> Secondary cores should always enter the kernel in ARM mode like the
-> primary core, right? So we need the same switching to Thumb2 as
-> head.S, but even secondary_startup doesn't do any switching. So either
-> platforms jump into the kernel with a bx and happen to work or
-> secondary boot is broken for Thumb2 kernels.
+> > Thanks. However, Krzysztof thinks that this implementation is
+> > incorrect. It certainly fixes my ixp4xx issues, but might not be good
+> > for everyone.
+> 
+> It because you don't have PCI devices setting coherent mask to 32-bits
+> (and that's what normal PCI devices do).
+> 
+> BTW PCI (and other) devices requesting 32-bit coherent allocs don't care
+> if they're given 26-bit memory. 26 bits fit perfectly in 32 bits. It's
+> the streaming mapping which is (may be) constrained by hardware.
 
-Makes sense. So should we instead do this?
-
-.arm
-ENTRY(sun6i_secondary_startup)
-	ARM_BE8(setend   be ) /* I suppose we need this too */
-	msr     cpsr_fsxc, #0xd3
-	ldr	r0, =secondary_startup
-	bx	r0
-
-(I'm a bit confused about when to use what branch instruction, so
-forgive me if the above doesn't make sense)
-
-> Also, secondary_startup takes care of making sure the core is in SVC
-> mode, so this function shouldn't be needed in the first place.
-
-I'd rather not change this part, unless Maxime can confirm that it's
-not necessary. I would assume that it's there for a reason otherwise.
+Should I revert the patch then until we have a better fix?
 
 	Arnd
