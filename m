@@ -1,47 +1,63 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Mar 2014 09:40:43 +0100
-Subject: [PATCH 02/62] ARM: at91: don't provide dt init code for at91x40
-In-Reply-To: <1395257399-359545-3-git-send-email-arnd@arndb.de>
+Date: Thu, 20 Mar 2014 09:51:59 +0100
+Subject: [PATCH 03/62] ARM: at91: export sam9_smc interfaces
+In-Reply-To: <1395257399-359545-4-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-3-git-send-email-arnd@arndb.de>
-Message-ID: <532AA98B.8030302@atmel.com>
+ <1395257399-359545-4-git-send-email-arnd@arndb.de>
+Message-ID: <532AAC2F.5000807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/2014 20:28, Arnd Bergmann :
-> at91x40 has no support for device tree, but Kconfig allows
-> us to enable CONFIG_OF anyway, causing a link error in the
-> at91 reset controller initialization.
-> 
-> The easiest fix is to adapt the existing #ifdef to omit
-> the broken code on at91x40 where it is never called anyway.
+On 19/03/2014 20:29, Arnd Bergmann :
+> The pata_at91 driver uses interfaces defined in the sam9_smc
+> platform code. Since the pata driver can be a loadable module,
+> we have to export those symbols in order to link cleanly.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Cc: Andrew Victor <linux@maxim.org.za>
 > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Yes, simple and does the trick:
+SMC may change in the near future (Cf. Jean-Jacques' patches sent some
+weeks ago). But I do not think this patch conflicts with the ongoing
+initiative...
+
+So:
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 > ---
->  arch/arm/mach-at91/setup.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-at91/sam9_smc.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index f7ca97b..f7a07a5 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -351,7 +351,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
->  		panic("Impossible to ioremap at91_matrix_base\n");
+> diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
+> index b26156b..826315a 100644
+> --- a/arch/arm/mach-at91/sam9_smc.c
+> +++ b/arch/arm/mach-at91/sam9_smc.c
+> @@ -36,6 +36,7 @@ void sam9_smc_write_mode(int id, int cs,
+>  {
+>  	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
 >  }
+> +EXPORT_SYMBOL_GPL(sam9_smc_write_mode);
 >  
-> -#if defined(CONFIG_OF)
-> +#if defined(CONFIG_OF) && !defined(CONFIG_ARCH_AT91X40)
->  static struct of_device_id rstc_ids[] = {
->  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
->  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+>  static void sam9_smc_cs_configure(void __iomem *base,
+>  					struct sam9_smc_config *config)
+> @@ -69,6 +70,7 @@ void sam9_smc_configure(int id, int cs,
+>  {
+>  	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
+>  }
+> +EXPORT_SYMBOL_GPL(sam9_smc_configure);
+>  
+>  static void sam9_smc_cs_read_mode(void __iomem *base,
+>  					struct sam9_smc_config *config)
+> @@ -84,6 +86,7 @@ void sam9_smc_read_mode(int id, int cs,
+>  {
+>  	sam9_smc_cs_read_mode(AT91_SMC_CS(id, cs), config);
+>  }
+> +EXPORT_SYMBOL_GPL(sam9_smc_read_mode);
+>  
+>  static void sam9_smc_cs_read(void __iomem *base,
+>  					struct sam9_smc_config *config)
 > 
 
 
