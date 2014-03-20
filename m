@@ -1,50 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 12:50:44 +0100
-Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
-In-Reply-To: <532AB6B0.7010108@ti.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <9096065.aGCg8yZblW@wuerfel> <532AB6B0.7010108@ti.com>
-Message-ID: <201403201250.45005.arnd@arndb.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 20 Mar 2014 12:51:32 +0100
+Subject: [PATCH 4/4] ata: add new-style AHCI platform driver for ST
+ SPEAr1340 AHCI controller
+In-Reply-To: <20140320085717.GC4607@pratyush-vbox>
+References: <1395081118-15248-1-git-send-email-b.zolnierkie@samsung.com>
+ <1395081118-15248-5-git-send-email-b.zolnierkie@samsung.com>
+ <20140320085717.GC4607@pratyush-vbox>
+Message-ID: <3482323.3pWPcG8rCe@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014, Sekhar Nori wrote:
-> On Thursday 20 March 2014 12:12 PM, Arnd Bergmann wrote:
-> > On Thursday 20 March 2014 01:36:13 Sergei Shtylyov wrote:
-> >> On 03/19/2014 11:21 PM, Arnd Bergmann wrote:
-> >>> The question is whether there is anyone who would do this properly.
-> >>
-> >>     Nobody cares, it seems. As you can imagine, I stopped to care enough after 
-> >> being switched to other projects.
+
+Hi,
+
+On Thursday, March 20, 2014 02:27:17 PM Pratyush Anand wrote:
+> On Tue, Mar 18, 2014 at 02:31:58AM +0800, Bartlomiej Zolnierkiewicz wrote:
+> > The new driver is named ahci_spear1340 and is only compile tested.  Once
+> > it is tested on the real hardware and verified to work correctly, the legacy
+> > platform code (which depends on the deprecated struct ahci_platform_data)
+> > can be removed.
 > > 
-> > I only care about it because I have the intention to get all 'randconfig'
-> > kernels to build eventually. For stuff that is definitely 'legacy'
-> > and won't get cleaned up properly, I'm fine with a hack.
-> > 
-> >>> Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
-> >>
-> >>     The idea at the time was to just ioremap() this register but I was not 
-> >> very eager.
-> > 
-> > Yes, that would work, too. However, that would cause problems later
-> > if we ever try to make the davinci platform "multiplatform", unless we also
-> > pass the physical address in a platform resource and make this a larger
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > 
-> Some SATA driver work done by Bartlomiej Zolnierkiewicz needed driver
-> access to syscfg registers too and I just asked him to pass the physical
-> addresses using platform resource. I think thats the best bet we have in
-> the absence of a modern interface.
-
-Ok.
-
-> > The syscon (system controller) framework helps share a set of registers
-> > across multiple drivers. If all accesses to the CFGCHIP2 register are
-> > in a single PHY driver, we wouldn't need it.
+> This patch will not be needed any more, since SPEAr sata platform code has
+> already been cleaned up.
 > 
-> CFGCHIP2 has controls both for USB 1.1 (OHCI) and USB 2.0 (MUSB). Not
-> sure if there can be a single PHY driver for both.
+> See:
+> https://lkml.org/lkml/2014/2/28/174
 
-The phy infrastructure explicitly supports multiple consumers for one
-phy, if I'm reading the code correctly.
+OK.  Conversion of SPEAr1340 AHCI platform code to PHY driver is even better
+than adding custom AHCI driver.
 
-	Arnd
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
