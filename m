@@ -1,48 +1,161 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 15:26:40 +0000
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <532B0384.1000400@codethink.co.uk>
-References: <201402241200.21944.arnd@arndb.de>
- <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
- <5165962.7bqj51B15Z@wuerfel> <532B0384.1000400@codethink.co.uk>
-Message-ID: <20140320152640.GW7528@n2100.arm.linux.org.uk>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 20 Mar 2014 10:28:37 -0500
+Subject: [PATCH 1/1] regulator: Add new driver for ST's PWM controlled
+ voltage regulators
+In-Reply-To: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
+References: <1395324654-8235-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140320152837.GW18529@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 04:04:36PM +0100, Ben Dooks wrote:
-> On 26/02/14 20:57, Arnd Bergmann wrote:
->> On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
->>> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> Hi Magnus,
->>>>
->>>> I noticed during randconfig testing that you enabled DMABOUNCE for the
->>>> pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
->>>>
->>>> I didn't see the original post unfortunately, but I fear we have to
->>>> revert it and come up with a better solution, ...
->>>
->>> Sounds like I should drop the following patches from my pci/host-rcar
->>> branch for now?
->>>
->>>    PCI: rcar: Add DMABOUNCE support
->>>    PCI: rcar: Enable BOUNCE in case of HIGHMEM
->>>    PCI: rcar: Make the Kconfig dependencies more generic
->>
->> Sounds good to me. The last patch is actually fine, but you'll have to
->> fix the context to apply it without the other two.
->
-> As a note, if we now boot a Lager with DT on 3.14-rc3 series the USB
-> controllers no longer work with full 2GiB RAM enabled in the device
-> tree.
->
-> Could we work around this by having 1GiB of memory defined in the
-> 32bit memory and then add the rest of the 3GiB from the >32bit
-> area via LPAE? Will the kernel ever try to allocate DMA memory from
-> anything >32bit?
+Hey Lee-
 
-Ignore highmem.  What is the actual hardware restriction concerning memory
-it can access?
+A few minor things below.
+
+On Thu, Mar 20, 2014 at 02:10:54PM +0000, Lee Jones wrote:
+> On some STMicroelectronics hardware reside regulators consisting
+> partly of a PWM input connected to the feedback loop. As the PWM
+> duty-cycle is varied the output voltage adapts. This driver
+> allows us to vary the output voltage by adapting the PWM input
+> duty-cycle.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> --- /dev/null
+> +++ b/drivers/regulator/st-pwm.c
+> +static int st_pwm_regulator_set_voltage(struct regulator_dev *dev,
+> +					int min_uV, int max_uV,
+> +					unsigned *selector)
+> +{
+> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+> +	int dutycycle, best_val = INT_MAX;
+> +	int sel, ret;
+> +
+> +	for (sel = 0; sel < dev->desc->n_voltages; sel++) {
+> +		if (drvdata->duty_cycle_table[sel].uV < best_val &&
+> +		    drvdata->duty_cycle_table[sel].uV >= min_uV &&
+> +		    drvdata->duty_cycle_table[sel].uV <= max_uV) {
+> +			best_val = drvdata->duty_cycle_table[sel].uV;
+> +			if (selector)
+> +				*selector = sel;
+> +		}
+> +	}
+
+If you implement .set_voltage_sel() instead and set map_voltage to
+regulator_map_voltage_iterate, the core can take care of this.
+
+> +
+> +	if (best_val == INT_MAX)
+> +		return -EINVAL;
+> +
+> +	dutycycle = (ST_PWM_REG_PERIOD / 100) *
+> +		drvdata->duty_cycle_table[sel].dutycycle;
+
+Considering (ST_PWM_REG_PERIOD / 100) is constant, could you get away
+with dropping this calculation by just putting the already-adjusted
+values into your duty cycle table?
+
+> +
+> +	ret = pwm_config(drvdata->pwm, dutycycle, ST_PWM_REG_PERIOD);
+> +	if (ret) {
+> +		dev_err(&dev->dev, "Failed to configure PWM\n");
+> +		return ret;
+> +	}
+> +
+> +	drvdata->state = sel;
+> +
+> +	if (!drvdata->enabled) {
+> +		ret = pwm_enable(drvdata->pwm);
+> +		if (ret) {
+> +			dev_err(&dev->dev, "Failed to enable PWM\n");
+> +			return ret;
+> +		}
+> +		drvdata->enabled = true;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_pwm_regulator_list_voltage(struct regulator_dev *dev,
+> +					 unsigned selector)
+> +{
+> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+> +
+> +	if (selector >= dev->desc->n_voltages)
+> +		return -EINVAL;
+> +
+> +	return drvdata->duty_cycle_table[selector].uV;
+> +}
+> +
+> +static struct regulator_ops st_pwm_regulator_voltage_ops = {
+> +	.get_voltage  = st_pwm_regulator_get_voltage,
+> +	.set_voltage  = st_pwm_regulator_set_voltage,
+> +	.list_voltage = st_pwm_regulator_list_voltage,
+> +};
+> +
+> +static struct st_pwm_voltages b2105_duty_cycle_table[] = {
+> +	{ .uV = 1114000, .dutycycle = 0,  },
+> +	{ .uV = 1095000, .dutycycle = 10, },
+> +	{ .uV = 1076000, .dutycycle = 20, },
+> +	{ .uV = 1056000, .dutycycle = 30, },
+> +	{ .uV = 1036000, .dutycycle = 40, },
+> +	{ .uV =  996000, .dutycycle = 50, },
+> +	/* WARNING: Values above 50% duty-cycle cause boot failures. */
+> +};
+> +
+> +static struct regulator_desc b2105_desc = {
+> +	.name		= "b2105-pwm-regulator",
+> +	.ops		= &st_pwm_regulator_voltage_ops,
+> +	.type		= REGULATOR_VOLTAGE,
+> +	.owner		= THIS_MODULE,
+> +	.n_voltages	= ARRAY_SIZE(b2105_duty_cycle_table),
+> +	.supply_name    = "pwm",
+> +};
+> +
+> +static struct st_pwm_regulator_data b2105_info = {
+> +	.desc		  = &b2105_desc,
+> +	.duty_cycle_table = b2105_duty_cycle_table,
+> +};
+> +
+> +static struct of_device_id st_pwm_of_match[] = {
+
+const.  At least the regulator_desc and duty cycle table should be const
+as well. (see my comments below about b2105_info).
+
+> +	{ .compatible = "st,b2105-pwm-regulator", .data = &b2105_info, },
+> +	{ },
+> +};
+
+You may want a MODULE_DEVICE_TABLE(of, ...); here if you want to be able
+to be autoloaded.
+
+> +
+> +static int st_pwm_regulator_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct st_pwm_regulator_data *drvdata;
+> +	const struct of_device_id *of_match;
+> +	struct regulator_dev *regulator;
+> +	struct regulator_config config = { };
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "Device Tree node missing\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	of_match = of_match_device(st_pwm_of_match, &pdev->dev);
+> +	if (!of_match) {
+> +		dev_err(&pdev->dev, "failed to match of device\n");
+> +		return -ENODEV;
+> +	}
+> +	drvdata =  (struct st_pwm_regulator_data *) of_match->data;
+
+Hrm, I typed "cast not necessary here", but then I realized it is
+necessary since you using it to cast away constness.
+
+Are you safe assuming that there will only be one of these devices in a
+system?  It doesn't seem like much a burden to just allocate a new
+object and use it instead of a statically allocated one.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
