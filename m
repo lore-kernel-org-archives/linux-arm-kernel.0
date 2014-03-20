@@ -1,49 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Mar 2014 15:05:10 +0900
-Subject: [PATCH Resend 1/3] ARM: EXYNOS: Consolidate Kconfig entries
-In-Reply-To: <02f701cf4400$e561e2c0$b025a840$@samsung.com>
-References: <1395224705-2935-1-git-send-email-sachin.kamat@linaro.org>
- <02f701cf4400$e561e2c0$b025a840$@samsung.com>
-Message-ID: <031401cf4402$59cdda00$0d698e00$@samsung.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Thu, 20 Mar 2014 06:07:31 +0000
+Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <20140318081019.GJ11360@pengutronix.de>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-17-git-send-email-mpa@pengutronix.de>
+ <1394894616.578942243@f331.i.mail.ru> <20140318081019.GJ11360@pengutronix.de>
+Message-ID: <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Sachin Kamat wrote:
-> >
-> > Instead of repeating the Kconfig entries for every SoC, move them under
-> > ARCH_EXYNOS4 and 5 and move the entries common to both 4 and 5 under
-> > ARCH_EXYNOS. Also, since the individual SoCs do not have any specific
-> > machine/platform code, keep them as boolean symbols instead of user
-> > selectable and select them from Exynos4 and 5 config symbols. Individual
-> > SoC symbols can be removed eventually once the driver Kconfig dependencies
-> > on these symbols are removed.
-> >
-> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> > Acked-by: Tomasz Figa <t.figa@samsung.com>
-> > ---
-> > This is a resend of the series rebased on top of latest linux-next and
-> > Tomasz Figa's PM consolidation series 1 and 2.
-> > ---
-> >  arch/arm/Kconfig             |   10 +++++
-> >  arch/arm/mach-exynos/Kconfig |   89
-> +++++++++++---------------------------
-> > ----
-> >  2 files changed, 33 insertions(+), 66 deletions(-)
-> >
-> Hmm...I'm still thinking whether we don't need to select some specific
-> Exynos SoCs. Because actually we're implement/develop some features based on
-> mainline kernel and sometimes the features are not valid on all of Exynos4
-> or Exynos5. Even though they are not in mainline, for mass product it's true
-> that Samsung needs to do it. It's another thing we have a plan for them or
-> not.
 
-Mainline upstreaming plan.
-
+> Subject: Re: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
 > 
-> So in my opinion, basically consolidation something is usually good but it's
-> not always good so we need to provide a way to use one of both.
+> On Sat, Mar 15, 2014 at 06:43:36PM +0400, Alexander Shiyan wrote:
+> > ???????, 15 ????? 2014, 13:44 +01:00 ?? Markus Pargmann <mpa@pengutronix.de>:
+> > > This patch replaces the ssi specific functions write_ssi, read_ssi and
+> > > write_ssi_mask by standard regmap function calls.
+> > ...
+> > > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> > ...
+> > > +static const struct regmap_config fsl_ssi_regconfig = {
+> > > +	.max_register = CCSR_SSI_SACCDIS,
+> > > +	.reg_bits = 32,
+> > > +	.val_bits = 32,
+> > > +	.reg_stride = 4,
+> > > +#ifdef PPC
+> > > +	.val_format_endian = REGMAP_ENDIAN_BIG,
+> > > +#endif
+> > > +};
+> >
+> > Why we cannot use REGMAP_ENDIAN_NATIVE here for all cases?
+> > Theoretically, we can use for i.MX SOCs with different endianness,
+> > so this will help us.
+> 
+> I can change and test it on i.MX, but I am not sure if it helps with the
+> PPC situation as I don't have the hardware.
 > 
 
-- Kukjin
+For the scenario of PowerPC(for CPU and devices mostly are in BE mode):
+CPU		SSI
+BE		BE	we can just use the REGMAP_ENDIAN_NATIVE here.
+
+For the scenario of ARM(for CPU and devices mostly are in LE mode):
+CPU		SSI
+LE		LE	we can also just use the REGMAP_ENDIAN_NATIVE here.
+
+While for the scenario like our LS1(ARM) platform.
+CPU		SSI
+LE		BE	then should we set the .val_format_endian to
+			REGMAP_ENDIAN_BIG
+
+
+And so not only for PowerPC, but also maybe for ARM platforms.
+So here how about just adding one Boolean property like 'big-endian' in DT node
+to learn the endianness of the devices dynamically ?  
+
+Thanks,
+:)
+
+Best Regards,
+Xiubo
