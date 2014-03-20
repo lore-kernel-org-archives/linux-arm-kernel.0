@@ -1,59 +1,82 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 20 Mar 2014 15:48:38 +0100
-Subject: [PATCH v3 2/5] pwm: kona: Introduce Kona PWM controller support
-In-Reply-To: <CAAYSxhpW-N7UdpsGE7JHvOJxQcvURRPdAOhiVkK=4EHc7E03gQ@mail.gmail.com>
-References: <1394655346-30048-1-git-send-email-tim.kryger@linaro.org>
- <1394655346-30048-3-git-send-email-tim.kryger@linaro.org>
- <20140318215231.GH5917@mithrandir>
- <CAAYSxhri0evgrbCPew6-MTXVmpzm7Oa6TpmJTSGZpTcV=876HQ@mail.gmail.com>
- <CAAYSxhpW-N7UdpsGE7JHvOJxQcvURRPdAOhiVkK=4EHc7E03gQ@mail.gmail.com>
-Message-ID: <20140320144833.GA25092@ulmo>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 20 Mar 2014 07:53:08 -0700
+Subject: [PATCH v1 2/2] Documentation: devicetree: Add new binding for
+ PSCIv0.2
+In-Reply-To: <20140320142242.GC23372@e106331-lin.cambridge.arm.com>
+References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1395276865-6868-2-git-send-email-ashwin.chaugule@linaro.org>
+ <20140320030319.GO1297@cbox>
+ <20140320142242.GC23372@e106331-lin.cambridge.arm.com>
+Message-ID: <CAMJs5B8ak-UFFHvX_KsJowmoL_-9Xm0XYXSF-R48qb9Er-2w+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 06:06:03PM -0700, Tim Kryger wrote:
-> On Tue, Mar 18, 2014 at 4:47 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> > On Tue, Mar 18, 2014 at 2:52 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> >> On Wed, Mar 12, 2014 at 01:15:43PM -0700, Tim Kryger wrote:
-[...]
-> >>> +static int kona_pwmc_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> >>> +                               enum pwm_polarity polarity)
-> >>> +{
-> >>> +     /*
-> >>> +      * The framework only allows the polarity to be changed when a PWM is
-> >>> +      * disabled so no immediate action is required here.  When a channel is
-> >>> +      * enabled, the polarity gets handled as part of the re-config step.
-> >>> +      */
-> >>> +
-> >>> +     return 0;
-> >>> +}
-> >>
-> >> See above. If you don't want to implement the hardware support for
-> >> inversed polarity, then simply don't implement this.
-> >
-> > I had originally planned to omit polarity support but because it
-> > affects the binding (which is treated as ABI), it wouldn't be possible
-> > to add it in later without defining a new compatible string.
-> 
-> I would like to get this right but it occurred to me that there may be
-> a way to defer the implementation of this feature without disrupting
-> the binding.
-> 
-> Would it be acceptable to continue using #pwm-cells = <3> and
-> of_pwm_xlate_with_flags but return -EINVAL from kona_pwmc_set_polarity
-> if PWM_POLARITY_INVERSED is specified?
+On 20 March 2014 07:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Mar 20, 2014 at 03:03:19AM +0000, Christoffer Dall wrote:
+>> On Wed, Mar 19, 2014 at 08:54:25PM -0400, Ashwin Chaugule wrote:
+>> > The PSCI v0.2+ spec defines static values for PSCI function IDs.
+>> > Add a new binding entry so that pre v0.2 implementations can
+>> > use DT entries for function IDs and v0.2+ implementations use
+>> > static entries as defined by the PSCIv0.2 specification.
+>> >
+>> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> > ---
+>> >  Documentation/devicetree/bindings/arm/psci.txt | 6 +++++-
+>> >  1 file changed, 5 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+>> > index 433afe9..a808284 100644
+>> > --- a/Documentation/devicetree/bindings/arm/psci.txt
+>> > +++ b/Documentation/devicetree/bindings/arm/psci.txt
+>> > @@ -21,7 +21,11 @@ to #0.
+>> >
+>> >  Main node required properties:
+>> >
+>> > - - compatible    : Must be "arm,psci"
+>> > + - compatible    : "arm,psci" : pre PSCIv0.2 spec implementations use this
+>> > +                   to get the function IDs from DT entries.
+>> > +
+>> > +                   "arm,psci-0.2": PSCIv0.2+ spec implementations use static
+>> > +                   values for function IDs as defined in the spec.
+>
+> How about:
+>
+> - compatible: should contain at least one of:
+>
+>   * "arm,psci" : for implementations complying to PSCI versions prior to
+>     0.2. For these cases function IDs must be provided.
+>
+>   * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
+>     IDs are not required and should be ignored by an OS with PSCI 0.2
+>     support, but are permitted to be present for compatibility with
+>     existing software when "arm,psci" is later in the compatible list.
+>
+>> Maybe specify that in this case no function IDs are passed in the device
+>> tree?
+>
+> As described above, for compatibility with existing kernels, the
+> hypervisor will likely want to provide IDs, e.g.
+>
+> psci {
+>         compatible = "arm,psci-0.2", "arm,psci";
+>         method = "hvc";
+>
+>         cpu_on = < arbitrary value >;
+>         cpu_off = < arbitrary value >;
+>
+>         ...
+> };
+>
+> In this case I'd expect an OS with PSCI 0.2 support to use the PSCI 0.2
+> IDs, but an older OS would use the IDs from the DT (which may or may not
+> match the PSCI 0.2 IDs).
+>
+> So while we should say is any function IDs should be ignored for
+> "arm,psci-0.2", we shouldn't say that they are disallowed in the node.
+>
+> The document should have examples of "arm,psci" only, "arm,psci-0.2"
+> only, and the compatibility case.
+>
+That solves the ambiguity I read with the first draft, thanks.
 
-This was recently discussed for the pwm-imx driver. And you can easily
-support #pwm-cells = <2> and #pwm-cells = <3> with the same binding. So
-you could start with #pwm-cells = <2>, leaving out .set_polarity() and
-implement it later on, extending the binding in a backwards-compatible
-way to support the polarity flag.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/9250062e/attachment.sig>
+-Chritoffer
