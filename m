@@ -1,48 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Mar 2014 11:50:16 +0100
-Subject: [PATCH 62/62] ARM: tegra: make debug_ll code build for ARMv6
-In-Reply-To: <5329FA18.6090208@wwwdotorg.org>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <6268308.cWSbPODKo9@wuerfel> <5329FA18.6090208@wwwdotorg.org>
-Message-ID: <201403201150.16963.arnd@arndb.de>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Thu, 20 Mar 2014 18:53:50 +0800
+Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
+In-Reply-To: <CAGVrzcY4SBKFfTvjB0TTvgpAOwCt30C6LjYf9e9E4ciMDVmp-w@mail.gmail.com>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395132017-15928-3-git-send-email-zhangfei.gao@linaro.org>
+ <CAGVrzcY4SBKFfTvjB0TTvgpAOwCt30C6LjYf9e9E4ciMDVmp-w@mail.gmail.com>
+Message-ID: <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Stephen Warren wrote:
-> On 03/19/2014 01:51 PM, Arnd Bergmann wrote:
-> > On Wednesday 19 March 2014 13:40:06 Stephen Warren wrote:
-> >> Hmmm. This code is guaranteed to only execute on Tegra (well, perhaps
-> >> someone can turn on the wrong debug option and run it on non-Tegra, but
-> >> then it's guaranteed not to work since the HW it touches doesn't exist).
-> >> As such, the code ought to be able to use ARMv7 instructions.
-> >>
-> >> As a fix for similar issues in assembly code in arch/arm/mach-tegra/*.S,
-> >> Makefile there does:
-> >>
-> >> asflags-y                               += -march=armv7-a
-> >>
-> >> (I think you added that? Yes, in 408e713545ca "ARM: tegra: build
-> >> assembly files with -march=armv7-a")
-> >>
-> >> Shouldn't we use the same fix in this case too?
-> > 
-> > That was my first idea, but I couldn't come up with a nice way to do this
-> > for arch/arm/kernel/debug.S, which #includes the specific implementation.
-> > 
-> > I'd rather not put lots of per-platform hacks into arch/arm/kernel/Makefile.
-> 
-> Oh, I guess the fact it's include makes it a bit more painful.
-> 
-> You could deal with it in Kconfig reasonably easily by having each of
-> DEBUG_*_UART select a config option indicating how to compile code that
-> includes DEBUG_LL_INCLUDE, and then have the Makefiles set up asflags
-> based on those. Still, that would be a lot of work and this patch is
-> simpler.
-> 
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+Dear Florian
 
-Ok, thanks for testing! I'm always cautious aobut my own assembly skills,
-so I'm glad this worked.
+On Wed, Mar 19, 2014 at 1:28 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2014-03-18 1:40 GMT-07:00 Zhangfei Gao <zhangfei.gao@linaro.org>:
 
-	Arnd
+>> +static int hip04_mdio_reset(struct mii_bus *bus)
+>> +{
+>> +       int temp, err, i;
+>> +
+>> +       for (i = 0; i < 2; i++) {
+>> +               hip04_mdio_write(bus, i, 22, 0);
+>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
+>> +               temp |= BMCR_RESET;
+>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
+>> +               if (err < 0)
+>> +                       return err;
+>> +       }
+>> +
+>> +       mdelay(500);
+>
+> This does not look correct, you should iterate over all possible PHYs:
+> PHY_MAX_ADDR instead of hardcoding the loop to 2.
+
+OK, got it.
+Use 2 is since only have 2 phy in the board, will use PHY_MAX_ADDR instead.
+>
+> I think we might want to remove the mdio bus reset callback in general
+> as the PHY library should already take care of software resetting the
+> PHY to put it in a sane state, as well as waiting for the appropriate
+> delay before using, unlike here, where you do not poll for BMCR_RESET
+> to be cleared by the PHY.
+>
+Do you mean will move BMCR_RESET to common code, that's would be great.
+The mdio_reset is added here to get phy_id, otherwise the phy_id can
+not be read as well as detection.
+
+Thanks
