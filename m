@@ -1,76 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Mar 2014 12:55:01 +0900
-Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
-In-Reply-To: <1395257399-359545-61-git-send-email-arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Mar 2014 12:55:28 +0900
+Subject: [PATCH 47/62] ARM: s3c64xx: MACH_SMDK6400 needs HSMMC1
+In-Reply-To: <1395257399-359545-48-git-send-email-arnd@arndb.de>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-61-git-send-email-arnd@arndb.de>
-Message-ID: <20140320035501.GE10601@verge.net.au>
+ <1395257399-359545-48-git-send-email-arnd@arndb.de>
+Message-ID: <01ee01cf43f0$3b436bc0$b1ca4340$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:57PM +0100, Arnd Bergmann wrote:
-> When phylib is set to be built as a module, the lager and koelsch
-> boards fail to build:
+Arnd Bergmann wrote:
 > 
-> arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
-> :(.text+0x738): undefined reference to `mdiobus_read'
-> :(.text+0x73c): undefined reference to `mdiobus_write'
-> arch/arm/mach-shmobile/built-in.o: In function `koelsch_ksz8041_fixup':
-> :(.text+0x7e8): undefined reference to `mdiobus_read'
-> :(.text+0x7ec): undefined reference to `mdiobus_write'
+> This board uses both MMC controllers, so we need to enable
+> the Kconfig option to define the platform data.
 > 
-> To work around that problem, this changes the code to check for
-> IS_BUILTIN rather than IS_ENABLED, turning the error into a runtime
-> problem. It's now possible to build random configurations, but the
-> phy may be set up incorrectly in this case.
-
-I wonder if Kconfig for koelsch should be tightened up somehow to
-ensure that PHYLIB is either unselected or builtin.
-
-Also, a minor nit, I would prefer changes for different boards
-in different patches. But I can split the patch myself if its
-not going to be changed otherwise.
-
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: linux-sh at vger.kernel.org
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
 > ---
->  arch/arm/mach-shmobile/board-koelsch.c | 2 +-
->  arch/arm/mach-shmobile/board-lager.c   | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-s3c64xx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-> index 5a034ff..b724f33 100644
-> --- a/arch/arm/mach-shmobile/board-koelsch.c
-> +++ b/arch/arm/mach-shmobile/board-koelsch.c
-> @@ -510,7 +510,7 @@ static void __init koelsch_init(void)
->  
->  	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
->  
-> -	if (IS_ENABLED(CONFIG_PHYLIB))
-> +	if (IS_BUILTIN(CONFIG_PHYLIB))
->  		phy_register_fixup_for_id("r8a7791-ether-ff:01",
->  					  koelsch_ksz8041_fixup);
->  }
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index f0104bf..67b1069 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -869,7 +869,7 @@ static void __init lager_init(void)
->  
->  	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
->  
-> -	if (IS_ENABLED(CONFIG_PHYLIB))
-> +	if (IS_BUILTIN(CONFIG_PHYLIB))
->  		phy_register_fixup_for_id("r8a7790-ether-ff:01",
->  					  lager_ksz8041_fixup);
->  }
-> -- 
-> 1.8.3.2
-> 
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index 64f04e6..92885d7 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -87,6 +87,7 @@ config MACH_SMDK6400
+>  	select CPU_S3C6400
+>  	select S3C64XX_SETUP_SDHCI
+>  	select S3C_DEV_HSMMC
+> +	select S3C_DEV_HSMMC1
+>  	select S3C_DEV_NAND
+
+Well, only HSMMC ch1 is used on smdk6400 and S3C_DEV_NAND is not needed.
+
+So should be following:
+
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 64f04e6..3136d86 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -86,8 +86,7 @@ config MACH_SMDK6400
+        bool "SMDK6400"
+ 	select CPU_S3C6400
+ 	select S3C64XX_SETUP_SDHCI
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_NAND
++	select S3C_DEV_HSMMC1
+ 	help
+ 	  Machine support for the Samsung SMDK6400
+
+Thanks,
+Kukjin
+
+>  	help
+>  	  Machine support for the Samsung SMDK6400
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 1.8.3.2
