@@ -1,30 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Mar 2014 22:34:57 +0300
-Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
-In-Reply-To: <5091055.xba9009NTn@wuerfel>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403201250.45005.arnd@arndb.de> <532B3A91.6000800@cogentembedded.com>
- <5091055.xba9009NTn@wuerfel>
-Message-ID: <532B42E1.6080804@cogentembedded.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Mar 2014 03:35:30 +0900
+Subject: [PATCH v2 6/6] ARM: s5p64x0: Explicitly include linux/serial_s3c.h
+ in mach/pm-core.h
+In-Reply-To: <1395162964-5916-6-git-send-email-t.figa@samsung.com>
+References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
+ <1395162964-5916-6-git-send-email-t.figa@samsung.com>
+Message-ID: <532B34F2.8050804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 03/19/14 02:16, Tomasz Figa wrote:
+> This patch fixes compilation failure due to missing explicit inclusion
+> of linux/serial_s3c.h in mach/pm-core.h, which contains definitions
+> required for further code in this header.
+>
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/mach-s5p64x0/include/mach/pm-core.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-s5p64x0/include/mach/pm-core.h b/arch/arm/mach-s5p64x0/include/mach/pm-core.h
+> index e52f754..1e0eb65 100644
+> --- a/arch/arm/mach-s5p64x0/include/mach/pm-core.h
+> +++ b/arch/arm/mach-s5p64x0/include/mach/pm-core.h
+> @@ -12,6 +12,8 @@
+>    * published by the Free Software Foundation.
+>    */
+>
+> +#include<linux/serial_s3c.h>
+> +
+>   #include<mach/regs-gpio.h>
+>
+>   static inline void s3c_pm_debug_init_uart(void)
 
-On 03/20/2014 09:22 PM, Arnd Bergmann wrote:
+Applied, thanks.
 
->>      Yes, it does. The issue is that the PHY code is different in MUSB and OHCI
->> drivers. I don't think the PHY driver knows what device binds to it.
-
-> At least in the DT case, it can get that information from DT, when you
-> set #phy-cells=<1>. I don't know how it would be done for platform_data,
-> but I assume one could find a way too.
-
-    #phy-cells is only defined for drivers/phy/ bindings IIRC, and I was 
-thinking a drivers/usb/phy/ driver so far. Probably you have a point and we 
-should go for the generic PHY framework instead. I'm just not very familiar 
-with it...
-
-> 	Arnd
-
-WBR, Sergei
+- Kukjin
