@@ -1,69 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 18:26:21 +0000
-Subject: Forcing DEBUG_UART_{PHYS, VIRT} changes when switching between
- v7 platforms?
-In-Reply-To: <CAGVrzcYTnW7mSqwL9sy61mg6EU6jJbUgCRUHjrdPvTgZ=eDZhg@mail.gmail.com>
-References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
- <8099777.qvOx0M5YBS@wuerfel>
- <CAGVrzcYTnW7mSqwL9sy61mg6EU6jJbUgCRUHjrdPvTgZ=eDZhg@mail.gmail.com>
-Message-ID: <20140320182621.GZ7528@n2100.arm.linux.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 20 Mar 2014 19:27:03 +0100
+Subject: [PATCH v2 0/3] ata: ahci_platform related cleanups
+Message-ID: <1395340026-3969-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 11:22:22AM -0700, Florian Fainelli wrote:
-> 2014-03-20 0:07 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 19 March 2014 16:38:45 Florian Fainelli wrote:
-> >> Hi,
-> >>
-> >> When switching between different Multi v7 platform which all select
-> >> DEBUG_UART_8250, whichever platform managed to set
-> >> DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
-> >> others.
-> >>
-> >> What I am seeing at the moment is for instance enabling BCM_MOBILE
-> >> will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
-> >> enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
-> >> re-computed.
-> >>
-> >> Should we add some sort of specific annotation to the Kconfig symbol
-> >> to force a recalculation of the UART PHYS address?
-> >
-> > Russell has plans to change the Konfig logic in the future, removing the
-> > platform specific options. With the current code, you could probably
-> > do something along the lines of
-> >
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index f72147f..aa20929 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -1013,7 +1013,7 @@ config DEBUG_UART_8250
-> >                 ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
-> >
-> >  config DEBUG_UART_PHYS
-> > -       hex "Physical base address of debug UART"
-> > +       hex
-> >         default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
-> >         default 0x01c28000 if DEBUG_SUNXI_UART0
-> >         default 0x01c28400 if DEBUG_SUNXI_UART1
-> > @@ -1074,7 +1074,7 @@ config DEBUG_UART_PHYS
-> >                 DEBUG_UART_8250 || DEBUG_UART_PL01X
-> >
-> >  config DEBUG_UART_VIRT
-> > -       hex "Virtual base address of debug UART"
-> > +       hex
-> >         default 0xe0010fe0 if ARCH_RPC
-> >         default 0xf0000be0 if ARCH_EBSA110
-> >         default 0xf0009000 if DEBUG_CNS3XXX
-> >
-> > with some extra logic to still allow you to enter the values
-> > manually if not set by default, but that probably wouldn't work
-> > any more when the rework is done.
-> 
-> Your change works great, thanks! Should we make that the current
-> behavior until Russell revamps the Kconfig logic?
+[ v1 was named "ata: add remaining new-style AHCI platform drivers"
+  but we are down from 2 drivers to 1 driver so the title of the patch
+  series no longer was valid :) ]
 
-No, because it takes away the ability to change it manually.
+Hi,
+
+This patch series:
+- fixes ahci_platform_data->suspend() handling
+- moves library AHCI platform code to its own file
+- adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
+
+Changes since v1:
+- dropped no longer needed patch #4 (ST SPEAr1340 AHCI controller driver)
+- adressed review comments for patch #3 from Sekhar Nori
+- updated patch descriptions
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+Bartlomiej Zolnierkiewicz (3):
+  ata: ahci_platform: fix ahci_platform_data->suspend method handling
+  ata: move library code from ahci_platform.c to libahci_platform.c
+  ata: add new-style AHCI platform driver for DaVinci DA850 AHCI
+    controller
+
+ arch/arm/mach-davinci/devices-da8xx.c |  99 +------
+ drivers/ata/Kconfig                   |  14 +-
+ drivers/ata/Makefile                  |   9 +-
+ drivers/ata/ahci_da850.c              | 116 ++++++++
+ drivers/ata/ahci_platform.c           | 508 -------------------------------
+ drivers/ata/libahci_platform.c        | 541 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 681 insertions(+), 606 deletions(-)
+ create mode 100644 drivers/ata/ahci_da850.c
+ create mode 100644 drivers/ata/libahci_platform.c
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.2.3
