@@ -1,42 +1,32 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 20 Mar 2014 10:24:35 +0100
-Subject: [PATCH 09/11] ARM: at91/dt: define main xtal frequency of the
- at91sam9261ek board
-In-Reply-To: <1395173924-3648-10-git-send-email-b.brezillon.dev@gmail.com>
-References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
- <1395173924-3648-10-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <CACh+v5OF52ZuDBpkqpev1Jxv0DJ1ckRR+DjcX500i3o0o4HE9A@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 20 Mar 2014 09:58:10 +0100
+Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT documentation
+Message-ID: <20140320092639.48F68A6279@smtp3-g21.free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
->
-> Define at91sam9261ek main crystal frequency.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> ---
->  arch/arm/boot/dts/at91sam9261ek.dts |    4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-> index 2ce527e..7175986 100644
-> --- a/arch/arm/boot/dts/at91sam9261ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
-> @@ -29,6 +29,10 @@
->                         compatible = "atmel,osc", "fixed-clock";
->                         clock-frequency = <18432000>;
->                 };
-> +
-> +               main_xtal: main_xtal {
-> +                       clock-frequency = <18432000>;
-> +               };
->         };
->
->         ahb {
-> --
-> 1.7.9.5
->
-You forgot to remove the old fixed-clock definition for the main_clock: clock at 0
+The I2C address (reg) is required for the TDA998x driver to be loaded
+and initialized.
 
-Otherwise:
-Acked-by: Jean-Jacques HIBLOT <jjhiblot@traphandler.com>
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+This patch applies to linux-next.
+---
+ Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+index d7df01c..fc7effa 100644
+--- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
++++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+@@ -3,6 +3,8 @@ Device-Tree bindings for the NXP TDA998x HDMI transmitter
+ Required properties;
+   - compatible: must be "nxp,tda998x"
+ 
++  - reg: I2C address - must be <0x70>
++
+ Optional properties:
+   - interrupts: interrupt number and trigger type
+ 	default: polling
+-- 
+1.9.1
