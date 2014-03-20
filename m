@@ -1,28 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Mar 2014 17:59:32 +0530
-Subject: [PATCH 07/62] ARM: davinci: make dm644x-evm phy fixup conditional
-In-Reply-To: <1395257399-359545-8-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-8-git-send-email-arnd@arndb.de>
-Message-ID: <532ADF2C.4040405@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 20 Mar 2014 12:34:46 +0000
+Subject: arm64: mainline with foundation model: hang in arm64_device_init
+In-Reply-To: <7h7g7pen2c.fsf@paris.lan>
+References: <7h7g7pen2c.fsf@paris.lan>
+Message-ID: <532AE066.5010809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014 12:59 AM, Arnd Bergmann wrote:
-> We cannot call phy_register_fixup_for_uid() if CONFIG_PHYLIB
-> is not built into the kernel, and we should not enforce that
-> to be built into vmlinux either, because one might want to
-> disable the entire network stack.
-> 
-> This change uses a compile-time condition on CONFIG_PHYLIB
-> to remove the call in the cases where it cannot work.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
+Hi Kevin,
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+On 20/03/14 00:22, Kevin Hilman wrote:
+> Hi Catalin,
+>
+> Should I expect vanilla mainline (v3.14-rc7) to work with the current
+> aarch64 foundation model r0p0 (model build 0.8.5206)?  I'm also using
+> the master branch of your boot-wrapper-aarch64 configured to point at
+> the mainline tree.
+>
+> I've gotten as far as adding initcall_debug to the cmdline and noticing
+> that arm64_device_init never returns, but have to call it a day so have
+> to wait til tomorrow to debug further.  In the mean time wanted to check
+> with you on whether it should work.
+>
 
-Thanks,
-Sekhar
+This is not due to any kernel bug, but due to bootwrapper picking up wrong 
+device tree. I will work on fixing it in the boot-wrapper-aarch64 repo.
+
+Meanwhile could change KERN_DTB in configure.ac to point to foundation-v8.dtb 
+and give it a try.
+
+Regards,
+Sudeep
