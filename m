@@ -1,62 +1,88 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 20 Mar 2014 06:07:31 +0000
-Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <20140318081019.GJ11360@pengutronix.de>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <1394887464-969-17-git-send-email-mpa@pengutronix.de>
- <1394894616.578942243@f331.i.mail.ru> <20140318081019.GJ11360@pengutronix.de>
-Message-ID: <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Mar 2014 07:42:21 +0100
+Subject: [PATCH 06/62] ARM: davinci: export da8xx_syscfg0_base
+In-Reply-To: <532A1BDD.904@cogentembedded.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <4836281.0IgPinItBq@wuerfel> <532A1BDD.904@cogentembedded.com>
+Message-ID: <9096065.aGCg8yZblW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Subject: Re: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+On Thursday 20 March 2014 01:36:13 Sergei Shtylyov wrote:
+> On 03/19/2014 11:21 PM, Arnd Bergmann wrote:
+> > The question is whether there is anyone who would do this properly.
 > 
-> On Sat, Mar 15, 2014 at 06:43:36PM +0400, Alexander Shiyan wrote:
-> > ???????, 15 ????? 2014, 13:44 +01:00 ?? Markus Pargmann <mpa@pengutronix.de>:
-> > > This patch replaces the ssi specific functions write_ssi, read_ssi and
-> > > write_ssi_mask by standard regmap function calls.
-> > ...
-> > > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> > ...
-> > > +static const struct regmap_config fsl_ssi_regconfig = {
-> > > +	.max_register = CCSR_SSI_SACCDIS,
-> > > +	.reg_bits = 32,
-> > > +	.val_bits = 32,
-> > > +	.reg_stride = 4,
-> > > +#ifdef PPC
-> > > +	.val_format_endian = REGMAP_ENDIAN_BIG,
-> > > +#endif
-> > > +};
-> >
-> > Why we cannot use REGMAP_ENDIAN_NATIVE here for all cases?
-> > Theoretically, we can use for i.MX SOCs with different endianness,
-> > so this will help us.
+>     Nobody cares, it seems. As you can imagine, I stopped to care enough after 
+> being switched to other projects.
+
+I only care about it because I have the intention to get all 'randconfig'
+kernels to build eventually. For stuff that is definitely 'legacy'
+and won't get cleaned up properly, I'm fine with a hack.
+
+> > Both the OHCI and MUSB drivers use exactly one register (CFGCHIP2)
 > 
-> I can change and test it on i.MX, but I am not sure if it helps with the
-> PPC situation as I don't have the hardware.
+>     The idea at the time was to just ioremap() this register but I was not 
+> very eager.
+
+Yes, that would work, too. However, that would cause problems later
+if we ever try to make the davinci platform "multiplatform", unless we also
+pass the physical address in a platform resource and make this a larger
+driver. I think we can reasonably have an exported set of functions
+declared in the platform data header file for these drivers, but passing
+the physical address through a header file wouldn't be much of an improvement
+over passing the virtual address.
+
+> There was no USB PHY driver subsystem yet.
 > 
+> > to control the clock, phy
+> 
+>     Note that it only controls PHY clock (PLL) which could be covered by an 
+> USB PHY driver.
 
-For the scenario of PowerPC(for CPU and devices mostly are in BE mode):
-CPU		SSI
-BE		BE	we can just use the REGMAP_ENDIAN_NATIVE here.
+Good point.
 
-For the scenario of ARM(for CPU and devices mostly are in LE mode):
-CPU		SSI
-LE		LE	we can also just use the REGMAP_ENDIAN_NATIVE here.
+> > and host/gadget mode switch.
+> 
+>     The main mode the USB 2.0 PHY should function now is OTG. The host/gadged 
+> modes are forced overrides of the ID pin. Unfortunately, the board code has to 
+> force host mode when host-only driver config is selected (these MUSB's 
+> host/gadget only modes were removed at one point but got reintroduced again).
 
-While for the scenario like our LS1(ARM) platform.
-CPU		SSI
-LE		BE	then should we set the .val_format_endian to
-			REGMAP_ENDIAN_BIG
+I think they are also required for 'randconfig' builds to some degree, because
+you can build a kernel without host mode for instance.
 
+> > In the modern world, we'd probably want to have a clock driver and
+> 
+>     Not sure about the clock driver...
+>
+> > a phy driver for these,
+> 
+>     Yes, that's what the MUSB maintainer wants too. The issue is the driver 
+> should somehow differ which USB controller it's bound too and do different 
+> things depending on that (at least that's how it looks now). I'm not sure it's 
+> possible, so probably should be rethought.
 
-And so not only for PowerPC, but also maybe for ARM platforms.
-So here how about just adding one Boolean property like 'big-endian' in DT node
-to learn the endianness of the devices dynamically ?  
+Yes, a phy driver seems the right approach if we can find someone to do it.
+Ideally that should let us use generic versions of the ohci and musb drivers
+even, if that's the only davinci specific part of these drivers.
 
-Thanks,
-:)
+> > based on a syscon driver.
+> 
+>     I don't know what syscon is...
 
-Best Regards,
-Xiubo
+The syscon (system controller) framework helps share a set of registers
+across multiple drivers. If all accesses to the CFGCHIP2 register are
+in a single PHY driver, we wouldn't need it.
+
+> > In all honesty I don't see that happening on davinci.
+> 
+>     I don't think people use USB 1.1 controllers these days, especially when 
+> there is USB 2.0 in the same SoC. For MUSB, there were recent attempt to get 
+> the DA8xx driver out of the broken state but it was turned down as well, IIRC, 
+> since it didn't offer a PHY driver.
+
+For USB 2.0 compliance you actually need to provide something to handle the
+low speed modes. A lot of people use a hub to do that nowadays rather than
+an OHCI or UHCI, but I don't know if that works with OTG.
+
+	Arnd
