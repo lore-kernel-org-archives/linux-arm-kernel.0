@@ -1,39 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Mar 2014 12:59:34 +0000
-Subject: [PATCH] ARM: topology: Make it clear that all CPUs need to be
- described
-Message-ID: <1395320374-29576-1-git-send-email-broonie@kernel.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 20 Mar 2014 14:01:56 +0100
+Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
+ documentation
+In-Reply-To: <532ADFD8.80301@gmail.com>
+References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
+ <532ADFD8.80301@gmail.com>
+Message-ID: <20140320140156.5d768b1f@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Thu, 20 Mar 2014 13:32:24 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-The ARMv8 code will reject topologies that omit some CPUs (and it's not
-clear that it's ever sensible to do so). Update the binding document to
-make this clear.
+> > +  - reg: I2C address - must be <0x70>  
+> 
+> TDA9983b datasheet says:
+> 
+> "Bits A0 and A1 of the I2C-bus device address are externally selected
+> by pins A0 and A1."
+> 
+> Therefore, 0x70, 0x71, 0x72, and 0x73 are valid i2c addresses.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- Documentation/devicetree/bindings/arm/topology.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Sebastian,
 
-diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
-index 4aa20e7a424e..1bd5edc225c1 100644
---- a/Documentation/devicetree/bindings/arm/topology.txt
-+++ b/Documentation/devicetree/bindings/arm/topology.txt
-@@ -75,9 +75,10 @@ The cpu-map node can only contain three types of child nodes:
- 
- whose bindings are described in paragraph 3.
- 
--The nodes describing the CPU topology (cluster/core/thread) can only be
--defined within the cpu-map node.
--Any other configuration is consider invalid and therefore must be ignored.
-+The nodes describing the CPU topology (cluster/core/thread) can only
-+be defined within the cpu-map node and every core/thread in the system
-+must be defined within the topology.  Any other configuration is
-+consider invalid and therefore must be ignored.
- 
- ===========================================
- 2.1 - cpu-map child nodes naming convention
+That's interesting!
+
+For the Cubox and the AMX33XX boards, the I2C address of the HDMI
+registers is 0x70, and the I2C address of the CEC registers is 0x34.
+
+For other boards using the TDA998x family, if the I2C address is
+different from 0x70, have you an idea about what can be the CEC I2C
+address? (this value is actually hard-coded in the TDA998x driver)
+
 -- 
-1.9.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
