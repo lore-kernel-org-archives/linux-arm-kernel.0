@@ -1,52 +1,101 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 20 Mar 2014 05:41:00 -0700
-Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
- arguments
-In-Reply-To: <1395317630.7776.29.camel@joe-AO722>
-References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
- <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
- <1395314713.7776.17.camel@joe-AO722>
- <20140320114123.GE21349@lee--X1>
- <1395316090.7776.24.camel@joe-AO722>
- <20140320115412.GU31517@norris-Latitude-E6410>
- <20140320120307.GA9240@lee--X1>
- <1395317630.7776.29.camel@joe-AO722>
-Message-ID: <CAN8TOE9g2VwVgVx1Sj3OcguuwP_A9pJS+WpgTAL49KyN9r1CiA@mail.gmail.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 20 Mar 2014 12:41:58 +0000
+Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
+In-Reply-To: <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
+References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+ <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <532AE216.3080106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 5:13 AM, Joe Perches <joe@perches.com> wrote:
-> On Thu, 2014-03-20 at 12:03 +0000, Lee Jones wrote:
->> > Good catch. That wasn't my intention.
->> > > Why?
->> An oversight.
->
-> That's still not an explanation.
->
-> Why, unless cast away by the code itself, is
-> const removal a good thing?
+On 19/03/14 16:22, Vincent Guittot wrote:
+> We replace the old way to configure the scheduler topology with a new method
+> which enables a platform to declare additionnal level (if needed).
+> 
+> We still have a default topology table definition that can be used by platform
+> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
+> be overwritten by an arch which either wants to add new level where a load balance
+> make sense like BOOK or powergating level or wants to change the flags
+> configuration of some levels.
+> 
+> For each level, we need a function pointer that returns cpumask for each cpu,
+> a function pointer that returns the flags for the level and a name. Only flags
+> that describe topology, can be set by an architecture. The current topology
+> flags are:
+>  SD_SHARE_CPUPOWER
+>  SD_SHARE_PKG_RESOURCES
+>  SD_NUMA
+>  SD_ASYM_PACKING
+> 
+> Then, each level must be a subset on the next one. The build sequence of the
+> sched_domain will take care of removing useless levels like those with 1 CPU
+> and those with the same CPU span and relevant information for load balancing
+> than its child.
 
-It's not so much removal as it is review of the initial driver merge.
-I'd contend that const was applied somewhat thoughtlessly originally,
-and it didn't really serve a good purpose.
+The paragraph above contains important information to set this up
+correctly, that's why it might be worth clarifying:
 
-> It does serve as an indication to a reader what
-> the code does with the argument.
->
-> About the only reason I can think of arguing in
-> favor of removal is inconsistent application of
-> const within the module.
+- "next one" of sd means "child of sd" ?
+- "subset" means really "subset" and not "proper subset" ?
 
-That's one good reason. And not only consistency within the modules,
-but consistency within the subsystem (and the kernel at large,
-really). There's rarely a case of a const function parameter. And I'm
-sure there are numerous function parameters which could potentially be
-marked 'const'.
+On TC2 w/ the following change in cpu_corepower_mask()
 
-I also don't think that a function parameter is the right place to
-mark const like this. Function arguments are always pass-by-value, so
-this 'const' tells users (callers) nothing useful. It only provides
-useless constraints on what the function can do with its copy of the
-parameter.
+ const struct cpumask *cpu_corepower_mask(int cpu)
+ {
+-       return &cpu_topology[cpu].thread_sibling;
++       return cpu_topology[cpu].socket_id ?
+&cpu_topology[cpu].thread_sibling :
++                       &cpu_topology[cpu].core_sibling;
+ }
 
-Brian
+I get this e.g. for CPU0,2:
+
+CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
+CPU0: cpu_coregroup_mask=0-1
+CPU0: cpu_cpu_mask=0-4
+
+CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
+CPU2: cpu_coregroup_mask=2-4
+CPU2: cpu_cpu_mask=0-4
+
+I assume here that this is a correct set-up.
+
+The domain degenerate part:
+
+"useless levels like those with 1 CPU" ... that's the case for GMC level
+for CPU2,3,4
+
+The GMC level is destroyed because of the following code snippet in
+sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
+
+so that's fine.
+
+In case of CPU0,1 since GMC and MC have the same span, the code in
+build_sched_groups() creates only one group for MC  and that's why
+pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
+the if condition 'if (~cflags & pflags)' is not hit and
+sd_parent_degenerate() finally returns 1 for MC.
+
+So the "those with the same CPU span and relevant information for load
+balancing than its child." is not so easy to understand for me. Because
+both levels have the same span we actually don't take the flags of the
+parent into consideration which require at least 2 groups.
+
+So the TC2 example covers for me two corner cases: (1) The level I want
+to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
+the parent level I want to get rid of (MC for CPU0,1) of is the same as
+the span of the level which should stay.
+
+Are these two corner cases the only one supported here? If yes this has
+to be stated somewhere, otherwise if somebody will try this approach on
+a different topology, (s)he might be surprised.
+
+If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
+this works fine.
+
+I would like to test this on more platforms but I only have my TC2
+available :-)
+
+-- Dietmar
+
+[...]
