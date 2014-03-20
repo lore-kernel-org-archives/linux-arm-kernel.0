@@ -1,30 +1,110 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 20 Mar 2014 21:51:45 +0100
-Subject: [PATCH 09/62] ARM: efm32: allow uncompress debug output
-In-Reply-To: <1395257399-359545-10-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-10-git-send-email-arnd@arndb.de>
-Message-ID: <20140320205145.GE23076@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 20 Mar 2014 16:58:34 -0400
+Subject: [PATCH] ARM: dts: keystone: use common "ti,keystone" compatible
+ instead of -evm
+In-Reply-To: <1395148354-22412-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1395148354-22412-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <532B567A.5060508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:29:06PM +0100, Arnd Bergmann wrote:
-> efm32 has no mach/uncompress.h, but we can trivially use
-> the fallback to the ll_debug code by just allowing this
-> option in Kconfig.
+On Tuesday 18 March 2014 09:12 AM, Ivan Khoronzhuk wrote:
+> As suggested by Olof Johansson at
+> http://www.spinics.net/lists/arm-kernel/msg314009.html.
+> It be better just keeping a "ti,keystone" top-level compatible and
+> just using that to probe. If so we don't have to touch the file
+> for new boards in the future.
 > 
-> Found during randconfig testing.
+> So use common "ti,keystone" compatible in keystone.c for all boards.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Uwe Kleine-K?nig <kernel@pengutronix.de>
-I didn't test it (and in fact I cannot because there is too little RAM
-to run a zImage on my board[1]) but the change looks good for a board
-having more RAM, so
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+> 
+> Based on linux-next/master
+> 
+Applying it to for_3.15/fixes
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-[1] maybe it would run long enough to see some output, but meh
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>  Documentation/devicetree/bindings/arm/keystone/keystone.txt | 6 +++---
+>  arch/arm/boot/dts/k2e-evm.dts                               | 2 +-
+>  arch/arm/boot/dts/k2hk-evm.dts                              | 2 +-
+>  arch/arm/boot/dts/k2l-evm.dts                               | 2 +-
+>  arch/arm/mach-keystone/keystone.c                           | 5 +----
+>  5 files changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+> index ad16e7a..59d7a46 100644
+> --- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+> @@ -11,10 +11,10 @@ Required properties:
+>  
+>  Boards:
+>  -  Keystone 2 Hawking/Kepler EVM
+> -   compatible = "ti,k2hk-evm"
+> +   compatible = "ti,k2hk-evm","ti,keystone"
+>  
+>  -  Keystone 2 Lamarr EVM
+> -   compatible = "ti,k2l-evm"
+> +   compatible = "ti,k2l-evm","ti,keystone"
+>  
+>  -  Keystone 2 Edison EVM
+> -   compatible = "ti,k2e-evm"
+> +   compatible = "ti,k2e-evm","ti,keystone"
+> diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
+> index bb8faeb..74b3b63 100644
+> --- a/arch/arm/boot/dts/k2e-evm.dts
+> +++ b/arch/arm/boot/dts/k2e-evm.dts
+> @@ -13,7 +13,7 @@
+>  #include "k2e.dtsi"
+>  
+>  / {
+> -	compatible =  "ti,k2e-evm";
+> +	compatible =  "ti,k2e-evm","ti,keystone";
+>  	model = "Texas Instruments Keystone 2 Edison EVM";
+>  
+>  	soc {
+> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+> index 1a1335b..f2a6658 100644
+> --- a/arch/arm/boot/dts/k2hk-evm.dts
+> +++ b/arch/arm/boot/dts/k2hk-evm.dts
+> @@ -13,7 +13,7 @@
+>  #include "k2hk.dtsi"
+>  
+>  / {
+> -	compatible =  "ti,k2hk-evm";
+> +	compatible =  "ti,k2hk-evm","ti,keystone";
+>  	model = "Texas Instruments Keystone 2 Kepler/Hawking EVM";
+>  
+>  	soc {
+> diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
+> index ebf316a..50a7013 100644
+> --- a/arch/arm/boot/dts/k2l-evm.dts
+> +++ b/arch/arm/boot/dts/k2l-evm.dts
+> @@ -13,7 +13,7 @@
+>  #include "k2l.dtsi"
+>  
+>  / {
+> -	compatible =  "ti,k2l-evm";
+> +	compatible =  "ti,k2l-evm","ti,keystone";
+>  	model = "Texas Instruments Keystone 2 Lamarr EVM";
+>  
+>  	soc {
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> index aa0d212..e0b9e1b 100644
+> --- a/arch/arm/mach-keystone/keystone.c
+> +++ b/arch/arm/mach-keystone/keystone.c
+> @@ -46,10 +46,7 @@ static void __init keystone_init(void)
+>  }
+>  
+>  static const char *keystone_match[] __initconst = {
+> -	"ti,keystone-evm",
+> -	"ti,k2hk-evm",
+> -	"ti,k2l-evm",
+> -	"ti,k2e-evm",
+> +	"ti,keystone",
+>  	NULL,
+>  };
+>  
+> 
