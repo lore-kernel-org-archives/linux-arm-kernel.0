@@ -1,96 +1,31 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 20 Mar 2014 11:38:21 +0000
-Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
-In-Reply-To: <201403201217.22339.arnd@arndb.de>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <8312584.jdZZuHGAjg@wuerfel>
- <20140320094654.GZ6457@e106497-lin.cambridge.arm.com>
- <201403201217.22339.arnd@arndb.de>
-Message-ID: <20140320113820.GH6457@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Mar 2014 11:41:23 +0000
+Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
+ arguments
+In-Reply-To: <1395314713.7776.17.camel@joe-AO722>
+References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
+ <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
+ <1395314713.7776.17.camel@joe-AO722>
+Message-ID: <20140320114123.GE21349@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 11:17:22AM +0000, Arnd Bergmann wrote:
-> On Thursday 20 March 2014, Liviu Dudau wrote:
-> > On Wed, Mar 19, 2014 at 06:37:51PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 19 March 2014 17:21:41 Liviu Dudau wrote:
-> > > > 
-> > > > My ultimate point is that no matter how long we argue about the shape of the functions that
-> > > > I've added into arch/arm64/kernel/pci.c I don't think we can get away without having that
-> > > > file, or at least not in the first phase if we want speedy integration into mainline.
-> > > 
-> > > Let me simplify the discussion here:
-> > > 
-> > > NAK to adding yet another architecture specific implementation.
-> > 
-> > So what would be your approach for handling pci_address_to_pio() in a non-arch specific way?
-> > 
-> > unsigned long __weak pci_address_to_pio(phys_addr_t address)
-> > {
-> > #ifdef ARCH_HAS_IOSPACE
-> >         if (address > IO_SPACE_LIMIT)
-> >                 return (unsigned long)-1;
-> > 
-> >         return (unsigned long) address;
-> > #else
-> >         struct ioresource *res;
-> > 
-> >         list_for_each_entry(res, &io_list, list) {
-> >                 if (address >= res->start &&
-> >                         address < res->start + res->size) {
-> >                         return res->start - address;
-> >                 }
-> >         }
-> > 
-> >         return (unsigned long)-1;
-> > #endif
-> > }
-> > 
-> > 
-> > Either that, or you have more magic rabbits than me.
-> 
-> I don't even understand why you want to create a generic pci_address_to_pio
-> implementation, when we don't need that for arm64 at all. Unless I'm
-> missing something important, that function is only called in case of
-> PCI_PROBE_DEVTREE with pci_of_scan on PowerPC. I don't expect any
-> architecture to do the same thing, and the only other architecture that
-> needs something like it (sparc) has a different implementation.
+On Thu, 20 Mar 2014, Joe Perches wrote:
 
-Because in my [v7 2/6]* patch for the generic host bridge support I start
-using pci_address_to_pio to fix the conversion of PCI ranges to resources.
-That requires an arm64 (or more correctly, an arch with memory mapped IO
-specific) version of pci_address_to_pio().
+> On Thu, 2014-03-20 at 11:11 +0000, Lee Jones wrote:
+> > Reported-by: Brian Norris <computersforpeace@gmail.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Why are these useless?
+> 
+> Even if the object code produced is the same,
+> these serve as information to the human reader
+> about how the arguments are used.
 
-Best regards,
-Liviu
-
-> 
-> The regular (non-DEVTREE) PCI bus scan should just be able to translate
-> the BUS I/O addresses into Linux I/O port numbers using io_offset,
-> without going through an intermediate step of translating into a CPU
-> physical address first, so the entire lookup method won't get used.
-> 
-> The reason why PowerPC needs it is that they traditionally don't
-> use PCI config space access to assign or look at resources, but
-> instead rely on the firmware to have set it up in advance and then
-> put matching information into DT and the BARs. For Solaris and AIX,
-> it's probably easier to use the information from DT, but in Linux,
-> we already need to implement the manual bus scan, e.g. to do
-> PCI device hotplugging if nothing else.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+https://lkml.org/lkml/2014/3/20/69
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
