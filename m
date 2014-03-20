@@ -1,41 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 02:56:36 +0900
-Subject: [PATCH 2/2] ARM: s3c64xx: Fix build for implicit serial_s3c.h
- inclusion
-In-Reply-To: <1395143803-2032-2-git-send-email-broonie@kernel.org>
-References: <1395143803-2032-1-git-send-email-broonie@kernel.org>
- <1395143803-2032-2-git-send-email-broonie@kernel.org>
-Message-ID: <532B2BD4.7060809@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 20 Mar 2014 14:02:39 -0400
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B2183.2080309@ti.com> <20140320172912.GW31517@norris-Latitude-E6410>
+ <532B2766.6090506@ti.com> <D69011BE-C37F-4085-B992-45F6F32AF1D0@gmail.com>
+Message-ID: <532B2D3F.6050004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/14 20:56, Mark Brown wrote:
-> From: Mark Brown<broonie@linaro.org>
->
-> Some very recent change appears to have removed an implicit inclusion of
-> serial_s3c.h causing build failures due to references to UART registers
-> in the serial port restore code in next-20140318.  Include it explicitly
-> to fix the build.
->
-> Signed-off-by: Mark Brown<broonie@linaro.org>
-> ---
->   arch/arm/mach-s3c64xx/include/mach/pm-core.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/pm-core.h b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-> index c0537f40a3d8..a30a1e3ffc6a 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-> @@ -15,6 +15,8 @@
->   #ifndef __MACH_S3C64XX_PM_CORE_H
->   #define __MACH_S3C64XX_PM_CORE_H __FILE__
->
-> +#include<linux/serial_s3c.h>
-> +
->   #include<mach/regs-gpio.h>
->
->   static inline void s3c_pm_debug_init_uart(void)
+On Thursday 20 March 2014 01:44 PM, Warner Losh wrote:
+> 
+> On Mar 20, 2014, at 11:37 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> 
+>>
+>>
+>> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
+>>> On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
+>>>> Boris,
+>>>
+>>> Who's Boris? And why should Boris be taking this patch? It's an MTD
+>>> patch.
+>>>
+>> I got your name completely wrong. Sorry....
+>>
+>>>> On Thursday 20 March 2014 01:06 PM, Ivan Khoronzhuk wrote:
+>>>>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>>>>
+>>>>> After testing NAND flash with ubifs for k2hk-emv board were committed
+>>>>> that flash doesn't support subpage writing, so we can fix it by
+>>>>> adding a property to disable subpage write.
+>>>
+>>> What flash? We try to autodetect NAND as much as possible. Perhaps we
+>>> should be adding infrastructure support instead of hacking it with a DT
+>>> property.
+>>>
+>> We can't auto detect it and thats why the DT approach was taken. We
+>> will double check that.
+> 
+> I though sub page writing was one of the fields in the onfi and/or jedec(toggle) meta data structures. Have you looked there?
+> 
+Am not sure if I follow you. The limitation is from the TI NAND controller(AEMIF) and
+not the NAND memory. 
 
-Applied, thanks.
-
-- Kukjin
+regards,
+Santosh
