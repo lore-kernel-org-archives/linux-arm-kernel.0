@@ -1,72 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Mar 2014 14:26:23 +0000
-Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
- versions of spec
-In-Reply-To: <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
- <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
-Message-ID: <20140320142623.GD23372@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 14:31:10 +0000
+Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
+ documentation
+In-Reply-To: <20140320145221.09252bf6@armhf>
+References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
+ <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
+ <532AEDE2.3080306@gmail.com> <20140320145221.09252bf6@armhf>
+Message-ID: <20140320143110.GU7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 01:25:53AM +0000, Rob Herring wrote:
-> On Wed, Mar 19, 2014 at 7:54 PM, Ashwin Chaugule
-> <ashwin.chaugule@linaro.org> wrote:
-> > The PSCI v0.2+ spec mandates specific values of Function IDs
-> > for ARM32 and ARM64. Use DT bindings of Function IDs only
-> > when using older versions. Use static values otherwise.
-> > This patch also prepares the code to easily use the ACPI API
-> > which is based off of PSCI v0.2+.
-> >
-> > Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > ---
-> >  arch/arm/include/asm/psci.h   |  15 ++++++
-> >  arch/arm/kernel/psci.c        | 110 +++++++++++++++++++++++++++++++++++++-----
-> >  arch/arm64/include/asm/psci.h |  12 +++++
-> >  arch/arm64/kernel/psci.c      | 106 +++++++++++++++++++++++++++++++++++-----
-> >  4 files changed, 218 insertions(+), 25 deletions(-)
-> >
-> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> > index c4ae171..3f8ebf9 100644
-> > --- a/arch/arm/include/asm/psci.h
-> > +++ b/arch/arm/include/asm/psci.h
-> > @@ -17,6 +17,19 @@
-> >  #define PSCI_POWER_STATE_TYPE_STANDBY          0
-> >  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
-> >
-> > +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
-> > +
-> > +#define PSCI_ID_VERSION                                0x84000000
-> > +#define PSCI_ID_CPU_SUSPEND                    0x84000001
-> > +#define PSCI_ID_CPU_OFF                                0x84000002
-> > +#define PSCI_ID_CPU_ON                         0x84000003
-> > +#define PSCI_ID_AFFINITY_INFO          0x84000004
-> > +#define PSCI_ID_CPU_MIGRATE                    0x84000005
-> > +#define PSCI_ID_MIGRATE_INFO_TYPE      0x84000006
-> > +#define PSCI_ID_MIGRATE_INFO_UP_CPU    0x84000007
-> > +#define PSCI_ID_SYSTEM_OFF                     0x84000008
-> > +#define PSCI_ID_SYSTEM_RESET           0x84000009
+On Thu, Mar 20, 2014 at 02:52:21PM +0100, Jean-Francois Moine wrote:
+> Thanks for the link.
 > 
-> With the KVM patches[1], this makes 4 copies of these defines in the
-> kernel (and then QEMU has more). This needs to go into a common header
-> under include/linux. Probably under uapi so QEMU can use. There is
-> some sync of headers between the kernel and QEMU I think.
-
-I agree we should have a common header, but I don't think this is uapi
-material. This is most definitely _not_ part of the user API, and it's
-from an external spec that we're not in control of -- I don't see why we
-should have to export a set of numbers forever because it happens to be
-marginally useful at this point in time.
-
-Having the IDs handled by the kernel and those used by hypervisors also
-encourages people to validate the use of the correct IDs rather than
-everyone making the same mistake.
-
-Cheers,
-Mark.
-
+> OK, then, as the linux tda998x driver handles only the tda 19988 and
+> 19989 chips, the HDMI I2C address is always 0x70.
 > 
-> Rob
+> So, question: Russell and Sebastian, do you still want an other patch?
 > 
-> [1] https://patches.linaro.org/23918/
-> 
+> Other question: the CEC address is hard-coded to 0x34 in the driver.
+> Should it be configurable in the DT?
+
+As we haven't had a mainline non-rc kernel release with this in yet,
+we have more scope in what we can do to sort this out.  What I'd
+suggest is:
+
+1. change the DT compatible strings the driver has to accept both
+   nxp,tda19988 and nxp,tda19989, and set the appropriate device
+   in the DT file (tda19988).  I'm a bit nervous about using
+   "nxp,tda1998x" in case we're clashing with devices with different
+   characteristics.
+
+2. specify that the i2c reg address must exist, but not specify what
+   it should be - leave that open.
+
+3. assume that there's a CEC at 0x34 for these two devices.
+
+If we wish to extend support to tda998x, then we'd need to modify the
+driver quite a bit anyway.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
