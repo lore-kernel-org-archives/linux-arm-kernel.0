@@ -1,33 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Mar 2014 14:25:08 +0100
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320140156.5d768b1f@armhf>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
-Message-ID: <20140320142508.557fb860@armhf>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 20 Mar 2014 21:15:09 +0800
+Subject: [PATCH 05/62] ARM: at91: sama5 always uses DT
+In-Reply-To: <1395257399-359545-6-git-send-email-arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-6-git-send-email-arnd@arndb.de>
+Message-ID: <BB996A46-32C9-4713-B44C-B19336F00C49@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Mar 2014 14:01:56 +0100
-Jean-Francois Moine <moinejf@free.fr> wrote:
 
-> For other boards using the TDA998x family, if the I2C address is
-> different from 0x70, have you an idea about what can be the CEC I2C
-> address? (this value is actually hard-coded in the TDA998x driver)
+On Mar 20, 2014, at 3:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-I had a look again on the tda998x driver from NXP and the linux tda998x
-driver:
-
-- the NXP driver handles the TDAs 19989, 19988, 9984, 9983 and 9981.
-  It accesses the tda registers only at I2C address 0x70 and 0x34
-  (hard-coded values in the driver).
-
-- the linux tda998x driver handles only the TDAs 19988 and 19989.
-
-As we have no documentation about the chips TDA 19988 and 19989,
-may the HDMI I2C addresses of these chips be different from 0x70?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+> 
+> It makes no sense for sama5 support to be enabled if we don't
+> also enable USE_OF. Making this automatic in Kconfig avoids
+> a possible randconfig conflict between the old and new clock
+> support code.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> 
+> ---
+> arch/arm/mach-at91/Kconfig | 1 +
+> 1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 7209c5b..5ec1da1 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -57,6 +57,7 @@ config SOC_SAMA5
+> 	select GENERIC_CLOCKEVENTS
+> 	select MULTI_IRQ_HANDLER
+> 	select SPARSE_IRQ
+> +	select USE_OF
+> 
+> menu "Atmel AT91 System-on-Chip"
+> 
+> -- 
+> 1.8.3.2
+> 
