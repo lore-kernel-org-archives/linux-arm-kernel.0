@@ -1,28 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Mar 2014 13:04:05 -0600
-Subject: [V2] arm: pj4: check cpu id for pj4 cp0 access
-In-Reply-To: <20140318201537.GA20942@beef>
-References: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
- <20140318201537.GA20942@beef>
-Message-ID: <532B3BA5.7080209@wwwdotorg.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Mar 2014 20:04:22 +0100
+Subject: DMABOUNCE in pci-rcar
+In-Reply-To: <20140320183932.GA7528@n2100.arm.linux.org.uk>
+References: <201402241200.21944.arnd@arndb.de>
+ <20140320173106.GA19395@obsidianresearch.com>
+ <532B2628.5080305@codethink.co.uk>
+ <201403201929.13633.arnd@arndb.de>
+ <20140320183932.GA7528@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdX0kZhJyJFCQK7MUbv3nnKbqLkEJ2gnWMuHLSGLQvuQ2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2014 02:15 PM, Matt Porter wrote:
-> On Fri, Jun 14, 2013 at 05:03:57AM -0400, Chao Xie wrote:
->> Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
->> pj4_cpu0_init just return.
->> This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
->> use same platform code.
->>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> This patch fixes a boot failure in next now that ARCH_DOVE (and thus
-> CPU_PJ4) are enabled in multi_v7_defconfig. I verified that boot works
-> again in next with the BCM28155-AP board.
-> 
-> Tested-by: Matt Porter <mporter@linaro.org>
+Hi Russell,
 
-This also solves the Tegra SoC boot failures with next-20130320.
-Tested-by: Stephen Warren <swarren@nvidia.com>
+On Thu, Mar 20, 2014 at 7:39 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> That all said, what I find most annoying is that Ben has ignored my
+> question about exactly what the nature of the limitation is on this
+> platform.  My response to that is - if you're not going to do the
+> curtesy of answering such a simple question, then you don't get to
+> patch the kernel for this problem.
+
+Ben did answer:
+"If the window is set to 2GiB it can only access 2GiB aligned to 2GiB
+ boundary, however DRAM spans a 2GiB boundary (being at 1-3GiB)"
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
