@@ -1,73 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 21:09:41 +0000
-Subject: [arm arch] local_irq_restore() does not play well with
- local_fiq_enable()
-In-Reply-To: <op.xc1f4mxnfh00o9@enterprised.lan>
-References: <op.xc1dkcblfh00o9@enterprised.lan>
- <20140320200233.GC7528@n2100.arm.linux.org.uk>
- <op.xc1f4mxnfh00o9@enterprised.lan>
-Message-ID: <20140320210941.GD7528@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Mar 2014 14:23:08 -0700
+Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
+In-Reply-To: <53172239.3030705@ti.com>
+References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
+ <53172239.3030705@ti.com>
+Message-ID: <20140320212308.21989.36094@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 08:49:24PM +0000, Jonathan Bell wrote:
-> On Thu, 20 Mar 2014 20:02:34 -0000, Russell King - ARM Linux  
-> <linux@arm.linux.org.uk> wrote:
->
->> On Thu, Mar 20, 2014 at 07:54:02PM +0000, Jonathan Bell wrote:
->>> hcd_init:
->>> 	setup the FIQ state
->>> 	install the fiq handler
->>> 	enable_fiq(USB)
->>> 	local_fiq_enable()
->>> 	usb_add_hcd()
->>
->> You're not supposed to use local_fiq_enable() to enable FIQs in a device
->> driver - they should already be enabled by this point.
->>
->> There has been a hole in that where FIQs haven't been enabled in the
->> idle thread, but that's a bug which needs fixing.  Otherwise, you should
->> assume that FIQs are always unmasked everywhere except for any short
->> code sequences that are contained within a short local_fiq_disable()..
->> local_fiq_enable() block.
->>
->
-> Relying on FIQs being enabled elsewhere is in fact what we used to do  
-> until ~3.10, whereupon some change (most likely the bug you describe)  
-> broke this behaviour.
->
-> Our use of local_fiq_disable() and local_fiq_enable() are indeed  
-> constrained to minimally small critical sections (mostly reading/writing 
-> a single hardware register or state variable) within the dwc_otg driver 
-> that "handles" the results from the FIQ.
+Quoting Tero Kristo (2014-03-05 05:10:17)
+> Ping.
+> 
+> Mike, any feedback on this?
 
-Realise that the state of the CPSR is per-process.  So if you're enabling
-it in PID 1 when your driver initialises and it isn't enabled in PID 0,
-then it will still remain not enabled in PID 0 - and that's a big problem
-because that means whenever the system is idle, FIQs will be masked.
+Hi Tero,
 
-Now, what I'm reading in 3.14-rc7 is that:
+Have you seen Sylwester's approach[1]? I prefer it since it is more
+device-oriented and less "centralized". The clock consumer enumerates
+the default parent or rate of a consumed clock. This can be made to work
+like your approach by having the clock driver consume these clocks and
+set them up with default rates or parents. What do you think?
 
-- there is a local_fiq_enable() in arch_cpu_idle_prepare() which ensures
-  that FIQs will be enabled for the idle loop for PID0.
+Regards,
+Mike
 
-- secondary CPUs have a local_fiq_enable() in secondary_start_kernel()
-  which ensures that the have FIQs enabled too.
+[1] https://lkml.org/lkml/2014/3/3/324
 
-- when a kernel thread is created, the initial register set is created
-  by copy_thread() which sets the CPSR to just 'SVC_MODE', thus clearing
-  the IRQ and FIQ mask bits in any spawned thread.
-
-So that all appears to be correct.
-
-> But even if FIQs are enabled before entering the idle thread, any kernel  
-> thread that sleeps (and yields the CPU) with an irqflags variable that 
-> was saved before the call to local_fiq_enable has the potential to 
-> corrupt the F bit when the thread subsequently wakes up.
-
-No, because local_fiq_enable() only ever affects the thread on the CPU
-which executed it.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+> -Tero
+> 
+> On 02/13/2014 11:00 AM, Tero Kristo wrote:
+> > Hi,
+> >
+> > This set is a mix-match of new DT properties for generic and TI specific
+> > clock drivers. Basically provided for commenting purposes. The patches
+> > provide a way to configure clock parents / rates during boot through DT.
+> >
+> > "default-rate" : sets rate of a clock during boot, supported for any DT
+> >                clock type (through generic clock driver)
+> > "ti,default-parent" : selects a default parent for a multiplexer clock,
+> >                     only supported for TI specific mux clock for now,
+> >                     as generic mux clock does not support DT clocks
+> >
+> > Patch #4 provided as a reference how to move the default rates / parents
+> > from kernel code to DT.
+> >
+> > Default-rate logic in patch #2 looks somewhat complicated, as the clocks
+> > need to be sorted based on their parents to avoid cases where a child clock
+> > would set its rate first, just to be overridden by its parent changing
+> > rate later and resulting in incorrect rate for the child clock.
+> >
+> > If the default-rate generic property is not going to fly, it can be moved
+> > to TI only drivers also.
+> >
+> > -Tero
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
