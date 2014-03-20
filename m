@@ -1,43 +1,47 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Thu, 20 Mar 2014 17:34:09 +0100
-Subject: [PATCH] ARM: at91: panic when the mck rate is zero
-In-Reply-To: <1395332062-4967-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395332062-4967-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532B1881.2050409@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Mar 2014 09:35:19 -0700
+Subject: [PATCH 0/4] sunxi clock fixes
+In-Reply-To: <20140320151551.GO27873@lukather>
+References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
+ <20140319190418.30995.17661@quantum> <5329ECCE.7010700@elopez.com.ar>
+ <20140320151551.GO27873@lukather>
+Message-ID: <20140320163519.21989.42741@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/03/2014 17:14, Alexandre Belloni a ?crit :
-> If the mck rate is zero, we'll hit the following warning:
->
-> WARNING: CPU: 0 PID: 0 at arch/arm/mach-at91/at91sam926x_time.c:257 at91sam926x_pit_init+0x13c/0x260()
->
-> But the kernel will continue to try booting and face a lot of divisions by zero
-> when trying to handle the various clocks.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/mach-at91/at91sam926x_time.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index 0f04ffe9c5a8..f060f6371392 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -250,6 +250,8 @@ void __init at91sam926x_pit_init(void)
->   	if (IS_ERR(mck))
->   		panic("AT91: PIT: Unable to get mck clk\n");
->   	pit_rate = clk_get_rate(mck) / 16;
-> +	if (pit_rate == 0)
-> +		panic("AT91: PIT: can't continue, mck rate is zero\n");
-You're testing pit_rate why not printing:
+Quoting Maxime Ripard (2014-03-20 08:15:51)
+> Hi,
+> 
+> On Wed, Mar 19, 2014 at 04:15:26PM -0300, Emilio L?pez wrote:
+> > Hi Mike,
+> > 
+> > El 19/03/14 16:04, Mike Turquette escribi?:
+> > >Quoting Emilio L?pez (2014-03-19 11:19:29)
+> > >>Hi everyone,
+> > >>
+> > >>This is a small series of patches fixing a couple of bugs that are
+> > >>present on the sunxi clock driver. Mike, are there any chances we can
+> > >>take these during the 3.15 merge window or -rc period?
+> > >
+> > >I can take these towards 3.15. Do you want me to take the dts patch too?
+> > 
+> > I'd rather have Maxime take it to avoid potential conflicts. That
+> > patch can wait in any case; there's no actual pll4 consumer in tree
+> > just yet.
+> 
+> I sent my last pull request for the merge window, but I can queue it
+> up as a fix for a later 3.15-rc*
 
-"AT91: PIT: can't continue, *pit* rate is zero\n"
+Just FYI, I took the three clock patches into clk-next yesterday so they
+should land in linux-next soon.
 
+Regards,
+Mike
 
-Otherwise,
-
-Acked-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->   	pit_cycle = (pit_rate + HZ/2) / HZ;
->   	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
->   
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
