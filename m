@@ -1,65 +1,44 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 20 Mar 2014 11:09:53 +0100
-Subject: [PATCH 09/11] ARM: at91/dt: define main xtal frequency of the
- at91sam9261ek board
-In-Reply-To: <532AB9EC.1030507@gmail.com>
-References: <1395173924-3648-1-git-send-email-b.brezillon.dev@gmail.com>
- <1395173924-3648-10-git-send-email-b.brezillon.dev@gmail.com>
- <CACh+v5OF52ZuDBpkqpev1Jxv0DJ1ckRR+DjcX500i3o0o4HE9A@mail.gmail.com>
- <532AB9EC.1030507@gmail.com>
-Message-ID: <CACh+v5Psjgs=v2feP3oETXgxUXw6JsVDXBKhEG4OPCP1-YM1aQ@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 20 Mar 2014 10:10:00 +0000
+Subject: [stable 3.10.y] Please backport a56a5cf1f2ec "ARM: highbank:
+ avoid L2 cache smc calls when PL310 is not present"
+In-Reply-To: <20140319235425.GA22080@kroah.com>
+References: <1394332548.13270.74.camel@hastur.hellion.org.uk>
+ <20140319235425.GA22080@kroah.com>
+Message-ID: <1395310200.16974.35.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That's right. I keep forgetting this.
+On Wed, 2014-03-19 at 23:54 +0000, Greg KH wrote:
+> On Sun, Mar 09, 2014 at 02:35:48AM +0000, Ian Campbell wrote:
+[...]
+> > I thought it might require 0b53c11d533a "ARM: move outer_cache
+> [...] 
+> > commit a56a5cf1f2ec895599eace0ac6eba1e4a489e4bf
 
-2014-03-20 10:50 GMT+01:00 Boris BREZILLON <b.brezillon.dev@gmail.com>:
->
-> Le 20/03/2014 10:24, Jean-Jacques Hiblot a ?crit :
->
->> 2014-03-18 21:18 GMT+01:00 Boris BREZILLON <brezillonboris@gmail.com>:
->>>
->>> Define at91sam9261ek main crystal frequency.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->>> ---
->>>   arch/arm/boot/dts/at91sam9261ek.dts |    4 ++++
->>>   1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts
->>> b/arch/arm/boot/dts/at91sam9261ek.dts
->>> index 2ce527e..7175986 100644
->>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
->>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
->>> @@ -29,6 +29,10 @@
->>>                          compatible = "atmel,osc", "fixed-clock";
->>>                          clock-frequency = <18432000>;
->>>                  };
->>> +
->>> +               main_xtal: main_xtal {
->>> +                       clock-frequency = <18432000>;
->>> +               };
->>>          };
->>>
->>>          ahb {
->>> --
->>> 1.7.9.5
->>>
->> You forgot to remove the old fixed-clock definition for the main_clock:
->> clock at 0
->
->
-> We need this clock when CCF is disabled (when using the old at91 clk
-> implementation).
-> I'm afraid we'll have to keep it until we move all sam9 SoCs and boards to
-> CCF (and DT).
->
-> Best Regards,
->
-> Boris
->
->>
->> Otherwise:
->> Acked-by: Jean-Jacques HIBLOT <jjhiblot@traphandler.com>
->
->
+> This doesn't apply to the 3.10 stable tree, so if you want it there, can
+> you provide a backported version?
+
+Strange, they both cherry-picked cleanly onto v3.10.33 for me. I've
+pushed the resulting tree.
+
+The following changes since commit 6969595f011b46b49c3f1b9e0bd7da27768c1fd9:
+
+  Linux 3.10.33 (2014-03-06 21:58:45 -0800)
+
+are available in the git repository at:
+
+  git://xenbits.xen.org/people/ianc/linux.git for-greg/3.10.y-arm-smc-backport
+
+for you to fetch changes up to ac416026f5abb1da41b19ea725f5c1a114702756:
+
+  ARM: highbank: avoid L2 cache smc calls when PL310 is not present (2014-03-20 10:07:22 +0000)
+
+----------------------------------------------------------------
+Rob Herring (2):
+      ARM: move outer_cache declaration out of ifdef
+      ARM: highbank: avoid L2 cache smc calls when PL310 is not present
+
+ arch/arm/include/asm/outercache.h |    4 ++--
+ arch/arm/mach-highbank/highbank.c |   13 ++++++-------
+ 2 files changed, 8 insertions(+), 9 deletions(-)
