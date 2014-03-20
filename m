@@ -1,77 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 18:39:32 +0000
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <201403201929.13633.arnd@arndb.de>
-References: <201402241200.21944.arnd@arndb.de>
- <20140320173106.GA19395@obsidianresearch.com>
- <532B2628.5080305@codethink.co.uk> <201403201929.13633.arnd@arndb.de>
-Message-ID: <20140320183932.GA7528@n2100.arm.linux.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 20 Mar 2014 11:42:37 -0700
+Subject: [PATCH 2/3] mtd: davinci-nand: add dts property for
+ NAND_NO_SUBPAGE_WRITE option
+In-Reply-To: <532B2766.6090506@ti.com>
+References: <1395335184-4745-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1395335184-4745-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B2183.2080309@ti.com>
+ <20140320172912.GW31517@norris-Latitude-E6410>
+ <532B2766.6090506@ti.com>
+Message-ID: <20140320184237.GA21018@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 07:29:13PM +0100, Arnd Bergmann wrote:
-> On Thursday 20 March 2014, Ben Dooks wrote:
-> > On 20/03/14 18:31, Jason Gunthorpe wrote:
-> > > On Thu, Mar 20, 2014 at 06:25:25PM +0100, Ben Dooks wrote:
-> > >> So doing:
-> > >>
-> > >> static void pci_rcar_fixup(struct pci_dev *dev)
-> > >> {
-> > >>      if (dev->bus->ops == &rcar_pci_ops) {
-> > >>              dev_info(&dev->dev, "applying new dma mask\n");
-> > >>              dev->dma_mask = DMA_BIT_MASK(31);
-> > >>      }
-> > >> }
-> > >>
-> > >> DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
-> > >>
-> > >> Did not work for me :(
-> > >
-> > > Seems like it should work, do you have CONFIG_PCI_QUIRKS turned on?
+On Thu, Mar 20, 2014 at 01:37:42PM -0400, Santosh Shilimkar wrote:
+> On Thursday 20 March 2014 01:29 PM, Brian Norris wrote:
+> > On Thu, Mar 20, 2014 at 01:12:35PM -0400, Santosh Shilimkar wrote:
+> >> Boris,
+> >
+> > Who's Boris? And why should Boris be taking this patch? It's an MTD
+> > patch.
 > > 
-> > Yes, see the print happening, just still PCI OHCI dies horribly.
-> 
-> Shouldn't that mask be 30 instead of 31 when you only support DMA
-> to the first GB?
-> 
-> Another possibility is that 'EARLY' means it gets applied before
-> the normal mask is set.
-> 
-> Finally, setting the mask itself is not enough. As I mentioned you
-> also need to use the swiotlb_dma_ops. Did you already implement
-> those?
+> I got your name completely wrong. Sorry....
 
-And the above is no way to handle the DMA mask - it will get
-overwritten if the PCI device calls pci_set_dma_mask().  Please people,
-read the documentation on how this stuff is supposed to work:
+I see. Maybe you were just dropping letters from "BrianNorris" :)
 
-  For correct operation, you must interrogate the kernel in your device
-  probe routine to see if the DMA controller on the machine can properly
-  support the DMA addressing limitation your device has.  It is good
-  style to do this even if your device holds the default setting,
-  because this shows that you did think about these issues wrt. your
-  device.
-
-Yes, OHCI's PCI driver doesn't do that at the moment, but that's not
-to say that it won't in the future - at which point hacks like the
-above suddenly stop working.
-
-We have other platforms which suffer from this - IXP is one of those
-examples where PCI only has 64MB available.  The unfortunate thing is
-we haven't yet got a good multi-platform way to handle dma_set_mask()
-and dma_set_coherent_mask() with these kinds of restrictions.
-
-However, the right solution here is that OHCI _should_ be making those
-calls, and we _should_ be applying the platform specific fixups like
-IXP does, but in a more generic way.  That includes using swiotlb
-rather than dmabounce.
-
-That all said, what I find most annoying is that Ben has ignored my
-question about exactly what the nature of the limitation is on this
-platform.  My response to that is - if you're not going to do the
-curtesy of answering such a simple question, then you don't get to
-patch the kernel for this problem.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+Brian
