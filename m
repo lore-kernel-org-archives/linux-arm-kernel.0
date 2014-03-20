@@ -1,127 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Mar 2014 09:20:39 +0000
-Subject: [PATCH v6 07/36] mtd: devices: Provide header for shared OPCODEs and
- SFDP commands
+Date: Thu, 20 Mar 2014 09:21:07 +0000
+Subject: [PATCH v6 35/36] mtd: st_spi_fsm: Convert ST SPI FSM (NOR) Flash
+ driver to new DT partitions
 In-Reply-To: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
 References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395307268-12721-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395307268-12721-36-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JEDEC have helped to standardise a great deal of the commands which
-can be issued to a Serial Flash devices. Many of the Serial Flash
-Discoverable Parameters (SFDP) commands are generic across devices.
-This patch provides a shared point where these commands can be
-defined.
+The old API expected a "partitions" property provided a phandle to a
+separate partitions node, which itself contained yet more nodes each
+representing one partition. The new API rids the requirement for the
+superfluous intermediary partitions node. This patch provides the
+added information required for automatic parsing by the core.
 
-Suggested-by: Mark Brown <broonie@kernel.org>
-Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/serial_flash_cmds.h | 81 +++++++++++++++++++++++++++++++++
- drivers/mtd/devices/st_spi_fsm.c        |  2 +
- 2 files changed, 83 insertions(+)
- create mode 100644 drivers/mtd/devices/serial_flash_cmds.h
+ drivers/mtd/devices/st_spi_fsm.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/devices/serial_flash_cmds.h b/drivers/mtd/devices/serial_flash_cmds.h
-new file mode 100644
-index 0000000..4f0c2c7
---- /dev/null
-+++ b/drivers/mtd/devices/serial_flash_cmds.h
-@@ -0,0 +1,81 @@
-+/*
-+ * Generic/SFDP Flash Commands and Device Capabilities
-+ *
-+ * Copyright (C) 2013 Lee Jones <lee.jones@lianro.org>
-+ *
-+ * This code is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef _MTD_SERIAL_FLASH_CMDS_H
-+#define _MTD_SERIAL_FLASH_CMDS_H
-+
-+/* Generic Flash Commands/OPCODEs */
-+#define FLASH_CMD_WREN		0x06
-+#define FLASH_CMD_WRDI		0x04
-+#define FLASH_CMD_RDID		0x9f
-+#define FLASH_CMD_RDSR		0x05
-+#define FLASH_CMD_RDSR2		0x35
-+#define FLASH_CMD_WRSR		0x01
-+#define FLASH_CMD_SE_4K		0x20
-+#define FLASH_CMD_SE_32K	0x52
-+#define FLASH_CMD_SE		0xd8
-+#define FLASH_CMD_CHIPERASE	0xc7
-+#define FLASH_CMD_WRVCR		0x81
-+#define FLASH_CMD_RDVCR		0x85
-+
-+/* JEDEC Standard - Serial Flash Discoverable Parmeters (SFDP) Commands */
-+#define FLASH_CMD_READ		0x03	/* READ */
-+#define FLASH_CMD_READ_FAST	0x0b	/* FAST READ */
-+#define FLASH_CMD_READ_1_1_2	0x3b	/* DUAL OUTPUT READ */
-+#define FLASH_CMD_READ_1_2_2	0xbb	/* DUAL I/O READ */
-+#define FLASH_CMD_READ_1_1_4	0x6b	/* QUAD OUTPUT READ */
-+#define FLASH_CMD_READ_1_4_4	0xeb	/* QUAD I/O READ */
-+
-+#define FLASH_CMD_WRITE		0x02	/* PAGE PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_2	0xa2	/* DUAL INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_2_2	0xd2	/* DUAL INPUT EXT PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_4	0x32	/* QUAD INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_4_4	0x12	/* QUAD INPUT EXT PROGRAM */
-+
-+#define FLASH_CMD_EN4B_ADDR	0xb7	/* Enter 4-byte address mode */
-+#define FLASH_CMD_EX4B_ADDR	0xe9	/* Exit 4-byte address mode */
-+
-+/* READ commands with 32-bit addressing */
-+#define FLASH_CMD_READ4		0x13
-+#define FLASH_CMD_READ4_FAST	0x0c
-+#define FLASH_CMD_READ4_1_1_2	0x3c
-+#define FLASH_CMD_READ4_1_2_2	0xbc
-+#define FLASH_CMD_READ4_1_1_4	0x6c
-+#define FLASH_CMD_READ4_1_4_4	0xec
-+
-+/* Configuration flags */
-+#define FLASH_FLAG_SINGLE	0x000000ff
-+#define FLASH_FLAG_READ_WRITE	0x00000001
-+#define FLASH_FLAG_READ_FAST	0x00000002
-+#define FLASH_FLAG_SE_4K	0x00000004
-+#define FLASH_FLAG_SE_32K	0x00000008
-+#define FLASH_FLAG_CE		0x00000010
-+#define FLASH_FLAG_32BIT_ADDR	0x00000020
-+#define FLASH_FLAG_RESET	0x00000040
-+#define FLASH_FLAG_DYB_LOCKING	0x00000080
-+
-+#define FLASH_FLAG_DUAL		0x0000ff00
-+#define FLASH_FLAG_READ_1_1_2	0x00000100
-+#define FLASH_FLAG_READ_1_2_2	0x00000200
-+#define FLASH_FLAG_READ_2_2_2	0x00000400
-+#define FLASH_FLAG_WRITE_1_1_2	0x00001000
-+#define FLASH_FLAG_WRITE_1_2_2	0x00002000
-+#define FLASH_FLAG_WRITE_2_2_2	0x00004000
-+
-+#define FLASH_FLAG_QUAD		0x00ff0000
-+#define FLASH_FLAG_READ_1_1_4	0x00010000
-+#define FLASH_FLAG_READ_1_4_4	0x00020000
-+#define FLASH_FLAG_READ_4_4_4	0x00040000
-+#define FLASH_FLAG_WRITE_1_1_4	0x00100000
-+#define FLASH_FLAG_WRITE_1_4_4	0x00200000
-+#define FLASH_FLAG_WRITE_4_4_4	0x00400000
-+
-+#endif /* _MTD_SERIAL_FLASH_CMDS_H */
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 9fc0b19..1eea949 100644
+index dccbac0..aefd48d 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -21,6 +21,8 @@
+@@ -18,6 +18,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
+ #include <linux/sched.h>
+ #include <linux/delay.h>
  #include <linux/io.h>
- #include <linux/of.h>
+@@ -1997,6 +1998,7 @@ boot_device_fail:
+ static int stfsm_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
++	struct mtd_part_parser_data ppdata;
+ 	struct flash_info *info;
+ 	struct resource *res;
+ 	struct stfsm *fsm;
+@@ -2006,6 +2008,7 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "No DT found\n");
+ 		return -EINVAL;
+ 	}
++	ppdata.of_node = np;
  
-+#include "serial_flash_cmds.h"
-+
- /*
-  * FSM SPI Controller Registers
-  */
+ 	fsm = devm_kzalloc(&pdev->dev, sizeof(*fsm), GFP_KERNEL);
+ 	if (!fsm)
+@@ -2062,6 +2065,7 @@ static int stfsm_probe(struct platform_device *pdev)
+ 			return ret;
+ 	}
+ 
++	fsm->mtd.name		= info->name;
+ 	fsm->mtd.dev.parent	= &pdev->dev;
+ 	fsm->mtd.type		= MTD_NORFLASH;
+ 	fsm->mtd.writesize	= 4;
+@@ -2081,7 +2085,7 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
+ 		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
+ 
+-	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
++	return mtd_device_parse_register(&fsm->mtd, NULL, &ppdata, NULL, 0);
+ }
+ 
+ static int stfsm_remove(struct platform_device *pdev)
 -- 
 1.8.3.2
