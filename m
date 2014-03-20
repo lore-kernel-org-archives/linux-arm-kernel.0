@@ -1,101 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Mar 2014 11:52:57 +0000
-Subject: [PATCH v2 10/19] KVM: ARM: vgic: move underflow handling to vgic_ops
+Date: Thu, 20 Mar 2014 11:53:02 +0000
+Subject: [PATCH v2 15/19] arm64: KVM: remove __kvm_hyp_code_{start,
+ end} from hyp.S
 In-Reply-To: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
 References: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1395316386-12617-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1395316386-12617-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the code dealing with LR underflow handling to its own functions,
-and make them accessible through vgic_ops.
+We already have __hyp_text_{start,end} to express the boundaries
+of the HYP text section, and __kvm_hyp_code_{start,end} are getting
+in the way of a more modular world switch code.
+
+Just turn __kvm_hyp_code_{start,end} into #defines mapping the
+linker-emited symbols.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
- 2 files changed, 27 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h | 6 ++++--
+ arch/arm64/include/asm/virt.h    | 4 ++++
+ arch/arm64/kvm/hyp.S             | 6 ------
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 95085a6..407e104 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -87,6 +87,8 @@ struct vgic_ops {
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
-+	void	(*set_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
- };
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index b25763b..dddb345 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -18,6 +18,8 @@
+ #ifndef __ARM_KVM_ASM_H__
+ #define __ARM_KVM_ASM_H__
  
- struct vgic_dist {
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 9e100f6..13dad1f 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1047,12 +1047,24 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
- 	return ret;
++#include <asm/virt.h>
++
+ /*
+  * 0 is reserved as an invalid value.
+  * Order *must* be kept in sync with the hyp switch code.
+@@ -95,8 +97,8 @@ extern char __kvm_hyp_init_end[];
+ 
+ extern char __kvm_hyp_vector[];
+ 
+-extern char __kvm_hyp_code_start[];
+-extern char __kvm_hyp_code_end[];
++#define	__kvm_hyp_code_start	__hyp_text_start
++#define	__kvm_hyp_code_end	__hyp_text_end
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 130e2be..290fb66 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -63,6 +63,10 @@ static inline bool is_hyp_mode_mismatched(void)
+ 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
  }
  
-+static void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+}
++/* The section containing the hypervisor text */
++extern char __hyp_text_start[];
++extern char __hyp_text_end[];
 +
-+static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+}
-+
- static const struct vgic_ops vgic_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
-+	.set_underflow		= vgic_v2_set_underflow,
-+	.clear_underflow	= vgic_v2_clear_underflow,
- };
+ #endif /* __ASSEMBLY__ */
  
- static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1081,6 +1093,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
- 	return vgic_ops.get_interrupt_status(vcpu);
- }
+ #endif /* ! __ASM__VIRT_H */
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index cc1b471..9e3364b 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -36,9 +36,6 @@
+ 	.pushsection	.hyp.text, "ax"
+ 	.align	PAGE_SHIFT
  
-+static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.set_underflow(vcpu);
-+}
-+
-+static inline void vgic_clear_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.clear_underflow(vcpu);
-+}
-+
- static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1262,9 +1284,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+-__kvm_hyp_code_start:
+-	.globl __kvm_hyp_code_start
+-
+ .macro save_common_regs
+ 	// x2: base address for cpu context
+ 	// x3: tmp register
+@@ -874,7 +871,4 @@ ENTRY(__kvm_hyp_vector)
+ 	ventry	el1_error_invalid		// Error 32-bit EL1
+ ENDPROC(__kvm_hyp_vector)
  
- epilog:
- 	if (overflow) {
--		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+		vgic_set_underflow(vcpu);
- 	} else {
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_clear_underflow(vcpu);
- 		/*
- 		 * We're about to run this VCPU, and we've consumed
- 		 * everything the distributor had in store for
-@@ -1311,7 +1333,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	}
- 
- 	if (status & INT_STATUS_UNDERFLOW)
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_clear_underflow(vcpu);
- 
- 	return level_pending;
- }
+-__kvm_hyp_code_end:
+-	.globl	__kvm_hyp_code_end
+-
+ 	.popsection
 -- 
 1.8.3.4
