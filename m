@@ -1,49 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 12:36:40 +0000
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <532ADFD8.80301@gmail.com>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com>
-Message-ID: <20140320123640.GR7528@n2100.arm.linux.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 20 Mar 2014 05:41:00 -0700
+Subject: [PATCH 1/5] mtd: st_spi_fsm: Remove useless consts from function
+ arguments
+In-Reply-To: <1395317630.7776.29.camel@joe-AO722>
+References: <1395313907-25318-1-git-send-email-lee.jones@linaro.org>
+ <1395313907-25318-2-git-send-email-lee.jones@linaro.org>
+ <1395314713.7776.17.camel@joe-AO722>
+ <20140320114123.GE21349@lee--X1>
+ <1395316090.7776.24.camel@joe-AO722>
+ <20140320115412.GU31517@norris-Latitude-E6410>
+ <20140320120307.GA9240@lee--X1>
+ <1395317630.7776.29.camel@joe-AO722>
+Message-ID: <CAN8TOE9g2VwVgVx1Sj3OcguuwP_A9pJS+WpgTAL49KyN9r1CiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 01:32:24PM +0100, Sebastian Hesselbarth wrote:
-> On 03/20/2014 09:58 AM, Jean-Francois Moine wrote:
->> The I2C address (reg) is required for the TDA998x driver to be loaded
->> and initialized.
->>
->> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
->> ---
->> This patch applies to linux-next.
->> ---
->>   Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
->> index d7df01c..fc7effa 100644
->> --- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
->> +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
->> @@ -3,6 +3,8 @@ Device-Tree bindings for the NXP TDA998x HDMI transmitter
->>   Required properties;
->>     - compatible: must be "nxp,tda998x"
->>
->> +  - reg: I2C address - must be <0x70>
+On Thu, Mar 20, 2014 at 5:13 AM, Joe Perches <joe@perches.com> wrote:
+> On Thu, 2014-03-20 at 12:03 +0000, Lee Jones wrote:
+>> > Good catch. That wasn't my intention.
+>> > > Why?
+>> An oversight.
 >
-> TDA9983b datasheet says:
+> That's still not an explanation.
 >
-> "Bits A0 and A1 of the I2C-bus device address are externally selected
-> by pins A0 and A1."
->
-> Therefore, 0x70, 0x71, 0x72, and 0x73 are valid i2c addresses.
+> Why, unless cast away by the code itself, is
+> const removal a good thing?
 
-Thanks Sebastian, those kinds of details are very important to get right
-when it comes to the binding doc, much more so than what's in the code.
-It probably makes more sense not to specify what the address actually is.
-After all, that's a specification by the data sheet and software shouldn't
-really care what that is.
+It's not so much removal as it is review of the initial driver merge.
+I'd contend that const was applied somewhat thoughtlessly originally,
+and it didn't really serve a good purpose.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> It does serve as an indication to a reader what
+> the code does with the argument.
+>
+> About the only reason I can think of arguing in
+> favor of removal is inconsistent application of
+> const within the module.
+
+That's one good reason. And not only consistency within the modules,
+but consistency within the subsystem (and the kernel at large,
+really). There's rarely a case of a const function parameter. And I'm
+sure there are numerous function parameters which could potentially be
+marked 'const'.
+
+I also don't think that a function parameter is the right place to
+mark const like this. Function arguments are always pass-by-value, so
+this 'const' tells users (callers) nothing useful. It only provides
+useless constraints on what the function can do with its copy of the
+parameter.
+
+Brian
