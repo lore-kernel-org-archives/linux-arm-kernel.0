@@ -1,76 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Mar 2014 18:12:30 -0700
-Subject: [PATCH v2 7/7] ARM: KVM: MMIO support BE host running LE code
-In-Reply-To: <1392183693-21238-8-git-send-email-victor.kamensky@linaro.org>
-References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
- <1392183693-21238-8-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140320011230.GM1297@cbox>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Mar 2014 20:25:53 -0500
+Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
+ versions of spec
+In-Reply-To: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <CAL_Jsq+XXMjZ_qCCWD7u98Tq-u4Pj+fHyupJbAov98Zs8xttKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:41:33PM -0800, Victor Kamensky wrote:
-> In case of status register E bit is not set (LE mode) and host runs in
-> BE mode we need byteswap data, so read/write is emulated correctly.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+On Wed, Mar 19, 2014 at 7:54 PM, Ashwin Chaugule
+<ashwin.chaugule@linaro.org> wrote:
+> The PSCI v0.2+ spec mandates specific values of Function IDs
+> for ARM32 and ARM64. Use DT bindings of Function IDs only
+> when using older versions. Use static values otherwise.
+> This patch also prepares the code to easily use the ACPI API
+> which is based off of PSCI v0.2+.
+>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
->  1 file changed, 18 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 0fa90c9..69b7469 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
->  		default:
->  			return be32_to_cpu(data);
->  		}
-> +	} else {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return le16_to_cpu(data & 0xffff);
-> +		default:
-> +			return le32_to_cpu(data);
-> +		}
->  	}
-> -
-> -	return data;		/* Leave LE untouched */
->  }
->  
->  static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> @@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->  		default:
->  			return cpu_to_be32(data);
->  		}
-> +	} else {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return cpu_to_le16(data & 0xffff);
-> +		default:
-> +			return cpu_to_le32(data);
-> +		}
->  	}
-> -
-> -	return data;		/* Leave LE untouched */
->  }
->  
->  #endif /* __ARM_KVM_EMULATE_H__ */
-> -- 
-> 1.8.1.4
-> 
+>  arch/arm/include/asm/psci.h   |  15 ++++++
+>  arch/arm/kernel/psci.c        | 110 +++++++++++++++++++++++++++++++++++++-----
+>  arch/arm64/include/asm/psci.h |  12 +++++
+>  arch/arm64/kernel/psci.c      | 106 +++++++++++++++++++++++++++++++++++-----
+>  4 files changed, 218 insertions(+), 25 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> index c4ae171..3f8ebf9 100644
+> --- a/arch/arm/include/asm/psci.h
+> +++ b/arch/arm/include/asm/psci.h
+> @@ -17,6 +17,19 @@
+>  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+>  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+>
+> +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
+> +
+> +#define PSCI_ID_VERSION                                0x84000000
+> +#define PSCI_ID_CPU_SUSPEND                    0x84000001
+> +#define PSCI_ID_CPU_OFF                                0x84000002
+> +#define PSCI_ID_CPU_ON                         0x84000003
+> +#define PSCI_ID_AFFINITY_INFO          0x84000004
+> +#define PSCI_ID_CPU_MIGRATE                    0x84000005
+> +#define PSCI_ID_MIGRATE_INFO_TYPE      0x84000006
+> +#define PSCI_ID_MIGRATE_INFO_UP_CPU    0x84000007
+> +#define PSCI_ID_SYSTEM_OFF                     0x84000008
+> +#define PSCI_ID_SYSTEM_RESET           0x84000009
 
-Somehow in my head the way I think about this is
+With the KVM patches[1], this makes 4 copies of these defines in the
+kernel (and then QEMU has more). This needs to go into a common header
+under include/linux. Probably under uapi so QEMU can use. There is
+some sync of headers between the kernel and QEMU I think.
 
-if (guest_be != host_be) {
-	return swab(data);
-}
+Rob
 
-but it's probably not more clear in terms of the actual code...
-
-Anyway, given that the ABI clarification text gets merged:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+[1] https://patches.linaro.org/23918/
