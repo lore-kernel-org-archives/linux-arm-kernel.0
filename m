@@ -1,49 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Mar 2014 13:23:08 +0900
-Subject: [PATCH 58/62] ARM: exynos: add missing include of linux/module.h
-In-Reply-To: <1395257399-359545-59-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-59-git-send-email-arnd@arndb.de>
-Message-ID: <027101cf43f4$18b17d00$4a147700$@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 20 Mar 2014 13:55:21 +0900
+Subject: [PATCH v3 0/4] Introduce new Kconfig for Samsung common clock
+In-Reply-To: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1395291325-4043-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> After the restructuring of the module.h and init.h headers,
-> we now need to include this explicitly here.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Introduce a new Kconfig file for Samsung common clock infrastructure
+related config options. As current Samsung common clock gets compiled
+based on PLAT_SAMSUNG, but moving ahead with ARM64 we can not have any
+more such config options, so this patch introduce new COMMON_CLK_SAMSUNG
+invisible option. This option also select COMMON_CLK so ARCH Kconfig just
+need to select COMMON_CLK_SAMSUNG in case they want to use Samsung common
+clock.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+This series is based on Kukjin's for-next branch.
 
-Arnd,
+V3: 
+ 1) Re-organized patches for preventing bisect issues.
+ 2) Rebase on top of latest Kukjin's for-next branch.
+ 3) Compile tested exynos_defconfig, s3c6400_defconfig and s3c2410_defconfig
+    after each commit.
 
-If you want me to take this fixes for Samsung stuff into samsung tree,
-please let me know.
+V2:
+ 1) Adding new Kconfig file for Samsung common clock.
+ 2) Make COMMON_CLK_SAMSUNG option invisible. (as suggested by Tomasz Figa)
+ 3) Let COMMON_CLK_SAMSUNG select COMMON_CLK. (as suggested by Tomasz Figa)
+ 4) Move S3C24XX clock config option in new Kconfig file.
 
-Thanks,
-Kukjin
+Pankaj Dubey (4):
+  clk: samsung: add new Kconfig for Samsung common clock option
+  ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and ARCH_S3C64XX
+  ARM: S3C24XX: move S3C24XX clock Kconfig options to Samsung clock
+    Kconfig file
+  drivers: clk: use COMMON_CLK_SAMSUNG for Samsung clock support
 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/mach-exynos/cpuidle.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
-> exynos/cpuidle.c
-> index f57cb91..93d2dec 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -14,6 +14,7 @@
->  #include <linux/cpu_pm.h>
->  #include <linux/io.h>
->  #include <linux/export.h>
-> +#include <linux/module.h>
->  #include <linux/time.h>
->  #include <linux/platform_device.h>
-> 
-> --
-> 1.8.3.2
+ arch/arm/Kconfig              |    4 ++--
+ arch/arm/mach-s3c24xx/Kconfig |   14 --------------
+ drivers/clk/Kconfig           |    2 ++
+ drivers/clk/Makefile          |    2 +-
+ drivers/clk/samsung/Kconfig   |   12 ++++++++++++
+ 5 files changed, 17 insertions(+), 17 deletions(-)
+ create mode 100644 drivers/clk/samsung/Kconfig
+
+-- 
+1.7.10.4
