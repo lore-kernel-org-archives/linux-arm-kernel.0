@@ -1,40 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Mar 2014 15:19:34 +0000
-Subject: [PATCH] ASoC: tda998x: Fix lack of required reg in DT
- documentation
-In-Reply-To: <20140320155935.7a474173@armhf>
-References: <20140320092639.48F68A6279@smtp3-g21.free.fr>
- <532ADFD8.80301@gmail.com> <20140320140156.5d768b1f@armhf>
- <532AEDE2.3080306@gmail.com> <20140320145221.09252bf6@armhf>
- <20140320143110.GU7528@n2100.arm.linux.org.uk>
- <20140320155935.7a474173@armhf>
-Message-ID: <20140320151934.GV7528@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Mar 2014 16:15:51 +0100
+Subject: [PATCH 0/4] sunxi clock fixes
+In-Reply-To: <5329ECCE.7010700@elopez.com.ar>
+References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
+ <20140319190418.30995.17661@quantum>
+ <5329ECCE.7010700@elopez.com.ar>
+Message-ID: <20140320151551.GO27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 03:59:35PM +0100, Jean-Francois Moine wrote:
-> On Thu, 20 Mar 2014 14:31:10 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > 1. change the DT compatible strings the driver has to accept both
-> >    nxp,tda19988 and nxp,tda19989, and set the appropriate device
-> >    in the DT file (tda19988).  I'm a bit nervous about using
-> >    "nxp,tda1998x" in case we're clashing with devices with different
-> >    characteristics.
-> 
-> The Cubox is sold with either the TDA19988 or the TDA19989 (I don't
-> know about the AMX33XX boards). Then, setting the exact type in the DT
-> would ask for 2 differents DTs or for having two tda998x definitions in
-> a same DT...
+Hi,
 
-I'm not saying that it has to match the physical device fitted - I'm
-merely suggesting not using nxp,tda1998x which could (and as Sebastian
-has found, does) conflict with other devices with different properties.
+On Wed, Mar 19, 2014 at 04:15:26PM -0300, Emilio L?pez wrote:
+> Hi Mike,
+> 
+> El 19/03/14 16:04, Mike Turquette escribi?:
+> >Quoting Emilio L?pez (2014-03-19 11:19:29)
+> >>Hi everyone,
+> >>
+> >>This is a small series of patches fixing a couple of bugs that are
+> >>present on the sunxi clock driver. Mike, are there any chances we can
+> >>take these during the 3.15 merge window or -rc period?
+> >
+> >I can take these towards 3.15. Do you want me to take the dts patch too?
+> 
+> I'd rather have Maxime take it to avoid potential conflicts. That
+> patch can wait in any case; there's no actual pll4 consumer in tree
+> just yet.
 
-We still auto-detect the exact device type by reading the ID register
-because that's the most reliable way to detect exactly what kind of
-device is fitted to the board.
+I sent my last pull request for the merge window, but I can queue it
+up as a fix for a later 3.15-rc*
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/78607325/attachment-0001.sig>
