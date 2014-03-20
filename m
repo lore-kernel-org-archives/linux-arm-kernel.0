@@ -1,53 +1,50 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 20 Mar 2014 11:09:14 +0100
-Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <532AB94D.1050406@freescale.com>
-References: <1395235406-13449-1-git-send-email-y>
- <532AB1A2.9010702@freescale.com>
- <20140320102153.7106f915@ipc1.ka-ro>
- <532AB94D.1050406@freescale.com>
-Message-ID: <20140320110914.731db7cf@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 10:11:27 +0000
+Subject: Forcing DEBUG_UART_{PHYS, VIRT} changes when switching between
+ v7 platforms?
+In-Reply-To: <8099777.qvOx0M5YBS@wuerfel>
+References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
+ <8099777.qvOx0M5YBS@wuerfel>
+Message-ID: <20140320101127.GN7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie wrote:
-> ? 2014?03?20? 17:21, Lothar Wa?mann ??:
+On Thu, Mar 20, 2014 at 08:07:52AM +0100, Arnd Bergmann wrote:
+> On Wednesday 19 March 2014 16:38:45 Florian Fainelli wrote:
 > > Hi,
-> >
-> > Huang Shijie wrote:
-> >> ? 2014?03?19? 21:23, y at karo-electronics.de ??:
-> >>> configurable via DT. This is required for the Ka-Ro electronics
-> >>> platforms.
-> >>>
-> >> If you disable the swapping, you will disable the NAND boot in actually.
-> >>
-> > No. All our modules do boot from NAND and none of them does the
-> > swapping.
-> >
-> >
-> It seems the NAND boot runs well by luck.
+> > 
+> > When switching between different Multi v7 platform which all select
+> > DEBUG_UART_8250, whichever platform managed to set
+> > DEBUG_UART_{PHYS,VIRT} first will end-up forcing its value to the
+> > others.
+> > 
+> > What I am seeing at the moment is for instance enabling BCM_MOBILE
+> > will set DEBUG_UART_PHYS to 0x3e000000, disabling BCM_MOBILE and now
+> > enabling MVEBU won't force a new DEBUG_UART_PHYS address to be
+> > re-computed.
+> > 
+> > Should we add some sort of specific annotation to the Kconfig symbol
+> > to force a recalculation of the UART PHYS address?
 > 
-> The ROM will do the swapping when it reads the BBT table written by the 
-> kobs-ng (or something else?).
-> 
-This can be disabled by parameter in the FCB (at least according to
-the i.MX6 reference Manual):
-|DISBBM 172 4 If 0 ROM will swap BadBlockMarkerByte with
-|             metadata[0] after reading a page using BCH40.
-|             If the value set is 1 then ROM will not do
-|             swapping
+> Russell has plans to change the Konfig logic in the future, removing the
+> platform specific options. With the current code, you could probably
+> do something along the lines of
 
+The only reason the default values are there is to provide an easy way
+for people to locate the values they need for the time being.  The
+plan is to kill them off, so you have to enter them manually.  The
+issue with that is it becomes quite painful if you have to keep searching
+around for the right values when something breaks.
 
-Lothar Wa?mann
+(Personally, I've ended up a number of times searching around for the
+right address to generate uImage's for various target platforms which
+can only load uImages... but I've now ended up with a script which has
+that information stored in it...)
+
+So yes, eventually these will have to be specified manually.  I'm
+probably going to move them into file(s) in Documentation/arm/
+so that we retain the information in an easily accessible form.
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
