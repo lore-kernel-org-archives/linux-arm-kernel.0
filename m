@@ -1,38 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Mar 2014 03:35:30 +0900
-Subject: [PATCH v2 6/6] ARM: s5p64x0: Explicitly include linux/serial_s3c.h
- in mach/pm-core.h
-In-Reply-To: <1395162964-5916-6-git-send-email-t.figa@samsung.com>
-References: <1395162964-5916-1-git-send-email-t.figa@samsung.com>
- <1395162964-5916-6-git-send-email-t.figa@samsung.com>
-Message-ID: <532B34F2.8050804@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Mar 2014 18:39:32 +0000
+Subject: DMABOUNCE in pci-rcar
+In-Reply-To: <201403201929.13633.arnd@arndb.de>
+References: <201402241200.21944.arnd@arndb.de>
+ <20140320173106.GA19395@obsidianresearch.com>
+ <532B2628.5080305@codethink.co.uk> <201403201929.13633.arnd@arndb.de>
+Message-ID: <20140320183932.GA7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/14 02:16, Tomasz Figa wrote:
-> This patch fixes compilation failure due to missing explicit inclusion
-> of linux/serial_s3c.h in mach/pm-core.h, which contains definitions
-> required for further code in this header.
->
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> ---
->   arch/arm/mach-s5p64x0/include/mach/pm-core.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/pm-core.h b/arch/arm/mach-s5p64x0/include/mach/pm-core.h
-> index e52f754..1e0eb65 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/pm-core.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/pm-core.h
-> @@ -12,6 +12,8 @@
->    * published by the Free Software Foundation.
->    */
->
-> +#include<linux/serial_s3c.h>
-> +
->   #include<mach/regs-gpio.h>
->
->   static inline void s3c_pm_debug_init_uart(void)
+On Thu, Mar 20, 2014 at 07:29:13PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 March 2014, Ben Dooks wrote:
+> > On 20/03/14 18:31, Jason Gunthorpe wrote:
+> > > On Thu, Mar 20, 2014 at 06:25:25PM +0100, Ben Dooks wrote:
+> > >> So doing:
+> > >>
+> > >> static void pci_rcar_fixup(struct pci_dev *dev)
+> > >> {
+> > >>      if (dev->bus->ops == &rcar_pci_ops) {
+> > >>              dev_info(&dev->dev, "applying new dma mask\n");
+> > >>              dev->dma_mask = DMA_BIT_MASK(31);
+> > >>      }
+> > >> }
+> > >>
+> > >> DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, pci_rcar_fixup);
+> > >>
+> > >> Did not work for me :(
+> > >
+> > > Seems like it should work, do you have CONFIG_PCI_QUIRKS turned on?
+> > 
+> > Yes, see the print happening, just still PCI OHCI dies horribly.
+> 
+> Shouldn't that mask be 30 instead of 31 when you only support DMA
+> to the first GB?
+> 
+> Another possibility is that 'EARLY' means it gets applied before
+> the normal mask is set.
+> 
+> Finally, setting the mask itself is not enough. As I mentioned you
+> also need to use the swiotlb_dma_ops. Did you already implement
+> those?
 
-Applied, thanks.
+And the above is no way to handle the DMA mask - it will get
+overwritten if the PCI device calls pci_set_dma_mask().  Please people,
+read the documentation on how this stuff is supposed to work:
 
-- Kukjin
+  For correct operation, you must interrogate the kernel in your device
+  probe routine to see if the DMA controller on the machine can properly
+  support the DMA addressing limitation your device has.  It is good
+  style to do this even if your device holds the default setting,
+  because this shows that you did think about these issues wrt. your
+  device.
+
+Yes, OHCI's PCI driver doesn't do that at the moment, but that's not
+to say that it won't in the future - at which point hacks like the
+above suddenly stop working.
+
+We have other platforms which suffer from this - IXP is one of those
+examples where PCI only has 64MB available.  The unfortunate thing is
+we haven't yet got a good multi-platform way to handle dma_set_mask()
+and dma_set_coherent_mask() with these kinds of restrictions.
+
+However, the right solution here is that OHCI _should_ be making those
+calls, and we _should_ be applying the platform specific fixups like
+IXP does, but in a more generic way.  That includes using swiotlb
+rather than dmabounce.
+
+That all said, what I find most annoying is that Ben has ignored my
+question about exactly what the nature of the limitation is on this
+platform.  My response to that is - if you're not going to do the
+curtesy of answering such a simple question, then you don't get to
+patch the kernel for this problem.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
