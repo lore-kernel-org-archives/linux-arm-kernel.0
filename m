@@ -1,62 +1,94 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Mar 2014 13:14:17 +0100
-Subject: [PATCH 20/20] mmc: mmci: Enforce max frequency configuration through
- DT
-In-Reply-To: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1395404057-27835-21-git-send-email-ulf.hansson@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 13:17:42 +0100
+Subject: [PATCH 3/5] ARM: berlin/dt: add cpupll and syspll support to BG2Q
+In-Reply-To: <532C2C71.4010703@gmail.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <532C2C71.4010703@gmail.com>
+Message-ID: <20140321121741.GB6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the option to provide a maximum frequency as platform data,
-enforce it through DT.
+On 21/03/2014 at 13:11:29 +0100, Sebastian Hesselbarth wrote :
+> On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
+> 
+> Alexandre,
+> 
+> Thanks for starting this! I'll start with the most obvious
+> things first and have a closer look on it later.
+> 
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c   |    5 +----
- include/linux/amba/mmci.h |    4 ----
- 2 files changed, 1 insertion(+), 8 deletions(-)
+I will rework and wait for your other comments before sending a new
+version. BTW, I've set up a branch on github if you want to try on your
+platforms:
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 181445e..cbbb87e 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1475,13 +1475,10 @@ static int mmci_probe(struct amba_device *dev,
- 	 * If no maximum operating frequency is supplied, fall back to use
- 	 * the module parameter, which has a (low) default value in case it
- 	 * is not specified. Either value must not exceed the clock rate into
--	 * the block, of course. Also note that DT takes precedence over
--	 * platform data.
-+	 * the block, of course.
- 	 */
- 	if (mmc->f_max)
- 		mmc->f_max = min(host->mclk, mmc->f_max);
--	else if (plat->f_max)
--		mmc->f_max = min(host->mclk, plat->f_max);
- 	else
- 		mmc->f_max = min(host->mclk, fmax);
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index bf339ff..8c98113 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -9,9 +9,6 @@
- /**
-  * struct mmci_platform_data - platform configuration for the MMCI
-  * (also known as PL180) block.
-- * @f_max: the maximum operational frequency for this host in this
-- * platform configuration. When this is specified it takes precedence
-- * over the module parameter for the same frequency.
-  * @ocr_mask: available voltages on the 4 pins from the block, this
-  * is ignored if a regulator is used, see the MMC_VDD_* masks in
-  * mmc/host.h
-@@ -28,7 +25,6 @@
-  * @cd_invert: true if the gpio_cd pin value is active low
-  */
- struct mmci_platform_data {
--	unsigned int f_max;
- 	unsigned int ocr_mask;
- 	int (*ios_handler)(struct device *, struct mmc_ios *);
- 	unsigned int (*status)(struct device *);
+https://github.com/alexandrebelloni/linux.git topic/berlin-clk
+
+> Missing commit description here.
+> 
+> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >---
+> >  arch/arm/boot/dts/berlin2q.dtsi | 20 ++++++++++++++++++--
+> >  1 file changed, 18 insertions(+), 2 deletions(-)
+> >
+> >diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> >index 07452a7483fa..19d2c82b0664 100644
+> >--- a/arch/arm/boot/dts/berlin2q.dtsi
+> >+++ b/arch/arm/boot/dts/berlin2q.dtsi
+> >@@ -59,10 +59,26 @@
+> >  		clock-frequency = <100000000>;
+> >  	};
+> >
+> >+	syspll: syspll {
+> 
+> syspll: pll at ea0030 {
+> 
+> and sort it in between other SoC nodes below. This will
+> most likely break clocks in v3.14 but v3.15 will receive
+> proper clock init ordering.
+> 
+
+I will do across all the dtsi, don't bother repeating yourself :)
+
+> >+		compatible = "marvell,berlin2q-pll";
+> >+		clocks = <&smclk>;
+> >+		#clock-cells = <0>;
+> >+		reg = <0xf7ea0030 8>;
+> >+	};
+> >+
+> >+	cpupll: cpupll {
+> 
+> dito.
+> 
+> >+		compatible = "marvell,berlin2q-pll";
+> >+		clocks = <&smclk>;
+> >+		#clock-cells = <0>;
+> >+		reg = <0xf7dd0170 8>;
+> >+	};
+> >+
+> >  	cpuclk: cpu-clock {
+> >-		compatible = "fixed-clock";
+> >+		compatible = "fixed-factor-clock";
+> >+		clocks = <&cpupll>;
+> >  		#clock-cells = <0>;
+> >-		clock-frequency = <1200000000>;
+> >+		clock-div = <1>;
+> >+		clock-mult = <1>;
+> 
+> Hmm, you probably know better than me, but if cpuclk == cpupll
+> is always true we don't need another clk layer here. If you
+> can scale down cpuclk from cpupll and we just have no driver
+> for it, I am fine with it.
+> 
+
+You can actually switch CPU clk from CPU pll to smclk. I'm not sure this
+is completely useful yet though, probably for suspend ?
+
+Also, while I'm not sure this is a good reason, other clocks are derived
+from CPU pll and have another divider.
+
+
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
