@@ -1,50 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Mar 2014 14:56:58 -0600
-Subject: [PATCH] ARM: update multi_v7_defconfig for Tegra
-Message-ID: <1395435418-1376-1-git-send-email-swarren@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 21 Mar 2014 16:08:40 -0500
+Subject: [PATCH 0/8] Generic serial earlycon
+Message-ID: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+From: Rob Herring <robh@kernel.org>
 
-This patch adds the same options to multi_v7_defconfig as were added to
-tegra_defconfig in commit d1c912c1001f "ARM: tegra: defconfig updates".
-(CONFIG_POWER_RESET_AS3722 is already enabled here.)
+This started out as an attempt to add arm64's earlyprintk support to ARM
+in order to get an earlier, runtime setup console on multi-platform
+kernels. The first issue was needing the fixmap support which
+conveniently Mark Salter was working on and is mostly in place now. Like
+many things on ARM and arm64 now, it then became where do I put the now
+common, shared code. After digging more into various early console/printk
+support, it turns out the 8250_early.c setup code was the best starting
+point. 
 
-Suggested-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+This is based on Mark Salter's fixmap support currently in linux-next.
+This is tested on arm64 and ARM with pl011 and 8250. The ARM support
+also requires fixmap and fixed mapping support which are not yet in place.
+I have some patches in my tree to support fixmap, but they need some more
+work. Fortunately, once fixmap is in place, it is just a Kconfig option
+to enable earlycon support on ARM. A git tree is available here[1].
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 9ee12b54ca7d..0585215bc2ee 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -102,6 +102,7 @@ CONFIG_RFKILL_GPIO=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
- CONFIG_MTD_M25P80=y
-@@ -170,6 +171,7 @@ CONFIG_SERIAL_ST_ASC=y
- CONFIG_SERIAL_ST_ASC_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
-+CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_MV64XXX=y
-@@ -226,6 +228,8 @@ CONFIG_REGULATOR_VEXPRESS=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_USB_SUPPORT=y
-+CONFIG_USB_VIDEO_CLASS=y
-+CONFIG_USB_GSPCA=y
- CONFIG_DRM=y
- CONFIG_DRM_TEGRA=y
- CONFIG_DRM_PANEL_SIMPLE=y
+Based on this series, I would like to add support for doing earlycon
+setup using DT.
+
+Rob
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon
+
+Rob Herring (8):
+  x86: move FIX_EARLYCON_MEM kconfig into x86
+  arm64: add FIXMAP_PAGE_NOCACHE definition
+  arm64: enable FIX_EARLYCON_MEM kconfig
+  tty/serial: add generic serial earlycon
+  tty/serial: convert 8250 to generic earlycon
+  tty/serial: pl011: add generic earlycon support
+  tty/serial: add arm64 semihosting earlycon
+  arm64: remove arch specific earlyprintk
+
+ Documentation/kernel-parameters.txt        |   6 +-
+ arch/arm64/Kconfig                         |   3 +
+ arch/arm64/Kconfig.debug                   |   9 --
+ arch/arm64/include/asm/fixmap.h            |   3 +-
+ arch/arm64/kernel/Makefile                 |   1 -
+ arch/arm64/kernel/early_printk.c           | 158 -----------------------------
+ arch/x86/Kconfig                           |   3 +
+ drivers/tty/serial/8250/8250_early.c       | 138 +++----------------------
+ drivers/tty/serial/8250/Kconfig            |   5 -
+ drivers/tty/serial/Kconfig                 |  24 ++++-
+ drivers/tty/serial/Makefile                |   3 +
+ drivers/tty/serial/amba-pl011.c            |  30 +++++-
+ drivers/tty/serial/earlycon-arm-semihost.c |  44 ++++++++
+ drivers/tty/serial/earlycon.c              | 148 +++++++++++++++++++++++++++
+ include/linux/serial_core.h                |  16 +++
+ 15 files changed, 287 insertions(+), 304 deletions(-)
+ delete mode 100644 arch/arm64/kernel/early_printk.c
+ create mode 100644 drivers/tty/serial/earlycon-arm-semihost.c
+ create mode 100644 drivers/tty/serial/earlycon.c
+
 -- 
-1.8.1.5
+1.8.3.2
