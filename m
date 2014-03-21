@@ -1,55 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Mar 2014 20:12:56 -0700
-Subject: [PATCH] clk: hisilicon: fix warning from smatch
-In-Reply-To: <1394422400-17639-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1394422400-17639-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20140321031256.21989.67304@quantum>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 21 Mar 2014 11:14:57 +0800
+Subject: [PATCH 0/2] ARM: berlin: SMP support
+In-Reply-To: <1395347986-30203-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1395347986-30203-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140321111457.6bed5091@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Zhangfei Gao (2014-03-09 20:33:20)
-> drivers/clk/hisilicon/clk-hi3620.c:338
-> mmc_clk_delay() warn: always true condition '(para >= 0) => (0-u32max >= 0)'
-> 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Thu, 20 Mar 2014 13:39:44 -0700
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Taken into clk-next.
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/hisilicon/clk-hi3620.c |   15 +++++++--------
->  1 file changed, 7 insertions(+), 8 deletions(-)
+> This is a small patch set for SMP support on Marvell Berlin BG2
+> and recently provided BG2Q. Nothing spectacular, as it basically
+> copies SMP holding pen mechanism from mach-prima2 and plat-versatile
+> with minor Berlin specific code for SCU and general purpose registers
+> used by secondary CPUs to get their boot address.
 > 
-> diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
-> index 38faa469d288..e75f742ca422 100644
-> --- a/drivers/clk/hisilicon/clk-hi3620.c
-> +++ b/drivers/clk/hisilicon/clk-hi3620.c
-> @@ -335,15 +335,14 @@ static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
->  {
->         u32 i;
->  
-> -       if (para >= 0) {
-> -               for (i = 0; i < len; i++) {
-> -                       if (para % 2)
-> -                               val |= 1 << (off + i);
-> -                       else
-> -                               val &= ~(1 << (off + i));
-> -                       para = para >> 1;
-> -               }
-> +       for (i = 0; i < len; i++) {
-> +               if (para % 2)
-> +                       val |= 1 << (off + i);
-> +               else
-> +                       val &= ~(1 << (off + i));
-> +               para = para >> 1;
->         }
-> +
->         return val;
->  }
->  
-> -- 
-> 1.7.9.5
+> There was some IRC discussion with Alexandre about using
+> scu_get_base() instead of a DT node. Although BG2Q is true A9
+> and provides SCU base; BG2 with PJ4b does not and I decided to
+> depend on a DT node for SCU in both cases, which is fine I guess.
 > 
+> I tested this on BG2, and BG2CD (which is UP). I expect the
+> Free-Electrons guys to test on BG2Q.
+
+Although BG2Q and future SoCs will go through PSCI code path finally. But
+currently, it's OK to use the pen mechanism.
+
+So for both of these two patches, 
+
+Acked-by: Jisheng Zhang <jszhang@marvell.com>
+
+Thanks,
+Jisheng
