@@ -1,116 +1,62 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Fri, 21 Mar 2014 14:34:16 +0000
-Subject: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
-In-Reply-To: <1395412013.4554.13.camel@weser.hi.pengutronix.de>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>		
- <1395397968-6242-3-git-send-email-phil.edworthy@renesas.com>
- <1395400638.4554.5.camel@weser.hi.pengutronix.de>	
- <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
- <1395412013.4554.13.camel@weser.hi.pengutronix.de>
-Message-ID: <OFB271EC60.092DC5D0-ON80257CA2.004FA802-80257CA2.00500A37@eu.necel.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 21 Mar 2014 09:36:04 -0500
+Subject: [PATCH] regulator: Add new driver for ST's PWM controlled
+ voltage regulators
+In-Reply-To: <1395397296-8196-1-git-send-email-lee.jones@linaro.org>
+References: <1395397296-8196-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140321143604.GY18529@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On Fri, Mar 21, 2014 at 10:21:36AM +0000, Lee Jones wrote:
+> +static int st_pwm_regulator_set_voltage_sel(struct regulator_dev *dev,
+> +					    unsigned selector)
+> +{
+> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+> +	int dutycycle;
+> +	int ret;
+> +
+> +	if (selector >= dev->desc->n_voltages)
+> +		return -EINVAL;
 
-On 21/03/2014 14:27, Lucas wrote:
-> Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
-> 
-> Am Freitag, den 21.03.2014, 14:15 +0000 schrieb
-> Phil.Edworthy at renesas.com:
-> > Hi Lucas,
-> > 
-> > Thanks for the review.
-> > 
-> > On 21/03/2014 11:18, Lucas wrote:
-> > > Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
-> > > 
-> > > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
-> > > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > > > ---
-> > > >  drivers/pci/host/pcie-rcar.c | 232 
-> > ++++++++++++++++++++++++++++++++++++++++++-
-> > > >  drivers/pci/host/pcie-rcar.h |   5 +
-> > > >  2 files changed, 236 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/pci/host/pcie-rcar.c 
-> > b/drivers/pci/host/pcie-rcar.c
-> > > > index 16670e5..cbbcd77 100644
-> > > > --- a/drivers/pci/host/pcie-rcar.c
-> > > > +++ b/drivers/pci/host/pcie-rcar.c
-> > > [...]
-> > > > +
-> > > > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
-> > > > +{
-> > > > +   struct rcar_pcie *pcie = data;
-> > > > +   struct rcar_msi *msi = &pcie->msi;
-> > > > +   unsigned long reg;
-> > > > +
-> > > > +   reg = pci_read_reg(pcie, PCIEMSIFR);
-> > > > +
-> > > > +   while (reg) {
-> > > > +      unsigned int index = find_first_bit(&reg, 32);
-> > > > +      unsigned int irq;
-> > > > +
-> > > > +      /* clear the interrupt */
-> > > > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
-> > > > +
-> > > > +      irq = irq_find_mapping(msi->domain, index);
-> > > > +      if (irq) {
-> > > > +         if (test_bit(index, msi->used))
-> > > > +            generic_handle_irq(irq);
-> > > > +         else
-> > > > +            dev_info(pcie->dev, "unhandled MSI\n");
-> > > > +      } else {
-> > > > +         /*
-> > > > +          * that's weird who triggered this?
-> > > > +          * just clear it
-> > > > +          */
-> > > > +         dev_info(pcie->dev, "unexpected MSI\n");
-> > > > +      }
-> > > > +
-> > > > +      /* see if there's any more pending in this vector */
-> > > > +      reg = pci_read_reg(pcie, PCIEMSIFR);
-> > > > +   }
-> > > > +
-> > > > +   return IRQ_HANDLED;
-> > > > +}
-> > > > +
-> > > From your DT binding it seems you have only one interrupt from the 
-PCIe
-> > > core, shared between the MSI irqs and the PCI legacy interrupts.
-> > > This means this handler may get called without an MSI irq pending, 
-so
-> > > this function really should have a path where it's returning 
-IRQ_NONE.
-> > Ah, yes you are right... though actually there are two interrupts, one 
-has 
-> > some MSI and INTx, the other has the rest of the MSIs.
-> > 
-> This isn't reflected in the DT binding. If you already know that there
-> may be more than a single interrupt for MSI, please push this into the
-> binding by using named interrupts. Even if your driver doesn't support
-> it yet, additional functionality can always be added later, but the DT
-> should be a stable ABI describing your hardware.
-> 
-> So if you already know your hardware has more than one interrupt, please
-> put it in the binding, to avoid churn later on.
-At the moment we support both interrupts but the code implicitly gets the 
-'next' interrupt for MSI. I'll change that so that all the interrupts are 
-specified in the binding.
+If this case is ever hit, I would argue it's a bug in the regulator
+core.
 
+> +static struct st_pwm_voltages b2105_duty_cycle_table[] = {
 
-> Regards,
-> Lucas
-> -- 
-> Pengutronix e.K.                           | Lucas Stach |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/ 
-|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 
-|
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 
-|
-> 
+const?
 
-Thanks
-Phil
+> +	{ .uV = 1114000, .dutycycle = 0,  },
+> +	{ .uV = 1095000, .dutycycle = 10, },
+> +	{ .uV = 1076000, .dutycycle = 20, },
+> +	{ .uV = 1056000, .dutycycle = 30, },
+> +	{ .uV = 1036000, .dutycycle = 40, },
+> +	{ .uV = 1016000, .dutycycle = 50, },
+> +	/* WARNING: Values above 50% duty-cycle cause boot failures. */
+> +};
+> +
+> +static const struct regulator_desc b2105_desc = {
+> +	.name		= "b2105-pwm-regulator",
+> +	.ops		= &st_pwm_regulator_voltage_ops,
+> +	.type		= REGULATOR_VOLTAGE,
+> +	.owner		= THIS_MODULE,
+> +	.n_voltages	= ARRAY_SIZE(b2105_duty_cycle_table),
+> +	.supply_name    = "pwm",
+> +};
+> +
+> +static const struct st_pwm_regulator_pdata b2105_info = {
+> +	.desc		  = &b2105_desc,
+> +	.duty_cycle_table = b2105_duty_cycle_table,
+> +};
+> +
+> +static struct of_device_id st_pwm_of_match[] = {
+
+const?
+
+Other than that:
+
+Reviewed-by: Josh Cartwright <joshc@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
