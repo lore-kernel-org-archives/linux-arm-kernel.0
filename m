@@ -1,45 +1,43 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Fri, 21 Mar 2014 15:01:58 +0800
-Subject: [PATCH 1/2] ARM: add cpu_is_pj4() to distinguish PJ4 core
-Message-ID: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+Date: Fri, 21 Mar 2014 15:01:59 +0800
+Subject: [PATCH 2/2] ARM: PJ4: check cpu id for PJ4 cp0 access
+In-Reply-To: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+References: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1395385319-25386-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PJ4 is based on V7, but it has some changes. For example, some
-coprocessor settings.
+Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+pj4_cpu0_init just return.
+This fix will help to make the all the V7 cpus(PJ4 and no-PJ4)
+use same platform code.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/include/asm/cputype.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/kernel/pj4-cp0.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 42f0889..c651e3b 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -221,4 +221,23 @@ static inline int cpu_is_xsc3(void)
- #define	cpu_is_xscale()	1
- #endif
+diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+index 679cf4d..fc72086 100644
+--- a/arch/arm/kernel/pj4-cp0.c
++++ b/arch/arm/kernel/pj4-cp0.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <asm/thread_notify.h>
++#include <asm/cputype.h>
  
-+/*
-+ * Marvell's PJ4 core is based on V7 version. It has some modification
-+ * for coprocessor setting. For this reason, we need a way to distinguish
-+ * it.
-+ */
-+#ifndef CONFIG_CPU_PJ4
-+#define cpu_is_pj4()	0
-+#else
-+static inline int cpu_is_pj4(void)
-+{
-+	unsigned int id;
+ static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
+ {
+@@ -80,6 +81,9 @@ static int __init pj4_cp0_init(void)
+ {
+ 	u32 cp_access;
+ 
++	if (!cpu_is_pj4())
++		return 0;
 +
-+	id = read_cpuid_id();
-+	if ((id & 0xfffffff0) == 0x562f5840)
-+		return 1;
-+
-+	return 0;
-+}
-+#endif
- #endif
+ 	cp_access = pj4_cp_access_read() & ~0xf;
+ 	pj4_cp_access_write(cp_access);
+ 
 -- 
 1.8.3.2
