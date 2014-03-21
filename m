@@ -1,44 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Mar 2014 16:27:50 +0000
-Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
-In-Reply-To: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
-References: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20140321162750.GI13596@arm.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Fri, 21 Mar 2014 16:31:24 +0000
+Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
+ R8A7790
+In-Reply-To: <532C6BF7.1050404@cogentembedded.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <532C5ADE.4030708@cogentembedded.com>
+ <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
+ <6044873.2S2Xlhp0hC@wuerfel> <532C6BF7.1050404@cogentembedded.com>
+Message-ID: <OFCC2858D2.BB49EE27-ON80257CA2.005AA51E-80257CA2.005AC3A0@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 05:35:19PM +0000, Christopher Covington wrote:
-> On an LPAE system, the physical addresses used by VirtIO-MMIO may
-> be larger than 32 bits, even if the header and configuration space
-> addresses fit into 32 bits. For example with the Versatile Express
-> memory map using 4G memory, the following error occured when trying
-> to use a VirtIO-MMIO block device.
-> 
-> EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: :
-> unaligned directory entry - offset=0, inode=3755990991, rec_len=57311,
-> name_len=223
-> 
-> To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
-> VIRTIO_MMIO are selected.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm/mm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 1f8fed9..a62bcc9 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -617,6 +617,7 @@ config ARM_LPAE
->  	bool "Support for the Large Physical Address Extension"
->  	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
->  		!CPU_32v4 && !CPU_32v3
-> +	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
+Hi Sergei,
 
-That's the wrong place to enable ARCH_DMA_ADDR_T_64BIT. Do you have a
-platform with >32-bit physical address space? If yes, it should be
-selected there.
+On: 21/03/2014 15:42, Sergei wrote:
+> Subject: Re: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes 
+for R8A7790
+> 
+> Hello.
+> 
+> On 03/21/2014 05:57 PM, Arnd Bergmann wrote:
+> 
+> >>>> +      reg = <0 0xfe000000 0 0x80000>;
+> >>>> +      #address-cells = >;
+> >>>> +      #size-cells = <2>;
+> >>>> +      device_type = "pci";
+> 
+> >>>      This legacy property is only meaningful for the true OF 
+firmware and thus
+> >>> have been phased out (it's only actively used for the memory nodes).
+> 
+> >> Ok, thanks for pointing this out.
+> 
+> > I think the code still relies on it for PCI though.
+> 
+>     OK, I have found where it does that but the recommended value seems 
+to be 
+> "pciex" for PCI-Express case.
 
--- 
-Catalin
+Ok, but why then do all the other PCIe hosts use "pci"?
+
+Thanks
+Phil
