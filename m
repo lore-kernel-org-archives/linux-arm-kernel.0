@@ -1,36 +1,152 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 21 Mar 2014 10:40:15 -0600
-Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <6044873.2S2Xlhp0hC@wuerfel>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <532C5ADE.4030708@cogentembedded.com>
- <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
- <6044873.2S2Xlhp0hC@wuerfel>
-Message-ID: <20140321164015.GA3374@obsidianresearch.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 21 Mar 2014 09:42:16 -0700
+Subject: [PATCH 1/3] Documentation: add Device tree bindings for Hisilicon
+ hip04 ethernet
+In-Reply-To: <1395414570-25515-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1395414570-25515-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395414570-25515-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <CAGVrzcbH6aGC=5PG5rMv7b8+ntF6roWXv_cK1yPa8cQhcHYLkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 03:57:25PM +0100, Arnd Bergmann wrote:
-> On Friday 21 March 2014 14:53:48 Phil.Edworthy at renesas.com wrote:
-> > 
-> > > > +      reg = <0 0xfe000000 0 0x80000>;
-> > > > +      #address-cells = >;
-> > > > +      #size-cells = <2>;
-> > > > +      device_type = "pci";
-> > > 
-> > >     This legacy property is only meaningful for the true OF firmware and 
-> > thus 
-> > > have been phased out (it's only actively used for the memory nodes).
-> > Ok, thanks for pointing this out.
-> > 
-> 
-> I think the code still relies on it for PCI though.
+2014-03-21 8:09 GMT-07:00 Zhangfei Gao <zhangfei.gao@linaro.org>:
+> This patch adds the Device Tree bindings for the Hisilicon hip04
+> Ethernet controller, including 100M / 1000M controller.
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  .../bindings/net/hisilicon-hip04-net.txt           |  107 ++++++++++++++++++++
+>  1 file changed, 107 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+> new file mode 100644
+> index 0000000..22838b2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+> @@ -0,0 +1,107 @@
+> +Hisilicon hip04 Ethernet Controller
+> +
+> +* Ethernet controller node
+> +
+> +Required properties:
+> +- compatible: should be "hisilicon,hip04-mac".
+> +- reg: address and length of the register set for the device.
+> +- interrupts: interrupt for the device.
+> +- port-handle: phandle, specifies a reference to a node representing
+> +  the connected port
+> +- Inherets from ethernet common binding [1]
+> +[1] Documentation/devicetree/bindings/net/ethernet.txt
+> +
+> +
+> +* Ethernet ppe node:
+> +Control rx & tx fifos of all ethernet controllers.
+> +Have 2048 recv channels shared by all ethernet controllers, only if no overlap.
+> +Each controller's start recv channel is alisa_id * RX_DESC_NUM.
+> +
+> +Required properties:
+> +- #address-cells : Should be <1>
+> +- #size-cells : Should be <0>
+> +- compatible: "hisilicon,hip04-ppe"
+> +- reg: address and length of the register set for the device.
+> +
+> +==Child node==
+> +
+> +Required properties:
+> +- reg: port physical number, range from 0 to 0x1f
+> +
+> +
+> +* MDIO bus node:
+> +
+> +Required properties:
+> +
+> +- compatible: should be "hisilicon,hip04-mdio", "ethernet-phy-ieee802.3-c22".
+> +- Inherets from MDIO bus node binding [2]
+> +[2] Documentation/devicetree/bindings/net/phy.txt
+> +
+> +Example:
+> +       aliases {
+> +               ethernet0 = &fe;
+> +               ethernet1 = &ge0;
+> +               ethernet2 = &ge8;
+> +       };
+> +
+> +       mdio {
+> +               compatible = "hisilicon,hip04-mdio", "ethernet-phy-ieee802.3-c22";
 
-Right, it must be present for PCI nodes, it triggers special behavior
-in the address parsing routines.
+That part is not quite correct, the compatible string should only be
+"hisilicon,hip04-mdio", the other compatible string is for the child
+Ethernet nodes below:
 
-What Phil has looks correct to me.
+> +               reg = <0x28f1000 0x1000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               phy0: ethernet-phy at 0 {
 
-Regards,
-Jason
+This is where you need:
+
+                            compatible = "ethernet-phy-ieee802.3-c22";
+
+> +                       reg = <0>;
+> +                       marvell,reg-init = <18 0x14 0 0x8001>;
+> +               };
+> +
+> +               phy1: ethernet-phy at 1 {
+> +                       reg = <1>;
+> +                       marvell,reg-init = <18 0x14 0 0x8001>;
+> +               };
+> +       };
+> +
+> +       ppe: ppe at 28c0000 {
+> +               compatible = "hisilicon,hip04-ppe";
+> +               reg = <0x28c0000 0x10000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               eth0_port: port at 1f {
+> +                       reg = <0x1f>;
+> +               };
+> +
+> +               eth1_port: port at 0 {
+> +                       reg = <0>;
+> +               };
+> +
+> +               eth2_port: port at 8 {
+> +                       reg = <8>;
+> +               };
+> +       };
+> +
+> +       fe: ethernet at 28b0000 {
+> +               compatible = "hisilicon,hip04-mac";
+> +               reg = <0x28b0000 0x10000>;
+> +               interrupts = <0 413 4>;
+> +               phy-mode = "mii";
+> +               port-handle = <&eth0_port>;
+> +       };
+> +
+> +       ge0: ethernet at 2800000 {
+> +               compatible = "hisilicon,hip04-mac";
+> +               reg = <0x2800000 0x10000>;
+> +               interrupts = <0 402 4>;
+> +               phy-mode = "sgmii";
+> +               port-handle = <&eth1_port>;
+> +               phy-handle = <&phy0>;
+> +       };
+> +
+> +       ge8: ethernet at 2880000 {
+> +               compatible = "hisilicon,hip04-mac";
+> +               reg = <0x2880000 0x10000>;
+> +               interrupts = <0 410 4>;
+> +               phy-mode = "sgmii";
+> +               port-handle = <&eth2_port>;
+> +               phy-handle = <&phy1>;
+> +       };
+> --
+> 1.7.9.5
+>
+
+
+
+-- 
+Florian
