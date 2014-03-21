@@ -1,42 +1,66 @@
 From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 21 Mar 2014 09:48:13 +0000
-Subject: [PATCH 1/2] ARM: move outer_cache declaration out of ifdef
+Date: Fri, 21 Mar 2014 09:48:14 +0000
+Subject: [PATCH 2/2] ARM: highbank: avoid L2 cache smc calls when PL310 is not
+ present
 In-Reply-To: <20140320233920.GD24571@kroah.com>
 References: <20140320233920.GD24571@kroah.com>
-Message-ID: <1395395294-17848-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <1395395294-17848-2-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-commit 0b53c11d533a8f6688d73fad0baf67dd08ec1b90 upstream.
+commit a56a5cf1f2ec895599eace0ac6eba1e4a489e4bf upstream.
 
-Move the outer_cache declaration of the CONFIG_OUTER_CACHE ifdef so that
-outer_cache can be used inside IS_ENABLED condition.
+While Midway firmware handles L2 smc calls as nops, the custom smc calls
+present a problem when running virtualized Midway guest. They aren't
+needed so just avoid calling them.
+
+In the process, cleanup the L2X0 ifdefs and use IS_ENABLED instead.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
 ---
- arch/arm/include/asm/outercache.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-highbank/highbank.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 12f71a1..f94784f 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -37,10 +37,10 @@ struct outer_cache_fns {
- 	void (*resume)(void);
- };
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 5ed19e8..35d1029 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -65,14 +65,12 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
+ 			  HB_JUMP_TABLE_PHYS(cpu) + 15);
+ }
  
--#ifdef CONFIG_OUTER_CACHE
--
- extern struct outer_cache_fns outer_cache;
- 
-+#ifdef CONFIG_OUTER_CACHE
-+
- static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+-#ifdef CONFIG_CACHE_L2X0
+ static void highbank_l2x0_disable(void)
  {
- 	if (outer_cache.inv_range)
+ 	outer_flush_all();
+ 	/* Disable PL310 L2 Cache controller */
+ 	highbank_smc1(0x102, 0x0);
+ }
+-#endif
+ 
+ static void __init highbank_init_irq(void)
+ {
+@@ -81,12 +79,13 @@ static void __init highbank_init_irq(void)
+ 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
+ 		highbank_scu_map_io();
+ 
+-#ifdef CONFIG_CACHE_L2X0
+ 	/* Enable PL310 L2 Cache controller */
+-	highbank_smc1(0x102, 0x1);
+-	l2x0_of_init(0, ~0UL);
+-	outer_cache.disable = highbank_l2x0_disable;
+-#endif
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
++		highbank_smc1(0x102, 0x1);
++		l2x0_of_init(0, ~0UL);
++		outer_cache.disable = highbank_l2x0_disable;
++	}
+ }
+ 
+ static void __init highbank_timer_init(void)
 -- 
 1.7.10.4
