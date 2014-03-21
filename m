@@ -1,35 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 16:42:00 +0100
-Subject: [PATCH 58/62] ARM: exynos: add missing include of linux/module.h
-In-Reply-To: <027101cf43f4$18b17d00$4a147700$@samsung.com>
+Date: Fri, 21 Mar 2014 16:43:24 +0100
+Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
+In-Reply-To: <20140320035501.GE10601@verge.net.au>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-59-git-send-email-arnd@arndb.de>
- <027101cf43f4$18b17d00$4a147700$@samsung.com>
-Message-ID: <201403211642.01108.arnd@arndb.de>
+ <1395257399-359545-61-git-send-email-arnd@arndb.de>
+ <20140320035501.GE10601@verge.net.au>
+Message-ID: <201403211643.24533.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014, Kukjin Kim wrote:
-> Arnd Bergmann wrote:
+On Thursday 20 March 2014, Simon Horman wrote:
+> On Wed, Mar 19, 2014 at 08:29:57PM +0100, Arnd Bergmann wrote:
+> > When phylib is set to be built as a module, the lager and koelsch
+> > boards fail to build:
 > > 
-> > After the restructuring of the module.h and init.h headers,
-> > we now need to include this explicitly here.
+> > arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
+> > :(.text+0x738): undefined reference to `mdiobus_read'
+> > :(.text+0x73c): undefined reference to `mdiobus_write'
+> > arch/arm/mach-shmobile/built-in.o: In function `koelsch_ksz8041_fixup':
+> > :(.text+0x7e8): undefined reference to `mdiobus_read'
+> > :(.text+0x7ec): undefined reference to `mdiobus_write'
 > > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > To work around that problem, this changes the code to check for
+> > IS_BUILTIN rather than IS_ENABLED, turning the error into a runtime
+> > problem. It's now possible to build random configurations, but the
+> > phy may be set up incorrectly in this case.
 > 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> I wonder if Kconfig for koelsch should be tightened up somehow to
+> ensure that PHYLIB is either unselected or builtin.
 > 
-> Arnd,
-> 
-> If you want me to take this fixes for Samsung stuff into samsung tree,
-> please let me know.
+> Also, a minor nit, I would prefer changes for different boards
+> in different patches. But I can split the patch myself if its
+> not going to be changed otherwise.
 
-I think it's easier for me to keep the 62 fixes together as a series
-this time.
-
-When I find new bugs later on, it may be better for you and the
-other platform maintainers to pick those up.
+I would prefer to take the entire series directly into arm-soc
+this time, if you don't mind.
 
 	Arnd
