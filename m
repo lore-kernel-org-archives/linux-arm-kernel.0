@@ -1,72 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 21 Mar 2014 11:33:07 +0000
-Subject: [PATCH RESEND for ARM-SoC 1/2] ARM: STi: stih416: Add support for the
- FSM Serial Flash Controller
-In-Reply-To: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
-References: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395401588-8825-2-git-send-email-lee.jones@linaro.org>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 21 Mar 2014 06:43:56 -0500
+Subject: [PATCH RESEND] clk: support hardware-specific debugfs entries
+Message-ID: <1395402236-16284-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we add the necessary device nodes required for successful device
-probing and Pinctrl setup for the FSM when booting on an STiH416 (Orly2).
+Add a new clk_ops->debug_init method to allow a clock hardware
+driver to populate the clock's debugfs directory with entries
+beyond those common for every clock.
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Acked-by Angus Clark <angus.clark@st.com>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/stih416.dtsi         | 13 +++++++++++++
- 2 files changed, 26 insertions(+)
+ drivers/clk/clk.c            |    4 ++++
+ include/linux/clk-provider.h |    8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index b29ff4b..81df8e7 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -210,6 +210,19 @@
- 					};
- 				};
- 			};
-+
-+			fsm {
-+				pinctrl_fsm: fsm {
-+					st,pins {
-+						spi-fsm-clk  = <&PIO12 2 ALT1 OUT>;
-+						spi-fsm-cs   = <&PIO12 3 ALT1 OUT>;
-+						spi-fsm-mosi = <&PIO12 4 ALT1 OUT>;
-+						spi-fsm-miso = <&PIO12 5 ALT1 IN>;
-+						spi-fsm-hol  = <&PIO12 6 ALT1 OUT>;
-+						spi-fsm-wp   = <&PIO12 7 ALT1 OUT>;
-+					};
-+				};
-+			};
- 		};
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index c42e608..92760b1 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -277,6 +277,10 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+ 	if (!d)
+ 		goto err_out;
  
- 		pin-controller-rear {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index b7ab47b..1e24b9e 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -145,5 +145,18 @@
++	if (clk->ops->debug_init)
++		if (clk->ops->debug_init(clk->hw, clk->dentry))
++			goto err_out;
++
+ 	ret = 0;
+ 	goto out;
  
- 			status		= "disabled";
- 		};
-+
-+		/* FSM */
-+		spifsm: spifsm at fe902000 {
-+			compatible	   = "st,spi-fsm";
-+			reg		   = <0xfe902000 0x1000>;
-+			pinctrl-0	   = <&pinctrl_fsm>;
-+
-+			st,syscfg	   = <&syscfg_rear>;
-+			st,boot-device-reg = <0x958>;
-+			st,boot-device-spi = <0x1a>;
-+
-+			status = "disabled";
-+		};
- 	};
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 939533d..5119174 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -32,6 +32,7 @@
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+ 
+ struct clk_hw;
++struct dentry;
+ 
+ /**
+  * struct clk_ops -  Callback operations for hardware clocks; these are to
+@@ -127,6 +128,12 @@ struct clk_hw;
+  *		separately via calls to .set_parent and .set_rate.
+  *		Returns 0 on success, -EERROR otherwise.
+  *
++ * @debug_init:	Set up type-specific debugfs entries for this clock.  This
++ *		is called once, after the debugfs directory entry for this
++ *		clock has been created.  The dentry pointer representing that
++ *		directory is provided as an argument.  Called with
++ *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
++ *
+  *
+  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+  * implementations to split any work between atomic (enable) and sleepable
+@@ -165,6 +172,7 @@ struct clk_ops {
+ 	unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
+ 					   unsigned long parent_accuracy);
+ 	void		(*init)(struct clk_hw *hw);
++	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
  };
+ 
+ /**
 -- 
-1.8.3.2
+1.7.9.5
