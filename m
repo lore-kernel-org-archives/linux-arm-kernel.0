@@ -1,53 +1,23 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 20 Mar 2014 21:39:38 -0400
-Subject: mxs-auart gives data from previous run after close and reopen
-In-Reply-To: <5323625B.4010203@meduna.org>
-References: <5323625B.4010203@meduna.org>
-Message-ID: <532B985A.7060505@hurleysoftware.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Mar 2014 22:43:22 -0300
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <201403200005.56334.marex@denx.de>
+ <201403200501.16881.marex@denx.de>
+ <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+ <20140320230559.GF7528@n2100.arm.linux.org.uk>
+ <532B86A7.5010200@boundarydevices.com>
+ <20140321011843.GG7528@n2100.arm.linux.org.uk>
+ <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
+Message-ID: <CAOMZO5CxjCHLrY0KTe4j=NiSU3CQVNZWhEAs33Le8ji3NAFETQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2014 04:11 PM, Stanislav Meduna wrote:
-> Hi,
->
-> following scenario:
->
-> - a Freescale i.MX28 machine
-> - RS232 AUART looped back Rx - Tx or two different ports cross-connected
-> - a test program sending data in one thread and receiving in the other:
->    thread A periodically sends "Quick brown fox jumps over the lazy dog",
->    thread B receives
-> - stop the program using ctrl-C
-> - restart
->
-> => sometimes the receiving thread gets "dogQuick", receiving
->     characters from the previous transmission
->
-> The extra characters definitely come from the receiver - the transmission
-> is OK. This was verified by a scope.
->
-> My theory is that this behaviour is caused by mxs_auart_shutdown
-> function gating and mxs_auart_startup reenabling the clock instead
-> of doing a soft reset. If the clock is gated while the AUART already
-> has something in the FIFO, but did not generate the interrupt yet,
-> the internal state machine is frozen in this state. As soon as it
-> is reenabled, the characters are delivered to a new user.
->
-> I am using a 3.4.77 kernel, but the relevant code looks the same in
-> the recent kernels (when not using DMA). I also backported patches
-> waiting for the transmission FIFO to clear at mxs_auart_shutdown.
->
-> I did not find any possibility to fully clear the receiver - even
-> if one disables the AUART and reads everything from the FIFO,
-> the character currently in transmit might be still somewhere (the
-> reference manual states that disabling is effective after the
-> current character is received). Which might be 1 ms at 9600 and one
-> has no clue whether it is the case.
->
-> Also note that the function mxs_auart_reset is in fact not doing
-> a reset - it just makes sure that the AUART comes out of one after
-> the initialization. Maybe a full reset at startup is the solution...
->
-> Pleas Cc: me when answering.
+On Thu, Mar 20, 2014 at 10:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Does disabling the fifo on shutdown clear the fifo?
+> Robert's tests were made on a mx53 (single CortexA9), and its cache
+> controller is not the L310.
+
+Ops, I meant CortexA8.
