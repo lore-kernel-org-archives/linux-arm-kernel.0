@@ -1,51 +1,116 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 21 Mar 2014 15:32:24 +0100
-Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
-In-Reply-To: <6295310.bvZ6PIzM4N@wuerfel>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-11-git-send-email-arnd@arndb.de>
- <20140320204847.GD23076@pengutronix.de>
- <6295310.bvZ6PIzM4N@wuerfel>
-Message-ID: <20140321143224.GF23076@pengutronix.de>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Fri, 21 Mar 2014 14:34:16 +0000
+Subject: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
+In-Reply-To: <1395412013.4554.13.camel@weser.hi.pengutronix.de>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>		
+ <1395397968-6242-3-git-send-email-phil.edworthy@renesas.com>
+ <1395400638.4554.5.camel@weser.hi.pengutronix.de>	
+ <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
+ <1395412013.4554.13.camel@weser.hi.pengutronix.de>
+Message-ID: <OFB271EC60.092DC5D0-ON80257CA2.004FA802-80257CA2.00500A37@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hi Lucas,
 
-On Thu, Mar 20, 2014 at 11:16:20PM +0100, Arnd Bergmann wrote:
-> On Thursday 20 March 2014 21:48:47 Uwe Kleine-K?nig wrote:
-> > 
-> > On Wed, Mar 19, 2014 at 08:29:07PM +0100, Arnd Bergmann wrote:
-> > > The efm32 platform does not provide a zreladdr-y line its Makefile.boot,
-> > > so we always have to use CONFIG_AUTO_ZRELADDR in order to successfully
-> > > build and link a zImage.
-> > I wonder why you need to AUTO_ZRELADDR (which is there to guess
-> > zreladdr) while efm32 doesn't have an MMU and so there is nothing to
-> > guess. So I think this patch fixes a build problem, but it's not a good
-> > change.
+On 21/03/2014 14:27, Lucas wrote:
+> Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
 > 
-> It is required in order to build a compressed zImage file. You mentioned
-> before that your system does not have enough RAM to support this, but
-> the compile-time option exists, and there is no dependency on MMU support
-> for it, nor should there be.
-My objection isn't about having only little RAM. AUTO_ZRELADDR is about
-guessing the physical address corresponding to PAGE_OFFSET. But without
-an MMU there is nothing to guess. So I wonder if the better change would
-be to do:
+> Am Freitag, den 21.03.2014, 14:15 +0000 schrieb
+> Phil.Edworthy at renesas.com:
+> > Hi Lucas,
+> > 
+> > Thanks for the review.
+> > 
+> > On 21/03/2014 11:18, Lucas wrote:
+> > > Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
+> > > 
+> > > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
+> > > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > > > ---
+> > > >  drivers/pci/host/pcie-rcar.c | 232 
+> > ++++++++++++++++++++++++++++++++++++++++++-
+> > > >  drivers/pci/host/pcie-rcar.h |   5 +
+> > > >  2 files changed, 236 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/pci/host/pcie-rcar.c 
+> > b/drivers/pci/host/pcie-rcar.c
+> > > > index 16670e5..cbbcd77 100644
+> > > > --- a/drivers/pci/host/pcie-rcar.c
+> > > > +++ b/drivers/pci/host/pcie-rcar.c
+> > > [...]
+> > > > +
+> > > > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+> > > > +{
+> > > > +   struct rcar_pcie *pcie = data;
+> > > > +   struct rcar_msi *msi = &pcie->msi;
+> > > > +   unsigned long reg;
+> > > > +
+> > > > +   reg = pci_read_reg(pcie, PCIEMSIFR);
+> > > > +
+> > > > +   while (reg) {
+> > > > +      unsigned int index = find_first_bit(&reg, 32);
+> > > > +      unsigned int irq;
+> > > > +
+> > > > +      /* clear the interrupt */
+> > > > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
+> > > > +
+> > > > +      irq = irq_find_mapping(msi->domain, index);
+> > > > +      if (irq) {
+> > > > +         if (test_bit(index, msi->used))
+> > > > +            generic_handle_irq(irq);
+> > > > +         else
+> > > > +            dev_info(pcie->dev, "unhandled MSI\n");
+> > > > +      } else {
+> > > > +         /*
+> > > > +          * that's weird who triggered this?
+> > > > +          * just clear it
+> > > > +          */
+> > > > +         dev_info(pcie->dev, "unexpected MSI\n");
+> > > > +      }
+> > > > +
+> > > > +      /* see if there's any more pending in this vector */
+> > > > +      reg = pci_read_reg(pcie, PCIEMSIFR);
+> > > > +   }
+> > > > +
+> > > > +   return IRQ_HANDLED;
+> > > > +}
+> > > > +
+> > > From your DT binding it seems you have only one interrupt from the 
+PCIe
+> > > core, shared between the MSI irqs and the PCI legacy interrupts.
+> > > This means this handler may get called without an MSI irq pending, 
+so
+> > > this function really should have a path where it's returning 
+IRQ_NONE.
+> > Ah, yes you are right... though actually there are two interrupts, one 
+has 
+> > some MSI and INTx, the other has the rest of the MSIs.
+> > 
+> This isn't reflected in the DT binding. If you already know that there
+> may be more than a single interrupt for MSI, please push this into the
+> binding by using named interrupts. Even if your driver doesn't support
+> it yet, additional functionality can always be added later, but the DT
+> should be a stable ABI describing your hardware.
+> 
+> So if you already know your hardware has more than one interrupt, please
+> put it in the binding, to avoid churn later on.
+At the moment we support both interrupts but the code implicitly gets the 
+'next' interrupt for MSI. I'll change that so that all the interrupts are 
+specified in the binding.
 
-	#ifdef CONFIG_MMU
-	#ifdef CONFIG_AUTO_ZRELADDR
-		... guess zreladdress based on instruction pointer
-	#else
-		... use zreladdr from Makefile.boot
-	#endif
-	#else
-		... use zreladdr = PAGE_OFFSET
-	#endif
 
-Best regards
-Uwe
+> Regards,
+> Lucas
+> -- 
+> Pengutronix e.K.                           | Lucas Stach |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/ 
+|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 
+|
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 
+|
+> 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Phil
