@@ -1,38 +1,100 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Mar 2014 16:06:00 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140321151617.GA11938@red-moon>
-References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
- <20140320112650.GA1408@red-moon>
- <20140320134357.GE11706@sirena.org.uk>
- <20140320180836.GA3307@red-moon>
- <20140321113202.GJ11706@sirena.org.uk>
- <20140321151617.GA11938@red-moon>
-Message-ID: <20140321160600.GB552@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 17:08:59 +0100
+Subject: [PATCH 26/62] ARM: mvebu: don't select CONFIG_NEON
+In-Reply-To: <532A0D17.9060105@free-electrons.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <20140319193740.GT15608@titan.lakedaemon.net>
+ <532A0D17.9060105@free-electrons.com>
+Message-ID: <201403211708.59462.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 03:16:17PM +0000, Lorenzo Pieralisi wrote:
+On Wednesday 19 March 2014, Gregory CLEMENT wrote:
+> On 19/03/2014 20:37, Jason Cooper wrote:
+> > On Wed, Mar 19, 2014 at 08:29:23PM +0100, Arnd Bergmann wrote:
+> >> CONFIG_NEON is meant to be user-selectable. Turning it on
+> >> unconditionally means we can't build a smaller kernel when
+> >> we don't need it, and causes build errors if CONFIG_VFP
+> >> is not also enabled.
+> >>
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> Cc: Andrew Lunn <andrew@lunn.ch>
+> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> >> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >> ---
+> >>  arch/arm/mach-mvebu/Kconfig | 2 --
+> >>  1 file changed, 2 deletions(-)
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> 
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> I understand that and I apologize, but I will still flag issues up
-> as long as I find some. For instance, I noticed patch is missing
+Thanks! Here is my new version.
 
-Thanks.  I do agree that it's important to find and fix issues, it was
-more about the mechanics of how that gets done.
+	Arnd
 
-> Instead of bothering you with another respin with minor changes I suggest
-> I will pick the last version up, diff what's needed and repost it here for
-> final look so that we are done with it.
+>From 59532706506c0b3bf9f46499e7ba6c0f169e3802 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 24 Feb 2014 21:56:19 +0100
+Subject: [PATCH] ARM: mvebu: don't select CONFIG_NEON
 
-> Please let me know if that's plausible, thank you.
+CONFIG_NEON is meant to be user-selectable. Turning it on
+unconditionally means we can't build a smaller kernel when
+we don't need it, and causes build errors if CONFIG_VFP
+is not also enabled.
 
-I've actually already got a mostly complete respin so I may as well send
-that, just doing a bit of testing though I'll wrap in the of_node_put()s
-as well now you mention that.  Should be out this afternoon.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/23e3ff22/attachment.sig>
+To still have neon enabled however, we need to turn it on
+now in multi_v7_defconfig and mvebu_v7_defconfig.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9ee12b5..cd16989 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -63,6 +63,7 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
+ CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_WM8850=y
+ CONFIG_ARCH_ZYNQ=y
++CONFIG_NEON=y
+ CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index 62b6a37..a34713d 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+ CONFIG_MACH_ARMADA_38X=y
+ CONFIG_MACH_ARMADA_XP=y
++CONFIG_NEON=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
+ CONFIG_PCI=y
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 485513cb..b24a082 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -39,7 +39,6 @@ config MACH_ARMADA_375
+ 	select ARMADA_375_CLK
+ 	select CPU_V7
+ 	select MACH_MVEBU_V7
+-	select NEON
+ 	select PINCTRL_ARMADA_375
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+@@ -53,7 +52,6 @@ config MACH_ARMADA_38X
+ 	select ARMADA_38X_CLK
+ 	select CPU_V7
+ 	select MACH_MVEBU_V7
+-	select NEON
+ 	select PINCTRL_ARMADA_38X
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
