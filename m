@@ -1,82 +1,82 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 21 Mar 2014 12:20:14 +0100
-Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents
- and rates
-In-Reply-To: <532AE239.9000800@samsung.com>
-References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
- <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
-Message-ID: <532C206E.1020907@st.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 21 Mar 2014 12:23:51 +0100
+Subject: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree bindings
+In-Reply-To: <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1395401031.4554.9.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
+> This patch adds the bindings for the rcar PCIE driver. The driver
+> resides under drivers/pci/host/pcie-rcar.c
+> 
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
+I have one question below. If you can answer this with yes after
+thinking again about it, this is:
 
-On 03/20/2014 01:42 PM, Sylwester Nawrocki wrote:
-> Hi Maxime,
->
-> On 06/03/14 14:45, Maxime Coquelin wrote:
->> Hi Sylwester,
->>
->> 	I like the principle of your implementation, but I have two questions:
->> 	1 - How can we manage PM with this solution, as the parent/rate will be
->> set only once at probe time?
->> 	2 - How to set the parent of a parent clock (which can be shared with
->> other devices)? Same question about the parent rates.
->
-> Thanks for your feedback and apologies for late reply.
-No problem! Apologies accepted ;)
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/pci/rcar-pci.txt | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/Documentation/devicetree/bindings/pci/rcar-pci.txt
+> new file mode 100644
+> index 0000000..0e219b0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
+> @@ -0,0 +1,40 @@
+> +* Renesas RCar PCIe interface
+> +
+> +Required properties:
+> +- compatible: should contain one of the following
+> +	"renesas,r8a7779-pcie", "renesas,r8a7790-pcie", "renesas,r8a7791-pcie"
+> +- reg: base addresses and lengths of the pcie controller.
+> +- #address-cells: set to <3>
+> +- #size-cells: set to <2>
+> +- device_type: set to "pci"
+> +- ranges: ranges for the PCI memory and I/O regions
+> +- interrupts: interrupt values for MSI interrupt
+> +- #interrupt-cells: set to <1>
+> +- interrupt-map-mask and interrupt-map: standard PCI properties
+> +	to define the mapping of the PCIe interface to interrupt
+> +	numbers.
+> +- clocks: from common clock binding: handle to pci clock.
+> +- clock-names: from common clock binding: should be "pcie"
 
->
-> IIUC your first concern is about a situation when clocks need to be
-> reconfigured upon each resume from system sleep or runtime PM resume ?
+You really only have one PCIe clock? So the controller is generating the
+PCIe bus clock from it's register clock? No need to enable any other
+clock for PCIe to work?
 
-Yes. This is the case of the STi SoCs.
-When resuming from system sleep, the clocks-related registers are 
-restored at their boot state.
+> +
+> +Example:
+> +
+> +SoC specific DT Entry:
+> +
+> +	pcie: pcie at 0x01000000 {
+> +		compatible = "renesas,r8a7790-pcie";
+> +		reg = <0 0xfe000000 0 0x80000>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+> +		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
+> +			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
+> +			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
+> +			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
+> +		interrupts = <0 116 4>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 0 0 0>;
+> +		interrupt-map = <0 0 0 0 &gic 0 116 4>;
+> +		clocks = <&mstp3_clks R8A7790_CLK_PCIE>;
+> +		clock-names = "pcie";
+> +		status = "disabled";
+> +	};
 
-> As I mentioned in v1 of the RFC I was considering having individual
-> drivers calling explicitly the clocks set up routine. Presumably this
-> would allow to resolve the power management related issue.
- From a functional point of view, that would indeed resolve the PM 
-related issue.
-But I'm not sure that on a performance point of view, parsing the DT at 
-each driver's resume call is an efficient way.
-
-> One example I'm aware the approach as in this RFC wouldn't work is
-> when a device in a SoC belongs to a power domain, which needs to be
-> first switched on before we can start setting up and the clocks'
-> configuration get lost after the power domain switch off.
-Yes, that's another case to handle.
-I don't know which platforms are in that case, but not STi SoCs for your 
-information.
-
->
-> OTOH I suspect devices for which one-time clocks setup is sufficient
-> will be quite common. And for these there would need to be a single
-> call to the setup routine in probe() I guess, since it wouldn't be
-> possible to figure out just from the DT data when the actual call
-> should be made.
->
-> For a global clocks configuration, I thought about specifying that
-> in the clocks controller node, and then to have the setup routine
-> called e.g. from of_clk_init(). I think that could work well enough,
-> together with the patch [1], adding clock dependencies handling.
-> But then the clock frequency set up function would need to be
-> modified to respect the clock parent relationships, similarly as
-> in patch series [2]. A just noticed [2] recently, after posting
-> this RFC (adding Tero at Cc).
-OK, I agree with the approach.
-There is still the PM issue remaining with these clocks, but I think 
-that is not related to your series as we already have the issue currently.
-
-Thanks,
-Maxime
-
->
-> --
-> Regards,
-> Sylwester
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
-> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
->
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
