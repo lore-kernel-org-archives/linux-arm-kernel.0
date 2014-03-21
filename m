@@ -1,53 +1,203 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Mar 2014 01:18:43 +0000
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <532B86A7.5010200@boundarydevices.com>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <201403200005.56334.marex@denx.de> <201403200501.16881.marex@denx.de>
- <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
- <20140320230559.GF7528@n2100.arm.linux.org.uk>
- <532B86A7.5010200@boundarydevices.com>
-Message-ID: <20140321011843.GG7528@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Mar 2014 18:26:40 -0700
+Subject: [PATCH V3 01/12] clk: shmobile: add CPG driver for rz-platforms
+In-Reply-To: <1394208048-32495-2-git-send-email-wsa@the-dreams.de>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <1394208048-32495-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140321012640.21989.58819@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 05:24:07PM -0700, Troy Kisky wrote:
-> My question is, on a non-cacheable, bufferable write, can an entire 64
-> byte line be written ?  Since our descriptors are only 32 bytes is there
-> contention between the cpu queuing  the next packet and the ENET completing
-> the one before ?
-
-Well, 64-byte lines would be covering descriptors 0,1 2,3 4,5 ... 12,13
-14,15 etc.
-
-However, it wouldn't really make sense because the store buffers in the
-L310 are 32-bytes in size, and there's three of them.  Given that with
-my patch the descriptor updates go through two draining of that buffer
-per update - once after the address, length and other parameters are
-written, then again after the status bits have been written, I think
-it's unlikely that what you're suggesting could be a possibility,
-unless there's some bug we don't know about.
-
-Remember, DMA memory is "normal, non-cacheable" so there shouldn't be
-any cache effects going on here - only store buffer effects which may
-delay, merge and/or reorder writes, and that's why we have barriers.
-
-> 13 SH 0x1c00 0x00000000   66   (null)
-> 14    0x9c00 0xce504000   66 de5b90c0
+Quoting Wolfram Sang (2014-03-07 08:00:37)
+> From: Wolfram Sang <wsa@sang-engineering.com>
 > 
-> Note that the problematic descriptor(14) is even. That would fit with
-> the above. In your testing, is it always even?
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> ---
+> 
+> Changes since V2:
+> 
+> * Document the input clocks for r7s72100
+> * revamp and simplify the error paths of the driver
+> 
+> Changes since V1:
+> * added docs
+> * preparation for usb_x1 support by documenting two input clocks
+> * static-consted frqcr_tab
+> * bail out if num_clks == 0
+> * cosmetic fixes
+> 
+> Mike: if you are fine with this driver, it would be good if you could apply it.
+> Then, we can deal with the orthogonal dependencies in mach-shmobile seperately
+> and know that the driver is already in place when the rest gets resolved.
+> Thanks!
 
-Since running with my patch on aan iMX6Q, I haven't seen any timeouts,
-and I've run many iperf sessions in both directions (even multiple
-machines hammering the poor iMX6Q, running iperf and/or flood pings
-with various packet sizes.)
+Taken into clk-next.
 
-What may be useful to know is which iMX device these are still happening
-on, with my patch applied.  I have both iMX6Q and iMX6S, the 6Q has been
-the focus of my hammering so far...
+Regards,
+Mike
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+>  .../bindings/clock/renesas,rz-cpg-clocks.txt       |  29 ++++++
+>  drivers/clk/shmobile/Makefile                      |   1 +
+>  drivers/clk/shmobile/clk-rz.c                      | 103 +++++++++++++++++++++
+>  3 files changed, 133 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+>  create mode 100644 drivers/clk/shmobile/clk-rz.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+> new file mode 100644
+> index 000000000000..98a257492522
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+> @@ -0,0 +1,29 @@
+> +* Renesas RZ Clock Pulse Generator (CPG)
+> +
+> +The CPG generates core clocks for the RZ SoCs. It includes the PLL, variable
+> +CPU and GPU clocks, and several fixed ratio dividers.
+> +
+> +Required Properties:
+> +
+> +  - compatible: Must be one of
+> +    - "renesas,r7s72100-cpg-clocks" for the r7s72100 CPG
+> +    - "renesas,rz-cpg-clocks" for the generic RZ CPG
+> +  - reg: Base address and length of the memory resource used by the CPG
+> +  - clocks: References to possible parent clocks. Order must match clock modes
+> +    in the datasheet. For the r7s72100, this is extal, usb_x1.
+> +  - #clock-cells: Must be 1
+> +  - clock-output-names: The names of the clocks. Supported clocks are "pll",
+> +    "i", and "g"
+> +
+> +
+> +Example
+> +-------
+> +
+> +       cpg_clocks: cpg_clocks at fcfe0000 {
+> +               #clock-cells = <1>;
+> +               compatible = "renesas,r7s72100-cpg-clocks",
+> +                            "renesas,rz-cpg-clocks";
+> +               reg = <0xfcfe0000 0x18>;
+> +               clocks = <&extal_clk>, <&usb_x1_clk>;
+> +               clock-output-names = "pll", "i", "g";
+> +       };
+> diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+> index 9ecef140dba7..5404cb931ebf 100644
+> --- a/drivers/clk/shmobile/Makefile
+> +++ b/drivers/clk/shmobile/Makefile
+> @@ -1,4 +1,5 @@
+>  obj-$(CONFIG_ARCH_EMEV2)               += clk-emev2.o
+> +obj-$(CONFIG_ARCH_R7S72100)            += clk-rz.o
+>  obj-$(CONFIG_ARCH_R8A7790)             += clk-rcar-gen2.o
+>  obj-$(CONFIG_ARCH_R8A7791)             += clk-rcar-gen2.o
+>  obj-$(CONFIG_ARCH_SHMOBILE_MULTI)      += clk-div6.o
+> diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
+> new file mode 100644
+> index 000000000000..7e68e8630962
+> --- /dev/null
+> +++ b/drivers/clk/shmobile/clk-rz.c
+> @@ -0,0 +1,103 @@
+> +/*
+> + * rz Core CPG Clocks
+> + *
+> + * Copyright (C) 2013 Ideas On Board SPRL
+> + * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +struct rz_cpg {
+> +       struct clk_onecell_data data;
+> +       void __iomem *reg;
+> +};
+> +
+> +#define CPG_FRQCR      0x10
+> +#define CPG_FRQCR2     0x14
+> +
+> +/* -----------------------------------------------------------------------------
+> + * Initialization
+> + */
+> +
+> +static struct clk * __init
+> +rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const char *name)
+> +{
+> +       u32 val;
+> +       unsigned mult;
+> +       static const unsigned frqcr_tab[4] = { 3, 2, 0, 1 };
+> +
+> +       if (strcmp(name, "pll") == 0) {
+> +               /* FIXME: cpg_mode should be read from GPIO. But no GPIO support yet */
+> +               unsigned cpg_mode = 0; /* hardcoded to EXTAL for now */
+> +               const char *parent_name = of_clk_get_parent_name(np, cpg_mode);
+> +
+> +               mult = cpg_mode ? (32 / 4) : 30;
+> +
+> +               return clk_register_fixed_factor(NULL, name, parent_name, 0, mult, 1);
+> +       }
+> +
+> +       /* If mapping regs failed, skip non-pll clocks. System will boot anyhow */
+> +       if (!cpg->reg)
+> +               return ERR_PTR(-ENXIO);
+> +
+> +       /* FIXME:"i" and "g" are variable clocks with non-integer dividers (e.g. 2/3)
+> +        * and the constraint that always g <= i. To get the rz platform started,
+> +        * let them run at fixed current speed and implement the details later.
+> +        */
+> +       if (strcmp(name, "i") == 0)
+> +               val = (clk_readl(cpg->reg + CPG_FRQCR) >> 8) & 3;
+> +       else if (strcmp(name, "g") == 0)
+> +               val = clk_readl(cpg->reg + CPG_FRQCR2) & 3;
+> +       else
+> +               return ERR_PTR(-EINVAL);
+> +
+> +       mult = frqcr_tab[val];
+> +       return clk_register_fixed_factor(NULL, name, "pll", 0, mult, 3);
+> +}
+> +
+> +static void __init rz_cpg_clocks_init(struct device_node *np)
+> +{
+> +       struct rz_cpg *cpg;
+> +       struct clk **clks;
+> +       unsigned i;
+> +       int num_clks;
+> +
+> +       num_clks = of_property_count_strings(np, "clock-output-names");
+> +       if (WARN(num_clks <= 0, "can't count CPG clocks\n"))
+> +               return;
+> +
+> +       cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
+> +       clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
+> +       BUG_ON(!cpg || !clks);
+> +
+> +       cpg->data.clks = clks;
+> +       cpg->data.clk_num = num_clks;
+> +
+> +       cpg->reg = of_iomap(np, 0);
+> +
+> +       for (i = 0; i < num_clks; ++i) {
+> +               const char *name;
+> +               struct clk *clk;
+> +
+> +               of_property_read_string_index(np, "clock-output-names", i, &name);
+> +
+> +               clk = rz_cpg_register_clock(np, cpg, name);
+> +               if (IS_ERR(clk))
+> +                       pr_err("%s: failed to register %s %s clock (%ld)\n",
+> +                              __func__, np->name, name, PTR_ERR(clk));
+> +               else
+> +                       cpg->data.clks[i] = clk;
+> +       }
+> +
+> +       of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
+> +}
+> +CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
+> -- 
+> 1.9.0
+> 
