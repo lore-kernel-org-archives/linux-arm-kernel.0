@@ -1,69 +1,107 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Mar 2014 23:08:22 +0100
-Subject: [PATCH v2 4/5] ARM: berlin/dt: add cpupll and syspll support to
- BG2CD
-In-Reply-To: <532CB09E.5000408@gmail.com>
+Date: Fri, 21 Mar 2014 23:20:22 +0100
+Subject: [PATCH v2 2/5] clk: berlin: add berlin clocks DT bindings
+ documentation
+In-Reply-To: <532CAF9D.3020303@gmail.com>
 References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395432521-11055-5-git-send-email-alexandre.belloni@free-electrons.com>
- <532CB09E.5000408@gmail.com>
-Message-ID: <20140321220821.GI6443@piout.net>
+ <1395432521-11055-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <532CAF9D.3020303@gmail.com>
+Message-ID: <20140321222022.GJ6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2014 at 22:35:26 +0100, Sebastian Hesselbarth wrote :
+On 21/03/2014 at 22:31:09 +0100, Sebastian Hesselbarth wrote :
 > On 03/21/2014 09:08 PM, Alexandre Belloni wrote:
-> >The Berlin BG2CD has two supported PLLs: CPU PLL and System PLL, add those to
-> >the SoC device tree.
+> >Document the device tree bindings for the PLLs found on the Marvell Berlin SoCs.
 > >
-> >This also moves the remaining clocks from the clocks container node to the root.
-> >
+> >Cc: devicetree at vger.kernel.org
+> 
+> You forgot to add Mark Rutland's Reviewed-by. He didn't mentioned it
+> explicitly but his "Otherwise this looks fine to me" on v1, is as good
+> as a Reviewed-by. But, no need to resend, I'll fix it up.
+> 
+
+Ok, I would have preferred an explicit one ;)
+
+> Also, everything above the '---' will be part of your commit log. While
+> the Signed-off-by and Reviewed-by should be in there, Cc's really don't
+> need to.
+> 
+
+Ok, it seemed common practice to put it in the commit log:
+
+$ git log | grep "    Cc:" | wc -l
+157126
+
+But I'll do as you suggest from now. Actually, I didn't know you could
+do like that.
+
+> You can add another '---' to separate commit message and some stuff
+> you want to have early in you email with:
+> 
+> Blablabla commit message.
+> 
+> Signed-off-by: ...
+> Reviewed-by: ...
+> ---
+> Changelog:
+> - blabla
+> 
+> Cc: cc-me-recipient
+> ...
+> ---
+>    .../devicetree/bindings/clock/berlin-clock.txt     | 29
+> ++++++++++++++++++++++
+>    1 file changed, 29 insertions(+)
+>    create mode 100644
+> Documentation/devicetree/bindings/clock/berlin-clock.txt
+> 
+>  diff --git
+> a/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> ...
+> 
 > >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > >---
-> >  arch/arm/boot/dts/berlin2cd.dtsi | 48 ++++++++++++++++++++++++++--------------
-> >  1 file changed, 31 insertions(+), 17 deletions(-)
+> >  .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
+> >  1 file changed, 29 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
 > >
-> >diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-> >index 094968c27533..bd4e9dd4867e 100644
-> >--- a/arch/arm/boot/dts/berlin2cd.dtsi
-> >+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-> >@@ -30,24 +30,24 @@
-> [...]
-> >@@ -76,7 +76,21 @@
-> >  			compatible = "arm,cortex-a9-twd-timer";
-> >  			reg = <0xad0600 0x20>;
-> >  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> >-			clocks = <&sysclk>;
-> >+			clocks = <&twdclk>;
-> >+		};
+> >diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> >new file mode 100644
+> >index 000000000000..49b7860bffb8
+> >--- /dev/null
+> >+++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> >@@ -0,0 +1,29 @@
+> >+Device Tree Clock bindings for Marvell Berlin clocks
 > >+
-> >+		syspll: syspll at ea0014 {
-> >+			compatible = "marvell,berlin2-pll";
-> >+			clocks = <&smclk>;
-> >+			#clock-cells = <0>;
-> >+			reg = <0xf7ea0014 8>;
-> 
-> nit: I prefer hex numbers all over for reg properties. berlin2q already
-> has them, and I'll fixup this and the one below myself.
-> 
-
-Indeed, I did fix that for bg2q and documentation and forgot bg2 and
-bg2cd.
-
-> >+		};
+> >+This binding uses the common clock binding[1].
 > >+
-> >+		cpupll: cpupll at ea003c {
-> >+			compatible = "marvell,berlin2-pll";
-> >+			clocks = <&smclk>;
-> >+			#clock-cells = <0>;
-> >+			reg = <0xf7ea003c 8>;
-> 
-> ditto.
-> 
-> Sebastian
-> 
-> >  		};
-> >
-> >  		apb at e80000 {
+> >+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >+
+> >+Required properties:
+> >+- compatible: shall be one of the following:
+> >+	"marvell,berlin2-pll",
+> >+	"marvell,berlin2q-pll":
+> >+		CPU PLL and System PLL
+> >+- reg: Address and length of the clock register set.
+> >+- #clock-cells: from common clock binding; shall be set to 0.
+> >+- clocks: from common clock binding
+> >+
+> >+smclk: sysmgr-clock {
+> >+	compatible = "fixed-clock";
+> >+	#clock-cells = <0>;
+> >+	clock-frequency = <25000000>;
+> >+};
+> >+
+> >+cpupll: cpupll at ea003c {
+> >+	compatible = "marvell,berlin2-pll";
+> >+	clocks = <&smclk>;
+> >+	#clock-cells = <0>;
+> >+	reg = <0xea003c 0x8>;
+> >+};
+> >+
+> >+
 > >
 > 
 
