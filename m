@@ -1,45 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 21 Mar 2014 19:31:02 +0100
-Subject: [PATCH 1/3 V4] crypto: Fix the pointer voodoo in unaligned ahash
-In-Reply-To: <20140321144007.GA25820@gondor.apana.org.au>
-References: <1394761026-7292-1-git-send-email-marex@denx.de>
- <20140321144007.GA25820@gondor.apana.org.au>
-Message-ID: <201403211931.02812.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 19:40:03 +0100
+Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
+In-Reply-To: <CAL_JsqKRW-T_5mAo-h7BHAwA7jBN8FfO6WpkJ9Uk_vpByYLHXA@mail.gmail.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <6006528.k1jnepzDNv@wuerfel>
+ <CAL_JsqKRW-T_5mAo-h7BHAwA7jBN8FfO6WpkJ9Uk_vpByYLHXA@mail.gmail.com>
+Message-ID: <4211929.spA11BNxmP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 21, 2014 at 03:40:07 PM, Herbert Xu wrote:
-> On Fri, Mar 14, 2014 at 02:37:04AM +0100, Marek Vasut wrote:
-> > Add documentation for the pointer voodoo that is happening in
-> > crypto/ahash.c in ahash_op_unaligned(). This code is quite confusing, so
-> > add a beefy chunk of documentation.
-> > 
-> > Moreover, make sure the mangled request is completely restored after
-> > finishing this unaligned operation. This means restoring all of .result,
-> > .base.data and .base.complete .
-> > 
-> > Also, remove the crypto_completion_t complete = ... line present in the
-> > ahash_op_unaligned_done() function. This type actually declares a
-> > function pointer, which is very confusing.
-> > 
-> > Finally, yet very important nonetheless, make sure the req->priv is
-> > free()'d only after the original request is restored in
-> > ahash_op_unaligned_done(). The req->priv data must not be free()'d
-> > before that in ahash_op_unaligned_finish(), since we would be accessing
-> > previously free()'d data in ahash_op_unaligned_done() and cause
-> > corruption.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Tom Lendacky <thomas.lendacky@amd.com>
+On Friday 21 March 2014 13:21:04 Rob Herring wrote:
+> > diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+> > index 7b141d8..3f9b889 100644
+> > --- a/arch/arm/mach-sunxi/platsmp.c
+> > +++ b/arch/arm/mach-sunxi/platsmp.c
+> > @@ -82,7 +82,7 @@ static int sun6i_smp_boot_secondary(unsigned int cpu,
+> >         spin_lock(&cpu_lock);
+> >
+> >         /* Set CPU boot address */
+> > -       writel(virt_to_phys(sun6i_secondary_startup),
+> > +       writel(virt_to_phys(secondary_startup),
+> >                cpucfg_membase + CPUCFG_PRIVATE0_REG);
+> >
+> >         /* Assert the CPU core in reset */
+> > @@ -120,5 +120,5 @@ static int sun6i_smp_boot_secondary(unsigned int cpu,
+> >
+> >  struct smp_operations sun6i_smp_ops __initdata = {
+> >         .smp_prepare_cpus       = sun6i_smp_prepare_cpus,
+> > -       .smp_boot_secondary     = sun6i_smp_boot_secondary,
+> > +       .smp_boot_secondary     = sun6i_smp_secondary_startup,
 > 
-> All applied.  Thanks Marek!
+> ?? This looks unintentional.
+> 
 
-Thank you for kicking me in the right direction all the time and thanks for your 
-patience with me !
+Yes, I just noticed the same thing after testing the resulting tree.
 
-Best regards,
-Marek Vasut
+I also had to add a global declaration for secondary_startup, which apparently
+mach-qcom also needs but added locally.
+
+	Arnd
