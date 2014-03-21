@@ -1,67 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 17:01:36 +0100
-Subject: [PATCH 23/62] ARM: omap1: fix building without 32K_TIMER
-In-Reply-To: <20140319203431.GA8333@atomide.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <20140319200100.GB4271@saruman.home> <20140319203431.GA8333@atomide.com>
-Message-ID: <201403211701.36846.arnd@arndb.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 17:01:47 +0100
+Subject: [PATCH 1/5] clk: berlin: add support for berlin plls
+In-Reply-To: <532C62E8.2070803@gmail.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <532C355C.3090606@gmail.com> <20140321154539.GD6443@piout.net>
+ <532C62E8.2070803@gmail.com>
+Message-ID: <20140321160147.GH6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140319 13:06]:
-> > On Wed, Mar 19, 2014 at 02:59:13PM -0500, Felipe Balbi wrote:
-> > > I had sent a fix for months and months ago, what happened to it ?
-> > 
-> > Here
-> > 
-> > http://marc.info/?l=linux-omap&m=138963632408031&w=2
-> > 
-> > Tony, did you forget to send a pull request ?
+On 21/03/2014 at 17:03:52 +0100, Sebastian Hesselbarth wrote :
+> On 03/21/2014 04:45 PM, Alexandre Belloni wrote:
+> >[all commentis I agree on are snipped]
 > 
-> Hmm yes weird, can't see it in my omap-for-v3.14/fixes branch.
+> :)
 > 
-> I must have gotten interrupted while applying and then probably
-> ran git reset --hard before committing.
+> >On 21/03/2014 at 13:49:32 +0100, Sebastian Hesselbarth wrote :
+> >>On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
+> >>obj-y += pll.o
+> >>obj-$(CONFIG_MACH_BERLIN_BG2)	+= pll-berlin2.o
+> >>obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= pll-berlin2.o
+> >>obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= pll-berlin2q.o
+> >>
+> >>Which reminds me, that we forgot to add MACH_BERLIN_BG2Q to
+> >>arch/arm/mach-berlin/Kconfig. Can you spin a patch?
+> >>
+> >
+> >I will do that.
+> >
+> >>>+static const u8 vcodiv_berlin2[] = {10, 15, 20, 25, 30, 40, 50, 60, 80};
+> >>>+
+> >>>+static struct berlin_pllmap berlin_pll_map = {
+> >>>+	.vcodiv = vcodiv_berlin2,
+> >>>+	.fbdiv_mask = 0x1FF,
+> >>>+	.rfdiv_mask = 0x1F,
+> >>>+	.divsel_mask = 0xF,
+> >>
+> >>divsel_mask allows 16 possible values, vcodiv_berlin2[] only provides
+> >>9, and common pll driver below does not know how many valid vcodiv
+> >>values are passed. That can become dangerous..
+> >>
+> >>I'd rather extend vcodiv_berlin2 to full divsel range and provide
+> >>safe (=1) divisiors. This way wrong/new register values will only
+> >>break clock frequency derived.
+> >>
+> >
+> >Good catch ! Then, what about simply shrinking the mask so that we don't
+> >overflow the table. We'll put it back to its supposed real value whant
+> >we know what are the remaining divisors (my guess is that they are already
+> >all listed here). I would say that we are getting the divisor wrong if
+> >divsel > 8 anyway.
 > 
-> Arnd, maybe pick up Felipe's earlier patch instead?
+> Hmm, maybe I should look up valid vcodiv myself, but your vcodiv_berlin2
+> has 9 values and I guess they are all valid, aren't they?
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> The next possible, larger mask where 0-8 fits in, is 0xf. You used that
+> above and that reveals 16 possible indices.
+> 
+> The only option for shrinking the table that I see, would be min/max
+> allowed indices, but that is as useful as having a slightly larger
+> table.
+> 
 
-Ok, using this version now, thanks!
+You are absolutely right :) I definitely need to take a break, right now !
 
-	Arnd
+> >>>+	.fbdiv_shift = 6,
+> >>>+	.rfdiv_shift = 1,
+> >>>+	.divsel_shift = 7,
+> >>
+> >>Have .foo_mask and .foo_shift together?
+> >>
+> >
+> >This will make the struct larger but I don't really have an opinion.
+> 
+> Maybe, I wasn't clear enough. Just assign .foo_mask and .foo_shift in
+> subsequent lines of code, i.e.
+> 
+> static struct berlin_pllmap berlin_pll_map = {
+> 	.vcodiv = vcodiv_berlin2,
+> 	.fbdiv_mask = 0x1FF,
+> 	.fbdiv_shift = 6,
+> 	.rfdiv_mask = 0x1F,
+> 	.rfdiv_shift = 1,
+> 	.divsel_mask = 0xF,
+> 	.divsel_shift = 7,
+> };
+> 
 
->From 64cdcf550319a37d1419aa6a87903e67b9d3d031 Mon Sep 17 00:00:00 2001
-From: Felipe Balbi <balbi@ti.com>
-Date: Sun, 16 Mar 2014 17:57:55 +0100
-Subject: [PATCH] ARM: omap1: fix build when !CONFIG_OMAP_32K_TIMER
+yeah, I figured that out a few minutes ago...
 
-If CONFIG_OMAP_32K_TIMER isn't enabled, we will
-try to use enable_dyn_sleep which wasn't defined
-anywhere.
+Thanks again for your reviews and patience !
 
-In order to fix the problem, we always define
-enable_dyn_sleep as 0 when !CONFIG_OMAP_32K_TIMER.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-index 40a1ae3..dbee729 100644
---- a/arch/arm/mach-omap1/pm.c
-+++ b/arch/arm/mach-omap1/pm.c
-@@ -71,7 +71,11 @@ static unsigned int mpui7xx_sleep_save[MPUI7XX_SLEEP_SAVE_SIZE];
- static unsigned int mpui1510_sleep_save[MPUI1510_SLEEP_SAVE_SIZE];
- static unsigned int mpui1610_sleep_save[MPUI1610_SLEEP_SAVE_SIZE];
- 
--#ifdef CONFIG_OMAP_32K_TIMER
-+#ifndef CONFIG_OMAP_32K_TIMER
-+
-+static unsigned short enable_dyn_sleep = 0;
-+
-+#else
- 
- static unsigned short enable_dyn_sleep = 1;
- 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
