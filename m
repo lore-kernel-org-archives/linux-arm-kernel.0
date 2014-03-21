@@ -1,46 +1,57 @@
 From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 21 Mar 2014 10:32:39 +0000
-Subject: [PATCH v4 0/9] R-Car Gen2 PCIe host driver
-Message-ID: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+Date: Fri, 21 Mar 2014 10:32:42 +0000
+Subject: [PATCH v4 3/9] ARM: shmobile: r8a7790: Add PCIe clock device tree
+ nodes
+In-Reply-To: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1395397968-6242-4-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 4 of a PCIe Host driver for the R-Car Gen2 devices,
-i.e. R-Car H2 (r8a7790) and R-Car M2 (r8a7791). This version includes
-DT support, and includes a patch to add MSI.
+This patch adds the device tree clock nodes for PCIe
 
-v4:
- - Patch 0001 changed to correct use of runtime PM
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+---
+ arch/arm/boot/dts/r8a7790.dtsi            | 7 ++++---
+ include/dt-bindings/clock/r8a7790-clock.h | 1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-Thanks
-Phil
-
-Phil Edworthy (9):
-  PCI: host: rcar: Add Renesas R-Car PCIe driver
-  PCI: host: rcar: Add MSI support
-  ARM: shmobile: r8a7790: Add PCIe clock device tree nodes
-  ARM: shmobile: r8a7791: Add PCIe clock device tree nodes
-  dt-bindings: pci: rcar pcie device tree bindings
-  ARM: shmobile: Add PCIe device tree nodes for R8A7790
-  ARM: shmobile: Add PCIe device tree nodes for R8A7791 Koelsch board
-  ARM: koelsch: Add PCIe to defconfig
-  ARM: koelsch: Add HAVE_ARM_ARCH_TIMER to defconfig
-
- Documentation/devicetree/bindings/pci/rcar-pci.txt |  40 +
- arch/arm/boot/dts/r8a7790.dtsi                     |  26 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts              |   4 +
- arch/arm/boot/dts/r8a7791.dtsi                     |  26 +-
- arch/arm/configs/koelsch_defconfig                 |   4 +
- drivers/pci/host/Kconfig                           |   6 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pcie-rcar.c                       | 831 +++++++++++++++++++++
- drivers/pci/host/pcie-rcar.h                       |  87 +++
- include/dt-bindings/clock/r8a7790-clock.h          |   1 +
- include/dt-bindings/clock/r8a7791-clock.h          |   1 +
- 11 files changed, 1022 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
- create mode 100644 drivers/pci/host/pcie-rcar.c
- create mode 100644 drivers/pci/host/pcie-rcar.h
-
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index da69afc..df9ec61 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -704,16 +704,17 @@
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+ 			clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
+ 				 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>,
+-				 <&mmc0_clk>, <&rclk_clk>;
++				 <&mmc0_clk>, <&rclk_clk>, <&mp_clk>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+ 				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+-				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1
++				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1 R8A7790_CLK_PCIE
+ 			>;
+ 			clock-output-names =
+ 				"tpu0", "mmcif1", "sdhi3", "sdhi2",
+-				"sdhi1", "sdhi0", "mmcif0", "cmt1";
++				"sdhi1", "sdhi0", "mmcif0", "cmt1",
++				"pcie";
+ 		};
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index 6548a5f..840dbc8 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -57,6 +57,7 @@
+ #define R8A7790_CLK_SDHI1		13
+ #define R8A7790_CLK_SDHI0		14
+ #define R8A7790_CLK_MMCIF0		15
++#define R8A7790_CLK_PCIE		19
+ #define R8A7790_CLK_SSUSB		28
+ #define R8A7790_CLK_CMT1		29
+ #define R8A7790_CLK_USBDMAC0		30
 -- 
 1.9.0
