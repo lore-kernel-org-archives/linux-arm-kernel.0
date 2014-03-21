@@ -1,102 +1,95 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Fri, 21 Mar 2014 14:18:38 +0000
-Subject: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree bindings
-In-Reply-To: <1395401031.4554.9.camel@weser.hi.pengutronix.de>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>	
- <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
- <1395401031.4554.9.camel@weser.hi.pengutronix.de>
-Message-ID: <OF03C9E23D.07B7D998-ON80257CA2.004E5877-80257CA2.004E9BFB@eu.necel.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 21 Mar 2014 15:26:53 +0100
+Subject: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
+In-Reply-To: <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <1395397968-6242-3-git-send-email-phil.edworthy@renesas.com>
+ <1395400638.4554.5.camel@weser.hi.pengutronix.de>
+ <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
+Message-ID: <1395412013.4554.13.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
-
-On 21/03/2014 11:24, Lucas wrote:
-> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
-bindings
+Am Freitag, den 21.03.2014, 14:15 +0000 schrieb
+Phil.Edworthy at renesas.com:
+> Hi Lucas,
 > 
-> Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
-> > This patch adds the bindings for the rcar PCIE driver. The driver
-> > resides under drivers/pci/host/pcie-rcar.c
+> Thanks for the review.
+> 
+> On 21/03/2014 11:18, Lucas wrote:
+> > Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
 > > 
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
+> > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > > ---
+> > >  drivers/pci/host/pcie-rcar.c | 232 
+> ++++++++++++++++++++++++++++++++++++++++++-
+> > >  drivers/pci/host/pcie-rcar.h |   5 +
+> > >  2 files changed, 236 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/pci/host/pcie-rcar.c 
+> b/drivers/pci/host/pcie-rcar.c
+> > > index 16670e5..cbbcd77 100644
+> > > --- a/drivers/pci/host/pcie-rcar.c
+> > > +++ b/drivers/pci/host/pcie-rcar.c
+> > [...]
+> > > +
+> > > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+> > > +{
+> > > +   struct rcar_pcie *pcie = data;
+> > > +   struct rcar_msi *msi = &pcie->msi;
+> > > +   unsigned long reg;
+> > > +
+> > > +   reg = pci_read_reg(pcie, PCIEMSIFR);
+> > > +
+> > > +   while (reg) {
+> > > +      unsigned int index = find_first_bit(&reg, 32);
+> > > +      unsigned int irq;
+> > > +
+> > > +      /* clear the interrupt */
+> > > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
+> > > +
+> > > +      irq = irq_find_mapping(msi->domain, index);
+> > > +      if (irq) {
+> > > +         if (test_bit(index, msi->used))
+> > > +            generic_handle_irq(irq);
+> > > +         else
+> > > +            dev_info(pcie->dev, "unhandled MSI\n");
+> > > +      } else {
+> > > +         /*
+> > > +          * that's weird who triggered this?
+> > > +          * just clear it
+> > > +          */
+> > > +         dev_info(pcie->dev, "unexpected MSI\n");
+> > > +      }
+> > > +
+> > > +      /* see if there's any more pending in this vector */
+> > > +      reg = pci_read_reg(pcie, PCIEMSIFR);
+> > > +   }
+> > > +
+> > > +   return IRQ_HANDLED;
+> > > +}
+> > > +
+> > From your DT binding it seems you have only one interrupt from the PCIe
+> > core, shared between the MSI irqs and the PCI legacy interrupts.
+> > This means this handler may get called without an MSI irq pending, so
+> > this function really should have a path where it's returning IRQ_NONE.
+> Ah, yes you are right... though actually there are two interrupts, one has 
+> some MSI and INTx, the other has the rest of the MSIs.
 > 
-> I have one question below. If you can answer this with yes after
-> thinking again about it, this is:
-> 
-> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  Documentation/devicetree/bindings/pci/rcar-pci.txt | 40 
-++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/
-> Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > new file mode 100644
-> > index 0000000..0e219b0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > @@ -0,0 +1,40 @@
-> > +* Renesas RCar PCIe interface
-> > +
-> > +Required properties:
-> > +- compatible: should contain one of the following
-> > +   "renesas,r8a7779-pcie", "renesas,r8a7790-pcie", 
-"renesas,r8a7791-pcie"
-> > +- reg: base addresses and lengths of the pcie controller.
-> > +- #address-cells: set to <3>
-> > +- #size-cells: set to <2>
-> > +- device_type: set to "pci"
-> > +- ranges: ranges for the PCI memory and I/O regions
-> > +- interrupts: interrupt values for MSI interrupt
-> > +- #interrupt-cells: set to <1>
-> > +- interrupt-map-mask and interrupt-map: standard PCI properties
-> > +   to define the mapping of the PCIe interface to interrupt
-> > +   numbers.
-> > +- clocks: from common clock binding: handle to pci clock.
-> > +- clock-names: from common clock binding: should be "pcie"
-> 
-> You really only have one PCIe clock? So the controller is generating the
-> PCIe bus clock from it's register clock? No need to enable any other
-> clock for PCIe to work?
-Yes, just the one clock. The PCIe bus clock is an external clock dedicated 
-to PCIe and SATA, and we have no control over it.
+This isn't reflected in the DT binding. If you already know that there
+may be more than a single interrupt for MSI, please push this into the
+binding by using named interrupts. Even if your driver doesn't support
+it yet, additional functionality can always be added later, but the DT
+should be a stable ABI describing your hardware.
 
+So if you already know your hardware has more than one interrupt, please
+put it in the binding, to avoid churn later on.
 
-> > +
-> > +Example:
-> > +
-> > +SoC specific DT Entry:
-> > +
-> > +   pcie: pcie at 0x01000000 {
-> > +      compatible = "renesas,r8a7790-pcie";
-> > +      reg = <0 0xfe000000 0 0x80000>;
-> > +      #address-cells = <3>;
-> > +      #size-cells = <2>;
-> > +      device_type = "pci";
-> > +      ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-> > +           0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-> > +           0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-> > +           0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-> > +      interrupts = <0 116 4>;
-> > +      #interrupt-cells = <1>;
-> > +      interrupt-map-mask = <0 0 0 0>;
-> > +      interrupt-map = <0 0 0 0 &gic 0 116 4>;
-> > +      clocks = <&mstp3_clks R8A7790_CLK_PCIE>;
-> > +      clock-names = "pcie";
-> > +      status = "disabled";
-> > +   };
-> 
-> -- 
-> Pengutronix e.K.                           | Lucas Stach |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/ 
-|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 
-|
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 
-|
-> 
-
-Thanks
-Phil
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
