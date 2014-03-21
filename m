@@ -1,63 +1,45 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Fri, 21 Mar 2014 14:53:48 +0000
-Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <532C5ADE.4030708@cogentembedded.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
- <532C5ADE.4030708@cogentembedded.com>
-Message-ID: <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 15:54:03 +0100
+Subject: [PATCH 3/5] ARM: berlin/dt: add cpupll and syspll support to BG2Q
+In-Reply-To: <532C30AB.5020108@gmail.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <532C2C71.4010703@gmail.com> <20140321121741.GB6443@piout.net>
+ <532C30AB.5020108@gmail.com>
+Message-ID: <20140321145403.GC6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On: 21/03/2014 14:30, Sergei wrote:
-> Subject: Re: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes 
-for R8A7790
+On 21/03/2014 at 13:29:31 +0100, Sebastian Hesselbarth wrote :
+> >>Hmm, you probably know better than me, but if cpuclk == cpupll
+> >>is always true we don't need another clk layer here. If you
+> >>can scale down cpuclk from cpupll and we just have no driver
+> >>for it, I am fine with it.
+> >>
+> >
+> >You can actually switch CPU clk from CPU pll to smclk. I'm not sure this
+> >is completely useful yet though, probably for suspend ?
 > 
-> Hello.
+> Then it should be clk mux instead?
 > 
-> On 03/21/2014 01:32 PM, Phil Edworthy wrote:
+> >Also, while I'm not sure this is a good reason, other clocks are derived
+> >from CPU pll and have another divider.
 > 
-> > This patch adds the device tree nodes for R8A7790
+> I have no strong opinion, but a fixed-factor-clock with 1:1 just to
+> rename cpupll to cpuclk seems a bit wasty ;)
 > 
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > ---
-> >   arch/arm/boot/dts/r8a7790.dtsi | 19 +++++++++++++++++++
-> >   1 file changed, 19 insertions(+)
+> If there is a mux, we should add it now - no matter if we are ever
+> going to make any use of it. For the derived clocks we should be
+> careful if they actually depend on cpuclk or always cpupll.
 > 
-> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi 
-b/arch/arm/boot/dts/r8a7790.dtsi
-> > index df9ec61..e7d498a 100644
-> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> > @@ -821,4 +821,23 @@
-> >         #size-cells = <0>;
-> >         status = "disabled";
-> >      };
-> > +
-> > +   pcie: pcie at fe000000 {
-> > +      compatible = "renesas,r8a7790-pcie";
-> 
->     The convention adopted on this list is to put the "pcie" first, and 
-SoC 
-> name the last.
-Ok, shame that all the other PCI hosts use vendor,device-pcie
-
-
-> > +      reg = <0 0xfe000000 0 0x80000>;
-> > +      #address-cells = <3>;
-> > +      #size-cells = <2>;
-> > +      device_type = "pci";
-> 
->     This legacy property is only meaningful for the true OF firmware and 
-thus 
-> have been phased out (it's only actively used for the memory nodes).
-Ok, thanks for pointing this out.
-
-> WBR, Sergei
+> If your (current) knowledge of the berlin clock trees is almost as
+> bad as mine, we can also ignore cpuclk mux if you prefer.
 > 
 
-Thanks
-Phil
+Yeah, fact is I know there is a mux but I don't know yet how to get/set
+its state so I will ignore it until we have more info.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
