@@ -1,53 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Mar 2014 17:27:58 +0000
-Subject: [PATCH 1/4] arm64: topology: Initialise default topology state
- immediately
-Message-ID: <1395422881-10029-1-git-send-email-broonie@kernel.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Mar 2014 17:32:53 +0000
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <CANBf9eNZB+BVBDkgWNxxGs-ndQ-mYCc6+bfVdS-8T-QLpSZ3GA@mail.gmail.com>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <201403200005.56334.marex@denx.de> <201403200501.16881.marex@denx.de>
+ <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+ <20140320230559.GF7528@n2100.arm.linux.org.uk>
+ <532B86A7.5010200@boundarydevices.com>
+ <20140321011843.GG7528@n2100.arm.linux.org.uk>
+ <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
+ <CAOMZO5CxjCHLrY0KTe4j=NiSU3CQVNZWhEAs33Le8ji3NAFETQ@mail.gmail.com>
+ <CANBf9eNZB+BVBDkgWNxxGs-ndQ-mYCc6+bfVdS-8T-QLpSZ3GA@mail.gmail.com>
+Message-ID: <20140321173252.GL7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Fri, Mar 21, 2014 at 05:33:02PM +0100, Bernd Faust wrote:
+> I also tried the patch, but unfortunately it doesn't work for me either.
+> I get the same error as Robert Daniels. My target is a i.MX6 (Cortex A9,
+> single core) running Linux Kernel version 3.10.9-rt5+
 
-As a legacy of the way 32 bit ARM did things the topology code uses a null
-topology map by default and then overwrites it by mapping cores with no
-information to a cluster by themselves later. In order to make it simpler
-to reset things as part of recovering from parse failures in firmware
-information directly set this configuration on init. A core will always be
-its own sibling so there should be no risk of confusion with firmware
-provided information.
+Hmm, rt kernels.  Does this happen without the rt patches applied?
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/kernel/topology.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> Test done:
+>   Start iperf server on target
+>     $ iperf -s -u &
+> 
+>    Let iperf client run for 10 minutes on the host
+>     $ iperf -c <ip_target> -u -b 100m -t 600 -l 256
+> 
+>   Also start a ping from host to target, to easily detect when the error
+> occurs
+>     $ ping <ip_target>
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 3e06b0be4ec8..ff662b23af5f 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
- 		 * reset it to default behaviour
- 		 */
- 		pr_debug("CPU%u: No topology information configured\n", cpuid);
--		cpuid_topo->core_id = 0;
--		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
--		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
- 		return;
- 	}
- 
-@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
- 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
- 
- 		cpu_topo->thread_id = -1;
--		cpu_topo->core_id =  -1;
-+		cpu_topo->core_id = 0;
- 		cpu_topo->cluster_id = -1;
-+
- 		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
- 	}
- }
+Right, I've just done this here, the results aren't that good:
+
+On the iMX6S:
+------------------------------------------------------------
+Server listening on UDP port 5001
+Receiving 1470 byte datagrams
+UDP buffer size:  160 KByte (default)
+------------------------------------------------------------
+[  3] local 192.168.1.181 port 5001 connected with 192.168.1.11 port 45248
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0-600.2 sec   109 MBytes  1.52 Mbits/sec  13.726 ms 29469735/29914906 (99%)
+
+On my x86 laptop:
+
+--- 192.168.1.181 ping statistics ---
+617 packets transmitted, 616 received, 0% packet loss, time 616014ms
+rtt min/avg/max/mdev = 0.167/0.294/8.934/0.512 ms
+
+------------------------------------------------------------
+Client connecting to 192.168.1.181, UDP port 5001
+Sending 256 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 192.168.1.11 port 45248 connected with 192.168.1.181 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-600.0 sec  7.13 GBytes   102 Mbits/sec
+[  3] Sent 29914976 datagrams
+[  3] Server Report:
+[  3]  0.0-600.2 sec   109 MBytes  1.52 Mbits/sec  13.726 ms 29469735/29914906 (99%)
+
+The loss is disappointing and needs further investigation, but as you
+can see, none of the symptoms you have reported are present - no lockup
+and no 9000ms ping times (the longest was 9ms).
+
+This is a plain 3.14-rc7 kernel configured for preempt, without the
+-rt patches.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
