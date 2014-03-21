@@ -1,136 +1,114 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 21 Mar 2014 00:52:42 -0500
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
-In-Reply-To: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
-References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20140321055242.GA1959@saruman.home>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 21 Mar 2014 01:52:48 -0500
+Subject: [PATCH] net: micrel : ks8851-ml: add vdd-supply support
+Message-ID: <1395384768-8461-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 10:50:13AM +0530, Lokesh Vutla wrote:
-> From: Dave Gerlach <d-gerlach@ti.com>
-> 
-> Do not reset GPIO5 at boot-up because GPIO5_7 is used
-> on AM437x GP-EVM to control VTT regulators on DDR3.
-> Without this some GP-EVM boards will fail to boot because
-> of DDR3 corruption.
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Tested-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Few platforms use external regulator to keep the ethernet MAC supplied.
+So, request and enable the regulator for driver functionality.
 
-every now and again we see a patch like this because yet another board
-is using a GPIO to toggle DDR regulators.
+Fixes: 66fda75f47dc (regulator: core: Replace direct ops->disable usage)
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Suggested-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-Instead of constantly patching things like this, how about we try
-something like below (build-tested only):
+This fixes a regression in SDP4430 platform as reported by Russel here:
+http://marc.info/?t=139509918200014&r=1&w=2
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 1f33f5d..f5962ff 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2610,6 +2610,10 @@ static int __init _setup_reset(struct omap_hwmod *oh)
- 	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
- 		return -EPERM;
+Patch is based on [v3.14-rc7] tag, if it is too late to submit, I can repost
+rebased to git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
+
+ .../devicetree/bindings/net/micrel-ks8851.txt      |    1 +
+ drivers/net/ethernet/micrel/ks8851.c               |   30 +++++++++++++++++++-
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/net/micrel-ks8851.txt b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+index 11ace3c..4fc3927 100644
+--- a/Documentation/devicetree/bindings/net/micrel-ks8851.txt
++++ b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+@@ -7,3 +7,4 @@ Required properties:
  
-+	/* NEVER reset GPIO blocks */
-+	if (strncmp(oh->name, "gpio", 4) == 0)
-+		return 0;
-+
- 	if (oh->rst_lines_cnt == 0) {
- 		r = _enable(oh);
- 		if (r) {
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 4243190..ce8b53a 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1130,6 +1130,29 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+ Optional properties:
+ - local-mac-address : Ethernet mac address to use
++- vdd-supply:	supply for Ethernet mac
+diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
+index 727b546a..e0c92e0 100644
+--- a/drivers/net/ethernet/micrel/ks8851.c
++++ b/drivers/net/ethernet/micrel/ks8851.c
+@@ -23,6 +23,7 @@
+ #include <linux/crc32.h>
+ #include <linux/mii.h>
+ #include <linux/eeprom_93cx6.h>
++#include <linux/regulator/consumer.h>
  
- static const struct of_device_id omap_gpio_match[];
+ #include <linux/spi/spi.h>
  
-+static void omap_gpio_init_context(struct gpio_bank *p)
-+{
-+	struct omap_gpio_reg_offs *regs = p->regs;
-+	void __iomem *base = p->base;
-+
-+	p->context.ctrl		= readl_relaxed(base + regs->ctrl);
-+	p->context.oe		= readl_relaxed(base + regs->direction);
-+	p->context.wake_en	= readl_relaxed(base + regs->wkup_en);
-+	p->context.leveldetect0	= readl_relaxed(base + regs->leveldetect0);
-+	p->context.leveldetect1	= readl_relaxed(base + regs->leveldetect1);
-+	p->context.risingdetect	= readl_relaxed(base + regs->risingdetect);
-+	p->context.fallingdetect = readl_relaxed(base + regs->fallingdetect);
-+	p->context.irqenable1	= readl_relaxed(base + regs->irqenable);
-+	p->context.irqenable2	= readl_relaxed(base + regs->irqenable2);
-+
-+	if (regs->set_dataout && p->regs->clr_dataout)
-+		p->context.dataout = readl_relaxed(base + regs->set_dataout);
-+	else
-+		p->context.dataout = readl_relaxed(base + regs->dataout);
-+
-+	p->context_valid = true;
-+}
-+
- static int omap_gpio_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -1246,6 +1269,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	omap_gpio_mod_init(bank);
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
-+	omap_gpio_init_context(bank);
+@@ -83,6 +84,7 @@ union ks8851_tx_hdr {
+  * @rc_rxqcr: Cached copy of KS_RXQCR.
+  * @eeprom_size: Companion eeprom size in Bytes, 0 if no eeprom
+  * @eeprom: 93CX6 EEPROM state for accessing on-board EEPROM.
++ * @vdd_reg:	Optional regulator supplying the chip
+  *
+  * The @lock ensures that the chip is protected when certain operations are
+  * in progress. When the read or write packet transfer is in progress, most
+@@ -130,6 +132,7 @@ struct ks8851_net {
+ 	struct spi_transfer	spi_xfer2[2];
  
- 	pm_runtime_put(bank->dev);
+ 	struct eeprom_93cx6	eeprom;
++	struct regulator	*vdd_reg;
+ };
  
-@@ -1325,8 +1349,6 @@ update_gpio_context_count:
+ static int msg_enable;
+@@ -1414,6 +1417,21 @@ static int ks8851_probe(struct spi_device *spi)
+ 	ks->spidev = spi;
+ 	ks->tx_space = 6144;
+ 
++	ks->vdd_reg = regulator_get_optional(&spi->dev, "vdd");
++	if (IS_ERR(ks->vdd_reg)) {
++		ret = PTR_ERR(ks->vdd_reg);
++		if (ret == -EPROBE_DEFER)
++			goto err_reg;
++	} else {
++		ret = regulator_enable(ks->vdd_reg);
++		if (ret) {
++			dev_err(&spi->dev, "regulator enable fail: %d\n",
++				ret);
++			goto err_reg_en;
++		}
++	}
++
++
+ 	mutex_init(&ks->lock);
+ 	spin_lock_init(&ks->statelock);
+ 
+@@ -1508,8 +1526,14 @@ static int ks8851_probe(struct spi_device *spi)
+ err_netdev:
+ 	free_irq(ndev->irq, ks);
+ 
+-err_id:
+ err_irq:
++err_id:
++	if (!IS_ERR(ks->vdd_reg))
++		regulator_disable(ks->vdd_reg);
++err_reg_en:
++	if (!IS_ERR(ks->vdd_reg))
++		regulator_put(ks->vdd_reg);
++err_reg:
+ 	free_netdev(ndev);
+ 	return ret;
+ }
+@@ -1523,6 +1547,10 @@ static int ks8851_remove(struct spi_device *spi)
+ 
+ 	unregister_netdev(priv->netdev);
+ 	free_irq(spi->irq, priv);
++	if (!IS_ERR(priv->vdd_reg)) {
++		regulator_disable(priv->vdd_reg);
++		regulator_put(priv->vdd_reg);
++	}
+ 	free_netdev(priv->netdev);
+ 
  	return 0;
- }
- 
--static void omap_gpio_init_context(struct gpio_bank *p);
--
- static int omap_gpio_runtime_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -1466,29 +1488,6 @@ void omap2_gpio_resume_after_idle(void)
- }
- 
- #if defined(CONFIG_PM_RUNTIME)
--static void omap_gpio_init_context(struct gpio_bank *p)
--{
--	struct omap_gpio_reg_offs *regs = p->regs;
--	void __iomem *base = p->base;
--
--	p->context.ctrl		= readl_relaxed(base + regs->ctrl);
--	p->context.oe		= readl_relaxed(base + regs->direction);
--	p->context.wake_en	= readl_relaxed(base + regs->wkup_en);
--	p->context.leveldetect0	= readl_relaxed(base + regs->leveldetect0);
--	p->context.leveldetect1	= readl_relaxed(base + regs->leveldetect1);
--	p->context.risingdetect	= readl_relaxed(base + regs->risingdetect);
--	p->context.fallingdetect = readl_relaxed(base + regs->fallingdetect);
--	p->context.irqenable1	= readl_relaxed(base + regs->irqenable);
--	p->context.irqenable2	= readl_relaxed(base + regs->irqenable2);
--
--	if (regs->set_dataout && p->regs->clr_dataout)
--		p->context.dataout = readl_relaxed(base + regs->set_dataout);
--	else
--		p->context.dataout = readl_relaxed(base + regs->dataout);
--
--	p->context_valid = true;
--}
--
- static void omap_gpio_restore_context(struct gpio_bank *bank)
- {
- 	writel_relaxed(bank->context.wake_en,
-
-Then, we can even remove ti,no-reset flag from all GPIO DT nodes.
-
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/6740694b/attachment.sig>
+1.7.9.5
