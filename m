@@ -1,109 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Mar 2014 23:20:22 +0100
-Subject: [PATCH v2 2/5] clk: berlin: add berlin clocks DT bindings
- documentation
-In-Reply-To: <532CAF9D.3020303@gmail.com>
+Date: Fri, 21 Mar 2014 23:22:43 +0100
+Subject: [PATCH v2 1/5] clk: berlin: add support for berlin plls
+In-Reply-To: <532CAD99.4060307@gmail.com>
 References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395432521-11055-3-git-send-email-alexandre.belloni@free-electrons.com>
- <532CAF9D.3020303@gmail.com>
-Message-ID: <20140321222022.GJ6443@piout.net>
+ <1395432521-11055-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <532CAD99.4060307@gmail.com>
+Message-ID: <20140321222243.GK6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2014 at 22:31:09 +0100, Sebastian Hesselbarth wrote :
+On 21/03/2014 at 22:22:33 +0100, Sebastian Hesselbarth wrote :
 > On 03/21/2014 09:08 PM, Alexandre Belloni wrote:
-> >Document the device tree bindings for the PLLs found on the Marvell Berlin SoCs.
-> >
-> >Cc: devicetree at vger.kernel.org
+> >This drivers allows to provide DT clocks for the cpu and system PLLs found on
+> >Marvell Berlin SoCs.
 > 
-> You forgot to add Mark Rutland's Reviewed-by. He didn't mentioned it
-> explicitly but his "Otherwise this looks fine to me" on v1, is as good
-> as a Reviewed-by. But, no need to resend, I'll fix it up.
+> Alexandre,
 > 
-
-Ok, I would have preferred an explicit one ;)
-
-> Also, everything above the '---' will be part of your commit log. While
-> the Signed-off-by and Reviewed-by should be in there, Cc's really don't
-> need to.
+> as mentioned on IRC, I now had a closer look on it. Some minor
+> remarks below. Sorry, I didn't mention them earlier.
 > 
 
-Ok, it seemed common practice to put it in the commit log:
+To clarify things, I'll just resend patch 1 and you are ready to take
+2-5, fixing up the remaining comments as soon as Mike takes it ?
 
-$ git log | grep "    Cc:" | wc -l
-157126
-
-But I'll do as you suggest from now. Actually, I didn't know you could
-do like that.
-
-> You can add another '---' to separate commit message and some stuff
-> you want to have early in you email with:
-> 
-> Blablabla commit message.
-> 
-> Signed-off-by: ...
-> Reviewed-by: ...
-> ---
-> Changelog:
-> - blabla
-> 
-> Cc: cc-me-recipient
-> ...
-> ---
->    .../devicetree/bindings/clock/berlin-clock.txt     | 29
-> ++++++++++++++++++++++
->    1 file changed, 29 insertions(+)
->    create mode 100644
-> Documentation/devicetree/bindings/clock/berlin-clock.txt
-> 
->  diff --git
-> a/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> ...
-> 
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >---
-> >  .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
-> >  1 file changed, 29 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
-> >
-> >diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> >new file mode 100644
-> >index 000000000000..49b7860bffb8
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> >@@ -0,0 +1,29 @@
-> >+Device Tree Clock bindings for Marvell Berlin clocks
-> >+
-> >+This binding uses the common clock binding[1].
-> >+
-> >+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >+
-> >+Required properties:
-> >+- compatible: shall be one of the following:
-> >+	"marvell,berlin2-pll",
-> >+	"marvell,berlin2q-pll":
-> >+		CPU PLL and System PLL
-> >+- reg: Address and length of the clock register set.
-> >+- #clock-cells: from common clock binding; shall be set to 0.
-> >+- clocks: from common clock binding
-> >+
-> >+smclk: sysmgr-clock {
-> >+	compatible = "fixed-clock";
-> >+	#clock-cells = <0>;
-> >+	clock-frequency = <25000000>;
-> >+};
-> >+
-> >+cpupll: cpupll at ea003c {
-> >+	compatible = "marvell,berlin2-pll";
-> >+	clocks = <&smclk>;
-> >+	#clock-cells = <0>;
-> >+	reg = <0xea003c 0x8>;
-> >+};
-> >+
-> >+
-> >
-> 
 
 -- 
 Alexandre Belloni, Free Electrons
