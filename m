@@ -1,28 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 15:57:25 +0100
-Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <532C5ADE.4030708@cogentembedded.com>
- <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
-Message-ID: <6044873.2S2Xlhp0hC@wuerfel>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 21 Mar 2014 14:58:06 +0000
+Subject: [PATCH v4] ARM: vDSO gettimeofday using generic timer architecture
+In-Reply-To: <CAASgrz0SaoNGb+ss6ZS+Zh_NoBzmznaneRur7xzp4_dyGb-wMg@mail.gmail.com>
+References: <1394734769-32760-1-git-send-email-nathan_lynch@mentor.com>
+ <CAASgrz0SaoNGb+ss6ZS+Zh_NoBzmznaneRur7xzp4_dyGb-wMg@mail.gmail.com>
+Message-ID: <CAPvkgC1K-_DTo7JreJm2v3Bp8keQY7Kwv6LD5c37-ii9+n5eMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014 14:53:48 Phil.Edworthy at renesas.com wrote:
-> 
-> > > +      reg = <0 0xfe000000 0 0x80000>;
-> > > +      #address-cells = >;
-> > > +      #size-cells = <2>;
-> > > +      device_type = "pci";
-> > 
-> >     This legacy property is only meaningful for the true OF firmware and 
-> thus 
-> > have been phased out (it's only actively used for the memory nodes).
-> Ok, thanks for pointing this out.
-> 
+On 18 March 2014 00:49, David Riley <davidriley@chromium.org> wrote:
+> Hi Nathan,
+>
+> I gave this a try against a 3.10 system and ran into issues when
+> vdso.so grew to two pages because of of a large .GCC.command.line
+> section.  __get_datapage was returning an address that was at the
+> beginning of the second code page instead of the data page since it
+> didn't account for the additional section.  I got it working by adding
+> .GCC.command.line to the DISCARD group in the linker script, but in
+> general it feels as if this code is a bit fragile since it depends on
+> knowing exactly which sections exist in the .so for the _vdso_data
+> symbol to be correct.
+>
+> Cheers,
+> David
+>
 
-I think the code still relies on it for PCI though.
+Hi David,
+Could you please send us the following output:
+$ nm -C ./arch/arm/kernel/vdso/vdso.so.dbg
 
-	Arnd
+For the vdso without the extra DISCARD?
+(As I'm interested in the alignment of __vdso_data)
+
+Cheers,
+--
+Steve
