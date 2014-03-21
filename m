@@ -1,24 +1,50 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Mar 2014 14:53:16 -0600
-Subject: drivers/dma/edma.c unconditional registration
-Message-ID: <532CA6BC.9010506@wwwdotorg.org>
+Date: Fri, 21 Mar 2014 14:56:58 -0600
+Subject: [PATCH] ARM: update multi_v7_defconfig for Tegra
+Message-ID: <1395435418-1376-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I see the following code which unconditionally registers an SoC-specific
-DMA driver in drivers/dma/edma.c:
+From: Stephen Warren <swarren@nvidia.com>
 
-static int edma_init(void)
-{
-        int ret = platform_driver_register(&edma_driver);
+This patch adds the same options to multi_v7_defconfig as were added to
+tegra_defconfig in commit d1c912c1001f "ARM: tegra: defconfig updates".
+(CONFIG_POWER_RESET_AS3722 is already enabled here.)
 
-        if (ret == 0) {
-                pdev0 = platform_device_register_full(&edma_dev_info0);
-...
-}
-subsys_initcall(edma_init);
+Suggested-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-This means that when I boot multi_v7_defconfig on a Tegra system, that
-driver probes. Luckily, this doesn't actually seem to cause any visible
-symptoms beyond the syslog entry "edma-dma-engine edma-dma-engine.0:
-Can't allocate PaRAM dummy slot", but still should be fixed.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9ee12b54ca7d..0585215bc2ee 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -102,6 +102,7 @@ CONFIG_RFKILL_GPIO=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
+ CONFIG_MTD=y
+ CONFIG_MTD_M25P80=y
+@@ -170,6 +171,7 @@ CONFIG_SERIAL_ST_ASC=y
+ CONFIG_SERIAL_ST_ASC_CONSOLE=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
++CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_MV64XXX=y
+@@ -226,6 +228,8 @@ CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_USB_SUPPORT=y
++CONFIG_USB_VIDEO_CLASS=y
++CONFIG_USB_GSPCA=y
+ CONFIG_DRM=y
+ CONFIG_DRM_TEGRA=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+-- 
+1.8.1.5
