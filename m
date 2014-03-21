@@ -1,112 +1,84 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 21 Mar 2014 14:46:00 +0100
-Subject: [PATCH] sh_eth: pm_runtime should not need null operations
-In-Reply-To: <CAMuHMdVhUwX0DO2+TBhG31HB2sx3_XRW3xPfZ+wH2d8b=RywLQ@mail.gmail.com>
-References: <1395396913-24354-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdWO-kNdWT_AxzAmCTrx3NerWpTG+auFNZTcL5hsbN+++A@mail.gmail.com>
- <532C1B13.7000805@codethink.co.uk>
- <CAMuHMdVhUwX0DO2+TBhG31HB2sx3_XRW3xPfZ+wH2d8b=RywLQ@mail.gmail.com>
-Message-ID: <532C4298.2050200@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Mar 2014 14:55:13 +0100
+Subject: [PATCH] ARM: ux500: remove pointless cache setup args
+Message-ID: <1395410113-19965-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/14 14:24, Geert Uytterhoeven wrote:
-> Hi Ben,
->
-> (dropping netdev and davem, adding Felipe, Kevin, linux-pm, and
-> linux-arm-kernel)
->
-> On Fri, Mar 21, 2014 at 11:57 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->> On 21/03/14 11:30, Geert Uytterhoeven wrote:
->>> On Fri, Mar 21, 2014 at 11:15 AM, Ben Dooks <ben.dooks@codethink.co.uk>
->>> wrote:
->>>> The driver has a no-op for the pm_runtime callbacks but
->>>> the pm_runtime core should correctly ignore drivers without
->>>> any pm_rumtime callback ops.
->>>
->>> The pm_runtime core doesn't ignore non-existing runtime_{suspend,resume}
->>> callbacks, it turns them into a failure withv -ENOSYS.
->>> Only non-existing runtime_idle callbacks are ignored.
->>
->> I've added Rafael Wysocki as he may be able to add better
->> feedback to this issue.
->>
->> [snip rpm_susend code block]
->>
->> I got very confused here. The clock_ops sets dev->pm_domain
->> which over-rides the use of the dev->driver->pm entry as the
->> primary pm for the device. The code above the bit you snipped
->> does a ladder looking for the pm_runtime entry it calls and
->> would stop at finding dev->pm_domain as so:
->>
->> from drivers/base/power/runtime.c:
->>      495         if (dev->pm_domain)
->>      496                 callback = dev->pm_domain->ops.runtime_suspend;
->>   ...
->>      502                 callback = dev->bus->pm->runtime_suspend;
->>      503         else
->>      504                 callback = NULL;
->>
->>
->> So for drivers on shmobile with drivers/sh/pm_runtime.c enabled
->> we would never call the drivers' entry as the ops that this code
->> introduces just calls the pm_clk calls and does not send the
->> events on.
->
-> Yes, that's also my understanding.
->
-> Commit 4d27e9dcff00a6425d779b065ec8892e4f391661 ("PM: Make
-> power domain callbacks take precedence over subsystem ones") explains
-> the rationale behind this.
->
-> Now, this doesn't prevent your power domain from delegating to other
-> callbacks...
->
->> If we send the events on, then we would use pm_generic_runtime_suspend()
->> to send it. This call treats the lack of runtime_pm driver entry as a
->> do nothing and return 0 which means in this case the code in sh_eth
->> is not necessary to have any pm_runtime functions.
->
-> If the power domain just calls pm_generic_runtime_suspend(), it will only
-> consider the driver-specific callback, bypassing type, class, and
-> bus-specific callbacks.
->
-> So should the power domain delegate it further using a similar ladder
-> strategy like RPM_GET_CALLBACK() at the core pm level, i.e.
-> try type/class/bus/driver?
-> And type should delegate to class/bus/driver, class to bus/driver, bus to
-> driver?
->
->> This means depending on if we have a pm_domain in the path we get
->> different treatment of NULL runtime pm ops pointer. I am not sure
->> how to handle this, as IIRC a number of other drivers for Renesas
->> currently assume that the NULL case is going to be fine for them.
->>
->> Changing pm_generic_runtime_suspend() to return ENOSYS would end
->> up breaking davinci and probably a number of other platforms.
->>
->> So questions:
->>
->> - Should rpm_suspend() ignore the lack of pm_runtime operations?
->> - Do we need to add a generic `ignore pm runtime callback`
->> - Are any other shmobile drivers similarly affected?
->
-> The code indeed looks a bit like a mix of:
->    - Lack of callback means it's safe to suspend,
->    - Lack of callback means it's not safe to suspend.
+This removes the setup of the l2x0 lines that are essentially
+just noops bouncing on the hardware as the cache registers are
+protected in the secure world and there is no point in writing
+them. Put in (0, ~0) to the l2x0_of_init() function as
+suggested by Russell and cut the complex code out.
 
-I thought historically NULL tended to mean it did not care about
-this.
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Russell: I don't know how this fits with other changes hitting
+the l2x0 code, this file is pretty much stand-alone and
+orthogonal to any other stuff hitting the Ux500 code, so I
+can put it in your patch tracker if you want to take it or
+some version of it into your tree.
+---
+ arch/arm/mach-ux500/cache-l2x0.c | 27 ++++-----------------------
+ 1 file changed, 4 insertions(+), 23 deletions(-)
 
-The whole thing is giving me a headache as I would expect the
-suspend to start with device and then work down the layers and
-resume to do the opposite. However currently rpm_resume will also
-start at the dev->pm_domain.
-
-Should the rpm_resume start with the dev->bus->pm and then work
-its way up to the dev->driver->pm callback? If so then the current
-davinci code is also going to be wrong...
-
+diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+index 264f894c0e3d..b535fc8f38bf 100644
+--- a/arch/arm/mach-ux500/cache-l2x0.c
++++ b/arch/arm/mach-ux500/cache-l2x0.c
+@@ -7,17 +7,15 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ #include "db8500-regs.h"
+ #include "id.h"
+ 
+-static void __iomem *l2x0_base;
+-
+ static int __init ux500_l2x0_unlock(void)
+ {
+ 	int i;
++	void __iomem *l2x0_base = __io_address(U8500_L2CC_BASE);
+ 
+ 	/*
+ 	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
+@@ -37,30 +35,13 @@ static int __init ux500_l2x0_unlock(void)
+ 
+ static int __init ux500_l2x0_init(void)
+ {
+-	u32 aux_val = 0x3e000000;
+-
+-	if (cpu_is_u8500_family() || cpu_is_ux540_family())
+-		l2x0_base = __io_address(U8500_L2CC_BASE);
+-	else
+-		/* Non-Ux500 platform */
++	/* Needed for multiplatform boots */
++	if (!(cpu_is_u8500_family() || cpu_is_ux540_family()))
+ 		return -ENODEV;
+ 
+ 	/* Unlock before init */
+ 	ux500_l2x0_unlock();
+-
+-	/* DBx540's L2 has 128KB way size */
+-	if (cpu_is_ux540_family())
+-		/* 128KB way size */
+-		aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+-	else
+-		/* 64KB way size */
+-		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+-
+-	/* 64KB way size, 8 way associativity, force WA */
+-	if (of_have_populated_dt())
+-		l2x0_of_init(aux_val, 0xc0000fff);
+-	else
+-		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
++	l2x0_of_init(0, ~0);
+ 
+ 	/*
+ 	 * We can't disable l2 as we are in non secure mode, currently
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.8.5.3
