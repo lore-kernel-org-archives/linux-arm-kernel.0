@@ -1,35 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Mar 2014 09:28:16 +0100
-Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
-In-Reply-To: <532815A8.9090807@ahsoftware.de>
-References: <5316FFCE.1060603@ti.com>
- <1394018461-757-1-git-send-email-holler@ahsoftware.de>
- <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
- <5322D529.4070904@ahsoftware.de>
- <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
- <5326F8C5.5090406@ti.com>
- <CACRpkdYZMzw31NkA4uSq+ZowzOnZgZthXhZri-eJY2Ozb8aNRQ@mail.gmail.com>
- <532805AE.9000806@ti.com> <532815A8.9090807@ahsoftware.de>
-Message-ID: <CACRpkdZwhP-wMDeNTEq6ELPsYC48xmppzGYTRLSzUewbqhrMvg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 21 Mar 2014 09:45:37 +0100
+Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <532B04D1.9000405@tabi.org>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-17-git-send-email-mpa@pengutronix.de>
+ <1394894616.578942243@f331.i.mail.ru>
+ <20140318081019.GJ11360@pengutronix.de>
+ <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
+ <532B04D1.9000405@tabi.org>
+Message-ID: <20140321084537.GA30910@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 10:45 AM, Alexander Holler <holler@ahsoftware.de> wrote:
+Hi,
 
-> But I don't need any rush here, I'm just unable to understand why the -rc
-> phase isn't used for bug fixing as I believe that's what this phase is for.
+On Thu, Mar 20, 2014 at 10:10:09AM -0500, Timur Tabi wrote:
+> On 03/20/2014 01:07 AM, Li.Xiubo at freescale.com wrote:
+> >While for the scenario like our LS1(ARM) platform.
+> >CPU		SSI
+> >LE		BE	then should we set the .val_format_endian to
+> >			REGMAP_ENDIAN_BIG
+> >
+> >
+> >And so not only for PowerPC, but also maybe for ARM platforms.
+> >So here how about just adding one Boolean property like 'big-endian' in DT node
+> >to learn the endianness of the devices dynamically ?
+> 
+> That's not a bad idea.  The property should be something like,
+> "fsl,ssi-endian" and is should be set to "big", "little", or
+> "native". In the absence of the property, it should default to
+> native endian.
 
-Right now it is mostly a practical issue to me, as I applied the patch to
-the devel (for-next) branch, then committed new development on top of
-it.
+Perhaps it is better to create some generic binding for that? There may
+be other drivers/components that have the same strange combinations and
+need a similar binding to use for regmap.
 
-If I send it for fixes now the same patch will come in two ways as I
-really do not like to rebase my tree at this point.
+We could use something like an "endian" property with "big", "little"
+and "native" which is then parsed by some function of the regmap
+framework. It could directly fill those information into the
+struct regmap_config.
 
-So I'd prefer to keep this for next and then have it tagged for stable as
-v3.14 is released, if that is OK?
+Thanks,
 
-It's as simple as sending a mail to Greg once it's upstream.
+Markus
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/418cdc7c/attachment.sig>
