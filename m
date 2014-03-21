@@ -1,41 +1,24 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Fri, 21 Mar 2014 13:37:41 -0400
-Subject: [RFC PATCH] staging: imx-drm: add suspend / resume
-References: <20140320151712.22089.59230.stgit@localhost>
-Message-ID: <87mwgj4fmi.fsf@nbsps.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Mar 2014 17:47:12 +0000
+Subject: [PATCH 14/20] regulator: db8500-prcmu: Set 1.8V as a fixed
+ voltage for vsmps2
+In-Reply-To: <1395404057-27835-15-git-send-email-ulf.hansson@linaro.org>
+References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
+ <1395404057-27835-15-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140321174712.GD552@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 Mar 2014, mfuzzey at parkeon.com wrote:
+On Fri, Mar 21, 2014 at 01:14:11PM +0100, Ulf Hansson wrote:
+> This regulator is used for system IO and is fixed to 1.8V. Let's give
+> consumers the option to fetch the voltage level.
 
-> Currently i.MX53 boards with the imx-drm display driver active
-> fail an intensive suspend to ram / resume test.
-
-> After around 5 - 50 cycles it is no longer possible to resume
-> the board.
-
-> The culprit is the imx-drm driver which does not stop DMA
-> before suspending. Removing the driver "fixes" the problem.
-
-> This patch provides a minimal suspend / resume implementation
-> enabling the intensive test to work (500 cycles ok).
-
-> I am only sending this as RFC for the moment since I don't
-> really know the hardware or driver code well enough to be
-> sure this is the "right" way of doing it.
-
-Sorry, I do not known that much about the imx53.  However, the imx25
-needs to have DMA controllers/modules clocked and working when trying to
-suspend the DDRam.  They may currently be bursting to the RAM
-independent of the main CPU, so some deep sleep (self-refresh) need all
-DMA controllers to ACK the DDR controller so that it may go to
-self-refresh.
-
-The controllers (FB, USB, ENET, etc on imx25) themselves seem to have a
-'sleep' mode.  However, the sleep code maybe trying to disable some
-clocks during sleep which need to remain active.  If the DRM DMA is
-active, but the module clock is turned off, it will not be able to ACK
-the DDR-controller.  Similar issues may exist with USB, ENET, etc.
-
-Fwiw,
-Bill Pringlemeir.
+Applied, thanks.  If the rest of the series can get applied I can
+easily drop this one. 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/cda303ca/attachment-0001.sig>
