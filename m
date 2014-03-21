@@ -1,55 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 17:28:04 +0100
-Subject: [PATCH 28/62] ARM: pxa: FB_W100 must be built-in
-In-Reply-To: <1395257399-359545-29-git-send-email-arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-29-git-send-email-arnd@arndb.de>
-Message-ID: <201403211728.04429.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Mar 2014 16:27:50 +0000
+Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
+In-Reply-To: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
+References: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
+Message-ID: <20140321162750.GI13596@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Arnd Bergmann wrote:
-> The pxa platform code directly calls into the W100 framebuffer
-> driver for eseries. This means it cannot be a loadable module
-> and we also have to ensure that the core framebuffer code
-> is built-in.
+On Wed, Mar 19, 2014 at 05:35:19PM +0000, Christopher Covington wrote:
+> On an LPAE system, the physical addresses used by VirtIO-MMIO may
+> be larger than 32 bits, even if the header and configuration space
+> addresses fit into 32 bits. For example with the Versatile Express
+> memory map using 4G memory, the following error occured when trying
+> to use a VirtIO-MMIO block device.
 > 
-
-Ignore this once, I'll drop it from the series and do a proper
-fix, like we did for some of the other patches. It's better 
-to change the code not to call into the fb driver if that is
-disabled.
-
-	Arnd
-
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 96100db..562b17f 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -556,6 +556,7 @@ config MACH_ICONTROL
->  config ARCH_PXA_ESERIES
->  	bool "PXA based Toshiba e-series PDAs"
->  	select FB_W100
-> +	select FB
->  	select PXA25x
->  
->  config MACH_E330
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index dade5b7..86873ff 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -1996,8 +1996,8 @@ config FB_FSL_DIU
->  	  Framebuffer driver for the Freescale SoC DIU
->  
->  config FB_W100
-> -	tristate "W100 frame buffer support"
-> -	depends on FB && ARCH_PXA
-> +	bool "W100 frame buffer support"
-> +	depends on FB=y && ARCH_PXA
->   	select FB_CFB_FILLRECT
->   	select FB_CFB_COPYAREA
->   	select FB_CFB_IMAGEBLIT
-> -- 
-> 1.8.3.2
+> EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: :
+> unaligned directory entry - offset=0, inode=3755990991, rec_len=57311,
+> name_len=223
 > 
+> To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
+> VIRTIO_MMIO are selected.
 > 
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm/mm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 1f8fed9..a62bcc9 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -617,6 +617,7 @@ config ARM_LPAE
+>  	bool "Support for the Large Physical Address Extension"
+>  	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
+>  		!CPU_32v4 && !CPU_32v3
+> +	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
+
+That's the wrong place to enable ARCH_DMA_ADDR_T_64BIT. Do you have a
+platform with >32-bit physical address space? If yes, it should be
+selected there.
+
+-- 
+Catalin
