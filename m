@@ -1,38 +1,25 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Mar 2014 23:35:37 +0100
-Subject: [PATCH v2 1/5] clk: berlin: add support for berlin plls
-In-Reply-To: <20140321222243.GK6443@piout.net>
-References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395432521-11055-2-git-send-email-alexandre.belloni@free-electrons.com>
- <532CAD99.4060307@gmail.com> <20140321222243.GK6443@piout.net>
-Message-ID: <532CBEB9.70902@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 21 Mar 2014 16:22:01 -0700
+Subject: [PATCH v5 01/11] KVM: Add capability to advertise PSCI v0.2
+ support
+In-Reply-To: <1395406414-11707-2-git-send-email-anup.patel@linaro.org>
+References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
+ <1395406414-11707-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140321232201.GA25519@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 11:22 PM, Alexandre Belloni wrote:
-> On 21/03/2014 at 22:22:33 +0100, Sebastian Hesselbarth wrote :
->> On 03/21/2014 09:08 PM, Alexandre Belloni wrote:
->>> This drivers allows to provide DT clocks for the cpu and system PLLs found on
->>> Marvell Berlin SoCs.
->>
->> Alexandre,
->>
->> as mentioned on IRC, I now had a closer look on it. Some minor
->> remarks below. Sorry, I didn't mention them earlier.
->
-> To clarify things, I'll just resend patch 1 and you are ready to take
-> 2-5, fixing up the remaining comments as soon as Mike takes it ?
+On Fri, Mar 21, 2014 at 06:23:24PM +0530, Anup Patel wrote:
+> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 
-Yes, no need to resend 2-5. Just keep on incrementing version on 1/5.
-If you send a v3 for patch 1, I can also prepare a topic branch that
-we refer to until Mike either takes the single patch or pulls the topic
-branch.
+Please add the acked-by tags when people give them to you - otherwise it's a
+bit of a wasted effort and I have to go back and check so I don't review
+the patches again.
 
-I'll work it out with Mike, but for a single patch, I guess he'll
-take it through his tree.
-
-As we target this all for v3.16, I'll get back to this, as soon as I
-have proper branches on v3.15-rc1 and possibly also managed it to have
-a for-next branch that gets pulled into linux-next.
-
-Sebastian
+Thanks,
+-Christoffer
