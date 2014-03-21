@@ -1,69 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Mar 2014 18:45:51 -0700
-Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents and
- rates
-In-Reply-To: <532AE239.9000800@samsung.com>
-References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
- <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
-Message-ID: <20140321014551.21989.57253@quantum>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 21 Mar 2014 01:52:25 +0000
+Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <532B04D1.9000405@tabi.org>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-17-git-send-email-mpa@pengutronix.de>
+ <1394894616.578942243@f331.i.mail.ru>
+ <20140318081019.GJ11360@pengutronix.de>
+ <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
+ <532B04D1.9000405@tabi.org>
+Message-ID: <283cb220a2e5421f8ba7e9ca11bec60d@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-03-20 05:42:33)
-> Hi Maxime,
+> Subject: Re: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
 > 
-> On 06/03/14 14:45, Maxime Coquelin wrote:
-> > Hi Sylwester,
-> > 
-> >       I like the principle of your implementation, but I have two questions:
-> >       1 - How can we manage PM with this solution, as the parent/rate will be 
-> > set only once at probe time?
-> >       2 - How to set the parent of a parent clock (which can be shared with 
-> > other devices)? Same question about the parent rates.
+> On 03/20/2014 01:07 AM, Li.Xiubo at freescale.com wrote:
+> > While for the scenario like our LS1(ARM) platform.
+> > CPU		SSI
+> > LE		BE	then should we set the .val_format_endian to
+> > 			REGMAP_ENDIAN_BIG
+> >
+> >
+> > And so not only for PowerPC, but also maybe for ARM platforms.
+> > So here how about just adding one Boolean property like 'big-endian' in DT
+> node
+> > to learn the endianness of the devices dynamically ?
 > 
-> Thanks for your feedback and apologies for late reply.
+> That's not a bad idea.  The property should be something like,
+> "fsl,ssi-endian" and is should be set to "big", "little", or "native".
+> In the absence of the property, it should default to native endian.
 > 
-> IIUC your first concern is about a situation when clocks need to be
-> reconfigured upon each resume from system sleep or runtime PM resume ?
-> As I mentioned in v1 of the RFC I was considering having individual
-> drivers calling explicitly the clocks set up routine. Presumably this
-> would allow to resolve the power management related issue.
-> One example I'm aware the approach as in this RFC wouldn't work is
-> when a device in a SoC belongs to a power domain, which needs to be
-> first switched on before we can start setting up and the clocks'
-> configuration get lost after the power domain switch off.
 
-I like Sylwester's approach of handling this one-time setup in the
-driver core.
+Well, yes, sounds good.
+That will lead the individual driver a little more complex. I do think that
+The regmap core should use the REGMAP_ENDIAN_SWAP instead of 
+REGMAP_ENDIAN_BIG/LITTLE ones if possible.
 
-Any kind of fine grained power management should not be hidden by DT,
-and by definition that logic belongs in the device driver. It can still
-be nicely abstracted away by runtime pm[1].
 
-Regards,
-Mike
+:)
+Thanks,
+--
 
-[1] Message-ID: <20140320114238.GQ7528@n2100.arm.linux.org.uk>
-
-> 
-> OTOH I suspect devices for which one-time clocks setup is sufficient
-> will be quite common. And for these there would need to be a single
-> call to the setup routine in probe() I guess, since it wouldn't be
-> possible to figure out just from the DT data when the actual call
-> should be made.
-> 
-> For a global clocks configuration, I thought about specifying that
-> in the clocks controller node, and then to have the setup routine
-> called e.g. from of_clk_init(). I think that could work well enough,
-> together with the patch [1], adding clock dependencies handling.
-> But then the clock frequency set up function would need to be
-> modified to respect the clock parent relationships, similarly as
-> in patch series [2]. A just noticed [2] recently, after posting
-> this RFC (adding Tero at Cc).
-> 
-> --
-> Regards,
-> Sylwester
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
-> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
+Best Regards,
+Xiubo
