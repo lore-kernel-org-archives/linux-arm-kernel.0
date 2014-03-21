@@ -1,71 +1,366 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 21 Mar 2014 13:40:03 +0100
-Subject: [PATCH-next 2/2] clk: s2mps11: Remove useless check for clk_table
-In-Reply-To: <1395405603-11772-1-git-send-email-k.kozlowski@samsung.com>
-References: <1395405603-11772-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1395405603-11772-2-git-send-email-k.kozlowski@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 21 Mar 2014 13:49:32 +0100
+Subject: [PATCH 1/5] clk: berlin: add support for berlin plls
+In-Reply-To: <1395402220-23503-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <532C355C.3090606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need for checking if 'clk_table' is not NULL twice (first
-after allocation and second at the end of probe()). Also move allocation
-of this 'clk_table' to probe from s2mps11_clk_parse_dt as this is
-logical place for it.
+On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
+> This drivers allows to provide DT clocks for the cpu and system PLLs found on
+> Marvell Berlin SoCs.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   drivers/clk/Makefile              |   1 +
+>   drivers/clk/berlin/Makefile       |   1 +
+>   drivers/clk/berlin/clk.h          |  35 +++++++++++++
+>   drivers/clk/berlin/pll-berlin2.c  |  41 ++++++++++++++++
+>   drivers/clk/berlin/pll-berlin2q.c |  41 ++++++++++++++++
+>   drivers/clk/berlin/pll.c          | 100 ++++++++++++++++++++++++++++++++++++++
+>   6 files changed, 219 insertions(+)
+>   create mode 100644 drivers/clk/berlin/Makefile
+>   create mode 100644 drivers/clk/berlin/clk.h
+>   create mode 100644 drivers/clk/berlin/pll-berlin2.c
+>   create mode 100644 drivers/clk/berlin/pll-berlin2q.c
+>   create mode 100644 drivers/clk/berlin/pll.c
+>
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index a367a9831717..4a2602737c27 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -29,6 +29,7 @@ obj-$(CONFIG_ARCH_VT8500)		+= clk-vt8500.o
+>   obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+>   obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+>   obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+> +obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+>   obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
+>   obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clk/clk-s2mps11.c |   24 +++++++++++-------------
- 1 file changed, 11 insertions(+), 13 deletions(-)
+I'll have a look at clk/Makefile later myself, but alphabetic ordering
+seems to be broken by ARCH_HI3xxx already. Anyway, we shouldn't just
+add another violator.
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index 843ec3646501..23ffd89c4023 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -141,11 +141,6 @@ static struct device_node *s2mps11_clk_parse_dt(struct platform_device *pdev)
- 		return ERR_PTR(-EINVAL);
- 	}
- 
--	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
--				 S2MPS11_CLKS_NUM, GFP_KERNEL);
--	if (!clk_table)
--		return ERR_PTR(-ENOMEM);
--
- 	for (i = 0; i < S2MPS11_CLKS_NUM; i++)
- 		of_property_read_string_index(clk_np, "clock-output-names", i,
- 				&s2mps11_clks_init[i].name);
-@@ -168,6 +163,11 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 
- 	s2mps11_clk = s2mps11_clks;
- 
-+	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
-+				 S2MPS11_CLKS_NUM, GFP_KERNEL);
-+	if (!clk_table)
-+		return -ENOMEM;
-+
- 	/* Store clocks of_node in first element of s2mps11_clks array */
- 	s2mps11_clks->clk_np = s2mps11_clk_parse_dt(pdev);
- 	if (IS_ERR(s2mps11_clks->clk_np))
-@@ -220,15 +220,13 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 		clkdev_add(s2mps11_clk->lookup);
- 	}
- 
--	if (clk_table) {
--		for (i = 0; i < S2MPS11_CLKS_NUM; i++)
--			clk_table[i] = s2mps11_clks[i].clk;
-+	for (i = 0; i < S2MPS11_CLKS_NUM; i++)
-+		clk_table[i] = s2mps11_clks[i].clk;
- 
--		clk_data.clks = clk_table;
--		clk_data.clk_num = S2MPS11_CLKS_NUM;
--		of_clk_add_provider(s2mps11_clks->clk_np,
--				of_clk_src_onecell_get, &clk_data);
--	}
-+	clk_data.clks = clk_table;
-+	clk_data.clk_num = S2MPS11_CLKS_NUM;
-+	of_clk_add_provider(s2mps11_clks->clk_np, of_clk_src_onecell_get,
-+			&clk_data);
- 
- 	platform_set_drvdata(pdev, s2mps11_clks);
- 
--- 
-1.7.9.5
+>   ifeq ($(CONFIG_COMMON_CLK), y)
+> diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+> new file mode 100644
+> index 000000000000..4f6580e2a3ee
+> --- /dev/null
+> +++ b/drivers/clk/berlin/Makefile
+> @@ -0,0 +1 @@
+> +obj-y += pll.o pll-berlin2.o pll-berlin2q.o
+
+obj-y += pll.o
+obj-$(CONFIG_MACH_BERLIN_BG2)	+= pll-berlin2.o
+obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= pll-berlin2.o
+obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= pll-berlin2q.o
+
+Which reminds me, that we forgot to add MACH_BERLIN_BG2Q to
+arch/arm/mach-berlin/Kconfig. Can you spin a patch?
+
+> diff --git a/drivers/clk/berlin/clk.h b/drivers/clk/berlin/clk.h
+
+I prefer to have this include named "common.h" as I guess we will
+dump all common declarations in here.
+
+> new file mode 100644
+> index 000000000000..41459db31a02
+> --- /dev/null
+> +++ b/drivers/clk/berlin/clk.h
+> @@ -0,0 +1,35 @@
+> +/*
+> + * Copyright (c) 2013 Marvell Technology Group Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __BERLIN_CLK_H
+> +#define __BERLIN_CLK_H
+> +
+> +#include <linux/clk-provider.h>
+
+What is this include good for in here?
+
+You will need struct device_node declared, but a simple
+
+struct device_node;
+
+should be sufficient.
+
+> +struct berlin_pllmap {
+> +	const u8	*vcodiv;
+> +	u32		fbdiv_mask;
+> +	u32		rfdiv_mask;
+> +	u32		divsel_mask;
+> +	u8		fbdiv_shift;
+> +	u8		rfdiv_shift;
+> +	u8		divsel_shift;
+> +	u8		mult;
+> +};
+> +
+> +extern void __init berlin_pll_setup(struct device_node *np,
+> +				struct berlin_pllmap *map);
+> +
+> +#endif /* BERLIN_CLK_H */
+> diff --git a/drivers/clk/berlin/pll-berlin2.c b/drivers/clk/berlin/pll-berlin2.c
+> new file mode 100644
+> index 000000000000..5f5b4674f811
+> --- /dev/null
+> +++ b/drivers/clk/berlin/pll-berlin2.c
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (c) 2014 Marvell Technology Group Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+
+Please sort includes alphabetically, it will save us some pain
+in the future.
+
+> +#include "clk.h"
+
+#include "common.h"
+
+> +static const u8 vcodiv_berlin2[] = {10, 15, 20, 25, 30, 40, 50, 60, 80};
+> +
+> +static struct berlin_pllmap berlin_pll_map = {
+> +	.vcodiv = vcodiv_berlin2,
+> +	.fbdiv_mask = 0x1FF,
+> +	.rfdiv_mask = 0x1F,
+> +	.divsel_mask = 0xF,
+
+divsel_mask allows 16 possible values, vcodiv_berlin2[] only provides
+9, and common pll driver below does not know how many valid vcodiv
+values are passed. That can become dangerous..
+
+I'd rather extend vcodiv_berlin2 to full divsel range and provide
+safe (=1) divisiors. This way wrong/new register values will only
+break clock frequency derived.
+
+> +	.fbdiv_shift = 6,
+> +	.rfdiv_shift = 1,
+> +	.divsel_shift = 7,
+
+Have .foo_mask and .foo_shift together?
+
+> +	.mult = 10,
+> +};
+> +
+> +static void __init berlin2_pll_setup(struct device_node *np)
+> +{
+> +	berlin_pll_setup(np, &berlin_pll_map);
+> +}
+> +CLK_OF_DECLARE(berlin2q_pll, "marvell,berlin2-pll", berlin2_pll_setup);
+> +
+> diff --git a/drivers/clk/berlin/pll-berlin2q.c b/drivers/clk/berlin/pll-berlin2q.c
+> new file mode 100644
+> index 000000000000..8ddfa69cf8c4
+> --- /dev/null
+> +++ b/drivers/clk/berlin/pll-berlin2q.c
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (c) 2013 Marvell Technology Group Ltd.
+
+nit: 2014?
+
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+
+same as above.
+
+> +#include "clk.h"
+
+ditto.
+
+> +static const u8 vcodiv_berlin2q[] = {1, 0, 2, 0, 3, 4, 0, 6, 8};
+> +
+> +static struct berlin_pllmap berlin2q_pll_map = {
+> +	.vcodiv = vcodiv_berlin2q,
+> +	.fbdiv_mask = 0x1FF,
+> +	.rfdiv_mask = 0x1F,
+> +	.divsel_mask = 0xF,
+> +	.fbdiv_shift = 7,
+> +	.rfdiv_shift = 2,
+> +	.divsel_shift = 9,
+> +	.mult = 1,
+> +};
+
+ditto.
+
+> +static void __init berlin2q_pll_setup(struct device_node *np)
+> +{
+> +	berlin_pll_setup(np, &berlin2q_pll_map);
+> +}
+> +CLK_OF_DECLARE(berlin2q_pll, "marvell,berlin2q-pll", berlin2q_pll_setup);
+> +
+> diff --git a/drivers/clk/berlin/pll.c b/drivers/clk/berlin/pll.c
+> new file mode 100644
+> index 000000000000..188b385af436
+> --- /dev/null
+> +++ b/drivers/clk/berlin/pll.c
+> @@ -0,0 +1,100 @@
+> +/*
+> + * Copyright (c) 2013 Marvell Technology Group Ltd.
+
+nit: 2014?
+
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+
+same as above.
+
+> +#include "clk.h"
+
+ditto.
+
+> +struct berlin_pll {
+> +	struct clk_hw	hw;
+> +	void __iomem	*base;
+> +	void		*data;
+
+struct berlin2_pllmap *map instead?
+
+> +};
+> +
+> +#define to_berlin_pll(hw)	container_of(hw, struct berlin_pll, hw)
+> +
+> +#define PLL_CTRL0	0x00
+> +#define PLL_CTRL1	0x04
+> +
+> +static inline u32 berlin_pll_read(struct berlin_pll *pll, unsigned long offset)
+> +{
+> +	return readl_relaxed(pll->base + offset);
+> +}
+> +
+> +static unsigned long berlin_pll_recalc_rate(struct clk_hw *hw,
+> +					unsigned long parent_rate)
+
+Maybe have a nice little comment on how pll output frequency is
+calculated out of the 5 variables?
+
+> +{
+> +	struct berlin_pll *pll = to_berlin_pll(hw);
+> +	struct berlin_pllmap *map = pll->data;
+> +	u32 val, fbdiv, rfdiv, vcodivsel;
+> +
+> +	val = berlin_pll_read(pll, PLL_CTRL0);
+> +	fbdiv = (val >> map->fbdiv_shift) & map->fbdiv_mask;
+> +	rfdiv = (val >> map->rfdiv_shift) & map->rfdiv_mask;
+> +	if (rfdiv == 0)
+> +		rfdiv = 1;
+> +
+> +	val = berlin_pll_read(pll, PLL_CTRL1);
+> +	vcodivsel = (val >> map->divsel_shift) & map->divsel_mask;
+> +
+> +	return parent_rate * fbdiv * map->mult / rfdiv /
+> +		map->vcodiv[vcodivsel];
+
+IMHO
+
+parent_rate *= fbdiv * map->mult;
+parent_rate /= rfdiv;
+return parent_rate / map->vcodiv[vcodivsel];
+
+makes it slightly more readable, but that is up to you.
+
+> +}
+> +
+> +static const struct clk_ops berlin_pll_ops = {
+> +	.recalc_rate	= berlin_pll_recalc_rate,
+> +};
+> +
+> +void __init berlin_pll_setup(struct device_node *np,
+> +			struct berlin_pllmap *map)
+> +{
+> +	struct clk_init_data init;
+> +	struct berlin_pll *pll;
+> +	const char *parent_name;
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +	if (WARN_ON(!pll))
+> +		return;
+> +
+> +	pll->base = of_iomap(np, 0);
+> +	if (WARN_ON(!pll->base))
+> +		return;
+> +
+> +	pll->data = map;
+
+pll->map = map;
+
+> +
+> +	init.name = np->name;
+> +	init.ops = &berlin_pll_ops;
+> +	parent_name = of_clk_get_parent_name(np, 0);
+> +	init.parent_names = &parent_name;
+> +	init.num_parents = 1;
+> +
+> +	pll->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &pll->hw);
+> +	if (WARN_ON(IS_ERR(clk)))
+> +		return;
+> +
+> +	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +	if (WARN_ON(ret))
+> +		return;
+> +}
+> +
+>
