@@ -1,67 +1,53 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 21 Mar 2014 06:43:56 -0500
-Subject: [PATCH RESEND] clk: support hardware-specific debugfs entries
-Message-ID: <1395402236-16284-1-git-send-email-elder@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 12:43:37 +0100
+Subject: [PATCH 2/5] clk: berlin: add berlin clocks DT bindings documentation
+In-Reply-To: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395402220-23503-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new clk_ops->debug_init method to allow a clock hardware
-driver to populate the clock's debugfs directory with entries
-beyond those common for every clock.
-
-Signed-off-by: Alex Elder <elder@linaro.org>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/clk.c            |    4 ++++
- include/linux/clk-provider.h |    8 ++++++++
- 2 files changed, 12 insertions(+)
+ .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c42e608..92760b1 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -277,6 +277,10 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
- 	if (!d)
- 		goto err_out;
- 
-+	if (clk->ops->debug_init)
-+		if (clk->ops->debug_init(clk->hw, clk->dentry))
-+			goto err_out;
+diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+new file mode 100644
+index 000000000000..ebc78f9b93a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+@@ -0,0 +1,29 @@
++Device Tree Clock bindings for Marvell Berlin clocks
 +
- 	ret = 0;
- 	goto out;
- 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 939533d..5119174 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -32,6 +32,7 @@
- #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
- 
- struct clk_hw;
-+struct dentry;
- 
- /**
-  * struct clk_ops -  Callback operations for hardware clocks; these are to
-@@ -127,6 +128,12 @@ struct clk_hw;
-  *		separately via calls to .set_parent and .set_rate.
-  *		Returns 0 on success, -EERROR otherwise.
-  *
-+ * @debug_init:	Set up type-specific debugfs entries for this clock.  This
-+ *		is called once, after the debugfs directory entry for this
-+ *		clock has been created.  The dentry pointer representing that
-+ *		directory is provided as an argument.  Called with
-+ *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
-+ *
-  *
-  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-  * implementations to split any work between atomic (enable) and sleepable
-@@ -165,6 +172,7 @@ struct clk_ops {
- 	unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
- 					   unsigned long parent_accuracy);
- 	void		(*init)(struct clk_hw *hw);
-+	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
- };
- 
- /**
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be one of the following:
++	"marvell,berlin2-pll" or
++	"marvell,berlin2q-pll":
++		CPU PLL and System PLL
++- reg : Address and length of the clock register set.
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : shall be the input parent clock phandle for the clock.
++
++smclk: sysmgr-clock {
++	compatible = "fixed-clock";
++	#clock-cells = <0>;
++	clock-frequency = <25000000>;
++};
++
++cpupll: cpupll {
++	compatible = "marvell,berlin2-pll";
++	clocks = <&smclk>;
++	#clock-cells = <0>;
++	reg = <0xf7ea003c 8>;
++};
++
++
 -- 
-1.7.9.5
+1.8.3.2
