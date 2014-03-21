@@ -1,56 +1,40 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Mar 2014 22:36:31 +0100
-Subject: [PATCH v2 5/5] ARM: berlin/dt: add cpupll and syspll support
- to BG2
-In-Reply-To: <1395432521-11055-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395432521-11055-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532CB0DF.3080003@gmail.com>
+Date: Fri, 21 Mar 2014 22:42:42 +0100
+Subject: [PATCH 1/2] ARM: berlin: add MACH_BERLIN_BG2Q symbol
+In-Reply-To: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <532CB252.6010702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 09:08 PM, Alexandre Belloni wrote:
-> The Berlin BG2 has two supported PLLs: CPU PLL and System PLL, add those to the
-> SoC device tree.
->
-> This also moves the remaining clocks from the clocks container node to the root.
+On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
+> Now that we start supporting the Marvell Berlin BG2Q, add a symbol allowing to
+> differentiate that SoC from the other SoCs of the Berlin family.
 >
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Applied to berlin/defconfig, Thanks!
+
 > ---
->   arch/arm/boot/dts/berlin2.dtsi | 48 +++++++++++++++++++++++++++---------------
->   1 file changed, 31 insertions(+), 17 deletions(-)
+>   arch/arm/mach-berlin/Kconfig | 7 +++++++
+>   1 file changed, 7 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> index 56a1af2f1052..6c080eb6242a 100644
-> --- a/arch/arm/boot/dts/berlin2.dtsi
-> +++ b/arch/arm/boot/dts/berlin2.dtsi
-[...]
-> @@ -83,7 +83,21 @@
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg = <0xad0600 0x20>;
->   			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&sysclk>;
-> +			clocks = <&twdclk>;
-> +		};
-> +
-> +		syspll: syspll at ea0014 {
-> +			compatible = "marvell,berlin2-pll";
-> +			clocks = <&smclk>;
-> +			#clock-cells = <0>;
-> +			reg = <0xea0014 8>;
-> +		};
-> +
-> +		cpupll: cpupll at ea003c {
-> +			compatible = "marvell,berlin2-pll";
-> +			clocks = <&smclk>;
-> +			#clock-cells = <0>;
-> +			reg = <0xea003c 8>;
-
-Same comment about hex numbers and I'll also fix it up.
-
-Sebastian
-
->   		};
+> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+> index 7a02d222c378..0ff6f5877076 100644
+> --- a/arch/arm/mach-berlin/Kconfig
+> +++ b/arch/arm/mach-berlin/Kconfig
+> @@ -24,6 +24,13 @@ config MACH_BERLIN_BG2CD
+>   	select CPU_V7
+>   	select HAVE_ARM_TWD if SMP
 >
->   		apb at e80000 {
+> +config MACH_BERLIN_BG2Q
+> +	bool "Marvell Armada 1500 Pro (BG2-Q)"
+> +	select CACHE_L2X0
+> +	select CPU_V7
+> +	select HAVE_ARM_TWD if SMP
+> +	select HAVE_SMP
+> +
+>   endmenu
+>
+>   endif
 >
