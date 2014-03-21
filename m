@@ -1,24 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Mar 2014 17:47:12 +0000
-Subject: [PATCH 14/20] regulator: db8500-prcmu: Set 1.8V as a fixed
- voltage for vsmps2
-In-Reply-To: <1395404057-27835-15-git-send-email-ulf.hansson@linaro.org>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
- <1395404057-27835-15-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140321174712.GD552@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 18:51:17 +0100
+Subject: stmmac-socfpga breakage in arm-soc
+In-Reply-To: <5329CA2A.8030309@elopez.com.ar>
+References: <201403191333.01095.arnd@arndb.de> <29079107.ja9Hu9mMY0@wuerfel>
+ <5329CA2A.8030309@elopez.com.ar>
+Message-ID: <201403211851.17955.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 01:14:11PM +0100, Ulf Hansson wrote:
-> This regulator is used for system IO and is fixed to 1.8V. Let's give
-> consumers the option to fetch the voltage level.
+On Wednesday 19 March 2014, Emilio L?pez wrote:
+> El 19/03/14 11:58, Arnd Bergmann escribi?:
+> (snip)
+> > diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+> > index 5748351..19d5648 100644
+> > --- a/Documentation/devicetree/bindings/net/stmmac.txt
+> > +++ b/Documentation/devicetree/bindings/net/stmmac.txt
+> > @@ -31,6 +31,10 @@ Optional properties:
+> >   - reset-names: Should contain the reset signal name "stmmaceth", if a
+> >       reset phandle is given
+> >   - max-frame-size: See ethernet.txt file in the same directory
+> > +- clocks: If present, the first clock should be the GMAC main clock,
+> > +  further clocks may be specified in derived bindings
+> > +- clock-names: One name for each entry in the clocks property, the
+> > +  first one should be "stmmaceth".
+> >
+> >   Examples:
+> >
+> > @@ -43,4 +47,6 @@ Examples:
+> >               mac-address = [000000000000]; /* Filled in by U-Boot */
+> >               max-frame-size = <3800>;
+> >               phy-mode = "gmii";
+> > +             clocks = <&clock>;
+> > +             clock-names = "stmmaceth">
+> 
+> There's a small typo there on the ;
 
-Applied, thanks.  If the rest of the series can get applied I can
-easily drop this one. 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/cda303ca/attachment-0001.sig>
+Fixed the typo locally. However, now we have another problem: I tried
+to apply the update patch to arm-soc and found that I originally based
+it on linux-next, which has a number of conflicting changes that are
+not in arm-soc.
+
+It's probably better if I remove the driver entirely from the arm-soc
+tree and instead send the modified version to David Miller for him
+to put it into the net tree.
+
+	Arnd
