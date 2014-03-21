@@ -1,95 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 21 Mar 2014 15:26:53 +0100
-Subject: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
-In-Reply-To: <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 21 Mar 2014 18:29:34 +0300
+Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
+ R8A7790
+In-Reply-To: <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
 References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-3-git-send-email-phil.edworthy@renesas.com>
- <1395400638.4554.5.camel@weser.hi.pengutronix.de>
- <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
-Message-ID: <1395412013.4554.13.camel@weser.hi.pengutronix.de>
+ <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <532C5ADE.4030708@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 21.03.2014, 14:15 +0000 schrieb
-Phil.Edworthy at renesas.com:
-> Hi Lucas,
-> 
-> Thanks for the review.
-> 
-> On 21/03/2014 11:18, Lucas wrote:
-> > Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
-> > 
-> > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
-> > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > > ---
-> > >  drivers/pci/host/pcie-rcar.c | 232 
-> ++++++++++++++++++++++++++++++++++++++++++-
-> > >  drivers/pci/host/pcie-rcar.h |   5 +
-> > >  2 files changed, 236 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/pci/host/pcie-rcar.c 
-> b/drivers/pci/host/pcie-rcar.c
-> > > index 16670e5..cbbcd77 100644
-> > > --- a/drivers/pci/host/pcie-rcar.c
-> > > +++ b/drivers/pci/host/pcie-rcar.c
-> > [...]
-> > > +
-> > > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
-> > > +{
-> > > +   struct rcar_pcie *pcie = data;
-> > > +   struct rcar_msi *msi = &pcie->msi;
-> > > +   unsigned long reg;
-> > > +
-> > > +   reg = pci_read_reg(pcie, PCIEMSIFR);
-> > > +
-> > > +   while (reg) {
-> > > +      unsigned int index = find_first_bit(&reg, 32);
-> > > +      unsigned int irq;
-> > > +
-> > > +      /* clear the interrupt */
-> > > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
-> > > +
-> > > +      irq = irq_find_mapping(msi->domain, index);
-> > > +      if (irq) {
-> > > +         if (test_bit(index, msi->used))
-> > > +            generic_handle_irq(irq);
-> > > +         else
-> > > +            dev_info(pcie->dev, "unhandled MSI\n");
-> > > +      } else {
-> > > +         /*
-> > > +          * that's weird who triggered this?
-> > > +          * just clear it
-> > > +          */
-> > > +         dev_info(pcie->dev, "unexpected MSI\n");
-> > > +      }
-> > > +
-> > > +      /* see if there's any more pending in this vector */
-> > > +      reg = pci_read_reg(pcie, PCIEMSIFR);
-> > > +   }
-> > > +
-> > > +   return IRQ_HANDLED;
-> > > +}
-> > > +
-> > From your DT binding it seems you have only one interrupt from the PCIe
-> > core, shared between the MSI irqs and the PCI legacy interrupts.
-> > This means this handler may get called without an MSI irq pending, so
-> > this function really should have a path where it's returning IRQ_NONE.
-> Ah, yes you are right... though actually there are two interrupts, one has 
-> some MSI and INTx, the other has the rest of the MSIs.
-> 
-This isn't reflected in the DT binding. If you already know that there
-may be more than a single interrupt for MSI, please push this into the
-binding by using named interrupts. Even if your driver doesn't support
-it yet, additional functionality can always be added later, but the DT
-should be a stable ABI describing your hardware.
+Hello.
 
-So if you already know your hardware has more than one interrupt, please
-put it in the binding, to avoid churn later on.
+On 03/21/2014 01:32 PM, Phil Edworthy wrote:
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> This patch adds the device tree nodes for R8A7790
+
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> ---
+>   arch/arm/boot/dts/r8a7790.dtsi | 19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index df9ec61..e7d498a 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -821,4 +821,23 @@
+>   		#size-cells = <0>;
+>   		status = "disabled";
+>   	};
+> +
+> +	pcie: pcie at fe000000 {
+> +		compatible = "renesas,r8a7790-pcie";
+
+    The convention adopted on this list is to put the "pcie" first, and SoC 
+name the last.
+
+> +		reg = <0 0xfe000000 0 0x80000>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		device_type = "pci";
+
+    This legacy property is only meaningful for the true OF firmware and thus 
+have been phased out (it's only actively used for the memory nodes).
+
+WBR, Sergei
