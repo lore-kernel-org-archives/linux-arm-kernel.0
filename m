@@ -1,62 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Mar 2014 20:11:27 +0100
-Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
-In-Reply-To: <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <1395257399-359545-62-git-send-email-arnd@arndb.de>
- <CAL_JsqKaL4W_bjozC_hTmZ9439pqh8f8pHU25H5CNdf8hQZtOg@mail.gmail.com>
- <201403201159.35842.arnd@arndb.de>
- <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
-Message-ID: <20140321191127.GS27873@lukather>
+From: chirantan@chromium.org (Chirantan Ekbote)
+Date: Fri, 21 Mar 2014 12:15:17 -0700
+Subject: [PATCH] ARM: mm: Speed up page list initialization during boot
+Message-ID: <1395429317-10084-1-git-send-email-chirantan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 10:54:49AM -0500, Rob Herring wrote:
-> >
-> > .arm
-> > ENTRY(sun6i_secondary_startup)
-> >         ARM_BE8(setend   be ) /* I suppose we need this too */
-> >         msr     cpsr_fsxc, #0xd3
-> >         ldr     r0, =secondary_startup
-> >         bx      r0
-> >
-> > (I'm a bit confused about when to use what branch instruction, so
-> > forgive me if the above doesn't make sense)
-> >
-> >> Also, secondary_startup takes care of making sure the core is in SVC
-> >> mode, so this function shouldn't be needed in the first place.
-> >
-> > I'd rather not change this part, unless Maxime can confirm that it's
-> > not necessary. I would assume that it's there for a reason otherwise.
-> 
-> That often proves to not be the case. :) Initial SOC code is whatever
-> we've failed to delete from vendor BSP code.
+During boot, we populate the page lists by using the page freeing
+mechanism on every individual page.  Unfortunately, this is very
+inefficient because the memory manager spends a lot of time coalescing
+pairs of adjacent free pages into bigger blocks.
 
-Yep, it definitely looks like it.
+Rather than adding a single order 0 page at a time, we can take
+advantage of the fact that we know that all the pages are available and
+free up big blocks of pages at a time instead.
 
-> Looking at the review comments adding SMP boot, there was discussion
-> about entering in HYP mode and that being dependent on u-boot support,
-> but nothing whether this was needed or not. So it appears to me we
-> probably enter the kernel in the reset default of secure supervisor
-> mode and this code is a nop. This code would not work if it was HYP
-> mode. So when u-boot does correctly setup HYP mode, this code will be
-> broken (although other parts of smp_ops will be too).
+Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+---
+ arch/arm/mm/init.c  | 19 +++++++++++++++++--
+ include/linux/gfp.h |  1 +
+ mm/internal.h       |  1 -
+ 3 files changed, 18 insertions(+), 3 deletions(-)
 
-Actually, we don't have any proper bootloader support for this SoC,
-and we're stuck with Allwinner's bootloader.
-
-Bootloader support will come eventually, but I wouldn't worry too much
-about HYP for now. And whenever we will have such a bootloader, we
-will use PSCI, so we won't need to worry about it either.
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 97c293e..c7fc2d8 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -22,6 +22,7 @@
+ #include <linux/memblock.h>
+ #include <linux/dma-contiguous.h>
+ #include <linux/sizes.h>
++#include <linux/bitops.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/memblock.h>
+@@ -469,8 +470,22 @@ static void __init free_unused_memmap(struct meminfo *mi)
+ #ifdef CONFIG_HIGHMEM
+ static inline void free_area_high(unsigned long pfn, unsigned long end)
+ {
+-	for (; pfn < end; pfn++)
+-		free_highmem_page(pfn_to_page(pfn));
++	while (pfn < end) {
++		struct page *page = pfn_to_page(pfn);
++		unsigned long order = min(__ffs(pfn), MAX_ORDER - 1);
++		unsigned long nr_pages = 1 << order;
++		unsigned long rem = end - pfn;
++
++		if (nr_pages > rem) {
++			order = __fls(rem);
++			nr_pages = 1 << order;
++		}
++
++		__free_pages_bootmem(page, order);
++		totalram_pages += nr_pages;
++		totalhigh_pages += nr_pages;
++		pfn += nr_pages;
++	}
+ }
+ #endif
+ 
+diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+index 39b81dc..a63d666 100644
+--- a/include/linux/gfp.h
++++ b/include/linux/gfp.h
+@@ -367,6 +367,7 @@ void *alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
+ #define __get_dma_pages(gfp_mask, order) \
+ 		__get_free_pages((gfp_mask) | GFP_DMA, (order))
+ 
++extern void __free_pages_bootmem(struct page *page, unsigned int order);
+ extern void __free_pages(struct page *page, unsigned int order);
+ extern void free_pages(unsigned long addr, unsigned int order);
+ extern void free_hot_cold_page(struct page *page, int cold);
+diff --git a/mm/internal.h b/mm/internal.h
+index 29e1e76..d2b8738 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -93,7 +93,6 @@ extern pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address);
+ /*
+  * in mm/page_alloc.c
+  */
+-extern void __free_pages_bootmem(struct page *page, unsigned int order);
+ extern void prep_compound_page(struct page *page, unsigned long order);
+ #ifdef CONFIG_MEMORY_FAILURE
+ extern bool is_free_buddy_page(struct page *page);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/9abe1377/attachment-0001.sig>
+1.9.1.423.g4596e3a
