@@ -1,50 +1,126 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 16:10:37 +0100
-Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
-In-Reply-To: <20140321143224.GF23076@pengutronix.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <6295310.bvZ6PIzM4N@wuerfel> <20140321143224.GF23076@pengutronix.de>
-Message-ID: <5056467.Kyhhz6b11e@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Mar 2014 15:11:26 +0000
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+In-Reply-To: <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
+References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
+ <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140321151126.GR23372@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014 15:32:24 Uwe Kleine-K?nig wrote:
-> On Thu, Mar 20, 2014 at 11:16:20PM +0100, Arnd Bergmann wrote:
-> > On Thursday 20 March 2014 21:48:47 Uwe Kleine-K?nig wrote:
-> > > 
-> > > On Wed, Mar 19, 2014 at 08:29:07PM +0100, Arnd Bergmann wrote:
-> > > > The efm32 platform does not provide a zreladdr-y line its Makefile.boot,
-> > > > so we always have to use CONFIG_AUTO_ZRELADDR in order to successfully
-> > > > build and link a zImage.
-> > > I wonder why you need to AUTO_ZRELADDR (which is there to guess
-> > > zreladdr) while efm32 doesn't have an MMU and so there is nothing to
-> > > guess. So I think this patch fixes a build problem, but it's not a good
-> > > change.
-> > 
-> > It is required in order to build a compressed zImage file. You mentioned
-> > before that your system does not have enough RAM to support this, but
-> > the compile-time option exists, and there is no dependency on MMU support
-> > for it, nor should there be.
-> My objection isn't about having only little RAM. AUTO_ZRELADDR is about
-> guessing the physical address corresponding to PAGE_OFFSET. But without
-> an MMU there is nothing to guess. So I wonder if the better change would
-> be to do:
-> 
->         #ifdef CONFIG_MMU
->         #ifdef CONFIG_AUTO_ZRELADDR
->                 ... guess zreladdress based on instruction pointer
->         #else
->                 ... use zreladdr from Makefile.boot
->         #endif
->         #else
->                 ... use zreladdr = PAGE_OFFSET
->         #endif
-> 
+Hi Jean,
 
-I don't see a reason to change the existing logic, it works for
-both MMU and NOMMU kernels, and you are talking about *three* instructions
-here.
-Also, once we integrate efm32 into ARCH_MULTIPLATFORM, it AUTO_ZRELADDR
-will be set anyway, unless we add another useless conditional.
+On Wed, Mar 19, 2014 at 09:42:33AM +0000, Jean Pihet wrote:
+> Introducing perf_regs_load function, which is going
+> to be used for dwarf unwind test in following patches.
+> 
+> It takes single argument as a pointer to the regs dump
+> buffer and populates it with current registers values, as
+> expected by the perf built-in unwinding test.
+> 
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Namhyung Kim <namhyung@kernel.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+> Cc: David Ahern <dsahern@gmail.com>
+> Cc: Jiri Olsa <jolsa@redhat.com>
+> ---
+>  tools/perf/arch/arm64/Makefile            |  1 +
+>  tools/perf/arch/arm64/include/perf_regs.h |  2 ++
+>  tools/perf/arch/arm64/tests/regs_load.S   | 39 +++++++++++++++++++++++++++++++
+>  3 files changed, 42 insertions(+)
+>  create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+> 
+> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+> index 67e9b3d..9b8f87e 100644
+> --- a/tools/perf/arch/arm64/Makefile
+> +++ b/tools/perf/arch/arm64/Makefile
+> @@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+>  endif
+>  ifndef NO_LIBUNWIND
+>  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
+> +LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+>  endif
+> diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
+> index 2359546..1e052f1 100644
+> --- a/tools/perf/arch/arm64/include/perf_regs.h
+> +++ b/tools/perf/arch/arm64/include/perf_regs.h
+> @@ -9,6 +9,8 @@
+>  #define PERF_REG_IP	PERF_REG_ARM64_PC
+>  #define PERF_REG_SP	PERF_REG_ARM64_SP
+>  
+> +void perf_regs_load(u64 *regs);
+> +
+>  static inline const char *perf_reg_name(int id)
+>  {
+>  	switch (id) {
+> diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+> new file mode 100644
+> index 0000000..92ab968
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/tests/regs_load.S
+> @@ -0,0 +1,39 @@
+> +#include <linux/linkage.h>
+> +
+> +/*
+> + * Implementation of void perf_regs_load(u64 *regs);
+> + *
+> + * This functions fills in the 'regs' buffer from the actual registers values,
+> + * in the way the perf built-in unwinding test expects them:
+> + * - the PC at the time at the call to this function. Since this function
+> + *   is called using a bl instruction, the PC value is taken from LR,
 
-	Arnd
+Is it guaranteed that this function is always invoked with a branch with
+link instruction, or is that just what current compiler versions are
+doing? I couldn't see where we would get that guarantee from.
+
+If it is called with a branch with link, then the LR value will be the
+PC at call time + 4, rather than just the exact PC at call time. If not
+then we don't have a guaranteed relationship between the PC at call time
+and the current LR value.
+
+If the only place that perf_regs_load is used is a single test which
+doesn't care about the precise PC at the time of the call, then it's
+probably OK to use the LR value, but we should be careful to document
+what the faked-up PC actually is and how we expect it to be used.
+
+> + * - the current SP (not touched by this function),
+> + * - the current value of LR is merely retrieved and stored because the
+> + *   value before the call to this function is unknown at this time; it will
+> + *   be unwound from the dwarf information in unwind__get_entries.
+> + */
+> +
+> +.text
+> +.type perf_regs_load,%function
+> +ENTRY(perf_regs_load)
+> +	stp x0,  x1,  [x0], #16	// store x0..x29
+> +	stp x2,  x3,  [x0], #16
+> +	stp x4,  x5,  [x0], #16
+> +	stp x6,  x7,  [x0], #16
+> +	stp x8,  x9,  [x0], #16
+> +	stp x10, x11, [x0], #16
+> +	stp x12, x13, [x0], #16
+> +	stp x14, x15, [x0], #16
+> +	stp x16, x17, [x0], #16
+> +	stp x18, x19, [x0], #16
+> +	stp x20, x21, [x0], #16
+> +	stp x22, x23, [x0], #16
+> +	stp x24, x25, [x0], #16
+> +	stp x26, x27, [x0], #16
+> +	stp x28, x29, [x0], #16
+> +	mov x1,  sp
+> +	stp x30, x1,  [x0], #16	// store lr and sp
+> +	str x30, [x0]		// store pc as lr in order to skip the call
+> +				//  to this function
+
+It might be better to word this a "store the lr in place of the pc". To
+me at least the current wording implies the opposite of what the code
+seems to be doing.
+
+Cheers,
+Mark.
