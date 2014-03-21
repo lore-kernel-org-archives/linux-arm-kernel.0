@@ -1,97 +1,63 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Mar 2014 13:13:52 +0100
-Subject: [PATCH 5/5] ARM: berlin/dt: add cpupll and syspll support to BG2
-In-Reply-To: <1395402220-23503-6-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 21 Mar 2014 13:16:29 +0100
+Subject: [PATCH 2/5] clk: berlin: add berlin clocks DT bindings
+ documentation
+In-Reply-To: <1395402220-23503-3-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395402220-23503-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532C2D00.2080508@gmail.com>
+ <1395402220-23503-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <532C2D9D.4050901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
-> This also moves the clocks from the clocks container node to the root.
-
-Same comments as for patch 4/5.
-
+> Cc: devicetree at vger.kernel.org
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->   arch/arm/boot/dts/berlin2.dtsi | 56 +++++++++++++++++++++++++++++-------------
->   1 file changed, 39 insertions(+), 17 deletions(-)
+>   .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
+>   1 file changed, 29 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
 >
-> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> index 56a1af2f1052..4b82076ef1ed 100644
-> --- a/arch/arm/boot/dts/berlin2.dtsi
-> +++ b/arch/arm/boot/dts/berlin2.dtsi
-> @@ -37,24 +37,46 @@
->   		};
->   	};
->
-> -	clocks {
-> -		smclk: sysmgr-clock {
-> -			compatible = "fixed-clock";
-> -			#clock-cells = <0>;
-> -			clock-frequency = <25000000>;
-> -		};
-> +	smclk: sysmgr-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +	};
->
-> -		cfgclk: cfg-clock {
-> -			compatible = "fixed-clock";
-> -			#clock-cells = <0>;
-> -			clock-frequency = <100000000>;
-> -		};
-> +	cfgclk: cfg-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +	};
->
-> -		sysclk: system-clock {
-> -			compatible = "fixed-clock";
-> -			#clock-cells = <0>;
-> -			clock-frequency = <400000000>;
-> -		};
-> +	syspll: syspll {
-> +		compatible = "marvell,berlin2-pll";
-> +		clocks = <&smclk>;
-> +		#clock-cells = <0>;
-> +		reg = <0xf7ea0014 8>;
-> +	};
+> diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> new file mode 100644
+> index 000000000000..ebc78f9b93a9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> @@ -0,0 +1,29 @@
+> +Device Tree Clock bindings for Marvell Berlin clocks
 > +
-> +	cpupll: cpupll {
-> +		compatible = "marvell,berlin2-pll";
-> +		clocks = <&smclk>;
-> +		#clock-cells = <0>;
-> +		reg = <0xf7ea003c 8>;
-> +	};
+> +This binding uses the common clock binding[1].
 > +
-> +	cpuclk: cpu-clock {
-> +		compatible = "fixed-factor-clock";
-> +		clocks = <&cpupll>;
-> +		#clock-cells = <0>;
-> +		clock-div = <1>;
-> +		clock-mult = <1>;
-> +	};
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 > +
-> +	twdclk: twdclk {
-> +		compatible = "fixed-factor-clock";
-> +		#clock-cells = <0>;
-> +		clocks = <&cpuclk>;
-> +		clock-mult = <1>;
-> +		clock-div = <3>;
->   	};
->
->   	soc {
-> @@ -83,7 +105,7 @@
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg = <0xad0600 0x20>;
->   			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&sysclk>;
-> +			clocks = <&twdclk>;
->   		};
->
->   		apb at e80000 {
+> +Required properties:
+> +- compatible : shall be one of the following:
+> +	"marvell,berlin2-pll" or
+
+nit: just use a comma instead of "or" otherwise that "or" will
+be pushed to the new last compatible every time we add a compatible.
+
+> +	"marvell,berlin2q-pll":
+> +		CPU PLL and System PLL
+> +- reg : Address and length of the clock register set.
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : shall be the input parent clock phandle for the clock.
+> +
+> +smclk: sysmgr-clock {
+> +	compatible = "fixed-clock";
+> +	#clock-cells = <0>;
+> +	clock-frequency = <25000000>;
+> +};
+> +
+> +cpupll: cpupll {
+
+Reminder: Should receive an update when you change the corresponding
+nodes to cpupll: pll at foo
+
+> +	compatible = "marvell,berlin2-pll";
+> +	clocks = <&smclk>;
+> +	#clock-cells = <0>;
+> +	reg = <0xf7ea003c 8>;
+> +};
+> +
+> +
 >
