@@ -1,35 +1,53 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 21 Mar 2014 09:51:16 +0900
-Subject: [PATCH 14/16] backlight: atmel-pwm-bl: remove obsolete driver
-In-Reply-To: <20140319142231.GF20872@samfundet.no>
-References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395234209-15546-15-git-send-email-alexandre.belloni@free-electrons.com>
- <20140319142231.GF20872@samfundet.no>
-Message-ID: <000101cf449f$aa609960$ff21cc20$%han@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Mar 2014 01:18:43 +0000
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <532B86A7.5010200@boundarydevices.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <201403200005.56334.marex@denx.de> <201403200501.16881.marex@denx.de>
+ <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+ <20140320230559.GF7528@n2100.arm.linux.org.uk>
+ <532B86A7.5010200@boundarydevices.com>
+Message-ID: <20140321011843.GG7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 19, 2014 11:23 PM, Hans-Christian Egtvedt wrote:
-> Around Wed 19 Mar 2014 14:03:27 +0100 or thereabout, Alexandre Belloni wrote:
-> > The atmel-pwm-bl driver is now obsolete. It is not used by any mainlined boards
-> > and is replaced by the generic pwm_bl with the pawm-atmel driver using the
-> > generic PWM framework.
-> >
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Thu, Mar 20, 2014 at 05:24:07PM -0700, Troy Kisky wrote:
+> My question is, on a non-cacheable, bufferable write, can an entire 64
+> byte line be written ?  Since our descriptors are only 32 bytes is there
+> contention between the cpu queuing  the next packet and the ENET completing
+> the one before ?
+
+Well, 64-byte lines would be covering descriptors 0,1 2,3 4,5 ... 12,13
+14,15 etc.
+
+However, it wouldn't really make sense because the store buffers in the
+L310 are 32-bytes in size, and there's three of them.  Given that with
+my patch the descriptor updates go through two draining of that buffer
+per update - once after the address, length and other parameters are
+written, then again after the status bits have been written, I think
+it's unlikely that what you're suggesting could be a possibility,
+unless there's some bug we don't know about.
+
+Remember, DMA memory is "normal, non-cacheable" so there shouldn't be
+any cache effects going on here - only store buffer effects which may
+delay, merge and/or reorder writes, and that's why we have barriers.
+
+> 13 SH 0x1c00 0x00000000   66   (null)
+> 14    0x9c00 0xce504000   66 de5b90c0
 > 
-> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+> Note that the problematic descriptor(14) is even. That would fit with
+> the above. In your testing, is it always even?
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Since running with my patch on aan iMX6Q, I haven't seen any timeouts,
+and I've run many iperf sessions in both directions (even multiple
+machines hammering the poor iMX6Q, running iperf and/or flood pings
+with various packet sizes.)
 
-Best regards,
-Jingoo Han
+What may be useful to know is which iMX device these are still happening
+on, with my patch applied.  I have both iMX6Q and iMX6S, the 6Q has been
+the focus of my hammering so far...
 
-> 
-> > ---
-> >  drivers/video/backlight/Kconfig        |  11 --
-> >  drivers/video/backlight/Makefile       |   1 -
-> >  drivers/video/backlight/atmel-pwm-bl.c | 223 ---------------------------------
-> >  include/linux/atmel-pwm-bl.h           |  43 -------
-> >  4 files changed, 278 deletions(-)
-> >  delete mode 100644 drivers/video/backlight/atmel-pwm-bl.c
-> >  delete mode 100644 include/linux/atmel-pwm-bl.h
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
