@@ -1,78 +1,91 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 21 Mar 2014 15:09:26 +0100
-Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents
- and rates
-In-Reply-To: <20140321014551.21989.57253@quantum>
-References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
- <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
- <20140321014551.21989.57253@quantum>
-Message-ID: <532C4816.2080102@st.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Fri, 21 Mar 2014 14:15:32 +0000
+Subject: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
+In-Reply-To: <1395400638.4554.5.camel@weser.hi.pengutronix.de>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>	
+ <1395397968-6242-3-git-send-email-phil.edworthy@renesas.com>
+ <1395400638.4554.5.camel@weser.hi.pengutronix.de>
+Message-ID: <OFFBE32003.3827BA14-ON80257CA2.004D7C1E-80257CA2.004E5338@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Lucas,
 
-On 03/21/2014 02:45 AM, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-03-20 05:42:33)
->> Hi Maxime,
->>
->> On 06/03/14 14:45, Maxime Coquelin wrote:
->>> Hi Sylwester,
->>>
->>>        I like the principle of your implementation, but I have two questions:
->>>        1 - How can we manage PM with this solution, as the parent/rate will be
->>> set only once at probe time?
->>>        2 - How to set the parent of a parent clock (which can be shared with
->>> other devices)? Same question about the parent rates.
->>
->> Thanks for your feedback and apologies for late reply.
->>
->> IIUC your first concern is about a situation when clocks need to be
->> reconfigured upon each resume from system sleep or runtime PM resume ?
->> As I mentioned in v1 of the RFC I was considering having individual
->> drivers calling explicitly the clocks set up routine. Presumably this
->> would allow to resolve the power management related issue.
->> One example I'm aware the approach as in this RFC wouldn't work is
->> when a device in a SoC belongs to a power domain, which needs to be
->> first switched on before we can start setting up and the clocks'
->> configuration get lost after the power domain switch off.
->
-> I like Sylwester's approach of handling this one-time setup in the
-> driver core.
->
-> Any kind of fine grained power management should not be hidden by DT,
-> and by definition that logic belongs in the device driver. It can still
-> be nicely abstracted away by runtime pm[1].
->
+Thanks for the review.
+
+On 21/03/2014 11:18, Lucas wrote:
+> Subject: Re: [PATCH v4 2/9] PCI: host: rcar: Add MSI support
+> 
+> Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > ---
+> >  drivers/pci/host/pcie-rcar.c | 232 
+++++++++++++++++++++++++++++++++++++++++++-
+> >  drivers/pci/host/pcie-rcar.h |   5 +
+> >  2 files changed, 236 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pci/host/pcie-rcar.c 
+b/drivers/pci/host/pcie-rcar.c
+> > index 16670e5..cbbcd77 100644
+> > --- a/drivers/pci/host/pcie-rcar.c
+> > +++ b/drivers/pci/host/pcie-rcar.c
+> [...]
+> > +
+> > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+> > +{
+> > +   struct rcar_pcie *pcie = data;
+> > +   struct rcar_msi *msi = &pcie->msi;
+> > +   unsigned long reg;
+> > +
+> > +   reg = pci_read_reg(pcie, PCIEMSIFR);
+> > +
+> > +   while (reg) {
+> > +      unsigned int index = find_first_bit(&reg, 32);
+> > +      unsigned int irq;
+> > +
+> > +      /* clear the interrupt */
+> > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
+> > +
+> > +      irq = irq_find_mapping(msi->domain, index);
+> > +      if (irq) {
+> > +         if (test_bit(index, msi->used))
+> > +            generic_handle_irq(irq);
+> > +         else
+> > +            dev_info(pcie->dev, "unhandled MSI\n");
+> > +      } else {
+> > +         /*
+> > +          * that's weird who triggered this?
+> > +          * just clear it
+> > +          */
+> > +         dev_info(pcie->dev, "unexpected MSI\n");
+> > +      }
+> > +
+> > +      /* see if there's any more pending in this vector */
+> > +      reg = pci_read_reg(pcie, PCIEMSIFR);
+> > +   }
+> > +
+> > +   return IRQ_HANDLED;
+> > +}
+> > +
+> From your DT binding it seems you have only one interrupt from the PCIe
+> core, shared between the MSI irqs and the PCI legacy interrupts.
+> This means this handler may get called without an MSI irq pending, so
+> this function really should have a path where it's returning IRQ_NONE.
+Ah, yes you are right... though actually there are two interrupts, one has 
+some MSI and INTx, the other has the rest of the MSIs.
+
 > Regards,
-> Mike
->
-> [1] Message-ID: <20140320114238.GQ7528@n2100.arm.linux.org.uk>
-How can I access this reference?
+> Lucas
+> 
+> -- 
+> Pengutronix e.K.                           | Lucas Stach |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/ 
+|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 
+|
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 
+|
+> 
 
-Thanks,
-Maxime
-
->
->>
->> OTOH I suspect devices for which one-time clocks setup is sufficient
->> will be quite common. And for these there would need to be a single
->> call to the setup routine in probe() I guess, since it wouldn't be
->> possible to figure out just from the DT data when the actual call
->> should be made.
->>
->> For a global clocks configuration, I thought about specifying that
->> in the clocks controller node, and then to have the setup routine
->> called e.g. from of_clk_init(). I think that could work well enough,
->> together with the patch [1], adding clock dependencies handling.
->> But then the clock frequency set up function would need to be
->> modified to respect the clock parent relationships, similarly as
->> in patch series [2]. A just noticed [2] recently, after posting
->> this RFC (adding Tero at Cc).
->>
->> --
->> Regards,
->> Sylwester
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
->> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
+Thanks
+Phil
