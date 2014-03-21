@@ -1,76 +1,65 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Mar 2014 13:11:29 +0100
-Subject: [PATCH 3/5] ARM: berlin/dt: add cpupll and syspll support to BG2Q
-In-Reply-To: <1395402220-23503-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395402220-23503-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532C2C71.4010703@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 21 Mar 2014 13:14:02 +0100
+Subject: [PATCH 05/20] mmc: mmci: Add DT bindings for signal direction
+In-Reply-To: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
+References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1395404057-27835-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
+Some variants have support for indicating the bus signal directions,
+which currently are configured through platform data.
 
-Alexandre,
+Add corresponding DT bindings to enable us to move away from using the
+platform data.
 
-Thanks for starting this! I'll start with the most obvious
-things first and have a closer look on it later.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ Documentation/devicetree/bindings/mmc/mmci.txt |    4 ++++
+ drivers/mmc/host/mmci.c                        |    7 +++++++
+ 2 files changed, 11 insertions(+)
 
-Missing commit description here.
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q.dtsi | 20 ++++++++++++++++++--
->   1 file changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 07452a7483fa..19d2c82b0664 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -59,10 +59,26 @@
->   		clock-frequency = <100000000>;
->   	};
->
-> +	syspll: syspll {
-
-syspll: pll at ea0030 {
-
-and sort it in between other SoC nodes below. This will
-most likely break clocks in v3.14 but v3.15 will receive
-proper clock init ordering.
-
-> +		compatible = "marvell,berlin2q-pll";
-> +		clocks = <&smclk>;
-> +		#clock-cells = <0>;
-> +		reg = <0xf7ea0030 8>;
-> +	};
-> +
-> +	cpupll: cpupll {
-
-dito.
-
-> +		compatible = "marvell,berlin2q-pll";
-> +		clocks = <&smclk>;
-> +		#clock-cells = <0>;
-> +		reg = <0xf7dd0170 8>;
-> +	};
-> +
->   	cpuclk: cpu-clock {
-> -		compatible = "fixed-clock";
-> +		compatible = "fixed-factor-clock";
-> +		clocks = <&cpupll>;
->   		#clock-cells = <0>;
-> -		clock-frequency = <1200000000>;
-> +		clock-div = <1>;
-> +		clock-mult = <1>;
-
-Hmm, you probably know better than me, but if cpuclk == cpupll
-is always true we don't need another clk layer here. If you
-can scale down cpuclk from cpupll and we just have no driver
-for it, I am fine with it.
-
-Sebastian
-
->   	};
->
->   	twdclk: twdclk {
->
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+index d167562..eb9ad86 100644
+--- a/Documentation/devicetree/bindings/mmc/mmci.txt
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -15,6 +15,7 @@ Optional properties:
+ - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
+ - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+ - vqmmc-supply           : phandle to the regulator device tree node.
++- signal-direction       : a bit pattern, indicating bus signals directions.
+ 
+ Example:
+ 
+@@ -37,6 +38,9 @@ sdi0_per1 at 80126000 {
+ 	mmc-cap-mmc-highspeed;
+ 	cd-gpios  = <&gpio2 31 0x4>; // 95
+ 
++	signal-direction = <(MCI_ST_DATA2DIREN | MCI_ST_CMDDIREN |
++			MCI_ST_DATA0DIREN | MCI_ST_FBCLKEN)>;
++
+ 	vmmc-supply = <&ab8500_ldo_aux3_reg>;
+ 	vqmmc-supply = <&vmmci>;
+ 
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index d6f20ba..76e41ba 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1390,8 +1390,15 @@ static struct mmc_host_ops mmci_ops = {
+ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ 					struct mmci_platform_data *pdata)
+ {
++	u32 sigdir = 0;
+ 	int bus_width = 0;
+ 
++	if (!of_property_read_u32(np, "signal-direction", &sigdir)) {
++		sigdir &= MCI_ST_DATA2DIREN|MCI_ST_CMDDIREN|MCI_ST_DATA0DIREN|
++			MCI_ST_DATA31DIREN|MCI_ST_FBCLKEN|MCI_ST_DATA74DIREN;
++		pdata->sigdir = sigdir;
++	}
++
+ 	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
+ 	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
+ 
+-- 
+1.7.9.5
