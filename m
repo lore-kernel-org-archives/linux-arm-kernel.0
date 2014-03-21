@@ -1,36 +1,73 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 21 Mar 2014 22:43:02 +0100
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Select
- CONFIG_MACH_BERLIN_BG2Q
-In-Reply-To: <1395430757-8677-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395430757-8677-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532CB266.6050800@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 23:08:22 +0100
+Subject: [PATCH v2 4/5] ARM: berlin/dt: add cpupll and syspll support to
+ BG2CD
+In-Reply-To: <532CB09E.5000408@gmail.com>
+References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395432521-11055-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <532CB09E.5000408@gmail.com>
+Message-ID: <20140321220821.GI6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
-> Now that we support Berlin BG2Q, select CONFIG_MACH_BERLIN_BG2Q so that we can
-> boot BG2Q based boards like the BG2Q DMP.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 21/03/2014 at 22:35:26 +0100, Sebastian Hesselbarth wrote :
+> On 03/21/2014 09:08 PM, Alexandre Belloni wrote:
+> >The Berlin BG2CD has two supported PLLs: CPU PLL and System PLL, add those to
+> >the SoC device tree.
+> >
+> >This also moves the remaining clocks from the clocks container node to the root.
+> >
+> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >---
+> >  arch/arm/boot/dts/berlin2cd.dtsi | 48 ++++++++++++++++++++++++++--------------
+> >  1 file changed, 31 insertions(+), 17 deletions(-)
+> >
+> >diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+> >index 094968c27533..bd4e9dd4867e 100644
+> >--- a/arch/arm/boot/dts/berlin2cd.dtsi
+> >+++ b/arch/arm/boot/dts/berlin2cd.dtsi
+> >@@ -30,24 +30,24 @@
+> [...]
+> >@@ -76,7 +76,21 @@
+> >  			compatible = "arm,cortex-a9-twd-timer";
+> >  			reg = <0xad0600 0x20>;
+> >  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> >-			clocks = <&sysclk>;
+> >+			clocks = <&twdclk>;
+> >+		};
+> >+
+> >+		syspll: syspll at ea0014 {
+> >+			compatible = "marvell,berlin2-pll";
+> >+			clocks = <&smclk>;
+> >+			#clock-cells = <0>;
+> >+			reg = <0xf7ea0014 8>;
+> 
+> nit: I prefer hex numbers all over for reg properties. berlin2q already
+> has them, and I'll fixup this and the one below myself.
+> 
 
-Applied to berlin/soc, Thanks!
+Indeed, I did fix that for bg2q and documentation and forgot bg2 and
+bg2cd.
 
-> ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index ee6982976d66..8b09b72fb688 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -15,6 +15,7 @@ CONFIG_ARCH_BCM_MOBILE=y
->   CONFIG_ARCH_BERLIN=y
->   CONFIG_MACH_BERLIN_BG2=y
->   CONFIG_MACH_BERLIN_BG2CD=y
-> +CONFIG_MACH_BERLIN_BG2Q=y
->   CONFIG_GPIO_PCA953X=y
->   CONFIG_ARCH_HIGHBANK=y
->   CONFIG_ARCH_HI3xxx=y
->
+> >+		};
+> >+
+> >+		cpupll: cpupll at ea003c {
+> >+			compatible = "marvell,berlin2-pll";
+> >+			clocks = <&smclk>;
+> >+			#clock-cells = <0>;
+> >+			reg = <0xf7ea003c 8>;
+> 
+> ditto.
+> 
+> Sebastian
+> 
+> >  		};
+> >
+> >  		apb at e80000 {
+> >
+> 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
