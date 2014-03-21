@@ -1,23 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Mar 2014 22:43:22 -0300
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
-References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
- <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <201403200005.56334.marex@denx.de>
- <201403200501.16881.marex@denx.de>
- <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
- <20140320230559.GF7528@n2100.arm.linux.org.uk>
- <532B86A7.5010200@boundarydevices.com>
- <20140321011843.GG7528@n2100.arm.linux.org.uk>
- <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
-Message-ID: <CAOMZO5CxjCHLrY0KTe4j=NiSU3CQVNZWhEAs33Le8ji3NAFETQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Mar 2014 18:45:51 -0700
+Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents and
+ rates
+In-Reply-To: <532AE239.9000800@samsung.com>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
+Message-ID: <20140321014551.21989.57253@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 10:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
+Quoting Sylwester Nawrocki (2014-03-20 05:42:33)
+> Hi Maxime,
+> 
+> On 06/03/14 14:45, Maxime Coquelin wrote:
+> > Hi Sylwester,
+> > 
+> >       I like the principle of your implementation, but I have two questions:
+> >       1 - How can we manage PM with this solution, as the parent/rate will be 
+> > set only once at probe time?
+> >       2 - How to set the parent of a parent clock (which can be shared with 
+> > other devices)? Same question about the parent rates.
+> 
+> Thanks for your feedback and apologies for late reply.
+> 
+> IIUC your first concern is about a situation when clocks need to be
+> reconfigured upon each resume from system sleep or runtime PM resume ?
+> As I mentioned in v1 of the RFC I was considering having individual
+> drivers calling explicitly the clocks set up routine. Presumably this
+> would allow to resolve the power management related issue.
+> One example I'm aware the approach as in this RFC wouldn't work is
+> when a device in a SoC belongs to a power domain, which needs to be
+> first switched on before we can start setting up and the clocks'
+> configuration get lost after the power domain switch off.
 
-> Robert's tests were made on a mx53 (single CortexA9), and its cache
-> controller is not the L310.
+I like Sylwester's approach of handling this one-time setup in the
+driver core.
 
-Ops, I meant CortexA8.
+Any kind of fine grained power management should not be hidden by DT,
+and by definition that logic belongs in the device driver. It can still
+be nicely abstracted away by runtime pm[1].
+
+Regards,
+Mike
+
+[1] Message-ID: <20140320114238.GQ7528@n2100.arm.linux.org.uk>
+
+> 
+> OTOH I suspect devices for which one-time clocks setup is sufficient
+> will be quite common. And for these there would need to be a single
+> call to the setup routine in probe() I guess, since it wouldn't be
+> possible to figure out just from the DT data when the actual call
+> should be made.
+> 
+> For a global clocks configuration, I thought about specifying that
+> in the clocks controller node, and then to have the setup routine
+> called e.g. from of_clk_init(). I think that could work well enough,
+> together with the patch [1], adding clock dependencies handling.
+> But then the clock frequency set up function would need to be
+> modified to respect the clock parent relationships, similarly as
+> in patch series [2]. A just noticed [2] recently, after posting
+> this RFC (adding Tero at Cc).
+> 
+> --
+> Regards,
+> Sylwester
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
+> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
