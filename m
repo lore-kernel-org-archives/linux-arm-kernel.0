@@ -1,72 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Mar 2014 10:51:52 +0000
-Subject: [PATCH v1 1/2] PSCI: Use DT Function ID values only for old
- versions of spec
-In-Reply-To: <CAJ5Y-eYwMKXWiuAx_Kbv8XJ2Ym_jbStuNaNjtWe1RP8Xz+j-Rg@mail.gmail.com>
-References: <1395276865-6868-1-git-send-email-ashwin.chaugule@linaro.org>
- <20140320145742.GF23372@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eYwMKXWiuAx_Kbv8XJ2Ym_jbStuNaNjtWe1RP8Xz+j-Rg@mail.gmail.com>
-Message-ID: <20140321105152.GL23372@e106331-lin.cambridge.arm.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Fri, 21 Mar 2014 11:50:17 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <532BCFCC.4080205@freescale.com>
+References: <532BCFCC.4080205@freescale.com>
+Message-ID: <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 03:39:30PM +0000, Ashwin Chaugule wrote:
-> Hi Mark,
-> 
-> On 20 March 2014 10:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> >>
-> >> +/* PSCI Function ID's for ARM32 as per PSCI spec v0.2 */
-> >
-> > Please drop the superfluous apostrophes, we aren't greengrocers [1].
-> >
-> > %s/ID's/IDs/
-> 
-> Ok. Will fix all the uncouth bacilli. ;)
+With a flash-based BBT there is no reason to move the Factory Bad
+Block Marker from the data area buffer (to where it is mapped by the
+GPMI NAND controller) to the OOB buffer. Thus, make this feature
+configurable via DT. This is required for the Ka-Ro electronics
+platforms.
 
-Cheers :)
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ Documentation/devicetree/bindings/mtd/gpmi-nand.txt |    3 +++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c              |   10 +++++++---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-> >> +     psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_ID_CPU_SUSPEND;
-> >> +     psci_ops.cpu_suspend = psci_cpu_suspend;
-> >> +
-> >> +     psci_function_id[PSCI_FN_CPU_OFF] = PSCI_ID_CPU_OFF;
-> >> +     psci_ops.cpu_off = psci_cpu_off;
-> >> +
-> >> +     psci_function_id[PSCI_FN_CPU_ON] = PSCI_ID_CPU_ON;
-> >> +     psci_ops.cpu_on = psci_cpu_on;
-> >> +
-> >> +     psci_function_id[PSCI_FN_MIGRATE] = PSCI_ID_CPU_MIGRATE;
-> >> +     psci_ops.migrate = psci_migrate;
-> >> +
-> >> +out_put_node:
-> >> +     of_node_put(np);
-> >> +     return err;
-> >> +}
-> >
-> > I'd very much like to see us use AFFINITY_INFO from the start, or we've
-> > got a racy down path (as we have for all PSCI implementations prior to
-> > 0.2), and implementors are likely to skip implementing it if Linux seems
-> > to work, so we'll never be able to rely on it.
-> >
-> > Additionally it'd be nice to check what MIGRATE_INFO_TYPE returns. If it
-> > returns a value other than 2 (MP or not present), then there's some
-> > additional work that we need to perform around a down path or we might
-> > not be able to shut down some CPUs.
-> 
-> The main intention of this patch is to separate function ID detection
-> depending on PSCI versions.
-> So, I think the additional functionality of AFFINITY_INFO and
-> MIGRATE_INFO_TYPE should go in as separate patches. Do you agree?
-
-Unfortunately this has the side effect of seemingly adding support for
-PSCI 0.2 while not actually doing so. I fear that people will begin
-using the "arm,psci-0.2" string before we end up implementing code using
-the other required functionality, and it will turn out we can't make use
-of any of it, because it will cause someone's firmware to blow up.
-
-I do not feel comfortable adding support for a not-quite-psci-0.2,
-especially when adding trivial use of some required functionality does
-not seem that difficult.
-
-Cheers,
-Mark.
+diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+index 458d596..f28949a 100644
+--- a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+@@ -25,6 +25,9 @@ Optional properties:
+                        discoverable or this property is not enabled,
+                        the software may chooses an implementation-defined
+                        ECC scheme.
++  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
++                       area with the byte in the data area but rely on the
++                       BBT for identifying bad blocks.
+ 
+ The device tree may optionally contain sub-nodes describing partitions of the
+ address space. See partition.txt for more detail.
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index bb77f75..98562eb 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1632,9 +1632,6 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	struct bch_geometry *bch_geo = &this->bch_geometry;
+ 	int ret;
+ 
+-	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+-	this->swap_block_mark = !GPMI_IS_MX23(this);
+-
+ 	/* Set up the medium geometry */
+ 	ret = gpmi_set_geometry(this);
+ 	if (ret)
+@@ -1701,6 +1698,13 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+ 	if (of_get_nand_on_flash_bbt(this->dev->of_node))
+ 		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+ 
++	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
++	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
++		this->swap_block_mark = !GPMI_IS_MX23(this);
++
++	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
++		this->swap_block_mark ? "en" : "dis");
++
+ 	/*
+ 	 * Allocate a temporary DMA buffer for reading ID in the
+ 	 * nand_scan_ident().
+-- 
+1.7.10.4
