@@ -1,39 +1,42 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 21 Mar 2014 10:44:23 +0100
-Subject: [PATCH 0/2] ARM: berlin: SMP support
-In-Reply-To: <20140321111457.6bed5091@xhacker>
-References: <1395347986-30203-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140321111457.6bed5091@xhacker>
-Message-ID: <532C09F7.3010003@codethink.co.uk>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 21 Mar 2014 09:48:13 +0000
+Subject: [PATCH 1/2] ARM: move outer_cache declaration out of ifdef
+In-Reply-To: <20140320233920.GD24571@kroah.com>
+References: <20140320233920.GD24571@kroah.com>
+Message-ID: <1395395294-17848-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/14 04:14, Jisheng Zhang wrote:
-> On Thu, 20 Mar 2014 13:39:44 -0700
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->
->> This is a small patch set for SMP support on Marvell Berlin BG2
->> and recently provided BG2Q. Nothing spectacular, as it basically
->> copies SMP holding pen mechanism from mach-prima2 and plat-versatile
->> with minor Berlin specific code for SCU and general purpose registers
->> used by secondary CPUs to get their boot address.
->>
->> There was some IRC discussion with Alexandre about using
->> scu_get_base() instead of a DT node. Although BG2Q is true A9
->> and provides SCU base; BG2 with PJ4b does not and I decided to
->> depend on a DT node for SCU in both cases, which is fine I guess.
->>
->> I tested this on BG2, and BG2CD (which is UP). I expect the
->> Free-Electrons guys to test on BG2Q.
->
-> Although BG2Q and future SoCs will go through PSCI code path finally. But
-> currently, it's OK to use the pen mechanism.
->
-> So for both of these two patches,
+From: Rob Herring <rob.herring@calxeda.com>
 
-Can you not just avoid starting CPUs until the kernel asks
-them to be booted?
+commit 0b53c11d533a8f6688d73fad0baf67dd08ec1b90 upstream.
 
+Move the outer_cache declaration of the CONFIG_OUTER_CACHE ifdef so that
+outer_cache can be used inside IS_ENABLED condition.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+---
+ arch/arm/include/asm/outercache.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 12f71a1..f94784f 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -37,10 +37,10 @@ struct outer_cache_fns {
+ 	void (*resume)(void);
+ };
+ 
+-#ifdef CONFIG_OUTER_CACHE
+-
+ extern struct outer_cache_fns outer_cache;
+ 
++#ifdef CONFIG_OUTER_CACHE
++
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.inv_range)
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.7.10.4
