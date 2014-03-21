@@ -1,100 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 21 Mar 2014 16:37:15 -0700
-Subject: [PATCH v5 10/11] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <1395406414-11707-11-git-send-email-anup.patel@linaro.org>
-References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
- <1395406414-11707-11-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140321233715.GE25519@cbox>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 22 Mar 2014 08:40:12 +0900
+Subject: [PATCH 58/62] ARM: exynos: add missing include of linux/module.h
+In-Reply-To: <201403211642.01108.arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-59-git-send-email-arnd@arndb.de>
+ <027101cf43f4$18b17d00$4a147700$@samsung.com>
+ <201403211642.01108.arnd@arndb.de>
+Message-ID: <00fe01cf455e$e87185b0$b9549110$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 06:23:33PM +0530, Anup Patel wrote:
-> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-> KVM ARM/ARM64. This is a CPU-level function call which can suspend
-> current CPU or current CPU cluster. We don't have VCPU clusters in
-> KVM so for KVM we simply suspend the current VCPU.
+Arnd Bergmann wrote:
 > 
-> The CPU_SUSPEND emulation is not tested much because currently there
-> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-> Simple CPUIDLE driver which is not published due to unstable DT-bindings
-> for PSCI.
-> (For more info, http://lwn.net/Articles/574950/)
+> On Thursday 20 March 2014, Kukjin Kim wrote:
+> > Arnd Bergmann wrote:
+> > >
+> > > After the restructuring of the module.h and init.h headers,
+> > > we now need to include this explicitly here.
+> > >
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >
+> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >
+> > Arnd,
+> >
+> > If you want me to take this fixes for Samsung stuff into samsung tree,
+> > please let me know.
 > 
-> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
-> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
-> for KVM ARM/ARM64.
+> I think it's easier for me to keep the 62 fixes together as a series
+> this time.
 > 
-> Due to this, the CPU_SUSPEND emulation added by this patch only pause
-> current VCPU and to wakeup a suspended VCPU we need to explicity call
-> PSCI CPU_ON from Guest.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm/kvm/psci.c |   24 ++++++++++++++++++++----
->  1 file changed, 20 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 1e85452..e32ad10 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -52,6 +52,22 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
->  	return affinity_mask;
->  }
->  
-> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-> +{
-> +	/*
-> +	 * NOTE: Currently, we don't have any wakeup events for KVM
-> +	 * hence VCPU suspend turns-out to be same as VCPU off request.
-> +	 * This means to suspend a VCPU we simply set the pause flag
-> +	 * and update VCPU registers as-per wakeup parameters provided
-> +	 * via r2 & r3 (or x2 & x3).
-> +	 */
-> +	vcpu->arch.pause = true;
-> +	*vcpu_pc(vcpu) = *vcpu_reg(vcpu, 2);
-> +	*vcpu_reg(vcpu, 0) = *vcpu_reg(vcpu, 3);
+OK.
 
-But the spec states in Section 5.1.2 that if Bit[16] StateType == 0,
-then the entry point and context_id parameters are ignored, because all
-state is retained for a standby state.
-
-I think Mark Rutland commented that KVM should define at last interrupts
-to the CPU as a wakeup event.
-
-> +
-> +	return KVM_PSCI_RET_SUCCESS;
-> +}
-> +
->  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  {
->  	vcpu->arch.pause = true;
-> @@ -195,6 +211,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		 */
->  		val = 2;
->  		break;
-> +	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
-> +	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
-> +		val = kvm_psci_vcpu_suspend(vcpu);
-> +		break;
->  	case KVM_PSCI_0_2_FN_CPU_OFF:
->  		kvm_psci_vcpu_off(vcpu);
->  		val = KVM_PSCI_RET_SUCCESS;
-> @@ -232,10 +252,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		val = KVM_PSCI_RET_SUCCESS;
->  		ret = 0;
->  		break;
-> -	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
-> -	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
-> -		val = KVM_PSCI_RET_NI;
-> -		break;
->  	default:
->  		return -EINVAL;
->  	}
-> -- 
-> 1.7.9.5
+> When I find new bugs later on, it may be better for you and the
+> other platform maintainers to pick those up.
 > 
+OK, thanks.
 
-Thanks,
--Christoffer
+- Kukjin
