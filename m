@@ -1,30 +1,112 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Mar 2014 13:39:17 +0000
-Subject: [PATCH] ARM: topology: Make it clear that all CPUs need to be
- described
-In-Reply-To: <20140321133202.GQ23372@e106331-lin.cambridge.arm.com>
-References: <1395320374-29576-1-git-send-email-broonie@kernel.org>
- <20140321133202.GQ23372@e106331-lin.cambridge.arm.com>
-Message-ID: <20140321133917.GQ11706@sirena.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 21 Mar 2014 14:46:00 +0100
+Subject: [PATCH] sh_eth: pm_runtime should not need null operations
+In-Reply-To: <CAMuHMdVhUwX0DO2+TBhG31HB2sx3_XRW3xPfZ+wH2d8b=RywLQ@mail.gmail.com>
+References: <1395396913-24354-1-git-send-email-ben.dooks@codethink.co.uk>
+ <CAMuHMdWO-kNdWT_AxzAmCTrx3NerWpTG+auFNZTcL5hsbN+++A@mail.gmail.com>
+ <532C1B13.7000805@codethink.co.uk>
+ <CAMuHMdVhUwX0DO2+TBhG31HB2sx3_XRW3xPfZ+wH2d8b=RywLQ@mail.gmail.com>
+Message-ID: <532C4298.2050200@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 01:32:02PM +0000, Mark Rutland wrote:
-> On Thu, Mar 20, 2014 at 12:59:34PM +0000, Mark Brown wrote:
+On 21/03/14 14:24, Geert Uytterhoeven wrote:
+> Hi Ben,
+>
+> (dropping netdev and davem, adding Felipe, Kevin, linux-pm, and
+> linux-arm-kernel)
+>
+> On Fri, Mar 21, 2014 at 11:57 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+>> On 21/03/14 11:30, Geert Uytterhoeven wrote:
+>>> On Fri, Mar 21, 2014 at 11:15 AM, Ben Dooks <ben.dooks@codethink.co.uk>
+>>> wrote:
+>>>> The driver has a no-op for the pm_runtime callbacks but
+>>>> the pm_runtime core should correctly ignore drivers without
+>>>> any pm_rumtime callback ops.
+>>>
+>>> The pm_runtime core doesn't ignore non-existing runtime_{suspend,resume}
+>>> callbacks, it turns them into a failure withv -ENOSYS.
+>>> Only non-existing runtime_idle callbacks are ignored.
+>>
+>> I've added Rafael Wysocki as he may be able to add better
+>> feedback to this issue.
+>>
+>> [snip rpm_susend code block]
+>>
+>> I got very confused here. The clock_ops sets dev->pm_domain
+>> which over-rides the use of the dev->driver->pm entry as the
+>> primary pm for the device. The code above the bit you snipped
+>> does a ladder looking for the pm_runtime entry it calls and
+>> would stop at finding dev->pm_domain as so:
+>>
+>> from drivers/base/power/runtime.c:
+>>      495         if (dev->pm_domain)
+>>      496                 callback = dev->pm_domain->ops.runtime_suspend;
+>>   ...
+>>      502                 callback = dev->bus->pm->runtime_suspend;
+>>      503         else
+>>      504                 callback = NULL;
+>>
+>>
+>> So for drivers on shmobile with drivers/sh/pm_runtime.c enabled
+>> we would never call the drivers' entry as the ops that this code
+>> introduces just calls the pm_clk calls and does not send the
+>> events on.
+>
+> Yes, that's also my understanding.
+>
+> Commit 4d27e9dcff00a6425d779b065ec8892e4f391661 ("PM: Make
+> power domain callbacks take precedence over subsystem ones") explains
+> the rationale behind this.
+>
+> Now, this doesn't prevent your power domain from delegating to other
+> callbacks...
+>
+>> If we send the events on, then we would use pm_generic_runtime_suspend()
+>> to send it. This call treats the lack of runtime_pm driver entry as a
+>> do nothing and return 0 which means in this case the code in sh_eth
+>> is not necessary to have any pm_runtime functions.
+>
+> If the power domain just calls pm_generic_runtime_suspend(), it will only
+> consider the driver-specific callback, bypassing type, class, and
+> bus-specific callbacks.
+>
+> So should the power domain delegate it further using a similar ladder
+> strategy like RPM_GET_CALLBACK() at the core pm level, i.e.
+> try type/class/bus/driver?
+> And type should delegate to class/bus/driver, class to bus/driver, bus to
+> driver?
+>
+>> This means depending on if we have a pm_domain in the path we get
+>> different treatment of NULL runtime pm ops pointer. I am not sure
+>> how to handle this, as IIRC a number of other drivers for Renesas
+>> currently assume that the NULL case is going to be fine for them.
+>>
+>> Changing pm_generic_runtime_suspend() to return ENOSYS would end
+>> up breaking davinci and probably a number of other platforms.
+>>
+>> So questions:
+>>
+>> - Should rpm_suspend() ignore the lack of pm_runtime operations?
+>> - Do we need to add a generic `ignore pm runtime callback`
+>> - Are any other shmobile drivers similarly affected?
+>
+> The code indeed looks a bit like a mix of:
+>    - Lack of callback means it's safe to suspend,
+>    - Lack of callback means it's not safe to suspend.
 
-> > -Any other configuration is consider invalid and therefore must be ignored.
-> > +The nodes describing the CPU topology (cluster/core/thread) can only
-> > +be defined within the cpu-map node and every core/thread in the system
-> > +must be defined within the topology.  Any other configuration is
-> > +consider invalid and therefore must be ignored.
+I thought historically NULL tended to mean it did not care about
+this.
 
-> s/consider/considered/ (or drop the word entirely?).
+The whole thing is giving me a headache as I would expect the
+suspend to start with device and then work down the layers and
+resume to do the opposite. However currently rpm_resume will also
+start at the dev->pm_domain.
 
-Yup (that's a preexisting thing in the text that got reflowed).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/4da148ef/attachment-0001.sig>
+Should the rpm_resume start with the dev->bus->pm and then work
+its way up to the dev->driver->pm callback? If so then the current
+davinci code is also going to be wrong...
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
