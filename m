@@ -1,100 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 17:08:59 +0100
-Subject: [PATCH 26/62] ARM: mvebu: don't select CONFIG_NEON
-In-Reply-To: <532A0D17.9060105@free-electrons.com>
+Date: Fri, 21 Mar 2014 17:11:02 +0100
+Subject: [PATCH 37/62] ARM: sa1100/pxa: fix MTD_XIP build
+In-Reply-To: <20140319201255.GI7528@n2100.arm.linux.org.uk>
 References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <20140319193740.GT15608@titan.lakedaemon.net>
- <532A0D17.9060105@free-electrons.com>
-Message-ID: <201403211708.59462.arnd@arndb.de>
+ <1395257399-359545-38-git-send-email-arnd@arndb.de>
+ <20140319201255.GI7528@n2100.arm.linux.org.uk>
+Message-ID: <201403211711.02404.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 March 2014, Gregory CLEMENT wrote:
-> On 19/03/2014 20:37, Jason Cooper wrote:
-> > On Wed, Mar 19, 2014 at 08:29:23PM +0100, Arnd Bergmann wrote:
-> >> CONFIG_NEON is meant to be user-selectable. Turning it on
-> >> unconditionally means we can't build a smaller kernel when
-> >> we don't need it, and causes build errors if CONFIG_VFP
-> >> is not also enabled.
-> >>
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Jason Cooper <jason@lakedaemon.net>
-> >> Cc: Andrew Lunn <andrew@lunn.ch>
-> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> >> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >> ---
-> >>  arch/arm/mach-mvebu/Kconfig | 2 --
-> >>  1 file changed, 2 deletions(-)
+On Wednesday 19 March 2014, Russell King - ARM Linux wrote:
+> On Wed, Mar 19, 2014 at 08:29:34PM +0100, Arnd Bergmann wrote:
+> > In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
+> > to IOMEM", the definition of the OSCR macro was changed to be an
+> > __iomem pointer, but the same register is also used by the XIP
+> > code. This patch does the corresponding change here as well.
 > > 
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > Since PXA now uses a local variable for the base address of the
+> > ICIP register, the xip_irqpending function has to be moved
+> > into irq.c in the process.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > ---
+> >  arch/arm/mach-pxa/include/mach/mtd-xip.h    | 7 ++++---
+> >  arch/arm/mach-pxa/irq.c                     | 8 ++++++++
+> >  arch/arm/mach-sa1100/include/mach/mtd-xip.h | 4 ++--
+> >  3 files changed, 14 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> > index 990d2bf..c4c90d1 100644
+> > --- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> > +++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+> > @@ -17,11 +17,12 @@
+> >  
+> >  #include <mach/regs-ost.h>
+> >  
+> > -#define xip_irqpending()     (ICIP & ICMR)
+> > +extern bool xip_irqpending(void);
+> >  
+> >  /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+> > -#define xip_currtime()               (OSCR)
+> > -#define xip_elapsed_since(x) (signed)((OSCR - (x)) / 4)
+> > +#define xip_irqpending()     xip_irqpending()
+> > +#define xip_currtime()               readl(OSCR)
+> > +#define xip_elapsed_since(x) (signed)((readl(OSCR) - (x)) / 4)
 > 
+> I don't think you can do that.  I believe xip_irqpending() has to be
+> inline so that the XIP code (located in RAM) can detect when an
+> interrupt is pending, suspend the MTD operation, switch the MTD back
+> to read mode, and then allow the kernel to run.
 > 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> I'd be nervous about this without Nicolas checking it, or it being
+> built and the resulting assembly inspected.
 
-Thanks! Here is my new version.
+Ok, I'll drop this patch from the series for now, and mark it as
+something to be investigated. and apply the change that Nico suggested.
 
 	Arnd
-
->From 59532706506c0b3bf9f46499e7ba6c0f169e3802 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 24 Feb 2014 21:56:19 +0100
-Subject: [PATCH] ARM: mvebu: don't select CONFIG_NEON
-
-CONFIG_NEON is meant to be user-selectable. Turning it on
-unconditionally means we can't build a smaller kernel when
-we don't need it, and causes build errors if CONFIG_VFP
-is not also enabled.
-
-To still have neon enabled however, we need to turn it on
-now in multi_v7_defconfig and mvebu_v7_defconfig.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 9ee12b5..cd16989 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -63,6 +63,7 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
-+CONFIG_NEON=y
- CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 62b6a37..a34713d 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
- CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
-+CONFIG_NEON=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
- CONFIG_PCI=y
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 485513cb..b24a082 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -39,7 +39,6 @@ config MACH_ARMADA_375
- 	select ARMADA_375_CLK
- 	select CPU_V7
- 	select MACH_MVEBU_V7
--	select NEON
- 	select PINCTRL_ARMADA_375
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
-@@ -53,7 +52,6 @@ config MACH_ARMADA_38X
- 	select ARMADA_38X_CLK
- 	select CPU_V7
- 	select MACH_MVEBU_V7
--	select NEON
- 	select PINCTRL_ARMADA_38X
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
