@@ -1,42 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Mar 2014 11:13:53 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140320171930.GA28238@arm.com>
-References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
- <20140320112650.GA1408@red-moon>
- <20140320134357.GE11706@sirena.org.uk>
- <20140320171930.GA28238@arm.com>
-Message-ID: <20140321111353.GA24945@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 21 Mar 2014 12:14:04 +0100
+Subject: [PATCH] Documentation: dt: list all compatible strings for at91
+In-Reply-To: <20140320162100.GU12021@piout.net>
+References: <1395224808-10133-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAL_Jsq+sctq85ZhqKyVa7=r5A0FEDKu36692rRJufyca1gzF6g@mail.gmail.com>
+ <20140320162100.GU12021@piout.net>
+Message-ID: <20140321111403.GA6443@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 05:19:32PM +0000, Catalin Marinas wrote:
-> On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
+Hi,
 
-> > Given ACPI (which really looks like it's going to happen at some point
-> > and presumably make OF optional) I'm not sure removing the handling of
-> > OF is actually constructive but whatever, it's done now...
+On 20/03/2014 at 17:21:00 +0100, Alexandre Belloni wrote :
+> Hi Rob,
+> 
+> On 19/03/2014 at 11:14:43 -0500, Rob Herring wrote :
+> > On Wed, Mar 19, 2014 at 5:26 AM, Alexandre Belloni
+> > <alexandre.belloni@free-electrons.com> wrote:
+> > > Avoids getting the newly introduced warning:
+> > > WARNING: DT compatible string "atmel,at91sam9g45-adc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> > > +                               compatible = "atmel,at91sam9g45-adc";
+> > >
+> > > Introduced by:
+> > > bff5da433525 checkpatch: add DT compatible string documentation checks
+> > 
+> > We should fix checkpatch instead. There are some fixes in progress,
+> > but I don't think it covers this issue. I'm puzzled by this one as I
+> > thought I checked for this case.
+> > 
+> 
+> Will someone take care of it ? I'm not sure how you want to handle that
+> as <chip> is replacing different values depending on the context. Also,
+> while for atmel and freescale, it is replacing the full chip name, that
+> is not the case for nvidia...
+> 
 
-> CONFIG_OF will always be enabled in the kernel even when we get ACPI. We
-> still use the chosen DT node to tell the kernel about ACPI.
+Also, I found that naughty one:
+WARNING: DT compatible string vendor "fixed-clock" appears un-documented -- check ./Documentation/devicetree/bindings/vendor-prefixes.txt
 
-One thing that occurs to me with this - if we've always got a DT even if
-we are booting with ACPI that might confuse code that implements
-handling for firmware idioms.  The regulator code does this sort of
-thing, though in that case we make exactly the same assumptions for ACPI
-and DT so there won't be any confusion.  There's a few other examples
-though and we might acquire more by the time ACPI gets merged.  Probably
-not a big deal but something that needs attention paying.
+and
 
-I was aware that there was a stub DT on ACPI systems but had expected
-that if we were booting with real ACPI support that'd get masked from
-the running system.  I can see why at least initially we'd want to just
-pull in the infrastructure to use when identifying that this is an ACPI
-system.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/1dc5d223/attachment.sig>
+WARNING: DT compatible string vendor "fixed-factor-clock" appears un-documented -- check ./Documentation/devicetree/bindings/vendor-prefixes.txt
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
