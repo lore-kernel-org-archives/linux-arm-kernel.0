@@ -1,50 +1,113 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 21 Mar 2014 10:25:34 +0100
-Subject: [PATCH v2 0/3] ata: ahci_platform related cleanups
-In-Reply-To: <532B3F3F.1050508@redhat.com>
-References: <1395340026-3969-1-git-send-email-b.zolnierkie@samsung.com>
- <532B3F3F.1050508@redhat.com>
-Message-ID: <3053465.Mc0SLxBG1L@amdc1032>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 21 Mar 2014 04:28:00 -0500
+Subject: [PATCH V2] net: micrel : ks8851-ml: add vdd-supply support
+In-Reply-To: <20140321085158.GB30910@pengutronix.de>
+References: <20140321085158.GB30910@pengutronix.de>
+Message-ID: <1395394080-28964-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Few platforms use external regulator to keep the ethernet MAC supplied.
+So, request and enable the regulator for driver functionality.
 
-Hi,
+Fixes: 66fda75f47dc (regulator: core: Replace direct ops->disable usage)
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Suggested-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+This fixes a regression in SDP4430 platform as reported by Russel here:
+http://marc.info/?t=139509918200014&r=1&w=2
 
-On Thursday, March 20, 2014 08:19:27 PM Hans de Goede wrote:
-> Hi,
-> 
-> On 03/20/2014 07:27 PM, Bartlomiej Zolnierkiewicz wrote:
-> > [ v1 was named "ata: add remaining new-style AHCI platform drivers"
-> >   but we are down from 2 drivers to 1 driver so the title of the patch
-> >   series no longer was valid :) ]
-> > 
-> > Hi,
-> > 
-> > This patch series:
-> > - fixes ahci_platform_data->suspend() handling
-> > - moves library AHCI platform code to its own file
-> > - adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
-> > 
-> > Changes since v1:
-> > - dropped no longer needed patch #4 (ST SPEAr1340 AHCI controller driver)
-> > - adressed review comments for patch #3 from Sekhar Nori
-> > - updated patch descriptions
-> 
-> I assume that the spear patch has been dropped since the spear code has
-> already been converted now and thus is no longer using ahci_platform_data ?
+Patch is based on [v3.14-rc7] tag, if it is too late to submit, I can repost
+rebased to git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
 
-Yes, the SPEAr platform AHCI code has been replaced by a proper PHY driver.
+Changes in v2: based on Marcus's comment, switched to managed regulator_get,
+	however retained the enable/disable as balanced.
+v1:  https://patchwork.kernel.org/patch/3871401/
 
-> In that case I think it would best to replace patch 1 with a patch just dropping
-> the suspend and resume callbacks from ahci_platform_data, as they then no
-> longer have any users.
+ .../devicetree/bindings/net/micrel-ks8851.txt      |    1 +
+ drivers/net/ethernet/micrel/ks8851.c               |   24 +++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
 
-I have this on my TODO but since the SPEAr changes are not yet merged upstream
-this have to wait a bit.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/Documentation/devicetree/bindings/net/micrel-ks8851.txt b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+index 11ace3c..4fc3927 100644
+--- a/Documentation/devicetree/bindings/net/micrel-ks8851.txt
++++ b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+@@ -7,3 +7,4 @@ Required properties:
+ 
+ Optional properties:
+ - local-mac-address : Ethernet mac address to use
++- vdd-supply:	supply for Ethernet mac
+diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
+index 727b546a..44923e0 100644
+--- a/drivers/net/ethernet/micrel/ks8851.c
++++ b/drivers/net/ethernet/micrel/ks8851.c
+@@ -23,6 +23,7 @@
+ #include <linux/crc32.h>
+ #include <linux/mii.h>
+ #include <linux/eeprom_93cx6.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/spi/spi.h>
+ 
+@@ -83,6 +84,7 @@ union ks8851_tx_hdr {
+  * @rc_rxqcr: Cached copy of KS_RXQCR.
+  * @eeprom_size: Companion eeprom size in Bytes, 0 if no eeprom
+  * @eeprom: 93CX6 EEPROM state for accessing on-board EEPROM.
++ * @vdd_reg:	Optional regulator supplying the chip
+  *
+  * The @lock ensures that the chip is protected when certain operations are
+  * in progress. When the read or write packet transfer is in progress, most
+@@ -130,6 +132,7 @@ struct ks8851_net {
+ 	struct spi_transfer	spi_xfer2[2];
+ 
+ 	struct eeprom_93cx6	eeprom;
++	struct regulator	*vdd_reg;
+ };
+ 
+ static int msg_enable;
+@@ -1414,6 +1417,20 @@ static int ks8851_probe(struct spi_device *spi)
+ 	ks->spidev = spi;
+ 	ks->tx_space = 6144;
+ 
++	ks->vdd_reg = regulator_get_optional(&spi->dev, "vdd");
++	if (IS_ERR(ks->vdd_reg)) {
++		ret = PTR_ERR(ks->vdd_reg);
++		if (ret == -EPROBE_DEFER)
++			goto err_reg;
++	} else {
++		ret = regulator_enable(ks->vdd_reg);
++		if (ret) {
++			dev_err(&spi->dev, "regulator enable fail: %d\n",
++				ret);
++			goto err_reg;
++		}
++	}
++
+ 	mutex_init(&ks->lock);
+ 	spin_lock_init(&ks->statelock);
+ 
+@@ -1508,8 +1525,11 @@ static int ks8851_probe(struct spi_device *spi)
+ err_netdev:
+ 	free_irq(ndev->irq, ks);
+ 
+-err_id:
+ err_irq:
++err_id:
++	if (!IS_ERR(ks->vdd_reg))
++		regulator_disable(ks->vdd_reg);
++err_reg:
+ 	free_netdev(ndev);
+ 	return ret;
+ }
+@@ -1523,6 +1543,8 @@ static int ks8851_remove(struct spi_device *spi)
+ 
+ 	unregister_netdev(priv->netdev);
+ 	free_irq(spi->irq, priv);
++	if (!IS_ERR(priv->vdd_reg))
++		regulator_disable(priv->vdd_reg);
+ 	free_netdev(priv->netdev);
+ 
+ 	return 0;
+-- 
+1.7.9.5
