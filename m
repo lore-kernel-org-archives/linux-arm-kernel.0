@@ -1,289 +1,94 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Mar 2014 12:43:36 +0100
-Subject: [PATCH 1/5] clk: berlin: add support for berlin plls
+Date: Fri, 21 Mar 2014 12:43:40 +0100
+Subject: [PATCH 5/5] ARM: berlin/dt: add cpupll and syspll support to BG2
 In-Reply-To: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395402220-23503-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1395402220-23503-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This drivers allows to provide DT clocks for the cpu and system PLLs found on
-Marvell Berlin SoCs.
+This also moves the clocks from the clocks container node to the root.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/Makefile              |   1 +
- drivers/clk/berlin/Makefile       |   1 +
- drivers/clk/berlin/clk.h          |  35 +++++++++++++
- drivers/clk/berlin/pll-berlin2.c  |  41 ++++++++++++++++
- drivers/clk/berlin/pll-berlin2q.c |  41 ++++++++++++++++
- drivers/clk/berlin/pll.c          | 100 ++++++++++++++++++++++++++++++++++++++
- 6 files changed, 219 insertions(+)
- create mode 100644 drivers/clk/berlin/Makefile
- create mode 100644 drivers/clk/berlin/clk.h
- create mode 100644 drivers/clk/berlin/pll-berlin2.c
- create mode 100644 drivers/clk/berlin/pll-berlin2q.c
- create mode 100644 drivers/clk/berlin/pll.c
+ arch/arm/boot/dts/berlin2.dtsi | 56 +++++++++++++++++++++++++++++-------------
+ 1 file changed, 39 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index a367a9831717..4a2602737c27 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -29,6 +29,7 @@ obj-$(CONFIG_ARCH_VT8500)		+= clk-vt8500.o
- obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
- obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
- obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
-+obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
- obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
- obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
- ifeq ($(CONFIG_COMMON_CLK), y)
-diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-new file mode 100644
-index 000000000000..4f6580e2a3ee
---- /dev/null
-+++ b/drivers/clk/berlin/Makefile
-@@ -0,0 +1 @@
-+obj-y += pll.o pll-berlin2.o pll-berlin2q.o
-diff --git a/drivers/clk/berlin/clk.h b/drivers/clk/berlin/clk.h
-new file mode 100644
-index 000000000000..41459db31a02
---- /dev/null
-+++ b/drivers/clk/berlin/clk.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2013 Marvell Technology Group Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __BERLIN_CLK_H
-+#define __BERLIN_CLK_H
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..4b82076ef1ed 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -37,24 +37,46 @@
+ 		};
+ 	};
+ 
+-	clocks {
+-		smclk: sysmgr-clock {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <25000000>;
+-		};
++	smclk: sysmgr-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <25000000>;
++	};
+ 
+-		cfgclk: cfg-clock {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <100000000>;
+-		};
++	cfgclk: cfg-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++	};
+ 
+-		sysclk: system-clock {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <400000000>;
+-		};
++	syspll: syspll {
++		compatible = "marvell,berlin2-pll";
++		clocks = <&smclk>;
++		#clock-cells = <0>;
++		reg = <0xf7ea0014 8>;
++	};
 +
-+#include <linux/clk-provider.h>
++	cpupll: cpupll {
++		compatible = "marvell,berlin2-pll";
++		clocks = <&smclk>;
++		#clock-cells = <0>;
++		reg = <0xf7ea003c 8>;
++	};
 +
-+struct berlin_pllmap {
-+	const u8	*vcodiv;
-+	u32		fbdiv_mask;
-+	u32		rfdiv_mask;
-+	u32		divsel_mask;
-+	u8		fbdiv_shift;
-+	u8		rfdiv_shift;
-+	u8		divsel_shift;
-+	u8		mult;
-+};
++	cpuclk: cpu-clock {
++		compatible = "fixed-factor-clock";
++		clocks = <&cpupll>;
++		#clock-cells = <0>;
++		clock-div = <1>;
++		clock-mult = <1>;
++	};
 +
-+extern void __init berlin_pll_setup(struct device_node *np,
-+				struct berlin_pllmap *map);
-+
-+#endif /* BERLIN_CLK_H */
-diff --git a/drivers/clk/berlin/pll-berlin2.c b/drivers/clk/berlin/pll-berlin2.c
-new file mode 100644
-index 000000000000..5f5b4674f811
---- /dev/null
-+++ b/drivers/clk/berlin/pll-berlin2.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (c) 2014 Marvell Technology Group Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+
-+#include "clk.h"
-+
-+static const u8 vcodiv_berlin2[] = {10, 15, 20, 25, 30, 40, 50, 60, 80};
-+
-+static struct berlin_pllmap berlin_pll_map = {
-+	.vcodiv = vcodiv_berlin2,
-+	.fbdiv_mask = 0x1FF,
-+	.rfdiv_mask = 0x1F,
-+	.divsel_mask = 0xF,
-+	.fbdiv_shift = 6,
-+	.rfdiv_shift = 1,
-+	.divsel_shift = 7,
-+	.mult = 10,
-+};
-+
-+static void __init berlin2_pll_setup(struct device_node *np)
-+{
-+	berlin_pll_setup(np, &berlin_pll_map);
-+}
-+CLK_OF_DECLARE(berlin2q_pll, "marvell,berlin2-pll", berlin2_pll_setup);
-+
-diff --git a/drivers/clk/berlin/pll-berlin2q.c b/drivers/clk/berlin/pll-berlin2q.c
-new file mode 100644
-index 000000000000..8ddfa69cf8c4
---- /dev/null
-+++ b/drivers/clk/berlin/pll-berlin2q.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (c) 2013 Marvell Technology Group Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+
-+#include "clk.h"
-+
-+static const u8 vcodiv_berlin2q[] = {1, 0, 2, 0, 3, 4, 0, 6, 8};
-+
-+static struct berlin_pllmap berlin2q_pll_map = {
-+	.vcodiv = vcodiv_berlin2q,
-+	.fbdiv_mask = 0x1FF,
-+	.rfdiv_mask = 0x1F,
-+	.divsel_mask = 0xF,
-+	.fbdiv_shift = 7,
-+	.rfdiv_shift = 2,
-+	.divsel_shift = 9,
-+	.mult = 1,
-+};
-+
-+static void __init berlin2q_pll_setup(struct device_node *np)
-+{
-+	berlin_pll_setup(np, &berlin2q_pll_map);
-+}
-+CLK_OF_DECLARE(berlin2q_pll, "marvell,berlin2q-pll", berlin2q_pll_setup);
-+
-diff --git a/drivers/clk/berlin/pll.c b/drivers/clk/berlin/pll.c
-new file mode 100644
-index 000000000000..188b385af436
---- /dev/null
-+++ b/drivers/clk/berlin/pll.c
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright (c) 2013 Marvell Technology Group Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+
-+#include "clk.h"
-+
-+struct berlin_pll {
-+	struct clk_hw	hw;
-+	void __iomem	*base;
-+	void		*data;
-+};
-+
-+#define to_berlin_pll(hw)	container_of(hw, struct berlin_pll, hw)
-+
-+#define PLL_CTRL0	0x00
-+#define PLL_CTRL1	0x04
-+
-+static inline u32 berlin_pll_read(struct berlin_pll *pll, unsigned long offset)
-+{
-+	return readl_relaxed(pll->base + offset);
-+}
-+
-+static unsigned long berlin_pll_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct berlin_pll *pll = to_berlin_pll(hw);
-+	struct berlin_pllmap *map = pll->data;
-+	u32 val, fbdiv, rfdiv, vcodivsel;
-+
-+	val = berlin_pll_read(pll, PLL_CTRL0);
-+	fbdiv = (val >> map->fbdiv_shift) & map->fbdiv_mask;
-+	rfdiv = (val >> map->rfdiv_shift) & map->rfdiv_mask;
-+	if (rfdiv == 0)
-+		rfdiv = 1;
-+
-+	val = berlin_pll_read(pll, PLL_CTRL1);
-+	vcodivsel = (val >> map->divsel_shift) & map->divsel_mask;
-+
-+	return parent_rate * fbdiv * map->mult / rfdiv /
-+		map->vcodiv[vcodivsel];
-+}
-+
-+static const struct clk_ops berlin_pll_ops = {
-+	.recalc_rate	= berlin_pll_recalc_rate,
-+};
-+
-+void __init berlin_pll_setup(struct device_node *np,
-+			struct berlin_pllmap *map)
-+{
-+	struct clk_init_data init;
-+	struct berlin_pll *pll;
-+	const char *parent_name;
-+	struct clk *clk;
-+	int ret;
-+
-+	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-+	if (WARN_ON(!pll))
-+		return;
-+
-+	pll->base = of_iomap(np, 0);
-+	if (WARN_ON(!pll->base))
-+		return;
-+
-+	pll->data = map;
-+
-+	init.name = np->name;
-+	init.ops = &berlin_pll_ops;
-+	parent_name = of_clk_get_parent_name(np, 0);
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	pll->hw.init = &init;
-+
-+	clk = clk_register(NULL, &pll->hw);
-+	if (WARN_ON(IS_ERR(clk)))
-+		return;
-+
-+	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	if (WARN_ON(ret))
-+		return;
-+}
-+
++	twdclk: twdclk {
++		compatible = "fixed-factor-clock";
++		#clock-cells = <0>;
++		clocks = <&cpuclk>;
++		clock-mult = <1>;
++		clock-div = <3>;
+ 	};
+ 
+ 	soc {
+@@ -83,7 +105,7 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+ 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&sysclk>;
++			clocks = <&twdclk>;
+ 		};
+ 
+ 		apb at e80000 {
 -- 
 1.8.3.2
