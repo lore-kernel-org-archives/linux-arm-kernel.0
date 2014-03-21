@@ -1,29 +1,35 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Fri, 21 Mar 2014 09:21:41 +0100
-Subject: mxs-auart gives data from previous run after close and reopen
-In-Reply-To: <532B985A.7060505@hurleysoftware.com>
-References: <5323625B.4010203@meduna.org> <532B985A.7060505@hurleysoftware.com>
-Message-ID: <532BF695.3030900@meduna.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Mar 2014 09:28:16 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <532815A8.9090807@ahsoftware.de>
+References: <5316FFCE.1060603@ti.com>
+ <1394018461-757-1-git-send-email-holler@ahsoftware.de>
+ <CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>
+ <5322D529.4070904@ahsoftware.de>
+ <CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>
+ <5326F8C5.5090406@ti.com>
+ <CACRpkdYZMzw31NkA4uSq+ZowzOnZgZthXhZri-eJY2Ozb8aNRQ@mail.gmail.com>
+ <532805AE.9000806@ti.com> <532815A8.9090807@ahsoftware.de>
+Message-ID: <CACRpkdZwhP-wMDeNTEq6ELPsYC48xmppzGYTRLSzUewbqhrMvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2014 02:39, Peter Hurley wrote:
+On Tue, Mar 18, 2014 at 10:45 AM, Alexander Holler <holler@ahsoftware.de> wrote:
 
-> Does disabling the fifo on shutdown clear the fifo?
+> But I don't need any rush here, I'm just unable to understand why the -rc
+> phase isn't used for bug fixing as I believe that's what this phase is for.
 
-I did not try this, but if my theory is correct, it would
-not help, as all this does is reducing the FIFO length
-to one character. So you'd still get up to two characters:
-one in the "FIFO" - it could get there a microsecond after
-you disable the FIFO before you gate the clock - and one
-being received into the shift register (garbled by shutting
-down the clock in the middle of the reception that was
-resumed when clock was resumed on startup). Note that one
-can get preempted here, so the instructions next to each
-other can be milliseconds apart in reality.
+Right now it is mostly a practical issue to me, as I applied the patch to
+the devel (for-next) branch, then committed new development on top of
+it.
 
-IMHO we need a soft-reset here.
+If I send it for fixes now the same patch will come in two ways as I
+really do not like to rebase my tree at this point.
 
-Regards
--- 
-                                     Stano
+So I'd prefer to keep this for next and then have it tagged for stable as
+v3.14 is released, if that is OK?
+
+It's as simple as sending a mail to Greg once it's upstream.
+
+Yours,
+Linus Walleij
