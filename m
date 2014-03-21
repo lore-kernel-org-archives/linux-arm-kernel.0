@@ -1,82 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Mar 2014 21:52:38 -0500
-Subject: [RFC] possible removal of omap-serial
-In-Reply-To: <CAOCHtYhwuAJy-=LJV=eFwzwqzDDPv5RngQ2dVJDOPhYT+J_Mvw@mail.gmail.com>
-References: <20140320235210.GB26964@saruman.home>
- <20140321001228.GA18131@kroah.com>
- <20140321013557.GB29691@saruman.home>
- <20140321013729.GC29691@saruman.home>
- <20140321023646.GB17404@kroah.com>
- <CAOCHtYhwuAJy-=LJV=eFwzwqzDDPv5RngQ2dVJDOPhYT+J_Mvw@mail.gmail.com>
-Message-ID: <20140321025238.GA31610@saruman.home>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 20 Mar 2014 20:12:56 -0700
+Subject: [PATCH] clk: hisilicon: fix warning from smatch
+In-Reply-To: <1394422400-17639-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1394422400-17639-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140321031256.21989.67304@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 09:45:42PM -0500, Robert Nelson wrote:
-> On Thu, Mar 20, 2014 at 9:36 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Thu, Mar 20, 2014 at 08:37:29PM -0500, Felipe Balbi wrote:
-> >> On Thu, Mar 20, 2014 at 08:35:57PM -0500, Felipe Balbi wrote:
-> >> > Hi,
-> >> >
-> >> > On Thu, Mar 20, 2014 at 05:12:28PM -0700, Greg KH wrote:
-> >> > > On Thu, Mar 20, 2014 at 06:52:10PM -0500, Felipe Balbi wrote:
-> >> > > > Hi folks,
-> >> > > >
-> >> > > > I've been toying with the idea of removing
-> >> > > > drivers/tty/serial/omap-serial.c since that's, to put it bluntly, an
-> >> > > > ungly copy of 8250 driver.
-> >> > > >
-> >> > > > The original concern was wrt suspend/resume but I think it'd be a far
-> >> > > > better approach to implement runtime PM in 8250 and write a rather small
-> >> > > > 8250-omap.c glue (much like 8250-acorn.c or 8250-dw.c) just to get the
-> >> > > > OMAP-specific details out of the way.
-> >> > > >
-> >> > > > The question I have is: omap-serial.c calls the serial devnodes ttyO\d,
-> >> > > > instead of ttyS\d so removing omap-serial.c would have a direct impact
-> >> > > > in userland. I wonder if it's an acceptable "regression" considering
-> >> > > > we'd be able to reuse 8250 gaining proper Flow Control support, proper
-> >> > > > DMA support, years and years of bug-fixes, etc.
-> >> > >
-> >> > > Breaking device node names is a contentious issue for serial ports, I
-> >> > > don't think you can do that :(
-> >> >
-> >> > would an upstream udev rule creating a symbolic link from ttyO to ttyS
-> >> > be enough ?
-> >> >
-> >> > I didn't test this yet but I guess this is enough (?)
-> >> >
-> >> > KERNEL=="ttyO[0-9]", GROUP="dialout", SYMLINK+="ttyS"
-> >>
-> >> or actually it should be to other way around, ttyS would be the real
-> >> device:
-> >>
-> >> KERNEL=="ttyS[0-9]", GROUP="dialout", SYMLINK+="ttyO"
-> >
-> > As udev rules don't ship with the kernel, this might be tough to do :(
-> >
-> > Might be easier to make the 8250 driver handle different "names" like
-> > Alan said.
+Quoting Zhangfei Gao (2014-03-09 20:33:20)
+> drivers/clk/hisilicon/clk-hi3620.c:338
+> mmc_clk_delay() warn: always true condition '(para >= 0) => (0-u32max >= 0)'
+> 
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-I'll see if I find a way to avoid that or at least see if we find any
-other way of creating a symlink... In any case, just switching back to
-8250, even if just maintaining ttyO name, is already a big benefit.
+Taken into clk-next.
 
-> On the support side, I'm not looking forward to this for beagle/panda
-> users.  We've already converted them once from ttySx -> ttyOx back in
-> 2.6.33/2.6.34? days.  That was an irc/email/u-boot/kernel nightmare...
+Regards,
+Mike
 
-that's exactly why we're talking about ways to maintain backwards
-compatibility here. But I'm more interested in finding a way to switch
-over to ttyS and have a symlink to ttyO, that way a simple debootstrap
-(or any other ARM distro minimal rootfs) would work out of the box,
-without any changes, just like in "normal" systems.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/c35bb0fa/attachment.sig>
+> ---
+>  drivers/clk/hisilicon/clk-hi3620.c |   15 +++++++--------
+>  1 file changed, 7 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+> index 38faa469d288..e75f742ca422 100644
+> --- a/drivers/clk/hisilicon/clk-hi3620.c
+> +++ b/drivers/clk/hisilicon/clk-hi3620.c
+> @@ -335,15 +335,14 @@ static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
+>  {
+>         u32 i;
+>  
+> -       if (para >= 0) {
+> -               for (i = 0; i < len; i++) {
+> -                       if (para % 2)
+> -                               val |= 1 << (off + i);
+> -                       else
+> -                               val &= ~(1 << (off + i));
+> -                       para = para >> 1;
+> -               }
+> +       for (i = 0; i < len; i++) {
+> +               if (para % 2)
+> +                       val |= 1 << (off + i);
+> +               else
+> +                       val &= ~(1 << (off + i));
+> +               para = para >> 1;
+>         }
+> +
+>         return val;
+>  }
+>  
+> -- 
+> 1.7.9.5
+> 
