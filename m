@@ -1,56 +1,52 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Mar 2014 21:08:38 +0100
-Subject: [PATCH v2 2/5] clk: berlin: add berlin clocks DT bindings
- documentation
-In-Reply-To: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1395432521-11055-3-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 21 Mar 2014 21:08:36 +0100
+Subject: [PATCH v2 0/5] berlin: initial support for the clocks
+Message-ID: <1395432521-11055-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree bindings for the PLLs found on the Marvell Berlin SoCs.
+This series adds support for the berlin PLLs. This allows to remove the bogus
+fixed clocks that are used in the SoCs dts includes.
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+For now, I have left out the AVPLL to ease reviewing.
+
+This is tested on a BG2Q DMP.
+
+Changes in v2:
+ - reworked the DT bindings documentation
+ - removed the cpuclk node
+ - moved the pll node in the soc node and ordered them by address.
+ - renamed clk.h => common.h and removed the stray #include
+ - reordered the includes in pll-*.c
+ - extended the vcodiv tables so that we can't overflow it
+ - reordered the struct berlin_pllmap members assignements
+ - replaced the void *data member of the struct berlin_pll by a
+   struct berlin_pllmap *map
+
+Alexandre Belloni (5):
+  clk: berlin: add support for berlin plls
+  clk: berlin: add berlin clocks DT bindings documentation
+  ARM: berlin/dt: add cpupll and syspll support to BG2Q
+  ARM: berlin/dt: add cpupll and syspll support to BG2CD
+  ARM: berlin/dt: add cpupll and syspll support to BG2
+
+ .../devicetree/bindings/clock/berlin-clock.txt     |  29 ++++++
+ arch/arm/boot/dts/berlin2.dtsi                     |  48 +++++----
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  48 +++++----
+ arch/arm/boot/dts/berlin2q.dtsi                    |  22 +++--
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/berlin/Makefile                        |   4 +
+ drivers/clk/berlin/common.h                        |  35 +++++++
+ drivers/clk/berlin/pll-berlin2.c                   |  42 ++++++++
+ drivers/clk/berlin/pll-berlin2q.c                  |  42 ++++++++
+ drivers/clk/berlin/pll.c                           | 107 +++++++++++++++++++++
+ 10 files changed, 337 insertions(+), 41 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
+ create mode 100644 drivers/clk/berlin/Makefile
+ create mode 100644 drivers/clk/berlin/common.h
+ create mode 100644 drivers/clk/berlin/pll-berlin2.c
+ create mode 100644 drivers/clk/berlin/pll-berlin2q.c
+ create mode 100644 drivers/clk/berlin/pll.c
 
-diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-new file mode 100644
-index 000000000000..49b7860bffb8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-@@ -0,0 +1,29 @@
-+Device Tree Clock bindings for Marvell Berlin clocks
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible: shall be one of the following:
-+	"marvell,berlin2-pll",
-+	"marvell,berlin2q-pll":
-+		CPU PLL and System PLL
-+- reg: Address and length of the clock register set.
-+- #clock-cells: from common clock binding; shall be set to 0.
-+- clocks: from common clock binding
-+
-+smclk: sysmgr-clock {
-+	compatible = "fixed-clock";
-+	#clock-cells = <0>;
-+	clock-frequency = <25000000>;
-+};
-+
-+cpupll: cpupll at ea003c {
-+	compatible = "marvell,berlin2-pll";
-+	clocks = <&smclk>;
-+	#clock-cells = <0>;
-+	reg = <0xea003c 0x8>;
-+};
-+
-+
 -- 
 1.8.3.2
