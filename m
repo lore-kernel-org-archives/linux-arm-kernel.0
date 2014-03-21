@@ -1,28 +1,29 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 21 Mar 2014 10:12:17 +0200
-Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
-In-Reply-To: <20140320212308.21989.36094@quantum>
-References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
- <53172239.3030705@ti.com> <20140320212308.21989.36094@quantum>
-Message-ID: <20140321081217.GD26674@tbergstrom-lnx.Nvidia.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Fri, 21 Mar 2014 09:21:41 +0100
+Subject: mxs-auart gives data from previous run after close and reopen
+In-Reply-To: <532B985A.7060505@hurleysoftware.com>
+References: <5323625B.4010203@meduna.org> <532B985A.7060505@hurleysoftware.com>
+Message-ID: <532BF695.3030900@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 10:23:08PM +0100, Mike Turquette wrote:
-> Quoting Tero Kristo (2014-03-05 05:10:17)
-> > Ping.
-> > 
-> > Mike, any feedback on this?
-> 
-> Hi Tero,
-> 
-> Have you seen Sylwester's approach[1]? I prefer it since it is more
-> device-oriented and less "centralized". The clock consumer enumerates
-> the default parent or rate of a consumed clock. This can be made to work
+On 21.03.2014 02:39, Peter Hurley wrote:
 
-That assumes driver writers are aware of the clock tree topology. IME that's
-seldomly the case.
+> Does disabling the fifo on shutdown clear the fifo?
 
-Cheers,
+I did not try this, but if my theory is correct, it would
+not help, as all this does is reducing the FIFO length
+to one character. So you'd still get up to two characters:
+one in the "FIFO" - it could get there a microsecond after
+you disable the FIFO before you gate the clock - and one
+being received into the shift register (garbled by shutting
+down the clock in the middle of the reception that was
+resumed when clock was resumed on startup). Note that one
+can get preempted here, so the instructions next to each
+other can be milliseconds apart in reality.
 
-Peter.
+IMHO we need a soft-reset here.
+
+Regards
+-- 
+                                     Stano
