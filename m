@@ -1,39 +1,33 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Mar 2014 13:14:04 +0100
-Subject: [PATCH 07/20] ARM: ux500: Add mmci signal directions in DT for href
+Date: Fri, 21 Mar 2014 13:14:09 +0100
+Subject: [PATCH 12/20] mmc: mmci: Enable MMC_CAP_CMD23
 In-Reply-To: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
 References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1395404057-27835-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1395404057-27835-13-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is pure software configuration, which mmci has been supporting for
+a while. Let's enable it as default so we can take benefit from it.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/ste-href.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mmc/host/mmci.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 6cb9b68..d50fe24 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -10,6 +10,7 @@
-  */
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 2e1d1b2..edf3cfd 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1532,6 +1532,9 @@ static int mmci_probe(struct amba_device *dev,
+ 		mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+ 	}
  
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/mmc/mmci.h>
- #include "ste-dbx5x0.dtsi"
- #include "ste-href-family-pinctrl.dtsi"
- 
-@@ -118,6 +119,10 @@
- 			bus-width = <4>;
- 			mmc-cap-sd-highspeed;
- 			mmc-cap-mmc-highspeed;
-+			signal-direction = <(MCI_ST_DATA2DIREN |
-+						MCI_ST_CMDDIREN |
-+						MCI_ST_DATA0DIREN |
-+						MCI_ST_FBCLKEN)>;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 			vqmmc-supply = <&vmmci>;
- 			pinctrl-names = "default", "sleep";
++	/* We support these capabilities. */
++	mmc->caps |= MMC_CAP_CMD23;
++
+ 	if (variant->busy_detect) {
+ 		mmci_ops.card_busy = mmci_card_busy;
+ 		mmci_write_datactrlreg(host, MCI_ST_DPSM_BUSYMODE);
 -- 
 1.7.9.5
