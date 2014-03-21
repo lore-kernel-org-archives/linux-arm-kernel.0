@@ -1,48 +1,132 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 21 Mar 2014 09:45:37 +0100
-Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <532B04D1.9000405@tabi.org>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <1394887464-969-17-git-send-email-mpa@pengutronix.de>
- <1394894616.578942243@f331.i.mail.ru>
- <20140318081019.GJ11360@pengutronix.de>
- <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
- <532B04D1.9000405@tabi.org>
-Message-ID: <20140321084537.GA30910@pengutronix.de>
+Date: Fri, 21 Mar 2014 09:51:58 +0100
+Subject: [PATCH] net: micrel : ks8851-ml: add vdd-supply support
+In-Reply-To: <1395384768-8461-1-git-send-email-nm@ti.com>
+References: <1395384768-8461-1-git-send-email-nm@ti.com>
+Message-ID: <20140321085158.GB30910@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Mar 20, 2014 at 10:10:09AM -0500, Timur Tabi wrote:
-> On 03/20/2014 01:07 AM, Li.Xiubo at freescale.com wrote:
-> >While for the scenario like our LS1(ARM) platform.
-> >CPU		SSI
-> >LE		BE	then should we set the .val_format_endian to
-> >			REGMAP_ENDIAN_BIG
-> >
-> >
-> >And so not only for PowerPC, but also maybe for ARM platforms.
-> >So here how about just adding one Boolean property like 'big-endian' in DT node
-> >to learn the endianness of the devices dynamically ?
+On Fri, Mar 21, 2014 at 01:52:48AM -0500, Nishanth Menon wrote:
+> Few platforms use external regulator to keep the ethernet MAC supplied.
+> So, request and enable the regulator for driver functionality.
 > 
-> That's not a bad idea.  The property should be something like,
-> "fsl,ssi-endian" and is should be set to "big", "little", or
-> "native". In the absence of the property, it should default to
-> native endian.
+> Fixes: 66fda75f47dc (regulator: core: Replace direct ops->disable usage)
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Suggested-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> 
+> This fixes a regression in SDP4430 platform as reported by Russel here:
+> http://marc.info/?t=139509918200014&r=1&w=2
+> 
+> Patch is based on [v3.14-rc7] tag, if it is too late to submit, I can repost
+> rebased to git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
+> 
+>  .../devicetree/bindings/net/micrel-ks8851.txt      |    1 +
+>  drivers/net/ethernet/micrel/ks8851.c               |   30 +++++++++++++++++++-
+>  2 files changed, 30 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/micrel-ks8851.txt b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+> index 11ace3c..4fc3927 100644
+> --- a/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+> +++ b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
+> @@ -7,3 +7,4 @@ Required properties:
+>  
+>  Optional properties:
+>  - local-mac-address : Ethernet mac address to use
+> +- vdd-supply:	supply for Ethernet mac
+> diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
+> index 727b546a..e0c92e0 100644
+> --- a/drivers/net/ethernet/micrel/ks8851.c
+> +++ b/drivers/net/ethernet/micrel/ks8851.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/crc32.h>
+>  #include <linux/mii.h>
+>  #include <linux/eeprom_93cx6.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #include <linux/spi/spi.h>
+>  
+> @@ -83,6 +84,7 @@ union ks8851_tx_hdr {
+>   * @rc_rxqcr: Cached copy of KS_RXQCR.
+>   * @eeprom_size: Companion eeprom size in Bytes, 0 if no eeprom
+>   * @eeprom: 93CX6 EEPROM state for accessing on-board EEPROM.
+> + * @vdd_reg:	Optional regulator supplying the chip
+>   *
+>   * The @lock ensures that the chip is protected when certain operations are
+>   * in progress. When the read or write packet transfer is in progress, most
+> @@ -130,6 +132,7 @@ struct ks8851_net {
+>  	struct spi_transfer	spi_xfer2[2];
+>  
+>  	struct eeprom_93cx6	eeprom;
+> +	struct regulator	*vdd_reg;
+>  };
+>  
+>  static int msg_enable;
+> @@ -1414,6 +1417,21 @@ static int ks8851_probe(struct spi_device *spi)
+>  	ks->spidev = spi;
+>  	ks->tx_space = 6144;
+>  
+> +	ks->vdd_reg = regulator_get_optional(&spi->dev, "vdd");
 
-Perhaps it is better to create some generic binding for that? There may
-be other drivers/components that have the same strange combinations and
-need a similar binding to use for regmap.
+You could use devm_regulator_get_optional here and remove the
+regulator_put.
 
-We could use something like an "endian" property with "big", "little"
-and "native" which is then parsed by some function of the regmap
-framework. It could directly fill those information into the
-struct regmap_config.
-
-Thanks,
+Regards,
 
 Markus
+
+> +	if (IS_ERR(ks->vdd_reg)) {
+> +		ret = PTR_ERR(ks->vdd_reg);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto err_reg;
+> +	} else {
+> +		ret = regulator_enable(ks->vdd_reg);
+> +		if (ret) {
+> +			dev_err(&spi->dev, "regulator enable fail: %d\n",
+> +				ret);
+> +			goto err_reg_en;
+> +		}
+> +	}
+> +
+> +
+>  	mutex_init(&ks->lock);
+>  	spin_lock_init(&ks->statelock);
+>  
+> @@ -1508,8 +1526,14 @@ static int ks8851_probe(struct spi_device *spi)
+>  err_netdev:
+>  	free_irq(ndev->irq, ks);
+>  
+> -err_id:
+>  err_irq:
+> +err_id:
+> +	if (!IS_ERR(ks->vdd_reg))
+> +		regulator_disable(ks->vdd_reg);
+> +err_reg_en:
+> +	if (!IS_ERR(ks->vdd_reg))
+> +		regulator_put(ks->vdd_reg);
+> +err_reg:
+>  	free_netdev(ndev);
+>  	return ret;
+>  }
+> @@ -1523,6 +1547,10 @@ static int ks8851_remove(struct spi_device *spi)
+>  
+>  	unregister_netdev(priv->netdev);
+>  	free_irq(spi->irq, priv);
+> +	if (!IS_ERR(priv->vdd_reg)) {
+> +		regulator_disable(priv->vdd_reg);
+> +		regulator_put(priv->vdd_reg);
+> +	}
+>  	free_netdev(priv->netdev);
+>  
+>  	return 0;
+> -- 
+> 1.7.9.5
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
@@ -55,4 +139,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/418cdc7c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/57d3cc26/attachment-0001.sig>
