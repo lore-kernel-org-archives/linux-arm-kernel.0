@@ -1,45 +1,36 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Mar 2014 13:14:11 +0100
-Subject: [PATCH 14/20] regulator: db8500-prcmu: Set 1.8V as a fixed voltage
- for vsmps2
+Date: Fri, 21 Mar 2014 13:14:12 +0100
+Subject: [PATCH 15/20] ARM: ux500: Add a vmmc regulator through DT for the
+ poped eMMC for href
 In-Reply-To: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
 References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1395404057-27835-15-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1395404057-27835-16-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This regulator is used for system IO and is fixed to 1.8V. Let's give
-consumers the option to fetch the voltage level.
+Add a node in DT for the proper regulator which means we can move away
+from the mmci platform data which currently holds the corresponding OCR
+mask.
 
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
+The mmci driver can then calculate the OCR mask based on the voltages
+supported by the regulator, instead of relying on the platform data.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
+ arch/arm/boot/dts/ste-href.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-Hi Mark and Liam,
-
-Then intent is to merge this complete patchset all together to not break
-anything. Thus I only request for an ack for this particular patch.
-
-Kind regards
-Ulf Hansson 
-
----
- drivers/regulator/db8500-prcmu.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/regulator/db8500-prcmu.c b/drivers/regulator/db8500-prcmu.c
-index 846acf2..617c1ad 100644
---- a/drivers/regulator/db8500-prcmu.c
-+++ b/drivers/regulator/db8500-prcmu.c
-@@ -263,6 +263,8 @@ dbx500_regulator_info[DB8500_NUM_REGULATORS] = {
- 			.ops	= &db8500_regulator_ops,
- 			.type	= REGULATOR_VOLTAGE,
- 			.owner	= THIS_MODULE,
-+			.fixed_uV = 1800000,
-+			.n_voltages = 1,
- 		},
- 		.exclude_from_power_state = true,
- 	},
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index be34beb..bf449de 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -155,6 +155,7 @@
+ 			bus-width = <8>;
+ 			cap-mmc-highspeed;
+ 			non-removable;
++			vmmc-supply = <&db8500_vsmps2_reg>;
+ 			pinctrl-names = "default", "sleep";
+ 			pinctrl-0 = <&sdi2_default_mode>;
+ 			pinctrl-1 = <&sdi2_sleep_mode>;
 -- 
 1.7.9.5
