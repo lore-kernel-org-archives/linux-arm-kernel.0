@@ -1,117 +1,106 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 21 Mar 2014 07:03:41 -0500
-Subject: [PATCH v2 00/12] clk: bcm281xx: updates for 3.15
-In-Reply-To: <1393373752-30875-1-git-send-email-elder@linaro.org>
-References: <1393373752-30875-1-git-send-email-elder@linaro.org>
-Message-ID: <532C2A9D.2080505@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 21 Mar 2014 13:13:20 +0100
+Subject: [PATCH 4/5] ARM: berlin/dt: add cpupll and syspll support to BG2CD
+In-Reply-To: <1395402220-23503-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <532C2CE0.4000205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike, I've given up on getting these in for 3.15, but
-I want to be sure they're considered ASAP for 3.16.
+On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
+> This also moves the clocks from the clocks container node to the root.
 
-You indicated you had questions about the prerequisite
-clocks I proposed.  What I'd like to do is resend only the
-first 7 patches of this series, leaving the patches that
-implement prerequisite clock functionality to work out
-separately.
+Please leave a word on the original intention of the patch here, too.
 
-In that case there is no special device tree dependency
-that would require the patches be taken through arm-soc.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/berlin2cd.dtsi | 56 ++++++++++++++++++++++++++++------------
+>   1 file changed, 39 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+> index 094968c27533..c84013c1597c 100644
+> --- a/arch/arm/boot/dts/berlin2cd.dtsi
+> +++ b/arch/arm/boot/dts/berlin2cd.dtsi
+> @@ -30,24 +30,46 @@
+>   		};
+>   	};
+>
+> -	clocks {
+> -		smclk: sysmgr-clock {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <25000000>;
+> -		};
+> +	smclk: sysmgr-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <25000000>;
+> +	};
+>
+> -		cfgclk: cfg-clock {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <75000000>;
+> -		};
+> +	cfgclk: cfg-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <75000000>;
+> +	};
+>
+> -		sysclk: system-clock {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <300000000>;
+> -		};
+> +	syspll: syspll {
 
-They do, however, still depend on the previous work that
-was queued through arm-soc, so they don't apply on your
-current clk-next branch.
+syspll: pll at ea0014 and sort it in SoC nodes.
 
-How would you like me to handle this?
+> +		compatible = "marvell,berlin2-pll";
+> +		clocks = <&smclk>;
+> +		#clock-cells = <0>;
+> +		reg = <0xf7ea0014 8>;
+> +	};
+> +
+> +	cpupll: cpupll {
 
-Thanks.
+ditto.
 
-					-Alex
+> +		compatible = "marvell,berlin2-pll";
+> +		clocks = <&smclk>;
+> +		#clock-cells = <0>;
+> +		reg = <0xf7ea003c 8>;
+> +	};
+> +
+> +	cpuclk: cpu-clock {
+> +		compatible = "fixed-factor-clock";
+> +		clocks = <&cpupll>;
+> +		#clock-cells = <0>;
+> +		clock-div = <1>;
+> +		clock-mult = <1>;
 
-http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-Branch review/bcm-clk-next-v2
+Same comment about cpuclk to cpupll relation.
 
-bc38518 clk: bcm281xx: add clock hysteresis support
-84f8738 clk: bcm281xx: add clock policy support
-825179f clk: bcm281xx: define CCU clock data statically
-1d2fbb7 clk: bcm281xx: initialize CCU structures statically
-d362801 clk: bcm281xx: change some symbol names
-bcacfe5 clk: bcm281xx: use init_data.name for clock name
-270dc8f clk: bcm281xx: warn if ccu_wait_bit() fails
-
-(based on)
-c771cfb ARM: dts: bcm281xx: define real clocks
-14a091d clk: bcm281xx: don't disable unused peripheral clocks
-44bc5c4 clk: bcm281xx: add initial clock framework support
-dcb99fd Linux 3.14-rc7
-
-
-
-On 02/25/2014 06:15 PM, Alex Elder wrote:
-> This series includes updates for the bcm281xx clock code for 3.15.
-> I had held off posting this until the code on which this is based
-> was queued for 3.14, and it now has been:
->     https://github.com/broadcom/mach-bcm/
->     Branch armsoc/for-3.15/drivers
-> 	clk: bcm281xx: don't disable unused peripheral clocks
-> 	clk: bcm281xx: add initial clock framework support
-> followed by:
->     (same repository)
->     Branch armsoc/for-3.15/dt
-> 	ARM: dts: bcm281xx: define real clocks
-> 
-> The patches in this series are available here:
->     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
->     Branch review/bcm-clk-next-v2
-> 
-> I've grouped them, and offer a little explanation of each of the
-> groups below.
-> 
-> Note:  The final (DT) patch *must* be committed last.
-> 
-> The first version of this series had a patch from the middle of the
-> series that shouldn't have been there, and it has been removed in
-> this version (that patch affected mach-bcm, not clk).  I also split
-> the final patch into two, with the second one isolating the change
-> to a device tree file.
-> 
-> 		    					-Alex
-> 
-> Alex Elder (12):
->   clk: bcm281xx: warn if ccu_wait_bit() fails
->   clk: bcm281xx: use init_data.name for clock name
->   clk: bcm281xx: change some symbol names
->        	Three small code improvements.
-> 
->   clk: bcm281xx: initialize CCU structures statically
->   clk: bcm281xx: define CCU clock data statically
-> 	Rearrange the way CCUs and the clocks they provide are
-> 	defined, so that they're defined statically to the extent
-> 	possible rather than allocating and initializing things at
-> 	runtime.
-> 
->   clk: bcm281xx: add clock policy support
->   clk: bcm281xx: add clock hysteresis support
->   clk: bcm281xx: add an initialized flag
->   clk: bcm281xx: implement prerequisite clocks
->   clk: bcm281xx: add bus clock support
->   clk: bcm281xx: define a bus clock
-> 	Add a few new features, ultimately for the purpose of adding
-> 	support for another type of Kona clock.  Currently only
-> 	peripheral clocks are supported; this adds the ability to
-> 	define and control bus clocks.  In addition, support is
-> 	added for clocks to identify a prerequisite clock; a clock
-> 	won't be initialized until after its prerequisite has been.
-> 
->   ARM: dts: add bus clock bsc3_apb for bcm281xx
->   	Add the new bus clock to the device tree.
-> 
->  arch/arm/boot/dts/bcm11351.dtsi      |    3 +-
->  drivers/clk/bcm/clk-bcm281xx.c       |  254 ++++++++++++--------------
->  drivers/clk/bcm/clk-kona-setup.c     |  331 +++++++++++++++++++++++++++-------
->  drivers/clk/bcm/clk-kona.c           |  331 ++++++++++++++++++++++++++++++++--
->  drivers/clk/bcm/clk-kona.h           |  189 ++++++++++++++++---
->  include/dt-bindings/clock/bcm281xx.h |    3 +-
->  6 files changed, 872 insertions(+), 239 deletions(-)
-> 
+> +	};
+> +
+> +	twdclk: twdclk {
+> +		compatible = "fixed-factor-clock";
+> +		#clock-cells = <0>;
+> +		clocks = <&cpuclk>;
+> +		clock-mult = <1>;
+> +		clock-div = <3>;
+>   	};
+>
+>   	soc {
+> @@ -76,7 +98,7 @@
+>   			compatible = "arm,cortex-a9-twd-timer";
+>   			reg = <0xad0600 0x20>;
+>   			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&sysclk>;
+> +			clocks = <&twdclk>;
+>   		};
+>
+>   		apb at e80000 {
+>
