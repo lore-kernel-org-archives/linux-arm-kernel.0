@@ -1,45 +1,56 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 21 Mar 2014 01:52:25 +0000
-Subject: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <532B04D1.9000405@tabi.org>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <1394887464-969-17-git-send-email-mpa@pengutronix.de>
- <1394894616.578942243@f331.i.mail.ru>
- <20140318081019.GJ11360@pengutronix.de>
- <5b62326226b54b1da0addf839cbcd104@BY2PR03MB505.namprd03.prod.outlook.com>
- <532B04D1.9000405@tabi.org>
-Message-ID: <283cb220a2e5421f8ba7e9ca11bec60d@BY2PR03MB505.namprd03.prod.outlook.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 20 Mar 2014 19:36:46 -0700
+Subject: [RFC] possible removal of omap-serial
+In-Reply-To: <20140321013729.GC29691@saruman.home>
+References: <20140320235210.GB26964@saruman.home>
+ <20140321001228.GA18131@kroah.com>
+ <20140321013557.GB29691@saruman.home>
+ <20140321013729.GC29691@saruman.home>
+Message-ID: <20140321023646.GB17404@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 16/16] ASoC: fsl-ssi: Use regmap
+On Thu, Mar 20, 2014 at 08:37:29PM -0500, Felipe Balbi wrote:
+> On Thu, Mar 20, 2014 at 08:35:57PM -0500, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Mar 20, 2014 at 05:12:28PM -0700, Greg KH wrote:
+> > > On Thu, Mar 20, 2014 at 06:52:10PM -0500, Felipe Balbi wrote:
+> > > > Hi folks,
+> > > > 
+> > > > I've been toying with the idea of removing
+> > > > drivers/tty/serial/omap-serial.c since that's, to put it bluntly, an
+> > > > ungly copy of 8250 driver.
+> > > > 
+> > > > The original concern was wrt suspend/resume but I think it'd be a far
+> > > > better approach to implement runtime PM in 8250 and write a rather small
+> > > > 8250-omap.c glue (much like 8250-acorn.c or 8250-dw.c) just to get the
+> > > > OMAP-specific details out of the way.
+> > > > 
+> > > > The question I have is: omap-serial.c calls the serial devnodes ttyO\d,
+> > > > instead of ttyS\d so removing omap-serial.c would have a direct impact
+> > > > in userland. I wonder if it's an acceptable "regression" considering
+> > > > we'd be able to reuse 8250 gaining proper Flow Control support, proper
+> > > > DMA support, years and years of bug-fixes, etc.
+> > > 
+> > > Breaking device node names is a contentious issue for serial ports, I
+> > > don't think you can do that :(
+> > 
+> > would an upstream udev rule creating a symbolic link from ttyO to ttyS
+> > be enough ?
+> > 
+> > I didn't test this yet but I guess this is enough (?)
+> > 
+> > KERNEL=="ttyO[0-9]", GROUP="dialout", SYMLINK+="ttyS"
 > 
-> On 03/20/2014 01:07 AM, Li.Xiubo at freescale.com wrote:
-> > While for the scenario like our LS1(ARM) platform.
-> > CPU		SSI
-> > LE		BE	then should we set the .val_format_endian to
-> > 			REGMAP_ENDIAN_BIG
-> >
-> >
-> > And so not only for PowerPC, but also maybe for ARM platforms.
-> > So here how about just adding one Boolean property like 'big-endian' in DT
-> node
-> > to learn the endianness of the devices dynamically ?
+> or actually it should be to other way around, ttyS would be the real
+> device:
 > 
-> That's not a bad idea.  The property should be something like,
-> "fsl,ssi-endian" and is should be set to "big", "little", or "native".
-> In the absence of the property, it should default to native endian.
-> 
+> KERNEL=="ttyS[0-9]", GROUP="dialout", SYMLINK+="ttyO"
 
-Well, yes, sounds good.
-That will lead the individual driver a little more complex. I do think that
-The regmap core should use the REGMAP_ENDIAN_SWAP instead of 
-REGMAP_ENDIAN_BIG/LITTLE ones if possible.
+As udev rules don't ship with the kernel, this might be tough to do :(
 
+Might be easier to make the 8250 driver handle different "names" like
+Alan said.
 
-:)
-Thanks,
---
-
-Best Regards,
-Xiubo
+greg k-h
