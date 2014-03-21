@@ -1,113 +1,104 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 21 Mar 2014 04:41:33 -0500
-Subject: [RESEND PATCH V2] net: micrel : ks8851-ml: add vdd-supply support
-In-Reply-To: <20140321085158.GB30910@pengutronix.de>
-References: <20140321085158.GB30910@pengutronix.de>
-Message-ID: <1395394893-32139-1-git-send-email-nm@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Mar 2014 10:42:17 +0100
+Subject: [PATCH 1/2] pinctrl: nomadik: rename secondary to latent
+Message-ID: <1395394937-31503-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Few platforms use external regulator to keep the ethernet MAC supplied.
-So, request and enable the regulator for driver functionality.
+The "secondary irq" in the nomadik pin control driver is actually
+not secondary (as in: can occur any time alongside the ordinary
+irq), it is a latent IRQ. It is an IRQ that has occurred when
+the system was in sleep state and has been cached in a special
+register flagged from the low power management unit (PRCM).
 
-Fixes: 66fda75f47dc (regulator: core: Replace direct ops->disable usage)
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Suggested-by: Markus Pargmann <mpa@pengutronix.de>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-This fixes a regression in SDP4430 platform as reported by Russell here:
-http://marc.info/?t=139509918200014&r=1&w=2
+ drivers/pinctrl/pinctrl-nomadik.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-Patch is based on [v3.14-rc7] tag, if it is too late to submit, I can repost
-rebased to git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
-
-Changes in v2(resend): based on Marcus's comment, switched to managed regulator
-	get, however retained the enable/disable as balanced.
-v1:  https://patchwork.kernel.org/patch/3871401/
-
- .../devicetree/bindings/net/micrel-ks8851.txt      |    1 +
- drivers/net/ethernet/micrel/ks8851.c               |   24 +++++++++++++++++++-
- 2 files changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/net/micrel-ks8851.txt b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-index 11ace3c..4fc3927 100644
---- a/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-+++ b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-@@ -7,3 +7,4 @@ Required properties:
- 
- Optional properties:
- - local-mac-address : Ethernet mac address to use
-+- vdd-supply:	supply for Ethernet mac
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index 727b546a..674a58a 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -23,6 +23,7 @@
- #include <linux/crc32.h>
- #include <linux/mii.h>
- #include <linux/eeprom_93cx6.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <linux/spi/spi.h>
- 
-@@ -83,6 +84,7 @@ union ks8851_tx_hdr {
-  * @rc_rxqcr: Cached copy of KS_RXQCR.
-  * @eeprom_size: Companion eeprom size in Bytes, 0 if no eeprom
-  * @eeprom: 93CX6 EEPROM state for accessing on-board EEPROM.
-+ * @vdd_reg:	Optional regulator supplying the chip
-  *
-  * The @lock ensures that the chip is protected when certain operations are
-  * in progress. When the read or write packet transfer is in progress, most
-@@ -130,6 +132,7 @@ struct ks8851_net {
- 	struct spi_transfer	spi_xfer2[2];
- 
- 	struct eeprom_93cx6	eeprom;
-+	struct regulator	*vdd_reg;
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index cec7762cf335..ee6a8ca264fc 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -254,7 +254,7 @@ struct nmk_gpio_platform_data {
+ 	int first_gpio;
+ 	int first_irq;
+ 	int num_gpio;
+-	u32 (*get_secondary_status)(unsigned int bank);
++	u32 (*get_latent_status)(unsigned int bank);
+ 	void (*set_ioforce)(bool enable);
+ 	bool supports_sleepmode;
  };
- 
- static int msg_enable;
-@@ -1414,6 +1417,20 @@ static int ks8851_probe(struct spi_device *spi)
- 	ks->spidev = spi;
- 	ks->tx_space = 6144;
- 
-+	ks->vdd_reg = devm_regulator_get_optional(&spi->dev, "vdd");
-+	if (IS_ERR(ks->vdd_reg)) {
-+		ret = PTR_ERR(ks->vdd_reg);
-+		if (ret == -EPROBE_DEFER)
-+			goto err_reg;
-+	} else {
-+		ret = regulator_enable(ks->vdd_reg);
-+		if (ret) {
-+			dev_err(&spi->dev, "regulator enable fail: %d\n",
-+				ret);
-+			goto err_reg;
-+		}
-+	}
-+
- 	mutex_init(&ks->lock);
- 	spin_lock_init(&ks->statelock);
- 
-@@ -1508,8 +1525,11 @@ static int ks8851_probe(struct spi_device *spi)
- err_netdev:
- 	free_irq(ndev->irq, ks);
- 
--err_id:
- err_irq:
-+err_id:
-+	if (!IS_ERR(ks->vdd_reg))
-+		regulator_disable(ks->vdd_reg);
-+err_reg:
- 	free_netdev(ndev);
- 	return ret;
+@@ -266,8 +266,8 @@ struct nmk_gpio_chip {
+ 	struct clk *clk;
+ 	unsigned int bank;
+ 	unsigned int parent_irq;
+-	int secondary_parent_irq;
+-	u32 (*get_secondary_status)(unsigned int bank);
++	int latent_parent_irq;
++	u32 (*get_latent_status)(unsigned int bank);
+ 	void (*set_ioforce)(bool enable);
+ 	spinlock_t lock;
+ 	bool sleepmode;
+@@ -909,11 +909,11 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	__nmk_gpio_irq_handler(irq, desc, status);
  }
-@@ -1523,6 +1543,8 @@ static int ks8851_remove(struct spi_device *spi)
  
- 	unregister_netdev(priv->netdev);
- 	free_irq(spi->irq, priv);
-+	if (!IS_ERR(priv->vdd_reg))
-+		regulator_disable(priv->vdd_reg);
- 	free_netdev(priv->netdev);
+-static void nmk_gpio_secondary_irq_handler(unsigned int irq,
++static void nmk_gpio_latent_irq_handler(unsigned int irq,
+ 					   struct irq_desc *desc)
+ {
+ 	struct nmk_gpio_chip *nmk_chip = irq_get_handler_data(irq);
+-	u32 status = nmk_chip->get_secondary_status(nmk_chip->bank);
++	u32 status = nmk_chip->get_latent_status(nmk_chip->bank);
+ 
+ 	__nmk_gpio_irq_handler(irq, desc, status);
+ }
+@@ -923,10 +923,10 @@ static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
+ 	irq_set_chained_handler(nmk_chip->parent_irq, nmk_gpio_irq_handler);
+ 	irq_set_handler_data(nmk_chip->parent_irq, nmk_chip);
+ 
+-	if (nmk_chip->secondary_parent_irq >= 0) {
+-		irq_set_chained_handler(nmk_chip->secondary_parent_irq,
+-					nmk_gpio_secondary_irq_handler);
+-		irq_set_handler_data(nmk_chip->secondary_parent_irq, nmk_chip);
++	if (nmk_chip->latent_parent_irq >= 0) {
++		irq_set_chained_handler(nmk_chip->latent_parent_irq,
++					nmk_gpio_latent_irq_handler);
++		irq_set_handler_data(nmk_chip->latent_parent_irq, nmk_chip);
+ 	}
  
  	return 0;
+@@ -1246,7 +1246,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	struct gpio_chip *chip;
+ 	struct resource *res;
+ 	struct clk *clk;
+-	int secondary_irq;
++	int latent_irq;
+ 	void __iomem *base;
+ 	int irq;
+ 	int ret;
+@@ -1270,8 +1270,8 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	if (irq < 0)
+ 		return irq;
+ 
+-	secondary_irq = platform_get_irq(dev, 1);
+-	if (secondary_irq >= 0 && !pdata->get_secondary_status)
++	latent_irq = platform_get_irq(dev, 1);
++	if (latent_irq >= 0 && !pdata->get_latent_status)
+ 		return -EINVAL;
+ 
+ 	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+@@ -1297,8 +1297,8 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 	nmk_chip->addr = base;
+ 	nmk_chip->chip = nmk_gpio_template;
+ 	nmk_chip->parent_irq = irq;
+-	nmk_chip->secondary_parent_irq = secondary_irq;
+-	nmk_chip->get_secondary_status = pdata->get_secondary_status;
++	nmk_chip->latent_parent_irq = latent_irq;
++	nmk_chip->get_latent_status = pdata->get_latent_status;
+ 	nmk_chip->set_ioforce = pdata->set_ioforce;
+ 	nmk_chip->sleepmode = pdata->supports_sleepmode;
+ 	spin_lock_init(&nmk_chip->lock);
 -- 
-1.7.9.5
+1.8.5.3
