@@ -1,68 +1,73 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Fri, 21 Mar 2014 15:56:04 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <4951263.YfedV5kHCP@wuerfel>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <201403201531.20416.arnd@arndb.de>
- <CAMj5BkgMuw-O7b7KnVgZ9gmTGDv=OhCxvAYBu+wZy=j6m8Anmg@mail.gmail.com>
- <4951263.YfedV5kHCP@wuerfel>
-Message-ID: <CAMj5BkgAv-6fBvf73mXULPF+Cw3VqWfPhi0YRR6WyUS75uD4yw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 21 Mar 2014 08:00:05 +0000
+Subject: [PATCH 2/2] ARM: STi: stih41x: Add support for the FSM Serial Flash
+ Controller
+In-Reply-To: <1395388805-15840-1-git-send-email-lee.jones@linaro.org>
+References: <1395388805-15840-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395388805-15840-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd
+Here we add the necessary device nodes required for successful device
+probing and Pinctrl setup for the FSM when booting on an STiH415 (Orly1)
+or STiH416 (Orly2) based b2020 development board.
 
-On Fri, Mar 21, 2014 at 3:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by Angus Clark <angus.clark@st.com>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih41x-b2020.dtsi  |  1 +
+ arch/arm/boot/dts/stih41x-b2020x.dtsi | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stih41x-b2020x.dtsi
 
->> >> >> +static int hip04_alloc_ring(struct net_device *ndev, struct device *d)
->> >> >> +{
->> >> >> +     struct hip04_priv *priv = netdev_priv(ndev);
->> >> >> +     int i;
->> >> >> +
->> >> >> +     priv->rx_buf_size = RX_BUF_SIZE +
->> >> >> +                         SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
->> >> >> +
->> >> >> +     priv->desc_pool = dma_pool_create(DRV_NAME, d, sizeof(struct tx_desc),
->> >> >> +                             SKB_DATA_ALIGN(sizeof(struct tx_desc)), 0);
->> >> >> +     if (!priv->desc_pool)
->> >> >> +             return -ENOMEM;
->> >> >> +
->> >> >> +     for (i = 0; i < TX_DESC_NUM; i++) {
->> >> >> +             priv->td_ring[i] = dma_pool_alloc(priv->desc_pool,
->> >> >> +                                     GFP_ATOMIC, &priv->td_phys[i]);
->> >> >> +             if (!priv->td_ring[i])
->> >> >> +                     return -ENOMEM;
->> >> >> +     }
->> >> >
->> >> > Why do you create a dma pool here, when you do all the allocations upfront?
->> >> >
->> >> > It looks to me like you could simply turn the td_ring array of pointers
->> >> > to tx descriptors into a an array of tx descriptors (no pointers) and allocate
->> >> > that one using dma_alloc_coherent.
->> >>
->> >> dma pool used here mainly because of alignment,
->> >> the desc has requirement of SKB_DATA_ALIGN,
->> >> so use the simplest way
->> >>         priv->desc_pool = dma_pool_create(DRV_NAME, d, sizeof(struct tx_desc),
->> >>                                 SKB_DATA_ALIGN(sizeof(struct tx_desc)), 0);
->> >
->> > dma_alloc_coherent() will actually give you PAGE_SIZE alignment, so that's
->> > still easier.
->> However since the alignment requirement, it can not simply use desc[i]
->> to get each desc.
->> desc = dma_alloc_coherent(d, size, &phys, GFP_KERNEL);
->> desc[i] is not what we want.
->> So still prefer using dma_pool_alloc here.
->
-> Ah, I see what you mean: struct tx_desc is actually smaller than the
-> required alignment. You can fix that by marking the structure
-> "____cacheline_aligned".
->
-
-Yes, after recheck the method carefully, it works with __aligned(0x40).
-"____cacheline_aligned" is much better.
-The desc can be get with either table or pointer.
-
-Will update accordingly, it is simpler.
-
-Thanks
+diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+index 0ef0a69..01487e0 100644
+--- a/arch/arm/boot/dts/stih41x-b2020.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+@@ -6,6 +6,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * publishhed by the Free Software Foundation.
+  */
++#include "stih41x-b2020x.dtsi"
+ / {
+ 	memory{
+ 		device_type = "memory";
+diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+new file mode 100644
+index 0000000..df01c12
+--- /dev/null
++++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics (R&D) Limited.
++ * Author: Lee Jones <lee.jones@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++/ {
++	soc {
++		spifsm: spifsm at fe902000 {
++			#address-cells = <1>;
++			#size-cells    = <1>;
++
++			status = "okay";
++
++			partition at 0 {
++				label = "SerialFlash1";
++				reg   = <0x00000000 0x00500000>;
++			};
++
++			partition at 500000 {
++				label = "SerialFlash2";
++				reg   = <0x00500000 0x00b00000>;
++			};
++		};
++	};
++};
+-- 
+1.8.3.2
