@@ -1,21 +1,35 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 21 Mar 2014 15:37:27 +0000
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <5326FECF.9070104@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com> <
- 532017B3.708@ti.com> <5326FECF.9070104@ti.com>
-Message-ID: <20140321153727.CCD87C405B0@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 16:42:00 +0100
+Subject: [PATCH 58/62] ARM: exynos: add missing include of linux/module.h
+In-Reply-To: <027101cf43f4$18b17d00$4a147700$@samsung.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-59-git-send-email-arnd@arndb.de>
+ <027101cf43f4$18b17d00$4a147700$@samsung.com>
+Message-ID: <201403211642.01108.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Mar 2014 15:55:27 +0200, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> Hi Grant,
+On Thursday 20 March 2014, Kukjin Kim wrote:
+> Arnd Bergmann wrote:
+> > 
+> > After the restructuring of the module.h and init.h headers,
+> > we now need to include this explicitly here.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> Ping.
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> Are you fine with me proceeding with the current V4L2 port/endpoint
-> bindings?
+> Arnd,
+> 
+> If you want me to take this fixes for Samsung stuff into samsung tree,
+> please let me know.
 
-Sorry, this thread didn't make it past my email filters. Yes, go ahead.
+I think it's easier for me to keep the 62 fixes together as a series
+this time.
 
-g.
+When I find new bugs later on, it may be better for you and the
+other platform maintainers to pick those up.
+
+	Arnd
