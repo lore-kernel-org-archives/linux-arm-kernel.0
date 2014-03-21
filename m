@@ -1,66 +1,153 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 21 Mar 2014 09:48:14 +0000
-Subject: [PATCH 2/2] ARM: highbank: avoid L2 cache smc calls when PL310 is not
- present
-In-Reply-To: <20140320233920.GD24571@kroah.com>
-References: <20140320233920.GD24571@kroah.com>
-Message-ID: <1395395294-17848-2-git-send-email-ian.campbell@citrix.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 21 Mar 2014 11:04:18 +0100
+Subject: [PATCH v3 1/6] sched: rework of sched_domain topology definition
+In-Reply-To: <532B22CF.1030504@arm.com>
+References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
+ <1395246165-31150-2-git-send-email-vincent.guittot@linaro.org>
+ <532AE216.3080106@arm.com>
+ <CAKfTPtB7Gh7Mw8XXGVOiWk8XAJYKB8V18+My86_2c=LAsMLp7Q@mail.gmail.com>
+ <532B22CF.1030504@arm.com>
+Message-ID: <CAKfTPtALFxdiWYa1ka3W+zhKBDshjngbz0Jys8trOgCjnmtDoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 20 March 2014 18:18, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 20/03/14 17:02, Vincent Guittot wrote:
+>> On 20 March 2014 13:41, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>>> On 19/03/14 16:22, Vincent Guittot wrote:
+>>>> We replace the old way to configure the scheduler topology with a new method
+>>>> which enables a platform to declare additionnal level (if needed).
+>>>>
+>>>> We still have a default topology table definition that can be used by platform
+>>>> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
+>>>> be overwritten by an arch which either wants to add new level where a load balance
+>>>> make sense like BOOK or powergating level or wants to change the flags
+>>>> configuration of some levels.
+>>>>
+>>>> For each level, we need a function pointer that returns cpumask for each cpu,
+>>>> a function pointer that returns the flags for the level and a name. Only flags
+>>>> that describe topology, can be set by an architecture. The current topology
+>>>> flags are:
+>>>>  SD_SHARE_CPUPOWER
+>>>>  SD_SHARE_PKG_RESOURCES
+>>>>  SD_NUMA
+>>>>  SD_ASYM_PACKING
+>>>>
+>>>> Then, each level must be a subset on the next one. The build sequence of the
+>>>> sched_domain will take care of removing useless levels like those with 1 CPU
+>>>> and those with the same CPU span and relevant information for load balancing
+>>>> than its child.
+>>>
+>>> The paragraph above contains important information to set this up
+>>> correctly, that's why it might be worth clarifying:
+>>>
+>>> - "next one" of sd means "child of sd" ?
+>>
+>> It's the next one in the table so the parent in the sched_domain
+>
+> Right, it's this way around. DIE is parent of MC is parent of GMC. Maybe
+> you could be more explicit about the parent of relation here?
+>
+>>
+>>> - "subset" means really "subset" and not "proper subset" ?
+>>
+>> yes, it's really "subset" and not "proper subset"
+>>
+>> Vincent
+>>
+>>>
+>>> On TC2 w/ the following change in cpu_corepower_mask()
+>>>
+>>>  const struct cpumask *cpu_corepower_mask(int cpu)
+>>>  {
+>>> -       return &cpu_topology[cpu].thread_sibling;
+>>> +       return cpu_topology[cpu].socket_id ?
+>>> &cpu_topology[cpu].thread_sibling :
+>>> +                       &cpu_topology[cpu].core_sibling;
+>>>  }
+>>>
+>>> I get this e.g. for CPU0,2:
+>>>
+>>> CPU0: cpu_corepower_mask=0-1  -> GMC is subset of MC
+>>> CPU0: cpu_coregroup_mask=0-1
+>>> CPU0: cpu_cpu_mask=0-4
+>>>
+>>> CPU2: cpu_corepower_mask=2    -> GMC is proper sunset of MC
+>>> CPU2: cpu_coregroup_mask=2-4
+>>> CPU2: cpu_cpu_mask=0-4
+>>>
+>>> I assume here that this is a correct set-up.
+>
+> So this is a correct setup?
 
-commit a56a5cf1f2ec895599eace0ac6eba1e4a489e4bf upstream.
+yes it's a correct setup before the degenerate sequence
 
-While Midway firmware handles L2 smc calls as nops, the custom smc calls
-present a problem when running virtualized Midway guest. They aren't
-needed so just avoid calling them.
+>
+>>>
+>>> The domain degenerate part:
+>>>
+>>> "useless levels like those with 1 CPU" ... that's the case for GMC level
+>>> for CPU2,3,4
+>>>
+>>> The GMC level is destroyed because of the following code snippet in
+>>> sd_degenerate(): if (cpumask_weight(sched_domain_span(sd)) == 1)
+>>>
+>>> so that's fine.
+>>>
+>>> In case of CPU0,1 since GMC and MC have the same span, the code in
+>>> build_sched_groups() creates only one group for MC  and that's why
+>>> pflags is altered in sd_parent_degenerate() to SD_WAKE_AFFINE (0x20) and
+>>> the if condition 'if (~cflags & pflags)' is not hit and
+>>> sd_parent_degenerate() finally returns 1 for MC.
+>>>
+>>> So the "those with the same CPU span and relevant information for load
+>>> balancing than its child." is not so easy to understand for me. Because
+>>> both levels have the same span we actually don't take the flags of the
+>>> parent into consideration which require at least 2 groups.
 
-In the process, cleanup the L2X0 ifdefs and use IS_ENABLED instead.
+It's only the case if the parent has got 1 group otherwise we take
+care of all flags
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
----
- arch/arm/mach-highbank/highbank.c |   13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+>>>
+>>> So the TC2 example covers for me two corner cases: (1) The level I want
+>>> to get rid of only contains 1 CPU (GMC for CPU2,3,4) and (2) The span of
+>>> the parent level I want to get rid of (MC for CPU0,1) of is the same as
+>>> the span of the level which should stay.
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 5ed19e8..35d1029 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -65,14 +65,12 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
- 			  HB_JUMP_TABLE_PHYS(cpu) + 15);
- }
- 
--#ifdef CONFIG_CACHE_L2X0
- static void highbank_l2x0_disable(void)
- {
- 	outer_flush_all();
- 	/* Disable PL310 L2 Cache controller */
- 	highbank_smc1(0x102, 0x0);
- }
--#endif
- 
- static void __init highbank_init_irq(void)
- {
-@@ -81,12 +79,13 @@ static void __init highbank_init_irq(void)
- 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
- 		highbank_scu_map_io();
- 
--#ifdef CONFIG_CACHE_L2X0
- 	/* Enable PL310 L2 Cache controller */
--	highbank_smc1(0x102, 0x1);
--	l2x0_of_init(0, ~0UL);
--	outer_cache.disable = highbank_l2x0_disable;
--#endif
-+	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
-+	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
-+		highbank_smc1(0x102, 0x1);
-+		l2x0_of_init(0, ~0UL);
-+		outer_cache.disable = highbank_l2x0_disable;
-+	}
- }
- 
- static void __init highbank_timer_init(void)
--- 
-1.7.10.4
+Having the same span is not enough. There must also no have relevant
+differences in the flags (after removing flags that need more than 1
+group is the parent has only 1 groups)
+
+>>>
+>>> Are these two corner cases the only one supported here? If yes this has
+>>> to be stated somewhere, otherwise if somebody will try this approach on
+>>> a different topology, (s)he might be surprised.
+
+The degenerate sequence is there to remove useless level but it will
+not remove useful level. This rework has not modify the behavior of
+the degenerate sequence so (s)he should take the same care than
+previously.
+
+Vincent
+
+>
+> Could you please comment on the paragraph above too?
+>
+> Thanks,
+>
+> -- Dietmar
+>
+>>>
+>>> If we only consider SD_SHARE_POWERDOMAIN for the socket related level,
+>>> this works fine.
+>>>
+>>> I would like to test this on more platforms but I only have my TC2
+>>> available :-)
+>>>
+>>> -- Dietmar
+>>>
+>>> [...]
+>>>
+>>
+>
+>
