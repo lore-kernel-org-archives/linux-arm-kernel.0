@@ -1,142 +1,39 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 21 Mar 2014 09:51:58 +0100
-Subject: [PATCH] net: micrel : ks8851-ml: add vdd-supply support
-In-Reply-To: <1395384768-8461-1-git-send-email-nm@ti.com>
-References: <1395384768-8461-1-git-send-email-nm@ti.com>
-Message-ID: <20140321085158.GB30910@pengutronix.de>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 21 Mar 2014 09:59:37 +0100
+Subject: [PATCH v2] gpio: davinci: fix gpio selection for OF
+In-Reply-To: <CACRpkdZwhP-wMDeNTEq6ELPsYC48xmppzGYTRLSzUewbqhrMvg@mail.gmail.com>
+References: <5316FFCE.1060603@ti.com>	<1394018461-757-1-git-send-email-holler@ahsoftware.de>	<CACRpkdaF=jc9Z1XZCtH8VPuih01t--qyV-sgH1R_ix0VM4RzVA@mail.gmail.com>	<5322D529.4070904@ahsoftware.de>	<CACRpkdaghneo1MvNCfxjTED+sJepHgeZCgmKsRteG9qrBNWAfQ@mail.gmail.com>	<5326F8C5.5090406@ti.com>	<CACRpkdYZMzw31NkA4uSq+ZowzOnZgZthXhZri-eJY2Ozb8aNRQ@mail.gmail.com>	<532805AE.9000806@ti.com>	<532815A8.9090807@ahsoftware.de>
+ <CACRpkdZwhP-wMDeNTEq6ELPsYC48xmppzGYTRLSzUewbqhrMvg@mail.gmail.com>
+Message-ID: <532BFF79.6070906@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am 21.03.2014 09:28, schrieb Linus Walleij:
+> On Tue, Mar 18, 2014 at 10:45 AM, Alexander Holler <holler@ahsoftware.de> wrote:
+>
+>> But I don't need any rush here, I'm just unable to understand why the -rc
+>> phase isn't used for bug fixing as I believe that's what this phase is for.
+>
+> Right now it is mostly a practical issue to me, as I applied the patch to
+> the devel (for-next) branch, then committed new development on top of
+> it.
+>
+> If I send it for fixes now the same patch will come in two ways as I
+> really do not like to rebase my tree at this point.
+>
+> So I'd prefer to keep this for next and then have it tagged for stable as
+> v3.14 is released, if that is OK?
 
-On Fri, Mar 21, 2014 at 01:52:48AM -0500, Nishanth Menon wrote:
-> Few platforms use external regulator to keep the ethernet MAC supplied.
-> So, request and enable the regulator for driver functionality.
-> 
-> Fixes: 66fda75f47dc (regulator: core: Replace direct ops->disable usage)
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Suggested-by: Markus Pargmann <mpa@pengutronix.de>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> 
-> This fixes a regression in SDP4430 platform as reported by Russel here:
-> http://marc.info/?t=139509918200014&r=1&w=2
-> 
-> Patch is based on [v3.14-rc7] tag, if it is too late to submit, I can repost
-> rebased to git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
-> 
->  .../devicetree/bindings/net/micrel-ks8851.txt      |    1 +
->  drivers/net/ethernet/micrel/ks8851.c               |   30 +++++++++++++++++++-
->  2 files changed, 30 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/micrel-ks8851.txt b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-> index 11ace3c..4fc3927 100644
-> --- a/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-> +++ b/Documentation/devicetree/bindings/net/micrel-ks8851.txt
-> @@ -7,3 +7,4 @@ Required properties:
->  
->  Optional properties:
->  - local-mac-address : Ethernet mac address to use
-> +- vdd-supply:	supply for Ethernet mac
-> diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-> index 727b546a..e0c92e0 100644
-> --- a/drivers/net/ethernet/micrel/ks8851.c
-> +++ b/drivers/net/ethernet/micrel/ks8851.c
-> @@ -23,6 +23,7 @@
->  #include <linux/crc32.h>
->  #include <linux/mii.h>
->  #include <linux/eeprom_93cx6.h>
-> +#include <linux/regulator/consumer.h>
->  
->  #include <linux/spi/spi.h>
->  
-> @@ -83,6 +84,7 @@ union ks8851_tx_hdr {
->   * @rc_rxqcr: Cached copy of KS_RXQCR.
->   * @eeprom_size: Companion eeprom size in Bytes, 0 if no eeprom
->   * @eeprom: 93CX6 EEPROM state for accessing on-board EEPROM.
-> + * @vdd_reg:	Optional regulator supplying the chip
->   *
->   * The @lock ensures that the chip is protected when certain operations are
->   * in progress. When the read or write packet transfer is in progress, most
-> @@ -130,6 +132,7 @@ struct ks8851_net {
->  	struct spi_transfer	spi_xfer2[2];
->  
->  	struct eeprom_93cx6	eeprom;
-> +	struct regulator	*vdd_reg;
->  };
->  
->  static int msg_enable;
-> @@ -1414,6 +1417,21 @@ static int ks8851_probe(struct spi_device *spi)
->  	ks->spidev = spi;
->  	ks->tx_space = 6144;
->  
-> +	ks->vdd_reg = regulator_get_optional(&spi->dev, "vdd");
+Sure.
 
-You could use devm_regulator_get_optional here and remove the
-regulator_put.
+> It's as simple as sending a mail to Greg once it's upstream.
+
+I already though about how to tag every patch I send as Cc: stable, 
+because almost any fix I send either goes through some -next or even 
+-next-next or already is for some stable kernel.
+(I usually don't even look at -rc kernels, just for some special things 
+I'm waiting for, like this of-gpio for davinci.)
 
 Regards,
 
-Markus
-
-> +	if (IS_ERR(ks->vdd_reg)) {
-> +		ret = PTR_ERR(ks->vdd_reg);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto err_reg;
-> +	} else {
-> +		ret = regulator_enable(ks->vdd_reg);
-> +		if (ret) {
-> +			dev_err(&spi->dev, "regulator enable fail: %d\n",
-> +				ret);
-> +			goto err_reg_en;
-> +		}
-> +	}
-> +
-> +
->  	mutex_init(&ks->lock);
->  	spin_lock_init(&ks->statelock);
->  
-> @@ -1508,8 +1526,14 @@ static int ks8851_probe(struct spi_device *spi)
->  err_netdev:
->  	free_irq(ndev->irq, ks);
->  
-> -err_id:
->  err_irq:
-> +err_id:
-> +	if (!IS_ERR(ks->vdd_reg))
-> +		regulator_disable(ks->vdd_reg);
-> +err_reg_en:
-> +	if (!IS_ERR(ks->vdd_reg))
-> +		regulator_put(ks->vdd_reg);
-> +err_reg:
->  	free_netdev(ndev);
->  	return ret;
->  }
-> @@ -1523,6 +1547,10 @@ static int ks8851_remove(struct spi_device *spi)
->  
->  	unregister_netdev(priv->netdev);
->  	free_irq(spi->irq, priv);
-> +	if (!IS_ERR(priv->vdd_reg)) {
-> +		regulator_disable(priv->vdd_reg);
-> +		regulator_put(priv->vdd_reg);
-> +	}
->  	free_netdev(priv->netdev);
->  
->  	return 0;
-> -- 
-> 1.7.9.5
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/57d3cc26/attachment-0001.sig>
+Alexander Holler
