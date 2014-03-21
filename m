@@ -1,73 +1,74 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 21 Mar 2014 10:20:06 -0500
-Subject: [PATCH 05/20] mmc: mmci: Add DT bindings for signal direction
-In-Reply-To: <1395404057-27835-6-git-send-email-ulf.hansson@linaro.org>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
- <1395404057-27835-6-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAL_JsqLFJbC=ZVgc1xu9MN6iYN2871mxvZoJnAQJw3BQU07B+w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 16:27:26 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1395414570-25515-4-git-send-email-zhangfei.gao@linaro.org>
+References: <1395414570-25515-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395414570-25515-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <4230433.d0bAGX3bJV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 7:14 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Some variants have support for indicating the bus signal directions,
-> which currently are configured through platform data.
->
-> Add corresponding DT bindings to enable us to move away from using the
-> platform data.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mmc/mmci.txt |    4 ++++
->  drivers/mmc/host/mmci.c                        |    7 +++++++
->  2 files changed, 11 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-> index d167562..eb9ad86 100644
-> --- a/Documentation/devicetree/bindings/mmc/mmci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-> @@ -15,6 +15,7 @@ Optional properties:
->  - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
->  - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
->  - vqmmc-supply           : phandle to the regulator device tree node.
-> +- signal-direction       : a bit pattern, indicating bus signals directions.
-
-You need to define the bit positions.
-
->
->  Example:
->
-> @@ -37,6 +38,9 @@ sdi0_per1 at 80126000 {
->         mmc-cap-mmc-highspeed;
->         cd-gpios  = <&gpio2 31 0x4>; // 95
->
-> +       signal-direction = <(MCI_ST_DATA2DIREN | MCI_ST_CMDDIREN |
-> +                       MCI_ST_DATA0DIREN | MCI_ST_FBCLKEN)>;
-
-The "ST" here is for STMicro or some ST based company? Use the vendor
-prefix here.
-
-I don't really understand why you need to specify the direction here.
-Data lines are bi-directional and cmd and clk are outputs.
+On Friday 21 March 2014 23:09:30 Zhangfei Gao wrote:
 
 > +
->         vmmc-supply = <&ab8500_ldo_aux3_reg>;
->         vqmmc-supply = <&vmmci>;
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index d6f20ba..76e41ba 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1390,8 +1390,15 @@ static struct mmc_host_ops mmci_ops = {
->  static void mmci_dt_populate_generic_pdata(struct device_node *np,
->                                         struct mmci_platform_data *pdata)
->  {
-> +       u32 sigdir = 0;
->         int bus_width = 0;
->
-> +       if (!of_property_read_u32(np, "signal-direction", &sigdir)) {
-> +               sigdir &= MCI_ST_DATA2DIREN|MCI_ST_CMDDIREN|MCI_ST_DATA0DIREN|
-> +                       MCI_ST_DATA31DIREN|MCI_ST_FBCLKEN|MCI_ST_DATA74DIREN;
+> +static void __iomem *ppebase;
 
-Spaces around the '|'.
+Any reason why you still have this, rather than using a separate
+driver for it as we discussed? If you have comments that you still
+plan to address, please mention those in the introductory mail,
+so you don't get the same review comments multiple times.
 
-Rob
+
+> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
+> +{
+> +	struct hip04_priv *priv = netdev_priv(ndev);
+> +	unsigned tx_head = priv->tx_head;
+> +	unsigned tx_tail = priv->tx_tail;
+> +	struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
+> +
+> +	while (tx_tail != tx_head) {
+> +		if (desc->send_addr != 0) {
+> +			if (force)
+> +				desc->send_addr = 0;
+> +			else
+> +				break;
+> +		}
+> +		if (priv->tx_phys[tx_tail]) {
+> +			dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
+> +				priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
+> +			priv->tx_phys[tx_tail] = 0;
+> +		}
+> +		dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
+> +		priv->tx_skb[tx_tail] = NULL;
+> +		tx_tail = TX_NEXT(tx_tail);
+> +		priv->tx_count--;
+> +	}
+> +	priv->tx_tail = tx_tail;
+> +}
+
+You call this function from start_xmit(), which may be too early, causing the
+dma_unmap_single() and dev_kfree_skb_irq() functions to be called while the
+device is still accessing the data. This is bad.
+
+You have to ensure that you only ever clean up tx buffers that have been
+successfully transmitted. Also, you should use an interrupt to notify you
+of this in case there is no further xmit packet. Otherwise you may have
+a user space program waiting indefinitely for a single packet to get sent
+on a socket.
+
+It's ok to also call the cleanup from start_xmit, but calling it from the
+poll() function or another appropriate place is required.
+
+> +	priv->id = of_alias_get_id(node, "ethernet");
+> +	if (priv->id < 0) {
+> +		dev_warn(d, "no ethernet alias\n");
+> +		ret = -EINVAL;
+> +		goto init_fail;
+> +	}
+
+Apparently you try to rely on the alias to refer to a specific piece
+of hardware, which is not correct. The alias is meant to be selectable
+to match e.g. the numbering written on the external connector, which
+is totally independent of the internal hardware.
+
+	Arnd
