@@ -1,126 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Mar 2014 15:11:26 +0000
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
-References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
- <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140321151126.GR23372@e106331-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Mar 2014 15:16:17 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140321113202.GJ11706@sirena.org.uk>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+ <20140320134357.GE11706@sirena.org.uk>
+ <20140320180836.GA3307@red-moon>
+ <20140321113202.GJ11706@sirena.org.uk>
+Message-ID: <20140321151617.GA11938@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
-On Wed, Mar 19, 2014 at 09:42:33AM +0000, Jean Pihet wrote:
-> Introducing perf_regs_load function, which is going
-> to be used for dwarf unwind test in following patches.
+On Fri, Mar 21, 2014 at 11:32:02AM +0000, Mark Brown wrote:
+> On Thu, Mar 20, 2014 at 06:08:36PM +0000, Lorenzo Pieralisi wrote:
 > 
-> It takes single argument as a pointer to the regs dump
-> buffer and populates it with current registers values, as
-> expected by the perf built-in unwinding test.
+> > > > This ifdef can be removed, CONFIG_OF is always selected for arm64 and
+> > > > the !CONFIG_OF path
 > 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Namhyung Kim <namhyung@kernel.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-> Cc: David Ahern <dsahern@gmail.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> ---
->  tools/perf/arch/arm64/Makefile            |  1 +
->  tools/perf/arch/arm64/include/perf_regs.h |  2 ++
->  tools/perf/arch/arm64/tests/regs_load.S   | 39 +++++++++++++++++++++++++++++++
->  3 files changed, 42 insertions(+)
->  create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+> > > This has been present since the very first time these patches were
+> > > posted but hasn't been mentioned as being a problem previously.
 > 
-> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-> index 67e9b3d..9b8f87e 100644
-> --- a/tools/perf/arch/arm64/Makefile
-> +++ b/tools/perf/arch/arm64/Makefile
-> @@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
->  endif
->  ifndef NO_LIBUNWIND
->  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-> +LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
->  endif
-> diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
-> index 2359546..1e052f1 100644
-> --- a/tools/perf/arch/arm64/include/perf_regs.h
-> +++ b/tools/perf/arch/arm64/include/perf_regs.h
-> @@ -9,6 +9,8 @@
->  #define PERF_REG_IP	PERF_REG_ARM64_PC
->  #define PERF_REG_SP	PERF_REG_ARM64_SP
->  
-> +void perf_regs_load(u64 *regs);
-> +
->  static inline const char *perf_reg_name(int id)
->  {
->  	switch (id) {
-> diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
-> new file mode 100644
-> index 0000000..92ab968
-> --- /dev/null
-> +++ b/tools/perf/arch/arm64/tests/regs_load.S
-> @@ -0,0 +1,39 @@
-> +#include <linux/linkage.h>
-> +
-> +/*
-> + * Implementation of void perf_regs_load(u64 *regs);
-> + *
-> + * This functions fills in the 'regs' buffer from the actual registers values,
-> + * in the way the perf built-in unwinding test expects them:
-> + * - the PC at the time at the call to this function. Since this function
-> + *   is called using a bl instruction, the PC value is taken from LR,
+> > I am sorry, I missed it, doing my best to help you get it through.
+> 
+> Please try to consider this from a submitter point of view; it is quite
+> frustrating every time something that has been around for a while and
+> fairly obvious gets identified as a new issue, it makes it hard to have
+> confidence that addressing review comments is moving closer to getting
+> things accepted.
 
-Is it guaranteed that this function is always invoked with a branch with
-link instruction, or is that just what current compiler versions are
-doing? I couldn't see where we would get that guarantee from.
+I understand that and I apologize, but I will still flag issues up
+as long as I find some. For instance, I noticed patch is missing
+of_node_put() calls almost everywhere DT nodes are parsed and we have
+to fix that before merging it. I can do that to save another respin.
 
-If it is called with a branch with link, then the LR value will be the
-PC at call time + 4, rather than just the exact PC at call time. If not
-then we don't have a guaranteed relationship between the PC at call time
-and the current LR value.
+[...]
 
-If the only place that perf_regs_load is used is a single test which
-doesn't care about the precise PC at the time of the call, then it's
-probably OK to use the LR value, but we should be careful to document
-what the faked-up PC actually is and how we expect it to be used.
+> > I know, it is complex, there is little we can do about that and it is
+> > code run just at cold boot and freed later so I deem that acceptable.
+> 
+> It's not that anything is really complex (the requirements keep on
+> evolving but nothing is particularly hard), it's that we could most
+> likely have had something useful for people already.
 
-> + * - the current SP (not touched by this function),
-> + * - the current value of LR is merely retrieved and stored because the
-> + *   value before the call to this function is unknown at this time; it will
-> + *   be unwound from the dwarf information in unwind__get_entries.
-> + */
-> +
-> +.text
-> +.type perf_regs_load,%function
-> +ENTRY(perf_regs_load)
-> +	stp x0,  x1,  [x0], #16	// store x0..x29
-> +	stp x2,  x3,  [x0], #16
-> +	stp x4,  x5,  [x0], #16
-> +	stp x6,  x7,  [x0], #16
-> +	stp x8,  x9,  [x0], #16
-> +	stp x10, x11, [x0], #16
-> +	stp x12, x13, [x0], #16
-> +	stp x14, x15, [x0], #16
-> +	stp x16, x17, [x0], #16
-> +	stp x18, x19, [x0], #16
-> +	stp x20, x21, [x0], #16
-> +	stp x22, x23, [x0], #16
-> +	stp x24, x25, [x0], #16
-> +	stp x26, x27, [x0], #16
-> +	stp x28, x29, [x0], #16
-> +	mov x1,  sp
-> +	stp x30, x1,  [x0], #16	// store lr and sp
-> +	str x30, [x0]		// store pc as lr in order to skip the call
-> +				//  to this function
+I agree and you are right.
 
-It might be better to word this a "store the lr in place of the pc". To
-me at least the current wording implies the opposite of what the code
-seems to be doing.
+In order to add all these checks this code is getting ways too complex for
+my taste, it is not your problem and it is not mine either, I just can't help
+notice though.
 
-Cheers,
-Mark.
+Patch is complete and I think it is almost ready to get merged.
+Instead of bothering you with another respin with minor changes I suggest
+I will pick the last version up, diff what's needed and repost it here for
+final look so that we are done with it.
+
+Please let me know if that's plausible, thank you.
+
+Lorenzo
