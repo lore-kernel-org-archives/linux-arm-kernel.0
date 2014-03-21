@@ -1,58 +1,50 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 21 Mar 2014 11:55:41 +0100
-Subject: [PATCH v2] drm/i2c: tda998x: Change the compatible strings
-Message-ID: <20140321115541.01cbbb06@armhf>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Mar 2014 10:57:08 +0000
+Subject: [PATCH] iommu/arm-smmu: fix panic in arm_smmu_alloc_init_pte
+In-Reply-To: <1395396367-19110-1-git-send-email-binw@marvell.com>
+References: <1395396367-19110-1-git-send-email-binw@marvell.com>
+Message-ID: <532C1B04.2040601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tda998x driver accepts only 3 chips from the TDA998x family.
-This patch changes the driver compatible strings to these chips.
+Hi Bin,
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v2: change the subject to drm/i2c
-This patch applies after
-	drm/i2c: tda998x: Fix lack of required reg in DT documentation
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 4 ++--
- drivers/gpu/drm/i2c/tda998x_drv.c                     | 4 +++-
- 2 files changed, 5 insertions(+), 3 deletions(-)
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index fc7effa..e3f3d65 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -1,7 +1,7 @@
- Device-Tree bindings for the NXP TDA998x HDMI transmitter
- 
- Required properties;
--  - compatible: must be "nxp,tda998x"
-+  - compatible: may be "nxp,tda9989", "nxp,tda19988" or "nxp,tda19989"
- 
-   - reg: I2C address
- 
-@@ -20,7 +20,7 @@ Optional properties:
- Example:
- 
- 	tda998x: hdmi-encoder {
--		compatible = "nxp,tda998x";
-+		compatible = "nxp,tda19988";
- 		reg = <0x70>;
- 		interrupt-parent = <&gpio0>;
- 		interrupts = <27 2>;		/* falling edge */
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 48af5ca..fd6751c 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1367,7 +1367,9 @@ fail:
- 
- #ifdef CONFIG_OF
- static const struct of_device_id tda998x_dt_ids[] = {
--	{ .compatible = "nxp,tda998x", },
-+	{ .compatible = "nxp,tda9989", },
-+	{ .compatible = "nxp,tda19988", },
-+	{ .compatible = "nxp,tda19989", },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
+On 21/03/14 10:06, Bin Wang wrote:
+> kernel panic happened when iommu_unmap a buffer larger than 2MB,
+> more than expected pmd entries got ?invalidated?, due to a wrong range
+> passed to arm_smmu_alloc_init_pte. it was likely a typo, now we fix
+> it, passing the correct "end" address to arm_smmu_alloc_init_pte.
+> 
+> Signed-off-by: Bin Wang <binw@marvell.com>
+> ---
+>  drivers/iommu/arm-smmu.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 1d9ab39..52d0c34 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1346,7 +1346,7 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
+>  
+>  	do {
+>  		next = pmd_addr_end(addr, end);
+> -		ret = arm_smmu_alloc_init_pte(smmu, pmd, addr, end, pfn,
+> +		ret = arm_smmu_alloc_init_pte(smmu, pmd, addr, next, pfn,
+>  					      flags, stage);
+>  		phys += next - addr;
+>  	} while (pmd++, addr = next, addr < end);
+> 
+
+Looks like a valid fix. In Will's absence ([1]), I'll queue it for 3.15,
+and CC stable.
+
+Joerg: are you still taking pull requests for 3.15, or shall I wait
+until rc1?
+
+Thanks,
+
+	M.
+
+[1]: http://www.spinics.net/lists/arm-kernel/msg315615.html
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
