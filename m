@@ -1,64 +1,50 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 21 Mar 2014 13:24:00 -0400
-Subject: [PATCH] checkpatch.pl: Add check for Change-Id
-In-Reply-To: <1395310100.7776.3.camel@joe-AO722>
-References: <1395255293-3419-1-git-send-email-cov@codeaurora.org>
- <1395310100.7776.3.camel@joe-AO722>
-Message-ID: <532C75B0.9040405@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Mar 2014 17:28:01 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1395422881-10029-1-git-send-email-broonie@kernel.org>
+References: <1395422881-10029-1-git-send-email-broonie@kernel.org>
+Message-ID: <1395422881-10029-4-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+From: Mark Brown <broonie@linaro.org>
 
-On 03/20/2014 06:08 AM, Joe Perches wrote:
-> On Wed, 2014-03-19 at 14:54 -0400, Christopher Covington wrote:
->> A commit hook for the Gerrit code review server inserts change
->> identifiers so Gerrit can track patches through multiple revisions.
->> These identifiers are noise in the context of the upstream kernel.
->> (Many Gerrit servers are private. Even given a public instance,
->> given only a Change-Id, one must guess which server a change was
->> tracked on. Patches submitted to the Linux kernel mailing lists
->> should be able to stand on their own. If it's truly useful to
->> reference code review on a Gerrit server, a URL is a much clearer
->> way to do so.) Thus, issue an error when a Change-Id: line is
->> encountered.
-> []
->> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> []
->> @@ -1891,6 +1891,12 @@ sub process {
->>  			}
->>  		}
->>  
->> +# Check for unwanted Gerrit info
->> +		if ($line =~ /^\s*change-id:/i) {
->> +			ERROR("BAD_SIGN_OFF",
->> +			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
->> +		}
->> +
-> 
-> I think this needs an "$in_commit_log" test added
-> 
-> 		if ($in_commit_log &&
-> 		    $line =~ /^\s*change-id:/i) {
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-This would mean that Change-Id lines that follow a Signed-off-by line will not
-get caught. I expect that the common case is to use the commit hook shipped
-with Gerrit [1], which inserts the Change-Id above the Signed-off-by, so the
-proposed change is fine by me.
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-1.
-https://gerrit.googlesource.com/gerrit/+/master/gerrit-server/src/main/resources/com/google/gerrit/server/tools/root/hooks/commit-msg
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
 
-> And maybe use a separate "TYPE", not "BAD_SIGN_OFF".
-> Maybe "GERRIT_CHANGE_ID"
-> 
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Will do.
-
-Thanks,
-Christopher
-
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 516dd2bed7d6..870de6a9a885 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -191,6 +191,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+1.9.1
