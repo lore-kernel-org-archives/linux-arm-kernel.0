@@ -1,48 +1,117 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
-Date: Fri, 21 Mar 2014 17:32:07 +0530
-Subject: [PATCH] mmc: dw_mmc: Support setting the ciu-div on exynos
-Message-ID: <1395403327-19713-1-git-send-email-yuvaraj.cd@samsung.com>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 21 Mar 2014 07:03:41 -0500
+Subject: [PATCH v2 00/12] clk: bcm281xx: updates for 3.15
+In-Reply-To: <1393373752-30875-1-git-send-email-elder@linaro.org>
+References: <1393373752-30875-1-git-send-email-elder@linaro.org>
+Message-ID: <532C2A9D.2080505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+Mike, I've given up on getting these in for 3.15, but
+I want to be sure they're considered ASAP for 3.16.
 
-The existing dw_mmc code for exynos5250/exynos5420 read the ciu-div
-property from the device tree and used it in calculations, but didn't
-actually ever set it in hardware.  That means that if the hardware
-value set by the firmware didn't match what was in the device tree
-that we'd be clocking things incorrectly.
+You indicated you had questions about the prerequisite
+clocks I proposed.  What I'd like to do is resend only the
+first 7 patches of this series, leaving the patches that
+implement prerequisite clock functionality to work out
+separately.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
----
- drivers/mmc/host/dw_mmc-exynos.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+In that case there is no special device tree dependency
+that would require the patches be taken through arm-soc.
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 3423c5e..07392ac 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -28,6 +28,7 @@
- #define SDMMC_CLKSEL_CCLK_SAMPLE(x)	(((x) & 7) << 0)
- #define SDMMC_CLKSEL_CCLK_DRIVE(x)	(((x) & 7) << 16)
- #define SDMMC_CLKSEL_CCLK_DIVIDER(x)	(((x) & 7) << 24)
-+#define SDMMC_CLKSEL_GET_SAMPLE(x)      (((x) >> 0) & 0x7)
- #define SDMMC_CLKSEL_GET_DRV_WD3(x)	(((x) >> 16) & 0x7)
- #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
- 					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
-@@ -118,6 +119,12 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
- {
- 	struct dw_mci_exynos_priv_data *priv = host->priv;
- 	unsigned long rate = clk_get_rate(host->ciu_clk);
-+	u32 clksel = mci_readl(host, CLKSEL);
-+
-+	clksel = SDMMC_CLKSEL_TIMING(SDMMC_CLKSEL_GET_SAMPLE(clksel),
-+				     SDMMC_CLKSEL_GET_DRV_WD3(clksel),
-+				     priv->ciu_div);
-+	mci_writel(host, CLKSEL, clksel);
- 
- 	host->bus_hz = rate / (priv->ciu_div + 1);
- 	return 0;
--- 
-1.7.10.4
+They do, however, still depend on the previous work that
+was queued through arm-soc, so they don't apply on your
+current clk-next branch.
+
+How would you like me to handle this?
+
+Thanks.
+
+					-Alex
+
+http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+Branch review/bcm-clk-next-v2
+
+bc38518 clk: bcm281xx: add clock hysteresis support
+84f8738 clk: bcm281xx: add clock policy support
+825179f clk: bcm281xx: define CCU clock data statically
+1d2fbb7 clk: bcm281xx: initialize CCU structures statically
+d362801 clk: bcm281xx: change some symbol names
+bcacfe5 clk: bcm281xx: use init_data.name for clock name
+270dc8f clk: bcm281xx: warn if ccu_wait_bit() fails
+
+(based on)
+c771cfb ARM: dts: bcm281xx: define real clocks
+14a091d clk: bcm281xx: don't disable unused peripheral clocks
+44bc5c4 clk: bcm281xx: add initial clock framework support
+dcb99fd Linux 3.14-rc7
+
+
+
+On 02/25/2014 06:15 PM, Alex Elder wrote:
+> This series includes updates for the bcm281xx clock code for 3.15.
+> I had held off posting this until the code on which this is based
+> was queued for 3.14, and it now has been:
+>     https://github.com/broadcom/mach-bcm/
+>     Branch armsoc/for-3.15/drivers
+> 	clk: bcm281xx: don't disable unused peripheral clocks
+> 	clk: bcm281xx: add initial clock framework support
+> followed by:
+>     (same repository)
+>     Branch armsoc/for-3.15/dt
+> 	ARM: dts: bcm281xx: define real clocks
+> 
+> The patches in this series are available here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+>     Branch review/bcm-clk-next-v2
+> 
+> I've grouped them, and offer a little explanation of each of the
+> groups below.
+> 
+> Note:  The final (DT) patch *must* be committed last.
+> 
+> The first version of this series had a patch from the middle of the
+> series that shouldn't have been there, and it has been removed in
+> this version (that patch affected mach-bcm, not clk).  I also split
+> the final patch into two, with the second one isolating the change
+> to a device tree file.
+> 
+> 		    					-Alex
+> 
+> Alex Elder (12):
+>   clk: bcm281xx: warn if ccu_wait_bit() fails
+>   clk: bcm281xx: use init_data.name for clock name
+>   clk: bcm281xx: change some symbol names
+>        	Three small code improvements.
+> 
+>   clk: bcm281xx: initialize CCU structures statically
+>   clk: bcm281xx: define CCU clock data statically
+> 	Rearrange the way CCUs and the clocks they provide are
+> 	defined, so that they're defined statically to the extent
+> 	possible rather than allocating and initializing things at
+> 	runtime.
+> 
+>   clk: bcm281xx: add clock policy support
+>   clk: bcm281xx: add clock hysteresis support
+>   clk: bcm281xx: add an initialized flag
+>   clk: bcm281xx: implement prerequisite clocks
+>   clk: bcm281xx: add bus clock support
+>   clk: bcm281xx: define a bus clock
+> 	Add a few new features, ultimately for the purpose of adding
+> 	support for another type of Kona clock.  Currently only
+> 	peripheral clocks are supported; this adds the ability to
+> 	define and control bus clocks.  In addition, support is
+> 	added for clocks to identify a prerequisite clock; a clock
+> 	won't be initialized until after its prerequisite has been.
+> 
+>   ARM: dts: add bus clock bsc3_apb for bcm281xx
+>   	Add the new bus clock to the device tree.
+> 
+>  arch/arm/boot/dts/bcm11351.dtsi      |    3 +-
+>  drivers/clk/bcm/clk-bcm281xx.c       |  254 ++++++++++++--------------
+>  drivers/clk/bcm/clk-kona-setup.c     |  331 +++++++++++++++++++++++++++-------
+>  drivers/clk/bcm/clk-kona.c           |  331 ++++++++++++++++++++++++++++++++--
+>  drivers/clk/bcm/clk-kona.h           |  189 ++++++++++++++++---
+>  include/dt-bindings/clock/bcm281xx.h |    3 +-
+>  6 files changed, 872 insertions(+), 239 deletions(-)
+> 
