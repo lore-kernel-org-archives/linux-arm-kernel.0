@@ -1,98 +1,54 @@
-From: rgb@redhat.com (Richard Guy Briggs)
-Date: Fri, 21 Mar 2014 13:37:50 -0400
-Subject: [PATCH 2/2] audit: use uapi/linux/audit.h for AUDIT_ARCH
- declarations
-In-Reply-To: <1394573578-2558-2-git-send-email-eparis@redhat.com>
-References: <1394573578-2558-1-git-send-email-eparis@redhat.com>
- <1394573578-2558-2-git-send-email-eparis@redhat.com>
-Message-ID: <20140321173750.GB16467@madcap2.tricolour.ca>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 21 Mar 2014 12:36:53 -0500
+Subject: [RFC] possible removal of omap-serial
+In-Reply-To: <20140321171029.GC3842@atomide.com>
+References: <20140320235210.GB26964@saruman.home>
+ <20140321001228.GA18131@kroah.com>
+ <20140321013557.GB29691@saruman.home>
+ <20140321013729.GC29691@saruman.home>
+ <20140321023646.GB17404@kroah.com>
+ <CAOCHtYhwuAJy-=LJV=eFwzwqzDDPv5RngQ2dVJDOPhYT+J_Mvw@mail.gmail.com>
+ <20140321025238.GA31610@saruman.home>
+ <20140321171029.GC3842@atomide.com>
+Message-ID: <20140321173653.GP12310@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/11, Eric Paris wrote:
-> The syscall.h headers were including linux/audit.h but really only
-> needed the uapi/linux/audit.h to get the requisite defines.  Switch to
-> the uapi headers.
+Hi,
+
+On Fri, Mar 21, 2014 at 10:10:30AM -0700, Tony Lindgren wrote:
+> > > On the support side, I'm not looking forward to this for beagle/panda
+> > > users.  We've already converted them once from ttySx -> ttyOx back in
+> > > 2.6.33/2.6.34? days.  That was an irc/email/u-boot/kernel nightmare...
+> > 
+> > that's exactly why we're talking about ways to maintain backwards
+> > compatibility here. But I'm more interested in finding a way to switch
+> > over to ttyS and have a symlink to ttyO, that way a simple debootstrap
+> > (or any other ARM distro minimal rootfs) would work out of the box,
+> > without any changes, just like in "normal" systems.
 > 
-> Signed-off-by: Eric Paris <eparis@redhat.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linux-s390 at vger.kernel.org
-> Cc: x86 at kernel.org
+> Yeah let's not break things. The symlink solution won't work for kernel
 
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
+again. Let's not break things again.
 
-> ---
->  arch/arm/include/asm/syscall.h  | 2 +-
->  arch/mips/include/asm/syscall.h | 2 +-
->  arch/s390/include/asm/syscall.h | 2 +-
->  arch/x86/include/asm/syscall.h  | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-> index ed805f1..4651f69 100644
-> --- a/arch/arm/include/asm/syscall.h
-> +++ b/arch/arm/include/asm/syscall.h
-> @@ -7,7 +7,7 @@
->  #ifndef _ASM_ARM_SYSCALL_H
->  #define _ASM_ARM_SYSCALL_H
->  
-> -#include <linux/audit.h> /* for AUDIT_ARCH_* */
-> +#include <uapi/linux/audit.h> /* for AUDIT_ARCH_* */
->  #include <linux/elf.h> /* for ELF_EM */
->  #include <linux/err.h>
->  #include <linux/sched.h>
-> diff --git a/arch/mips/include/asm/syscall.h b/arch/mips/include/asm/syscall.h
-> index 625e709..fc556d8 100644
-> --- a/arch/mips/include/asm/syscall.h
-> +++ b/arch/mips/include/asm/syscall.h
-> @@ -13,7 +13,7 @@
->  #ifndef __ASM_MIPS_SYSCALL_H
->  #define __ASM_MIPS_SYSCALL_H
->  
-> -#include <linux/audit.h>
-> +#include <uapi/linux/audit.h>
->  #include <linux/elf-em.h>
->  #include <linux/kernel.h>
->  #include <linux/sched.h>
-> diff --git a/arch/s390/include/asm/syscall.h b/arch/s390/include/asm/syscall.h
-> index bebc0bd..7776870 100644
-> --- a/arch/s390/include/asm/syscall.h
-> +++ b/arch/s390/include/asm/syscall.h
-> @@ -12,7 +12,7 @@
->  #ifndef _ASM_SYSCALL_H
->  #define _ASM_SYSCALL_H	1
->  
-> -#include <linux/audit.h>
-> +#include <uapi/linux/audit.h>
->  #include <linux/sched.h>
->  #include <linux/err.h>
->  #include <asm/ptrace.h>
-> diff --git a/arch/x86/include/asm/syscall.h b/arch/x86/include/asm/syscall.h
-> index 7e6d0c4..d6a756a 100644
-> --- a/arch/x86/include/asm/syscall.h
-> +++ b/arch/x86/include/asm/syscall.h
-> @@ -13,7 +13,7 @@
->  #ifndef _ASM_X86_SYSCALL_H
->  #define _ASM_X86_SYSCALL_H
->  
-> -#include <linux/audit.h>
-> +#include <uapi/linux/audit.h>
->  #include <linux/sched.h>
->  #include <linux/err.h>
->  #include <asm/asm-offsets.h>	/* For NR_syscalls */
-> -- 
-> 1.8.5.3
-> 
-> --
-> Linux-audit mailing list
-> Linux-audit at redhat.com
-> https://www.redhat.com/mailman/listinfo/linux-audit
+> console output so it needs to be dealt with some other way.
 
-- RGB
+it would if kernel itself would create the symlink, but that might not
+be doable in a clean way.
 
---
-Richard Guy Briggs <rbriggs@redhat.com>
-Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
-Remote, Ottawa, Canada
-Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+> It seems that the biggest amount of work is making existing 8250
+> support the missing features in a clean way and without breaking
+> other platforms. Looks like 8250_dw.c has some pm_runtime_calls so
+> obviously it's doable.
+
+right
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/2335bfe4/attachment.sig>
