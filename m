@@ -1,82 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 17:05:09 +0100
-Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
-In-Reply-To: <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403201159.35842.arnd@arndb.de>
- <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
-Message-ID: <4626847.CFbp3XOTnf@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Mar 2014 16:06:00 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140321151617.GA11938@red-moon>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+ <20140320134357.GE11706@sirena.org.uk>
+ <20140320180836.GA3307@red-moon>
+ <20140321113202.GJ11706@sirena.org.uk>
+ <20140321151617.GA11938@red-moon>
+Message-ID: <20140321160600.GB552@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014 10:54:49 Rob Herring wrote:
-> On Thu, Mar 20, 2014 at 5:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 19 March 2014, Rob Herring wrote:
-> >
-> >> > --- a/arch/arm/mach-sunxi/headsmp.S
-> >> > +++ b/arch/arm/mach-sunxi/headsmp.S
-> >> > @@ -4,6 +4,7 @@
-> >> >          .section ".text.head", "ax"
-> >> >
-> >> >  ENTRY(sun6i_secondary_startup)
-> >> > -       msr     cpsr_fsxc, #0xd3
-> >> > +       mov     r0, #0xd3
-> >> > +       msr     cpsr_fsxc, r0
-> >> >         b       secondary_startup
-> >>
-> >> Secondary cores should always enter the kernel in ARM mode like the
-> >> primary core, right? So we need the same switching to Thumb2 as
-> >> head.S, but even secondary_startup doesn't do any switching. So either
-> >> platforms jump into the kernel with a bx and happen to work or
-> >> secondary boot is broken for Thumb2 kernels.
-> >
-> > Makes sense. So should we instead do this?
-> 
-> That would work, but I'm more worried that Thumb2 may be broken on
-> other platforms.
+On Fri, Mar 21, 2014 at 03:16:17PM +0000, Lorenzo Pieralisi wrote:
 
-I'm rather sure it is. I have found lots of build-time bugs with
-thumb2, so by extrapolation there are more run-time bugs. I have
-considered just enabling it in multi_v7_defconfig though, mainly
-to see what would break ;-).
+> I understand that and I apologize, but I will still flag issues up
+> as long as I find some. For instance, I noticed patch is missing
 
-> > .arm
-> > ENTRY(sun6i_secondary_startup)
-> >         ARM_BE8(setend   be ) /* I suppose we need this too */
-> >         msr     cpsr_fsxc, #0xd3
-> >         ldr     r0, =secondary_startup
-> >         bx      r0
-> >
-> > (I'm a bit confused about when to use what branch instruction, so
-> > forgive me if the above doesn't make sense)
-> >
-> >> Also, secondary_startup takes care of making sure the core is in SVC
-> >> mode, so this function shouldn't be needed in the first place.
-> >
-> > I'd rather not change this part, unless Maxime can confirm that it's
-> > not necessary. I would assume that it's there for a reason otherwise.
-> 
-> That often proves to not be the case. :) Initial SOC code is whatever
-> we've failed to delete from vendor BSP code.
-> 
-> Looking at the review comments adding SMP boot, there was discussion
-> about entering in HYP mode and that being dependent on u-boot support,
-> but nothing whether this was needed or not. So it appears to me we
-> probably enter the kernel in the reset default of secure supervisor
-> mode and this code is a nop. This code would not work if it was HYP
-> mode. So when u-boot does correctly setup HYP mode, this code will be
-> broken (although other parts of smp_ops will be too).
-> 
-> The first things secondary_startup do are:
-> 
-> -set BE mode
-> -if in HYP mode, install hyp vectors and drop to SVC
-> -set the CPSR to a know value (safe_svcmode_maskall r9)
-> 
-> So this code is completely redundant and unnecessary. If there were
-> some reason for it, then it should be in secondary_startup.
+Thanks.  I do agree that it's important to find and fix issues, it was
+more about the mechanics of how that gets done.
 
-Ah, thanks for the clarification. Shall we just delete the file then
-and jump straight to secondary_startup?
+> Instead of bothering you with another respin with minor changes I suggest
+> I will pick the last version up, diff what's needed and repost it here for
+> final look so that we are done with it.
 
-	Arnd
+> Please let me know if that's plausible, thank you.
+
+I've actually already got a mostly complete respin so I may as well send
+that, just doing a bit of testing though I'll wrap in the of_node_put()s
+as well now you mention that.  Should be out this afternoon.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/23e3ff22/attachment.sig>
