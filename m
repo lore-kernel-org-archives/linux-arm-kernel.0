@@ -1,34 +1,78 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 21 Mar 2014 15:06:44 +0100
-Subject: [PATCH v4 1/9] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <OF038A7DC3.59E6288A-ON80257CA2.004AF404-80257CA2.004CDD76@eu.necel.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-2-git-send-email-phil.edworthy@renesas.com>
- <27671657.LuGQtNBfqX@wuerfel>
- <OF038A7DC3.59E6288A-ON80257CA2.004AF404-80257CA2.004CDD76@eu.necel.com>
-Message-ID: <532C4774.20803@codethink.co.uk>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 21 Mar 2014 15:09:26 +0100
+Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents
+ and rates
+In-Reply-To: <20140321014551.21989.57253@quantum>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
+ <20140321014551.21989.57253@quantum>
+Message-ID: <532C4816.2080102@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/14 14:59, Phil.Edworthy at renesas.com wrote:
-> Hi Arnd,
->
-> Thanks for the review.
->
->
->>> +static int __init pcie_init(void)
->>> +{
->>> +   return platform_driver_probe(&rcar_pcie_driver, rcar_pcie_probe);
->>> +}
->>> +subsys_initcall(pcie_init);
+Hi Mike,
+
+On 03/21/2014 02:45 AM, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2014-03-20 05:42:33)
+>> Hi Maxime,
 >>
->> Why so early?
-> Good catch, copied from another PCIe driver!
+>> On 06/03/14 14:45, Maxime Coquelin wrote:
+>>> Hi Sylwester,
+>>>
+>>>        I like the principle of your implementation, but I have two questions:
+>>>        1 - How can we manage PM with this solution, as the parent/rate will be
+>>> set only once at probe time?
+>>>        2 - How to set the parent of a parent clock (which can be shared with
+>>> other devices)? Same question about the parent rates.
+>>
+>> Thanks for your feedback and apologies for late reply.
+>>
+>> IIUC your first concern is about a situation when clocks need to be
+>> reconfigured upon each resume from system sleep or runtime PM resume ?
+>> As I mentioned in v1 of the RFC I was considering having individual
+>> drivers calling explicitly the clocks set up routine. Presumably this
+>> would allow to resolve the power management related issue.
+>> One example I'm aware the approach as in this RFC wouldn't work is
+>> when a device in a SoC belongs to a power domain, which needs to be
+>> first switched on before we can start setting up and the clocks'
+>> configuration get lost after the power domain switch off.
+>
+> I like Sylwester's approach of handling this one-time setup in the
+> driver core.
+>
+> Any kind of fine grained power management should not be hidden by DT,
+> and by definition that logic belongs in the device driver. It can still
+> be nicely abstracted away by runtime pm[1].
+>
+> Regards,
+> Mike
+>
+> [1] Message-ID: <20140320114238.GQ7528@n2100.arm.linux.org.uk>
+How can I access this reference?
 
-I think you can change it to use module_driver() instead of the
-init_call.
+Thanks,
+Maxime
 
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+>
+>>
+>> OTOH I suspect devices for which one-time clocks setup is sufficient
+>> will be quite common. And for these there would need to be a single
+>> call to the setup routine in probe() I guess, since it wouldn't be
+>> possible to figure out just from the DT data when the actual call
+>> should be made.
+>>
+>> For a global clocks configuration, I thought about specifying that
+>> in the clocks controller node, and then to have the setup routine
+>> called e.g. from of_clk_init(). I think that could work well enough,
+>> together with the patch [1], adding clock dependencies handling.
+>> But then the clock frequency set up function would need to be
+>> modified to respect the clock parent relationships, similarly as
+>> in patch series [2]. A just noticed [2] recently, after posting
+>> this RFC (adding Tero at Cc).
+>>
+>> --
+>> Regards,
+>> Sylwester
+>>
+>> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
+>> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
