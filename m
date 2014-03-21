@@ -1,184 +1,230 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Mar 2014 14:03:09 +0000
-Subject: [PATCH] ARM: ux500: remove pointless cache setup args
-In-Reply-To: <1395410113-19965-1-git-send-email-linus.walleij@linaro.org>
-References: <1395410113-19965-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140321140308.GJ7528@n2100.arm.linux.org.uk>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Fri, 21 Mar 2014 13:59:35 +0000
+Subject: [PATCH v4 1/9] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <27671657.LuGQtNBfqX@wuerfel>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <1395397968-6242-2-git-send-email-phil.edworthy@renesas.com>
+ <27671657.LuGQtNBfqX@wuerfel>
+Message-ID: <OF038A7DC3.59E6288A-ON80257CA2.004AF404-80257CA2.004CDD76@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 02:55:13PM +0100, Linus Walleij wrote:
-> This removes the setup of the l2x0 lines that are essentially
-> just noops bouncing on the hardware as the cache registers are
-> protected in the secure world and there is no point in writing
-> them. Put in (0, ~0) to the l2x0_of_init() function as
-> suggested by Russell and cut the complex code out.
+Hi Arnd,
+
+Thanks for the review.
+
+> From: Arnd Bergmann <arnd@arndb.de>
+> To: linux-arm-kernel at lists.infradead.org, 
+> Cc: Phil Edworthy <phil.edworthy@renesas.com>, 
+linux-pci at vger.kernel.org, 
+> linux-sh at vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>, Valentine 
+
+> Barshak <valentine.barshak@cogentembedded.com>, Simon Horman 
+> <horms@verge.net.au>, Bjorn Helgaas <bhelgaas@google.com>, Ben Dooks 
+> <ben.dooks@codethink.co.uk>
+> Date: 21/03/2014 11:04
+> Subject: Re: [PATCH v4 1/9] PCI: host: rcar: Add Renesas R-Car PCIe 
+driver
 > 
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Russell: I don't know how this fits with other changes hitting
-> the l2x0 code, this file is pretty much stand-alone and
-> orthogonal to any other stuff hitting the Ux500 code, so I
-> can put it in your patch tracker if you want to take it or
-> some version of it into your tree.
+> On Friday 21 March 2014 10:32:40 Phil Edworthy wrote:
+> > +static const struct of_device_id rcar_pcie_of_match[] = {
+> > +   { .compatible = "renesas,r8a7779-pcie", .data = (void *)RCAR_H1 },
+> > +   { .compatible = "renesas,r8a7790-pcie", .data = (void 
+*)RCAR_GENERIC },
+> > +   { .compatible = "renesas,r8a7791-pcie", .data = (void 
+*)RCAR_GENERIC },
+> > +   {},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, rcar_pcie_of_match);
+> 
+> The only difference between RCAR_H1 and RCAR_GENERIC seems to be the
+> use of the rcar_pcie_phy_init_rcar_h1 vs rcar_pcie_hw_init
+> functions. I think this would be expressed in a nicer way doing
+> 
+> static const struct of_device_id rcar_pcie_of_match[] = {
+>    { .compatible = "renesas,r8a7779-pcie", .data = 
+rcar_pcie_phy_init_rcar_h1},
+>    { .compatible = "renesas,r8a7790-pcie", .data =  rcar_pcie_hw_init},
+>    { .compatible = "renesas,r8a7791-pcie", .data =  rcar_pcie_hw_init},
+>    {},
+> };
+> 
+> If you need other differences in the future, you can extend this
+> to use a pointer to a struct containing the init function pointer.
+Ok, I understand what you mean, though the rcar_pcie_phy_init_rcar_h1 
+function is an extra call for r8a7779 devices to setup the PHY, not an 
+alternative to rcar_pcie_hw_init.
 
-I already have something which does a similar modification.  Here's
-the existing commits in order (copy'n'pasted with gpm so whitespace
-damaged):
 
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Sun Mar 16 19:15:21 2014 +0000
+> > +static int rcar_pcie_setup_window(int win, struct resource *res,
+> > +               struct rcar_pcie *pcie)
+> > +{
+> > +   /* Setup PCIe address space mappings for each resource */
+> > +   resource_size_t size;
+> > +   u32 mask;
+> > +
+> > +   pci_write_reg(pcie, 0x00000000, PCIEPTCTLR(win));
+> > +
+> > +   /*
+> > +    * The PAMR mask is calculated in units of 128Bytes, which
+> > +    * keeps things pretty simple.
+> > +    */
+> > +   size = resource_size(res);
+> > +   mask = (roundup_pow_of_two(size) / SZ_128) - 1;
+> > +   pci_write_reg(pcie, mask << 7, PCIEPAMR(win));
+> > +
+> > +   pci_write_reg(pcie, upper_32_bits(res->start), PCIEPARH(win));
+> > +   pci_write_reg(pcie, lower_32_bits(res->start), PCIEPARL(win));
+> > +
+> > +   /* First resource is for IO */
+> > +   mask = PAR_ENABLE;
+> > +   if (res->flags & IORESOURCE_IO)
+> > +      mask |= IO_SPACE;
+> > +
+> > +   pci_write_reg(pcie, mask, PCIEPTCTLR(win));
+> > +
+> > +   return 0;
+> > +}
+> 
+> Would it be possible to have this done in the boot loader so the kernel
+> doesn't need to be bothered with it?
+Hmm, I don't like the idea of depending on settings made by a bootloader, 
+when it may be that a different bootloader could be used, or no bootloader 
+at all.
 
-    ARM: l2c: ux500: implement dummy write_sec method
 
-    ux500 can't write to any of the secure registers on the L2C controllers,
-    so provide a dummy handler which ignores all writes.
+> > +
+> > +static int rcar_pcie_setup(int nr, struct pci_sys_data *sys)
+> > +{
+> > +   struct rcar_pcie *pcie = sys_to_pcie(sys);
+> > +   struct resource *res;
+> > +   int i, ret;
+> > +
+> > +   pcie->root_bus_nr = sys->busnr;
+> > +
+> > +   /* Setup PCI resources */
+> > +   for (i = 0; i < PCI_MAX_RESOURCES; i++) {
+> > +
+> > +      res = &pcie->res[i];
+> > +      if (!res->flags)
+> > +         continue;
+> > +
+> > +      if (res->flags & IORESOURCE_IO) {
+> > +         /* Setup IO mapped memory accesses */
+> > +         ret = pci_ioremap_io(0, res->start);
+> > +         if (ret)
+> > +            return 1;
+> > +
+> > +         /* Correct addresses for remapped IO */
+> > +         res->end = res->end - res->start;
+> > +         res->start = 0;
+> > +      }
+> > +
+> > +      rcar_pcie_setup_window(i, res, pcie);
+> > +      pci_add_resource(&sys->resources, res);
+> > +   }
+> 
+> This assumes that the start of the I/O window is always at
+> bus address 0, and that you have only one PCI host in the system.
+> Are both guaranteed through the hardware design?
+The I/O window can be anywhere I believe, so I guess I should pull the 
+actual bus address from the DT.
+All existing devices I have seen, have a single PCIe host.
 
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.cindex 264f894c0e3d..5cc7e3625d8c 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -35,6 +35,14 @@ static int __init ux500_l2x0_unlock(void)
-        return 0;
- }
+> > +static void __init rcar_pcie_enable(struct rcar_pcie *pcie)
+> > +{
+> > +   struct platform_device *pdev = to_platform_device(pcie->dev);
+> > +   struct hw_pci hw;
+> > +
+> > +   memset(&hw, 0, sizeof(hw));
+> > +
+> > +   hw.nr_controllers = 1;
+> > +   hw.private_data   = (void **)&pcie;
+> > +   hw.setup          = rcar_pcie_setup,
+> > +   hw.map_irq        = of_irq_parse_and_map_pci,
+> > +   hw.ops        = &rcar_pcie_ops,
+> 
+> You can write this slightly nicer doing
+> 
+>    struct hw_pci hw = {
+>       .nr_controllers = 1,
+>       .private_data = (void **)&pcie,
+>       ...
+>    };
+Ok, will do.
 
-+static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
-+{
-+       /*
-+        * We can't write to secure registers as we are in non-secure
-+        * mode, until we have some SMI service available.
-+        */
-+}
-+
- static int __init ux500_l2x0_init(void)
- {
-        u32 aux_val = 0x3e000000;
-@@ -56,21 +64,14 @@ static int __init ux500_l2x0_init(void)
-                /* 64KB way size */
-                aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
 
-+       outer_cache.write_sec = ux500_l2c310_write_sec;
-+
-        /* 64KB way size, 8 way associativity, force WA */
-        if (of_have_populated_dt())
-                l2x0_of_init(aux_val, 0xc0000fff);
-        else
-                l2x0_init(l2x0_base, aux_val, 0xc0000fff);
+> > +static int __init rcar_pcie_phy_init_rcar_h1(struct rcar_pcie *pcie)
+> > +{
+> > +   unsigned int timeout = 10;
+> > +
+> > +   /* Initialize the phy */
+> > +   phy_write_reg(pcie, 0, 0x42, 0x1, 0x0EC34191);
+> > +   phy_write_reg(pcie, 1, 0x42, 0x1, 0x0EC34180);
+> > +   phy_write_reg(pcie, 0, 0x43, 0x1, 0x00210188);
+> > +   phy_write_reg(pcie, 1, 0x43, 0x1, 0x00210188);
+> > +   phy_write_reg(pcie, 0, 0x44, 0x1, 0x015C0014);
+> > +   phy_write_reg(pcie, 1, 0x44, 0x1, 0x015C0014);
+> > +   phy_write_reg(pcie, 1, 0x4C, 0x1, 0x786174A0);
+> 
+> Have you considered moving this into a separate PHY driver?
+> There are probably good reasons either way, so I'm not asking you
+> to do it, just to think about what would be best for this driver.
+> 
+> It seems that you already have two different implementations
+> that only vary in how they access the PHY, so moving that
+> into a separate driver would keep the knowledge out of the
+> host driver. OTOH, the PHY registers look like they are part of
+> the pci host itself.
+The PHYs are separate entities, but access to them is via the PCIe 
+controller's registers. In the general case, there shouldn't be any PHY 
+setup to do, it's just the R-Car H1 devices that needs a little tweaking.
 
--       /*
--        * We can't disable l2 as we are in non secure mode, currently
--        * this seems be called only during kexec path. So let's
--        * override outer.disable with nasty assignment until we have
--        * some SMI service available.
--        */
--       outer_cache.disable = NULL;
--       outer_cache.set_debug = NULL;
--
-        return 0;
- }
 
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Sun Mar 16 20:52:25 2014 +0000
+> > +   /*
+> > +    * For target transfers, setup a single 64-bit 4GB mapping at 
+address
+> > +    * 0. The hardware can only map memory that starts on a power of 
+two
+> > +    * boundary, and size is power of 2, so best to ignore it.
+> > +    */
+> > +   pci_write_reg(pcie, 0, PCIEPRAR(0));
+> > +   pci_write_reg(pcie, 0, PCIELAR(0));
+> > +   pci_write_reg(pcie, 0xfffffff0UL | LAM_PREFETCH |
+> > +      LAM_64BIT | LAR_ENABLE, PCIELAMR(0));
+> > +   pci_write_reg(pcie, 0, PCIELAR(1));
+> > +   pci_write_reg(pcie, 0, PCIEPRAR(1));
+> > +   pci_write_reg(pcie, 0, PCIELAMR(1));
+> 
+> Is this the only reasonable configuration? If not, you might want to
+> do the same thing as the x-gene PCI driver that is not yet merged,
+> and parse the 'dma-ranges' property to determine what the mapping
+> on a particular machine should be.
+Based on the restrictions of these registers, it seemed like a sensible 
+approach to open up the whole 32-bit address space. I'll have a look at 
+the x-gene patches to see if that would be better.
 
-    ARM: l2c: fix register naming
+> Most importantly, why don't you use a mapping that includes RAM beyond
+> the first 4GB?
+I had intended to send a patch later on to open this up to the first 12GB. 
+Limitations of this block of hardware mean that we can do at most three 
+4GB regions. The first 12GB would be ok for LPAE on existing devices as 
+all DDR is mapped within that range, but obviously not ideal.
 
-    We have a mixture of different devices with different register layouts,
-    but we group all the bits together in an opaque mess.  Split them out
-    into those which are L2C-310 specific and ones which refer to earlier
-    devices.  Provide full auxiliary control register definitions.
 
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > +static int __init pcie_init(void)
+> > +{
+> > +   return platform_driver_probe(&rcar_pcie_driver, rcar_pcie_probe);
+> > +}
+> > +subsys_initcall(pcie_init);
+> 
+> Why so early?
+Good catch, copied from another PCIe driver!
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.cindex 5cc7e3625d8c..067c37a054fb 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -59,10 +59,10 @@ static int __init ux500_l2x0_init(void)
-        /* DBx540's L2 has 128KB way size */
-        if (cpu_is_ux540_family())
-                /* 128KB way size */
--               aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
-+               aux_val |= L2C_AUX_CTRL_WAY_SIZE(4);
-        else
-                /* 64KB way size */
--               aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
-+               aux_val |= L2C_AUX_CTRL_WAY_SIZE(3);
+> Overall, this driver looks pretty good.
+> 
+>    Arnd
 
-        outer_cache.write_sec = ux500_l2c310_write_sec;
-
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Wed Mar 19 01:22:05 2014 +0000
-
-    ARM: l2c: ux500: remove associativity and way size from aux_ctrl
-
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.cindex 067c37a054fb..5b891d051054 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -45,8 +45,6 @@ static void ux500_l2c310_write_sec(unsigned long val, unsigned
- static int __init ux500_l2x0_init(void)
- {
--       u32 aux_val = 0x3e000000;
--
-        if (cpu_is_u8500_family() || cpu_is_ux540_family())
-                l2x0_base = __io_address(U8500_L2CC_BASE);
-        else
-@@ -56,21 +54,12 @@ static int __init ux500_l2x0_init(void)
-        /* Unlock before init */
-        ux500_l2x0_unlock();
--       /* DBx540's L2 has 128KB way size */
--       if (cpu_is_ux540_family())
--               /* 128KB way size */
--               aux_val |= L2C_AUX_CTRL_WAY_SIZE(4);
--       else
--               /* 64KB way size */
--               aux_val |= L2C_AUX_CTRL_WAY_SIZE(3);
--
-        outer_cache.write_sec = ux500_l2c310_write_sec;
-
--       /* 64KB way size, 8 way associativity, force WA */
-        if (of_have_populated_dt())
--               l2x0_of_init(aux_val, 0xc0000fff);
-+               l2x0_of_init(0x3e000000, 0xc00f0fff);
-        else
--               l2x0_init(l2x0_base, aux_val, 0xc0000fff);
-+               l2x0_init(l2x0_base, 0x3e000000, 0xc00f0fff);
-
-        return 0;
- }
-
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Wed Mar 19 12:47:58 2014 +0000
-
-    ARM: l2c: ux500: don't try to change the L2 cache auxiliary control register
-    ux500 can't change the auxiliary control register, so there's no point
-    passing values to try and modify it to the l2x0 init functions.
-
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.cindex 5b891d051054..842ebedbdd1c 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -57,9 +57,9 @@ static int __init ux500_l2x0_init(void)
-        outer_cache.write_sec = ux500_l2c310_write_sec;
-
-        if (of_have_populated_dt())
--               l2x0_of_init(0x3e000000, 0xc00f0fff);
-+               l2x0_of_init(0, ~0);
-        else
--               l2x0_init(l2x0_base, 0x3e000000, 0xc00f0fff);
-+               l2x0_init(l2x0_base, 0, ~0);
-
-        return 0;
- }
-
-So the only difference between what you've ended up with is that I've
-kept the l2x0_base stuff around and the legacy init.  If you want the
-legacy init to be killed, I'd be more than happy to add another patch
-on top of my existing series to do that.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks
+Phil
