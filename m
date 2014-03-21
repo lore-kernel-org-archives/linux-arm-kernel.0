@@ -1,176 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Mar 2014 12:04:16 +0100
-Subject: [PATCH v4 1/9] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <1395397968-6242-2-git-send-email-phil.edworthy@renesas.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-2-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <27671657.LuGQtNBfqX@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Mar 2014 11:13:53 +0000
+Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140320171930.GA28238@arm.com>
+References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
+ <20140320112650.GA1408@red-moon>
+ <20140320134357.GE11706@sirena.org.uk>
+ <20140320171930.GA28238@arm.com>
+Message-ID: <20140321111353.GA24945@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014 10:32:40 Phil Edworthy wrote:
-> +static const struct of_device_id rcar_pcie_of_match[] = {
-> +	{ .compatible = "renesas,r8a7779-pcie", .data = (void *)RCAR_H1 },
-> +	{ .compatible = "renesas,r8a7790-pcie", .data = (void *)RCAR_GENERIC },
-> +	{ .compatible = "renesas,r8a7791-pcie", .data = (void *)RCAR_GENERIC },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, rcar_pcie_of_match);
+On Thu, Mar 20, 2014 at 05:19:32PM +0000, Catalin Marinas wrote:
+> On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
 
-The only difference between RCAR_H1 and RCAR_GENERIC seems to be the
-use of the rcar_pcie_phy_init_rcar_h1 vs rcar_pcie_hw_init
-functions. I think this would be expressed in a nicer way doing
+> > Given ACPI (which really looks like it's going to happen at some point
+> > and presumably make OF optional) I'm not sure removing the handling of
+> > OF is actually constructive but whatever, it's done now...
 
-static const struct of_device_id rcar_pcie_of_match[] = {
-	{ .compatible = "renesas,r8a7779-pcie", .data =  rcar_pcie_phy_init_rcar_h1},
-	{ .compatible = "renesas,r8a7790-pcie", .data =  rcar_pcie_hw_init},
-	{ .compatible = "renesas,r8a7791-pcie", .data =  rcar_pcie_hw_init},
-	{},
-};
+> CONFIG_OF will always be enabled in the kernel even when we get ACPI. We
+> still use the chosen DT node to tell the kernel about ACPI.
 
-If you need other differences in the future, you can extend this
-to use a pointer to a struct containing the init function pointer.
+One thing that occurs to me with this - if we've always got a DT even if
+we are booting with ACPI that might confuse code that implements
+handling for firmware idioms.  The regulator code does this sort of
+thing, though in that case we make exactly the same assumptions for ACPI
+and DT so there won't be any confusion.  There's a few other examples
+though and we might acquire more by the time ACPI gets merged.  Probably
+not a big deal but something that needs attention paying.
 
-> +static int rcar_pcie_setup_window(int win, struct resource *res,
-> +					struct rcar_pcie *pcie)
-> +{
-> +	/* Setup PCIe address space mappings for each resource */
-> +	resource_size_t size;
-> +	u32 mask;
-> +
-> +	pci_write_reg(pcie, 0x00000000, PCIEPTCTLR(win));
-> +
-> +	/*
-> +	 * The PAMR mask is calculated in units of 128Bytes, which
-> +	 * keeps things pretty simple.
-> +	 */
-> +	size = resource_size(res);
-> +	mask = (roundup_pow_of_two(size) / SZ_128) - 1;
-> +	pci_write_reg(pcie, mask << 7, PCIEPAMR(win));
-> +
-> +	pci_write_reg(pcie, upper_32_bits(res->start), PCIEPARH(win));
-> +	pci_write_reg(pcie, lower_32_bits(res->start), PCIEPARL(win));
-> +
-> +	/* First resource is for IO */
-> +	mask = PAR_ENABLE;
-> +	if (res->flags & IORESOURCE_IO)
-> +		mask |= IO_SPACE;
-> +
-> +	pci_write_reg(pcie, mask, PCIEPTCTLR(win));
-> +
-> +	return 0;
-> +}
-
-Would it be possible to have this done in the boot loader so the kernel
-doesn't need to be bothered with it?
-
-> +
-> +static int rcar_pcie_setup(int nr, struct pci_sys_data *sys)
-> +{
-> +	struct rcar_pcie *pcie = sys_to_pcie(sys);
-> +	struct resource *res;
-> +	int i, ret;
-> +
-> +	pcie->root_bus_nr = sys->busnr;
-> +
-> +	/* Setup PCI resources */
-> +	for (i = 0; i < PCI_MAX_RESOURCES; i++) {
-> +
-> +		res = &pcie->res[i];
-> +		if (!res->flags)
-> +			continue;
-> +
-> +		if (res->flags & IORESOURCE_IO) {
-> +			/* Setup IO mapped memory accesses */
-> +			ret = pci_ioremap_io(0, res->start);
-> +			if (ret)
-> +				return 1;
-> +
-> +			/* Correct addresses for remapped IO */
-> +			res->end = res->end - res->start;
-> +			res->start = 0;
-> +		}
-> +
-> +		rcar_pcie_setup_window(i, res, pcie);
-> +		pci_add_resource(&sys->resources, res);
-> +	}
-
-This assumes that the start of the I/O window is always at
-bus address 0, and that you have only one PCI host in the system.
-Are both guaranteed through the hardware design?
-
-> +static void __init rcar_pcie_enable(struct rcar_pcie *pcie)
-> +{
-> +	struct platform_device *pdev = to_platform_device(pcie->dev);
-> +	struct hw_pci hw;
-> +
-> +	memset(&hw, 0, sizeof(hw));
-> +
-> +	hw.nr_controllers = 1;
-> +	hw.private_data   = (void **)&pcie;
-> +	hw.setup          = rcar_pcie_setup,
-> +	hw.map_irq        = of_irq_parse_and_map_pci,
-> +	hw.ops		  = &rcar_pcie_ops,
-
-You can write this slightly nicer doing
-
-	struct hw_pci hw = {
-		.nr_controllers = 1,
-		.private_data = (void **)&pcie,
-		...
-	};
-> +static int __init rcar_pcie_phy_init_rcar_h1(struct rcar_pcie *pcie)
-> +{
-> +	unsigned int timeout = 10;
-> +
-> +	/* Initialize the phy */
-> +	phy_write_reg(pcie, 0, 0x42, 0x1, 0x0EC34191);
-> +	phy_write_reg(pcie, 1, 0x42, 0x1, 0x0EC34180);
-> +	phy_write_reg(pcie, 0, 0x43, 0x1, 0x00210188);
-> +	phy_write_reg(pcie, 1, 0x43, 0x1, 0x00210188);
-> +	phy_write_reg(pcie, 0, 0x44, 0x1, 0x015C0014);
-> +	phy_write_reg(pcie, 1, 0x44, 0x1, 0x015C0014);
-> +	phy_write_reg(pcie, 1, 0x4C, 0x1, 0x786174A0);
-
-Have you considered moving this into a separate PHY driver?
-There are probably good reasons either way, so I'm not asking you
-to do it, just to think about what would be best for this driver.
-
-It seems that you already have two different implementations
-that only vary in how they access the PHY, so moving that
-into a separate driver would keep the knowledge out of the
-host driver. OTOH, the PHY registers look like they are part of
-the pci host itself.
-
-> +	/*
-> +	 * For target transfers, setup a single 64-bit 4GB mapping at address
-> +	 * 0. The hardware can only map memory that starts on a power of two
-> +	 * boundary, and size is power of 2, so best to ignore it.
-> +	 */
-> +	pci_write_reg(pcie, 0, PCIEPRAR(0));
-> +	pci_write_reg(pcie, 0, PCIELAR(0));
-> +	pci_write_reg(pcie, 0xfffffff0UL | LAM_PREFETCH |
-> +		LAM_64BIT | LAR_ENABLE, PCIELAMR(0));
-> +	pci_write_reg(pcie, 0, PCIELAR(1));
-> +	pci_write_reg(pcie, 0, PCIEPRAR(1));
-> +	pci_write_reg(pcie, 0, PCIELAMR(1));
-
-Is this the only reasonable configuration? If not, you might want to
-do the same thing as the x-gene PCI driver that is not yet merged,
-and parse the 'dma-ranges' property to determine what the mapping
-on a particular machine should be.
-
-Most importantly, why don't you use a mapping that includes RAM beyond
-the first 4GB?
-
-> +static int __init pcie_init(void)
-> +{
-> +	return platform_driver_probe(&rcar_pcie_driver, rcar_pcie_probe);
-> +}
-> +subsys_initcall(pcie_init);
-
-Why so early?
-
-Overall, this driver looks pretty good.
-
-	Arnd
+I was aware that there was a stub DT on ACPI systems but had expected
+that if we were booting with real ACPI support that'd get masked from
+the running system.  I can see why at least initially we'd want to just
+pull in the infrastructure to use when identifying that this is an ACPI
+system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/1dc5d223/attachment.sig>
