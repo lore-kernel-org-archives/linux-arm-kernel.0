@@ -1,85 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Mar 2014 09:08:18 +0100
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <532CE4EB.6010305@linaro.org>
-References: <1395414570-25515-1-git-send-email-zhangfei.gao@linaro.org>
- <4230433.d0bAGX3bJV@wuerfel> <532CE4EB.6010305@linaro.org>
-Message-ID: <4830403.iGU9jDN0hr@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Mar 2014 20:17:39 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
+In-Reply-To: <CAP=VYLqCmG6fRmPPABoW4xg_tFgGh2pji=f5ML=cBgCu4zZocg@mail.gmail.com>
+References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307160836.GM21483@n2100.arm.linux.org.uk>
+ <20140310105808.GE2815@lukather>
+ <20140310112929.GY21483@n2100.arm.linux.org.uk>
+ <CAP=VYLqCmG6fRmPPABoW4xg_tFgGh2pji=f5ML=cBgCu4zZocg@mail.gmail.com>
+Message-ID: <20140321191739.GT27873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 22 March 2014 09:18:35 zhangfei wrote:
-> >> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
-> >> +{
-> >> +	struct hip04_priv *priv = netdev_priv(ndev);
-> >> +	unsigned tx_head = priv->tx_head;
-> >> +	unsigned tx_tail = priv->tx_tail;
-> >> +	struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
-> >> +
-> >> +	while (tx_tail != tx_head) {
-> >> +		if (desc->send_addr != 0) {
-> >> +			if (force)
-> >> +				desc->send_addr = 0;
-> >> +			else
-> >> +				break;
-> >> +		}
-> >> +		if (priv->tx_phys[tx_tail]) {
-> >> +			dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
-> >> +				priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
-> >> +			priv->tx_phys[tx_tail] = 0;
-> >> +		}
-> >> +		dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
-> >> +		priv->tx_skb[tx_tail] = NULL;
-> >> +		tx_tail = TX_NEXT(tx_tail);
-> >> +		priv->tx_count--;
-> >> +	}
-> >> +	priv->tx_tail = tx_tail;
-> >> +}
+On Fri, Mar 21, 2014 at 11:49:59AM -0400, Paul Gortmaker wrote:
+> On Mon, Mar 10, 2014 at 7:29 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Mar 10, 2014 at 11:58:08AM +0100, Maxime Ripard wrote:
+> >> On Fri, Mar 07, 2014 at 04:08:36PM +0000, Russell King - ARM Linux wrote:
+> >> > On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
+> >> > > @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+> >> > >  exit_free_irq:
+> >> > >   free_irq(drv_data->irq, drv_data);
+> >> > >  exit_reset:
+> >> > > - if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
+> >> > > + if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
+> >> > > +     !IS_ERR(drv_data->rstc))
+> >> > >           reset_control_assert(drv_data->rstc);
+> >> >
+> >> > Another question is... why do we need to check pd->dev.of_node here?
+> >> > If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
+> >> > controller node, so drv_data->rstc is either going to be a valid
+> >> > pointer, or it's going to be an error pointer - neither
+> >> > reset_control_get() nor devm_reset_control_get return NULL.
+> >>
+> >> Following back on this as I was doing the patch, actually,
+> >> drv_data->rstc will be NULL if we're not probed by DT, and hence never
+> >> call reset_control_get, that would set an error pointer.
+> >>
+> >> But then, we can use IS_ERR_OR_NULL on drv_data->rstc.
 > >
-> > You call this function from start_xmit(), which may be too early, causing the
-> > dma_unmap_single() and dev_kfree_skb_irq() functions to be called while the
-> > device is still accessing the data. This is bad.
+> > I think you can also move the devm_reset_control_get() into the main
+> > probe function: you're only checking for -EPROBE_DEFER from it to fail,
+> > allowing other errors to continue with the driver init.  This means
+> > that on non-OF, devm_reset_control_get() will fail with -ENOENT.
 > 
-> There is a protection.
-> Only after xmit done, desc->send_addr = 0, which is cleared by hardware.
+> Looping linux-next into the CC since this is the cause of the failure
+> in orion5x_defconfig there, and no point in anyone else re-doing the
+> same bisect.
 
-Ok, I see.
+I sent a fix for this that hasn't been picked up yet:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/239069.html
 
-> > You have to ensure that you only ever clean up tx buffers that have been
-> > successfully transmitted. Also, you should use an interrupt to notify you
-> > of this in case there is no further xmit packet. Otherwise you may have
-> > a user space program waiting indefinitely for a single packet to get sent
-> > on a socket.
-> >
-> > It's ok to also call the cleanup from start_xmit, but calling it from the
-> > poll() function or another appropriate place is required.
-> 
-> There is no transmit done interrupt, so relying on every xmit to reclaim 
-> finished buffer.
-> I thought it would be enough, since there are TX_DESC_NUM descs.
-> It is a good idea also put reclaim in poll, then will add spin lock etc.
+IIRC, Wolfram's away until Monday, so I guess it will be merged some
+time next week.
 
-It may be simpler to call napi_schedule() when you want to do tx descriptor
-cleanup and have the function always be called in one place. If you do this
-carefully, you can probably avoid most of the locking.
-
-> >> +	priv->id = of_alias_get_id(node, "ethernet");
-> >> +	if (priv->id < 0) {
-> >> +		dev_warn(d, "no ethernet alias\n");
-> >> +		ret = -EINVAL;
-> >> +		goto init_fail;
-> >> +	}
-> >
-> > Apparently you try to rely on the alias to refer to a specific piece
-> > of hardware, which is not correct. The alias is meant to be selectable
-> > to match e.g. the numbering written on the external connector, which
-> > is totally independent of the internal hardware.
-> 
-> Thanks for clarifying alisa.
-> The id will be used for start channel in ppe, RX_DESC_NUM * priv->id;
-> Is it suitable directly use id in the dts, or other name such as start-chan?
-
-Yes, I think it's best to just pass the id the same way as the channel
-number.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140321/492266f9/attachment.sig>
