@@ -1,135 +1,203 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Mar 2014 14:24:51 +0100
-Subject: [PATCH] sh_eth: pm_runtime should not need null operations
-In-Reply-To: <532C1B13.7000805@codethink.co.uk>
-References: <1395396913-24354-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdWO-kNdWT_AxzAmCTrx3NerWpTG+auFNZTcL5hsbN+++A@mail.gmail.com>
- <532C1B13.7000805@codethink.co.uk>
-Message-ID: <CAMuHMdVhUwX0DO2+TBhG31HB2sx3_XRW3xPfZ+wH2d8b=RywLQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Mar 2014 22:26:25 +0900
+Subject: [PATCH v4 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and
+ SSDK-GH7 board
+Message-ID: <000301cf4509$2b6400b0$822c0210$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
 
-(dropping netdev and davem, adding Felipe, Kevin, linux-pm, and
-linux-arm-kernel)
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-On Fri, Mar 21, 2014 at 11:57 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 21/03/14 11:30, Geert Uytterhoeven wrote:
->> On Fri, Mar 21, 2014 at 11:15 AM, Ben Dooks <ben.dooks@codethink.co.uk>
->> wrote:
->>> The driver has a no-op for the pm_runtime callbacks but
->>> the pm_runtime core should correctly ignore drivers without
->>> any pm_rumtime callback ops.
->>
->> The pm_runtime core doesn't ignore non-existing runtime_{suspend,resume}
->> callbacks, it turns them into a failure withv -ENOSYS.
->> Only non-existing runtime_idle callbacks are ignored.
->
-> I've added Rafael Wysocki as he may be able to add better
-> feedback to this issue.
->
-> [snip rpm_susend code block]
->
-> I got very confused here. The clock_ops sets dev->pm_domain
-> which over-rides the use of the dev->driver->pm entry as the
-> primary pm for the device. The code above the bit you snipped
-> does a ladder looking for the pm_runtime entry it calls and
-> would stop at finding dev->pm_domain as so:
->
-> from drivers/base/power/runtime.c:
->     495         if (dev->pm_domain)
->     496                 callback = dev->pm_domain->ops.runtime_suspend;
->  ...
->     502                 callback = dev->bus->pm->runtime_suspend;
->     503         else
->     504                 callback = NULL;
->
->
-> So for drivers on shmobile with drivers/sh/pm_runtime.c enabled
-> we would never call the drivers' entry as the ops that this code
-> introduces just calls the pm_clk calls and does not send the
-> events on.
+Changes since v3:
+- addressed comments from Mark
+  : updated reserved memory
+  : fixed interrupt trigger for pmu and serial
+- removing 'gh7-pmu' from PMU compatible string
 
-Yes, that's also my understanding.
+Since the patch 2nd and 3rd are same with previous version I'm not re-posting.
 
-Commit 4d27e9dcff00a6425d779b065ec8892e4f391661 ("PM: Make
-power domain callbacks take precedence over subsystem ones") explains
-the rationale behind this.
+ arch/arm64/boot/dts/samsung-gh7.dtsi     |  134 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/samsung-ssdk-gh7.dts |   26 ++++++
+ 2 files changed, 160 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+ create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
 
-Now, this doesn't prevent your power domain from delegating to other
-callbacks...
-
-> If we send the events on, then we would use pm_generic_runtime_suspend()
-> to send it. This call treats the lack of runtime_pm driver entry as a
-> do nothing and return 0 which means in this case the code in sh_eth
-> is not necessary to have any pm_runtime functions.
-
-If the power domain just calls pm_generic_runtime_suspend(), it will only
-consider the driver-specific callback, bypassing type, class, and
-bus-specific callbacks.
-
-So should the power domain delegate it further using a similar ladder
-strategy like RPM_GET_CALLBACK() at the core pm level, i.e.
-try type/class/bus/driver?
-And type should delegate to class/bus/driver, class to bus/driver, bus to
-driver?
-
-> This means depending on if we have a pm_domain in the path we get
-> different treatment of NULL runtime pm ops pointer. I am not sure
-> how to handle this, as IIRC a number of other drivers for Renesas
-> currently assume that the NULL case is going to be fine for them.
->
-> Changing pm_generic_runtime_suspend() to return ENOSYS would end
-> up breaking davinci and probably a number of other platforms.
->
-> So questions:
->
-> - Should rpm_suspend() ignore the lack of pm_runtime operations?
-> - Do we need to add a generic `ignore pm runtime callback`
-> - Are any other shmobile drivers similarly affected?
-
-The code indeed looks a bit like a mix of:
-  - Lack of callback means it's safe to suspend,
-  - Lack of callback means it's not safe to suspend.
-
-BTW, I also looked a bit into history, and added asterisks in front of the
-most interesting parts:
-
- 1. drivers/sh/pm_runtime.c
-    Initial version by Magnus, reworked by Rafael
-
- 2. This approach was applied to omap1, "to allow code sharing with shmobile",
-    in commit 600b776eb39a13a28b090ba9efceb0c69d4508aa
-    ("OMAP1 / PM: Use generic clock manipulation routines for runtime PM")
-    by Rafael, acked-by Kevin Hilman.
-*   This one is interesting, as it moves omap1 away from the
-*   fck/ick-centric approach Felipe proposed to generalize in
-*   https://lkml.org/lkml/2014/1/31/290
-
- 3. Kevin converted omap2 in commit
-    commit 638080c37ae08fd0c44cec13d7948ca5385ae851 ("OMAP2+ / PM: move
-    runtime PM implementation to use device power domains")
-*   and fixed it for power domain callbacks taking precedence in commit
-*   345f79b3de7f6d651e4dba794af7c7303bdfd649 ("OMAP: PM: omap_device: fix
-*   device power domain callbacks").
-*   This is what Ben is proposing to add to drivers/sh/pm_runtime.c.
-
- 4. Kevin converted davinci in commit
-    ce9dcb8784611c50974d1c6b600c71f5c0a29308 ("ARM: davinci: add runtime PM
-    support for clock management").
-
- 5. which got copied by Santosh Shilimkar for keystone in commit
-    fc20ffe1213beb09bb7fb6687b404fe48183a55e ("ARM: keystone: add PM domain
-    support for clock management").
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+new file mode 100644
+index 0000000..d3ab914
+--- /dev/null
++++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+@@ -0,0 +1,134 @@
++/*
++ * SAMSUNG GH7 SoC device tree source
++ *
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/memreserve/ 0x80000000 0x00010000;
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	aliases {
++		serial0 = "/amba/uart at 12c00000";
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 000 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x000>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 001 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x001>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 002 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x002>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 003 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x003>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x102>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x103>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++	};
++
++	gic: interrupt-controller at 1C000000 {
++		compatible = "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x0 0x1C001000 0 0x1000>,	/* GIC Dist */
++		      <0x0 0x1C002000 0 0x1000>,	/* GIC CPU */
++		      <0x0 0x1C004000 0 0x2000>,	/* GIC VCPU Control */
++		      <0x0 0x1C006000 0 0x2000>;	/* GIC VCPU */
++		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0xff01>,	/* Secure Phys IRQ */
++			     <1 14 0xff01>,	/* Non-secure Phys IRQ */
++			     <1 11 0xff01>,	/* Virt IRQ */
++			     <1 10 0xff01>;	/* Hyp IRQ */
++	};
++
++	pmu {
++		compatible = "armv8-pmuv3";
++		interrupts = <0 294 8>,
++			     <0 295 8>,
++			     <0 296 8>,
++			     <0 297 8>,
++			     <0 298 8>,
++			     <0 299 8>,
++			     <0 300 8>,
++			     <0 301 8>;
++	};
++
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		serial at 12c00000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0 0x12c00000 0 0x10000>;
++			interrupts = <0 418 4>;
++		};
++
++		serial at 12c20000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0 0x12c20000 0 0x10000>;
++			interrupts = <0 420 4>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/samsung-ssdk-gh7.dts b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+new file mode 100644
+index 0000000..80bd93c
+--- /dev/null
++++ b/arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+@@ -0,0 +1,26 @@
++/*
++ * SAMSUNG SSDK-GH7 board device tree source
++ *
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++#include "samsung-gh7.dtsi"
++
++/ {
++	model = "samsung,SSDK-GH7";
++	compatible = "samsung,ssdk-gh7", "samsung,gh7";
++
++	chosen {
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x80000000>;
++	};
++};
+-- 
+1.7.10.4
