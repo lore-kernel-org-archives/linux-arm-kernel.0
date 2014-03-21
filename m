@@ -1,66 +1,28 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri, 21 Mar 2014 15:46:24 +0100
-Subject: [PATCH v3 1/2] of: irq: Added of_find_irq_domain() to get the domain
- of an irq
-In-Reply-To: <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
-References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
- <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1395413185-29763-2-git-send-email-jjhiblot@traphandler.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 15:57:25 +0100
+Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
+ R8A7790
+In-Reply-To: <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <532C5ADE.4030708@cogentembedded.com>
+ <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
+Message-ID: <6044873.2S2Xlhp0hC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This functions does the same parsing as irq_of_parse_and_map but instead
-of doing the mapping, it returns a pointer to the irq domain
+On Friday 21 March 2014 14:53:48 Phil.Edworthy at renesas.com wrote:
+> 
+> > > +      reg = <0 0xfe000000 0 0x80000>;
+> > > +      #address-cells = >;
+> > > +      #size-cells = <2>;
+> > > +      device_type = "pci";
+> > 
+> >     This legacy property is only meaningful for the true OF firmware and 
+> thus 
+> > have been phased out (it's only actively used for the memory nodes).
+> Ok, thanks for pointing this out.
+> 
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- drivers/of/irq.c       | 20 ++++++++++++++++++++
- include/linux/of_irq.h |  2 ++
- 2 files changed, 22 insertions(+)
+I think the code still relies on it for PCI though.
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 9bcf2cf..7d3184f 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -46,6 +46,26 @@ unsigned int irq_of_parse_and_map(struct device_node *dev, int index)
- EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
- 
- /**
-+ * of_find_irq_domain - Parse the DT and returns a pointer to the irq domain
-+ * @dev: Device node of the device whose interrupt is concerned
-+ * @index: Index of the interrupt to get the domain for
-+ *
-+ * This function is a wrapper that chains of_irq_parse_one() and
-+ * irq_find_host() to make things easier to callers
-+ */
-+struct irq_domain *of_find_irq_domain(struct device_node *dev, int index)
-+{
-+	int rc;
-+	struct of_phandle_args oirq;
-+
-+	rc = of_irq_parse_one(dev, index, &oirq);
-+	if (rc)
-+		return ERR_PTR(rc);
-+
-+	return irq_find_host(oirq.np);
-+}
-+
-+/**
-  * of_irq_find_parent - Given a device node, find its interrupt parent node
-  * @child: pointer to device node
-  *
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 3f23b44..600ff0a 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -58,6 +58,8 @@ static inline int of_irq_count(struct device_node *dev)
-  * so declare it here regardless of the CONFIG_OF_IRQ setting.
-  */
- extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
-+extern struct irq_domain *of_find_irq_domain(struct device_node *dev,
-+					     int index);
- extern struct device_node *of_irq_find_parent(struct device_node *child);
- 
- #else /* !CONFIG_OF */
--- 
-1.9.0
+	Arnd
