@@ -1,243 +1,124 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Mar 2014 13:14:13 +0100
-Subject: [PATCH 16/20] ARM: ux500: Remove redundant board file for mmci
- platform data
+Date: Fri, 21 Mar 2014 13:14:14 +0100
+Subject: [PATCH 17/20] mmc: mmci: Enforce DT for signal direction
 In-Reply-To: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
 References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1395404057-27835-17-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1395404057-27835-18-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all platform data has been transfered to DT, we don't need the
-container for the mmci platform data anymore. Remove the file and the
-corresponding references to it's data.
+Remove the option to provide signal direction configuration as platform
+data, enforce it through DT.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-ux500/Makefile           |    3 +-
- arch/arm/mach-ux500/board-mop500-sdi.c |  166 --------------------------------
- arch/arm/mach-ux500/board-mop500.h     |    5 -
- arch/arm/mach-ux500/cpu-db8500.c       |    4 -
- 4 files changed, 1 insertion(+), 177 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+ drivers/mmc/host/mmci.c   |   24 ++++++++----------------
+ drivers/mmc/host/mmci.h   |    1 +
+ include/linux/amba/mmci.h |    4 ----
+ 3 files changed, 9 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index de544aa..9741de95 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -5,8 +5,7 @@
- obj-y				:= cpu.o id.o timer.o pm.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
--obj-$(CONFIG_MACH_MOP500)	+= board-mop500-sdi.o \
--				board-mop500-regulators.o \
-+obj-$(CONFIG_MACH_MOP500)	+= board-mop500-regulators.o \
- 				board-mop500-audio.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-deleted file mode 100644
-index fcbf3a1..0000000
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ /dev/null
-@@ -1,166 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2010
-- *
-- * Author: Hanumath Prasad <hanumath.prasad@stericsson.com>
-- * License terms: GNU General Public License (GPL) version 2
-- */
--
--#include <linux/kernel.h>
--#include <linux/gpio.h>
--#include <linux/amba/bus.h>
--#include <linux/amba/mmci.h>
--#include <linux/mmc/host.h>
--#include <linux/platform_device.h>
--#include <linux/platform_data/dma-ste-dma40.h>
--
--#include <asm/mach-types.h>
--
--#include "db8500-regs.h"
--#include "board-mop500.h"
--#include "ste-dma40-db8500.h"
--
--/*
-- * v2 has a new version of this block that need to be forced, the number found
-- * in hardware is incorrect
-- */
--#define U8500_SDI_V2_PERIPHID 0x10480180
--
--/*
-- * SDI 0 (MicroSD slot)
-- */
--
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV29_SD_MM0,
--};
--
--static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV29_SD_MM0,
--};
--#endif
--
--struct mmci_platform_data mop500_sdi0_data = {
--	.f_max		= 100000000,
--	.capabilities	= MMC_CAP_4_BIT_DATA |
--				MMC_CAP_SD_HIGHSPEED |
--				MMC_CAP_MMC_HIGHSPEED |
--				MMC_CAP_ERASE |
--				MMC_CAP_UHS_SDR12 |
--				MMC_CAP_UHS_SDR25,
--	.gpio_wp	= -1,
--	.sigdir		= MCI_ST_FBCLKEN |
--				MCI_ST_CMDDIREN |
--				MCI_ST_DATA0DIREN |
--				MCI_ST_DATA2DIREN,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi0_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi0_dma_cfg_tx,
--#endif
--};
--
--/*
-- * SDI1 (SDIO WLAN)
-- */
--#ifdef CONFIG_STE_DMA40
--static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV32_SD_MM1,
--};
--
--static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV32_SD_MM1,
--};
--#endif
--
--struct mmci_platform_data mop500_sdi1_data = {
--	.ocr_mask	= MMC_VDD_29_30,
--	.f_max		= 100000000,
--	.capabilities	= MMC_CAP_4_BIT_DATA |
--				MMC_CAP_NONREMOVABLE,
--	.gpio_cd	= -1,
--	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &sdi1_dma_cfg_rx,
--	.dma_tx_param	= &sdi1_dma_cfg_tx,
--#endif
--};
--
--/*
-- * SDI 2 (POP eMMC, not on DB8500ed)
-- */
--
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type =  DB8500_DMA_DEV28_SD_MM2,
--};
--
--static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV28_SD_MM2,
--};
--#endif
--
--struct mmci_platform_data mop500_sdi2_data = {
--	.ocr_mask	= MMC_VDD_165_195,
--	.f_max		= 100000000,
--	.capabilities	= MMC_CAP_4_BIT_DATA |
--				MMC_CAP_8_BIT_DATA |
--				MMC_CAP_NONREMOVABLE |
--				MMC_CAP_MMC_HIGHSPEED |
--				MMC_CAP_ERASE |
--				MMC_CAP_CMD23,
--	.gpio_cd	= -1,
--	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi2_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi2_dma_cfg_tx,
--#endif
--};
--
--/*
-- * SDI 4 (on-board eMMC)
-- */
--
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type =  DB8500_DMA_DEV42_SD_MM4,
--};
--
--static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV42_SD_MM4,
--};
--#endif
--
--struct mmci_platform_data mop500_sdi4_data = {
--	.f_max		= 100000000,
--	.capabilities	= MMC_CAP_4_BIT_DATA |
--				MMC_CAP_8_BIT_DATA |
--				MMC_CAP_NONREMOVABLE |
--				MMC_CAP_MMC_HIGHSPEED |
--				MMC_CAP_ERASE |
--				MMC_CAP_CMD23,
--	.gpio_cd	= -1,
--	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi4_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi4_dma_cfg_tx,
--#endif
--};
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 32cc0d8..7c7b0ad 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -8,12 +8,7 @@
- #define __BOARD_MOP500_H
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index edf3cfd..bef3f85 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -34,6 +34,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/amba/mmci.h>
++#include <dt-bindings/mmc/mmci.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
+ #include <linux/pinctrl/consumer.h>
+@@ -1287,7 +1288,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		 * indicating signal direction for the signals in
+ 		 * the SD/MMC bus and feedback-clock usage.
+ 		 */
+-		pwr |= host->plat->sigdir;
++		pwr |= host->sigdir;
  
- #include <linux/platform_data/asoc-ux500-msp.h>
--#include <linux/amba/mmci.h>
+ 		if (ios->bus_width == MMC_BUS_WIDTH_4)
+ 			pwr &= ~MCI_ST_DATA74DIREN;
+@@ -1386,24 +1387,18 @@ static struct mmc_host_ops mmci_ops = {
+ 	.start_signal_voltage_switch = mmci_sig_volt_switch,
+ };
  
--extern struct mmci_platform_data mop500_sdi0_data;
--extern struct mmci_platform_data mop500_sdi1_data;
--extern struct mmci_platform_data mop500_sdi2_data;
--extern struct mmci_platform_data mop500_sdi4_data;
- extern struct msp_i2s_platform_data msp0_platform_data;
- extern struct msp_i2s_platform_data msp1_platform_data;
- extern struct msp_i2s_platform_data msp2_platform_data;
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 8820f60..fa308f0 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -146,10 +146,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
- 	/* Requires DMA bindings. */
--	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
--	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
--	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
--	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
- 		       "ux500-msp-i2s.0", &msp0_platform_data),
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80124000,
+-static void mmci_dt_populate_generic_pdata(struct device_node *np,
+-					struct mmci_platform_data *pdata)
+-{
+-	u32 sigdir = 0;
+-
+-	if (!of_property_read_u32(np, "signal-direction", &sigdir)) {
+-		sigdir &= MCI_ST_DATA2DIREN|MCI_ST_CMDDIREN|MCI_ST_DATA0DIREN|
+-			MCI_ST_DATA31DIREN|MCI_ST_FBCLKEN|MCI_ST_DATA74DIREN;
+-		pdata->sigdir = sigdir;
+-	}
+-}
+-
+ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
+ {
++	struct mmci_host *host = mmc_priv(mmc);
+ 	int ret = mmc_of_parse(mmc);
+ 	if (ret)
+ 		return ret;
+ 
++	if (!of_property_read_u32(np, "signal-direction", &host->sigdir))
++		host->sigdir &= MCI_ST_DATA2DIREN | MCI_ST_CMDDIREN |
++			MCI_ST_DATA0DIREN | MCI_ST_DATA31DIREN |
++			MCI_ST_FBCLKEN | MCI_ST_DATA74DIREN;
++
+ 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+ 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
+ 	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
+@@ -1434,9 +1429,6 @@ static int mmci_probe(struct amba_device *dev,
+ 			return -ENOMEM;
+ 	}
+ 
+-	if (np)
+-		mmci_dt_populate_generic_pdata(np, plat);
+-
+ 	if (!devm_request_mem_region(&dev->dev, dev->res.start,
+ 				resource_size(&dev->res), DRIVER_NAME))
+ 		return -ENOMEM;
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 8fc5814..6fdd11b 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -188,6 +188,7 @@ struct mmci_host {
+ 	u32			busy_status;
+ 	bool			vqmmc_enabled;
+ 	struct mmci_platform_data *plat;
++	u32			sigdir;
+ 	struct variant_data	*variant;
+ 
+ 	u8			hw_designer;
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 47ff176..0d3ff95 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -5,7 +5,6 @@
+ #define AMBA_MMCI_H
+ 
+ #include <linux/mmc/host.h>
+-#include <dt-bindings/mmc/mmci.h>
+ 
+ /* Just some dummy forwarding */
+ struct dma_chan;
+@@ -33,8 +32,6 @@ struct dma_chan;
+  * @capabilities: the capabilities of the block as implemented in
+  * this platform, signify anything MMC_CAP_* from mmc/host.h
+  * @capabilities2: more capabilities, MMC_CAP2_* from mmc/host.h
+- * @sigdir: a bit field indicating for what bits in the MMC bus the host
+- * should enable signal direction indication.
+  * @dma_filter: function used to select an appropriate RX and TX
+  * DMA channel to be used for DMA, if and only if you're deploying the
+  * generic DMA engine
+@@ -57,7 +54,6 @@ struct mmci_platform_data {
+ 	bool	cd_invert;
+ 	unsigned long capabilities;
+ 	unsigned long capabilities2;
+-	u32 sigdir;
+ 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+ 	void *dma_rx_param;
+ 	void *dma_tx_param;
 -- 
 1.7.9.5
