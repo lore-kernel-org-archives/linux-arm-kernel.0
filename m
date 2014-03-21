@@ -1,98 +1,82 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Mar 2014 17:01:47 +0100
-Subject: [PATCH 1/5] clk: berlin: add support for berlin plls
-In-Reply-To: <532C62E8.2070803@gmail.com>
-References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395402220-23503-2-git-send-email-alexandre.belloni@free-electrons.com>
- <532C355C.3090606@gmail.com> <20140321154539.GD6443@piout.net>
- <532C62E8.2070803@gmail.com>
-Message-ID: <20140321160147.GH6443@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Mar 2014 17:05:09 +0100
+Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
+In-Reply-To: <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <201403201159.35842.arnd@arndb.de>
+ <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
+Message-ID: <4626847.CFbp3XOTnf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2014 at 17:03:52 +0100, Sebastian Hesselbarth wrote :
-> On 03/21/2014 04:45 PM, Alexandre Belloni wrote:
-> >[all commentis I agree on are snipped]
-> 
-> :)
-> 
-> >On 21/03/2014 at 13:49:32 +0100, Sebastian Hesselbarth wrote :
-> >>On 03/21/2014 12:43 PM, Alexandre Belloni wrote:
-> >>obj-y += pll.o
-> >>obj-$(CONFIG_MACH_BERLIN_BG2)	+= pll-berlin2.o
-> >>obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= pll-berlin2.o
-> >>obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= pll-berlin2q.o
-> >>
-> >>Which reminds me, that we forgot to add MACH_BERLIN_BG2Q to
-> >>arch/arm/mach-berlin/Kconfig. Can you spin a patch?
-> >>
+On Friday 21 March 2014 10:54:49 Rob Herring wrote:
+> On Thu, Mar 20, 2014 at 5:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 19 March 2014, Rob Herring wrote:
 > >
-> >I will do that.
+> >> > --- a/arch/arm/mach-sunxi/headsmp.S
+> >> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> >> > @@ -4,6 +4,7 @@
+> >> >          .section ".text.head", "ax"
+> >> >
+> >> >  ENTRY(sun6i_secondary_startup)
+> >> > -       msr     cpsr_fsxc, #0xd3
+> >> > +       mov     r0, #0xd3
+> >> > +       msr     cpsr_fsxc, r0
+> >> >         b       secondary_startup
+> >>
+> >> Secondary cores should always enter the kernel in ARM mode like the
+> >> primary core, right? So we need the same switching to Thumb2 as
+> >> head.S, but even secondary_startup doesn't do any switching. So either
+> >> platforms jump into the kernel with a bx and happen to work or
+> >> secondary boot is broken for Thumb2 kernels.
 > >
-> >>>+static const u8 vcodiv_berlin2[] = {10, 15, 20, 25, 30, 40, 50, 60, 80};
-> >>>+
-> >>>+static struct berlin_pllmap berlin_pll_map = {
-> >>>+	.vcodiv = vcodiv_berlin2,
-> >>>+	.fbdiv_mask = 0x1FF,
-> >>>+	.rfdiv_mask = 0x1F,
-> >>>+	.divsel_mask = 0xF,
-> >>
-> >>divsel_mask allows 16 possible values, vcodiv_berlin2[] only provides
-> >>9, and common pll driver below does not know how many valid vcodiv
-> >>values are passed. That can become dangerous..
-> >>
-> >>I'd rather extend vcodiv_berlin2 to full divsel range and provide
-> >>safe (=1) divisiors. This way wrong/new register values will only
-> >>break clock frequency derived.
-> >>
+> > Makes sense. So should we instead do this?
+> 
+> That would work, but I'm more worried that Thumb2 may be broken on
+> other platforms.
+
+I'm rather sure it is. I have found lots of build-time bugs with
+thumb2, so by extrapolation there are more run-time bugs. I have
+considered just enabling it in multi_v7_defconfig though, mainly
+to see what would break ;-).
+
+> > .arm
+> > ENTRY(sun6i_secondary_startup)
+> >         ARM_BE8(setend   be ) /* I suppose we need this too */
+> >         msr     cpsr_fsxc, #0xd3
+> >         ldr     r0, =secondary_startup
+> >         bx      r0
 > >
-> >Good catch ! Then, what about simply shrinking the mask so that we don't
-> >overflow the table. We'll put it back to its supposed real value whant
-> >we know what are the remaining divisors (my guess is that they are already
-> >all listed here). I would say that we are getting the divisor wrong if
-> >divsel > 8 anyway.
-> 
-> Hmm, maybe I should look up valid vcodiv myself, but your vcodiv_berlin2
-> has 9 values and I guess they are all valid, aren't they?
-> 
-> The next possible, larger mask where 0-8 fits in, is 0xf. You used that
-> above and that reveals 16 possible indices.
-> 
-> The only option for shrinking the table that I see, would be min/max
-> allowed indices, but that is as useful as having a slightly larger
-> table.
-> 
-
-You are absolutely right :) I definitely need to take a break, right now !
-
-> >>>+	.fbdiv_shift = 6,
-> >>>+	.rfdiv_shift = 1,
-> >>>+	.divsel_shift = 7,
-> >>
-> >>Have .foo_mask and .foo_shift together?
-> >>
+> > (I'm a bit confused about when to use what branch instruction, so
+> > forgive me if the above doesn't make sense)
 > >
-> >This will make the struct larger but I don't really have an opinion.
+> >> Also, secondary_startup takes care of making sure the core is in SVC
+> >> mode, so this function shouldn't be needed in the first place.
+> >
+> > I'd rather not change this part, unless Maxime can confirm that it's
+> > not necessary. I would assume that it's there for a reason otherwise.
 > 
-> Maybe, I wasn't clear enough. Just assign .foo_mask and .foo_shift in
-> subsequent lines of code, i.e.
+> That often proves to not be the case. :) Initial SOC code is whatever
+> we've failed to delete from vendor BSP code.
 > 
-> static struct berlin_pllmap berlin_pll_map = {
-> 	.vcodiv = vcodiv_berlin2,
-> 	.fbdiv_mask = 0x1FF,
-> 	.fbdiv_shift = 6,
-> 	.rfdiv_mask = 0x1F,
-> 	.rfdiv_shift = 1,
-> 	.divsel_mask = 0xF,
-> 	.divsel_shift = 7,
-> };
+> Looking at the review comments adding SMP boot, there was discussion
+> about entering in HYP mode and that being dependent on u-boot support,
+> but nothing whether this was needed or not. So it appears to me we
+> probably enter the kernel in the reset default of secure supervisor
+> mode and this code is a nop. This code would not work if it was HYP
+> mode. So when u-boot does correctly setup HYP mode, this code will be
+> broken (although other parts of smp_ops will be too).
 > 
+> The first things secondary_startup do are:
+> 
+> -set BE mode
+> -if in HYP mode, install hyp vectors and drop to SVC
+> -set the CPSR to a know value (safe_svcmode_maskall r9)
+> 
+> So this code is completely redundant and unnecessary. If there were
+> some reason for it, then it should be in secondary_startup.
 
-yeah, I figured that out a few minutes ago...
+Ah, thanks for the clarification. Shall we just delete the file then
+and jump straight to secondary_startup?
 
-Thanks again for your reviews and patience !
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
