@@ -1,84 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Mar 2014 21:22:40 +0300
-Subject: [PATCH 1/3] Documentation: add Device tree bindings for Hisilicon
- hip04 ethernet
-In-Reply-To: <1395414570-25515-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1395414570-25515-1-git-send-email-zhangfei.gao@linaro.org>
- <1395414570-25515-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <532C8370.8000602@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Mar 2014 17:27:58 +0000
+Subject: [PATCH 1/4] arm64: topology: Initialise default topology state
+ immediately
+Message-ID: <1395422881-10029-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Mark Brown <broonie@linaro.org>
 
-On 03/21/2014 06:09 PM, Zhangfei Gao wrote:
+As a legacy of the way 32 bit ARM did things the topology code uses a null
+topology map by default and then overwrites it by mapping cores with no
+information to a cluster by themselves later. In order to make it simpler
+to reset things as part of recovering from parse failures in firmware
+information directly set this configuration on init. A core will always be
+its own sibling so there should be no risk of confusion with firmware
+provided information.
 
-> This patch adds the Device Tree bindings for the Hisilicon hip04
-> Ethernet controller, including 100M / 1000M controller.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->   .../bindings/net/hisilicon-hip04-net.txt           |  107 ++++++++++++++++++++
->   1 file changed, 107 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
-
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
-> new file mode 100644
-> index 0000000..22838b2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
-> @@ -0,0 +1,107 @@
-> +Hisilicon hip04 Ethernet Controller
-> +
-> +* Ethernet controller node
-> +
-> +Required properties:
-> +- compatible: should be "hisilicon,hip04-mac".
-> +- reg: address and length of the register set for the device.
-> +- interrupts: interrupt for the device.
-> +- port-handle: phandle, specifies a reference to a node representing
-> +  the connected port
-> +- Inherets from ethernet common binding [1]
-
-    Inherits.
-
-> +[1] Documentation/devicetree/bindings/net/ethernet.txt
-
-    Well, this way it's not clear what exactly it iherits as that file 
-describes many alternate properties with the same meaning.
-
-> +
-> +
-> +* Ethernet ppe node:
-> +Control rx & tx fifos of all ethernet controllers.
-> +Have 2048 recv channels shared by all ethernet controllers, only if no overlap.
-> +Each controller's start recv channel is alisa_id * RX_DESC_NUM.
-> +
-> +Required properties:
-> +- #address-cells : Should be <1>
-> +- #size-cells : Should be <0>
-> +- compatible: "hisilicon,hip04-ppe"
-> +- reg: address and length of the register set for the device.
-> +
-> +==Child node==
-> +
-> +Required properties:
-> +- reg: port physical number, range from 0 to 0x1f
-> +
-> +
-> +* MDIO bus node:
-> +
-> +Required properties:
-> +
-> +- compatible: should be "hisilicon,hip04-mdio", "ethernet-phy-ieee802.3-c22".
-
-    I didn't understand what kind of node this is: MDIO bus or PHY? These 
-values seem mutually exclusive.
-
-> +- Inherets from MDIO bus node binding [2]
-
-    Inherits.
-
-> +[2] Documentation/devicetree/bindings/net/phy.txt
-
-WBR, Sergei
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 3e06b0be4ec8..ff662b23af5f 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
+ 		 * reset it to default behaviour
+ 		 */
+ 		pr_debug("CPU%u: No topology information configured\n", cpuid);
+-		cpuid_topo->core_id = 0;
+-		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
+-		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
+ 		return;
+ 	}
+ 
+@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
+ 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+ 
+ 		cpu_topo->thread_id = -1;
+-		cpu_topo->core_id =  -1;
++		cpu_topo->core_id = 0;
+ 		cpu_topo->cluster_id = -1;
++
+ 		cpumask_clear(&cpu_topo->core_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+ 	}
+ }
+-- 
+1.9.1
