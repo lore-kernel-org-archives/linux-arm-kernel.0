@@ -1,62 +1,35 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 21 Mar 2014 09:36:04 -0500
-Subject: [PATCH] regulator: Add new driver for ST's PWM controlled
- voltage regulators
-In-Reply-To: <1395397296-8196-1-git-send-email-lee.jones@linaro.org>
-References: <1395397296-8196-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140321143604.GY18529@joshc.qualcomm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 21 Mar 2014 10:40:00 -0400
+Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
+In-Reply-To: <53208CDD.7030106@ti.com>
+References: <1394639330-1288-1-git-send-email-balbi@ti.com>
+ <53208CDD.7030106@ti.com>
+Message-ID: <532C4F40.5010903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 10:21:36AM +0000, Lee Jones wrote:
-> +static int st_pwm_regulator_set_voltage_sel(struct regulator_dev *dev,
-> +					    unsigned selector)
-> +{
-> +	struct st_pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-> +	int dutycycle;
-> +	int ret;
-> +
-> +	if (selector >= dev->desc->n_voltages)
-> +		return -EINVAL;
+On Wednesday 12 March 2014 12:35 PM, Santosh Shilimkar wrote:
+> On Wednesday 12 March 2014 11:48 PM, Felipe Balbi wrote:
+>> Currently, even when building keystone only
+>> kernel builds, DTB won't get build because
+>> we lack a Makefile rule to get it compiled.
+>>
+>> This patch adds that rule so mainline kernel
+>> users have a chance to use up-to-date DTB on
+>> keystone 2 platforms.
+>>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> ---
+>>
+> We have been building dtbs with explicit command
+> instead of dtbs since it was just one dtb so far
+> supported. Was planning to add the rule once more
+> boards get added. Now with Lamarr and Edision in
+> for next merge window, will do that post 3.15-rc1.
+> 
+Just to close the loop, I added a patch as part
+of my 3.15 fixes which builds all keystone dt
+blobs.
 
-If this case is ever hit, I would argue it's a bug in the regulator
-core.
-
-> +static struct st_pwm_voltages b2105_duty_cycle_table[] = {
-
-const?
-
-> +	{ .uV = 1114000, .dutycycle = 0,  },
-> +	{ .uV = 1095000, .dutycycle = 10, },
-> +	{ .uV = 1076000, .dutycycle = 20, },
-> +	{ .uV = 1056000, .dutycycle = 30, },
-> +	{ .uV = 1036000, .dutycycle = 40, },
-> +	{ .uV = 1016000, .dutycycle = 50, },
-> +	/* WARNING: Values above 50% duty-cycle cause boot failures. */
-> +};
-> +
-> +static const struct regulator_desc b2105_desc = {
-> +	.name		= "b2105-pwm-regulator",
-> +	.ops		= &st_pwm_regulator_voltage_ops,
-> +	.type		= REGULATOR_VOLTAGE,
-> +	.owner		= THIS_MODULE,
-> +	.n_voltages	= ARRAY_SIZE(b2105_duty_cycle_table),
-> +	.supply_name    = "pwm",
-> +};
-> +
-> +static const struct st_pwm_regulator_pdata b2105_info = {
-> +	.desc		  = &b2105_desc,
-> +	.duty_cycle_table = b2105_duty_cycle_table,
-> +};
-> +
-> +static struct of_device_id st_pwm_of_match[] = {
-
-const?
-
-Other than that:
-
-Reviewed-by: Josh Cartwright <joshc@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Santosh
