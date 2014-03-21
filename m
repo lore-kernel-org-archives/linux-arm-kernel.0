@@ -1,54 +1,25 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Fri, 21 Mar 2014 13:27:57 +0800
-Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <CAGVrzcZ4K2gvQ8f=uMTf4+jm29e3FQXL-a-wc9xgumyHpH6+UA@mail.gmail.com>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <1395132017-15928-3-git-send-email-zhangfei.gao@linaro.org>
- <CAGVrzcY4SBKFfTvjB0TTvgpAOwCt30C6LjYf9e9E4ciMDVmp-w@mail.gmail.com>
- <CAMj5Bkjm3G=K=fqas6VG5NXroofWijN_sc7XGLzT5jVehwTd0Q@mail.gmail.com>
- <CAGVrzcZ4K2gvQ8f=uMTf4+jm29e3FQXL-a-wc9xgumyHpH6+UA@mail.gmail.com>
-Message-ID: <CAMj5BkiUUJUEKJJp-5VOHcEXdjxAfSNKK2QZViRCLPs5yqgEzg@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 21 Mar 2014 13:36:12 +0800
+Subject: [PATCH] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <1395235406-13449-1-git-send-email-y>
+References: <1395235406-13449-1-git-send-email-y>
+Message-ID: <532BCFCC.4080205@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 1:59 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 2014-03-20 3:53 GMT-07:00 Zhangfei Gao <zhangfei.gao@gmail.com>:
->>>> +static int hip04_mdio_reset(struct mii_bus *bus)
->>>> +{
->>>> +       int temp, err, i;
->>>> +
->>>> +       for (i = 0; i < 2; i++) {
->>>> +               hip04_mdio_write(bus, i, 22, 0);
->>>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
->>>> +               temp |= BMCR_RESET;
->>>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
->>>> +               if (err < 0)
->>>> +                       return err;
->>>> +       }
->>>> +
->>>> +       mdelay(500);
->>>
->>> This does not look correct, you should iterate over all possible PHYs:
->>> PHY_MAX_ADDR instead of hardcoding the loop to 2.
->>
->> OK, got it.
->> Use 2 is since only have 2 phy in the board, will use PHY_MAX_ADDR instead.
->>>
->>> I think we might want to remove the mdio bus reset callback in general
->>> as the PHY library should already take care of software resetting the
->>> PHY to put it in a sane state, as well as waiting for the appropriate
->>> delay before using, unlike here, where you do not poll for BMCR_RESET
->>> to be cleared by the PHY.
->>>
->> Do you mean will move BMCR_RESET to common code, that's would be great.
->> The mdio_reset is added here to get phy_id, otherwise the phy_id can
->> not be read as well as detection.
->
-> Oh I see, thanks for mentioning that, this is not properly covered
-> here today as we need to get the PHY id before we assign it a
-> phy_device structure, let me cook a patch for this.
-> --
+? 2014?03?19? 21:23, y at karo-electronics.de ??:
+> +	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+> +	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
+> +		this->swap_block_mark = !GPMI_IS_MX23(this);
 
-Should I keep hip04_mdio_reset in the next submit or remove it directly?
 
-Thanks
+Our ROM guy had confirmed that the Rom will disable the swapping if we 
+set the DISBBM bit.
+But please do not change any logic for imx23/imx28.
+
+I really do not know what's the benefit we can get from this patch.
+Please send the new version about this patch if you want this feature.
+
+
+thanks
+Huang Shijie
