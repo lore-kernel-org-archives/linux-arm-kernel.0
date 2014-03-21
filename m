@@ -1,109 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Mar 2014 11:47:10 +0000
-Subject: [PATCH v3 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
- and SSDK-GH7 board
-In-Reply-To: <1395094477-8921-2-git-send-email-kgene.kim@samsung.com>
-References: <1395094477-8921-1-git-send-email-kgene.kim@samsung.com>
- <1395094477-8921-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20140321114710.GO23372@e106331-lin.cambridge.arm.com>
+Date: Fri, 21 Mar 2014 11:53:18 +0000
+Subject: [PATCH 2/5] clk: berlin: add berlin clocks DT bindings
+ documentation
+In-Reply-To: <1395402220-23503-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395402220-23503-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1395402220-23503-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140321115318.GP23372@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Mar 17, 2014 at 10:14:35PM +0000, Kukjin Kim wrote:
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+On Fri, Mar 21, 2014 at 11:43:37AM +0000, Alexandre Belloni wrote:
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  arch/arm64/boot/dts/samsung-gh7.dtsi     | 134 +++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/samsung-ssdk-gh7.dts |  26 ++++++
->  2 files changed, 160 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
->  create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+>  .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/berlin-clock.txt
 > 
-> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
 > new file mode 100644
-> index 0000000..d3ab914
+> index 000000000000..ebc78f9b93a9
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
-> @@ -0,0 +1,134 @@
-> +/*
-> + * SAMSUNG GH7 SoC device tree source
-> + *
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
+> +++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
+> @@ -0,0 +1,29 @@
+> +Device Tree Clock bindings for Marvell Berlin clocks
 > +
-> +/memreserve/ 0xFEC00000 0x1400000;	/* EL3 monitor, secure intepreter */
-
-As I've mentioned, I'm concerned that this is even in the non-secure
-address space that the kernel can access. Why is this not hidden from
-the kernel entirely? Why is it expected to be mapped in and reserved?
-
-Additionally, the memory the used by the spin-table (0x0 0x8000fff8) has
-not been reserved, and thus the kernel is free to clobber it.
-
-[...]
-
-> +	gic: interrupt-controller at 1C000000 {
-> +		compatible = "arm,cortex-a15-gic";
-
-For targeting any future workarounds I would very much prefer a more
-specific string.
-
-[...]
-
-> +	pmu {
-> +		compatible = "samsung,gh7-pmu", "armv8-pmuv3";
-> +		interrupts = <0 294 0>,
-> +			     <0 295 0>,
-> +			     <0 296 0>,
-> +			     <0 297 0>,
-> +			     <0 298 0>,
-> +			     <0 299 0>,
-> +			     <0 300 0>,
-> +			     <0 301 0>;
-> +	};
-
-These are all missing a trigger type (thus making them unusable), and as
-"GH7" is the SoC name rather than the CPU name, the compatible string is
-somewhat bad.
-
+> +This binding uses the common clock binding[1].
 > +
-> +	amba {
-> +		compatible = "arm,amba-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 > +
-> +		serial at 12c00000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0 0x12c00000 0 0x10000>;
-> +			interrupts = <0 418 0>;
-> +		};
-> +
-> +		serial at 12c20000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0 0x12c20000 0 0x10000>;
-> +			interrupts = <0 420 0>;
-> +		};
+> +Required properties:
+> +- compatible : shall be one of the following:
+> +	"marvell,berlin2-pll" or
+> +	"marvell,berlin2q-pll":
+> +		CPU PLL and System PLL
+> +- reg : Address and length of the clock register set.
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : shall be the input parent clock phandle for the clock.
 
-While the primecell bindings and PL011 bindings state that clocks are
-optional, the primecell bus code requires a clock named apb_pclk, and
-the pl011 driver requires a clock (which it expects to be UARTCLK) to
-acquire the frequency from. As neither are provided I do not see how
-this DT could possibly be used to boot a usable system.
+Nit: clocks aren't just phandles. Either define the full type (phandle +
+clock-specifier pair), or don't define the type at all given it's a
+standard property.
 
-Additionally the interrupt trigger types are missing.
-
-Given that these are the only IO devices described in the dtsi/dts
-combination, and they do not appear to be usable, what is the point in
-merging this?
+Otherwise this looks fine to me.
 
 Cheers,
 Mark.
+
+> +
+> +smclk: sysmgr-clock {
+> +	compatible = "fixed-clock";
+> +	#clock-cells = <0>;
+> +	clock-frequency = <25000000>;
+> +};
+> +
+> +cpupll: cpupll {
+> +	compatible = "marvell,berlin2-pll";
+> +	clocks = <&smclk>;
+> +	#clock-cells = <0>;
+> +	reg = <0xf7ea003c 8>;
+> +};
+> +
+> +
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
