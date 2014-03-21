@@ -1,195 +1,91 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 20 Mar 2014 20:52:33 -0700
-Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <531068F4.3060903@free-electrons.com>
-References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
- <531068F4.3060903@free-electrons.com>
-Message-ID: <20140321035233.32624.98694@quantum>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 21 Mar 2014 13:49:00 +0900
+Subject: [PATCH v11 10/27] iommu/exynos: use managed device helper
+ functions
+In-Reply-To: <532AC6A2.9070307@gmail.com>
+References: <20140314140542.f4ded6c50dbd8a1d937bf354@samsung.com>
+ <CAK9yfHw7zYaX9EYFE+m3Mh-u8Uiyubx-cS0EwPmfW+0weLiBKw@mail.gmail.com>
+ <20140318200915.7dd833ce0fddbbd6ecd8dac9@samsung.com>
+ <532862ED.8040809@samsung.com>
+ <20140319175927.a3feadcacbffe80eca1d3421@samsung.com>
+ <CAK9yfHxxo2eFh38gPZkpYf1ueBWySWqPzgLV_tSSykzHhNzN8g@mail.gmail.com>
+ <532988CA.4000008@samsung.com>
+ <20140320190333.9c3555b097e97d593faddbdd@samsung.com>
+ <532AC6A2.9070307@gmail.com>
+Message-ID: <20140321134900.ef9b7ac83443ae2e0bc5565b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2014-02-28 02:46:12)
-> Hi Mike,
+On Thu, 20 Mar 2014 11:44:50 +0100, Tomasz Figa wrote:
+> On 20.03.2014 11:03, Cho KyongHo wrote:
+> > On Wed, 19 Mar 2014 13:08:42 +0100, Tomasz Figa wrote:
+> >> On 19.03.2014 10:01, Sachin Kamat wrote:
+> >>> On 19 March 2014 14:29, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> >>>> On Tue, 18 Mar 2014 16:14:53 +0100, Tomasz Figa wrote:
+> >>>>> On 18.03.2014 12:09, Cho KyongHo wrote:
+> >>>>>> On Fri, 14 Mar 2014 20:52:43 +0530, Sachin Kamat wrote:
+> >>>>>>> Hi KyongHo,
+> >>>>>>>
+> >>>>>>> On 14 March 2014 10:35, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> >>>>>>>> This patch uses managed device helper functions in the probe().
+> >>>>>>>>
+> >>>>>>>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> >>>>>>>> ---
+> >>>>>>> [snip]
+> >>>>>>>
+> >>>>>>>> +       data->clk = devm_clk_get(dev, "sysmmu");
+> >>>>>>>> +       if (IS_ERR(data->clk)) {
+> >>>>>>>> +               dev_info(dev, "No gate clock found!\n");
+> >>>>>>>> +               data->clk = NULL;
+> >>>>>>>> +       }
+> >>>>>>>
+> >>>>>>> Why aren't you returning from here upon error?
+> >>>>>>
+> >>>>>> It is for the case of a System MMU which does not need clock gating.
+> >>>>>>
+> >>>>>
+> >>>>> Are there really such cases?
+> >>>>>
+> >>>>
+> >>>> Yes.
+> >>>> Especially in the case of initial stage of new SoC development.
+> >>>>
+> >>>> I have experianced some software workaround for H/W restriction
+> >>>> needs prevention of clock gating for some devices.
+> >>>
+> >>> So aren't these basically some exceptions/hacks rather than the usual way
+> >>> of functioning of the device?
+> >>>
+> >>
+> >> This actually raises a good question, whether we really need to support
+> >> such early development SoC versions in mainline.
+> >>
+> >> Another thing is that if you need to assure that a clock is ungated, you
+> >> must acquire it and prepare_enable explicitly, so I don't think this
+> >> kind of handling is correct.
+> >>
+> > On early development step of a new SoC, clock related stuffs and
+> > some device drivers like display controller are usually developed in parallel.
+> >
+> > In that case, -ENOENT from clk_get() must not treated as an error.
+> > "[PATCH v11 20/17] iommu/exynos: allow having multiple System MMUs for a master H/W"
+> > patch distinguishes -ENOENT from other error values returned by devm_clk_get().
 > 
-> On 24/02/2014 19:10, Gregory CLEMENT wrote:
-> > Until now the clock providers were initialized in the order found in
-> > the device tree. This led to have the dependencies between the clocks
-> > not respected: children clocks could be initialized before their
-> > parent clocks.
-> > 
-> > Instead of forcing each platform to manage its own initialization order,
-> > this patch adds this work inside the framework itself.
-> > 
-> > Using the data of the device tree the of_clk_init function now delayed
-> > the initialization of a clock provider if its parent provider was not
-> > ready yet.
-> > 
-> > The strict dependency check (all parents of a given clk must be
-> > initialized) was added by Boris BREZILLON
+> I still don't think upstream is right place for such development hacks 
+> and such assumption will mask potential errors caused by clocks 
+> unspecified in DT.
 > 
-> Are you ok with this version?
-> Will you take it for 3.15?
-> Or maybe you expected that it will be part of a pull request?
+> If such thing is needed for development, an extra patch might be kept in 
+> development tree, until clock driver is implemented or a dummy 
+> fixed-rate clock might be specified in DT.
 > 
-> However as it is modifying the core of the framework I thought that you
-> would take it and apply yourself.
 
-Hi Gregory,
+Ok.
 
-I have taken this into clk-next. If no regressions pop up over the next
-few days then it should go into 3.15.
+Now I understand.
 
-Thanks,
-Mike
+Error from clk_get() will be failure of probe in the next patch series.
 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> > 
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> > ---
-> > Mike,
-> > 
-> > This patch depend on the patch "clk: return probe defer when DT clock
-> > not yet ready": http://article.gmane.org/gmane.linux.kernel/1643466
-> > 
-> > If for any reason you don't want to take it, then I will write a new
-> > version closer to the v2 for the parent_ready() function.
-> > 
-> > I have taken into account all the remarks from Tomasz.
-> > 
-> > Thanks,
-> > 
-> > Changelog:
-> > v2->v3:
-> > 
-> > - added the SoB flag of Boris
-> > - used of_clk_get(np, i) in the parent_ready() function.
-> > - simplified the loops to manage the order dependencies in of_clk_init()
-> > 
-> > v1 -> v2:
-> > Merged the  strict dependency check from Boris.
-> > 
-> > 
-> >  drivers/clk/clk.c | 83 ++++++++++++++++++++++++++++++++++++++++++++++++++++---
-> >  1 file changed, 79 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 32d84e921b23..3a07f8ac2e11 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -2526,24 +2526,99 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
-> >  
-> > +struct clock_provider {
-> > +     of_clk_init_cb_t clk_init_cb;
-> > +     struct device_node *np;
-> > +     struct list_head node;
-> > +};
-> > +
-> > +static LIST_HEAD(clk_provider_list);
-> > +
-> > +/*
-> > + * This function looks for a parent clock. If there is one, then it
-> > + * checks that the provider for this parent clock was initialized, in
-> > + * this case the parent clock will be ready.
-> > + */
-> > +static int parent_ready(struct device_node *np)
-> > +{
-> > +     int i = 0;
-> > +
-> > +     while (true) {
-> > +             struct clk *clk = of_clk_get(np, i);
-> > +
-> > +             /* this parent is ready we can check the next one */
-> > +             if (!IS_ERR(clk)) {
-> > +                     clk_put(clk);
-> > +                     i++;
-> > +                     continue;
-> > +             }
-> > +
-> > +             /* at least one parent is not ready, we exit now */
-> > +             if (PTR_ERR(clk) == -EPROBE_DEFER)
-> > +                     return 0;
-> > +
-> > +             /*
-> > +              * Here we make assumption that the device tree is
-> > +              * written correctly. So an error means that there is
-> > +              * no more parent. As we didn't exit yet, then the
-> > +              * previous parent are ready. If there is no clock
-> > +              * parent, no need to wait for them, then we can
-> > +              * consider their absence as being ready
-> > +              */
-> > +             return 1;
-> > +     }
-> > +}
-> > +
-> >  /**
-> >   * of_clk_init() - Scan and init clock providers from the DT
-> >   * @matches: array of compatible values and init functions for providers.
-> >   *
-> > - * This function scans the device tree for matching clock providers and
-> > - * calls their initialization functions
-> > + * This function scans the device tree for matching clock providers
-> > + * and calls their initialization functions. It also do it by trying
-> > + * to follow the dependencies.
-> >   */
-> >  void __init of_clk_init(const struct of_device_id *matches)
-> >  {
-> >       const struct of_device_id *match;
-> >       struct device_node *np;
-> > +     struct clock_provider *clk_provider, *next;
-> > +     bool is_init_done;
-> > +     bool force = false;
-> >  
-> >       if (!matches)
-> >               matches = &__clk_of_table;
-> >  
-> > +     /* First prepare the list of the clocks providers */
-> >       for_each_matching_node_and_match(np, matches, &match) {
-> > -             of_clk_init_cb_t clk_init_cb = match->data;
-> > -             clk_init_cb(np);
-> > +             struct clock_provider *parent =
-> > +                     kzalloc(sizeof(struct clock_provider),  GFP_KERNEL);
-> > +
-> > +             parent->clk_init_cb = match->data;
-> > +             parent->np = np;
-> > +             list_add(&parent->node, &clk_provider_list);
-> > +     }
-> > +
-> > +     while (!list_empty(&clk_provider_list)) {
-> > +             is_init_done = false;
-> > +             list_for_each_entry_safe(clk_provider, next,
-> > +                                     &clk_provider_list, node) {
-> > +                     if (force || parent_ready(clk_provider->np)) {
-> > +                             clk_provider->clk_init_cb(clk_provider->np);
-> > +                             list_del(&clk_provider->node);
-> > +                             kfree(clk_provider);
-> > +                             is_init_done = true;
-> > +                     }
-> > +             }
-> > +
-> > +             /*
-> > +              * We didn't managed to initialize any of the
-> > +              * remaining providers during the last loop, so now we
-> > +              * initialize all the remaining ones unconditionally
-> > +              * in case the clock parent was not mandatory
-> > +              */
-> > +             if (!is_init_done)
-> > +                     force = true;
-> > +
-> >       }
-> >  }
-> >  #endif
-> > 
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+Thanks.
+
+KyongHo
