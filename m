@@ -1,81 +1,124 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Fri, 21 Mar 2014 18:23:28 +0530
-Subject: [PATCH v5 05/11] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
- header
+Date: Fri, 21 Mar 2014 18:23:30 +0530
+Subject: [PATCH v5 07/11] ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
 In-Reply-To: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
 References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1395406414-11707-6-git-send-email-anup.patel@linaro.org>
+Message-ID: <1395406414-11707-8-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we don't have an exit reason to notify user space about
-a system-level event (for e.g. system reset or shutdown) triggered
-by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
-this purpose. We can also inform user space about the 'type' and
-architecture specific 'flags' of a system-level event using the
-kvm_run structure.
-
-This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
-in-kernel PSCI v0.2 support to reset/shutdown VMs.
+This patch adds emulation of PSCI v0.2 AFFINITY_INFO function call
+for KVM ARM/ARM64. This is a VCPU-level function call which will be
+used to determine current state of given affinity level.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 ---
- Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
- include/uapi/linux/kvm.h          |    8 ++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/kvm/psci.c |   67 +++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 65 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 0114d5b..e675ec2 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2721,6 +2721,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
- external interrupt has just been delivered into the guest. User space
- should put the acknowledged interrupt vector into the 'epr' field.
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 1f1720a..5bd9ae4 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -27,6 +27,31 @@
+  * as described in ARM document number ARM DEN 0022A.
+  */
  
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
++static unsigned long psci_affinity_mask(unsigned long affinity_level)
++{
++	unsigned long affinity_mask = MPIDR_HWID_BITMASK;
 +
-+If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
-+a system-level event using some architecture specific mechanism (hypercall
-+or some special instruction). In case of ARM/ARM64, this is triggered using
-+HVC instruction based PSCI call from the vcpu. The 'type' field describes
-+the system-level event type. The 'flags' field describes architecture
-+specific flags for the system-level event.
++	switch (affinity_level) {
++	case 0: /* All affinity levels are valid */
++		affinity_mask &= ~0x0UL;
++		break;
++	case 1: /* Aff0 ignored */
++		affinity_mask &= ~0xFFUL;
++		break;
++	case 2: /* Aff0 and Aff1 ignored */
++		affinity_mask &= ~0xFFFFUL;
++		break;
++	case 3: /* Aff0, Aff1, and Aff2 ignored */
++		affinity_mask &= ~0xFFFFFFUL;
++		break;
++	default:
++		affinity_mask = 0;
++		break;
++	};
 +
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 260d3ae..0cf2882 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -171,6 +171,7 @@ struct kvm_pit_config {
- #define KVM_EXIT_WATCHDOG         21
- #define KVM_EXIT_S390_TSCH        22
- #define KVM_EXIT_EPR              23
-+#define KVM_EXIT_SYSTEM_EVENT     24
++	return affinity_mask;
++}
++
+ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.pause = true;
+@@ -85,6 +110,42 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	return KVM_PSCI_RET_SUCCESS;
+ }
  
- /* For KVM_EXIT_INTERNAL_ERROR */
- /* Emulate instruction failed. */
-@@ -301,6 +302,13 @@ struct kvm_run {
- 		struct {
- 			__u32 epr;
- 		} epr;
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
++static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
++{
++	int i;
++	unsigned long mpidr;
++	unsigned long target_affinity;
++	unsigned long target_affinity_mask;
++	unsigned long lowest_affinity_level;
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *tmp;
++
++	target_affinity = *vcpu_reg(vcpu, 1);
++	lowest_affinity_level = *vcpu_reg(vcpu, 2);
++
++	/* Determine target affinity mask */
++	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
++	if (!target_affinity_mask)
++		return KVM_PSCI_RET_INVAL;
++
++	/* Ignore other bits of target affinity */
++	target_affinity &= target_affinity_mask;
++
++	/*
++	 * If one or more VCPU matching target affinity are running
++	 * then return 0 (ON) else return 1 (OFF)
++	 */
++	kvm_for_each_vcpu(i, tmp, kvm) {
++		mpidr = kvm_vcpu_get_mpidr(tmp);
++		if (((mpidr & target_affinity_mask) == target_affinity) &&
++		    !tmp->arch.pause) {
++			return 0;
++		}
++	}
++
++	return 1;
++}
++
+ static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+ {
+ 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+@@ -132,6 +193,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	case KVM_PSCI_0_2_FN64_CPU_ON:
+ 		val = kvm_psci_vcpu_on(vcpu);
+ 		break;
++	case KVM_PSCI_0_2_FN_AFFINITY_INFO:
++	case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
++		val = kvm_psci_vcpu_affinity_info(vcpu);
++		break;
+ 	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+ 		kvm_psci_system_off(vcpu);
+ 		val = KVM_PSCI_RET_SUCCESS;
+@@ -143,12 +208,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		ret = 0;
+ 		break;
+ 	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
+-	case KVM_PSCI_0_2_FN_AFFINITY_INFO:
+ 	case KVM_PSCI_0_2_FN_MIGRATE:
+ 	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+ 	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+ 	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+-	case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
+ 	case KVM_PSCI_0_2_FN64_MIGRATE:
+ 	case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+ 		val = KVM_PSCI_RET_NI;
 -- 
 1.7.9.5
