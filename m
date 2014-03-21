@@ -1,36 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Mar 2014 14:52:22 +0000
-Subject: [PATCH 1/3] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <20140320175253.GH11706@sirena.org.uk>
-References: <1395252139-16239-1-git-send-email-broonie@kernel.org>
- <20140320112650.GA1408@red-moon>
- <20140320134357.GE11706@sirena.org.uk>
- <20140320171930.GA28238@arm.com>
- <20140320175253.GH11706@sirena.org.uk>
-Message-ID: <20140321145222.GG13596@arm.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Fri, 21 Mar 2014 14:53:48 +0000
+Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
+ R8A7790
+In-Reply-To: <532C5ADE.4030708@cogentembedded.com>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
+ <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
+ <532C5ADE.4030708@cogentembedded.com>
+Message-ID: <OF4D80B18E.5A1F55AB-ON80257CA2.0051AADA-80257CA2.0051D412@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 05:52:53PM +0000, Mark Brown wrote:
-> On Thu, Mar 20, 2014 at 05:19:32PM +0000, Catalin Marinas wrote:
-> > On Thu, Mar 20, 2014 at 01:43:57PM +0000, Mark Brown wrote:
-> 
-> > > To be honest at this point I think what I want to do is go back to the
-> > > original approach of layering DT on top of MPIDR.  MPIDR is smaller and
-> > > simpler code so seems more likely to make progress.  I really do expect
-> > > that for a very large proportion of systems it'll be sufficient.
-> 
-> > Do you mean the physical MPIDR_EL1 or the DT representation of
-> > MPIDR_EL1?
-> 
-> Well, the affinities need to be the same anyway (so we can tie the
-> hardware to the description in DT) though we need to use the physical
-> register to get the MT bit since the binding requires that this be
-> omitted from the value stored in DT.  Lorenzo was keen on paying
-> attention to the MT bit which does seem like a reasonable thing to do.
+Hi Sergei,
 
-OK, as long as topology in DT takes priority (in case the hardware got
-it wrong).
+On: 21/03/2014 14:30, Sergei wrote:
+> Subject: Re: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes 
+for R8A7790
+> 
+> Hello.
+> 
+> On 03/21/2014 01:32 PM, Phil Edworthy wrote:
+> 
+> > This patch adds the device tree nodes for R8A7790
+> 
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > ---
+> >   arch/arm/boot/dts/r8a7790.dtsi | 19 +++++++++++++++++++
+> >   1 file changed, 19 insertions(+)
+> 
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi 
+b/arch/arm/boot/dts/r8a7790.dtsi
+> > index df9ec61..e7d498a 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> > @@ -821,4 +821,23 @@
+> >         #size-cells = <0>;
+> >         status = "disabled";
+> >      };
+> > +
+> > +   pcie: pcie at fe000000 {
+> > +      compatible = "renesas,r8a7790-pcie";
+> 
+>     The convention adopted on this list is to put the "pcie" first, and 
+SoC 
+> name the last.
+Ok, shame that all the other PCI hosts use vendor,device-pcie
 
--- 
-Catalin
+
+> > +      reg = <0 0xfe000000 0 0x80000>;
+> > +      #address-cells = <3>;
+> > +      #size-cells = <2>;
+> > +      device_type = "pci";
+> 
+>     This legacy property is only meaningful for the true OF firmware and 
+thus 
+> have been phased out (it's only actively used for the memory nodes).
+Ok, thanks for pointing this out.
+
+> WBR, Sergei
+> 
+
+Thanks
+Phil
