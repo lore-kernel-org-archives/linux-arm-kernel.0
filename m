@@ -1,25 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Mar 2014 18:32:00 +0300
-Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <532C5B70.5060509@cogentembedded.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Mar 2014 15:32:24 +0100
+Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
+In-Reply-To: <6295310.bvZ6PIzM4N@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-11-git-send-email-arnd@arndb.de>
+ <20140320204847.GD23076@pengutronix.de>
+ <6295310.bvZ6PIzM4N@wuerfel>
+Message-ID: <20140321143224.GF23076@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello Arnd,
 
-On 03/21/2014 01:32 PM, Phil Edworthy wrote:
+On Thu, Mar 20, 2014 at 11:16:20PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 March 2014 21:48:47 Uwe Kleine-K?nig wrote:
+> > 
+> > On Wed, Mar 19, 2014 at 08:29:07PM +0100, Arnd Bergmann wrote:
+> > > The efm32 platform does not provide a zreladdr-y line its Makefile.boot,
+> > > so we always have to use CONFIG_AUTO_ZRELADDR in order to successfully
+> > > build and link a zImage.
+> > I wonder why you need to AUTO_ZRELADDR (which is there to guess
+> > zreladdr) while efm32 doesn't have an MMU and so there is nothing to
+> > guess. So I think this patch fixes a build problem, but it's not a good
+> > change.
+> 
+> It is required in order to build a compressed zImage file. You mentioned
+> before that your system does not have enough RAM to support this, but
+> the compile-time option exists, and there is no dependency on MMU support
+> for it, nor should there be.
+My objection isn't about having only little RAM. AUTO_ZRELADDR is about
+guessing the physical address corresponding to PAGE_OFFSET. But without
+an MMU there is nothing to guess. So I wonder if the better change would
+be to do:
 
-> This patch adds the device tree nodes for R8A7790
+	#ifdef CONFIG_MMU
+	#ifdef CONFIG_AUTO_ZRELADDR
+		... guess zreladdress based on instruction pointer
+	#else
+		... use zreladdr from Makefile.boot
+	#endif
+	#else
+		... use zreladdr = PAGE_OFFSET
+	#endif
 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> ---
->   arch/arm/boot/dts/r8a7790.dtsi | 19 +++++++++++++++++++
->   1 file changed, 19 insertions(+)
+Best regards
+Uwe
 
-    Why are you not enabling PCIe for Lager, only on Koelsch?
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
