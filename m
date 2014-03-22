@@ -1,50 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Mar 2014 10:27:09 +0100
-Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
-In-Reply-To: <CAL_Jsq+vd6dqQgfJsS3sfCOhu7qCpPdcmrXPhC33zym2R9J=rQ@mail.gmail.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <20140321185430.GG23076@pengutronix.de>
- <CAL_Jsq+vd6dqQgfJsS3sfCOhu7qCpPdcmrXPhC33zym2R9J=rQ@mail.gmail.com>
-Message-ID: <201403221027.10332.arnd@arndb.de>
+Date: Sat, 22 Mar 2014 10:54:39 +0100
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201403221054.39799.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 21 March 2014, Rob Herring wrote:
-> On Fri, Mar 21, 2014 at 1:54 PM, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > On Fri, Mar 21, 2014 at 04:10:37PM +0100, Arnd Bergmann wrote:
-> >> I don't see a reason to change the existing logic, it works for
-> >> both MMU and NOMMU kernels, and you are talking about three instructions
-> >> here.
-> > it doesn't matter how many instructions are involved. The relevant
-> > difference is that with my approach you fix the problem for all no-MMU
-> > platforms, with yours you only fix efm32. (OK, I think there are not too
-> > many no-MMU platforms, but still.) An even easier implementation would
-> > be to add something like:
-> >
-> >         ifeq($(zreladdr-y)$(CONFIG_MMU),)
-> >         zreladdr-y := CONFIG_PAGE_OFFSET + CONFIG_TEXT_OFFSET
-> >         endif
-> >
-> > to arch/arm/boot/Makefile.
-
-This makes sense, we can add it as soon as we have a use for it. At the
-moment, the only problem we have is a randconfig build error, and the
-obvious change I proposed should work just fine.
-
-> > But I don't care much, if you still want to make EFM32 select
-> > AUTO_ZRELADDR go ahead.
+> From: Rob Herring <robh@kernel.org>
 > 
-> How about a kconfig fix:
+> This started out as an attempt to add arm64's earlyprintk support to ARM
+> in order to get an earlier, runtime setup console on multi-platform
+> kernels. The first issue was needing the fixmap support which
+> conveniently Mark Salter was working on and is mostly in place now. Like
+> many things on ARM and arm64 now, it then became where do I put the now
+> common, shared code. After digging more into various early console/printk
+> support, it turns out the 8250_early.c setup code was the best starting
+> point. 
 > 
-> bool "Auto calculation of the decompressed kernel image address" if MMU
-> default y if !MMU
+> This is based on Mark Salter's fixmap support currently in linux-next.
+> This is tested on arm64 and ARM with pl011 and 8250. The ARM support
+> also requires fixmap and fixed mapping support which are not yet in place.
+> I have some patches in my tree to support fixmap, but they need some more
+> work. Fortunately, once fixmap is in place, it is just a Kconfig option
+> to enable earlycon support on ARM. A git tree is available here[1].
+> 
+> Based on this series, I would like to add support for doing earlycon
+> setup using DT.
 
-This however would break builds that today for some reason cannot use
-AUTO_ZRELADDR on !MMU kernels, i.e. has a funny bootloader that
-uses ZBOOT_ROM or other tricks. In principle any platform should
-work with MMU disabled (although I'm sure there are tons of bugs),
-and not every one uses AUTO_ZRELADDR today. Uwe's suggestion above
-takes advantage of the fact that !MMU-kernels know what physical
-address they run on.
+Hi Rob,
+
+I like this series a lot, great work!
+
+I would consider the DT parsing support essential here, we should not
+merge the patches until that is done as well, because I don't want
+to see users pass earlycon command line options in DT when they can
+use the established "linux,stdout-path" property instead. I would
+expect that in almost every case in which we are booting using DT
+today, we can just use linux,stdout-path to locate the device that
+the boot loader has already set up and start usign it.
 
 	Arnd
