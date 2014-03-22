@@ -1,35 +1,51 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 22 Mar 2014 23:03:49 +0100 (CET)
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
- <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <alpine.DEB.2.02.1403222302510.18573@ionos.tec.linutronix.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 22 Mar 2014 23:20:57 +0100
+Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART inputs
+In-Reply-To: <2567235.KcPFJfGIvp@typ>
+References: <6599423.XddAUl3dCe@typ> <3174671.zfR1X00SEg@phil>
+ <2567235.KcPFJfGIvp@typ>
+Message-ID: <2573614.4MaI90U1A8@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Mar 2014, James Bottomley wrote:
+Hi Max,
 
-> On Sat, 2014-03-22 at 11:13 -0700, Laura Abbott wrote:
-> > Rather than have architectures #define ARCH_HAS_SG_CHAIN in an architecture
-> > specific scatterlist.h, make it a proper Kconfig option and use that
-> > instead. At same time, remove the header files are are now mostly
-> > useless and just include asm-generic/scatterlist.h.
+
+Am Donnerstag, 13. M?rz 2014, 20:25:43 schrieb Max Schwarz:
+> Hello Heiko,
 > 
-> Well, the transformation looks fine.  Perhaps part of the reason for the
-> lack of response is that there's no compelling reason in the change log
-> above for doing this.  The usual reason for eliminating ARCH_HAS is that
-> it's hiding something that would be better expressed a different way
-> (that's actually intuitive to grep) or that it's expressing something
-> that should be configurable.  Neither of these reasons apply in this
-> case, because SG_CHAIN definitely is a property of the architecture not
-> the config space and it's not really hiding anything.
+> > So I agree with you but would like to determine if we should also set the
+> > txd to pull down in one go, to restore the default pull setting of these
+> > pins or should leave them as is.
+> > Thoughts?
+> 
+> As soon as the UART is enabled, that TX pull-down does not do anything
+> because the UART will actively drive the pin. I don't know what happens if
+> the UART is suspended through runtime PM, though. I skimmed over the
+> 8250_dw and saw support for that.
+> 
+> On the radxa board, there is even an external pull-up on the TX pin. The
+> UART idle level is high, so that makes sense. If we wanted to pull the pin
+> somewhere, I guess it should be up, not down.
+> 
+> My vote would be to keep the patch as it is. In any case, it's an
+> improvement of the status quo and does not change TX behavior.
 
-Getting rid of pointless copied code is definitely a good enough
-reason and the patch removes quite some of that.
- 
-Thanks,
+ok, but as we change the default behaviour of the pin - and as we discussed 
+above rightfully so, the commit message should reflect this and not describe a 
+Radxa-Rock specific change. So would you be ok with something like:
 
-	tglx
+---------- 8< --------------------
+Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART RX pins
+
+The default behaviour of the uart-rx pins on the rk3188 is to be pulled up and 
+a lot of designs use diodes to even prevent them from being raised from the 
+outside.
+
+Therefore change the rx-pin settings accordingly.
+
+This also fixes a uart receive problem on mass production Radxa Rock boards.
+---------- 8< --------------------
+
+
+Heiko
