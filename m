@@ -1,97 +1,96 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sat, 22 Mar 2014 09:18:35 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <4230433.d0bAGX3bJV@wuerfel>
-References: <1395414570-25515-1-git-send-email-zhangfei.gao@linaro.org>
- <1395414570-25515-4-git-send-email-zhangfei.gao@linaro.org>
- <4230433.d0bAGX3bJV@wuerfel>
-Message-ID: <532CE4EB.6010305@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 21 Mar 2014 19:29:50 -0700
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor.secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk>
+ <531843EE.8040102@redhat.com> <53185FB9.1040308@redhat.com>
+ <20140306120449.GA29916@mal.justgohome.co.uk>
+ <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+Message-ID: <20140322010206.GF25519@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd
+On Fri, Mar 07, 2014 at 08:24:18PM +0800, Grant Likely wrote:
+> On Thu, 6 Mar 2014 12:04:50 +0000, Robie Basak <robie.basak@canonical.com> wrote:
+> > On Thu, Mar 06, 2014 at 12:44:57PM +0100, Laszlo Ersek wrote:
+> > > If I understand correctly, the question is this:
+> > > 
+> > >   Given a hypervisor that doesn't support non-volatile UEFI variables
+> > >   (including BootOrder and Boot####), is it possible to automatically
+> > >   boot a carefully prepared VM image, made available as a fixed media
+> > >   device?
+> > > 
+> > > The answer is "yes". See
+> > 
+> > Right, but I think there is a subsequent problem.
+> > 
+> > >   It is expected that this default boot will load an operating system or
+> > >   a maintenance utility. If this is an operating system setup program it
+> > >   is then responsible for setting the requisite environment variables
+> > >   for subsequent boots. The platform firmware may also decide to recover
+> >         ^^^^^^^^^^^^^^^^
+> > >   or set to a known set of boot options.
+> > 
+> > It seems to me that the guest OS is permitted to assume that persistent
+> > boot variables will work after first boot, for subsequent boots.
+> > 
+> > So, for example, the guest OS might, on bootloader or kernel upgrade,
+> > completely replace the boot mechanism, dropping the removable path and
+> > replacing it with a fixed disk arrangement, setting boot variables
+> > appropriately, and assume that it can reboot and everything will
+> > continue to work.
+> > 
+> > But if the host does not support non-volatile variables, then this will
+> > break.
+> 
+> Correct
+> 
+> > This is why I'm suggesting that the specification mandate that the guest
+> > OS shipped in a "portable disk image" as defined by the spec must not
+> > make this assumption.
+> 
+> Also correct... the installer must be aware of this constraint which is
+> why it is part of the draft spec.
+> 
+> > It's either this, or mandate that all hosts must support persistent
+> > variables. I have no objection to that in principle, but since we have
+> > no implementation currently, it seems easier to avoid this particular
+> > roadblock by tweaking the spec in a way that nobody seems to care about
+> > anyway.
+> 
+> Right. I guess my position is that if persistent storage is not
+> implemented then there are a number of install/upgrade scenarios that
+> won't work. Regardless, portable images must assume an empty boot list
+> and we can build that into the spec.
+> 
 
-On 03/21/2014 11:27 PM, Arnd Bergmann wrote:
-> On Friday 21 March 2014 23:09:30 Zhangfei Gao wrote:
->
->> +
->> +static void __iomem *ppebase;
->
-> Any reason why you still have this, rather than using a separate
-> driver for it as we discussed? If you have comments that you still
-> plan to address, please mention those in the introductory mail,
-> so you don't get the same review comments multiple times.
+Sorry for the delay in responding - all sorts of unexpected things
+happened when I returned from LCA14.
 
-Sorry for my bad understanding.
-I thought you agreed to use this.
-Will check your earlier comments more carefully.
+I agree on the technical discussion going on here.  My conclusion is
+that we have two options:
 
->
->
->> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
->> +{
->> +	struct hip04_priv *priv = netdev_priv(ndev);
->> +	unsigned tx_head = priv->tx_head;
->> +	unsigned tx_tail = priv->tx_tail;
->> +	struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
->> +
->> +	while (tx_tail != tx_head) {
->> +		if (desc->send_addr != 0) {
->> +			if (force)
->> +				desc->send_addr = 0;
->> +			else
->> +				break;
->> +		}
->> +		if (priv->tx_phys[tx_tail]) {
->> +			dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
->> +				priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
->> +			priv->tx_phys[tx_tail] = 0;
->> +		}
->> +		dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
->> +		priv->tx_skb[tx_tail] = NULL;
->> +		tx_tail = TX_NEXT(tx_tail);
->> +		priv->tx_count--;
->> +	}
->> +	priv->tx_tail = tx_tail;
->> +}
->
-> You call this function from start_xmit(), which may be too early, causing the
-> dma_unmap_single() and dev_kfree_skb_irq() functions to be called while the
-> device is still accessing the data. This is bad.
+1. Simply mandate that VM implementations support persistent variables
+   for their UEFI implementation - with whatever constraints that may
+   put on higher level tools.
 
-There is a protection.
-Only after xmit done, desc->send_addr = 0, which is cleared by hardware.
+2. Require that OSes shipped as part of compliant VM images make no
+   assumption that changes to the UEFI environment will be stored.
 
->
-> You have to ensure that you only ever clean up tx buffers that have been
-> successfully transmitted. Also, you should use an interrupt to notify you
-> of this in case there is no further xmit packet. Otherwise you may have
-> a user space program waiting indefinitely for a single packet to get sent
-> on a socket.
->
-> It's ok to also call the cleanup from start_xmit, but calling it from the
-> poll() function or another appropriate place is required.
+I feel that option number two will break in all sorts of cases, just
+like Grant stated above, and it is fundamentally not practical; if a
+distribution ships Linux with a UEFI stub that expects to be able to do
+something, distributions must modify Linux to conform to this spec.  I
+think imagining that this spec controls how UEFI support in Linux/Grub
+is done in general would be overreaching.  Additionally, Michael brought
+up the fact that it would be non-UEFI compliant.
 
-There is no transmit done interrupt, so relying on every xmit to reclaim 
-finished buffer.
-I thought it would be enough, since there are TX_DESC_NUM descs.
-It is a good idea also put reclaim in poll, then will add spin lock etc.
+I know that door #1 may be a pain in terms of libvirt/openstack support
+and other related tools, but it feels by far the cleanest and most
+long-term solution and is in my oppinion what we shoud shoot for.  We
+are early enough in the ARM server/VM game that we should be able to
+make the right decisions at this point.
 
->
->> +	priv->id = of_alias_get_id(node, "ethernet");
->> +	if (priv->id < 0) {
->> +		dev_warn(d, "no ethernet alias\n");
->> +		ret = -EINVAL;
->> +		goto init_fail;
->> +	}
->
-> Apparently you try to rely on the alias to refer to a specific piece
-> of hardware, which is not correct. The alias is meant to be selectable
-> to match e.g. the numbering written on the external connector, which
-> is totally independent of the internal hardware.
-
-Thanks for clarifying alisa.
-The id will be used for start channel in ppe, RX_DESC_NUM * priv->id;
-Is it suitable directly use id in the dts, or other name such as start-chan?
-
-Thanks
+-Christoffer
