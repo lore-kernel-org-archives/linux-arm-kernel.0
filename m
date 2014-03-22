@@ -1,51 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 22 Mar 2014 14:50:40 +0800
-Subject: [PATCH 5/5] ARM: dts: tx53: Add IPU DI ports and endpoints
-In-Reply-To: <1395235721-13847-5-git-send-email-LW@KARO-electronics.de>
-References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
- <1395235721-13847-5-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140322065038.GE5938@dragon>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Sat, 22 Mar 2014 09:08:37 +0100
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140322010206.GF25519@cbox>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor.secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.8040102@redhat.com>
+ <53185FB9.1040308@redhat.com> <20140306120449.GA29916@mal.justgohome.co.uk>
+ <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+ <20140322010206.GF25519@cbox>
+Message-ID: <532D4505.1090603@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 02:28:41PM +0100, Lothar Wa?mann wrote:
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  arch/arm/boot/dts/imx53-tx53-x03x.dts |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> index 0217dde3..43b4b7b 100644
-> --- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> +++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> @@ -25,12 +25,17 @@
->  	soc {
->  		display: display at di0 {
->  			compatible = "fsl,imx-parallel-display";
-> -			crtcs = <&ipu 0>;
->  			interface-pix-fmt = "rgb24";
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_rgb24_vga1>;
->  			status = "okay";
->  
-> +			port {
-> +				display0_in: endpoint {
-> +					remote-endpoint = <&ipu_di0_disp0>;
-> +				};
-> +			};
-> +
+Il 22/03/2014 03:29, Christoffer Dall ha scritto:
+> 1. Simply mandate that VM implementations support persistent variables
+>    for their UEFI implementation - with whatever constraints that may
+>    put on higher level tools.
+>
+> 2. Require that OSes shipped as part of compliant VM images make no
+>    assumption that changes to the UEFI environment will be stored.
+>
+> I feel that option number two will break in all sorts of cases, just
+> like Grant stated above, and it is fundamentally not practical; if a
+> distribution ships Linux with a UEFI stub that expects to be able to do
+> something, distributions must modify Linux to conform to this spec.  I
+> think imagining that this spec controls how UEFI support in Linux/Grub
+> is done in general would be overreaching.  Additionally, Michael brought
+> up the fact that it would be non-UEFI compliant.
 
-I shouldn't apply this until I rebase my branch on 3.15-rc1 where
-Philipp's OF graph is to be seen, right?
+OSes are already able to cope with loss of changes to UEFI environment 
+are stored, because losing persistent variables is what happens if you 
+copy an image to a new hard disk.
 
-Shawn
+Asking implementations for support of persistent variables is a good 
+idea; however, independent of what is in the spec, OSes should not 
+expect that users will enable that support---most of them won't.
 
->  			display-timings {
->  				VGA {
->  					clock-frequency = <25200000>;
-> -- 
-> 1.7.10.4
-> 
-> 
-> 
+Paolo
