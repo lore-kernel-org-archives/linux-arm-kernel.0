@@ -1,40 +1,50 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Fri, 21 Mar 2014 23:42:54 -0700
-Subject: [PATCH] unwind_support
-Message-ID: <1395470574-17056-1-git-send-email-behanw@converseincode.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 22 Mar 2014 14:46:54 +0800
+Subject: [PATCH 4/5] ARM: dts: tx53: add simple-panel support
+In-Reply-To: <1395235721-13847-4-git-send-email-LW@KARO-electronics.de>
+References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
+ <1395235721-13847-4-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140322064653.GC5938@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Charlebois <charlebm@gmail.com>
+On Wed, Mar 19, 2014 at 02:28:40PM +0100, Lothar Wa?mann wrote:
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/boot/dts/imx53-tx53-x13x.dts |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> index 26b918e..86a964d 100644
+> --- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> +++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> @@ -63,6 +63,18 @@
+>  		default-brightness-level = <50>;
+>  	};
+>  
+> +	panel0 {
+> +		compatible = "simple-panel";
 
-Patch to prevent warning of a buggy compiler when using clang and
-the ARM_UNWIND option.
+>From what I can see, "simple-panel" is not a documented compatible.
 
-Clang defines (at least on the current trunk) GNUC, GNUC_MINOR, and
-GNUC_PATCHLEVEL to 4, 2, and 1 respectively.
+Shawn
 
-This version of GCC gets flagged as buggy, but it isn't actually an
-issue with clang so the patch will do what it did before unless clang
-is defined and then it will not report the GCC version as an issue.
-
-Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-Signed-off-by: Behan Webster <behanw@converseincode.com>
----
- arch/arm/kernel/unwind.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 00df012..321c4f9 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -31,7 +31,7 @@
- #warning Your compiler does not have EABI support.
- #warning    ARM unwind is known to compile only with EABI compilers.
- #warning    Change compiler or disable ARM_UNWIND option.
--#elif (__GNUC__ == 4 && __GNUC_MINOR__ <= 2)
-+#elif (__GNUC__ == 4 && __GNUC_MINOR__ <= 2) && !defined(__clang__)
- #warning Your compiler is too buggy; it is known to not compile ARM unwind support.
- #warning    Change compiler or disable ARM_UNWIND option.
- #endif
--- 
-1.8.3.2
+> +		power-supply = <&reg_lcd_pwr0>;
+> +		backlight = <&backlight0>;
+> +	};
+> +
+> +	panel1 {
+> +		compatible = "simple-panel";
+> +		power-supply = <&reg_lcd_pwr1>;
+> +		backlight = <&backlight1>;
+> +	};
+> +
+>  	regulators {
+>  		reg_lcd_pwr0: regulator at 5 {
+>  			compatible = "regulator-fixed";
+> -- 
+> 1.7.10.4
+> 
+> 
+> 
