@@ -1,106 +1,119 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 22 Mar 2014 12:23:54 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140322010206.GF25519@cbox>
-References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
- .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
- 8040102@redhat.com> <53185FB9.1040308@redhat.com> <20140306120449.GA29916@
- mal.justgohome.co.uk> <20140307122418.2F2C4C408EC@trevor.secretlab.ca> <
- 20140322010206.GF25519@cbox>
-Message-ID: <20140322122354.7644FC418C4@trevor.secretlab.ca>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 22 Mar 2014 12:31:06 +0000
+Subject: [PATCH 00/15] iio: adc: at91 cleanups and atmel_tsadcc removal
+In-Reply-To: <53296F2B.3010406@atmel.com>
+References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5325EDAF.4060003@kernel.org> <53296F2B.3010406@atmel.com>
+Message-ID: <532D828A.8000108@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Mar 2014 19:29:50 -0700, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, Mar 07, 2014 at 08:24:18PM +0800, Grant Likely wrote:
-> > On Thu, 6 Mar 2014 12:04:50 +0000, Robie Basak <robie.basak@canonical.com> wrote:
-> > > On Thu, Mar 06, 2014 at 12:44:57PM +0100, Laszlo Ersek wrote:
-> > > > If I understand correctly, the question is this:
-> > > > 
-> > > >   Given a hypervisor that doesn't support non-volatile UEFI variables
-> > > >   (including BootOrder and Boot####), is it possible to automatically
-> > > >   boot a carefully prepared VM image, made available as a fixed media
-> > > >   device?
-> > > > 
-> > > > The answer is "yes". See
-> > > 
-> > > Right, but I think there is a subsequent problem.
-> > > 
-> > > >   It is expected that this default boot will load an operating system or
-> > > >   a maintenance utility. If this is an operating system setup program it
-> > > >   is then responsible for setting the requisite environment variables
-> > > >   for subsequent boots. The platform firmware may also decide to recover
-> > >         ^^^^^^^^^^^^^^^^
-> > > >   or set to a known set of boot options.
-> > > 
-> > > It seems to me that the guest OS is permitted to assume that persistent
-> > > boot variables will work after first boot, for subsequent boots.
-> > > 
-> > > So, for example, the guest OS might, on bootloader or kernel upgrade,
-> > > completely replace the boot mechanism, dropping the removable path and
-> > > replacing it with a fixed disk arrangement, setting boot variables
-> > > appropriately, and assume that it can reboot and everything will
-> > > continue to work.
-> > > 
-> > > But if the host does not support non-volatile variables, then this will
-> > > break.
-> > 
-> > Correct
-> > 
-> > > This is why I'm suggesting that the specification mandate that the guest
-> > > OS shipped in a "portable disk image" as defined by the spec must not
-> > > make this assumption.
-> > 
-> > Also correct... the installer must be aware of this constraint which is
-> > why it is part of the draft spec.
-> > 
-> > > It's either this, or mandate that all hosts must support persistent
-> > > variables. I have no objection to that in principle, but since we have
-> > > no implementation currently, it seems easier to avoid this particular
-> > > roadblock by tweaking the spec in a way that nobody seems to care about
-> > > anyway.
-> > 
-> > Right. I guess my position is that if persistent storage is not
-> > implemented then there are a number of install/upgrade scenarios that
-> > won't work. Regardless, portable images must assume an empty boot list
-> > and we can build that into the spec.
-> > 
-> 
-> Sorry for the delay in responding - all sorts of unexpected things
-> happened when I returned from LCA14.
-> 
-> I agree on the technical discussion going on here.  My conclusion is
-> that we have two options:
-> 
-> 1. Simply mandate that VM implementations support persistent variables
->    for their UEFI implementation - with whatever constraints that may
->    put on higher level tools.
-> 
-> 2. Require that OSes shipped as part of compliant VM images make no
->    assumption that changes to the UEFI environment will be stored.
-> 
-> I feel that option number two will break in all sorts of cases, just
-> like Grant stated above, and it is fundamentally not practical; if a
-> distribution ships Linux with a UEFI stub that expects to be able to do
-> something, distributions must modify Linux to conform to this spec.  I
-> think imagining that this spec controls how UEFI support in Linux/Grub
-> is done in general would be overreaching.  Additionally, Michael brought
-> up the fact that it would be non-UEFI compliant.
-
-That isn't actually my position. I absolutely think that VMs /should/
-implement persistent variables, but the variables are a property of a VM
-instance, not of the disk image. As far as this spec is concerned, I
-think portable disk images should operate under the assumption of an
-empty set of variables, and therefore follow the removable disk
-requirements in the UEFI spec.
-
-I would propose a modification to option 1:
-
-VM implementations SHOULD to implement persistent variables for
-their UEFI implementation - with whatever constraints that may be put on
-higher level tools. Variable storage SHALL be a property of a VM
-instance, but SHALL NOT be stored as part of a portable disk image.
-Portable disk images SHALL conform to the UEFI removable disk
-requirements from the UEFI spec.
-
-g.
+On 19/03/14 10:19, Nicolas Ferre wrote:
+> On 16/03/2014 19:30, Jonathan Cameron :
+>> On 05/03/14 17:35, Alexandre Belloni wrote:
+>>> This patch set is a followup of my previous series: iio: adc: at91 fixes
+>>>
+>>> I'm sorry it is so long, I made sure this is bissectable.
+>> It's a nice series, don't apologise for doing things right!
+>>
+>> Clearly there are a few outstanding snippets from the reviews so far, but we
+>> are getting to the point where we need to agree on a path for this.  I'm
+>> happy to take the whole series through the IIO tree if Dmitry and the at91
+>> maintainers are happy with that.  If it is considered two invasive form the
+>> atmel side then I'm perfectly happy with someone to take it through the relevant
+>> platform tree instead.
+>
+> Jonathan, Dmitry,
+>
+> Considering the amount of AT91 files touched by this series, I would
+> like to take everything through Atmel's git tree and later on arm-soc.
+Sure. Just as a warning, there are one or two patches queued up already that this
+sits on top of.  Give a spot of bad timing these are too late to go in as fixes
+before the release. Might be worth waiting on those hitting Linus' tree sometime
+after rc1 before taking this series.
+>
+>
+>> I'm obviously not going to pick it up at all until it has a complete set
+>> of at91 maintainer acks though!
+>>
+>> Realistically it's missed the coming merge window anyway, so we have a fair
+>> bit of time.
+>
+> Yes, I will review Alexandre's v2 series.
+>
+> Thanks a lot for your review and for having thought about the path that
+> these patches would take.
+>
+> Bye,
+>
+>
+>> Jonathan
+>>>
+>>> 1-3) The first 3 patches are cleaning up the patform_data used for at91_adc.
+>>>
+>>> 4-5) Then touchscreen support for older ADCs is added, this allows to use that
+>>>        for the sam9m10g45ek.
+>>>
+>>> 6) Following those modifications, the mach/at91_adc.h is not used anywhere but
+>>>      in the at91_adc driver so it is remove and its content (register definitions)
+>>>      placed directly in the driver.
+>>>
+>>> 7-9) at91sam9rl support is added to at91_adc and is used for the at91sam9rl
+>>>        based boards.
+>>>
+>>> 10-11) Prepare the atmel_tsadcc removal by switching sam9rl and sam9g45 to use
+>>>          only at91_adc instead of atmel_tsadcc.
+>>>
+>>> 12-15) atmel_tsadcc removal
+>>>
+>>>
+>>> Alexandre Belloni (15):
+>>>     ARM: at91: sam9g45: remove unused platform_data
+>>>     ARM: at91: sam9260: remove unused platform_data
+>>>     iio: adc: at91: cleanup platform_data
+>>>     iio: adc: at91_adc: Add support for touchscreens without TSMR
+>>>     ARM: at91: sam9m10g45ek: Add touchscreen support through at91_adc
+>>>     iio: adc: at91: remove unused include from include/mach
+>>>     iio: adc: at91: add sam9rl support
+>>>     ARM: at91: sam9rl: add at91_adc to support adc and touchscreen
+>>>     ARM: at91: sam9rlek add touchscreen support through at91_adc
+>>>     ARM: at91: sam9g45: switch from atmel_tsadcc to at91_adc
+>>>     ARM: at91: sam9rl: switch from atmel_tsadcc to at91_adc
+>>>     ARM: at91: remove atmel_tsadcc platform_data
+>>>     ARM: at91: remove atmel_tsadcc from sama5_defconfig
+>>>     Input: atmel_tsadcc: remove driver
+>>>     ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node
+>>>
+>>>    MAINTAINERS                                |   6 -
+>>>    arch/arm/boot/dts/at91-cosino_mega2560.dts |   5 -
+>>>    arch/arm/configs/at91sam9g45_defconfig     |   3 +-
+>>>    arch/arm/configs/at91sam9rl_defconfig      |   3 +-
+>>>    arch/arm/configs/sama5_defconfig           |   1 -
+>>>    arch/arm/mach-at91/at91sam9260_devices.c   |  10 -
+>>>    arch/arm/mach-at91/at91sam9g45.c           |   2 +-
+>>>    arch/arm/mach-at91/at91sam9g45_devices.c   |  63 +----
+>>>    arch/arm/mach-at91/at91sam9rl.c            |   7 +
+>>>    arch/arm/mach-at91/at91sam9rl_devices.c    |  83 +++++--
+>>>    arch/arm/mach-at91/board-sam9m10g45ek.c    |  16 +-
+>>>    arch/arm/mach-at91/board-sam9rlek.c        |  16 +-
+>>>    arch/arm/mach-at91/board.h                 |   3 -
+>>>    arch/arm/mach-at91/include/mach/at91_adc.h | 107 ---------
+>>>    drivers/iio/adc/at91_adc.c                 | 339 +++++++++++++++++++++++----
+>>>    drivers/input/touchscreen/Kconfig          |  12 -
+>>>    drivers/input/touchscreen/Makefile         |   1 -
+>>>    drivers/input/touchscreen/atmel_tsadcc.c   | 358 -----------------------------
+>>>    include/linux/platform_data/at91_adc.h     |  27 +--
+>>>    include/linux/platform_data/atmel.h        |   7 -
+>>>    20 files changed, 380 insertions(+), 689 deletions(-)
+>>>    delete mode 100644 arch/arm/mach-at91/include/mach/at91_adc.h
+>>>    delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
