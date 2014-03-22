@@ -1,54 +1,32 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sat, 22 Mar 2014 15:59:11 -0700
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <20140322225201.GN7528@n2100.arm.linux.org.uk>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
- <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
- <20140322222306.GM7528@n2100.arm.linux.org.uk>
- <1395527860.2143.61.camel@dabdike.int.hansenpartnership.com>
- <20140322225201.GN7528@n2100.arm.linux.org.uk>
-Message-ID: <1395529151.2143.64.camel@dabdike.int.hansenpartnership.com>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Sun, 23 Mar 2014 00:03:22 +0100
+Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART inputs
+In-Reply-To: <2573614.4MaI90U1A8@diego>
+References: <6599423.XddAUl3dCe@typ> <2567235.KcPFJfGIvp@typ>
+ <2573614.4MaI90U1A8@diego>
+Message-ID: <34897065.ss2WWxiNAl@xq-nb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-03-22 at 22:52 +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 22, 2014 at 03:37:40PM -0700, James Bottomley wrote:
-> > On Sat, 2014-03-22 at 22:23 +0000, Russell King - ARM Linux wrote:
-> > > On Sat, Mar 22, 2014 at 02:31:21PM -0700, James Bottomley wrote:
-> > > > Perhaps now might be the time to ask which are the remaining
-> > > > architectures that cannot do SG chaining and then we can fix them and
-> > > > pull the whole thing out.
-> > > 
-> > > Not quite.  You're making the assumption that we can be sure that all
-> > > the scatterlist users on an architecture have been converted - that's
-> > > simply not true on ARM.
-> > 
-> > No I'm not, I said "now might be the time to ask which are the remaining
-> > architectures that cannot do SG chaining"
-> 
-> And I'm disagreeing with that statement which implies that it's something
-> that is an architecture wide property for any particular architecture.
-> 
-> Right now in mainline, if ARM has IOMMU support enabled, then SG_CHAIN
-> support will also be enabled.  I've a patch out of tree which I've been
-> using for years which enables SG_CHAIN for a particular SoC (Dove).
-> Otherwise, it doesn't have support for SG_CHAIN.
-> 
-> PARISC on the other hand (as you list) has no support to enable SG_CHAIN
-> under any circumstances.
-> 
-> Where we're disagreeing is whether this is something that is always-on or
-> always-off for any particular architecture.
+Hi Heiko,
 
-Actually, I don't disagree with that.  PA used to share sb_iommu with
-ia64 (it's the same chipset for the HP versions), but we can't now
-because ia64 is chained and we're not and there's no way to say chained
-for this platform but not for these other more legacy ones.  If you have
-a proposal for this, I'd be interested, so I don't have to do an all or
-nothing conversion, but the config option isn't it because our platform
-configuration is runtime determined (we usually select every driver and
-let the actual one be chosen at runtime from the config table).
+> ok, but as we change the default behaviour of the pin - and as we discussed
+> above rightfully so, the commit message should reflect this and not describe
+> a Radxa-Rock specific change. So would you be ok with something like:
+> 
+> ---------- 8< --------------------
+> Subject: [PATCH] ARM: rockchip: rk3188: enable pull-ups on UART RX pins
+> 
+> The default behaviour of the uart-rx pins on the rk3188 is to be pulled up
+> and a lot of designs use diodes to even prevent them from being raised from
+> the outside.
+> 
+> Therefore change the rx-pin settings accordingly.
+> 
+> This also fixes a uart receive problem on mass production Radxa Rock boards.
+> ---------- 8< --------------------
 
-James
+Yes, that sounds good to me. Thanks!
+
+Cheers,
+  Max
