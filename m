@@ -1,46 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 22 Mar 2014 14:25:17 +0800
-Subject: [PATCH] ARM: dts: ventana: fix eth1 pci dev node
-In-Reply-To: <20140318201519.GA8637@obsidianresearch.com>
-References: <1394747064-4106-1-git-send-email-tharvey@gateworks.com>
- <20140314132805.GD813@S2101-09.ap.freescale.net>
- <CAJ+vNU2Av-n1-efbFbXNvO4SmoobL_WpQKApFRS1Zjy0egLLzw@mail.gmail.com>
- <20140318201519.GA8637@obsidianresearch.com>
-Message-ID: <20140322062432.GB5938@dragon>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Fri, 21 Mar 2014 23:42:54 -0700
+Subject: [PATCH] unwind_support
+Message-ID: <1395470574-17056-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 02:15:19PM -0600, Jason Gunthorpe wrote:
-> On Tue, Mar 18, 2014 at 01:02:55PM -0700, Tim Harvey wrote:
-> > > Is this whole bridge/switch hierarchy binding documented somewhere
-> > > or is this just something that work for you?
-> > 
-> > I'm not sure where its 'best' documented, but it is the way the
-> > kernel works.
-> 
-> It is documented in the 'PCI Bus Binding to Open Firware'
-> publication from IEEE.
-> 
-> > >> +             pcie at 0,0 {
-> > >> +                     /* 01:00.0 PCIe switch */
-> > >> +                     #address-cells = <3>;
-> > >> +                     #size-cells = <2>;
-> > >> +                     device_type = "pci";
-> > >> +                     reg = <0x0 0 0 0 0>;
-> > >> +
-> > >> +                     pcie at 8,0 {
-> > >
-> > > What's the naming schema for all these pcie nodes?  Generally, we should
-> > > have the numbers encoded in the node name coming from the address cells
-> > > in 'reg' property.
-> 
-> The 'reg' property for PCI encodes the device and function number, and
-> the suffix in the device path is of the form @DEVICE,FUNCTION (see
-> 2.2.1.3 of the spec)
-> 
-> So device=8, function=0 is @8,0 and reg = 0x4000.
+From: Mark Charlebois <charlebm@gmail.com>
 
-Ok, thanks for the info.  I missed the fact the pointer to the spec has
-been there in Documentation/devicetree/bindings/pci/pci.txt.
+Patch to prevent warning of a buggy compiler when using clang and
+the ARM_UNWIND option.
 
-Shawn
+Clang defines (at least on the current trunk) GNUC, GNUC_MINOR, and
+GNUC_PATCHLEVEL to 4, 2, and 1 respectively.
+
+This version of GCC gets flagged as buggy, but it isn't actually an
+issue with clang so the patch will do what it did before unless clang
+is defined and then it will not report the GCC version as an issue.
+
+Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+---
+ arch/arm/kernel/unwind.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 00df012..321c4f9 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -31,7 +31,7 @@
+ #warning Your compiler does not have EABI support.
+ #warning    ARM unwind is known to compile only with EABI compilers.
+ #warning    Change compiler or disable ARM_UNWIND option.
+-#elif (__GNUC__ == 4 && __GNUC_MINOR__ <= 2)
++#elif (__GNUC__ == 4 && __GNUC_MINOR__ <= 2) && !defined(__clang__)
+ #warning Your compiler is too buggy; it is known to not compile ARM unwind support.
+ #warning    Change compiler or disable ARM_UNWIND option.
+ #endif
+-- 
+1.8.3.2
