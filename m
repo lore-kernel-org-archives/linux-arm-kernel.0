@@ -1,54 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 22 Mar 2014 12:39:16 +0000
-Subject: [PATCH v2 12/15] ARM: at91: remove atmel_tsadcc platform_data
-In-Reply-To: <1395064628-644-13-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395064628-644-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395064628-644-13-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <532D8474.8020601@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 22 Mar 2014 13:45:55 +0100
+Subject: [PATCH 0/5] Kirkwood DT Documentation
+Message-ID: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/14 13:57, Alexandre Belloni wrote:
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-See below.
-> ---
->   arch/arm/mach-at91/board.h          | 3 ---
->   include/linux/platform_data/atmel.h | 7 -------
->   2 files changed, 10 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
-> index 6c08b341167d..4e773b55bc2d 100644
-> --- a/arch/arm/mach-at91/board.h
-> +++ b/arch/arm/mach-at91/board.h
-> @@ -118,9 +118,6 @@ struct isi_platform_data;
->   extern void __init at91_add_device_isi(struct isi_platform_data *data,
->   		bool use_pck_as_mck);
->
-> - /* Touchscreen Controller */
-> -extern void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data);
-> -
->   /* CAN */
->   extern void __init at91_add_device_can(struct at91_can_data *data);
->
-> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-> index cea9f70133c5..4b452c6a2f7b 100644
-> --- a/include/linux/platform_data/atmel.h
-> +++ b/include/linux/platform_data/atmel.h
-> @@ -86,13 +86,6 @@ struct atmel_uart_data {
->   	struct serial_rs485	rs485;		/* rs485 settings */
->   };
->
-> - /* Touchscreen Controller */
-> -struct at91_tsadcc_data {
-> -	unsigned int    adc_clock;
-> -	u8		pendet_debounce;
-> -	u8		ts_sample_hold_time;
-> -};
-> -
-I believe this is still in use in the driver you don't remove until patch 14.
+This patchset fixes up a number of issues found by checkpatch in the
+kirkwood DT files or binding Documentation. Vendor Prefixes are
+documented, missing prefixes are added, incorrect prefixes are
+corrected, and Kirkwood SoCs are documented.
 
-Probably best to reorder the patches...
->   /* CAN */
->   struct at91_can_data {
->   	void (*transceiver_switch)(int on);
->
+Note that some of these patches contain UTF-8 characters, which the
+mailing lists sometime don't like. The patches can also be found in
+
+https://github.com/lunn/linux.git v3.14-rc7-next-20140321-dt
+
+which is based on linux-next tag next-20140321.
+
+Andrew Lunn (5):
+  DT: Vendor: Add prefixes used by Kirkwood devices
+  DT: bindings: add missing Marvell Kirkwood SoC documentation
+  ARM: Kirkwood: Fix Atmel vendor prefix
+  DT: I2C: Add trivial bindings used by kirkwood boards
+  ARM: Kirkwood: DT: Add missing vendor prefix
+
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
+ .../devicetree/bindings/i2c/trivial-devices.txt    | 16 ++++
+ .../devicetree/bindings/vendor-prefixes.txt        | 13 ++-
+ arch/arm/boot/dts/kirkwood-b3.dts                  |  2 +-
+ arch/arm/boot/dts/kirkwood-cloudbox.dts            |  2 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |  2 +-
+ arch/arm/boot/dts/kirkwood-laplug.dts              |  2 +-
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     |  2 +-
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  4 +-
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |  2 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts             |  2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts       |  2 +-
+ 13 files changed, 136 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+
+-- 
+1.9.1
