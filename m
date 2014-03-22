@@ -1,38 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 22 Mar 2014 19:29:06 +0000
-Subject: [linux-sunxi] Re: [PATCH v2 1/8] mfd: AXP20x: Add mfd driver for
- AXP20x PMIC
-In-Reply-To: <20140322190803.GA20987@localhost.fastwebnet.it>
-References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-2-git-send-email-carlo@caione.org>
- <20140318155919.GS25478@lee--X1>
- <20140322165132.GC20668@localhost.fastwebnet.it>
- <20140322173313.GU552@sirena.org.uk>
- <CAOQ7t2Yg5pp_rXYfsdnHpy-zGFGimzT3EW15P_0ugYMtgPtOrw@mail.gmail.com>
- <20140322184201.GA27611@core.coreip.homeip.net>
- <20140322190803.GA20987@localhost.fastwebnet.it>
-Message-ID: <20140322192906.GA2269@sirena.org.uk>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Sat, 22 Mar 2014 20:57:58 +0100
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140322122354.7644FC418C4@trevor.secretlab.ca>
+References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
+ .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
+ 8040102@redhat.com> <53185FB9.1040308@redhat.com> <20140306120449.GA29916@
+ mal.justgohome.co.uk> <20140307122418.2F2C4C408EC@trevor.secretlab.ca> <
+ 20140322010206.GF25519@cbox> <20140322122354.7644FC418C4@trevor.secretlab.ca>
+Message-ID: <532DEB46.3040107@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 08:08:03PM +0100, Carlo Caione wrote:
-> On Sat, Mar 22, 2014 at 11:42:01AM -0700, Dmitry Torokhov wrote:
+Il 22/03/2014 13:23, Grant Likely ha scritto:
+> VM implementations SHOULD to implement persistent variables for
+> their UEFI implementation - with whatever constraints that may be put on
+> higher level tools. Variable storage SHALL be a property of a VM
+> instance, but SHALL NOT be stored as part of a portable disk image.
+> Portable disk images SHALL conform to the UEFI removable disk
+> requirements from the UEFI spec.
 
-> > > drivers/mfd/axp20x.c:172:18: warning: assignment makes integer
-> > > frompointer without a cast [enabled by default]
+I fully agree with this wording.
 
-> > You need to cast to long, otherwise you will get warnings when compiling
-> > on 64 bit arches.
-
-> Actually no warning also with (int) cast.
-
-That's because you squashed it to something smaller than a long using
-the cast.  The other option is to make the variable you're assigning to
-suitable to hold the value - intptr_t or a long.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140322/736dbead/attachment.sig>
+Paolo
