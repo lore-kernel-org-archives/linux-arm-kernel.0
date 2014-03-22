@@ -1,44 +1,87 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 22 Mar 2014 11:07:15 -0700
-Subject: [ANNOUNCE] ARM kernel mini-summit @ ELC: Call for Topics,
- Invitation Request
-In-Reply-To: <7hmwgtk9ma.fsf@paris.lan>
-References: <7hmwgtk9ma.fsf@paris.lan>
-Message-ID: <CAOesGMhm_fi9H3Nr_+5x-W8-6ALKWkh6o-F4NLF2sm0dQrYP6w@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Sat, 22 Mar 2014 11:13:50 -0700
+Subject: [RESEND][PATCH 0/2] Cleanup asm/scatterlist.h
+Message-ID: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 3:38 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Hello,
->
-> We will be holding a one-day, ARM kernel mini-summit at ELC this year in
-> San Jose[1].  The mini-summit will be Monday, April 28th, and ELC starts
-> on Tuesday.
->
-> The ARM summit brings together maintainers and developers in the ARM
-> community face to face to discuss current work and to plan for what is
-> coming next. To keep the group small and encourage open discussion the
-> event is invite-only.
->
-> To propose a discussion topic and/or request an invitation:
->
-> 1) subscribe yourself to arm-summit-discuss at lists.infradead.org:
->    http://lists.infradead.org/mailman/listinfo/arm-summit-discuss
->
-> 2) send your invite request and/or topic proposal to
->    arm-summit-discuss at lists.infradead.org with a subject prefix of
->    "[ARM ATTEND]".  Also, please Cc the main linux-arm-kernel list.
->
-> All topics and invitation requests will be reviewed by the program
-> committee and decisions will be made by the end of March, so please get
-> your requests/topics in soon.
-
-With about a week to go, there's been very little proposed topics or
-other traffic on this.
-
-At the current outlook, the logical choice would be to just arrange an
-ad-hoc BoF at ELC instead. So, if you've been sitting on something you
-want to discuss, please propose it so we can get discussion going.
 
 
--Olof
+I haven't gotten many responses so I'm going to try sending again
+(this time with a cover letter which I probably should have done in
+the first place...)
+
+ARCH_HAS_SG_CHAIN is currently defined as needed in asm/scatterlist.h.
+It was suggested[1] that this should probably be a proper Kconfig.
+At the same time, we can clean up most of the asm/scatterlist.h files
+to reduce redundancy. This makes parisc the only architecture that still
+has an asm/scatterlist.h file due to the #define sg_virt_addr (which
+could probably be cleaned up further still)
+
+Andrew, once we get a few more Acked-bys can we take this through your tree
+as suggested by Will?
+
+Thanks,
+Laura
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240435.html
+
+Laura Abbott (2):
+  lib/scatterlist: Make ARCH_HAS_SG_CHAIN an actual Kconfig
+  Cleanup useless architecture versions of scatterlist.h
+
+ arch/alpha/include/asm/Kbuild             |  1 +
+ arch/alpha/include/asm/scatterlist.h      |  6 ------
+ arch/arm/Kconfig                          |  1 +
+ arch/arm/include/asm/Kbuild               |  1 +
+ arch/arm/include/asm/scatterlist.h        | 12 ------------
+ arch/arm64/Kconfig                        |  1 +
+ arch/cris/include/asm/Kbuild              |  1 +
+ arch/cris/include/asm/scatterlist.h       |  6 ------
+ arch/frv/include/asm/Kbuild               |  1 +
+ arch/frv/include/asm/scatterlist.h        |  6 ------
+ arch/ia64/Kconfig                         |  1 +
+ arch/ia64/include/asm/Kbuild              |  1 +
+ arch/ia64/include/asm/scatterlist.h       |  7 -------
+ arch/m32r/include/asm/Kbuild              |  1 +
+ arch/m32r/include/asm/scatterlist.h       |  6 ------
+ arch/microblaze/include/asm/Kbuild        |  1 +
+ arch/microblaze/include/asm/scatterlist.h |  1 -
+ arch/mn10300/include/asm/Kbuild           |  1 +
+ arch/mn10300/include/asm/scatterlist.h    | 16 ----------------
+ arch/powerpc/Kconfig                      |  1 +
+ arch/powerpc/include/asm/Kbuild           |  1 +
+ arch/powerpc/include/asm/scatterlist.h    | 17 -----------------
+ arch/s390/Kconfig                         |  1 +
+ arch/s390/include/asm/Kbuild              |  1 +
+ arch/s390/include/asm/scatterlist.h       |  3 ---
+ arch/score/include/asm/Kbuild             |  2 +-
+ arch/score/include/asm/scatterlist.h      |  6 ------
+ arch/sparc/Kconfig                        |  1 +
+ arch/sparc/include/asm/Kbuild             |  1 +
+ arch/sparc/include/asm/scatterlist.h      |  8 --------
+ arch/x86/Kconfig                          |  1 +
+ arch/x86/include/asm/Kbuild               |  1 +
+ arch/x86/include/asm/scatterlist.h        |  8 --------
+ include/linux/scatterlist.h               |  2 +-
+ include/scsi/scsi.h                       |  2 +-
+ lib/Kconfig                               |  7 +++++++
+ lib/scatterlist.c                         |  4 ++--
+ 37 files changed, 31 insertions(+), 107 deletions(-)
+ delete mode 100644 arch/alpha/include/asm/scatterlist.h
+ delete mode 100644 arch/arm/include/asm/scatterlist.h
+ delete mode 100644 arch/cris/include/asm/scatterlist.h
+ delete mode 100644 arch/frv/include/asm/scatterlist.h
+ delete mode 100644 arch/ia64/include/asm/scatterlist.h
+ delete mode 100644 arch/m32r/include/asm/scatterlist.h
+ delete mode 100644 arch/microblaze/include/asm/scatterlist.h
+ delete mode 100644 arch/mn10300/include/asm/scatterlist.h
+ delete mode 100644 arch/powerpc/include/asm/scatterlist.h
+ delete mode 100644 arch/s390/include/asm/scatterlist.h
+ delete mode 100644 arch/score/include/asm/scatterlist.h
+ delete mode 100644 arch/sparc/include/asm/scatterlist.h
+ delete mode 100644 arch/x86/include/asm/scatterlist.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
