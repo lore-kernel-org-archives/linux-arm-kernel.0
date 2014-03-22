@@ -1,44 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 22 Mar 2014 11:45:43 -0500
-Subject: [PATCH v3] ARM: mm: fix reporting of read-only PMD bits
-In-Reply-To: <20140322151657.GA23606@www.outflux.net>
-References: <20140322151657.GA23606@www.outflux.net>
-Message-ID: <CAL_JsqKjt3oBxeHPdDjUGoH+JMma21rbgFjUab62yCXtck_SZA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 22 Mar 2014 17:51:32 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 1/8] mfd: AXP20x: Add mfd driver for
+ AXP20x PMIC
+In-Reply-To: <20140318155919.GS25478@lee--X1>
+References: <1394898225-28452-1-git-send-email-carlo@caione.org>
+ <1394898225-28452-2-git-send-email-carlo@caione.org>
+ <20140318155919.GS25478@lee--X1>
+Message-ID: <20140322165132.GC20668@localhost.fastwebnet.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 10:16 AM, Kees Cook <keescook@chromium.org> wrote:
-> On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
-> "PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
-> report this.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> v3:
->  - check for pre-v6 CPUs on the page table report.
-> v2:
->  - reorder bits, suggested by Olof.
-> ---
->  arch/arm/mm/dump.c |   31 +++++++++++++++++++++++++------
->  1 file changed, 25 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-> index ef69152f9b52..c1122d266c45 100644
-> --- a/arch/arm/mm/dump.c
-> +++ b/arch/arm/mm/dump.c
-> @@ -121,23 +121,42 @@ static const struct prot_bits pte_bits[] = {
->
->  static const struct prot_bits section_bits[] = {
->  #ifndef CONFIG_ARM_LPAE
-> -       /* These are approximate */
-> +# if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+On Tue, Mar 18, 2014 at 03:59:19PM +0000, Lee Jones wrote:
+> > +static struct mfd_cell axp20x_cells[] = {
+> > +	{
+> > +		.name		= "axp20x-pek",
+> > +		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
+> > +		.resources	= axp20x_pek_resources,
+> > +	}, {
+> > +		.name		= "axp20x-regulator",
+> > +	},
+> > +};
+> 
+> nit: The format of these two structs are inconsistent.
 
-You can simplify the ifdef logic like this:
+Uhm, what do you mean?
 
-#ifdef CONFIG_ARM_LPAE /* Implies v7 */
+> > +static int axp20x_i2c_probe(struct i2c_client *i2c,
+> > +			 const struct i2c_device_id *id)
+> > +{
+> > +	struct axp20x_dev *axp20x;
+> > +	const struct of_device_id *of_id;
+> > +	int ret;
+> > +
+> > +	axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
+> > +	if (!axp20x)
+> > +		return -ENOMEM;
+> > +
+> > +	of_id = of_match_device(axp20x_of_match, &i2c->dev);
+> > +	if (!of_id) {
+> > +		dev_err(&i2c->dev, "Unable to setup AXP20X data\n");
+> > +		return -ENODEV;
+> > +	}
+> > +	axp20x->variant = (int) of_id->data;
+> 
+> No need to cast from void *.
 
-#elif __LINUX_ARM_ARCH__ >= 6
+My compiler says otherwise :)
 
-#else
-/* v4/v5 */
-#endif
+> [...]
+> 
+> > +static const struct i2c_device_id axp20x_i2c_id[] = {
+> > +	{ "axp202", AXP202_ID },
+> > +	{ "axp209", AXP209_ID },
+> > +	{ }
+> > +};
+> > +MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+> 
+> Isn't this redundant now that you're using of_id?
+
+It is not. Even it is unused it has to be in the driver otherwise the
+driver is not loaded. Probably it is something wrong in the I2C core.
+
+Best,
+
+-- 
+Carlo Caione
