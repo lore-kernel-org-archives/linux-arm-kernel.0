@@ -1,72 +1,64 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Sat, 22 Mar 2014 11:14:48 +0100
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <CACQ1gAjNfZ5e7tp6zpXZfceyDeORTODxHMN-YM3hY0Zz-vEefA@mail.gmail.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
- <20140317232359.GA8943@kroah.com>
- <CACQ1gAjNfZ5e7tp6zpXZfceyDeORTODxHMN-YM3hY0Zz-vEefA@mail.gmail.com>
-Message-ID: <CACQ1gAh++TQ_qviep952ubmyxEg8WokT1szYs3-mN+3Ep_vmRQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Mar 2014 12:11:24 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
+In-Reply-To: <20140321191739.GT27873@lukather>
+References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAP=VYLqCmG6fRmPPABoW4xg_tFgGh2pji=f5ML=cBgCu4zZocg@mail.gmail.com>
+ <20140321191739.GT27873@lukather>
+Message-ID: <4177769.XedaQsoUgV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-18 11:13 GMT+01:00 Richard Genoud <richard.genoud@gmail.com>:
-> 2014-03-18 0:23 GMT+01:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
->> On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
->>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
->>> GPIO.
->>> This will be useful for many boards which have a serial controller that
->>> only handle CTS/RTS pins (or even just RX/TX).
->>>
->>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>
->> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>
->> I can't take this series through my tty tree as the non-tty patches
->> don't apply, so feel free to take them through whatever tree is needed.
->>
->> greg k-h
->
-> To clarify things, here are the patches that this series needs, on top
-> of 3.14-rc6:
-> tty/tty-next tree: ddaa603739fe tty/serial: at91: use dev_err instead of printk
-> tty/tty-next tree: a3c1fa99f4d2 tty/serial: at91: remove unused open/close hooks
-> ukl/dropmachtimexh-fixup: 354e57f3a0a2 ARM/serial: at91: switch atmel
-> serial to use gpiolib
-> tree unknown: [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
-> pinctrl/for-next: 8af584b86836 pinctrl: at91: implement get_direction
->
-> after that, the series applies cleanly.
-> the patch "[PATCH v3 5/7] ARM: at91: gpio: implement get_direction"
-> has been acked-by Linus, but I didn't found it in a tree.
->
-> onto next-20140318, it only needs "[PATCH v3 5/7] ARM: at91: gpio:
-> implement get_direction" .
->
-> trees:
-> tty: git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
-> ukl: git://git.pengutronix.de/git/ukl/linux.git
-> pinctrl: git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
->
->
-> Richard.
+On Friday 21 March 2014 20:17:39 Maxime Ripard wrote:
+> On Fri, Mar 21, 2014 at 11:49:59AM -0400, Paul Gortmaker wrote:
+> > On Mon, Mar 10, 2014 at 7:29 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Mon, Mar 10, 2014 at 11:58:08AM +0100, Maxime Ripard wrote:
+> > >> On Fri, Mar 07, 2014 at 04:08:36PM +0000, Russell King - ARM Linux wrote:
+> > >> > On Fri, Mar 07, 2014 at 03:59:30PM +0100, Maxime Ripard wrote:
+> > >> > > @@ -900,7 +902,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+> > >> > >  exit_free_irq:
+> > >> > >   free_irq(drv_data->irq, drv_data);
+> > >> > >  exit_reset:
+> > >> > > - if (pd->dev.of_node && !IS_ERR(drv_data->rstc))
+> > >> > > + if (pd->dev.of_node && IS_ENABLED(CONFIG_RESET_CONTROLLER) &&
+> > >> > > +     !IS_ERR(drv_data->rstc))
+> > >> > >           reset_control_assert(drv_data->rstc);
+> > >> >
+> > >> > Another question is... why do we need to check pd->dev.of_node here?
+> > >> > If CONFIG_RESET_CONTROLLER is set, we always try to get the reset
+> > >> > controller node, so drv_data->rstc is either going to be a valid
+> > >> > pointer, or it's going to be an error pointer - neither
+> > >> > reset_control_get() nor devm_reset_control_get return NULL.
+> > >>
+> > >> Following back on this as I was doing the patch, actually,
+> > >> drv_data->rstc will be NULL if we're not probed by DT, and hence never
+> > >> call reset_control_get, that would set an error pointer.
+> > >>
+> > >> But then, we can use IS_ERR_OR_NULL on drv_data->rstc.
+> > >
+> > > I think you can also move the devm_reset_control_get() into the main
+> > > probe function: you're only checking for -EPROBE_DEFER from it to fail,
+> > > allowing other errors to continue with the driver init.  This means
+> > > that on non-OF, devm_reset_control_get() will fail with -ENOENT.
+> > 
+> > Looping linux-next into the CC since this is the cause of the failure
+> > in orion5x_defconfig there, and no point in anyone else re-doing the
+> > same bisect.
+> 
+> I sent a fix for this that hasn't been picked up yet:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/239069.html
+> 
+> IIRC, Wolfram's away until Monday, so I guess it will be merged some
+> time next week.
 
-If it helps, I've prepared some branches on github that can be pulled
-from tty-next (or pinctrl-next, or dropmachtimexh-fixup)
-(I didn't find which branch to base this on in the AT91 tree)
+I think there is something wrong with an interface that makes you use
+IS_ERR_OR_NULL(). If you are calling reset_control_get_optional(), that'
+should not return an error when there is no reset controller listed
+in the device tree. We should still have a way to propagate -EPROBE_DEFER,
+or bail out if there is a reset controller but there is something wrong
+with it, but otherwise I'd suggest just leaving NULL as a valid pointer
+in drv_data->rstc and making sure that the reset controller functions
+can just deal with a NULL argument, so you never have to check it again.
 
-the address is:
-git at github.com:rgenoud/linux.git
-
-branch for_upstream/gpiolib-helpers-for-tty-next has the gpiolib
-series rebased onto tty-next
-branch for_upstream/gpiolib-helpers-for-pinctrl-next : same thing on
-pinctrl-next
-branch for_upstream/gpiolib-helpers-for-dropmachtimexh-fixup : same on
-dropmachtimexh-fixup
-branch for_upstream/atmel_serial-final is just the series onto 3.14-rc6
-
-I'm not sure this is the right way to do it though.
-
-Richard.
+	Arnd
