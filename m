@@ -1,110 +1,49 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Mar 2014 13:46:00 +0100
-Subject: [PATCH 5/5] ARM: Kirkwood: DT: Add missing vendor prefix
+Date: Sat, 22 Mar 2014 13:45:59 +0100
+Subject: =?UTF-8?q?=5BPATCH=204/5=5D=20DT=3A=20I2C=3A=20Add=20trivial=20bindings=20used=20by=20kirkwood=20boards?=
 In-Reply-To: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
 References: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1395492360-1865-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1395492360-1865-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vendor prefixes to compatible strings where they are missing.
-
-Both the I2C and MTD framework ignore the prefix, so adding them has
-no effect on backwards compatibility.
+Add a number of eeproms and temperature sensors/fan controllers used
+by kirkwood boards.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
- arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
- arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
- arch/arm/boot/dts/kirkwood-nsa310.dts          | 2 +-
- arch/arm/boot/dts/kirkwood-nsa310a.dts         | 2 +-
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts   | 2 +-
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 2 +-
- 9 files changed, 9 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/i2c/trivial-devices.txt          | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-index 40791053106b..6becedebaa4e 100644
---- a/arch/arm/boot/dts/kirkwood-b3.dts
-+++ b/arch/arm/boot/dts/kirkwood-b3.dts
-@@ -77,3 +77,3 @@
- 				#size-cells = <1>;
--				compatible = "m25p16";
-+				compatible = "st,m25p16";
- 				reg = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-index 0e06fd3cee4d..3b62aeeaa3a2 100644
---- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-+++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-@@ -48,3 +48,3 @@
- 				#size-cells = <1>;
--				compatible = "mx25l4005a";
-+				compatible = "mxicy,mx25l4005a";
- 				reg = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index ef3463e0ae19..28b3ee369778 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -45,3 +45,3 @@
- 				#size-cells = <1>;
--				compatible = "mx25l1606e";
-+				compatible = "mxicy,mx25l1606e";
- 				reg = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index 2cb0dc529165..32c6fb4a1162 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -58,3 +58,3 @@
- 				#size-cells = <1>;
--				compatible = "mx25l12805d";
-+				compatible = "mxicy,mx25l12805d";
- 				reg = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index 843eb478b3e4..e6e5ec4fe6b9 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -34,3 +34,3 @@
- 				#size-cells = <1>;
--				compatible = "mx25l4005a";
-+				compatible = "mxicy,mx25l4005a";
- 				reg = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 03fa24cf3344..0a07af9d8e58 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -106,3 +106,3 @@
- 			adt7476: adt7476a at 2e {
--				compatible = "adt7476";
-+				compatible = "adi,adt7476";
- 				reg = <0x2e>;
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-index a5e779452867..27ca6a79c48a 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-@@ -96,3 +96,3 @@
- 			lm85: lm85 at 2e {
--				compatible = "lm85";
-+				compatible = "national,lm85";
- 				reg = <0x2e>;
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index b88da9392c32..0650beafc1de 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -42,3 +42,3 @@
- 			s35390a: s35390a at 30 {
--				compatible = "s35390a";
-+				compatible = "sii,s35390a";
- 				reg = <0x30>;
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-index b2f7cae06839..38520a287514 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-@@ -54,3 +54,3 @@
- 			s24c02: s24c02 at 50 {
--				compatible = "24c02";
-+				compatible = "atmel,24c02";
- 				reg = <0x50>;
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 71724d026ffa..bef86e57c388 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -15,4 +15,18 @@ adi,adt7461		+/-1C TDM Extended Temp Range I.C
+ adt7461			+/-1C TDM Extended Temp Range I.C
++adi,adt7473		+/-1C TDM Extended Temp Range I.C
++adi,adt7475		+/-1C TDM Extended Temp Range I.C
++adi,adt7476		+/-1C TDM Extended Temp Range I.C
++adi,adt7490		+/-1C TDM Extended Temp Range I.C
+ at,24c08		i2c serial eeprom  (24cxx)
++atmel,24c00		i2c serial eeprom  (24cxx)
++atmel,24c01		i2c serial eeprom  (24cxx)
+ atmel,24c02		i2c serial eeprom  (24cxx)
++atmel,24c04		i2c serial eeprom  (24cxx)
++atmel,24c16		i2c serial eeprom  (24cxx)
++atmel,24c32		i2c serial eeprom  (24cxx)
++atmel,24c64		i2c serial eeprom  (24cxx)
++atmel,24c128		i2c serial eeprom  (24cxx)
++atmel,24c256		i2c serial eeprom  (24cxx)
++atmel,24c512		i2c serial eeprom  (24cxx)
++atmel,24c1024		i2c serial eeprom  (24cxx)
+ atmel,at97sc3204t	i2c trusted platform module (TPM)
+@@ -48,4 +62,6 @@ maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Inte
+ mc,rv3029c2		Real Time Clock Module with I2C-Bus
++national,lm63		Temperature sensor with integrated fan control
+ national,lm75		I2C TEMP SENSOR
+ national,lm80		Serial Interface ACPI-Compatible Microprocessor System Hardware Monitor
++national,lm85		Temperature sensor with integrated fan control
+ national,lm92		?0.33?C Accurate, 12-Bit + Sign Temperature Sensor and Thermal Window Comparator with Two-Wire Interface
 -- 
 1.9.1
