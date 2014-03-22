@@ -1,37 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 Mar 2014 22:23:06 +0000
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
- <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <20140322222306.GM7528@n2100.arm.linux.org.uk>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 22 Mar 2014 22:35:33 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <532DEB46.3040107@redhat.com>
+References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
+ .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
+ 8040102@redhat.com> <53185FB9.1040308@redhat.com> <20140306120449.GA29916@
+ mal.justgohome.co.uk> <20140307122418.2F2C4C408EC@trevor.secretlab.ca> <
+ 20140322010206.GF25519@cbox> <20140322122354.7644FC418C4@trevor.secretlab.
+ ca> <532DEB46.3040107@redhat.com>
+Message-ID: <20140322223533.3D840C412EA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 02:31:21PM -0700, James Bottomley wrote:
-> Perhaps now might be the time to ask which are the remaining
-> architectures that cannot do SG chaining and then we can fix them and
-> pull the whole thing out.
+On Sat, 22 Mar 2014 20:57:58 +0100, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> Il 22/03/2014 13:23, Grant Likely ha scritto:
+> > VM implementations SHOULD to implement persistent variables for
+> > their UEFI implementation - with whatever constraints that may be put on
+> > higher level tools. Variable storage SHALL be a property of a VM
+> > instance, but SHALL NOT be stored as part of a portable disk image.
+> > Portable disk images SHALL conform to the UEFI removable disk
+> > requirements from the UEFI spec.
+> 
+> I fully agree with this wording.
 
-Not quite.  You're making the assumption that we can be sure that all
-the scatterlist users on an architecture have been converted - that's
-simply not true on ARM.  We have some which have, and some which still
-have not been audited.
+:-)
 
-The cases that get us here would be old platform DMA code which walks
-scatterlists handed to it from drivers - stuff like
-arch/arm/mach-rpc/dma.c (which probably can cope), and drivers/scsi/arm/*
-(which definitely can't because of their SCSI pointers save/restore
-handling message.)  I know that's one case where SG_CHAIN definitely
-isn't supported on ARM.
+On a seperate, but related, topic. If we were to define a portable VM
+spec that includes the entire hardware configuration, then variables
+storage should be included in that.
 
-So, we had decided not to enable it, but this means that new stuff
-isn't benefitting from this.  I've recently asked arm-soc to enable
-it for the modern multi-platform builds, because modern stuff really
-be written with correct SG chaining in mind.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+g.
