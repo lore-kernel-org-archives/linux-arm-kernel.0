@@ -1,114 +1,38 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Sat, 22 Mar 2014 10:03:28 +0530
-Subject: [PATCH v5 10/11] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <20140321233715.GE25519@cbox>
-References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
- <1395406414-11707-11-git-send-email-anup.patel@linaro.org>
- <20140321233715.GE25519@cbox>
-Message-ID: <CALrVBksdYsNhWY9fr1PZOqNfmfo3BiLWzy0gGx+6SAATQ-eVwA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Mar 2014 22:10:49 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.14
+Message-ID: <20140322051049.GA27925@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2014 05:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, Mar 21, 2014 at 06:23:33PM +0530, Anup Patel wrote:
->> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
->> KVM ARM/ARM64. This is a CPU-level function call which can suspend
->> current CPU or current CPU cluster. We don't have VCPU clusters in
->> KVM so for KVM we simply suspend the current VCPU.
->>
->> The CPU_SUSPEND emulation is not tested much because currently there
->> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
->> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
->> Simple CPUIDLE driver which is not published due to unstable DT-bindings
->> for PSCI.
->> (For more info, http://lwn.net/Articles/574950/)
->>
->> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
->> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
->> for KVM ARM/ARM64.
->>
->> Due to this, the CPU_SUSPEND emulation added by this patch only pause
->> current VCPU and to wakeup a suspended VCPU we need to explicity call
->> PSCI CPU_ON from Guest.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm/kvm/psci.c |   24 ++++++++++++++++++++----
->>  1 file changed, 20 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
->> index 1e85452..e32ad10 100644
->> --- a/arch/arm/kvm/psci.c
->> +++ b/arch/arm/kvm/psci.c
->> @@ -52,6 +52,22 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
->>       return affinity_mask;
->>  }
->>
->> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
->> +{
->> +     /*
->> +      * NOTE: Currently, we don't have any wakeup events for KVM
->> +      * hence VCPU suspend turns-out to be same as VCPU off request.
->> +      * This means to suspend a VCPU we simply set the pause flag
->> +      * and update VCPU registers as-per wakeup parameters provided
->> +      * via r2 & r3 (or x2 & x3).
->> +      */
->> +     vcpu->arch.pause = true;
->> +     *vcpu_pc(vcpu) = *vcpu_reg(vcpu, 2);
->> +     *vcpu_reg(vcpu, 0) = *vcpu_reg(vcpu, 3);
->
-> But the spec states in Section 5.1.2 that if Bit[16] StateType == 0,
-> then the entry point and context_id parameters are ignored, because all
-> state is retained for a standby state.
+Hi Linus,
 
-OK, I will update this accordingly.
+The following changes since commit 10554647b488f58f2c36c78368e9bab4b93da721:
 
->
-> I think Mark Rutland commented that KVM should define at last interrupts
-> to the CPU as a wakeup event.
+  Merge tag 'omap-for-v3.14/fixes-dt-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-03-08 22:56:31 -0800)
 
-How about using kvm_vcpu_block(vcpu) instead of "vcpu->arch.pause = true"?
+are available in the git repository at:
 
-This will make CPU_SUSPEND emulation very similar to WFI emulation.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-Regards,
-Anup
+for you to fetch changes up to f656d46bbb2d3ecdb71c998ccf657dccea8d19a9:
 
->
->> +
->> +     return KVM_PSCI_RET_SUCCESS;
->> +}
->> +
->>  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->>  {
->>       vcpu->arch.pause = true;
->> @@ -195,6 +211,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->>                */
->>               val = 2;
->>               break;
->> +     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->> +     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
->> +             val = kvm_psci_vcpu_suspend(vcpu);
->> +             break;
->>       case KVM_PSCI_0_2_FN_CPU_OFF:
->>               kvm_psci_vcpu_off(vcpu);
->>               val = KVM_PSCI_RET_SUCCESS;
->> @@ -232,10 +252,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->>               val = KVM_PSCI_RET_SUCCESS;
->>               ret = 0;
->>               break;
->> -     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->> -     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
->> -             val = KVM_PSCI_RET_NI;
->> -             break;
->>       default:
->>               return -EINVAL;
->>       }
->> --
->> 1.7.9.5
->>
->
-> Thanks,
-> -Christoffer
->
+  ARM: at91: fix network interface ordering for sama5d36 (2014-03-11 12:49:10 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.14
+
+Only two patches this time, one to fix ethernet probe order on at91 (better
+fix with proper device aliasing will be done for 3.15, this is stop-gap), and
+one update to MAINTAINERS due to Freescale moving their repo to kernel.org.
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      ARM: at91: fix network interface ordering for sama5d36
+
+Shawn Guo (1):
+      MAINTAINERS: update IMX kernel git tree
+
+ MAINTAINERS                     | 4 ++--
+ arch/arm/boot/dts/sama5d36.dtsi | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
