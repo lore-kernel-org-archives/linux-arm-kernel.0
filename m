@@ -1,41 +1,124 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Mar 2014 13:45:58 +0100
-Subject: [PATCH 3/5] ARM: Kirkwood: Fix Atmel vendor prefix
+Date: Sat, 22 Mar 2014 13:45:57 +0100
+Subject: [PATCH 2/5] DT: bindings: add missing Marvell Kirkwood SoC
+ documentation
 In-Reply-To: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
 References: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1395492360-1865-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1395492360-1865-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documented vendor prefix for Atmel is 'atmel' not 'at' as used in
-these .dts[i] files.
-
-The i2c framework actually ignores the prefix, so making this change
-does not cause compatibility issues.
+Marvell Kirkwood SoC binding have not yet been documented. Add the
+documentation including the supported SoCs and boards.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-laplug.dts      | 2 +-
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood-laplug.dts b/arch/arm/boot/dts/kirkwood-laplug.dts
-index c9e82eff9bf2..6761ffa2c4ab 100644
---- a/arch/arm/boot/dts/kirkwood-laplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-laplug.dts
-@@ -50,3 +50,3 @@
- 			eeprom at 50 {
--				compatible = "at,24c04";
-+				compatible = "atmel,24c04";
- 				pagesize = <16>;
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index 743152f31a81..843eb478b3e4 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -52,3 +52,3 @@
- 			eeprom at 50 {
--				compatible = "at,24c04";
-+				compatible = "atmel,24c04";
- 				pagesize = <16>;
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+new file mode 100644
+index 000000000000..925ecbf6e7b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+@@ -0,0 +1,97 @@
++Marvell Kirkwood SoC Family Device Tree Bindings
++------------------------------------------------
++
++Boards with a SoC of the Marvell Kirkwook family, eg 88f6281
++
++* Required root node properties:
++compatible: must contain "marvell,kirkwood"
++
++In addition, the above compatible shall be extended with the specific
++SoC. Currently known SoC compatibles are:
++
++"marvell,kirkwood-88f6192"
++"marvell,kirkwood-88f6281"
++"marvell,kirkwood-88f6282"
++"marvell,kirkwood-88f6283"
++"marvell,kirkwood-88f6702"
++"marvell,kirkwood-98DX4122"
++
++And in addition, the compatible shall be extended with the specific
++board. Currently known boards are:
++
++"buffalo,lschlv2"
++"buffalo,lsxhl"
++"buffalo,lsxl"
++"dlink,dns-320"
++"dlink,dns-320-a1"
++"dlink,dns-325"
++"dlink,dns-325-a1"
++"dlink,dns-kirkwood"
++"excito,b3"
++"globalscale,dreamplug-003-ds2001"
++"globalscale,guruplug"
++"globalscale,guruplug-server-plus"
++"globalscale,sheevaplug"
++"globalscale,sheevaplug"
++"globalscale,sheevaplug-esata"
++"globalscale,sheevaplug-esata-rev13"
++"iom,iconnect"
++"iom,iconnect-1.1"
++"iom,ix2-200"
++"keymile,km_kirkwood"
++"lacie,cloudbox"
++"lacie,inetspace_v2"
++"lacie,laplug"
++"lacie,netspace_lite_v2"
++"lacie,netspace_max_v2"
++"lacie,netspace_mini_v2"
++"lacie,netspace_v2"
++"marvell,db-88f6281-bp"
++"marvell,db-88f6282-bp"
++"marvell,mv88f6281gtw-ge"
++"marvell,rd88f6281"
++"marvell,rd88f6281"
++"marvell,rd88f6281-a0"
++"marvell,rd88f6281-a1"
++"mpl,cec4"
++"mpl,cec4-10"
++"netgear,readynas"
++"netgear,readynas"
++"netgear,readynas-duo-v2"
++"netgear,readynas-nv+-v2"
++"plathome,openblocks-a6"
++"plathome,openblocks-a7"
++"raidsonic,ib-nas6210"
++"raidsonic,ib-nas6210-b"
++"raidsonic,ib-nas6220"
++"raidsonic,ib-nas6220-b"
++"raidsonic,ib-nas62x0"
++"seagate,dockstar"
++"seagate,goflexnet"
++"synology,ds109"
++"synology,ds110jv10"
++"synology,ds110jv20"
++"synology,ds110jv30"
++"synology,ds111"
++"synology,ds209"
++"synology,ds210jv10"
++"synology,ds210jv20"
++"synology,ds212"
++"synology,ds212jv10"
++"synology,ds212jv20"
++"synology,ds212pv10"
++"synology,ds409"
++"synology,ds409slim"
++"synology,ds410j"
++"synology,ds411"
++"synology,ds411j"
++"synology,ds411slim"
++"synology,ds413jv10"
++"synology,rs212"
++"synology,rs409"
++"synology,rs411"
++"synology,rs812"
++"usi,topkick"
++"usi,topkick-1281P2"
++"zyxel,nsa310"
++"zyxel,nsa310a"
 -- 
 1.9.1
