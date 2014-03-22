@@ -1,62 +1,50 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Sat, 22 Mar 2014 01:24:51 -0700
-Subject: [PATCH] ARM: LLVMLinux: Change "extern inline" to "static inline" in
- glue-cache.h
-Message-ID: <1395476691-23040-1-git-send-email-behanw@converseincode.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Mar 2014 10:27:09 +0100
+Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
+In-Reply-To: <CAL_Jsq+vd6dqQgfJsS3sfCOhu7qCpPdcmrXPhC33zym2R9J=rQ@mail.gmail.com>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <20140321185430.GG23076@pengutronix.de>
+ <CAL_Jsq+vd6dqQgfJsS3sfCOhu7qCpPdcmrXPhC33zym2R9J=rQ@mail.gmail.com>
+Message-ID: <201403221027.10332.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+On Friday 21 March 2014, Rob Herring wrote:
+> On Fri, Mar 21, 2014 at 1:54 PM, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> > On Fri, Mar 21, 2014 at 04:10:37PM +0100, Arnd Bergmann wrote:
+> >> I don't see a reason to change the existing logic, it works for
+> >> both MMU and NOMMU kernels, and you are talking about three instructions
+> >> here.
+> > it doesn't matter how many instructions are involved. The relevant
+> > difference is that with my approach you fix the problem for all no-MMU
+> > platforms, with yours you only fix efm32. (OK, I think there are not too
+> > many no-MMU platforms, but still.) An even easier implementation would
+> > be to add something like:
+> >
+> >         ifeq($(zreladdr-y)$(CONFIG_MMU),)
+> >         zreladdr-y := CONFIG_PAGE_OFFSET + CONFIG_TEXT_OFFSET
+> >         endif
+> >
+> > to arch/arm/boot/Makefile.
 
-With compilers which follow the C99 standard (like modern versions of gcc and
-clang), "extern inline" does the wrong thing (emits code for an externally
-linkable version of the inline function). "static inline" is the correct choice
-instead.
+This makes sense, we can add it as soon as we have a use for it. At the
+moment, the only problem we have is a randconfig build error, and the
+obvious change I proposed should work just fine.
 
-Author: Behan Webster <behanw@converseincode.com>
-Signed-off-by: Behan Webster <behanw@converseincode.com>
-Reviewed-by: Mark Charlebois <charlebm@gmail.com>
----
- arch/arm/include/asm/glue-cache.h | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+> > But I don't care much, if you still want to make EFM32 select
+> > AUTO_ZRELADDR go ahead.
+> 
+> How about a kconfig fix:
+> 
+> bool "Auto calculation of the decompressed kernel image address" if MMU
+> default y if !MMU
 
-diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
-index c81adc0..a3c24cd 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -130,22 +130,22 @@
- #endif
- 
- #ifndef __ASSEMBLER__
--extern inline void nop_flush_icache_all(void) { }
--extern inline void nop_flush_kern_cache_all(void) { }
--extern inline void nop_flush_kern_cache_louis(void) { }
--extern inline void nop_flush_user_cache_all(void) { }
--extern inline void nop_flush_user_cache_range(unsigned long a,
-+static inline void nop_flush_icache_all(void) { }
-+static inline void nop_flush_kern_cache_all(void) { }
-+static inline void nop_flush_kern_cache_louis(void) { }
-+static inline void nop_flush_user_cache_all(void) { }
-+static inline void nop_flush_user_cache_range(unsigned long a,
- 		unsigned long b, unsigned int c) { }
- 
--extern inline void nop_coherent_kern_range(unsigned long a, unsigned long b) { }
--extern inline int nop_coherent_user_range(unsigned long a,
-+static inline void nop_coherent_kern_range(unsigned long a, unsigned long b) { }
-+static inline int nop_coherent_user_range(unsigned long a,
- 		unsigned long b) { return 0; }
--extern inline void nop_flush_kern_dcache_area(void *a, size_t s) { }
-+static inline void nop_flush_kern_dcache_area(void *a, size_t s) { }
- 
--extern inline void nop_dma_flush_range(const void *a, const void *b) { }
-+static inline void nop_dma_flush_range(const void *a, const void *b) { }
- 
--extern inline void nop_dma_map_area(const void *s, size_t l, int f) { }
--extern inline void nop_dma_unmap_area(const void *s, size_t l, int f) { }
-+static inline void nop_dma_map_area(const void *s, size_t l, int f) { }
-+static inline void nop_dma_unmap_area(const void *s, size_t l, int f) { }
- #endif
- 
- #ifndef MULTI_CACHE
--- 
-1.8.3.2
+This however would break builds that today for some reason cannot use
+AUTO_ZRELADDR on !MMU kernels, i.e. has a funny bootloader that
+uses ZBOOT_ROM or other tricks. In principle any platform should
+work with MMU disabled (although I'm sure there are tons of bugs),
+and not every one uses AUTO_ZRELADDR today. Uwe's suggestion above
+takes advantage of the fact that !MMU-kernels know what physical
+address they run on.
+
+	Arnd
