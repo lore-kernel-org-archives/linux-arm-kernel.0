@@ -1,38 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Mar 2014 22:10:49 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.14
-Message-ID: <20140322051049.GA27925@quad.lixom.net>
+From: sdu.liu@huawei.com (Liu hua)
+Date: Sat, 22 Mar 2014 13:14:43 +0800
+Subject: [PATCH] ARM: kdump: Avoid overflow when converting pfn to physaddr
+In-Reply-To: <20140318104855.GU21483@n2100.arm.linux.org.uk>
+References: <1395138042-62364-1-git-send-email-sdu.liu@huawei.com>
+ <20140318104855.GU21483@n2100.arm.linux.org.uk>
+Message-ID: <532D1C43.4070206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 2014/3/18 18:48, Russell King - ARM Linux wrote:
+> On Tue, Mar 18, 2014 at 06:20:42PM +0800, Liu Hua wrote:
+>> When we configure CONFIG_LPAE=y, pfn << PAGE_SHIFT will
+>> overflow if pfn >= 0x100000 in copy_oldmem_page.
+>>
+>> So use __pfn_to_phys for converting.
+> 
+> Yes.  The sad thing is that if you grep the kernel for similar things,
+> it's littered with this problem.  I'm not sure whether anyone
+> particularly "owns" the crash_dump.c file - Mika Westerberg and
+> Olaf Hering were the last two to touch it... I guess put this in my
+> patch system please.
+> 
+> Thanks.
+> 
 
-The following changes since commit 10554647b488f58f2c36c78368e9bab4b93da721:
-
-  Merge tag 'omap-for-v3.14/fixes-dt-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-03-08 22:56:31 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to f656d46bbb2d3ecdb71c998ccf657dccea8d19a9:
-
-  ARM: at91: fix network interface ordering for sama5d36 (2014-03-11 12:49:10 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.14
-
-Only two patches this time, one to fix ethernet probe order on at91 (better
-fix with proper device aliasing will be done for 3.15, this is stop-gap), and
-one update to MAINTAINERS due to Freescale moving their repo to kernel.org.
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      ARM: at91: fix network interface ordering for sama5d36
-
-Shawn Guo (1):
-      MAINTAINERS: update IMX kernel git tree
-
- MAINTAINERS                     | 4 ++--
- arch/arm/boot/dts/sama5d36.dtsi | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Yes, I found this problem in serval places after a quick review. I will
+do a check on this.
