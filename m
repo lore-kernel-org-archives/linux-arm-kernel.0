@@ -1,124 +1,60 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Mar 2014 13:45:57 +0100
-Subject: [PATCH 2/5] DT: bindings: add missing Marvell Kirkwood SoC
- documentation
-In-Reply-To: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-References: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1395492360-1865-3-git-send-email-andrew@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 22 Mar 2014 09:14:31 -0500
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <201403221054.39799.arnd@arndb.de>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <201403221054.39799.arnd@arndb.de>
+Message-ID: <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Kirkwood SoC binding have not yet been documented. Add the
-documentation including the supported SoCs and boards.
+On Sat, Mar 22, 2014 at 4:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 March 2014, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> This started out as an attempt to add arm64's earlyprintk support to ARM
+>> in order to get an earlier, runtime setup console on multi-platform
+>> kernels. The first issue was needing the fixmap support which
+>> conveniently Mark Salter was working on and is mostly in place now. Like
+>> many things on ARM and arm64 now, it then became where do I put the now
+>> common, shared code. After digging more into various early console/printk
+>> support, it turns out the 8250_early.c setup code was the best starting
+>> point.
+>>
+>> This is based on Mark Salter's fixmap support currently in linux-next.
+>> This is tested on arm64 and ARM with pl011 and 8250. The ARM support
+>> also requires fixmap and fixed mapping support which are not yet in place.
+>> I have some patches in my tree to support fixmap, but they need some more
+>> work. Fortunately, once fixmap is in place, it is just a Kconfig option
+>> to enable earlycon support on ARM. A git tree is available here[1].
+>>
+>> Based on this series, I would like to add support for doing earlycon
+>> setup using DT.
+>
+> Hi Rob,
+>
+> I like this series a lot, great work!
+>
+> I would consider the DT parsing support essential here, we should not
+> merge the patches until that is done as well, because I don't want
+> to see users pass earlycon command line options in DT when they can
+> use the established "linux,stdout-path" property instead. I would
+> expect that in almost every case in which we are booting using DT
+> today, we can just use linux,stdout-path to locate the device that
+> the boot loader has already set up and start usign it.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+I think this series stands on its own. It is largely refactoring
+existing code and supporting existing command line options (arm64 just
+changes from earlyprintk= to earlycon=). There will be cases where
+changing the kernel command line is the only way to setup the
+earlycon. Also, I think we would still want the kernel command line to
+control whether or not we enable the earlycon (i.e. earlycon=dt).
+There's not a standard way for how bootloaders would decide to set
+"linux,stdout-path" or not.
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-new file mode 100644
-index 000000000000..925ecbf6e7b7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -0,0 +1,97 @@
-+Marvell Kirkwood SoC Family Device Tree Bindings
-+------------------------------------------------
-+
-+Boards with a SoC of the Marvell Kirkwook family, eg 88f6281
-+
-+* Required root node properties:
-+compatible: must contain "marvell,kirkwood"
-+
-+In addition, the above compatible shall be extended with the specific
-+SoC. Currently known SoC compatibles are:
-+
-+"marvell,kirkwood-88f6192"
-+"marvell,kirkwood-88f6281"
-+"marvell,kirkwood-88f6282"
-+"marvell,kirkwood-88f6283"
-+"marvell,kirkwood-88f6702"
-+"marvell,kirkwood-98DX4122"
-+
-+And in addition, the compatible shall be extended with the specific
-+board. Currently known boards are:
-+
-+"buffalo,lschlv2"
-+"buffalo,lsxhl"
-+"buffalo,lsxl"
-+"dlink,dns-320"
-+"dlink,dns-320-a1"
-+"dlink,dns-325"
-+"dlink,dns-325-a1"
-+"dlink,dns-kirkwood"
-+"excito,b3"
-+"globalscale,dreamplug-003-ds2001"
-+"globalscale,guruplug"
-+"globalscale,guruplug-server-plus"
-+"globalscale,sheevaplug"
-+"globalscale,sheevaplug"
-+"globalscale,sheevaplug-esata"
-+"globalscale,sheevaplug-esata-rev13"
-+"iom,iconnect"
-+"iom,iconnect-1.1"
-+"iom,ix2-200"
-+"keymile,km_kirkwood"
-+"lacie,cloudbox"
-+"lacie,inetspace_v2"
-+"lacie,laplug"
-+"lacie,netspace_lite_v2"
-+"lacie,netspace_max_v2"
-+"lacie,netspace_mini_v2"
-+"lacie,netspace_v2"
-+"marvell,db-88f6281-bp"
-+"marvell,db-88f6282-bp"
-+"marvell,mv88f6281gtw-ge"
-+"marvell,rd88f6281"
-+"marvell,rd88f6281"
-+"marvell,rd88f6281-a0"
-+"marvell,rd88f6281-a1"
-+"mpl,cec4"
-+"mpl,cec4-10"
-+"netgear,readynas"
-+"netgear,readynas"
-+"netgear,readynas-duo-v2"
-+"netgear,readynas-nv+-v2"
-+"plathome,openblocks-a6"
-+"plathome,openblocks-a7"
-+"raidsonic,ib-nas6210"
-+"raidsonic,ib-nas6210-b"
-+"raidsonic,ib-nas6220"
-+"raidsonic,ib-nas6220-b"
-+"raidsonic,ib-nas62x0"
-+"seagate,dockstar"
-+"seagate,goflexnet"
-+"synology,ds109"
-+"synology,ds110jv10"
-+"synology,ds110jv20"
-+"synology,ds110jv30"
-+"synology,ds111"
-+"synology,ds209"
-+"synology,ds210jv10"
-+"synology,ds210jv20"
-+"synology,ds212"
-+"synology,ds212jv10"
-+"synology,ds212jv20"
-+"synology,ds212pv10"
-+"synology,ds409"
-+"synology,ds409slim"
-+"synology,ds410j"
-+"synology,ds411"
-+"synology,ds411j"
-+"synology,ds411slim"
-+"synology,ds413jv10"
-+"synology,rs212"
-+"synology,rs409"
-+"synology,rs411"
-+"synology,rs812"
-+"usi,topkick"
-+"usi,topkick-1281P2"
-+"zyxel,nsa310"
-+"zyxel,nsa310a"
--- 
-1.9.1
+The DT support won't be all that quick to implement. The challenge
+with the DT parsing is we have to do it on the flattened DT. I have
+something functioning, but it doesn't do any address translation which
+is the hard part.
+
+Rob
