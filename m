@@ -1,31 +1,58 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sat, 22 Mar 2014 14:31:21 -0700
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Mar 2014 23:01:30 +0100
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <201403221054.39799.arnd@arndb.de>
+ <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
+Message-ID: <201403222301.30222.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-03-22 at 11:13 -0700, Laura Abbott wrote:
-> Rather than have architectures #define ARCH_HAS_SG_CHAIN in an architecture
-> specific scatterlist.h, make it a proper Kconfig option and use that
-> instead. At same time, remove the header files are are now mostly
-> useless and just include asm-generic/scatterlist.h.
+On Saturday 22 March 2014, Rob Herring wrote:
+> I think this series stands on its own. It is largely refactoring
+> existing code and supporting existing command line options (arm64 just
+> changes from earlyprintk= to earlycon=). There will be cases where
+> changing the kernel command line is the only way to setup the
+> earlycon. Also, I think we would still want the kernel command line to
+> control whether or not we enable the earlycon (i.e. earlycon=dt).
+> There's not a standard way for how bootloaders would decide to set
+> "linux,stdout-path" or not.
+> 
+> The DT support won't be all that quick to implement. The challenge
+> with the DT parsing is we have to do it on the flattened DT. I have
+> something functioning, but it doesn't do any address translation which
+> is the hard part.
 
-Well, the transformation looks fine.  Perhaps part of the reason for the
-lack of response is that there's no compelling reason in the change log
-above for doing this.  The usual reason for eliminating ARCH_HAS is that
-it's hiding something that would be better expressed a different way
-(that's actually intuitive to grep) or that it's expressing something
-that should be configurable.  Neither of these reasons apply in this
-case, because SG_CHAIN definitely is a property of the architecture not
-the config space and it's not really hiding anything.
+Ah, I hadn't realized that we call parse_early_param() twice, both
+in start_kernel() and before that in setup_arch(). You are right
+that the first one of these can only look at the flat device tree
+at the moment. I wonder if that's out of necessity or just coincidence
+though.
 
-Perhaps now might be the time to ask which are the remaining
-architectures that cannot do SG chaining and then we can fix them and
-pull the whole thing out.
+There is relatively little going on between the first parse_early_param()
+and the call to unflatten_device_tree(), so it may be possible to move
+the former down, or the latter up.
 
-James
+        parse_early_param();
+
+        sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+
+        early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+        setup_dma_zone(mdesc);  
+        sanity_check_meminfo();
+        arm_memblock_init(&meminfo, mdesc);
+                                
+        paging_init(mdesc);
+        request_standard_resources(mdesc);
+                
+        if (mdesc->restart)
+                arm_pm_restart = mdesc->restart;
+        
+        unflatten_device_tree();
+
+On powerpc, unflatten_device_tree is called way before paging_init, so I assume
+it has to be possible, but it might end up being harder to do than what you
+have in mind with parsing the flat device tree.
+
+	Arnd
