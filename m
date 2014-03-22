@@ -1,45 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 Mar 2014 22:52:01 +0000
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 22 Mar 2014 15:59:11 -0700
 Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
  actual Kconfig
-In-Reply-To: <1395527860.2143.61.camel@dabdike.int.hansenpartnership.com>
+In-Reply-To: <20140322225201.GN7528@n2100.arm.linux.org.uk>
 References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
  <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
  <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
  <20140322222306.GM7528@n2100.arm.linux.org.uk>
  <1395527860.2143.61.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <20140322225201.GN7528@n2100.arm.linux.org.uk>
+ <20140322225201.GN7528@n2100.arm.linux.org.uk>
+Message-ID: <1395529151.2143.64.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 03:37:40PM -0700, James Bottomley wrote:
-> On Sat, 2014-03-22 at 22:23 +0000, Russell King - ARM Linux wrote:
-> > On Sat, Mar 22, 2014 at 02:31:21PM -0700, James Bottomley wrote:
-> > > Perhaps now might be the time to ask which are the remaining
-> > > architectures that cannot do SG chaining and then we can fix them and
-> > > pull the whole thing out.
+On Sat, 2014-03-22 at 22:52 +0000, Russell King - ARM Linux wrote:
+> On Sat, Mar 22, 2014 at 03:37:40PM -0700, James Bottomley wrote:
+> > On Sat, 2014-03-22 at 22:23 +0000, Russell King - ARM Linux wrote:
+> > > On Sat, Mar 22, 2014 at 02:31:21PM -0700, James Bottomley wrote:
+> > > > Perhaps now might be the time to ask which are the remaining
+> > > > architectures that cannot do SG chaining and then we can fix them and
+> > > > pull the whole thing out.
+> > > 
+> > > Not quite.  You're making the assumption that we can be sure that all
+> > > the scatterlist users on an architecture have been converted - that's
+> > > simply not true on ARM.
 > > 
-> > Not quite.  You're making the assumption that we can be sure that all
-> > the scatterlist users on an architecture have been converted - that's
-> > simply not true on ARM.
+> > No I'm not, I said "now might be the time to ask which are the remaining
+> > architectures that cannot do SG chaining"
 > 
-> No I'm not, I said "now might be the time to ask which are the remaining
-> architectures that cannot do SG chaining"
+> And I'm disagreeing with that statement which implies that it's something
+> that is an architecture wide property for any particular architecture.
+> 
+> Right now in mainline, if ARM has IOMMU support enabled, then SG_CHAIN
+> support will also be enabled.  I've a patch out of tree which I've been
+> using for years which enables SG_CHAIN for a particular SoC (Dove).
+> Otherwise, it doesn't have support for SG_CHAIN.
+> 
+> PARISC on the other hand (as you list) has no support to enable SG_CHAIN
+> under any circumstances.
+> 
+> Where we're disagreeing is whether this is something that is always-on or
+> always-off for any particular architecture.
 
-And I'm disagreeing with that statement which implies that it's something
-that is an architecture wide property for any particular architecture.
+Actually, I don't disagree with that.  PA used to share sb_iommu with
+ia64 (it's the same chipset for the HP versions), but we can't now
+because ia64 is chained and we're not and there's no way to say chained
+for this platform but not for these other more legacy ones.  If you have
+a proposal for this, I'd be interested, so I don't have to do an all or
+nothing conversion, but the config option isn't it because our platform
+configuration is runtime determined (we usually select every driver and
+let the actual one be chosen at runtime from the config table).
 
-Right now in mainline, if ARM has IOMMU support enabled, then SG_CHAIN
-support will also be enabled.  I've a patch out of tree which I've been
-using for years which enables SG_CHAIN for a particular SoC (Dove).
-Otherwise, it doesn't have support for SG_CHAIN.
-
-PARISC on the other hand (as you list) has no support to enable SG_CHAIN
-under any circumstances.
-
-Where we're disagreeing is whether this is something that is always-on or
-always-off for any particular architecture.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+James
