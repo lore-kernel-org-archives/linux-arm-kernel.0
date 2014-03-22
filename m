@@ -1,24 +1,38 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Sat, 22 Mar 2014 20:57:58 +0100
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140322122354.7644FC418C4@trevor.secretlab.ca>
-References: <20140226183454.GA14639@cbox> <20140301152756.67A02C40238@trevor
- .secretlab.ca> <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
- 8040102@redhat.com> <53185FB9.1040308@redhat.com> <20140306120449.GA29916@
- mal.justgohome.co.uk> <20140307122418.2F2C4C408EC@trevor.secretlab.ca> <
- 20140322010206.GF25519@cbox> <20140322122354.7644FC418C4@trevor.secretlab.ca>
-Message-ID: <532DEB46.3040107@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 22 Mar 2014 21:44:24 +0100 (CET)
+Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
+ actual Kconfig
+In-Reply-To: <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
+References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
+ <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1403222142560.18573@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 22/03/2014 13:23, Grant Likely ha scritto:
-> VM implementations SHOULD to implement persistent variables for
-> their UEFI implementation - with whatever constraints that may be put on
-> higher level tools. Variable storage SHALL be a property of a VM
-> instance, but SHALL NOT be stored as part of a portable disk image.
-> Portable disk images SHALL conform to the UEFI removable disk
-> requirements from the UEFI spec.
+On Sat, 22 Mar 2014, Laura Abbott wrote:
 
-I fully agree with this wording.
+> Rather than have architectures #define ARCH_HAS_SG_CHAIN in an architecture
+> specific scatterlist.h, make it a proper Kconfig option and use that
+> instead. At same time, remove the header files are are now mostly
+> useless and just include asm-generic/scatterlist.h.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Paolo
+For the x86 part:
+
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
