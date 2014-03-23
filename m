@@ -1,97 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Mar 2014 10:54:13 -0700
-Subject: [PATCH v5 10/11] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <CALrVBksdYsNhWY9fr1PZOqNfmfo3BiLWzy0gGx+6SAATQ-eVwA@mail.gmail.com>
-References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
- <1395406414-11707-11-git-send-email-anup.patel@linaro.org>
- <20140321233715.GE25519@cbox>
- <CALrVBksdYsNhWY9fr1PZOqNfmfo3BiLWzy0gGx+6SAATQ-eVwA@mail.gmail.com>
-Message-ID: <20140323175413.GF30885@cbox>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 23 Mar 2014 18:35:49 +0100
+Subject: [PATCH v3] drm/i2c: tda998x: Deprecate "nxp,tda998x" in favour of
+ "nxp,tda9989"
+Message-ID: <20140323180246.1C3E54B0143@smtp2-g21.free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 10:03:28AM +0530, Anup Patel wrote:
-> On 22 March 2014 05:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Fri, Mar 21, 2014 at 06:23:33PM +0530, Anup Patel wrote:
-> >> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-> >> KVM ARM/ARM64. This is a CPU-level function call which can suspend
-> >> current CPU or current CPU cluster. We don't have VCPU clusters in
-> >> KVM so for KVM we simply suspend the current VCPU.
-> >>
-> >> The CPU_SUSPEND emulation is not tested much because currently there
-> >> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-> >> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-> >> Simple CPUIDLE driver which is not published due to unstable DT-bindings
-> >> for PSCI.
-> >> (For more info, http://lwn.net/Articles/574950/)
-> >>
-> >> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
-> >> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
-> >> for KVM ARM/ARM64.
-> >>
-> >> Due to this, the CPU_SUSPEND emulation added by this patch only pause
-> >> current VCPU and to wakeup a suspended VCPU we need to explicity call
-> >> PSCI CPU_ON from Guest.
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> ---
-> >>  arch/arm/kvm/psci.c |   24 ++++++++++++++++++++----
-> >>  1 file changed, 20 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> >> index 1e85452..e32ad10 100644
-> >> --- a/arch/arm/kvm/psci.c
-> >> +++ b/arch/arm/kvm/psci.c
-> >> @@ -52,6 +52,22 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
-> >>       return affinity_mask;
-> >>  }
-> >>
-> >> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +     /*
-> >> +      * NOTE: Currently, we don't have any wakeup events for KVM
-> >> +      * hence VCPU suspend turns-out to be same as VCPU off request.
-> >> +      * This means to suspend a VCPU we simply set the pause flag
-> >> +      * and update VCPU registers as-per wakeup parameters provided
-> >> +      * via r2 & r3 (or x2 & x3).
-> >> +      */
-> >> +     vcpu->arch.pause = true;
-> >> +     *vcpu_pc(vcpu) = *vcpu_reg(vcpu, 2);
-> >> +     *vcpu_reg(vcpu, 0) = *vcpu_reg(vcpu, 3);
-> >
-> > But the spec states in Section 5.1.2 that if Bit[16] StateType == 0,
-> > then the entry point and context_id parameters are ignored, because all
-> > state is retained for a standby state.
-> 
-> OK, I will update this accordingly.
-> 
-> >
-> > I think Mark Rutland commented that KVM should define at last interrupts
-> > to the CPU as a wakeup event.
-> 
-> How about using kvm_vcpu_block(vcpu) instead of "vcpu->arch.pause = true"?
+The tda998x driver accepts only 3 chips from the TDA998x family.
 
-You mean if StateType==0 only, or will you always force a shutdown event
-to be handled as a suspend event (I believe the spec allows for you to
-do so)?  If you are going down this path, please document that clearly
-somewhere.
+To avoid confusion with the other TDA998x chips, this patch changes
+the driver compatible string to "nxp,tda9989".
 
-I definitely want to see us using something like kvm_vcpu_block(vcpu)
-for suspend requests, but the thing with kvm_vcpu_block() is that a
-regular signal to the VCPU thread wakes up that VCPU, which I think we
-agreed was fine for the WFI implementation, as it should handle spurious
-interrupts as wake up events (which is also how we handle the fact that
-any VCPUs in WFI will be woken up when migrated).
+As the previous compatible string is not actually used in any DT,
+no compatibility is offered.
 
-But for PSCI CPU_SUSPEND, I'm not sure if that's still a valid
-assumption.  Anyone?
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+v3:
+  - fix the I2C ID (the OF compatible is not used for such drivers)
+  - define only one compatible (Sebastian Hesselbarth)
+  - change the subject (Sebastian Hesselbarth)
+v2:
+  - change the subject to drm/i2c
+This patch applies after
+	drm/i2c: tda998x: Fix lack of required reg in DT documentation
+---
+ Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 4 ++--
+ drivers/gpu/drm/i2c/tda998x_drv.c                     | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-> 
-> This will make CPU_SUSPEND emulation very similar to WFI emulation.
-> 
-
-Yes, I think the PSCI docs suggest this should be the behavior as well.
-
-Thanks,
--Christoffer
+diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+index e9e4bce..9b41c7e 100644
+--- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
++++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+@@ -1,7 +1,7 @@
+ Device-Tree bindings for the NXP TDA998x HDMI transmitter
+ 
+ Required properties;
+-  - compatible: must be "nxp,tda998x"
++  - compatible: must be "nxp,tda9989"
+ 
+   - reg: I2C address
+ 
+@@ -20,7 +20,7 @@ Optional properties:
+ Example:
+ 
+ 	tda998x: hdmi-encoder {
+-		compatible = "nxp,tda998x";
++		compatible = "nxp,tda9989";
+ 		reg = <0x70>;
+ 		interrupt-parent = <&gpio0>;
+ 		interrupts = <27 2>;		/* falling edge */
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 48af5ca..249ef84 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1367,14 +1367,14 @@ fail:
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id tda998x_dt_ids[] = {
+-	{ .compatible = "nxp,tda998x", },
++	{ .compatible = "nxp,tda9989", },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
+ #endif
+ 
+ static struct i2c_device_id tda998x_ids[] = {
+-	{ "tda998x", 0 },
++	{ "tda9989", 0 },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, tda998x_ids);
+-- 
+1.9.1
