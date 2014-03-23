@@ -1,57 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Mar 2014 13:44:30 +0000
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <CANBf9ePuqFXXy+tsHdeuogPuVgN1OD2jswhvZ1qJYHC=Lu+N-g@mail.gmail.com>
-References: <201403200501.16881.marex@denx.de>
- <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
- <20140320230559.GF7528@n2100.arm.linux.org.uk>
- <532B86A7.5010200@boundarydevices.com>
- <20140321011843.GG7528@n2100.arm.linux.org.uk>
- <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
- <CAOMZO5CxjCHLrY0KTe4j=NiSU3CQVNZWhEAs33Le8ji3NAFETQ@mail.gmail.com>
- <CANBf9eNZB+BVBDkgWNxxGs-ndQ-mYCc6+bfVdS-8T-QLpSZ3GA@mail.gmail.com>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <CANBf9ePuqFXXy+tsHdeuogPuVgN1OD2jswhvZ1qJYHC=Lu+N-g@mail.gmail.com>
-Message-ID: <20140323134429.GO7528@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 23 Mar 2014 10:09:05 -0500
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <201403222301.30222.arnd@arndb.de>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <201403221054.39799.arnd@arndb.de>
+ <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
+ <201403222301.30222.arnd@arndb.de>
+Message-ID: <CAL_Jsq+j4ixVbfue62q_tOHb-HPA2jAxwZtTjtLy6jE9crGvsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 23, 2014 at 12:38:31PM +0100, Bernd Faust wrote:
-> On 21 March 2014 18:32, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Fri, Mar 21, 2014 at 05:33:02PM +0100, Bernd Faust wrote:
-> >> I also tried the patch, but unfortunately it doesn't work for me either.
-> >> I get the same error as Robert Daniels. My target is a i.MX6 (Cortex A9,
-> >> single core) running Linux Kernel version 3.10.9-rt5+
-> >
-> > Hmm, rt kernels.  Does this happen without the rt patches applied?
-> >
-> 
-> On a kernel without RT patches the problem does not occur, so in my
-> case the problem seems to be introduced/triggered by the RT patches.
+On Sat, Mar 22, 2014 at 5:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 22 March 2014, Rob Herring wrote:
+>> I think this series stands on its own. It is largely refactoring
+>> existing code and supporting existing command line options (arm64 just
+>> changes from earlyprintk= to earlycon=). There will be cases where
+>> changing the kernel command line is the only way to setup the
+>> earlycon. Also, I think we would still want the kernel command line to
+>> control whether or not we enable the earlycon (i.e. earlycon=dt).
+>> There's not a standard way for how bootloaders would decide to set
+>> "linux,stdout-path" or not.
+>>
+>> The DT support won't be all that quick to implement. The challenge
+>> with the DT parsing is we have to do it on the flattened DT. I have
+>> something functioning, but it doesn't do any address translation which
+>> is the hard part.
+>
+> Ah, I hadn't realized that we call parse_early_param() twice, both
+> in start_kernel() and before that in setup_arch(). You are right
+> that the first one of these can only look at the flat device tree
+> at the moment. I wonder if that's out of necessity or just coincidence
+> though.
+>
+> There is relatively little going on between the first parse_early_param()
+> and the call to unflatten_device_tree(), so it may be possible to move
+> the former down, or the latter up.
+>
+>         parse_early_param();
+>
+>         sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+>
+>         early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+>         setup_dma_zone(mdesc);
+>         sanity_check_meminfo();
+>         arm_memblock_init(&meminfo, mdesc);
+>
+>         paging_init(mdesc);
+>         request_standard_resources(mdesc);
+>
+>         if (mdesc->restart)
+>                 arm_pm_restart = mdesc->restart;
+>
+>         unflatten_device_tree();
+>
+> On powerpc, unflatten_device_tree is called way before paging_init, so I assume
+> it has to be possible, but it might end up being harder to do than what you
+> have in mind with parsing the flat device tree.
 
-Yes, this suggests it's some kind of race introduced by the RT patches.
-I've never looked at the RT patches, so I can't help there.
+IIRC, the unflattening cannot be done before memblock is up which is
+in arm_memblock_init. I believe that will get done earlier similar to
+PPC with Laura's meminfo removal series. However, in interest of
+getting output enabled as early as possible, the earliest point is
+always going to be with a flat tree. So I think we do want to be able
+to parse the flat tree for this. There's code in u-boot to do the
+address translation on FDT we can steal. Really, i'd like to put that
+code in libfdt, but there's a licensing problem with the u-boot code
+being GPL and libfdt being BSD.
 
-What I can say is that there are a number of other problems with this
-driver which are all races of one form or another, but they should not
-affect normal operation.
-
-For example:
-- the FEC_QUIRK_ERR006358 workaround (for iMX6 only) can read the previous
-  descriptor before the write to new descriptor's TX status bit has become
-  visible to the hardware.
-- FEC_QUIRK_ERR006358 workaround not quite having the desired effect
-  (a scheduled delayed work can't be re-scheduled until after it has
-  already fired.)
-- the number of places that call fec_stop() without first stopping the
-  transmit queue or dealing with the above work-around before
-  reconfiguring the hardware and re-initialising the rings.
-- the rx path having a similar problem to the above (writing descriptor
-  entries after the descriptor has been handed over to uDMA.)
-
-I haven't addressed any of these yet, but they're on my list.  I'm pretty
-sure there's other problems in there too...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Rob
