@@ -1,76 +1,31 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 23 Mar 2014 18:35:49 +0100
-Subject: [PATCH v3] drm/i2c: tda998x: Deprecate "nxp,tda998x" in favour of
- "nxp,tda9989"
-Message-ID: <20140323180246.1C3E54B0143@smtp2-g21.free.fr>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 23 Mar 2014 19:12:05 +0100
+Subject: [PATCH v2] drm/i2c: tda998x: Change the compatible strings
+In-Reply-To: <20140323111903.51c73c82@armhf>
+References: <20140321115541.01cbbb06@armhf> <532C40B0.3000805@gmail.com>
+ <20140323111903.51c73c82@armhf>
+Message-ID: <532F23F5.6020001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tda998x driver accepts only 3 chips from the TDA998x family.
+On 03/23/2014 11:19 AM, Jean-Francois Moine wrote:
+> On Fri, 21 Mar 2014 14:37:52 +0100
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>>>    Required properties;
+>>> -  - compatible: must be "nxp,tda998x"
+>>> +  - compatible: may be "nxp,tda9989", "nxp,tda19988" or "nxp,tda19989"
+>>
+>> There is a "DT is ABI" policy and although there is no mainline Linux
+>> user of current compatible, the correct way would be to deprecate
+>> "nxp,tda998x" and introduce new compatibles.
+>
+> Pratically, what is this way?
 
-To avoid confusion with the other TDA998x chips, this patch changes
-the driver compatible string to "nxp,tda9989".
+Currently, there is no effective way to deprecate a binding or
+compatible. You just add the one(s) that are more sensible and
+you mark the old one as DEPRECATED by simply writing it in the
+binding doc.
 
-As the previous compatible string is not actually used in any DT,
-no compatibility is offered.
+The driver should support the old binding at least for a while.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v3:
-  - fix the I2C ID (the OF compatible is not used for such drivers)
-  - define only one compatible (Sebastian Hesselbarth)
-  - change the subject (Sebastian Hesselbarth)
-v2:
-  - change the subject to drm/i2c
-This patch applies after
-	drm/i2c: tda998x: Fix lack of required reg in DT documentation
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 4 ++--
- drivers/gpu/drm/i2c/tda998x_drv.c                     | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index e9e4bce..9b41c7e 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -1,7 +1,7 @@
- Device-Tree bindings for the NXP TDA998x HDMI transmitter
- 
- Required properties;
--  - compatible: must be "nxp,tda998x"
-+  - compatible: must be "nxp,tda9989"
- 
-   - reg: I2C address
- 
-@@ -20,7 +20,7 @@ Optional properties:
- Example:
- 
- 	tda998x: hdmi-encoder {
--		compatible = "nxp,tda998x";
-+		compatible = "nxp,tda9989";
- 		reg = <0x70>;
- 		interrupt-parent = <&gpio0>;
- 		interrupts = <27 2>;		/* falling edge */
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 48af5ca..249ef84 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1367,14 +1367,14 @@ fail:
- 
- #ifdef CONFIG_OF
- static const struct of_device_id tda998x_dt_ids[] = {
--	{ .compatible = "nxp,tda998x", },
-+	{ .compatible = "nxp,tda9989", },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
- #endif
- 
- static struct i2c_device_id tda998x_ids[] = {
--	{ "tda998x", 0 },
-+	{ "tda9989", 0 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(i2c, tda998x_ids);
--- 
-1.9.1
+Sebastian
