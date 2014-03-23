@@ -1,49 +1,97 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Mar 2014 10:44:31 -0700
-Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
-In-Reply-To: <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+Date: Sun, 23 Mar 2014 10:54:13 -0700
+Subject: [PATCH v5 10/11] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+In-Reply-To: <CALrVBksdYsNhWY9fr1PZOqNfmfo3BiLWzy0gGx+6SAATQ-eVwA@mail.gmail.com>
 References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
- <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
- <20140321232704.GB25519@cbox>
- <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
-Message-ID: <20140323174431.GE30885@cbox>
+ <1395406414-11707-11-git-send-email-anup.patel@linaro.org>
+ <20140321233715.GE25519@cbox>
+ <CALrVBksdYsNhWY9fr1PZOqNfmfo3BiLWzy0gGx+6SAATQ-eVwA@mail.gmail.com>
+Message-ID: <20140323175413.GF30885@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 09:54:55AM +0530, Anup Patel wrote:
-> On 22 March 2014 04:57, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Fri, Mar 21, 2014 at 06:23:25PM +0530, Anup Patel wrote:
-> >> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
-> >> VCPUs. This patch extends current in-kernel PSCI emulation to provide
-> >> PSCI v0.2 interface to VCPUs.
+On Sat, Mar 22, 2014 at 10:03:28AM +0530, Anup Patel wrote:
+> On 22 March 2014 05:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Fri, Mar 21, 2014 at 06:23:33PM +0530, Anup Patel wrote:
+> >> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
+> >> KVM ARM/ARM64. This is a CPU-level function call which can suspend
+> >> current CPU or current CPU cluster. We don't have VCPU clusters in
+> >> KVM so for KVM we simply suspend the current VCPU.
 > >>
-> >> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
-> >> keeping the ABI backward-compatible.
+> >> The CPU_SUSPEND emulation is not tested much because currently there
+> >> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
+> >> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
+> >> Simple CPUIDLE driver which is not published due to unstable DT-bindings
+> >> for PSCI.
+> >> (For more info, http://lwn.net/Articles/574950/)
 > >>
-> >> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
-> >> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
-> >> init using KVM_ARM_VCPU_INIT ioctl.
+> >> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
+> >> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
+> >> for KVM ARM/ARM64.
+> >>
+> >> Due to this, the CPU_SUSPEND emulation added by this patch only pause
+> >> current VCPU and to wakeup a suspended VCPU we need to explicity call
+> >> PSCI CPU_ON from Guest.
 > >>
 > >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> >> ---
+> >>  arch/arm/kvm/psci.c |   24 ++++++++++++++++++++----
+> >>  1 file changed, 20 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> >> index 1e85452..e32ad10 100644
+> >> --- a/arch/arm/kvm/psci.c
+> >> +++ b/arch/arm/kvm/psci.c
+> >> @@ -52,6 +52,22 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
+> >>       return affinity_mask;
+> >>  }
+> >>
+> >> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +     /*
+> >> +      * NOTE: Currently, we don't have any wakeup events for KVM
+> >> +      * hence VCPU suspend turns-out to be same as VCPU off request.
+> >> +      * This means to suspend a VCPU we simply set the pause flag
+> >> +      * and update VCPU registers as-per wakeup parameters provided
+> >> +      * via r2 & r3 (or x2 & x3).
+> >> +      */
+> >> +     vcpu->arch.pause = true;
+> >> +     *vcpu_pc(vcpu) = *vcpu_reg(vcpu, 2);
+> >> +     *vcpu_reg(vcpu, 0) = *vcpu_reg(vcpu, 3);
 > >
-> > The content here can carry my Reviewed-by tag, but I think Rob's point
-> > about sharing this code between KVM arm/arm64 and the PSCI code itself
-> > it important, see:
+> > But the spec states in Section 5.1.2 that if Bit[16] StateType == 0,
+> > then the entry point and context_id parameters are ignored, because all
+> > state is retained for a standby state.
+> 
+> OK, I will update this accordingly.
+> 
 > >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241792.html
+> > I think Mark Rutland commented that KVM should define at last interrupts
+> > to the CPU as a wakeup event.
 > 
-> My apologies, I totally missed Rob's comment.
+> How about using kvm_vcpu_block(vcpu) instead of "vcpu->arch.pause = true"?
 
-No worries at all.
+You mean if StateType==0 only, or will you always force a shutdown event
+to be handled as a suspend event (I believe the spec allows for you to
+do so)?  If you are going down this path, please document that clearly
+somewhere.
+
+I definitely want to see us using something like kvm_vcpu_block(vcpu)
+for suspend requests, but the thing with kvm_vcpu_block() is that a
+regular signal to the VCPU thread wakes up that VCPU, which I think we
+agreed was fine for the WFI implementation, as it should handle spurious
+interrupts as wake up events (which is also how we handle the fact that
+any VCPUs in WFI will be woken up when migrated).
+
+But for PSCI CPU_SUSPEND, I'm not sure if that's still a valid
+assumption.  Anyone?
 
 > 
-> My suggestion would be to have:
-> arch/arm/include/uapi/asm/psci.h
-> arch/arm64/include/uapi/asm/psci.h
+> This will make CPU_SUSPEND emulation very similar to WFI emulation.
+> 
 
-I think the suggestion was to move all this to include/uapi/linux/psci.h
-or something equivalent so also arm and arm64 can share these defines,
-but maybe I read too much into it.
+Yes, I think the PSCI docs suggest this should be the behavior as well.
 
-Rob?
+Thanks,
+-Christoffer
