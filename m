@@ -1,59 +1,168 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 22 Mar 2014 20:29:39 -0700
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140323031952.GB30885@cbox>
-References: <20140226183454.GA14639@cbox>
- <20140301152756.67A02C40238@trevor.secretlab.ca>
- <20140306085213.GU643@mal.justgohome.co.uk>
- <531843EE.8040102@redhat.com> <53185FB9.1040308@redhat.com>
- <20140306120449.GA29916@mal.justgohome.co.uk>
- <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
- <20140322010206.GF25519@cbox> <532D4505.1090603@redhat.com>
- <20140323031952.GB30885@cbox>
-Message-ID: <20140323032939.GD30885@cbox>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 23 Mar 2014 04:49:51 +0100
+Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <1394675277-24913-2-git-send-email-yao.yuan@freescale.com>
+References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
+ <1394675277-24913-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <201403230449.51515.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 08:19:52PM -0700, Christoffer Dall wrote:
-> On Sat, Mar 22, 2014 at 09:08:37AM +0100, Paolo Bonzini wrote:
-> > Il 22/03/2014 03:29, Christoffer Dall ha scritto:
-> > >1. Simply mandate that VM implementations support persistent variables
-> > >   for their UEFI implementation - with whatever constraints that may
-> > >   put on higher level tools.
-> > >
-> > >2. Require that OSes shipped as part of compliant VM images make no
-> > >   assumption that changes to the UEFI environment will be stored.
-> > >
-> > >I feel that option number two will break in all sorts of cases, just
-> > >like Grant stated above, and it is fundamentally not practical; if a
-> > >distribution ships Linux with a UEFI stub that expects to be able to do
-> > >something, distributions must modify Linux to conform to this spec.  I
-> > >think imagining that this spec controls how UEFI support in Linux/Grub
-> > >is done in general would be overreaching.  Additionally, Michael brought
-> > >up the fact that it would be non-UEFI compliant.
-> > 
-> > OSes are already able to cope with loss of changes to UEFI
-> > environment are stored, because losing persistent variables is what
-> > happens if you copy an image to a new hard disk.
-> > 
-> > Asking implementations for support of persistent variables is a good
-> > idea; however, independent of what is in the spec, OSes should not
-> > expect that users will enable that support---most of them won't.
-> > 
-> OK, fair enough, mandating support for persistent variable storage may
-> be overreaching but at the same time I feel it is unlikely for this spec
-> to reach far enough that a generic UEFI Linux loader, for example,
-> actually follows it, and therefore explicitly mandating that guest OSes
-> must be completely portable in all that they do is a non-practical
-> constraint.  That was the request that kicked this discussion off, and
-> what I was trygint to address.
+On Thursday, March 13, 2014 at 02:47:56 AM, Yuan Yao wrote:
+> Add dma support for i2c. This function depend on DMA driver.
+> You can turn on it by write both the dmas and dma-name properties in dts
+> node.
 > 
-After thinking about this a bit more, I think I see what we're actually
-discussing.  It's obvious that if software in a VM makes changes to UEFI
-variables that are required to be persistent for that VM image to boot
-again, then the VM image is no longer portable, as per the spec.
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
+>  drivers/i2c/busses/i2c-imx.c | 354
+> +++++++++++++++++++++++++++++++++++++------ 1 file changed, 306
+> insertions(+), 48 deletions(-)
 
-It is in fact probably a good idea to specify that out clearly, I found
-it intuitively obvious, but it could be spelled out nevertheless.
+Changelog is missing.
 
--Christoffer
+[...]
+
+> +/* Functions for DMA support */
+> +static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
+> +						dma_addr_t phy_addr)
+> +{
+> +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> +	struct dma_slave_config dma_sconfig;
+> +	struct device *dev = &i2c_imx->adapter.dev;
+> +	int ret;
+> +
+> +	dma->chan_tx = dma_request_slave_channel(dev, "tx");
+> +	if (!dma->chan_tx) {
+> +		dev_err(dev, "Dma tx channel request failed!\n");
+
+DMA is written in all caps, it's an abbrev. for Direct Memory Access . Please 
+fix globally.
+
+[...]
+
+>  static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg
+> *msgs) {
+
+[...]
+
+> -	/* write data */
+> -	for (i = 0; i < msgs->len; i++) {
+> -		dev_dbg(&i2c_imx->adapter.dev,
+> -			"<%s> write byte: B%d=0x%X\n",
+> -			__func__, i, msgs->buf[i]);
+> -		imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp |= I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +		/* write slave address */
+> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> +		result = wait_for_completion_interruptible_timeout(
+> +					&i2c_imx->dma->cmd_complete,
+> +					msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
+> +		if (result <= 0) {
+> +			dmaengine_terminate_all(dma->chan_using);
+> +			if (result)
+> +				return result;
+> +			else
+> +				return -ETIMEDOUT;
+> +		}
+> +
+> +		/* waiting for Transfer complete. */
+> +		while (timeout--) {
+> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> +			if (temp & I2SR_ICF)
+> +				break;
+> +			udelay(10);
+> +		}
+
+Do you ever check if this really timed out and handle such case at all ? I don't 
+see it , but I might be wrong ...
+
+> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> +		temp &= ~I2CR_DMAEN;
+> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> +
+> +		/* write the last byte */
+> +		imx_i2c_write_reg(msgs->buf[msgs->len-1],
+> +					i2c_imx, IMX_I2C_I2DR);
+>  		result = i2c_imx_trx_complete(i2c_imx);
+>  		if (result)
+>  			return result;
+> +
+>  		result = i2c_imx_acked(i2c_imx);
+>  		if (result)
+>  			return result;
+> +	} else {
+> +		/* write slave address */
+> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> +		result = i2c_imx_trx_complete(i2c_imx);
+> +		if (result)
+> +			return result;
+> +
+> +		result = i2c_imx_acked(i2c_imx);
+> +		if (result)
+> +			return result;
+> +
+> +		dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
+> +
+> +		/* write data */
+> +		for (i = 0; i < msgs->len; i++) {
+> +			dev_dbg(&i2c_imx->adapter.dev,
+> +				"<%s> write byte: B%d=0x%X\n",
+> +				__func__, i, msgs->buf[i]);
+
+Can you not just have a variable $dev here and avoid having such a long noodle 
+in the dev_dbg() call ?
+
+> +			imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
+> +			result = i2c_imx_trx_complete(i2c_imx);
+> +			if (result)
+> +				return result;
+> +			result = i2c_imx_acked(i2c_imx);
+> +			if (result)
+> +				return result;
+> +		}
+>  	}
+>  	return 0;
+>  }
+[...]
+
+> +		/* waiting for Transfer complete. */
+> +		while (timeout--) {
+> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> +			if (temp & I2SR_ICF)
+> +				break;
+> +			udelay(10);
+> +		}
+
+Timeout handling here as well ...
+
+[...]
+
+> @@ -696,6 +936,21 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  		i2c_imx->adapter.name);
+>  	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
+> 
+> +	/* Init DMA config if support*/
+> +	i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
+> +					GFP_KERNEL);
+> +	if (!i2c_imx->dma) {
+> +		dev_info(&pdev->dev,
+> +				"can't allocate dma struct faild use dma.\n");
+
+Or just have $dev variable and you won't have to break the line at all ...
+
+> +		i2c_imx->use_dma = false;
+> +	} else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr)) {
+> +		dev_info(&pdev->dev,
+> +				"can't request dma chan, faild use dma.\n");
+> +		i2c_imx->use_dma = false;
+> +	} else {
+> +		i2c_imx->use_dma = true;
+> +	}
+
+Can you not just check if i2c_imx->dma is valid pointer or NULL pointer ? Then 
+you won't need a separate variable, for this purpose ... right ?
+[...]
