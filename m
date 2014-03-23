@@ -1,60 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 23 Mar 2014 12:32:05 +0100
-Subject: [PATCH 10/62] ARM: efm32: select AUTO_ZRELADDR
-In-Reply-To: <201403221027.10332.arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <20140321185430.GG23076@pengutronix.de>
- <CAL_Jsq+vd6dqQgfJsS3sfCOhu7qCpPdcmrXPhC33zym2R9J=rQ@mail.gmail.com>
- <201403221027.10332.arnd@arndb.de>
-Message-ID: <20140323113205.GI23076@pengutronix.de>
+From: berndfaust@gmail.com (Bernd Faust)
+Date: Sun, 23 Mar 2014 12:38:31 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140321173252.GL7528@n2100.arm.linux.org.uk>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <201403200005.56334.marex@denx.de>
+ <201403200501.16881.marex@denx.de>
+ <CAOMZO5Bx60C8VhZ-6LqsLxx29cuxRkAc6XPozZv9X+grKLJy6w@mail.gmail.com>
+ <20140320230559.GF7528@n2100.arm.linux.org.uk>
+ <532B86A7.5010200@boundarydevices.com>
+ <20140321011843.GG7528@n2100.arm.linux.org.uk>
+ <CAOMZO5A+e+mHw1EG9t983ZG_KVL_O1r5UVwUU3JBsU5yPxOBsA@mail.gmail.com>
+ <CAOMZO5CxjCHLrY0KTe4j=NiSU3CQVNZWhEAs33Le8ji3NAFETQ@mail.gmail.com>
+ <CANBf9eNZB+BVBDkgWNxxGs-ndQ-mYCc6+bfVdS-8T-QLpSZ3GA@mail.gmail.com>
+ <20140321173252.GL7528@n2100.arm.linux.org.uk>
+Message-ID: <CANBf9ePuqFXXy+tsHdeuogPuVgN1OD2jswhvZ1qJYHC=Lu+N-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 10:27:09AM +0100, Arnd Bergmann wrote:
-> On Friday 21 March 2014, Rob Herring wrote:
-> > On Fri, Mar 21, 2014 at 1:54 PM, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > On Fri, Mar 21, 2014 at 04:10:37PM +0100, Arnd Bergmann wrote:
-> > >> I don't see a reason to change the existing logic, it works for
-> > >> both MMU and NOMMU kernels, and you are talking about three instructions
-> > >> here.
-> > > it doesn't matter how many instructions are involved. The relevant
-> > > difference is that with my approach you fix the problem for all no-MMU
-> > > platforms, with yours you only fix efm32. (OK, I think there are not too
-> > > many no-MMU platforms, but still.) An even easier implementation would
-> > > be to add something like:
-> > >
-> > >         ifeq($(zreladdr-y)$(CONFIG_MMU),)
-> > >         zreladdr-y := CONFIG_PAGE_OFFSET + CONFIG_TEXT_OFFSET
-> > >         endif
-> > >
-> > > to arch/arm/boot/Makefile.
-> 
-> This makes sense, we can add it as soon as we have a use for it. At the
-> moment, the only problem we have is a randconfig build error, and the
-> obvious change I proposed should work just fine.
-My suggestion is an alternative fix for the randconfig error you see, so
-there is a use already now. I fail to compile a zImage for different
-reasons on top of next, but maybe this works instead of your patch:
+On 21 March 2014 18:32, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Fri, Mar 21, 2014 at 05:33:02PM +0100, Bernd Faust wrote:
+>> I also tried the patch, but unfortunately it doesn't work for me either.
+>> I get the same error as Robert Daniels. My target is a i.MX6 (Cortex A9,
+>> single core) running Linux Kernel version 3.10.9-rt5+
+>
+> Hmm, rt kernels.  Does this happen without the rt patches applied?
+>
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index ec2f8065f955..2d935dd098e5 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -15,6 +15,10 @@ ifneq ($(MACHINE),)
- include $(srctree)/$(MACHINE)/Makefile.boot
- endif
- 
-+ifeq ($(zreladdr-y)$(CONFIG_MMU),)
-+zreladdr-y := $(CONFIG_PAGE_OFFSET)+$(TEXT_OFFSET)
-+endif
-+
- # Note: the following conditions must always be true:
- #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
- #   PARAMS_PHYS must be within 4MB of ZRELADDR
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On a kernel without RT patches the problem does not occur, so in my
+case the problem seems to be introduced/triggered by the RT patches.
