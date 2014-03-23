@@ -1,48 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 23 Mar 2014 20:36:18 +0100
-Subject: [PATCH] ARM: shmobile: r8a7778/bockw: Move "select
- RENESAS_INTC_IRQPIN" under SoC
-Message-ID: <1395603378-32199-1-git-send-email-geert@linux-m68k.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 23 Mar 2014 20:49:41 +0100
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <CAL_Jsq+j4ixVbfue62q_tOHb-HPA2jAxwZtTjtLy6jE9crGvsg@mail.gmail.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <201403222301.30222.arnd@arndb.de>
+ <CAL_Jsq+j4ixVbfue62q_tOHb-HPA2jAxwZtTjtLy6jE9crGvsg@mail.gmail.com>
+Message-ID: <201403232049.41866.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Sunday 23 March 2014, Rob Herring wrote:
+> IIRC, the unflattening cannot be done before memblock is up which is
+> in arm_memblock_init. I believe that will get done earlier similar to
+> PPC with Laura's meminfo removal series. However, in interest of
+> getting output enabled as early as possible, the earliest point is
+> always going to be with a flat tree. So I think we do want to be able
+> to parse the flat tree for this. There's code in u-boot to do the
+> address translation on FDT we can steal. Really, i'd like to put that
+> code in libfdt, but there's a licensing problem with the u-boot code
+> being GPL and libfdt being BSD.
 
-Move the "select RENESAS_INTC_IRQPIN" from the two bockw-specific sections
-to the one r8a7778-specific section, like is done for the other SoCs.
+I suppose it depends on what the goal is. If you are trying to get as
+close as possible to the debug_ll functionality without losing the
+ability to turn it on unconditionally, I agree that it needs to be done
+on the flat tree.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/mach-shmobile/Kconfig |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+However, the goal that interests me more at the moment is to have
+reliable debug output done in a simple way earlier than what we have
+today with the normal console support. For this, it seems a better
+tradeoff to initialize the early console slightly later. This
+can actually be done independent of the the command line option,
+I don't see any downsides from having a compile-time option that
+would initialize the early console from setup_arch (after
+unflatten_device_tree) whenever there is a linux,stdout-path
+property that points to a usable device.
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index edf61e5c1b7b..75ccebfa16a3 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -102,6 +102,7 @@ config ARCH_R8A7778
- 	select ARM_GIC
- 	select USB_ARCH_HAS_EHCI
- 	select USB_ARCH_HAS_OHCI
-+	select RENESAS_INTC_IRQPIN
- 
- config ARCH_R8A7779
- 	bool "R-Car H1 (R8A77790)"
-@@ -198,7 +199,6 @@ config MACH_BOCKW
- 	depends on ARCH_R8A7778
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select RENESAS_INTC_IRQPIN
- 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
- 	select USE_OF
-@@ -207,7 +207,6 @@ config MACH_BOCKW_REFERENCE
- 	bool "BOCK-W  - Reference Device Tree Implementation"
- 	depends on ARCH_R8A7778
- 	select ARCH_REQUIRE_GPIOLIB
--	select RENESAS_INTC_IRQPIN
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select USE_OF
- 	---help---
--- 
-1.7.9.5
+	Arnd
