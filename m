@@ -1,168 +1,101 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 23 Mar 2014 04:49:51 +0100
-Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <1394675277-24913-2-git-send-email-yao.yuan@freescale.com>
-References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
- <1394675277-24913-2-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201403230449.51515.marex@denx.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Sat, 22 Mar 2014 21:20:50 -0700
+Subject: [PATCH v4] ARM: mm: fix reporting of read-only PMD bits
+Message-ID: <20140323042050.GA15181@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 13, 2014 at 02:47:56 AM, Yuan Yao wrote:
-> Add dma support for i2c. This function depend on DMA driver.
-> You can turn on it by write both the dmas and dma-name properties in dts
-> node.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> ---
->  drivers/i2c/busses/i2c-imx.c | 354
-> +++++++++++++++++++++++++++++++++++++------ 1 file changed, 306
-> insertions(+), 48 deletions(-)
+On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
+"PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
+report this.
 
-Changelog is missing.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+v4:
+ - clean up defines for CPU versions; Rob Herring.
+v3:
+ - check for pre-v6 CPUs on the page table report.
+v2:
+ - reorder bits, suggested by Olof.
+---
+ arch/arm/mm/dump.c |   47 ++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 32 insertions(+), 15 deletions(-)
 
-[...]
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index ef69152f9b52..c508f41a43bc 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -120,34 +120,51 @@ static const struct prot_bits pte_bits[] = {
+ };
+ 
+ static const struct prot_bits section_bits[] = {
+-#ifndef CONFIG_ARM_LPAE
+-	/* These are approximate */
++#ifdef CONFIG_ARM_LPAE
++	{
++		.mask	= PMD_SECT_USER,
++		.val	= PMD_SECT_USER,
++		.set	= "USR",
++	}, {
++		.mask	= PMD_SECT_RDONLY,
++		.val	= PMD_SECT_RDONLY,
++		.set	= "ro",
++		.clear	= "RW",
++#elif __LINUX_ARM_ARCH__ >= 6
+ 	{
+-		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+-		.val	= 0,
++		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.val	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
+ 		.set	= "    ro",
+ 	}, {
+-		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val	= PMD_SECT_AP_WRITE,
+ 		.set	= "    RW",
+ 	}, {
+-		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val	= PMD_SECT_AP_READ,
+ 		.set	= "USR ro",
+ 	}, {
+-		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.set	= "USR RW",
+-#else
++#else /* ARMv4/ARMv5  */
++	/* These are approximate */
+ 	{
+-		.mask	= PMD_SECT_USER,
+-		.val	= PMD_SECT_USER,
+-		.set	= "USR",
++		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.val    = 0,
++		.set    = "    ro",
+ 	}, {
+-		.mask	= PMD_SECT_RDONLY,
+-		.val	= PMD_SECT_RDONLY,
+-		.set	= "ro",
+-		.clear	= "RW",
++		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.val    = PMD_SECT_AP_WRITE,
++		.set    = "    RW",
++	}, {
++		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.val    = PMD_SECT_AP_READ,
++		.set    = "USR ro",
++	}, {
++		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.val    = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
++		.set    = "USR RW",
+ #endif
+ 	}, {
+ 		.mask	= PMD_SECT_XN,
+-- 
+1.7.9.5
 
-> +/* Functions for DMA support */
-> +static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
-> +						dma_addr_t phy_addr)
-> +{
-> +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> +	struct dma_slave_config dma_sconfig;
-> +	struct device *dev = &i2c_imx->adapter.dev;
-> +	int ret;
-> +
-> +	dma->chan_tx = dma_request_slave_channel(dev, "tx");
-> +	if (!dma->chan_tx) {
-> +		dev_err(dev, "Dma tx channel request failed!\n");
 
-DMA is written in all caps, it's an abbrev. for Direct Memory Access . Please 
-fix globally.
-
-[...]
-
->  static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg
-> *msgs) {
-
-[...]
-
-> -	/* write data */
-> -	for (i = 0; i < msgs->len; i++) {
-> -		dev_dbg(&i2c_imx->adapter.dev,
-> -			"<%s> write byte: B%d=0x%X\n",
-> -			__func__, i, msgs->buf[i]);
-> -		imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
-> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> +		temp |= I2CR_DMAEN;
-> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> +
-> +		/* write slave address */
-> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> +		result = wait_for_completion_interruptible_timeout(
-> +					&i2c_imx->dma->cmd_complete,
-> +					msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> +		if (result <= 0) {
-> +			dmaengine_terminate_all(dma->chan_using);
-> +			if (result)
-> +				return result;
-> +			else
-> +				return -ETIMEDOUT;
-> +		}
-> +
-> +		/* waiting for Transfer complete. */
-> +		while (timeout--) {
-> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> +			if (temp & I2SR_ICF)
-> +				break;
-> +			udelay(10);
-> +		}
-
-Do you ever check if this really timed out and handle such case at all ? I don't 
-see it , but I might be wrong ...
-
-> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> +		temp &= ~I2CR_DMAEN;
-> +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> +
-> +		/* write the last byte */
-> +		imx_i2c_write_reg(msgs->buf[msgs->len-1],
-> +					i2c_imx, IMX_I2C_I2DR);
->  		result = i2c_imx_trx_complete(i2c_imx);
->  		if (result)
->  			return result;
-> +
->  		result = i2c_imx_acked(i2c_imx);
->  		if (result)
->  			return result;
-> +	} else {
-> +		/* write slave address */
-> +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> +		result = i2c_imx_trx_complete(i2c_imx);
-> +		if (result)
-> +			return result;
-> +
-> +		result = i2c_imx_acked(i2c_imx);
-> +		if (result)
-> +			return result;
-> +
-> +		dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
-> +
-> +		/* write data */
-> +		for (i = 0; i < msgs->len; i++) {
-> +			dev_dbg(&i2c_imx->adapter.dev,
-> +				"<%s> write byte: B%d=0x%X\n",
-> +				__func__, i, msgs->buf[i]);
-
-Can you not just have a variable $dev here and avoid having such a long noodle 
-in the dev_dbg() call ?
-
-> +			imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
-> +			result = i2c_imx_trx_complete(i2c_imx);
-> +			if (result)
-> +				return result;
-> +			result = i2c_imx_acked(i2c_imx);
-> +			if (result)
-> +				return result;
-> +		}
->  	}
->  	return 0;
->  }
-[...]
-
-> +		/* waiting for Transfer complete. */
-> +		while (timeout--) {
-> +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> +			if (temp & I2SR_ICF)
-> +				break;
-> +			udelay(10);
-> +		}
-
-Timeout handling here as well ...
-
-[...]
-
-> @@ -696,6 +936,21 @@ static int i2c_imx_probe(struct platform_device *pdev)
->  		i2c_imx->adapter.name);
->  	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
-> 
-> +	/* Init DMA config if support*/
-> +	i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
-> +					GFP_KERNEL);
-> +	if (!i2c_imx->dma) {
-> +		dev_info(&pdev->dev,
-> +				"can't allocate dma struct faild use dma.\n");
-
-Or just have $dev variable and you won't have to break the line at all ...
-
-> +		i2c_imx->use_dma = false;
-> +	} else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr)) {
-> +		dev_info(&pdev->dev,
-> +				"can't request dma chan, faild use dma.\n");
-> +		i2c_imx->use_dma = false;
-> +	} else {
-> +		i2c_imx->use_dma = true;
-> +	}
-
-Can you not just check if i2c_imx->dma is valid pointer or NULL pointer ? Then 
-you won't need a separate variable, for this purpose ... right ?
-[...]
+-- 
+Kees Cook
+Chrome OS Security
