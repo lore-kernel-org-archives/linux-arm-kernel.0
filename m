@@ -1,139 +1,180 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 23 Mar 2014 01:34:16 +0100
-Subject: [PATCH 1/3] IXP4xx: Fix Goramo Multilink GPIO conversion.
+Date: Sun, 23 Mar 2014 01:36:48 +0100
+Subject: [PATCH 2/3] IXP4xx: Fix DMA masks.
 In-Reply-To: <m3siq9iyt2.fsf@intrepid.localdomain> (Krzysztof Halasa's message
  of "Sun, 23 Mar 2014 00:44:09 +0100")
 References: <m3siq9iyt2.fsf@intrepid.localdomain>
-Message-ID: <m3bnwxiwhj.fsf@intrepid.localdomain>
+Message-ID: <m37g7liwdb.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'set_scl':
-arch/arm/mach-ixp4xx/goramo_mlr.c:82: error: implicit declaration of function 'gpio_line_set'
+Now, devices will have 32-bit default DMA masks (0xFFFFFFFF) as per DMA API.
 
-arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'output_control':
-arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: implicit declaration of function 'gpio_line_config'
-arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: 'IXP4XX_GPIO_OUT' undeclared
+Fixes:
+$ ifconfig eth0 up
+net eth0: coherent DMA mask is unset
 
-arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'hss_dcd_irq':
-arch/arm/mach-ixp4xx/goramo_mlr.c:155: error: implicit declaration of function 'gpio_line_get'
+$ ifconfig hdlc0 up
+net hdlc0: coherent DMA mask is unset
 
-arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'gmlr_init':
-arch/arm/mach-ixp4xx/goramo_mlr.c:416: error: 'IXP4XX_GPIO_OUT' undeclared
-arch/arm/mach-ixp4xx/goramo_mlr.c:421: error: 'IXP4XX_GPIO_IN' undeclared
+Also fixes a cosmetic off-by-one bug which caused DMA transfers ending exactly
+on the 64 MiB boundary to go through dmabounce unnecessarily.
 
 Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 
-diff --git a/arch/arm/mach-ixp4xx/goramo_mlr.c b/arch/arm/mach-ixp4xx/goramo_mlr.c
-index e54ff49..80bd9d6 100644
---- a/arch/arm/mach-ixp4xx/goramo_mlr.c
-+++ b/arch/arm/mach-ixp4xx/goramo_mlr.c
-@@ -4,6 +4,7 @@
-  */
- 
- #include <linux/delay.h>
-+#include <linux/gpio.h>
- #include <linux/hdlc.h>
- #include <linux/i2c-gpio.h>
- #include <linux/io.h>
-@@ -79,19 +80,19 @@ static u8 control_value;
- 
- static void set_scl(u8 value)
- {
--	gpio_line_set(GPIO_SCL, !!value);
-+	gpio_set_value(GPIO_SCL, !!value);
- 	udelay(3);
- }
- 
- static void set_sda(u8 value)
- {
--	gpio_line_set(GPIO_SDA, !!value);
-+	gpio_set_value(GPIO_SDA, !!value);
- 	udelay(3);
- }
- 
- static void set_str(u8 value)
- {
--	gpio_line_set(GPIO_STR, !!value);
-+	gpio_set_value(GPIO_STR, !!value);
- 	udelay(3);
- }
- 
-@@ -108,8 +109,8 @@ static void output_control(void)
- {
- 	int i;
- 
--	gpio_line_config(GPIO_SCL, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_SDA, IXP4XX_GPIO_OUT);
-+	gpio_direction_output(GPIO_SCL, 1);
-+	gpio_direction_output(GPIO_SDA, 1);
- 
- 	for (i = 0; i < 8; i++) {
- 		set_scl(0);
-@@ -151,8 +152,8 @@ static int hss_set_clock(int port, unsigned int clock_type)
- 
- static irqreturn_t hss_dcd_irq(int irq, void *pdev)
- {
--	int i, port = (irq == IXP4XX_GPIO_IRQ(GPIO_HSS1_DCD_N));
--	gpio_line_get(port ? GPIO_HSS1_DCD_N : GPIO_HSS0_DCD_N, &i);
-+	int port = (irq == IXP4XX_GPIO_IRQ(GPIO_HSS1_DCD_N));
-+	int i = gpio_get_value(port ? GPIO_HSS1_DCD_N : GPIO_HSS0_DCD_N);
- 	set_carrier_cb_tab[port](pdev, !i);
- 	return IRQ_HANDLED;
- }
-@@ -168,7 +169,7 @@ static int hss_open(int port, void *pdev,
- 	else
- 		irq = IXP4XX_GPIO_IRQ(GPIO_HSS1_DCD_N);
- 
--	gpio_line_get(port ? GPIO_HSS1_DCD_N : GPIO_HSS0_DCD_N, &i);
-+	i = gpio_get_value(port ? GPIO_HSS1_DCD_N : GPIO_HSS0_DCD_N);
- 	set_carrier_cb(pdev, !i);
- 
- 	set_carrier_cb_tab[!!port] = set_carrier_cb;
-@@ -181,7 +182,7 @@ static int hss_open(int port, void *pdev,
- 
- 	set_control(port ? CONTROL_HSS1_DTR_N : CONTROL_HSS0_DTR_N, 0);
- 	output_control();
--	gpio_line_set(port ? GPIO_HSS1_RTS_N : GPIO_HSS0_RTS_N, 0);
-+	gpio_set_value(port ? GPIO_HSS1_RTS_N : GPIO_HSS0_RTS_N, 0);
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index 200970d..4977296 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -315,33 +315,6 @@ static int abort_handler(unsigned long addr, unsigned int fsr, struct pt_regs *r
  	return 0;
  }
  
-@@ -193,7 +194,7 @@ static void hss_close(int port, void *pdev)
+-
+-static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+-{
+-	return (dma_addr + size) >= SZ_64M;
+-}
+-
+-/*
+- * Setup DMA mask to 64MB on PCI devices. Ignore all other devices.
+- */
+-static int ixp4xx_pci_platform_notify(struct device *dev)
+-{
+-	if (dev_is_pci(dev)) {
+-		*dev->dma_mask =  SZ_64M - 1;
+-		dev->coherent_dma_mask = SZ_64M - 1;
+-		dmabounce_register_dev(dev, 2048, 4096, ixp4xx_needs_bounce);
+-	}
+-	return 0;
+-}
+-
+-static int ixp4xx_pci_platform_notify_remove(struct device *dev)
+-{
+-	if (dev_is_pci(dev))
+-		dmabounce_unregister_dev(dev);
+-
+-	return 0;
+-}
+-
+ void __init ixp4xx_pci_preinit(void)
+ {
+ 	unsigned long cpuid = read_cpuid_id();
+@@ -475,20 +448,8 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 	pci_add_resource_offset(&sys->resources, &res[0], sys->io_offset);
+ 	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
  
- 	set_control(port ? CONTROL_HSS1_DTR_N : CONTROL_HSS0_DTR_N, 1);
- 	output_control();
--	gpio_line_set(port ? GPIO_HSS1_RTS_N : GPIO_HSS0_RTS_N, 1);
-+	gpio_set_value(port ? GPIO_HSS1_RTS_N : GPIO_HSS0_RTS_N, 1);
+-	platform_notify = ixp4xx_pci_platform_notify;
+-	platform_notify_remove = ixp4xx_pci_platform_notify_remove;
+-
+ 	return 1;
  }
  
+-int dma_set_coherent_mask(struct device *dev, u64 mask)
+-{
+-	if (mask >= SZ_64M - 1)
+-		return 0;
+-
+-	return -EIO;
+-}
+-
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+ EXPORT_SYMBOL(ixp4xx_pci_write);
+-EXPORT_SYMBOL(dma_set_coherent_mask);
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 6d68aed..12c71a4 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -30,8 +30,8 @@
+ #include <linux/export.h>
+ #include <linux/gpio.h>
+ #include <linux/cpu.h>
++#include <linux/pci.h>
+ #include <linux/sched_clock.h>
+-
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+ #include <mach/io.h>
+@@ -40,7 +40,6 @@
+ #include <asm/page.h>
+ #include <asm/irq.h>
+ #include <asm/system_misc.h>
+-
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
+@@ -578,6 +577,54 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
+ 	}
+ }
  
-@@ -413,13 +414,21 @@ static void __init gmlr_init(void)
- 	if (hw_bits & CFG_HW_HAS_EEPROM)
- 		device_tab[devices++] = &device_i2c; /* max index 6 */
- 
--	gpio_line_config(GPIO_SCL, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_SDA, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_STR, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_HSS0_RTS_N, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_HSS1_RTS_N, IXP4XX_GPIO_OUT);
--	gpio_line_config(GPIO_HSS0_DCD_N, IXP4XX_GPIO_IN);
--	gpio_line_config(GPIO_HSS1_DCD_N, IXP4XX_GPIO_IN);
-+	gpio_request(GPIO_SCL, "SCL/clock");
-+	gpio_request(GPIO_SDA, "SDA/data");
-+	gpio_request(GPIO_STR, "strobe");
-+	gpio_request(GPIO_HSS0_RTS_N, "HSS0 RTS");
-+	gpio_request(GPIO_HSS1_RTS_N, "HSS1 RTS");
-+	gpio_request(GPIO_HSS0_DCD_N, "HSS0 DCD");
-+	gpio_request(GPIO_HSS1_DCD_N, "HSS1 DCD");
++#ifdef CONFIG_PCI
++static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
++{
++	return (dma_addr + size) > SZ_64M;
++}
 +
-+	gpio_direction_output(GPIO_SCL, 1);
-+	gpio_direction_output(GPIO_SDA, 1);
-+	gpio_direction_output(GPIO_STR, 0);
-+	gpio_direction_output(GPIO_HSS0_RTS_N, 1);
-+	gpio_direction_output(GPIO_HSS1_RTS_N, 1);
-+	gpio_direction_input(GPIO_HSS0_DCD_N);
-+	gpio_direction_input(GPIO_HSS1_DCD_N);
- 	irq_set_irq_type(IXP4XX_GPIO_IRQ(GPIO_HSS0_DCD_N), IRQ_TYPE_EDGE_BOTH);
- 	irq_set_irq_type(IXP4XX_GPIO_IRQ(GPIO_HSS1_DCD_N), IRQ_TYPE_EDGE_BOTH);
++static int ixp4xx_platform_notify_remove(struct device *dev)
++{
++	if (dev_is_pci(dev))
++		dmabounce_unregister_dev(dev);
++
++	return 0;
++}
++#endif
++
++/*
++ * Setup DMA mask to 64MB on PCI devices and 4 GB on all other things.
++ */
++static int ixp4xx_platform_notify(struct device *dev)
++{
++	dev->dma_mask = &dev->coherent_dma_mask;
++
++#ifdef CONFIG_PCI
++	if (dev_is_pci(dev)) {
++		dev->coherent_dma_mask = DMA_BIT_MASK(28); /* 64 MB */
++		dmabounce_register_dev(dev, 2048, 4096, ixp4xx_needs_bounce);
++		return 0;
++	}
++#endif
++
++	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	return 0;
++}
++
++int dma_set_coherent_mask(struct device *dev, u64 mask)
++{
++	if (dev_is_pci(dev))
++		mask &= DMA_BIT_MASK(28); /* 64 MB */
++
++	if ((mask & DMA_BIT_MASK(28)) == DMA_BIT_MASK(28)) {
++		dev->coherent_dma_mask = mask;
++		return 0;
++	}
++
++	return -EIO;		/* device wanted sub-64MB mask */
++}
++EXPORT_SYMBOL(dma_set_coherent_mask);
++
+ #ifdef CONFIG_IXP4XX_INDIRECT_PCI
+ /*
+  * In the case of using indirect PCI, we simply return the actual PCI
+@@ -600,12 +647,16 @@ static void ixp4xx_iounmap(void __iomem *addr)
+ 	if (!is_pci_memory((__force u32)addr))
+ 		__iounmap(addr);
+ }
++#endif
  
+ void __init ixp4xx_init_early(void)
+ {
++	platform_notify = ixp4xx_platform_notify;
++#ifdef CONFIG_PCI
++	platform_notify_remove = ixp4xx_platform_notify_remove;
++#endif
++#ifdef CONFIG_IXP4XX_INDIRECT_PCI
+ 	arch_ioremap_caller = ixp4xx_ioremap_caller;
+ 	arch_iounmap = ixp4xx_iounmap;
+-}
+-#else
+-void __init ixp4xx_init_early(void) {}
+ #endif
++}
