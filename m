@@ -1,70 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 23 Mar 2014 10:09:05 -0500
-Subject: [PATCH 0/8] Generic serial earlycon
-In-Reply-To: <201403222301.30222.arnd@arndb.de>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <201403221054.39799.arnd@arndb.de>
- <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
- <201403222301.30222.arnd@arndb.de>
-Message-ID: <CAL_Jsq+j4ixVbfue62q_tOHb-HPA2jAxwZtTjtLy6jE9crGvsg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 23 Mar 2014 10:44:31 -0700
+Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
+ <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
+ <20140321232704.GB25519@cbox>
+ <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+Message-ID: <20140323174431.GE30885@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 5:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 22 March 2014, Rob Herring wrote:
->> I think this series stands on its own. It is largely refactoring
->> existing code and supporting existing command line options (arm64 just
->> changes from earlyprintk= to earlycon=). There will be cases where
->> changing the kernel command line is the only way to setup the
->> earlycon. Also, I think we would still want the kernel command line to
->> control whether or not we enable the earlycon (i.e. earlycon=dt).
->> There's not a standard way for how bootloaders would decide to set
->> "linux,stdout-path" or not.
->>
->> The DT support won't be all that quick to implement. The challenge
->> with the DT parsing is we have to do it on the flattened DT. I have
->> something functioning, but it doesn't do any address translation which
->> is the hard part.
->
-> Ah, I hadn't realized that we call parse_early_param() twice, both
-> in start_kernel() and before that in setup_arch(). You are right
-> that the first one of these can only look at the flat device tree
-> at the moment. I wonder if that's out of necessity or just coincidence
-> though.
->
-> There is relatively little going on between the first parse_early_param()
-> and the call to unflatten_device_tree(), so it may be possible to move
-> the former down, or the latter up.
->
->         parse_early_param();
->
->         sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
->
->         early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
->         setup_dma_zone(mdesc);
->         sanity_check_meminfo();
->         arm_memblock_init(&meminfo, mdesc);
->
->         paging_init(mdesc);
->         request_standard_resources(mdesc);
->
->         if (mdesc->restart)
->                 arm_pm_restart = mdesc->restart;
->
->         unflatten_device_tree();
->
-> On powerpc, unflatten_device_tree is called way before paging_init, so I assume
-> it has to be possible, but it might end up being harder to do than what you
-> have in mind with parsing the flat device tree.
+On Sat, Mar 22, 2014 at 09:54:55AM +0530, Anup Patel wrote:
+> On 22 March 2014 04:57, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Fri, Mar 21, 2014 at 06:23:25PM +0530, Anup Patel wrote:
+> >> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
+> >> VCPUs. This patch extends current in-kernel PSCI emulation to provide
+> >> PSCI v0.2 interface to VCPUs.
+> >>
+> >> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
+> >> keeping the ABI backward-compatible.
+> >>
+> >> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
+> >> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
+> >> init using KVM_ARM_VCPU_INIT ioctl.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> >
+> > The content here can carry my Reviewed-by tag, but I think Rob's point
+> > about sharing this code between KVM arm/arm64 and the PSCI code itself
+> > it important, see:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241792.html
+> 
+> My apologies, I totally missed Rob's comment.
 
-IIRC, the unflattening cannot be done before memblock is up which is
-in arm_memblock_init. I believe that will get done earlier similar to
-PPC with Laura's meminfo removal series. However, in interest of
-getting output enabled as early as possible, the earliest point is
-always going to be with a flat tree. So I think we do want to be able
-to parse the flat tree for this. There's code in u-boot to do the
-address translation on FDT we can steal. Really, i'd like to put that
-code in libfdt, but there's a licensing problem with the u-boot code
-being GPL and libfdt being BSD.
+No worries at all.
 
-Rob
+> 
+> My suggestion would be to have:
+> arch/arm/include/uapi/asm/psci.h
+> arch/arm64/include/uapi/asm/psci.h
+
+I think the suggestion was to move all this to include/uapi/linux/psci.h
+or something equivalent so also arm and arm64 can share these defines,
+but maybe I read too much into it.
+
+Rob?
