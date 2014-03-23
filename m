@@ -1,33 +1,26 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 23 Mar 2014 11:13:20 +0100
-Subject: [PATCH v4 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <532C5ADE.4030708@cogentembedded.com>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>
- <1395397968-6242-7-git-send-email-phil.edworthy@renesas.com>
- <532C5ADE.4030708@cogentembedded.com>
-Message-ID: <CAMuHMdVMCeZwX_67ktCYcYLe_P3+X5EeRbUDT3ZJjcgvU=Hwqg@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 23 Mar 2014 11:19:03 +0100
+Subject: [PATCH v2] drm/i2c: tda998x: Change the compatible strings
+In-Reply-To: <532C40B0.3000805@gmail.com>
+References: <20140321115541.01cbbb06@armhf>
+	<532C40B0.3000805@gmail.com>
+Message-ID: <20140323111903.51c73c82@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 4:29 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->> +
->> +       pcie: pcie at fe000000 {
->> +               compatible = "renesas,r8a7790-pcie";
->
->    The convention adopted on this list is to put the "pcie" first, and SoC
-> name the last.
+On Fri, 21 Mar 2014 14:37:52 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Except for clock bindings ;-)
+> >   Required properties;
+> > -  - compatible: must be "nxp,tda998x"
+> > +  - compatible: may be "nxp,tda9989", "nxp,tda19988" or "nxp,tda19989"  
+> 
+> There is a "DT is ABI" policy and although there is no mainline Linux
+> user of current compatible, the correct way would be to deprecate
+> "nxp,tda998x" and introduce new compatibles.
 
-Gr{oetje,eeting}s,
+Pratically, what is this way?
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
