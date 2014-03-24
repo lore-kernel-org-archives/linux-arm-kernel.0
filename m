@@ -1,35 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 24 Mar 2014 14:33:50 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
-In-Reply-To: <20140321191739.GT27873@lukather>
-References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140307160836.GM21483@n2100.arm.linux.org.uk>
- <20140310105808.GE2815@lukather>
- <20140310112929.GY21483@n2100.arm.linux.org.uk>
- <CAP=VYLqCmG6fRmPPABoW4xg_tFgGh2pji=f5ML=cBgCu4zZocg@mail.gmail.com>
- <20140321191739.GT27873@lukather>
-Message-ID: <20140324133349.GA2631@katana>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 24 Mar 2014 08:36:46 -0500
+Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
+In-Reply-To: <9368307.RXEGmQia1C@wuerfel>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <1395436128-11244-5-git-send-email-robherring2@gmail.com>
+ <20140324112203.GD3850@arm.com> <9368307.RXEGmQia1C@wuerfel>
+Message-ID: <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
+>> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
+>> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>> > new file mode 100644
+>> > index 0000000..241757a
+>> > --- /dev/null
+>> > +++ b/drivers/tty/serial/earlycon.c
+>> [...]
+>> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
+>> > +{
+>> > +   void __iomem *base;
+>> > +#ifdef CONFIG_FIX_EARLYCON_MEM
+>> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
+>> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
+>> > +   base += paddr & ~PAGE_MASK;
+>> > +#else
+>> > +   base = ioremap_nocache(paddr, size);
+>> > +#endif
+>>
+>> Just curious why not set_fixmap_io (and plain ioremap)?
+>
+> Good point. Note that ioremap_nocache() is the same as ioremap()
+> on *all* architectures.
 
-> > Looping linux-next into the CC since this is the cause of the failure
-> > in orion5x_defconfig there, and no point in anyone else re-doing the
-> > same bisect.
-> 
-> I sent a fix for this that hasn't been picked up yet:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/239069.html
-> 
-> IIRC, Wolfram's away until Monday, so I guess it will be merged some
-> time next week.
+I investigated this before adding this to arm64. set_fixmap_io and
+set_fixmap_nocache are not the same settings on x86. Whether the
+mapping type really matters on x86 or not, I don't know. So I added
+the nocache variant to arm64 to avoid a change to x86.
 
-I'd love to apply the fix but the reset framework update is not in
-linux-next yet.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/c9931237/attachment.sig>
+Rob
