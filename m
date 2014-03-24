@@ -1,77 +1,65 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 24 Mar 2014 09:21:14 +0100
-Subject: [PATCH v3 6/6] sched: powerpc: Add SD_SHARE_POWERDOMAIN for SMT
- level
-In-Reply-To: <532E3DB4.9060908@linux.vnet.ibm.com>
-References: <1395246165-31150-1-git-send-email-vincent.guittot@linaro.org>
- <1395246165-31150-7-git-send-email-vincent.guittot@linaro.org>
- <532E3DB4.9060908@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtCAgKysDU-PhwbQJjbABQbqbVS678iOa3TGoygzt7GquA@mail.gmail.com>
+From: brezillonboris@gmail.com (Boris BREZILLON)
+Date: Mon, 24 Mar 2014 09:27:12 +0100
+Subject: [PATCH v2 00/11] ARM: at91: rework main and slow clk implementation
+Message-ID: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2014 02:49, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
-> Hi Vincent,
->
-> On 03/19/2014 09:52 PM, Vincent Guittot wrote:
->> Set the power domain dependency at SMT level of Power8 but keep the flag
->> clear at CPU level. The goal is to consolidate tasks on the threads of a
->> core up to a level as explained by Preeti:
->> "On powerpc we would want to clear the SD_SHARE_POWERDOMAIN flag at the CPU
->> domain. On Power8, considering we have 8 threads per core, we would want to
->> consolidate tasks atleast upto 4 threads without significant performance
->> impact before spilling over to the other cores. By doing so, besides making
->> use of the higher power of the core we could do cpuidle management at the
->> core level for the remaining idle cores as a result of this consolidation."
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
->
-> We were discussing the impact of this consolidation and we are not too
-> sure if it will yield us good power efficiency. So we would want to
-> experiment with the power aware scheduler to find the "sweet spot" for
-> the number of threads to consolidate to and more importantly if there is
-> one such number at all. Else we would not want to go this way at all.
-> Hence it looks best if this patch is dropped until we validate it. We
-> don't want the code getting in and then out if we find out later there
-> are no benefits to it.
->
-> I am sorry that I suggested this patch a bit pre-mature in the
-> experimentation and validation stage. When you release the load
-> balancing patchset for power aware scheduler I shall validate this
-> patch. But until then its best if it does not get merged.
+Hello,
 
-Hi Preeti,
+This series introduce the real clock model (as described in atmel datasheets)
+for slow and main clocks.
 
-ok. I will drop this patch. Nevertheless, this patch only adds details
-about the power domain topology of Powerpc arch but it doesn't make
-any assumption about the scheduler policy or how it can be used by a
-power aware scheduler.
+The modifications introduced by this series break the DT compat, but, as the
+at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
+eval boards) I think it won't impact a lot of users.
 
-Regards,
-Vincent
+Nicolas, Mike, if this series is accepted, I'd like to get it merged as soon as
+possible to prevent other developpers from using a deprecated DT binding.
+Moreover, I think this series should go through the same path for both clk
+and DT changes (whatever path is chosen: either at91 or clk tree) because the
+changes are tightly coupled.
 
->
-> Thanks
->
-> Regards
-> Preeti U Murthy
->> ---
->>  arch/powerpc/kernel/smp.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
->> index c9cade5..fbbac3c 100644
->> --- a/arch/powerpc/kernel/smp.c
->> +++ b/arch/powerpc/kernel/smp.c
->> @@ -759,7 +759,7 @@ int setup_profiling_timer(unsigned int multiplier)
->>  /* cpumask of CPUs with asymetric SMT dependancy */
->>  static const int powerpc_smt_flags(void)
->>  {
->> -     int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
->> +     int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES | SD_SHARE_POWERDOMAIN;
->>
->>       if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
->>               printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
->>
->
+Best Regards,
+
+Boris
+
+Changes since v1:
+- fix sam9rl main clk definition 
+
+Boris BREZILLON (11):
+  clk: at91: rework main clk implementation
+  clk: at91: update main clk documentation
+  clk: at91: add slow clks driver
+  clk: at91: add slow clk documentation
+  ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
+  ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
+  ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
+  ARM: at91/dt: move at91sam9261 SoC to the new main clock model
+  ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
+  ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
+  ARM: at91/dt: define sam9rlek crystal frequencies
+
+ .../devicetree/bindings/clock/at91-clock.txt       |  128 ++++-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   10 +
+ arch/arm/boot/dts/at91sam9261.dtsi                 |   10 +-
+ arch/arm/boot/dts/at91sam9261ek.dts                |    4 +
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |   47 +-
+ arch/arm/boot/dts/at91sam9rlek.dts                 |    8 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |   61 +-
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  |   10 +
+ drivers/clk/at91/Makefile                          |    4 +-
+ drivers/clk/at91/clk-main.c                        |  581 +++++++++++++++++---
+ drivers/clk/at91/clk-slow.c                        |  467 ++++++++++++++++
+ drivers/clk/at91/pmc.c                             |   12 +
+ drivers/clk/at91/pmc.h                             |    9 +
+ drivers/clk/at91/sckc.c                            |   57 ++
+ drivers/clk/at91/sckc.h                            |   22 +
+ include/linux/clk/at91_pmc.h                       |    1 +
+ 16 files changed, 1343 insertions(+), 88 deletions(-)
+ create mode 100644 drivers/clk/at91/clk-slow.c
+ create mode 100644 drivers/clk/at91/sckc.c
+ create mode 100644 drivers/clk/at91/sckc.h
+
+-- 
+1.7.9.5
