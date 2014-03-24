@@ -1,54 +1,115 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Mar 2014 08:34:31 +0000
-Subject: [linux-sunxi] Re: [PATCH v2 1/8] mfd: AXP20x: Add mfd driver for
- AXP20x PMIC
-In-Reply-To: <20140322165132.GC20668@localhost.fastwebnet.it>
-References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-2-git-send-email-carlo@caione.org>
- <20140318155919.GS25478@lee--X1>
- <20140322165132.GC20668@localhost.fastwebnet.it>
-Message-ID: <20140324083431.GH8541@lee--X1>
+From: brezillonboris@gmail.com (Boris BREZILLON)
+Date: Mon, 24 Mar 2014 09:27:16 +0100
+Subject: [PATCH v2 04/11] clk: at91: add slow clk documentation
+In-Reply-To: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1395649643-9146-5-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +static struct mfd_cell axp20x_cells[] = {
-> > > +	{
-> > > +		.name		= "axp20x-pek",
-> > > +		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
-> > > +		.resources	= axp20x_pek_resources,
-> > > +	}, {
-> > > +		.name		= "axp20x-regulator",
-> > > +	},
-> > > +};
-> > 
-> > nit: The format of these two structs are inconsistent.
-> 
-> Uhm, what do you mean?
+Add slow clk, and slow oscillators documentation.
 
-Well you've removed the struct above this one in your reply. Take a
-look at my reply to you and see the differences between this _two_
-structs, this being only one of them.
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+ .../devicetree/bindings/clock/at91-clock.txt       |   72 ++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-[...]
-
-> > > +static const struct i2c_device_id axp20x_i2c_id[] = {
-> > > +	{ "axp202", AXP202_ID },
-> > > +	{ "axp209", AXP209_ID },
-> > > +	{ }
-> > > +};
-> > > +MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
-> > 
-> > Isn't this redundant now that you're using of_id?
-> 
-> It is not. Even it is unused it has to be in the driver otherwise the
-> driver is not loaded. Probably it is something wrong in the I2C core.
-
-Sorry, I should have been more specific. The I2C core requires this
-struct, but the IDs are unused and redundant. Best remove them in
-order to mitigate any confusion.
-
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 9a7025b..820061c 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -6,6 +6,16 @@ This binding uses the common clock binding[1].
+ 
+ Required properties:
+ - compatible : shall be one of the following:
++	"atmel,at91sam9x5-sckc":
++		at91 SCKC (Slow Clock Controller)
++		This node contains the slow clock definitions.
++
++	"atmel,at91sam9x5-clk-slow-osc":
++		at91 slow oscillator
++
++	"atmel,at91sam9x5-clk-slow-rc-osc":
++		at91 internal slow RC oscillator
++
+ 	"atmel,at91rm9200-pmc" or
+ 	"atmel,at91sam9g45-pmc" or
+ 	"atmel,at91sam9n12-pmc" or
+@@ -15,6 +25,11 @@ Required properties:
+ 		All at91 specific clocks (clocks defined below) must be child
+ 		node of the PMC node.
+ 
++	"atmel,at91sam9x5-clk-slow" (under sckc node)
++	or
++	"atmel,at91sam9260-clk-slow" (under pmc node):
++		at91 slow clk
++
+ 	"atmel,at91rm9200-clk-main-osc"
+ 	"atmel,at91sam9x5-clk-main-rc-osc"
+ 		at91 main clk sources
+@@ -59,6 +74,63 @@ Required properties:
+ 	"atmel,at91sam9x5-clk-utmi":
+ 		at91 utmi clock
+ 
++Required properties for SCKC node:
++- reg : defines the IO memory reserved for the SCKC.
++- #size-cells : shall be 0 (reg is used to encode clk id).
++- #address-cells : shall be 1 (reg is used to encode clk id).
++
++
++For example:
++	ckc: sckc at fffffe50 {
++		compatible = "atmel,sama5d3-pmc";
++		reg = <0xfffffe50 0x4>
++		#size-cells = <0>;
++		#address-cells = <1>;
++
++		/* put at91 slow clocks here */
++	};
++
++
++Required properties for internal slow RC oscillator:
++- #clock-cells : from common clock binding; shall be set to 0.
++- clock-frequency : define the internal RC oscillator frequency.
++
++Optional properties:
++- clock-accuracy : define the internal RC oscillator accuracy.
++
++For example:
++	slow_rc_osc: slow_rc_osc {
++		compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
++		clock-frequency = <32768>;
++		clock-accuracy = <50000000>;
++	};
++
++Required properties for slow oscillator:
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : shall encode the main osc source clk sources (see atmel datasheet).
++
++Optional properties:
++- atmel,osc-bypass : boolean property. Set this when a clock signal is directly
++  provided on XIN.
++
++For example:
++	slow_osc: slow_osc {
++		compatible = "atmel,at91rm9200-clk-slow-osc";
++		#clock-cells = <0>;
++		clocks = <&slow_xtal>;
++	};
++
++Required properties for slow clock:
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : shall encode the slow clk sources (see atmel datasheet).
++
++For example:
++	clk32k: slck {
++		compatible = "atmel,at91sam9x5-clk-slow";
++		#clock-cells = <0>;
++		clocks = <&slow_rc_osc &slow_osc>;
++	};
++
+ Required properties for PMC node:
+ - reg : defines the IO memory reserved for the PMC.
+ - #size-cells : shall be 0 (reg is used to encode clk id).
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
