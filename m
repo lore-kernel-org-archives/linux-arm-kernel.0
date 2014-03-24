@@ -1,43 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 24 Mar 2014 21:21:58 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
-Message-ID: <201403242121.58705.marex@denx.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Mar 2014 13:42:29 -0700
+Subject: [PATCH RFC] ixp4xx_eth: Allow setting the MDIO bus name in
+ platform data
+In-Reply-To: <m3r45r72u9.fsf@intrepid.localdomain>
+References: <20140324151729.1b8e3bb5@marrow.netinsight.se>
+ <m3r45r72u9.fsf@intrepid.localdomain>
+Message-ID: <CAGVrzcaJ5LKE_HAvsmbnFxYsLbNwi9h9UYrz60AQ3z4DOZKwYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 24, 2014 at 06:57:18 PM, robert.daniels at vantagecontrols.com 
-wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 03/21/2014
-> 
-> 11:32:53 AM:
-> > Hmm, rt kernels.  Does this happen without the rt patches applied?
-> 
-> I am not using the rt patches and I still see the problem.  I'm using
-> 3.14.0-rc6+ with
-> fec patches on the i.MX53 Quick Start Board with the latest U-Boot.
-> 
-> When I run my test I will immediately see packet loss with the eventual tx
-> timeout issue.
-> 
-> These are the steps I use to reproduce the problem:
-> 
-> Setup: Desktop (Ubuntu 12.04: webfs, iperf3, /srv/ftp/test.bmp ~27 MB)
->        i.MX53 Quick Start Board (linux 3.14.0-rc6+ with fec patches:
-> iperf3, wget)
-> 
-> Test:
-> 
->   Desktop:
->     iperf3 -s -V
-> 
->   i.MX53 QSB:
->     ssh 1> iperf3 -c 192.168.1.101 -u -l 64 -b 55M -V -t 1000
+2014-03-24 13:34 GMT-07:00 Krzysztof Halasa <khc@pm.waw.pl>:
+> Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
+>
+>> Allows using e.g., a fixed MDIO bus with the ixp4xx_eth driver.
+>> Example:
+>>
+>>   static struct eth_plat_info board_plat_eth_internal[] = {
+>>       {
+>>               .mdio_bus_id    = "fixed-0",
+>>               .phy            = 31,
+>>               .rxq            = 4,
+>>               .txreadyq       = 21,
+>>               .hwaddr         = {0x02, 0x00, 0x00, 0x00, 0x00, 0x00},
+>>       }
+>>   };
+>
+> Why do we need it? I'm not sure I know what constitutes a "fixed MDIO
+> bus".
 
-I think the UDP test might be lossy, can you try with TCP test please ?
-
-Best regards,
-Marek Vasut
+This is a software emulation MDIO bus for when your Ethernet MAC is
+connected to a PHY which does not appear on the MDIO bus. This is
+typically used to provide the Ethernet driver with a link that is
+always seen as UP, when you cannot directly query it via MDIO/MDC.
+-- 
+Florian
