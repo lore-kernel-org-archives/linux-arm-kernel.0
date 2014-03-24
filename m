@@ -1,34 +1,49 @@
-From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
-Date: Mon, 24 Mar 2014 16:41:41 +0100
-Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
-In-Reply-To: <1762157698.5689069.1395675049240.JavaMail.zimbra@adeneo-embedded.com>
-References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
- <20140321222320.14370739@e6520eb>
- <1762157698.5689069.1395675049240.JavaMail.zimbra@adeneo-embedded.com>
-Message-ID: <20140324164141.51b85f8c@e6520eb>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Mar 2014 16:42:02 +0100
+Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
+In-Reply-To: <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <9368307.RXEGmQia1C@wuerfel>
+ <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
+Message-ID: <21117957.8m9iUdR1VN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hubert,
-
-Le Mon, 24 Mar 2014 16:30:49 +0100 (CET),
-CHAUMETTE Hubert <hchaumette@adeneo-embedded.com> a ?crit :
-> > From: "Eric B?nard" <eric@eukrea.com>
-> > that's board specific (the needed delay depends on the routing delay on
-> > the PCB), so this should not go in a generic file.
-> > 
-> > Eric
-> > 
+On Monday 24 March 2014 08:36:46 Rob Herring wrote:
+> On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
+> >> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
+> >> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> >> > new file mode 100644
+> >> > index 0000000..241757a
+> >> > --- /dev/null
+> >> > +++ b/drivers/tty/serial/earlycon.c
+> >> [...]
+> >> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
+> >> > +{
+> >> > +   void __iomem *base;
+> >> > +#ifdef CONFIG_FIX_EARLYCON_MEM
+> >> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
+> >> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
+> >> > +   base += paddr & ~PAGE_MASK;
+> >> > +#else
+> >> > +   base = ioremap_nocache(paddr, size);
+> >> > +#endif
+> >>
+> >> Just curious why not set_fixmap_io (and plain ioremap)?
+> >
+> > Good point. Note that ioremap_nocache() is the same as ioremap()
+> > on *all* architectures.
 > 
-> I admit it may need to be in a separate function, but this file already contains
-> board-specific fixups (for imx6q sabrelite, Data Modul eDM-QMX6).
-> 
-true but that's not a reason to add more ;-)
+> I investigated this before adding this to arm64. set_fixmap_io and
+> set_fixmap_nocache are not the same settings on x86. Whether the
+> mapping type really matters on x86 or not, I don't know. So I added
+> the nocache variant to arm64 to avoid a change to x86.
 
-> Anyway, do you have any suggestion for the location I should put it ?
-> 
-no idea at the moment, I simply used your patch to bring this issue on
-the ML as we recently needed to patch the default values for testing
-mainline kernel on a custom boards.
+My best guess is that it's an x86 bug. ioremap() always uses an uncached
+mapping on x86, so it's strange to see early_ioremap() and set_fixmap_io()
+use a cached mapping. It probably doesn't matter as long as the mtrr is
+set up to treat all MMIO registers as non-cacheable, but I think there
+should not be a difference.
 
-Eric
+	Arnd
