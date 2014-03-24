@@ -1,40 +1,134 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Mar 2014 16:27:47 +0100
-Subject: [PATCH 1/3] IXP4xx: Fix Goramo Multilink GPIO conversion.
-In-Reply-To: <m3bnwxiwhj.fsf@intrepid.localdomain>
-References: <m3siq9iyt2.fsf@intrepid.localdomain>
- <m3bnwxiwhj.fsf@intrepid.localdomain>
-Message-ID: <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Mar 2014 16:34:44 +0100
+Subject: [PATCH 1/2] ARM: clps711x: Add cpuidle driver
+In-Reply-To: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
+References: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
+Message-ID: <53305094.8010008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 23, 2014 at 1:34 AM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
-
-> arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'set_scl':
-> arch/arm/mach-ixp4xx/goramo_mlr.c:82: error: implicit declaration of function 'gpio_line_set'
+On 03/22/2014 06:44 AM, Alexander Shiyan wrote:
+> Add cpuidle support for ARM Cirrus Logic CLPS711X CPUs.
+> This CPU has an unique internal register and write to this location
+> will put the system into the Idle State by halting the clock to the
+> processor until an interrupt is generated.
 >
-> arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'output_control':
-> arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: implicit declaration of function 'gpio_line_config'
-> arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: 'IXP4XX_GPIO_OUT' undeclared
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>   drivers/cpuidle/Kconfig.arm        |  6 ++++
+>   drivers/cpuidle/Makefile           |  1 +
+>   drivers/cpuidle/cpuidle-clps711x.c | 64 ++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 71 insertions(+)
+>   create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
 >
-> arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'hss_dcd_irq':
-> arch/arm/mach-ixp4xx/goramo_mlr.c:155: error: implicit declaration of function 'gpio_line_get'
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 97ccc31..371e75d 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -13,6 +13,12 @@ config ARM_BIG_LITTLE_CPUIDLE
+>   	  define different C-states for little and big cores through the
+>   	  multiple CPU idle drivers infrastructure.
 >
-> arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'gmlr_init':
-> arch/arm/mach-ixp4xx/goramo_mlr.c:416: error: 'IXP4XX_GPIO_OUT' undeclared
-> arch/arm/mach-ixp4xx/goramo_mlr.c:421: error: 'IXP4XX_GPIO_IN' undeclared
+> +config ARM_CLPS711X_CPUIDLE
+> +	bool "CPU Idle Driver for CLPS711X processors"
+> +	depends on ARCH_CLPS711X || COMPILE_TEST
+> +	help
+> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X SOCs.
+> +
+>   config ARM_HIGHBANK_CPUIDLE
+>   	bool "CPU Idle Driver for Calxeda processors"
+>   	depends on ARM_PSCI
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index f71ae1b..534fff5 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>   ##################################################################################
+>   # ARM SoC drivers
+>   obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+> +obj-$(CONFIG_ARM_CLPS711X_CPUIDLE)	+= cpuidle-clps711x.o
+>   obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+>   obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
+>   obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+> new file mode 100644
+> index 0000000..5243811
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-clps711x.c
+> @@ -0,0 +1,64 @@
+> +/*
+> + *  CLPS711X CPU idle driver
+> + *
+> + *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define CLPS711X_CPUIDLE_NAME	"clps711x-cpuidle"
+> +
+> +static void __iomem *clps711x_halt;
+> +
+> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
+> +				 struct cpuidle_driver *drv, int index)
+> +{
+> +	writel(0xaa, clps711x_halt);
+> +
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver clps711x_idle_driver = {
+> +	.name		= CLPS711X_CPUIDLE_NAME,
+> +	.owner		= THIS_MODULE,
+> +	.states[0]	= {
+> +		.name		= "HALT",
+> +		.desc		= "CLPS711X HALT",
+> +		.enter		= clps711x_cpuidle_halt,
+> +		.exit_latency	= 1,
+
+Did you forget target_residency ? Or just not defined it as it is 0 ?
+
+> +	},
+> +	.state_count	= 1,
+> +};
+> +
+> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(clps711x_halt))
+> +		return PTR_ERR(clps711x_halt);
+> +
+> +	return cpuidle_register(&clps711x_idle_driver, NULL);
+> +}
+> +
+> +static struct platform_driver clps711x_cpuidle_driver = {
+> +	.driver	= {
+> +		.name	= CLPS711X_CPUIDLE_NAME,
+> +		.owner	= THIS_MODULE,
+> +	},
+> +};
+> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+> +
+> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
+> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
+> +MODULE_LICENSE("GPL");
 >
-> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Mea culpa.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Arnd: can you apply this one patch directly for ARM SoC fixes and
-Cc: stable at vger.kernel.org on this one?
-
-Alternatively can you send this for fixes to arm at kernel.org with Cc:
-stable added Krzysztof?
-
-Yours,
-Linus Walleij
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
