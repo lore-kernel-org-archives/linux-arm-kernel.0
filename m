@@ -1,35 +1,56 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Mon, 24 Mar 2014 06:47:06 +0100
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140324054706.GA4487@osiris>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Sun, 23 Mar 2014 22:58:29 -0700
+Subject: [PATCH v2] arm: LLVMLinux: use static inline in ARM ftrace.h
+In-Reply-To: <20140311083107.6aa2bba4@gandalf.local.home>
+References: <20140311083107.6aa2bba4@gandalf.local.home>
+Message-ID: <1395640709-29042-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 11:13:51AM -0700, Laura Abbott wrote:
-> Rather than have architectures #define ARCH_HAS_SG_CHAIN in an architecture
-> specific scatterlist.h, make it a proper Kconfig option and use that
-> instead. At same time, remove the header files are are now mostly
-> useless and just include asm-generic/scatterlist.h.
-> 
+From: Behan Webster <behanw@converseincode.com>
 
-[...]
+With compilers which follow the C99 standard (like modern versions of gcc and
+clang), "extern inline" does the wrong thing (emits code for an externally
+linkable version of the inline function). In this case using static inline
+and removing the NULL version of return_address in return_address.c does
+the right thing.
 
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index 65a0775..d6c2059 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -142,6 +142,7 @@ config S390
->  	select SYSCTL_EXCEPTION_TRACE
->  	select VIRT_CPU_ACCOUNTING
->  	select VIRT_TO_BUS
-> +	select ARCH_HAS_SG_CHAIN
-> 
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+Reviewed-by: Mark Charlebois <charlebm@gmail.com>
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/include/asm/ftrace.h    | 2 +-
+ arch/arm/kernel/return_address.c | 5 -----
+ 2 files changed, 1 insertion(+), 6 deletions(-)
 
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
-
-FWIW, it would have been nice to keep the list of selected configs sorted.
-However no need to resend.
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index f89515a..2bb8cac 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -45,7 +45,7 @@ void *return_address(unsigned int);
+ 
+ #else
+ 
+-extern inline void *return_address(unsigned int level)
++static inline void *return_address(unsigned int level)
+ {
+ 	return NULL;
+ }
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index fafedd8..f6aa84d 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -63,11 +63,6 @@ void *return_address(unsigned int level)
+ #warning "TODO: return_address should use unwind tables"
+ #endif
+ 
+-void *return_address(unsigned int level)
+-{
+-	return NULL;
+-}
+-
+ #endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
+ 
+ EXPORT_SYMBOL_GPL(return_address);
+-- 
+1.8.3.2
