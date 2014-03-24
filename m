@@ -1,65 +1,48 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 23 Mar 2014 20:22:33 -0400
-Subject: [PATCH 0/5] Kirkwood DT Documentation
-In-Reply-To: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-References: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140324002233.GZ15608@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 24 Mar 2014 10:35:56 +0900
+Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
+In-Reply-To: <201403211643.24533.arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-61-git-send-email-arnd@arndb.de>
+ <20140320035501.GE10601@verge.net.au>
+ <201403211643.24533.arnd@arndb.de>
+Message-ID: <20140324013556.GF23924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-soc maintainers,
-
-On Sat, Mar 22, 2014 at 01:45:55PM +0100, Andrew Lunn wrote:
-> This patchset fixes up a number of issues found by checkpatch in the
-> kirkwood DT files or binding Documentation. Vendor Prefixes are
-> documented, missing prefixes are added, incorrect prefixes are
-> corrected, and Kirkwood SoCs are documented.
+On Fri, Mar 21, 2014 at 04:43:24PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 March 2014, Simon Horman wrote:
+> > On Wed, Mar 19, 2014 at 08:29:57PM +0100, Arnd Bergmann wrote:
+> > > When phylib is set to be built as a module, the lager and koelsch
+> > > boards fail to build:
+> > > 
+> > > arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
+> > > :(.text+0x738): undefined reference to `mdiobus_read'
+> > > :(.text+0x73c): undefined reference to `mdiobus_write'
+> > > arch/arm/mach-shmobile/built-in.o: In function `koelsch_ksz8041_fixup':
+> > > :(.text+0x7e8): undefined reference to `mdiobus_read'
+> > > :(.text+0x7ec): undefined reference to `mdiobus_write'
+> > > 
+> > > To work around that problem, this changes the code to check for
+> > > IS_BUILTIN rather than IS_ENABLED, turning the error into a runtime
+> > > problem. It's now possible to build random configurations, but the
+> > > phy may be set up incorrectly in this case.
+> > 
+> > I wonder if Kconfig for koelsch should be tightened up somehow to
+> > ensure that PHYLIB is either unselected or builtin.
+> > 
+> > Also, a minor nit, I would prefer changes for different boards
+> > in different patches. But I can split the patch myself if its
+> > not going to be changed otherwise.
 > 
-> Note that some of these patches contain UTF-8 characters, which the
-> mailing lists sometime don't like. The patches can also be found in
-> 
-> https://github.com/lunn/linux.git v3.14-rc7-next-20140321-dt
-> 
-> which is based on linux-next tag next-20140321.
+> I would prefer to take the entire series directly into arm-soc
+> this time, if you don't mind.
 
-I'd like to take this in as 'fixes-non-critical' for v3.15.  However,
-I'm having trouble finding a stable, conflict-free branch to base it on.
-The main problem seems to be vendor-prefixes.txt.
+That I'm happy to go along with though I don't understand the motivation
+for it. And regardless of how the patches go in I'd prefer if they were
+split as I suggested above.
 
-How would you prefer I handle this?  Or, would you guys just like to
-take the series directly?  I'm fine either way.
 
-If taking directly,
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
-
-> Andrew Lunn (5):
->   DT: Vendor: Add prefixes used by Kirkwood devices
->   DT: bindings: add missing Marvell Kirkwood SoC documentation
->   ARM: Kirkwood: Fix Atmel vendor prefix
->   DT: I2C: Add trivial bindings used by kirkwood boards
->   ARM: Kirkwood: DT: Add missing vendor prefix
-> 
->  .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
->  .../devicetree/bindings/i2c/trivial-devices.txt    | 16 ++++
->  .../devicetree/bindings/vendor-prefixes.txt        | 13 ++-
->  arch/arm/boot/dts/kirkwood-b3.dts                  |  2 +-
->  arch/arm/boot/dts/kirkwood-cloudbox.dts            |  2 +-
->  arch/arm/boot/dts/kirkwood-dreamplug.dts           |  2 +-
->  arch/arm/boot/dts/kirkwood-laplug.dts              |  2 +-
->  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     |  2 +-
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  4 +-
->  arch/arm/boot/dts/kirkwood-nsa310.dts              |  2 +-
->  arch/arm/boot/dts/kirkwood-nsa310a.dts             |  2 +-
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  2 +-
->  arch/arm/boot/dts/kirkwood-openblocks_a7.dts       |  2 +-
->  13 files changed, 136 insertions(+), 12 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> 
-> -- 
-> 1.9.1
-> 
+What I'm not so happy about is us potentially moving a problem from being a
+compile time error, which is easy to observe, to a run-time behavioural
+problem, which may be much less obvious to the beholder.
