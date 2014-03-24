@@ -1,44 +1,54 @@
-From: anish198519851985@gmail.com (anish singh)
-Date: Mon, 24 Mar 2014 14:33:18 -0700
-Subject: Disabling gcc inline operation
-In-Reply-To: <532FFBDE.7030407@broadcom.com>
-References: <CAK7N6vrgnNdFvo8as+DrhXurxP+SexN9gi3WFrX_SCO9i2Ybyw@mail.gmail.com>
- <532FFBDE.7030407@broadcom.com>
-Message-ID: <CAK7N6voRqo5fztqHLM7BLG14GNrMXPu_fpS6weue8hZU5uUJ1w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Mar 2014 14:51:20 -0700
+Subject: [PATCH v5 1/7] clk: sunxi: Remove calls to clk_put
+In-Reply-To: <1394723659-4995-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1394723659-4995-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394723659-4995-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140324215120.32624.63543@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 2:33 AM, Arend van Spriel <arend@broadcom.com> wrote:
-> On 23/03/14 23:31, anish singh wrote:
->>
->> Many a time i have got a crash and it is difficult
->> to find out the exact function which crashed
->> because the crash stack doesn't show the "real"
->> function because gcc inlines many functions when
->> ever it desires or when it optimizes for speed.
->>
->> So i don't want gcc to inline any function instead
->> just call the function so that i can see the crash
->> stack of each function called. I just want to do
->> this for debugging. Please let me know how can
->> i do that?
->>
->> What switch command to pass to gcc in the make
->> of linux kernel?
->
->
-> You tried to look at gcc.gnu.org, right? Your best options are -O0 and/or
-> -Og for debugging purposes.
-It worked with -fno-inline
->
-> Regards,
-> Arend
->
->
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->>
->
+Quoting Maxime Ripard (2014-03-13 08:14:13)
+> Callers of clk_put must disable the clock first. This also means that as long
+> as the clock is enabled the driver should hold a reference to that clock.
+> Hence, the call to clk_put here are bogus and should be removed.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Looks good to me. There is a balanced clk_put in the module remove
+function?
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 23baad9d934a..7119c02c9fa8 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -1290,17 +1290,13 @@ static void __init sunxi_clock_protect(void)
+>  
+>         /* memory bus clock - sun5i+ */
+>         clk = clk_get(NULL, "mbus");
+> -       if (!IS_ERR(clk)) {
+> +       if (!IS_ERR(clk))
+>                 clk_prepare_enable(clk);
+> -               clk_put(clk);
+> -       }
+>  
+>         /* DDR clock - sun4i+ */
+>         clk = clk_get(NULL, "pll5_ddr");
+> -       if (!IS_ERR(clk)) {
+> +       if (!IS_ERR(clk))
+>                 clk_prepare_enable(clk);
+> -               clk_put(clk);
+> -       }
+>  }
+>  
+>  static void __init sunxi_init_clocks(void)
+> -- 
+> 1.9.0
+> 
