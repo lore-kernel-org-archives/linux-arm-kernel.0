@@ -1,40 +1,35 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 24 Mar 2014 11:41:56 +0100
+Date: Mon, 24 Mar 2014 11:46:13 +0100
 Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <1395651814.4052.6.camel@dagon.hellion.org.uk>
-References: <20140226183454.GA14639@cbox>	 <20140301152756.67A02C40238@trevor
- .secretlab.ca>	 <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.
- 8040102@redhat.com>	 <53185FB9.1040308@redhat.com>	 <20140306120449.GA29916@
- mal.justgohome.co.uk>	 <20140307122418.2F2C4C408EC@trevor.secretlab.ca>	 <
- 20140322010206.GF25519@cbox>	
- <20140322122354.7644FC418C4@trevor.secretlab.ca>
- <1395651814.4052.6.camel@dagon.hellion.org.uk>
-Message-ID: <53300BF4.2000309@redhat.com>
+In-Reply-To: <20140324095723.GJ23363@mal.justgohome.co.uk>
+References: <20140301152756.67A02C40238@trevor.secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk> <531843EE.8040102@redhat.com>
+ <53185FB9.1040308@redhat.com> <20140306120449.GA29916@mal.justgohome.co.uk>
+ <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+ <20140322010206.GF25519@cbox> <532D4505.1090603@redhat.com>
+ <20140323031952.GB30885@cbox> <20140323032939.GD30885@cbox>
+ <20140324095723.GJ23363@mal.justgohome.co.uk>
+Message-ID: <53300CF5.5090808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 24/03/2014 10:03, Ian Campbell ha scritto:
->> > That isn't actually my position. I absolutely think that VMs /should/
->> > implement persistent variables, but the variables are a property of a VM
->> > instance, not of the disk image. As far as this spec is concerned, I
->> > think portable disk images should operate under the assumption of an
->> > empty set of variables, and therefore follow the removable disk
->> > requirements in the UEFI spec.
-> Just to be sure I understand. You position is:
->      1. A VM image downloaded from www.distro.org should neither contain
->         nor expect any persistent variables to be present.
->      2. After a VM image is instantiated into a specific VM instance and
->         booted then it is at liberty to set persistent variables (either
->         on first boot or as part of an upgrade) and the VM should ensure
->         that those variables a retained over reboot for that specific
->         instance.
->      3. If a VM does not preserve those variables then the instance
->         should have some sane functional fallback (implied by the
->         removable disk requirements from the UEFI spec).
+Il 24/03/2014 10:57, Robie Basak ha scritto:
+>> > After thinking about this a bit more, I think I see what we're actually
+>> > discussing.  It's obvious that if software in a VM makes changes to UEFI
+>> > variables that are required to be persistent for that VM image to boot
+>> > again, then the VM image is no longer portable, as per the spec.
+> No longer portable, and given the current state of implementation, no
+> longer bootable, since we don't support persistent storage yet;
+> certainly not on OpenStack? Or do we have that now?
 >
-> Is that right? I'm pretty sure you meant (1), reasonably sure you meant
-> (2) and not at all sure you meant (3) ;-)
+> Are we really pushing ahead with a specification that nobody can
+> implement today? How far away are we from a fully compliant
+> implementation?
 
-At least I do. :)
+The spec says SHOULD, so I think it's fine.  While support for 
+persistent variables in the KVM stack is in the early stages, there is 
+request and it is not ARM-specific.  It will be implemented sooner 
+rather than later at least at the libvirt level, and I suppose qemu-arm, 
+xl, OpenStack/, Virt, XenServer and everything else will follow soon.
 
 Paolo
