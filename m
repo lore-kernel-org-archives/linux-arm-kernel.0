@@ -1,66 +1,37 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 24 Mar 2014 10:14:48 -0400
-Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
-In-Reply-To: <90DB5198-051A-48EC-B577-5342BD706713@arm.com>
-References: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
- <20140321162750.GI13596@arm.com> <532C96B9.4090805@codeaurora.org>
- <90DB5198-051A-48EC-B577-5342BD706713@arm.com>
-Message-ID: <53303DD8.6010906@codeaurora.org>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 24 Mar 2014 22:14:53 +0800
+Subject: [PATCH v3 0/3] add hisilicon hip04 ethernet driver
+Message-ID: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 07:27 PM, Catalin Marinas wrote:
-> On 21 Mar 2014, at 19:44, Christopher Covington <cov@codeaurora.org> wrote:
->> On 03/21/2014 12:27 PM, Catalin Marinas wrote:
->>> On Wed, Mar 19, 2014 at 05:35:19PM +0000, Christopher Covington wrote:
->>>> On an LPAE system, the physical addresses used by VirtIO-MMIO may
->>>> be larger than 32 bits, even if the header and configuration space
->>>> addresses fit into 32 bits. For example with the Versatile Express
->>>> memory map using 4G memory, the following error occured when trying
->>>> to use a VirtIO-MMIO block device.
->>>>
->>>> EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: :
->>>> unaligned directory entry - offset=0, inode=3755990991, rec_len=57311,
->>>> name_len=223
->>>>
->>>> To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
->>>> VIRTIO_MMIO are selected.
->>>>
->>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->>>> ---
->>>> arch/arm/mm/Kconfig | 1 +
->>>> 1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
->>>> index 1f8fed9..a62bcc9 100644
->>>> --- a/arch/arm/mm/Kconfig
->>>> +++ b/arch/arm/mm/Kconfig
->>>> @@ -617,6 +617,7 @@ config ARM_LPAE
->>>> 	bool "Support for the Large Physical Address Extension"
->>>> 	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
->>>> 		!CPU_32v4 && !CPU_32v3
->>>> +	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
->>>
->>> That's the wrong place to enable ARCH_DMA_ADDR_T_64BIT. Do you have a
->>> platform with >32-bit physical address space? If yes, it should be
->>> selected there.
->>
->> The platforms I'm currently using are models like the Versatile Express
->> RTSM/FVP. I can respin with changes to ARCH_VEXPRESS and ARCH_VIRT instead.
-> 
-> But do you use RAM beyond 32-bit on such models?
+v3:
+Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
+Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
 
-Yes. On the Versatile Express memory map only 2G RAM is 32-bit accessible, and
-I'm using 4G as I tried to note in the commit message.
+v2:
+Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
+Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
+Refer property in ethernet.txt, change ppe description, etc.
 
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0575h/Bbajihec.html
+Zhangfei Gao (3):
+  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
+  net: hisilicon: new hip04 MDIO driver
+  net: hisilicon: new hip04 ethernet driver
 
-(For reference, the device tree I'm passing the A32 kernel is
-arch/arm64/boot/dts/rtsm_ve-aemv8a.dts.)
-
-Christopher
+ .../bindings/net/hisilicon-hip04-net.txt           |  110 +++
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/hisilicon/Kconfig             |   32 +
+ drivers/net/ethernet/hisilicon/Makefile            |    5 +
+ drivers/net/ethernet/hisilicon/hip04_eth.c         |  728 ++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hip04_mdio.c        |  186 +++++
+ 7 files changed, 1063 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+ create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
+ create mode 100644 drivers/net/ethernet/hisilicon/Makefile
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+1.7.9.5
