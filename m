@@ -1,155 +1,66 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 24 Mar 2014 15:11:41 +0100
-Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
-In-Reply-To: <532C8941.4090104@codeaurora.org>
-References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
- <52FB9602.1000805@samsung.com>
- <20140212163317.GQ26684@n2100.arm.linux.org.uk>
- <53036D51.2070502@samsung.com> <xa1t8ut8wc2f.fsf@mina86.com>
- <532C8941.4090104@codeaurora.org>
-Message-ID: <xa1tlhvzn0te.fsf@mina86.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 24 Mar 2014 10:14:48 -0400
+Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
+In-Reply-To: <90DB5198-051A-48EC-B577-5342BD706713@arm.com>
+References: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
+ <20140321162750.GI13596@arm.com> <532C96B9.4090805@codeaurora.org>
+ <90DB5198-051A-48EC-B577-5342BD706713@arm.com>
+Message-ID: <53303DD8.6010906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21 2014, Laura Abbott wrote:
-> From: Laura Abbott <lauraa@codeaurora.org>
-> Date: Tue, 25 Feb 2014 11:01:19 -0800
-> Subject: [PATCH] cma: Remove potential deadlock situation
->
-> CMA locking is currently very coarse. The cma_mutex protects both
-> the bitmap and avoids concurrency with alloc_contig_range. There
-> are several situations which may result in a deadlock on the CMA
-> mutex currently, mostly involving AB/BA situations with alloc and
-> free. Fix this issue by protecting the bitmap with a mutex per CMA
-> region and use the existing mutex for protecting against concurrency
-> with alloc_contig_range.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On 03/21/2014 07:27 PM, Catalin Marinas wrote:
+> On 21 Mar 2014, at 19:44, Christopher Covington <cov@codeaurora.org> wrote:
+>> On 03/21/2014 12:27 PM, Catalin Marinas wrote:
+>>> On Wed, Mar 19, 2014 at 05:35:19PM +0000, Christopher Covington wrote:
+>>>> On an LPAE system, the physical addresses used by VirtIO-MMIO may
+>>>> be larger than 32 bits, even if the header and configuration space
+>>>> addresses fit into 32 bits. For example with the Versatile Express
+>>>> memory map using 4G memory, the following error occured when trying
+>>>> to use a VirtIO-MMIO block device.
+>>>>
+>>>> EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: :
+>>>> unaligned directory entry - offset=0, inode=3755990991, rec_len=57311,
+>>>> name_len=223
+>>>>
+>>>> To fix this, select ARCH_DMA_ADDR_T_64BIT when both LPAE and
+>>>> VIRTIO_MMIO are selected.
+>>>>
+>>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+>>>> ---
+>>>> arch/arm/mm/Kconfig | 1 +
+>>>> 1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+>>>> index 1f8fed9..a62bcc9 100644
+>>>> --- a/arch/arm/mm/Kconfig
+>>>> +++ b/arch/arm/mm/Kconfig
+>>>> @@ -617,6 +617,7 @@ config ARM_LPAE
+>>>> 	bool "Support for the Large Physical Address Extension"
+>>>> 	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
+>>>> 		!CPU_32v4 && !CPU_32v3
+>>>> +	select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
+>>>
+>>> That's the wrong place to enable ARCH_DMA_ADDR_T_64BIT. Do you have a
+>>> platform with >32-bit physical address space? If yes, it should be
+>>> selected there.
+>>
+>> The platforms I'm currently using are models like the Versatile Express
+>> RTSM/FVP. I can respin with changes to ARCH_VEXPRESS and ARCH_VIRT instead.
+> 
+> But do you use RAM beyond 32-bit on such models?
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Yes. On the Versatile Express memory map only 2G RAM is 32-bit accessible, and
+I'm using 4G as I tried to note in the commit message.
 
-Furthermore, since CMA regions are always MAX_ORDER-page or pageblock
-(whichever is bigger) aligned, we could use two mutexes per CMA region:
-one protecting the bitmap and the other one protecting calls to
-alloc_contig_range touching given region.
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0575h/Bbajihec.html
 
-On the other hand, we could also go the other way and have two global
-mutexes: one protecting all the bitmaps in all the regions and another
-protecting calls to alloc_contig_range.
+(For reference, the device tree I'm passing the A32 kernel is
+arch/arm64/boot/dts/rtsm_ve-aemv8a.dts.)
 
-Either way, I think the below patch should work and fix the problem.
-
-> ---
->  drivers/base/dma-contiguous.c | 32 +++++++++++++++++++++++++-------
->  1 file changed, 25 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 165c2c2..dfb48ef 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -37,6 +37,7 @@ struct cma {
->  	unsigned long	base_pfn;
->  	unsigned long	count;
->  	unsigned long	*bitmap;
-> +	struct mutex	lock;
->  };
->  
->  struct cma *dma_contiguous_default_area;
-> @@ -161,6 +162,7 @@ static int __init cma_activate_area(struct cma *cma)
->  		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
->  	} while (--i);
->  
-> +	mutex_init(&cma->lock);
->  	return 0;
->  }
->  
-> @@ -261,6 +263,13 @@ err:
->  	return ret;
->  }
->  
-> +static void clear_cma_bitmap(struct cma *cma, unsigned long pfn, int count)
-> +{
-> +	mutex_lock(&cma->lock);
-> +	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
-> +	mutex_unlock(&cma->lock);
-> +}
-> +
->  /**
->   * dma_alloc_from_contiguous() - allocate pages from contiguous area
->   * @dev:   Pointer to device for which the allocation is performed.
-> @@ -294,30 +303,41 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->  
->  	mask = (1 << align) - 1;
->  
-> -	mutex_lock(&cma_mutex);
->  
->  	for (;;) {
-> +		mutex_lock(&cma->lock);
->  		pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
->  						    start, count, mask);
-> -		if (pageno >= cma->count)
-> +		if (pageno >= cma->count) {
-> +			mutex_unlock(&cma_mutex);
->  			break;
-> +		}
-> +		bitmap_set(cma->bitmap, pageno, count);
-> +		/*
-> +		 * It's safe to drop the lock here. We've marked this region for
-> +		 * our exclusive use. If the migration fails we will take the
-> +		 * lock again and unmark it.
-> +		 */
-> +		mutex_unlock(&cma->lock);
->  
->  		pfn = cma->base_pfn + pageno;
-> +		mutex_lock(&cma_mutex);
->  		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
-> +		mutex_unlock(&cma_mutex);
->  		if (ret == 0) {
-> -			bitmap_set(cma->bitmap, pageno, count);
->  			page = pfn_to_page(pfn);
->  			break;
->  		} else if (ret != -EBUSY) {
-> +			clear_cma_bitmap(cma, pfn, count);
->  			break;
->  		}
-> +		clear_cma_bitmap(cma, pfn, count);
->  		pr_debug("%s(): memory range at %p is busy, retrying\n",
->  			 __func__, pfn_to_page(pfn));
->  		/* try again with a bit different memory target */
->  		start = pageno + mask + 1;
->  	}
->  
-> -	mutex_unlock(&cma_mutex);
->  	pr_debug("%s(): returned %p\n", __func__, page);
->  	return page;
->  }
-> @@ -350,10 +370,8 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
->  
->  	VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
->  
-> -	mutex_lock(&cma_mutex);
-> -	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
->  	free_contig_range(pfn, count);
-> -	mutex_unlock(&cma_mutex);
-> +	clear_cma_bitmap(cma, pfn, count);
->  
->  	return true;
->  }
-> -- 
-> Code Aurora Forum chooses to take this file under the GPL v 2 license only.
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+Christopher
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/bfcfa73d/attachment.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
