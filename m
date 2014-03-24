@@ -1,55 +1,109 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Mar 2014 14:18:10 +0530
-Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
-In-Reply-To: <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
-References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
- <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 24 Mar 2014 14:30:19 +0530
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+Message-ID: <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2014 15:57, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Despite this patch set is working and applicable on top of 3.14-rc5,
-> please regard it solely as a pure RFC.
+Hi Jassi,
 
-Okay, I am trying to do a review here and because you have mentioned
-how different it is from the earlier versions, I am trying with a fresh mind.
-i.e. with zero memories of earlier discussions :)
+Thanks for the Acked-by.
 
-LAB was: Legacy Application Boost ??
-
-Probably mention that in your new threads as well, so that new readers
-know the details. Also, like other governors, just name it "boost" governor.
-
-> This patch provides support for LAB governor build on top of ondemand.
-> Previous version of LAB can be found here:
-> http://thread.gmane.org/gmane.linux.kernel/1484746/match=cpufreq
+On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
 >
-> LAB short reminder:
+>> +
+>> +/**
+>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
 >
-> LAB uses information about how many cores are in "idle" state (the core
-> idleness is represented as the value between 0 and 100) and the overall
-> load of the system (from 0 to 100) to decide about frequency to be set.
-> It is extremely useful with SoCs like Exynos4412, which can set only one
-> frequency for all cores.
+> Should be xilinx_vdma_dma_prep_interleaved here.
 
-Probably a description of how exactly these two values come into play
-would have been more interesting here for all. Always think of new followers
-of your patchset and so add all interesting things about it when you resend
-it.
+Ok, I will correct it.  Thanks.
 
-If I remember well the logic was more or less like this:
-- More idle cores means run few running cores at high frequency
-- Less idle cores means don't run them at very high frequencies
+>
+>> +/**
+>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
+>> + * Run-time configuration for Axi VDMA, supports:
+>> + * . halt the channel
+>> + * . configure interrupt coalescing and inter-packet delay threshold
+>> + * . start/stop parking
+>> + * . enable genlock
+>> + *
+>> + * @dchan: DMA channel
+>> + * @cfg: VDMA device configuration pointer
+>> + *
+>> + * Return: '0' on success and failure value on error
+>> + */
+>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>> +                                       struct xilinx_vdma_config *cfg)
+>> +{
+>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>> +       u32 dmacr;
+>> +
+>> +       if (cfg->reset)
+>> +               return xilinx_vdma_chan_reset(chan);
+>> +
+>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
+>> +
+>> +       chan->config.frm_dly = cfg->frm_dly;
+>> +       chan->config.park = cfg->park;
+>> +
+>> +       /* genlock settings */
+>> +       chan->config.gen_lock = cfg->gen_lock;
+>> +       chan->config.master = cfg->master;
+>> +
+>> +       if (cfg->gen_lock && chan->genlock) {
+>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
+>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
+>> +       }
+>> +
+>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
+>> +       if (cfg->park)
+>> +               chan->config.park_frm = cfg->park_frm;
+>> +       else
+>> +               chan->config.park_frm = -1;
+>> +
+>> +       chan->config.coalesc = cfg->coalesc;
+>> +       chan->config.delay = cfg->delay;
+>> +
+>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
+>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
+>> +               chan->config.coalesc = cfg->coalesc;
+>> +       }
+>> +
+>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
+>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
+>> +               chan->config.delay = cfg->delay;
+>> +       }
+>> +
+>> +       /* FSync Source selection */
+>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
+>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
+>> +
+>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
+>> +
+>> +       return 0;
+>> +}
+>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+>> +
+> Bypassing the DMAEngine api doesn't seem very neat.
+> Is there currently any client driver that /changes/ this configuration
+> between channel requests? If no, then simply get the configuration
+> from DT node and avoid this api.
 
-Right?
+This change is recently suggested by Lars in the following patch series,
+"dma: Remove comment about embedding dma_slave_config into custom structs"
 
-What about making it as simple as:
-- changing the ondemand governor only instead of adding a new governor
-- Keeping the bahavior as is for all platforms not publishing boost frequencies
-- If more cores are idle, enable switching to boost frequencies and take them
-into consideration all the time.
-- If less cores are idle, disable boost frequencies..
+Thanks,
+Srikanth
 
-Lets discuss this first and then I will get into the very details of your
-implementation.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
