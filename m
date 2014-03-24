@@ -1,56 +1,96 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 24 Mar 2014 10:26:02 +0800
-Subject: [PATCH 1/3] ARM: dts: i.MX5: Remove outdated VPU clock lookups
-In-Reply-To: <1395240564-25940-1-git-send-email-l.stach@pengutronix.de>
-References: <1395240564-25940-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140324022600.GC4006@dragon>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Mar 2014 03:38:10 +0100
+Subject: [PATCH] gpio: mxs: Allow for recursive enable_irq_wake() call
+Message-ID: <1395628690-7225-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 03:49:22PM +0100, Lucas Stach wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> CODA7 clock lookups are now defined in the device tree.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+The scenario here is that someone calls enable_irq_wake() from somewhere
+in the code. This will result in the lockdep producing a backtrace as can
+be seen below. In my case, this problem is triggered when using the wl1271
+(TI WlCore) driver found in drivers/net/wireless/ti/ .
 
-Applied with removing 'dts:' from patch subject, since it's not a dts
-change.  And the other 2 get applied without any change.
+The problem cause is rather obvious from the backtrace, but let's outline
+the dependency. enable_irq_wake() grabs the IRQ buslock in irq_set_irq_wake(),
+which in turns calls mxs_gpio_set_wake_irq() . But mxs_gpio_set_wake_irq()
+calls enable_irq_wake() again on the one-level-higher IRQ , thus it tries to
+grab the IRQ buslock again in irq_set_irq_wake() . Because the spinlock in
+irq_set_irq_wake()->irq_get_desc_buslock()->__irq_get_desc_lock() is not
+marked as recursive, lockdep will spew the stuff below.
 
-Shawn
+We know we can safely re-enter the lock, so use IRQ_GC_INIT_NESTED_LOCK to
+fix the spew.
 
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 19fca1fdc6fe..b53c5ca7650a 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -438,7 +438,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  
->  	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
->  	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
-> -	clk_register_clkdev(clk[IMX5_CLK_VPU_GATE], NULL, "imx51-vpu.0");
->  	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx27-fec.0");
->  	clk_register_clkdev(clk[IMX5_CLK_USB_PHY_GATE], "phy", "mxc-ehci.0");
->  	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_IPG_GATE], "ipg", "sdhci-esdhc-imx51.0");
-> @@ -563,7 +562,6 @@ static void __init mx53_clocks_init(struct device_node *np)
->  
->  	mx5_clocks_common_init(0, 0, 0, 0);
->  
-> -	clk_register_clkdev(clk[IMX5_CLK_VPU_GATE], NULL, "imx53-vpu.0");
->  	clk_register_clkdev(clk[IMX5_CLK_I2C3_GATE], NULL, "imx21-i2c.2");
->  	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx25-fec.0");
->  	clk_register_clkdev(clk[IMX5_CLK_USB_PHY1_GATE], "usb_phy1", "mxc-ehci.0");
-> -- 
-> 1.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+ =============================================
+ [ INFO: possible recursive locking detected ]
+ 3.10.33-00012-gf06b763-dirty #61 Not tainted
+ ---------------------------------------------
+ kworker/0:1/18 is trying to acquire lock:
+  (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
+
+ but task is already holding lock:
+  (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
+
+ other info that might help us debug this:
+  Possible unsafe locking scenario:
+
+        CPU0
+        ----
+   lock(&irq_desc_lock_class);
+   lock(&irq_desc_lock_class);
+
+  *** DEADLOCK ***
+
+  May be due to missing lock nesting notation
+
+ 3 locks held by kworker/0:1/18:
+  #0:  (events){.+.+.+}, at: [<c0036308>] process_one_work+0x134/0x4a4
+  #1:  ((&fw_work->work)){+.+.+.}, at: [<c0036308>] process_one_work+0x134/0x4a4
+  #2:  (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
+
+ stack backtrace:
+ CPU: 0 PID: 18 Comm: kworker/0:1 Not tainted 3.10.33-00012-gf06b763-dirty #61
+ Workqueue: events request_firmware_work_func
+ [<c0013eb4>] (unwind_backtrace+0x0/0xf0) from [<c0011c74>] (show_stack+0x10/0x14)
+ [<c0011c74>] (show_stack+0x10/0x14) from [<c005bb08>] (__lock_acquire+0x140c/0x1a64)
+ [<c005bb08>] (__lock_acquire+0x140c/0x1a64) from [<c005c6a8>] (lock_acquire+0x9c/0x104)
+ [<c005c6a8>] (lock_acquire+0x9c/0x104) from [<c051d5a4>] (_raw_spin_lock_irqsave+0x44/0x58)
+ [<c051d5a4>] (_raw_spin_lock_irqsave+0x44/0x58) from [<c00685f0>] (__irq_get_desc_lock+0x48/0x88)
+ [<c00685f0>] (__irq_get_desc_lock+0x48/0x88) from [<c0068e78>] (irq_set_irq_wake+0x20/0xf4)
+ [<c0068e78>] (irq_set_irq_wake+0x20/0xf4) from [<c027260c>] (mxs_gpio_set_wake_irq+0x1c/0x24)
+ [<c027260c>] (mxs_gpio_set_wake_irq+0x1c/0x24) from [<c0068cf4>] (set_irq_wake_real+0x30/0x44)
+ [<c0068cf4>] (set_irq_wake_real+0x30/0x44) from [<c0068ee4>] (irq_set_irq_wake+0x8c/0xf4)
+ [<c0068ee4>] (irq_set_irq_wake+0x8c/0xf4) from [<c0310748>] (wlcore_nvs_cb+0x10c/0x97c)
+ [<c0310748>] (wlcore_nvs_cb+0x10c/0x97c) from [<c02be5e8>] (request_firmware_work_func+0x38/0x58)
+ [<c02be5e8>] (request_firmware_work_func+0x38/0x58) from [<c0036394>] (process_one_work+0x1c0/0x4a4)
+ [<c0036394>] (process_one_work+0x1c0/0x4a4) from [<c0036a4c>] (worker_thread+0x138/0x394)
+ [<c0036a4c>] (worker_thread+0x138/0x394) from [<c003cb74>] (kthread+0xa4/0xb0)
+ [<c003cb74>] (kthread+0xa4/0xb0) from [<c000ee00>] (ret_from_fork+0x14/0x34)
+ wlcore: loaded
+
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-mxs.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+NOTE 1: I think this should go into -stable as well eventually.
+NOTE 2: I developed this on 3.10.33, but I still see this is not fixed in -next.
+
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index f8e6af2..d599fc4 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -214,7 +214,8 @@ static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port, int irq_base)
+ 	ct->regs.ack = PINCTRL_IRQSTAT(port) + MXS_CLR;
+ 	ct->regs.mask = PINCTRL_IRQEN(port);
+ 
+-	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
++	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_NESTED_LOCK,
++			       IRQ_NOREQUEST, 0);
+ }
+ 
+ static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+-- 
+1.9.0
