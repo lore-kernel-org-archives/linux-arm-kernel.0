@@ -1,96 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 24 Mar 2014 14:01:30 -0500
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
-In-Reply-To: <20140324185027.GC12500@saruman.home>
-References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
- <20140321055242.GA1959@saruman.home> <53304F76.8090703@ti.com>
- <20140324185027.GC12500@saruman.home>
-Message-ID: <5330810A.3090004@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 24 Mar 2014 19:03:19 +0000
+Subject: [PATCH v2 02/19] arm64: initial support for GICv3
+In-Reply-To: <1395316386-12617-3-git-send-email-marc.zyngier@arm.com>
+References: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
+ <1395316386-12617-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <53308177.9090809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2014 01:50 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Mar 24, 2014 at 10:29:58AM -0500, Dave Gerlach wrote:
->> On 03/21/2014 12:52 AM, Felipe Balbi wrote:
->>> On Fri, Mar 21, 2014 at 10:50:13AM +0530, Lokesh Vutla wrote:
->>>> From: Dave Gerlach <d-gerlach@ti.com>
->>>>
->>>> Do not reset GPIO5 at boot-up because GPIO5_7 is used
->>>> on AM437x GP-EVM to control VTT regulators on DDR3.
->>>> Without this some GP-EVM boards will fail to boot because
->>>> of DDR3 corruption.
->>>>
->>>> Reported-by: Nishanth Menon <nm@ti.com>
->>>> Tested-by: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>
->>> every now and again we see a patch like this because yet another board
->>> is using a GPIO to toggle DDR regulators.
->>>
->>> Instead of constantly patching things like this, how about we try
->>> something like below (build-tested only):
->>
->> Why should we change all of them? Is it correct to leave every single GPIO
->> at the mercy of the bootloader in every situation? The reason we see these
-> 
-> it's not leaving anything at the mercy of the bootloader. It's simply
-> looking at the HW itself and asking "what's the current state of this
-> GPIO ?"
+Hi Marc,
 
-And you assume here that every GPIO pin left in what ever state by
-bootloader is the correct state for kernel to function in? that is not
-exactly a good idea from even power consumption perspective - example
-GPIOs used by bootloader to detect board revision is not used in
-kernel, leaving such GPIOs active is not optimal, certain other GPIOs
-used by external peripherals might even be wrongly configured by
-bootloader issues -> the idea of ti,no-reset-on-init is to ensure that
-we *know* which instances "need special handling" and we depend on
-bootloader configuration.
-
-Taking it a step further, why is "not doing IP module kernel reset"
-just a constraint for GPIO then? Why not leave every IP module in what
-ever state bootloader left it at?
-
->> patches only every now and again is because it's a special case that should
+On 20/03/14 11:52, Marc Zyngier wrote:
+> The Generic Interrupt Controller (version 3) offers services that are
+> similar to GICv2, with a number of additional features:
+> - Affinity routing based on the CPU MPIDR (ARE)
+> - System register for the CPU interfaces (SRE)
+> - Support for more that 8 CPUs
+> - Locality-specific Peripheral Interrupts (LPIs)
+> - Interrupt Translation Services (ITS)
 > 
-> I wouldn't call it "special". A GPIO block is pretty dumb, its registers
-> only give you current pin state, there's virtually no state machine
-> involved whatsoever.
+> This patch adds preliminary support for GICv3 with ARE and SRE,
+> non-secure mode only. It relies on higher exception levels to grant ARE
+> and SRE access.
 > 
->> be handled only for that situation. I also don't think it makes sense
->> to make gpio's a unique case that never gets reset while every other
->> IP does by default.
+> Support for LPI and ITS will be added at a later time.
 > 
-> Well, if it doesn't need to be reset, why would you spend that time
-> resetting it ? In the GPIO case, you gain nothing by resetting the IP,
-> nothing at all, other than "now I'm sure the IP is in
-> no-standby/no-idle" but that can be easily read back from SYS[SC]
-> registers anyway.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-because, you do not know how else the system might be used. instead of
-assuming the bootloader or host OS (in a virtualized environment) will
-always be doing the right thing, kernel takes responsibility of
-peripherals and exceptions are clearly marked (such as with
-ti,no-reset-on-init;).
+[...]
 
-> 
-> The point is that we have two choices here:
-> 
-> a) every time a new board comes around using GPIO as an enable signal
-> for DDR, we spend a few days debugging why it's not booting.
+> +#ifdef CONFIG_SMP
+> +static int __init gic_secondary_init(struct notifier_block *nfb,
+> +                                    unsigned long action, void *hcpu)
+> +{
+> +       if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+> +               gic_cpu_init();
+> +       return NOTIFY_OK;
+> +}
+> +
+> +/*
+> + * Notifier for enabling the GIC CPU interface. Set an arbitrarily high
+> + * priority because the GIC needs to be up before the ARM generic timers.
+> + */
+> +static struct notifier_block __initdata gic_cpu_notifier = {
+> +       .notifier_call = gic_secondary_init,
+> +       .priority = 100,
+> +};
+> +
 
-yeah - read the darned schematics - this is valid for anyone doing
-board/platform bringup - this is the right way to do it.
+You need to remove __init annotations in gic_populate_rdist, gic_cpu_init,
+and gic_secondary_init for CPU hotplug to work.
 
-> 
-> b) make sure no GPIO block is ever reset, so we never go through the
-> debugging cycle again.
-> 
-the holy grail of new bugs! Sigh!
-
--- 
 Regards,
-Nishanth Menon
+Sudeep
