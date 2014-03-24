@@ -1,96 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Mar 2014 11:02:28 +0100
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <201403201531.20416.arnd@arndb.de>
- <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
-Message-ID: <5755212.stImUCLDZi@wuerfel>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Mar 2014 15:45:34 +0530
+Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
+In-Reply-To: <20140324110032.7aeae15e@amdc2363>
+References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
+ <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
+ <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
+ <20140324110032.7aeae15e@amdc2363>
+Message-ID: <CAKohpo=6F_d3WF6TuNODDhhig5oDjC2dhAjqXp4E+c6VJyCiFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 March 2014 16:17:42 Zhangfei Gao wrote:
-> On Thu, Mar 20, 2014 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >
-> >> >> +     if (!ppebase) {
-> >> >> +             struct device_node *n;
-> >> >> +
-> >> >> +             n = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-ppebase");
-> >> >> +             if (!n) {
-> >> >> +                     ret = -EINVAL;
-> >> >> +                     netdev_err(ndev, "not find hisilicon,ppebase\n");
-> >> >> +                     goto init_fail;
-> >> >> +             }
-> >> >> +             ppebase = of_iomap(n, 0);
-> >> >> +     }
-> >> >
-> >> > How about using syscon_regmap_lookup_by_phandle() here? That way, you can have
-> >> > a more generic abstraction of the ppe, and stick the port and id in there as
-> >> > well, e.g.
-> >> >
-> >> >         ppe-syscon = <&hip04ppe 1 4>; // ppe, port, id
-> 
-> Even if using syscon_regmap_lookup_by_phandle, there still have static
-> struct regmap, since three controllers
-> share one regmap.
+[Adding Linaro lists in cc as there are few people here working on power/thermal
+stuff.]
 
-The regmap is then owned by the syscon driver, while each controller takes
-a reference to the regmap that it can store in its own private data
-structure. However, as we discussed using a ppe driver sounds nicer than
-regmap.
+On 24 March 2014 15:30, Lukasz Majewski <l.majewski@samsung.com> wrote:
+>> On 4 March 2014 15:57, Lukasz Majewski <l.majewski@samsung.com> wrote:
 
-> > It's probably a little simpler to avoid the sub-nodes and instead do
-> >
-> >>               ppe: ppe at 28c0000 {
-> >>                         compatible = "hisilicon,hip04-ppe";
-> >>                         reg = <0x28c0000 0x10000>;
-> >>                         #address-cells = <1>;
-> >>                         #size-cells = <0>;
-> >>                 };
-> >>                 fe: ethernet at 28b0000 {
-> >>                         compatible = "hisilicon,hip04-mac";
-> >>                         reg = <0x28b0000 0x10000>;
-> >>                         interrupts = <0 413 4>;
-> >>                         phy-mode = "mii";
-> >>                         port-handle = <&ppe 31>;
-> >>                 };
-> >
-> > In the code, I would create a simple ppe driver that exports
-> > a few functions. you need. In the ethernet driver probe() function,
-> > you should get a handle to the ppe using
-> >
-> >         /* look up "port-handle" property of the current device, find ppe and port */
-> >         struct hip04_ppe *ppe = hip04_ppe_get(dev->of_node);
-> >         if (IS_ERR(ppe))
-> >                 return PTR_ERR(ptr); /* this handles -EPROBE_DEFER */
-> >
-> > and then in other code you can just do
-> >
-> >         hip04_ppe_set_foo(priv->ppe, foo_config);
-> >
-> > This is a somewhat more high-level abstraction that syscon, which
-> > just gives you a 'struct regmap' structure for doing register-level
-> > configuration like you have today.
-> >
-> 
-> Do you mean create one additional file like ppe.c with some exported
-> function to remove the static ppebase?
+> I think, that "LAB" name is with us for some time, so it would be a
+> pity to discard it.
 
-It doesn't have to be a separate file, as long as you register a
-separate platform_driver for the ppe.
+It doesn't matter with Mainline how you do naming initially for your code :)
+We need to pick the right name now, and the decision should be made
+now (after discussions obviously) :)
 
-> Since the ppe is specifically bounded with ethernet, and does not used
-> anywhere else,
-> the exported function may not be used anywhere else.
-> Is it make it more complicated since there are probe, remove etc.
-> 
-> So I may still prefer using "static void __iomem *ppebase", as it is simpler.
+>> What about making it as simple as:
+>> - changing the ondemand governor only instead of adding a new governor
+>
+> My goal is to not touch the ondemand code. It has matured, so I would
+> like to leave it as it is.
 
-The trouble is that the driver should not rely on being only there
-for a single instance, that's not how we write drivers.
+Because the boost feature is already part of CPUFreq core, I think its
+better if we enhance current governors to use it. So, I would like to
+make this part of existing governors. Not only ondemand but maybe
+conservative as well..
 
-I'm fine with either a syscon instance (which would be simpler) or a
-separate ppe driver as part of the hip04-mac driver (which would be
-a nicer abstraction).
+Also, I feel we maynot necessarily move this piece of code into cpufreq.
+All you are doing is thermal management here :)
 
-	Arnd
+If we are sure we will not burn out our SoC (When many cores are idle),
+run at max freq (if there is enough load of course :))..
+
+And if there are chances that we might burn our chip (when very few
+cores are idle), don't run on boost frequencies..
+
+This is actually a 'cooling' device :)
+
+Think of it this way: CPUFreq will provide a range of frequency which
+SoC's can use. And then based on some conditions we may or may not
+want to run on these frequencies.
+
+@Zhang/Eduardo: Can we have your inputs here as well ?
+
+This may look hard but we need to design things in the best possible
+way for managing things better in future. Lets see what others have
+to say on this.
