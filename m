@@ -1,67 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Mar 2014 19:07:46 +0000
-Subject: [PATCH v2 02/19] arm64: initial support for GICv3
-In-Reply-To: <53308177.9090809@arm.com>
-References: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
- <1395316386-12617-3-git-send-email-marc.zyngier@arm.com>
- <53308177.9090809@arm.com>
-Message-ID: <53308282.4010106@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 24 Mar 2014 20:08:56 +0100
+Subject: [PATCH v3] i2c: new bus driver for efm32
+In-Reply-To: <20140324184114.GK23076@pengutronix.de>
+References: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140324170131.GB7524@katana>
+ <20140324184114.GK23076@pengutronix.de>
+Message-ID: <20140324190856.GA11532@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
 
-On 24/03/14 19:03, Sudeep Holla wrote:
-> Hi Marc,
-> 
-> On 20/03/14 11:52, Marc Zyngier wrote:
->> The Generic Interrupt Controller (version 3) offers services that are
->> similar to GICv2, with a number of additional features:
->> - Affinity routing based on the CPU MPIDR (ARE)
->> - System register for the CPU interfaces (SRE)
->> - Support for more that 8 CPUs
->> - Locality-specific Peripheral Interrupts (LPIs)
->> - Interrupt Translation Services (ITS)
->>
->> This patch adds preliminary support for GICv3 with ARE and SRE,
->> non-secure mode only. It relies on higher exception levels to grant ARE
->> and SRE access.
->>
->> Support for LPI and ITS will be added at a later time.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> [...]
-> 
->> +#ifdef CONFIG_SMP
->> +static int __init gic_secondary_init(struct notifier_block *nfb,
->> +                                    unsigned long action, void *hcpu)
->> +{
->> +       if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
->> +               gic_cpu_init();
->> +       return NOTIFY_OK;
->> +}
->> +
->> +/*
->> + * Notifier for enabling the GIC CPU interface. Set an arbitrarily high
->> + * priority because the GIC needs to be up before the ARM generic timers.
->> + */
->> +static struct notifier_block __initdata gic_cpu_notifier = {
->> +       .notifier_call = gic_secondary_init,
->> +       .priority = 100,
->> +};
->> +
-> 
-> You need to remove __init annotations in gic_populate_rdist, gic_cpu_init,
-> and gic_secondary_init for CPU hotplug to work.
+> > > +config I2C_EFM32
+> > > +	tristate "EFM32 I2C controller"
+> > > +	depends on OF && (ARCH_EFM32 || COMPILE_TEST)
+> > 
+> > Is EFM32 DT only? Do we need the dependency on OF?
+> yes, efm32 is DT only. Still for the COMPILE_TEST branch the OF is
+> needed.
 
-Ah, who needs hotplug? ;-)
+Really? of_* functions should have empty templates if OF is not
+selected, I'd think.
 
-Very good point, thanks for noticing that. I'll fix it in the next revision!
-
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/332c8e85/attachment.sig>
