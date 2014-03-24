@@ -1,96 +1,96 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 24 Mar 2014 11:00:32 +0100
-Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
-In-Reply-To: <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
-References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
- <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
- <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
-Message-ID: <20140324110032.7aeae15e@amdc2363>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Mar 2014 11:02:28 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <201403201531.20416.arnd@arndb.de>
+ <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
+Message-ID: <5755212.stImUCLDZi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-> On 4 March 2014 15:57, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> > Despite this patch set is working and applicable on top of 3.14-rc5,
-> > please regard it solely as a pure RFC.
+On Monday 24 March 2014 16:17:42 Zhangfei Gao wrote:
+> On Thu, Mar 20, 2014 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >
+> >> >> +     if (!ppebase) {
+> >> >> +             struct device_node *n;
+> >> >> +
+> >> >> +             n = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-ppebase");
+> >> >> +             if (!n) {
+> >> >> +                     ret = -EINVAL;
+> >> >> +                     netdev_err(ndev, "not find hisilicon,ppebase\n");
+> >> >> +                     goto init_fail;
+> >> >> +             }
+> >> >> +             ppebase = of_iomap(n, 0);
+> >> >> +     }
+> >> >
+> >> > How about using syscon_regmap_lookup_by_phandle() here? That way, you can have
+> >> > a more generic abstraction of the ppe, and stick the port and id in there as
+> >> > well, e.g.
+> >> >
+> >> >         ppe-syscon = <&hip04ppe 1 4>; // ppe, port, id
 > 
-> Okay, I am trying to do a review here and because you have mentioned
-> how different it is from the earlier versions, I am trying with a
-> fresh mind. i.e. with zero memories of earlier discussions :)
-> 
-> LAB was: Legacy Application Boost ??
+> Even if using syscon_regmap_lookup_by_phandle, there still have static
+> struct regmap, since three controllers
+> share one regmap.
 
-Yes, correct.
+The regmap is then owned by the syscon driver, while each controller takes
+a reference to the regmap that it can store in its own private data
+structure. However, as we discussed using a ppe driver sounds nicer than
+regmap.
 
-> 
-> Probably mention that in your new threads as well, so that new readers
-> know the details. Also, like other governors, just name it "boost"
-> governor.
-
-I think, that "LAB" name is with us for some time, so it would be a
-pity to discard it.
-
-> 
-> > This patch provides support for LAB governor build on top of
-> > ondemand. Previous version of LAB can be found here:
-> > http://thread.gmane.org/gmane.linux.kernel/1484746/match=cpufreq
+> > It's probably a little simpler to avoid the sub-nodes and instead do
 > >
-> > LAB short reminder:
+> >>               ppe: ppe at 28c0000 {
+> >>                         compatible = "hisilicon,hip04-ppe";
+> >>                         reg = <0x28c0000 0x10000>;
+> >>                         #address-cells = <1>;
+> >>                         #size-cells = <0>;
+> >>                 };
+> >>                 fe: ethernet at 28b0000 {
+> >>                         compatible = "hisilicon,hip04-mac";
+> >>                         reg = <0x28b0000 0x10000>;
+> >>                         interrupts = <0 413 4>;
+> >>                         phy-mode = "mii";
+> >>                         port-handle = <&ppe 31>;
+> >>                 };
 > >
-> > LAB uses information about how many cores are in "idle" state (the
-> > core idleness is represented as the value between 0 and 100) and
-> > the overall load of the system (from 0 to 100) to decide about
-> > frequency to be set. It is extremely useful with SoCs like
-> > Exynos4412, which can set only one frequency for all cores.
+> > In the code, I would create a simple ppe driver that exports
+> > a few functions. you need. In the ethernet driver probe() function,
+> > you should get a handle to the ppe using
+> >
+> >         /* look up "port-handle" property of the current device, find ppe and port */
+> >         struct hip04_ppe *ppe = hip04_ppe_get(dev->of_node);
+> >         if (IS_ERR(ppe))
+> >                 return PTR_ERR(ptr); /* this handles -EPROBE_DEFER */
+> >
+> > and then in other code you can just do
+> >
+> >         hip04_ppe_set_foo(priv->ppe, foo_config);
+> >
+> > This is a somewhat more high-level abstraction that syscon, which
+> > just gives you a 'struct regmap' structure for doing register-level
+> > configuration like you have today.
+> >
 > 
-> Probably a description of how exactly these two values come into play
-> would have been more interesting here for all. Always think of new
-> followers of your patchset and so add all interesting things about it
-> when you resend it.
+> Do you mean create one additional file like ppe.c with some exported
+> function to remove the static ppebase?
+
+It doesn't have to be a separate file, as long as you register a
+separate platform_driver for the ppe.
+
+> Since the ppe is specifically bounded with ethernet, and does not used
+> anywhere else,
+> the exported function may not be used anywhere else.
+> Is it make it more complicated since there are probe, remove etc.
 > 
-> If I remember well the logic was more or less like this:
-> - More idle cores means run few running cores at high frequency
-> - Less idle cores means don't run them at very high frequencies
-> 
-> Right?
+> So I may still prefer using "static void __iomem *ppebase", as it is simpler.
 
-This is correct. Also, the underlying SoC - Exynos4412 has 4 cores with
-option to set frequency only on all of them.
+The trouble is that the driver should not rely on being only there
+for a single instance, that's not how we write drivers.
 
-> 
-> What about making it as simple as:
-> - changing the ondemand governor only instead of adding a new governor
+I'm fine with either a syscon instance (which would be simpler) or a
+separate ppe driver as part of the hip04-mac driver (which would be
+a nicer abstraction).
 
-My goal is to not touch the ondemand code. It has matured, so I would
-like to leave it as it is.
-
-> - Keeping the bahavior as is for all platforms not publishing boost
-> frequencies
-
-This is also done - you get the LAB configuration specified in the DT
-for the particular platform/board.
-
-> - If more cores are idle, enable switching to boost frequencies and
-> take them into consideration all the time.
-
-I'm not sure if I have understood you, but something like that is also
-performed in the code.
-
-> - If less cores are idle, disable boost frequencies..
-
-As written above.
-
-> 
-> Lets discuss this first and then I will get into the very details of
-> your implementation.
-
-Discussion about above functionalities requires consulting the
-implementation to be sure that our opinions are the same.
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+	Arnd
