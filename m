@@ -1,44 +1,45 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Tue, 25 Mar 2014 09:28:41 +0100
-Subject: [PATCH v0 01/15] drivers: clk: st: Support for DIVMUX and PreDiv
- Clocks
-In-Reply-To: <20140325052725.32624.39974@quantum>
-References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
- <1393514668-17440-2-git-send-email-gabriel.fernandez@st.com>
- <20140325052725.32624.39974@quantum>
-Message-ID: <53313E39.9080605@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Mar 2014 15:39:18 +0100
+Subject: [PATCH v3 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
+In-Reply-To: <20140313212725.GF2696@katana>
+References: <1394710643-3411-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1394710643-3411-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140313212725.GF2696@katana>
+Message-ID: <20140324143918.GJ5416@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Mar 13, 2014 at 10:27:25PM +0100, Wolfram Sang wrote:
+> > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > index 4cc2f5f2ecad..c1fd510fd2c4 100644
+> > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > @@ -762,7 +762,7 @@
+> >  		};
+> >  
+> >  		i2c0: i2c at 01c2ac00 {
+> > -			compatible = "allwinner,sun4i-i2c";
+> > +			compatible = "allwinner,sun4i-a10-i2c";
+> 
+> I still wonder why there is no "allwinner,sun4i-a20-i2c" entry first
+> (even if there is no similar entry in the driver *yet*). 
 
-I want that you take theses patches directly.
+Ahh, I didn't understand it like that in your previous mail. Yes, it
+makes sense.
 
-Many thanks
+I'll update the patches and resend.
 
+Thanks,
+Maxime
 
-Best regards
-
-Gabriel.
-
-
-On 03/25/2014 06:27 AM, Mike Turquette wrote:
-> Quoting Gabriel FERNANDEZ (2014-02-27 07:24:14)
->> +/**
->> + * DOC: Clock mux with a programmable divider on each of its three inputs.
->> + *      The mux has an input setting which effectively gates its output.
->> + *
->> + * Traits of this clock:
->> + * prepare - clk_(un)prepare only ensures parent is (un)prepared
-> Minor nitpick but it doesn't look like .prepare or .unprepare are
-> supported below. It looks like this copy/paste comment applies to most
-> of the clk patches as well.
->
-> It's a small problem and doesn't require a patch respin. But perhaps can
-> be cleaned up some day in the future.
->
-> Do you want me to take these patches directly or are you just looking
-> for an Ack?
->
-> Regards,
-> Mike
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/76b58905/attachment.sig>
