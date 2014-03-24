@@ -1,106 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Mar 2014 10:27:16 +0100
-Subject: [PATCH v2 10/11] ARM: at91/dt: move at91sam9rl SoC to the new
- slow/main clock models
-In-Reply-To: <1395649643-9146-11-git-send-email-b.brezillon.dev@gmail.com>
-References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
- <1395649643-9146-11-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <20140324092716.GA20484@piout.net>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Mon, 24 Mar 2014 10:33:18 +0100
+Subject: Disabling gcc inline operation
+In-Reply-To: <CAK7N6vrgnNdFvo8as+DrhXurxP+SexN9gi3WFrX_SCO9i2Ybyw@mail.gmail.com>
+References: <CAK7N6vrgnNdFvo8as+DrhXurxP+SexN9gi3WFrX_SCO9i2Ybyw@mail.gmail.com>
+Message-ID: <532FFBDE.7030407@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/2014 at 09:27:22 +0100, Boris BREZILLON wrote :
-> Move at91sam9rl SoC to the new main/slow clock model.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+On 23/03/14 23:31, anish singh wrote:
+> Many a time i have got a crash and it is difficult
+> to find out the exact function which crashed
+> because the crash stack doesn't show the "real"
+> function because gcc inlines many functions when
+> ever it desires or when it optimizes for speed.
+>
+> So i don't want gcc to inline any function instead
+> just call the function so that i can see the crash
+> stack of each function called. I just want to do
+> this for debugging. Please let me know how can
+> i do that?
+>
+> What switch command to pass to gcc in the make
+> of linux kernel?
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+You tried to look at gcc.gnu.org, right? Your best options are -O0 
+and/or -Og for debugging purposes.
 
-> ---
->  arch/arm/boot/dts/at91sam9rl.dtsi |   47 +++++++++++++++++++++++++++++++------
->  1 file changed, 40 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-> index 63e1784..56220d8 100644
-> --- a/arch/arm/boot/dts/at91sam9rl.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-> @@ -48,6 +48,20 @@
->  		reg = <0x20000000 0x04000000>;
->  	};
->  
-> +	clocks {
-> +		slow_xtal: slow_xtal {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <0>;
-> +		};
-> +
-> +		main_xtal: main_xtal {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <0>;
-> +		};
-> +	};
-> +
->  	ahb {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> @@ -548,17 +562,11 @@
->  				#size-cells = <0>;
->  				#interrupt-cells = <1>;
->  
-> -				clk32k: slck {
-> -					compatible = "fixed-clock";
-> -					#clock-cells = <0>;
-> -					clock-frequency = <32768>;
-> -				};
-> -
->  				main: mainck {
->  					compatible = "atmel,at91rm9200-clk-main";
->  					#clock-cells = <0>;
->  					interrupts-extended = <&pmc AT91_PMC_MOSCS>;
-> -					clocks = <&clk32k>;
-> +					clocks = <&main_xtal>;
->  				};
->  
->  				plla: pllack {
-> @@ -769,6 +777,31 @@
->  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
->  				status = "disabled";
->  			};
-> +
-> +			sckc at fffffd50 {
-> +				compatible = "atmel,at91sam9x5-sckc";
-> +
-> +				slow_osc: slow_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-osc";
-> +					#clock-cells = <0>;
-> +					atmel,startup-time-usec = <1200000>;
-> +					clocks = <&slow_xtal>;
-> +				};
-> +
-> +				slow_rc_osc: slow_rc_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
-> +					#clock-cells = <0>;
-> +					atmel,startup-time-usec = <75>;
-> +					clock-frequency = <32768>;
-> +					clock-accuracy = <50000000>;
-> +				};
-> +
-> +				clk32k: slck {
-> +					compatible = "atmel,at91sam9x5-clk-slow";
-> +					#clock-cells = <0>;
-> +					clocks = <&slow_rc_osc &slow_osc>;
-> +				};
-> +			};
->  		};
->  	};
->  
-> -- 
-> 1.7.9.5
-> 
+Regards,
+Arend
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
