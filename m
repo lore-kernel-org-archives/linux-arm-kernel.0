@@ -1,117 +1,140 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 24 Mar 2014 20:53:44 +0530
-Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CA+mB=1LRQSpz+Hmtym44x6+KW9ksXj9WQ8UKcHydk-JAWdyP+w@mail.gmail.com>
-References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
- <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
- <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
- <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
- <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
- <CA+mB=1LRQSpz+Hmtym44x6+KW9ksXj9WQ8UKcHydk-JAWdyP+w@mail.gmail.com>
-Message-ID: <CABb+yY1U_XFQndHq4aumZ+BNbCu3Frrk+x9fM9Dg5nxDT=HfoQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 24 Mar 2014 10:29:58 -0500
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
+In-Reply-To: <20140321055242.GA1959@saruman.home>
+References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
+ <20140321055242.GA1959@saruman.home>
+Message-ID: <53304F76.8090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 8:44 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> On Mon, Mar 24, 2014 at 4:21 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->> On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>> Hi Jassi,
->>>
->>> Thanks for the Acked-by.
->>>
->>> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>>
->>>>> +
->>>>> +/**
->>>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
->>>>
->>>> Should be xilinx_vdma_dma_prep_interleaved here.
->>>
->>> Ok, I will correct it.  Thanks.
->>>
->>>>
->>>>> +/**
->>>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
->>>>> + * Run-time configuration for Axi VDMA, supports:
->>>>> + * . halt the channel
->>>>> + * . configure interrupt coalescing and inter-packet delay threshold
->>>>> + * . start/stop parking
->>>>> + * . enable genlock
->>>>> + *
->>>>> + * @dchan: DMA channel
->>>>> + * @cfg: VDMA device configuration pointer
->>>>> + *
->>>>> + * Return: '0' on success and failure value on error
->>>>> + */
->>>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->>>>> +                                       struct xilinx_vdma_config *cfg)
->>>>> +{
->>>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>>>> +       u32 dmacr;
->>>>> +
->>>>> +       if (cfg->reset)
->>>>> +               return xilinx_vdma_chan_reset(chan);
->>>>> +
->>>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
->>>>> +
->>>>> +       chan->config.frm_dly = cfg->frm_dly;
->>>>> +       chan->config.park = cfg->park;
->>>>> +
->>>>> +       /* genlock settings */
->>>>> +       chan->config.gen_lock = cfg->gen_lock;
->>>>> +       chan->config.master = cfg->master;
->>>>> +
->>>>> +       if (cfg->gen_lock && chan->genlock) {
->>>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
->>>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
->>>>> +       }
->>>>> +
->>>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
->>>>> +       if (cfg->park)
->>>>> +               chan->config.park_frm = cfg->park_frm;
->>>>> +       else
->>>>> +               chan->config.park_frm = -1;
->>>>> +
->>>>> +       chan->config.coalesc = cfg->coalesc;
->>>>> +       chan->config.delay = cfg->delay;
->>>>> +
->>>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
->>>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
->>>>> +               chan->config.coalesc = cfg->coalesc;
->>>>> +       }
->>>>> +
->>>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
->>>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
->>>>> +               chan->config.delay = cfg->delay;
->>>>> +       }
->>>>> +
->>>>> +       /* FSync Source selection */
->>>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
->>>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
->>>>> +
->>>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
->>>>> +
->>>>> +       return 0;
->>>>> +}
->>>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
->>>>> +
->>>> Bypassing the DMAEngine api doesn't seem very neat.
->>>> Is there currently any client driver that /changes/ this configuration
->>>> between channel requests? If no, then simply get the configuration
->>>> from DT node and avoid this api.
->>>
->>> This change is recently suggested by Lars in the following patch series,
->>> "dma: Remove comment about embedding dma_slave_config into custom structs"
->>>
->> If some user does indeed need to /change/ the configuration across
->> channel requests, we can keep function. Is there currently any such
->> user?
+On 03/21/2014 12:52 AM, Felipe Balbi wrote:
+> On Fri, Mar 21, 2014 at 10:50:13AM +0530, Lokesh Vutla wrote:
+>> From: Dave Gerlach <d-gerlach@ti.com>
+>>
+>> Do not reset GPIO5 at boot-up because GPIO5_7 is used
+>> on AM437x GP-EVM to control VTT regulators on DDR3.
+>> Without this some GP-EVM boards will fail to boot because
+>> of DDR3 corruption.
+>>
+>> Reported-by: Nishanth Menon <nm@ti.com>
+>> Tested-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 >
-> Yes, we are planning to push these changes soon to drivers/media/.
+> every now and again we see a patch like this because yet another board
+> is using a GPIO to toggle DDR regulators.
 >
-This is not what I asked though. I asked if some client driver changes
-the configuration options based on some runtime decision? If yes, then
-the api is warranted. Otherwise, you might consider getting the static
-configuration from DT. That's all I suggest.
+> Instead of constantly patching things like this, how about we try
+> something like below (build-tested only):
+
+Why should we change all of them? Is it correct to leave every single 
+GPIO at the mercy of the bootloader in every situation? The reason we 
+see these patches only every now and again is because it's a special 
+case that should be handled only for that situation. I also don't think 
+it makes sense to make gpio's a unique case that never gets reset while 
+every other IP does by default.
+
+Regards,
+Dave
+
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 1f33f5d..f5962ff 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2610,6 +2610,10 @@ static int __init _setup_reset(struct omap_hwmod *oh)
+>   	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
+>   		return -EPERM;
+>
+> +	/* NEVER reset GPIO blocks */
+> +	if (strncmp(oh->name, "gpio", 4) == 0)
+> +		return 0;
+> +
+>   	if (oh->rst_lines_cnt == 0) {
+>   		r = _enable(oh);
+>   		if (r) {
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 4243190..ce8b53a 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1130,6 +1130,29 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+>
+>   static const struct of_device_id omap_gpio_match[];
+>
+> +static void omap_gpio_init_context(struct gpio_bank *p)
+> +{
+> +	struct omap_gpio_reg_offs *regs = p->regs;
+> +	void __iomem *base = p->base;
+> +
+> +	p->context.ctrl		= readl_relaxed(base + regs->ctrl);
+> +	p->context.oe		= readl_relaxed(base + regs->direction);
+> +	p->context.wake_en	= readl_relaxed(base + regs->wkup_en);
+> +	p->context.leveldetect0	= readl_relaxed(base + regs->leveldetect0);
+> +	p->context.leveldetect1	= readl_relaxed(base + regs->leveldetect1);
+> +	p->context.risingdetect	= readl_relaxed(base + regs->risingdetect);
+> +	p->context.fallingdetect = readl_relaxed(base + regs->fallingdetect);
+> +	p->context.irqenable1	= readl_relaxed(base + regs->irqenable);
+> +	p->context.irqenable2	= readl_relaxed(base + regs->irqenable2);
+> +
+> +	if (regs->set_dataout && p->regs->clr_dataout)
+> +		p->context.dataout = readl_relaxed(base + regs->set_dataout);
+> +	else
+> +		p->context.dataout = readl_relaxed(base + regs->dataout);
+> +
+> +	p->context_valid = true;
+> +}
+> +
+>   static int omap_gpio_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev = &pdev->dev;
+> @@ -1246,6 +1269,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>   	omap_gpio_mod_init(bank);
+>   	omap_gpio_chip_init(bank);
+>   	omap_gpio_show_rev(bank);
+> +	omap_gpio_init_context(bank);
+>
+>   	pm_runtime_put(bank->dev);
+>
+> @@ -1325,8 +1349,6 @@ update_gpio_context_count:
+>   	return 0;
+>   }
+>
+> -static void omap_gpio_init_context(struct gpio_bank *p);
+> -
+>   static int omap_gpio_runtime_resume(struct device *dev)
+>   {
+>   	struct platform_device *pdev = to_platform_device(dev);
+> @@ -1466,29 +1488,6 @@ void omap2_gpio_resume_after_idle(void)
+>   }
+>
+>   #if defined(CONFIG_PM_RUNTIME)
+> -static void omap_gpio_init_context(struct gpio_bank *p)
+> -{
+> -	struct omap_gpio_reg_offs *regs = p->regs;
+> -	void __iomem *base = p->base;
+> -
+> -	p->context.ctrl		= readl_relaxed(base + regs->ctrl);
+> -	p->context.oe		= readl_relaxed(base + regs->direction);
+> -	p->context.wake_en	= readl_relaxed(base + regs->wkup_en);
+> -	p->context.leveldetect0	= readl_relaxed(base + regs->leveldetect0);
+> -	p->context.leveldetect1	= readl_relaxed(base + regs->leveldetect1);
+> -	p->context.risingdetect	= readl_relaxed(base + regs->risingdetect);
+> -	p->context.fallingdetect = readl_relaxed(base + regs->fallingdetect);
+> -	p->context.irqenable1	= readl_relaxed(base + regs->irqenable);
+> -	p->context.irqenable2	= readl_relaxed(base + regs->irqenable2);
+> -
+> -	if (regs->set_dataout && p->regs->clr_dataout)
+> -		p->context.dataout = readl_relaxed(base + regs->set_dataout);
+> -	else
+> -		p->context.dataout = readl_relaxed(base + regs->dataout);
+> -
+> -	p->context_valid = true;
+> -}
+> -
+>   static void omap_gpio_restore_context(struct gpio_bank *bank)
+>   {
+>   	writel_relaxed(bank->context.wake_en,
+>
+> Then, we can even remove ti,no-reset flag from all GPIO DT nodes.
+>
