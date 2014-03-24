@@ -1,78 +1,83 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 24 Mar 2014 17:17:52 +0100
-Subject: [PATCH 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+Date: Mon, 24 Mar 2014 17:17:51 +0100
+Subject: [PATCH 2/3] ARM: mm: add support for HW coherent systems in PL310
 In-Reply-To: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1395677872-32741-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
-CPU core, the PL310 cache and the Marvell PCIe hardware block are
-affected a L2/PCIe deadlock problem when hardware I/O coherency is used.
+When a PL310 cache is used on a system that provides hardware
+coherency, the outer cache sync operation is useless, and can be
+skipped. Moreover, on some systems, it is harmful as it causes
+deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+controller and the Cortex-A9.
 
-This deadlock can be avoided by mapping the PCIe memory areas as
-strongly-ordered, and by removing the outer cache sync done in
-software. This is done in this patch, thanks to the new bits of
-infrastructure added in 'ARM: mm: allow sub-architectures to override
-PCI I/O memory type' and 'ARM: mm: add support for HW coherent systems
-in PL310' respectively.
+This commit adds a new l2x0_of_init_coherent() variant of
+l2x0_of_init(), which allows the caller to tell the L2 cache
+initialization that the system has hardware coherency support enabled,
+and that therefore the outer cache sync operation can be skipped if
+possible.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/board-v7.c | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
+ arch/arm/mm/cache-l2x0.c                   | 22 +++++++++++++++++++++-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 6260cb8..af4eee9 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -75,6 +75,26 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
- 	return 1;
- }
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 6795ff7..d7db409 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -110,6 +110,7 @@
+ extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
+ #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
+ extern int l2x0_of_init(u32 aux_val, u32 aux_mask);
++extern int l2x0_of_init_coherent(u32 aux_val, u32 aux_mask);
+ #else
+ static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
+ {
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 7abde2c..76ec012 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -968,7 +968,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+ 	{}
+ };
  
-+/*
-+ * This ioremap hook is used on Armada 375/38x to ensure that PCIe
-+ * memory areas are mapped as MT_MEMORY_RW_SO instead of
-+ * MT_DEVICE. This is needed as a workaround for a deadlock issue
-+ * between the PCIe interface and the cache controller.
-+ */
-+static void __iomem *
-+armada_pcie_wa_ioremap_caller(phys_addr_t phys_addr, size_t size,
-+			      unsigned int mtype, void *caller)
+-int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
++int __init l2x0_of_init_common(u32 aux_val, u32 aux_mask, bool is_coherent)
+ {
+ 	struct device_node *np;
+ 	const struct l2x0_of_data *data;
+@@ -1005,8 +1005,28 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+ 	of_init = true;
+ 	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
++
++	/*
++	 * PL310 doesn't need an outer cache sync operation when the
++	 * system is operating with hardware coherency enabled, as it
++	 * is done directly in hardware.
++	 */
++	if (of_device_is_compatible(np, "arm,pl310-cache") && is_coherent)
++		outer_cache.sync = NULL;
++
+ 	l2x0_init(l2x0_base, aux_val, aux_mask);
+ 
+ 	return 0;
+ }
++
++int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
 +{
-+	struct resource pcie_mem;
-+
-+	mvebu_mbus_get_pcie_mem_aperture(&pcie_mem);
-+
-+	if (pcie_mem.start <= phys_addr && (phys_addr + size) <= pcie_mem.end)
-+		mtype = MT_MEMORY_RW_SO;
-+
-+	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
++	return l2x0_of_init_common(aux_val, aux_mask, false);
 +}
 +
- static void __init mvebu_timer_and_clk_init(void)
- {
- 	of_clk_init(NULL);
-@@ -83,9 +103,18 @@ static void __init mvebu_timer_and_clk_init(void)
- 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
- 	coherency_init();
- #ifdef CONFIG_CACHE_L2X0
--	l2x0_of_init(0, ~0UL);
-+	if (coherency_available())
-+		l2x0_of_init_coherent(0, ~0UL);
-+	else
-+		l2x0_of_init(0, ~0UL);
- #endif
- 
-+	if (of_machine_is_compatible("marvell,armada375") ||
-+	    of_machine_is_compatible("marvell,armada38x")) {
-+		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-+		pci_ioremap_set_mem_type(MT_MEMORY_RW_SO);
-+	}
++int __init l2x0_of_init_coherent(u32 aux_val, u32 aux_mask)
++{
++	return l2x0_of_init_common(aux_val, aux_mask, true);
++}
 +
- 	if (of_machine_is_compatible("marvell,armada375"))
- 		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
- 				"imprecise external abort");
+ #endif
 -- 
 1.8.3.2
