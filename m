@@ -1,94 +1,21 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 24 Mar 2014 07:50:29 +0100
-Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
-In-Reply-To: <532712D2.4020004@monstr.eu>
-References: <53061EBA.1080002@monstr.eu> <531D746A.4020903@monstr.eu>
- <20140311213331.GA6429@quad.lixom.net> <53204D22.2000703@monstr.eu>
- <20140317044453.GA18210@quad.lixom.net> <532712D2.4020004@monstr.eu>
-Message-ID: <532FD5B5.5030608@monstr.eu>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Mar 2014 12:21:45 +0530
+Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
+In-Reply-To: <20140324074742.00181c21@amdc2363>
+References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
+ <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
+ <20140317163824.3c5480b3@amdc2363>
+ <CAKohpokz9SknhPH_sgGE6Q8DB+QtaJKSwMG4WgfmWet9skMKUA@mail.gmail.com>
+ <20140318101736.501844d1@amdc2363>
+ <20140324074742.00181c21@amdc2363>
+Message-ID: <CAKohpomktssFyOh3cqDjYVB4qzE5UN=uaGAgQK1ustK_9Cwg6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2014 04:20 PM, Michal Simek wrote:
-> Hi,
-> 
-> please pull these changes to your arm-soc tree. This branch is based
-> on zynq/dt branch.
-> Based on my discussion with Olof I have removed zynq-ocm driver
-> from this pull request and we will investigate different solution
-> 
-> Changes in v3: Remove OCM driver from pull request
-> Changes in v2: Fix incorrect git repo url
-> 
-> Thanks,
-> Michal
-> 
-> 
-> The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
-> 
->   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.15-v2
-> 
-> for you to fetch changes up to bffc3b8d2197f5e0622a6f0afb30bffeb326f942:
-> 
->   ARM: zynq: Add support for SOC_BUS (2014-03-17 15:13:25 +0100)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq cleanup patches for v3.15
-> 
-> - Redesign SLCR initialization to enable
->   driver developing which targets SLCR space
-> - Add SOC_BUS support
-> 
-> ----------------------------------------------------------------
-> Michal Simek (7):
->       ARM: zynq: Split slcr in two parts
->       ARM: zynq: Map I/O memory on clkc init
->       ARM: zynq: Add and use zynq_slcr_read/write() helper functions
->       ARM: zynq: Introduce zynq_slcr_unlock()
->       ARM: zynq: Move of_clk_init from clock driver
->       ARM: zynq: Add waituart implementation
->       ARM: zynq: Add support for SOC_BUS
-> 
-> Steffen Trumtrar (3):
->       ARM: zynq: Move clock_init from slcr to common
->       ARM: zynq: Hang iomapped slcr address on device_node
->       ARM: zynq: Make zynq_slcr_base static
-> 
->  Documentation/devicetree/bindings/clock/zynq-7000.txt |   4 ++-
->  arch/arm/boot/dts/zynq-7000.dtsi                      |  49 ++++++++++++++-------------
->  arch/arm/include/debug/zynq.S                         |   3 ++
->  arch/arm/mach-zynq/Kconfig                            |   2 ++
->  arch/arm/mach-zynq/common.c                           |  80 ++++++++++++++++++++++++++++++++++++++++++--
->  arch/arm/mach-zynq/common.h                           |   3 +-
->  arch/arm/mach-zynq/slcr.c                             | 123 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
->  drivers/clk/zynq/clkc.c                               |  89 ++++++++++++++++++++++++++++++++++---------------
->  include/linux/clk/zynq.h                              |   2 +-
->  9 files changed, 285 insertions(+), 70 deletions(-)
+On 24 March 2014 12:17, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Viresh, will you find time for reviewing this RFC in a near future?
 
-We are getting closer and closer to 3.14 and haven't got any reply on
-this one.
-Olof: Any update?
+Yes. I have been trying hard last week but couldn't find some time
+for it. Will try this week for sure.. Sorry to keep you waiting :(
 
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/4f7ffcef/attachment.sig>
+@Rafael: Please see if you can also give them a look..
