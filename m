@@ -1,49 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Mar 2014 12:00:52 +0100
-Subject: [PATCH v2 3/3] Documentation: add devicetree bindings for Cavium
- Thunder SoC
-In-Reply-To: <1395652179-9216-4-git-send-email-mohun106@gmail.com>
-References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
- <1395652179-9216-4-git-send-email-mohun106@gmail.com>
-Message-ID: <4189666.qlSmlZKNNW@wuerfel>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 24 Mar 2014 16:32:36 +0530
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <53301023.8080301@monstr.eu>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+ <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+ <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+ <53301023.8080301@monstr.eu>
+Message-ID: <CABb+yY13sheOvhVUkYNAO7t16egnPdf5x_fSvNuXVsU4E=W1Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 March 2014 14:39:39 mohun106 at gmail.com wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-> new file mode 100644
-> index 0000000..6ea0a34
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-> @@ -0,0 +1,9 @@
-> +Cavium Thunder platform device tree bindings
-> +---------------------------------------------
-> +
-> +Boards with Cavium's Thunder SoC shall have following properties.
-> +
-> +Root Node
-> +---------
-> +Required root node properties:
-> +    - compatible = "cavium,thunder";
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 333f4ae..f6cadf1 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
->                             "arm,cortex-r4"
->                             "arm,cortex-r5"
->                             "arm,cortex-r7"
-> +                           "cavium,thunder"
->                             "faraday,fa526"
->                             "intel,sa110"
->                             "intel,sa1100"
+On Mon, Mar 24, 2014 at 4:29 PM, Michal Simek <monstr@monstr.eu> wrote:
+> Hi Vinod,
+>
+> sorry for top posting.
+>
+> is there any chance to get this driver to the 3.15?
+> Or have you already closed your dma repo for new drivers?
+>
+> The driver should be in pretty good shape after long review.
+> From email below Srikanth got ACK from Jassi
+> and there should be a small fix which Srikanth will send in v7
+> which I hope will be the last version.
+>
++1  Any change may come incrementally.
 
-
-It seems very confusing to use the same name for both the SoC and the
-CPU core. Can you guarantee that there will never be another SoC with
-the same core, or a different CPU core in a SoC with the same name?
-
-If not, please be more specific here and use the exact model names
-rather than the product names.
-
-	Arnd
+Btw, here's the ack
+   Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
