@@ -1,31 +1,26 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 24 Mar 2014 21:34:38 +0100
-Subject: [PATCH RFC] ixp4xx_eth: Allow setting the MDIO bus name in
- platform data
-In-Reply-To: <20140324151729.1b8e3bb5@marrow.netinsight.se> ("Simon
- =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Mon, 24 Mar 2014 15:17:29
- +0100")
-References: <20140324151729.1b8e3bb5@marrow.netinsight.se>
-Message-ID: <m3r45r72u9.fsf@intrepid.localdomain>
+Date: Mon, 24 Mar 2014 21:36:25 +0100
+Subject: [PATCH 1/3] IXP4xx: Fix Goramo Multilink GPIO conversion.
+In-Reply-To: <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 24 Mar 2014 16:27:47 +0100")
+References: <m3siq9iyt2.fsf@intrepid.localdomain>
+ <m3bnwxiwhj.fsf@intrepid.localdomain>
+ <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
+Message-ID: <m3mwgf72ra.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-> Allows using e.g., a fixed MDIO bus with the ixp4xx_eth driver.
-> Example:
+>> arch/arm/mach-ixp4xx/goramo_mlr.c:416: error: 'IXP4XX_GPIO_OUT' undeclared
+>> arch/arm/mach-ixp4xx/goramo_mlr.c:421: error: 'IXP4XX_GPIO_IN' undeclared
+>>
+>> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 >
->   static struct eth_plat_info board_plat_eth_internal[] = {
-> 	{
-> 		.mdio_bus_id	= "fixed-0",
-> 		.phy		= 31,
-> 		.rxq		= 4,
-> 		.txreadyq	= 21,
-> 		.hwaddr		= {0x02, 0x00, 0x00, 0x00, 0x00, 0x00},
-> 	}
->   };
+> Alternatively can you send this for fixes to arm at kernel.org with Cc:
+> stable added Krzysztof?
 
-Why do we need it? I'm not sure I know what constitutes a "fixed MDIO
-bus".
+Given the platform's specifics, I guess it's enough to just fix it in
+mainline.
 -- 
 Krzysztof Halasa
