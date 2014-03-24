@@ -1,101 +1,55 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Mon, 24 Mar 2014 21:23:39 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <5755212.stImUCLDZi@wuerfel>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <201403201531.20416.arnd@arndb.de>
- <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
- <5755212.stImUCLDZi@wuerfel>
-Message-ID: <CAMj5Bkje6gwXENTV7yZGH8qxyMwxsdms4frxF_q38TG=sncshw@mail.gmail.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Mon, 24 Mar 2014 08:26:33 -0500
+Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <20140323174431.GE30885@cbox>
+References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
+ <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
+ <20140321232704.GB25519@cbox>
+ <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+ <20140323174431.GE30885@cbox>
+Message-ID: <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 6:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 16:17:42 Zhangfei Gao wrote:
->> On Thu, Mar 20, 2014 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> >
->> >> >> +     if (!ppebase) {
->> >> >> +             struct device_node *n;
->> >> >> +
->> >> >> +             n = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-ppebase");
->> >> >> +             if (!n) {
->> >> >> +                     ret = -EINVAL;
->> >> >> +                     netdev_err(ndev, "not find hisilicon,ppebase\n");
->> >> >> +                     goto init_fail;
->> >> >> +             }
->> >> >> +             ppebase = of_iomap(n, 0);
->> >> >> +     }
->> >> >
->> >> > How about using syscon_regmap_lookup_by_phandle() here? That way, you can have
->> >> > a more generic abstraction of the ppe, and stick the port and id in there as
->> >> > well, e.g.
->> >> >
->> >> >         ppe-syscon = <&hip04ppe 1 4>; // ppe, port, id
+On Sun, Mar 23, 2014 at 12:44 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Sat, Mar 22, 2014 at 09:54:55AM +0530, Anup Patel wrote:
+>> On 22 March 2014 04:57, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> > On Fri, Mar 21, 2014 at 06:23:25PM +0530, Anup Patel wrote:
+>> >> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
+>> >> VCPUs. This patch extends current in-kernel PSCI emulation to provide
+>> >> PSCI v0.2 interface to VCPUs.
+>> >>
+>> >> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
+>> >> keeping the ABI backward-compatible.
+>> >>
+>> >> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
+>> >> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
+>> >> init using KVM_ARM_VCPU_INIT ioctl.
+>> >>
+>> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> >
+>> > The content here can carry my Reviewed-by tag, but I think Rob's point
+>> > about sharing this code between KVM arm/arm64 and the PSCI code itself
+>> > it important, see:
+>> >
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241792.html
 >>
->> Even if using syscon_regmap_lookup_by_phandle, there still have static
->> struct regmap, since three controllers
->> share one regmap.
+>> My apologies, I totally missed Rob's comment.
 >
-> The regmap is then owned by the syscon driver, while each controller takes
-> a reference to the regmap that it can store in its own private data
-> structure. However, as we discussed using a ppe driver sounds nicer than
-> regmap.
+> No worries at all.
 >
->> > It's probably a little simpler to avoid the sub-nodes and instead do
->> >
->> >>               ppe: ppe at 28c0000 {
->> >>                         compatible = "hisilicon,hip04-ppe";
->> >>                         reg = <0x28c0000 0x10000>;
->> >>                         #address-cells = <1>;
->> >>                         #size-cells = <0>;
->> >>                 };
->> >>                 fe: ethernet at 28b0000 {
->> >>                         compatible = "hisilicon,hip04-mac";
->> >>                         reg = <0x28b0000 0x10000>;
->> >>                         interrupts = <0 413 4>;
->> >>                         phy-mode = "mii";
->> >>                         port-handle = <&ppe 31>;
->> >>                 };
->> >
->> > In the code, I would create a simple ppe driver that exports
->> > a few functions. you need. In the ethernet driver probe() function,
->> > you should get a handle to the ppe using
->> >
->> >         /* look up "port-handle" property of the current device, find ppe and port */
->> >         struct hip04_ppe *ppe = hip04_ppe_get(dev->of_node);
->> >         if (IS_ERR(ppe))
->> >                 return PTR_ERR(ptr); /* this handles -EPROBE_DEFER */
->> >
->> > and then in other code you can just do
->> >
->> >         hip04_ppe_set_foo(priv->ppe, foo_config);
->> >
->> > This is a somewhat more high-level abstraction that syscon, which
->> > just gives you a 'struct regmap' structure for doing register-level
->> > configuration like you have today.
->> >
 >>
->> Do you mean create one additional file like ppe.c with some exported
->> function to remove the static ppebase?
+>> My suggestion would be to have:
+>> arch/arm/include/uapi/asm/psci.h
+>> arch/arm64/include/uapi/asm/psci.h
 >
-> It doesn't have to be a separate file, as long as you register a
-> separate platform_driver for the ppe.
->
->> Since the ppe is specifically bounded with ethernet, and does not used
->> anywhere else,
->> the exported function may not be used anywhere else.
->> Is it make it more complicated since there are probe, remove etc.
->>
->> So I may still prefer using "static void __iomem *ppebase", as it is simpler.
->
-> The trouble is that the driver should not rely on being only there
-> for a single instance, that's not how we write drivers.
->
-> I'm fine with either a syscon instance (which would be simpler) or a
-> separate ppe driver as part of the hip04-mac driver (which would be
-> a nicer abstraction).
->
+> I think the suggestion was to move all this to include/uapi/linux/psci.h
+> or something equivalent so also arm and arm64 can share these defines,
+> but maybe I read too much into it.
 
-Understand now.
-Will update with syscon, as it is simpler.
-Thanks for your patience.
+Yes. It is perfectly fine for a somewhat architecture specific header
+to live in include/linux (or include/uapi/linux).
+
+Rob
