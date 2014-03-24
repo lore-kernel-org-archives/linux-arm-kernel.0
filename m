@@ -1,130 +1,109 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 24 Mar 2014 10:00:25 +0100
-Subject: [PATCH 00/15] iio: adc: at91 cleanups and atmel_tsadcc removal
-In-Reply-To: <532D828A.8000108@kernel.org>
-References: <1394040940-18246-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5325EDAF.4060003@kernel.org> <53296F2B.3010406@atmel.com>
- <532D828A.8000108@kernel.org>
-Message-ID: <532FF429.40201@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Mar 2014 10:03:26 +0100
+Subject: [PATCH 03/20] mmc: mmci: Update DT documentation
+In-Reply-To: <CAL_JsqJbaxayELNt+d1VSfFyD58eRYQM=d15RaFcFQKbot3iaw@mail.gmail.com>
+References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
+ <1395404057-27835-4-git-send-email-ulf.hansson@linaro.org>
+ <CAL_JsqJbaxayELNt+d1VSfFyD58eRYQM=d15RaFcFQKbot3iaw@mail.gmail.com>
+Message-ID: <CAPDyKFpHW1TgtNoKieG+7cws-wPwc335sSCNo5LoBixAX=9Fbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/2014 13:31, Jonathan Cameron :
-> On 19/03/14 10:19, Nicolas Ferre wrote:
->> On 16/03/2014 19:30, Jonathan Cameron :
->>> On 05/03/14 17:35, Alexandre Belloni wrote:
->>>> This patch set is a followup of my previous series: iio: adc: at91 fixes
->>>>
->>>> I'm sorry it is so long, I made sure this is bissectable.
->>> It's a nice series, don't apologise for doing things right!
->>>
->>> Clearly there are a few outstanding snippets from the reviews so far, but we
->>> are getting to the point where we need to agree on a path for this.  I'm
->>> happy to take the whole series through the IIO tree if Dmitry and the at91
->>> maintainers are happy with that.  If it is considered two invasive form the
->>> atmel side then I'm perfectly happy with someone to take it through the relevant
->>> platform tree instead.
+On 21 March 2014 16:03, Rob Herring <robherring2@gmail.com> wrote:
+> On Fri, Mar 21, 2014 at 7:14 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> Document how to configure the regulator supplies and add an example of
+>> a typical mmci DT node.
 >>
->> Jonathan, Dmitry,
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/mmci.txt |   35 ++++++++++++++++++++++--
+>>  1 file changed, 33 insertions(+), 2 deletions(-)
 >>
->> Considering the amount of AT91 files touched by this series, I would
->> like to take everything through Atmel's git tree and later on arm-soc.
-> Sure. Just as a warning, there are one or two patches queued up already that this
-> sits on top of.  Give a spot of bad timing these are too late to go in as fixes
-> before the release. Might be worth waiting on those hitting Linus' tree sometime
-> after rc1 before taking this series.
+>> diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+>> index 2b584ca..d167562 100644
+>> --- a/Documentation/devicetree/bindings/mmc/mmci.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+>> @@ -9,7 +9,38 @@ by mmc.txt and the properties used by the mmci driver.
+>>  Required properties:
+>>  - compatible             : contains "arm,pl18x", "arm,primecell".
+>>  - arm,primecell-periphid : contains the PrimeCell Peripheral ID.
+>
+> This should not be required. This is only for if the peripheral ID is
+> wrong in the h/w.
 
-Okay, advice well-noted.
+You are right, I will move it to the optional section and add better
+comment for it.
 
-Thanks Jonathan.
+>
+>> +- vmmc-supply            : phandle to the regulator device tree node.
+>
+> You cannot add new required properties as that breaks the ABI. The
+> exception is if you *know* it is okay to break all users of this
+> binding.
 
->>> I'm obviously not going to pick it up at all until it has a complete set
->>> of at91 maintainer acks though!
->>>
->>> Realistically it's missed the coming merge window anyway, so we have a fair
->>> bit of time.
->>
->> Yes, I will review Alexandre's v2 series.
->>
->> Thanks a lot for your review and for having thought about the path that
->> these patches would take.
->>
->> Bye,
->>
->>
->>> Jonathan
->>>>
->>>> 1-3) The first 3 patches are cleaning up the patform_data used for at91_adc.
->>>>
->>>> 4-5) Then touchscreen support for older ADCs is added, this allows to use that
->>>>        for the sam9m10g45ek.
->>>>
->>>> 6) Following those modifications, the mach/at91_adc.h is not used anywhere but
->>>>      in the at91_adc driver so it is remove and its content (register definitions)
->>>>      placed directly in the driver.
->>>>
->>>> 7-9) at91sam9rl support is added to at91_adc and is used for the at91sam9rl
->>>>        based boards.
->>>>
->>>> 10-11) Prepare the atmel_tsadcc removal by switching sam9rl and sam9g45 to use
->>>>          only at91_adc instead of atmel_tsadcc.
->>>>
->>>> 12-15) atmel_tsadcc removal
->>>>
->>>>
->>>> Alexandre Belloni (15):
->>>>     ARM: at91: sam9g45: remove unused platform_data
->>>>     ARM: at91: sam9260: remove unused platform_data
->>>>     iio: adc: at91: cleanup platform_data
->>>>     iio: adc: at91_adc: Add support for touchscreens without TSMR
->>>>     ARM: at91: sam9m10g45ek: Add touchscreen support through at91_adc
->>>>     iio: adc: at91: remove unused include from include/mach
->>>>     iio: adc: at91: add sam9rl support
->>>>     ARM: at91: sam9rl: add at91_adc to support adc and touchscreen
->>>>     ARM: at91: sam9rlek add touchscreen support through at91_adc
->>>>     ARM: at91: sam9g45: switch from atmel_tsadcc to at91_adc
->>>>     ARM: at91: sam9rl: switch from atmel_tsadcc to at91_adc
->>>>     ARM: at91: remove atmel_tsadcc platform_data
->>>>     ARM: at91: remove atmel_tsadcc from sama5_defconfig
->>>>     Input: atmel_tsadcc: remove driver
->>>>     ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node
->>>>
->>>>    MAINTAINERS                                |   6 -
->>>>    arch/arm/boot/dts/at91-cosino_mega2560.dts |   5 -
->>>>    arch/arm/configs/at91sam9g45_defconfig     |   3 +-
->>>>    arch/arm/configs/at91sam9rl_defconfig      |   3 +-
->>>>    arch/arm/configs/sama5_defconfig           |   1 -
->>>>    arch/arm/mach-at91/at91sam9260_devices.c   |  10 -
->>>>    arch/arm/mach-at91/at91sam9g45.c           |   2 +-
->>>>    arch/arm/mach-at91/at91sam9g45_devices.c   |  63 +----
->>>>    arch/arm/mach-at91/at91sam9rl.c            |   7 +
->>>>    arch/arm/mach-at91/at91sam9rl_devices.c    |  83 +++++--
->>>>    arch/arm/mach-at91/board-sam9m10g45ek.c    |  16 +-
->>>>    arch/arm/mach-at91/board-sam9rlek.c        |  16 +-
->>>>    arch/arm/mach-at91/board.h                 |   3 -
->>>>    arch/arm/mach-at91/include/mach/at91_adc.h | 107 ---------
->>>>    drivers/iio/adc/at91_adc.c                 | 339 +++++++++++++++++++++++----
->>>>    drivers/input/touchscreen/Kconfig          |  12 -
->>>>    drivers/input/touchscreen/Makefile         |   1 -
->>>>    drivers/input/touchscreen/atmel_tsadcc.c   | 358 -----------------------------
->>>>    include/linux/platform_data/at91_adc.h     |  27 +--
->>>>    include/linux/platform_data/atmel.h        |   7 -
->>>>    20 files changed, 380 insertions(+), 689 deletions(-)
->>>>    delete mode 100644 arch/arm/mach-at91/include/mach/at91_adc.h
->>>>    delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
->>>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->>
-> 
-> 
+It's okay, this is already supported by the users.
 
+>
+>>  Optional properties:
+>> -- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
+>> -- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
+>> +- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
+>> +- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+>> +- vqmmc-supply           : phandle to the regulator device tree node.
+>
+> Is this a standard property? If not, explain what vmmc and vgmmc are
+> for and what the difference is.
 
--- 
-Nicolas Ferre
+Currently both vqmmc and vmmc are handled through an API provided by
+the mmc core. It's up to each mmc host driver to use it. So, yes -
+this is a standard mmc binding, but it depends on the host if it's
+supported.
+
+I suppose I could add it as an optional binding for the generic mmc
+bindings and then keep them here for mmci as well?
+
+>
+>> +
+>> +Example:
+>> +
+>> +sdi0_per1 at 80126000 {
+>> +       compatible = "arm,pl18x", "arm,primecell";
+>> +       arm,primecell-periphid = <0x10480180>;
+>
+> Drop this from the example.
+>
+>> +       reg = <0x80126000 0x1000>;
+>> +       interrupts = <0 60 IRQ_TYPE_LEVEL_HIGH>;
+>> +
+>> +       dmas = <&dma 29 0 0x2>, /* Logical - DevToMem */
+>> +              <&dma 29 0 0x0>; /* Logical - MemToDev */
+>> +       dma-names = "rx", "tx";
+>> +
+>> +       clocks = <&prcc_kclk 1 5>, <&prcc_pclk 1 5>;
+>> +       clock-names = "sdi", "apb_pclk";
+>> +
+>> +       max-frequency = <100000000>;
+>> +       bus-width = <4>;
+>> +       mmc-cap-sd-highspeed;
+>> +       mmc-cap-mmc-highspeed;
+>> +       cd-gpios  = <&gpio2 31 0x4>; // 95
+>> +
+>> +       vmmc-supply = <&ab8500_ldo_aux3_reg>;
+>> +       vqmmc-supply = <&vmmci>;
+>> +
+>> +       pinctrl-names = "default", "sleep";
+>> +       pinctrl-0 = <&sdi0_default_mode>;
+>> +       pinctrl-1 = <&sdi0_sleep_mode>;
+>> +};
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks for reviewing!
+
+Kind regards
+Ulf Hansson
