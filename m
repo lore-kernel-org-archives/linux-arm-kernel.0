@@ -1,382 +1,110 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 24 Mar 2014 13:01:29 +0100
-Subject: [PATCH] ARM: dts: imx6: add support for Ka-Ro TX6 modules
-In-Reply-To: <20140322082352.GF5938@dragon>
-References: <1395235784-14034-1-git-send-email-LW@KARO-electronics.de>
- <20140322082352.GF5938@dragon>
-Message-ID: <20140324130129.1c2ec444@ipc1.ka-ro>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Mon, 24 Mar 2014 12:04:27 +0000
+Subject: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree bindings
+In-Reply-To: <OFC7DD5DAC.D378B300-ON80257CA2.0051ECEE-80257CA2.00529F98@LocalDomain>
+References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>		
+ <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
+ <1395401031.4554.9.camel@weser.hi.pengutronix.de>	
+ <OF03C9E23D.07B7D998-ON80257CA2.004E5877-80257CA2.004E9BFB@eu.necel.com>
+ <1395412213.4554.17.camel@weser.hi.pengutronix.de>
+ <OFC7DD5DAC.D378B300-ON80257CA2.0051ECEE-80257CA2.00529F98@LocalDomain>
+Message-ID: <OF9DD6173A.94976872-ON80257CA5.0041752F-80257CA5.0042532C@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Lucas,
 
-it would help readability a lot if you would trim down the quoted parts
-of the original mail (like I did with [...] in this reply).
-
-
-Shawn Guo wrote:
-> On Wed, Mar 19, 2014 at 02:29:44PM +0100, Lothar Wa?mann wrote:
-> > This patch adds support for the Ka-Ro electronics GmbH TX6 modules.
-> > There are five distinct module types with either i.MX6Q or i.MX6DL and
-> > LVDS or LCD display interface and one DTS file for a complete system
-> > with an i.MX6DL based TX6 module and a baseboard mounted on the back
-> > of a display (imx6dl-tx6dl-comtft.dts).
+On: 21/03/2014 15:02, Phil wrote:
+> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
+bindings
+> 
+> Hi Lucas,
+> 
+> On: 21/03/2014 14:31, Lucas wrote:
+> > Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
+bindings
 > > 
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |    6 +
-> >  arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts |  114 +++++
-> >  arch/arm/boot/dts/imx6dl-tx6u-801x.dts    |  188 ++++++++
-> >  arch/arm/boot/dts/imx6dl-tx6u-811x.dts    |  166 +++++++
-> >  arch/arm/boot/dts/imx6q-tx6q-1010.dts     |  192 +++++++++
-> >  arch/arm/boot/dts/imx6q-tx6q-1020.dts     |  192 +++++++++
-> >  arch/arm/boot/dts/imx6q-tx6q-1110.dts     |  174 ++++++++
-> >  arch/arm/boot/dts/imx6qdl-tx6.dtsi        |  672 +++++++++++++++++++++++++++++
-> >  8 files changed, 1704 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6dl-tx6u-801x.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6q-tx6q-1010.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6q-tx6q-1020.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6q-tx6q-1110.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> > 
-[...]
-> > diff --git a/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts b/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-> > new file mode 100644
-> > index 0000000..6df5a25
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-> > @@ -0,0 +1,114 @@
-> > +/*
-> > + * Copyright 2014 Lothar Wa?mann <LW@KARO-electronics.de>
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "imx6dl.dtsi"
-> > +#include "imx6qdl-tx6.dtsi"
-> > +
-> > +/ {
-> > +	model = "Ka-Ro electronics TX6DL Module on CoMpact TFT";
-> > +	compatible = "fsl,imx6dl-tx6dl", "fsl,imx6dl";
-> 
-> Shouldn't it be "karo,imx6dl-tx6dl" instead?
-> 
-Of course. :(
+> > Am Freitag, den 21.03.2014, 14:18 +0000 schrieb
+> > Phil.Edworthy at renesas.com:
+> > > Hi Lucas,
+> > > 
+> > > On 21/03/2014 11:24, Lucas wrote:
+> > > > Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device 
+tree 
+> > > bindings
+> > > > 
+> > > > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
+> > > > > This patch adds the bindings for the rcar PCIE driver. The 
+driver
+> > > > > resides under drivers/pci/host/pcie-rcar.c
+> > > > > 
+> > > > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > > > 
+> > > > I have one question below. If you can answer this with yes after
+> > > > thinking again about it, this is:
+> > > > 
+> > > > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> > > > > ---
+> > > > >  Documentation/devicetree/bindings/pci/rcar-pci.txt | 40 
+> > > ++++++++++++++++++++++
+> > > > >  1 file changed, 40 insertions(+)
+> > > > >  create mode 100644 
+Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt 
+b/
+> > > > Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..0e219b0
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > > > > @@ -0,0 +1,40 @@
+> > > > > +* Renesas RCar PCIe interface
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible: should contain one of the following
+> > > > > +   "renesas,r8a7779-pcie", "renesas,r8a7790-pcie", 
+> > > "renesas,r8a7791-pcie"
+> > > > > +- reg: base addresses and lengths of the pcie controller.
+> > > > > +- #address-cells: set to <3>
+> > > > > +- #size-cells: set to <2>
+> > > > > +- device_type: set to "pci"
+> > > > > +- ranges: ranges for the PCI memory and I/O regions
+> > > > > +- interrupts: interrupt values for MSI interrupt
+> > > > > +- #interrupt-cells: set to <1>
+> > > > > +- interrupt-map-mask and interrupt-map: standard PCI properties
+> > > > > +   to define the mapping of the PCIe interface to interrupt
+> > > > > +   numbers.
+> > > > > +- clocks: from common clock binding: handle to pci clock.
+> > > > > +- clock-names: from common clock binding: should be "pcie"
+> > > > 
+> > > > You really only have one PCIe clock? So the controller is 
+generating the
+> > > > PCIe bus clock from it's register clock? No need to enable any 
+other
+> > > > clock for PCIe to work?
+> > > Yes, just the one clock. The PCIe bus clock is an external clock 
+dedicated 
+> > > to PCIe and SATA, and we have no control over it.
+> > > 
+> > Is this some kind of always-on clock? If not you probably want a
+> > reference to it from the PCIe driver even if it's shared between SATA
+> > and PCIe. After all you don't want to end up unconditionally enabling
+> > this clock from the board or SoC level just to have PCIe working, 
+right?
+> Ok, I see, I'll need a reference to a board clock, even if it's always 
+on for 
+> these boards. 
+One small question...
 
-> > +
-> > +	aliases {
-> > +		display = &display;
-> > +	};
-> > +
-> > +	backlight: backlight {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&pwm2 0 500000 0>;
-> > +		power-supply = <&reg_3v3>;
-> > +		/*
-> > +		 * a poor man's way to create a 1:1 relationship between
-> > +		 * the PWM value and the actual duty cycle
-> > +		 */
-> > +		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-> > +				     10 11 12 13 14 15 16 17 18 19
-> > +				     20 21 22 23 24 25 26 27 28 29
-> > +				     30 31 32 33 34 35 36 37 38 39
-> > +				     40 41 42 43 44 45 46 47 48 49
-> > +				     50 51 52 53 54 55 56 57 58 59
-> > +				     60 61 62 63 64 65 66 67 68 69
-> > +				     70 71 72 73 74 75 76 77 78 79
-> > +				     80 81 82 83 84 85 86 87 88 89
-> > +				     90 91 92 93 94 95 96 97 98 99
-> > +				    100>;
-> > +		default-brightness-level = <50>;
-> > +	};
-> > +
-> > +	display: display at di0 {
-> > +		compatible = "fsl,imx-parallel-display";
-> > +		interface-pix-fmt = "rgb24";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_disp0_1>;
-> > +		status = "okay";
-> > +
-> > +		port {
-> > +			display0_in: endpoint {
-> > +				remote-endpoint = <&ipu1_di0_disp0>;
-> > +			};
-> > +		};
-> 
-> I do not have OF graph stuff in my tree yet.
-> 
-You can apply the patch, once it arrives in your tree.
+The patches added the PCIe host controller to two devices, r8a7790 and 
+r8a7791. The r8a7790-based Lager board doesn't have the necessary hardware 
+to use PCIe, so should I add a dummy pcie_bus clock to the Lager board 
+dts, even though PCIe is not used?
 
-[...]
-> > diff --git a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-> > new file mode 100644
-> > index 0000000..c97fb42
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-> > @@ -0,0 +1,166 @@
-> > +/*
-> > + * Copyright 2014 Lothar Wa?mann <LW@KARO-electronics.de>
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "imx6dl.dtsi"
-> > +#include "imx6qdl-tx6.dtsi"
-> > +
-> > +/ {
-> > +	model = "Ka-Ro electronics TX6U-811x Module";
-> > +	compatible = "fsl,imx6dl-tx6dl", "fsl,imx6dl";
-> > +
-> > +	aliases {
-> > +		display = &lvds0;
-> > +		lvds0 = &lvds0;
-> > +		lvds1 = &lvds1;
-> > +	};
-> > +
-> > +	backlight0: backlight0 {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&pwm2 0 500000 0>;
-> > +		power-supply = <&reg_lcd0_pwr>;
-> > +		/*
-> > +		 * a poor man's way to create a 1:1 relationship between
-> > +		 * the PWM value and the actual duty cycle
-> > +		 */
-> > +		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-> > +				     10 11 12 13 14 15 16 17 18 19
-> > +				     20 21 22 23 24 25 26 27 28 29
-> > +				     30 31 32 33 34 35 36 37 38 39
-> > +				     40 41 42 43 44 45 46 47 48 49
-> > +				     50 51 52 53 54 55 56 57 58 59
-> > +				     60 61 62 63 64 65 66 67 68 69
-> > +				     70 71 72 73 74 75 76 77 78 79
-> > +				     80 81 82 83 84 85 86 87 88 89
-> > +				     90 91 92 93 94 95 96 97 98 99
-> > +				    100>;
-> > +		default-brightness-level = <50>;
-> > +	};
-> > +
-> > +	backlight1: backlight1 {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&pwm1 0 500000 0>;
-> > +		power-supply = <&reg_lcd1_pwr>;
-> > +		/*
-> > +		 * a poor man's way to create a 1:1 relationship between
-> > +		 * the PWM value and the actual duty cycle
-> > +		 */
-> > +		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-> > +				     10 11 12 13 14 15 16 17 18 19
-> > +				     20 21 22 23 24 25 26 27 28 29
-> > +				     30 31 32 33 34 35 36 37 38 39
-> > +				     40 41 42 43 44 45 46 47 48 49
-> > +				     50 51 52 53 54 55 56 57 58 59
-> > +				     60 61 62 63 64 65 66 67 68 69
-> > +				     70 71 72 73 74 75 76 77 78 79
-> > +				     80 81 82 83 84 85 86 87 88 89
-> > +				     90 91 92 93 94 95 96 97 98 99
-> > +				    100>;
-> > +		default-brightness-level = <50>;
-> > +	};
-> > +
-> > +	panel0 {
-> 
-> The convention of device tree node is node-name at unit-address, so in this
-> case it should probably be panel at 0.
-> 
-AFAIK that's only true for nodes that require a 'reg' property.
-Thus if it were:
-	panels {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <0>;
+I'm just wondering what the dts file looks like for a board that doesn't 
+support many interfaces. Does it become littered with dummy clocks and 
+regulators?
 
-		panel at 0 {
-			compatible = "simple-panel";
-			reg = <0>;
-			power-supply = <&reg_3v3>;
-			backlight = <&backlight0>;
-		};
-[...]
-> > diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> > new file mode 100644
-> > index 0000000..828e7f3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> > @@ -0,0 +1,672 @@
-> > +/*
-> > + * Copyright 2014 Lothar Wa?mann <LW@KARO-electronics.de>
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +#include <dt-bindings/gpio/gpio.h>
-> > +#include <dt-bindings/input/input.h>
-> > +#include <dt-bindings/pwm/pwm.h>
-> > +
-> > +/ {
-> > +	aliases {
-> > +		can0 = &can2;
-> > +		can1 = &can1;
-> > +		ethernet0 = &fec;
-> > +		lcdif_23bit_pins_a = &pinctrl_disp0_1;
-> > +		lcdif_24bit_pins_a = &pinctrl_disp0_2;
-> > +		pwm0 = &pwm1;
-> > +		pwm1 = &pwm2;
-> > +		reg_can_xcvr = &reg_can_xcvr;
-> > +		stk5led = &user_led;
-> > +		usbotg = &usbotg;
-> > +		sdhc0 = &usdhc1;
-> > +		sdhc1 = &usdhc2;
-> > +	};
-> > +
-> > +	memory {
-> > +		reg = <0 0>; /* will be filled by U-Boot */
-> > +	};
-> > +
-> > +	clocks {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		mclk: codec_clock {
-> 
-> clock at 0
-> 
-OK.
-
-> > +&can1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_flexcan1>;
-> > +	xceiver-supply = <&reg_can_xcvr>;
-> > +
-> 
-> Drop the new line.
-> 
-OK.
-
-[...]
-> > +&i2c3 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_i2c3>;
-> > +	clock-frequency = <400000>;
-> > +	status = "okay";
-> > +
-> > +	sgtl5000: sgtl5000 at 0a {
-> > +		compatible = "fsl,sgtl5000";
-> > +		reg = <0x0a>;
-> > +		VDDA-supply = <&reg_2v5>;
-> > +		VDDIO-supply = <&reg_3v3>;
-> > +		clocks = <&mclk>;
-> > +	};
-> > +
-> > +	polytouch: edt-ft5x06 at 38 {
-> > +		compatible = "edt,edt-ft5x06";
-> > +		reg = <0x38>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_edt_ft5x06>;
-> > +		interrupt-parent = <&gpio6>;
-> > +		interrupts = <15 0>;
-> > +		reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>;
-> > +		wake-gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-> 
-> Where are all these bindings documented?
-> 
-That's one in a separate patch adding DT support to the edt_ft5x06
-driver.
-
-> > +		linux,wakeup;
-> > +	};
-> > +
-> > +	touchscreen: tsc2007 at 48 {
-> > +		compatible = "ti,tsc2007";
-> > +		reg = <0x48>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_tsc2007>;
-> > +		interrupt-parent = <&gpio3>;
-> > +		interrupts = <26 0>;
-> > +		gpios = <&gpio3 26 GPIO_ACTIVE_LOW>;
-> > +		ti,x-plate-ohms = <660>;
-> > +		linux,wakeup;
-> > +	};
-> > +};
-> > +
-> > +&iomuxc {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_hog>;
-> > +
-> > +	imx6qdl-tx6 {
-> > +		pinctrl_hog: hoggrp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b1 /* LED */
-> > +				MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
-> > +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT
-> 
-> Broken comment?
-> 
-Yeah, right. Bad, that the compiler doesn't complain here. :(
-
-[...]
-> > +		pinctrl_flexcan_xcvr: flexcan-xcvrgrp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_DISP0_DAT0__GPIO4_IO21	0x1b0b0 /* Flexcan XCVR enable */
-> > +			>;
-> > +		};
-> > +
-> > +		pinctrl_gpmi_nand: gpmi-nand {
-> 
-> gpminandgrp
-> 
-OK.
-
-> > +		pinctrl_kpp: kppgrp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_GPIO_9__KEY_COL6		0x1b0b1
-> > +				MX6QDL_PAD_GPIO_4__KEY_COL7		0x1b0b1
-> > +				MX6QDL_PAD_KEY_COL2__KEY_COL2		0x1b0b1
-> > +				MX6QDL_PAD_KEY_COL3__KEY_COL3		0x1b0b1
-> > +
-> 
-> Drop it.
-> 
-I guess you mean the empty line.
-OK.
-
-[...]
-> > +&uart2 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_uart2 &pinctrl_uart2_rtscts>;
-> 
-> These two entries can be merged into one.
-> 
-I prefer to have the handshake pinctrls separate from the data lines so
-that the uart can be used with or without RTS/CTS, without having to
-mess around with the pinctrl defs.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks
+Phil
