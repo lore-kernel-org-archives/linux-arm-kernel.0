@@ -1,56 +1,88 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Sun, 23 Mar 2014 22:58:29 -0700
-Subject: [PATCH v2] arm: LLVMLinux: use static inline in ARM ftrace.h
-In-Reply-To: <20140311083107.6aa2bba4@gandalf.local.home>
-References: <20140311083107.6aa2bba4@gandalf.local.home>
-Message-ID: <1395640709-29042-1-git-send-email-behanw@converseincode.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 24 Mar 2014 11:50:49 +0530
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+Message-ID: <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
 
-With compilers which follow the C99 standard (like modern versions of gcc and
-clang), "extern inline" does the wrong thing (emits code for an externally
-linkable version of the inline function). In this case using static inline
-and removing the NULL version of return_address in return_address.c does
-the right thing.
+> +
+> +/**
+> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
 
-Signed-off-by: Behan Webster <behanw@converseincode.com>
-Reviewed-by: Mark Charlebois <charlebm@gmail.com>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
----
- arch/arm/include/asm/ftrace.h    | 2 +-
- arch/arm/kernel/return_address.c | 5 -----
- 2 files changed, 1 insertion(+), 6 deletions(-)
+Should be xilinx_vdma_dma_prep_interleaved here.
 
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index f89515a..2bb8cac 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -45,7 +45,7 @@ void *return_address(unsigned int);
- 
- #else
- 
--extern inline void *return_address(unsigned int level)
-+static inline void *return_address(unsigned int level)
- {
- 	return NULL;
- }
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index fafedd8..f6aa84d 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -63,11 +63,6 @@ void *return_address(unsigned int level)
- #warning "TODO: return_address should use unwind tables"
- #endif
- 
--void *return_address(unsigned int level)
--{
--	return NULL;
--}
--
- #endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
- 
- EXPORT_SYMBOL_GPL(return_address);
--- 
-1.8.3.2
+> +/**
+> + * xilinx_vdma_channel_set_config - Configure VDMA channel
+> + * Run-time configuration for Axi VDMA, supports:
+> + * . halt the channel
+> + * . configure interrupt coalescing and inter-packet delay threshold
+> + * . start/stop parking
+> + * . enable genlock
+> + *
+> + * @dchan: DMA channel
+> + * @cfg: VDMA device configuration pointer
+> + *
+> + * Return: '0' on success and failure value on error
+> + */
+> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+> +                                       struct xilinx_vdma_config *cfg)
+> +{
+> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> +       u32 dmacr;
+> +
+> +       if (cfg->reset)
+> +               return xilinx_vdma_chan_reset(chan);
+> +
+> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
+> +
+> +       chan->config.frm_dly = cfg->frm_dly;
+> +       chan->config.park = cfg->park;
+> +
+> +       /* genlock settings */
+> +       chan->config.gen_lock = cfg->gen_lock;
+> +       chan->config.master = cfg->master;
+> +
+> +       if (cfg->gen_lock && chan->genlock) {
+> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
+> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
+> +       }
+> +
+> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
+> +       if (cfg->park)
+> +               chan->config.park_frm = cfg->park_frm;
+> +       else
+> +               chan->config.park_frm = -1;
+> +
+> +       chan->config.coalesc = cfg->coalesc;
+> +       chan->config.delay = cfg->delay;
+> +
+> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
+> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
+> +               chan->config.coalesc = cfg->coalesc;
+> +       }
+> +
+> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
+> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
+> +               chan->config.delay = cfg->delay;
+> +       }
+> +
+> +       /* FSync Source selection */
+> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
+> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
+> +
+> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+> +
+Bypassing the DMAEngine api doesn't seem very neat.
+Is there currently any client driver that /changes/ this configuration
+between channel requests? If no, then simply get the configuration
+from DT node and avoid this api.
