@@ -1,56 +1,110 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 Mar 2014 08:28:45 +0100
-Subject: [PATCH] ARM: determine zreladdr for no-MMU machines automatically
-In-Reply-To: <20140323113205.GI23076@pengutronix.de>
-References: <20140323113205.GI23076@pengutronix.de>
-Message-ID: <1395646125-8479-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Mon, 24 Mar 2014 16:17:42 +0800
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <201403201531.20416.arnd@arndb.de>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <4611515.XyVGvsaLcW@wuerfel>
+ <CAMj5Bkiaw=BT_EUdjthPjgk_pp0z44yPjh4_AfHXqiJLUiDe=g@mail.gmail.com>
+ <201403201531.20416.arnd@arndb.de>
+Message-ID: <CAMj5Bkgc2ChK48QmqEEMEmxdF6iGZxMX0kVUqGFd8jYhEWCvOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-zreladdr must be virt_to_phys(PAGE_OFFSET + TEXT_OFFSET). For no-MMU
-machines virt_to_phys is the identity mapping so zreladdr can be defined
-to just PAGE_OFFSET + TEXT_OFFSET for no-MMU machines.
+Dear Arnd
 
-This fixes one of the problems when trying to compile a zImage for efm32
-because this platform doesn't define zreladdr.
+On Thu, Mar 20, 2014 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 20 March 2014, Zhangfei Gao wrote:
+>> On Tue, Mar 18, 2014 at 7:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 18 March 2014 16:40:17 Zhangfei Gao wrote:
+>> >
+>> >> +
+>> >> +static void __iomem *ppebase;
+>> >
+>> > The global 'ppebase' seems hacky. Isn't that a SoC-specific register area, while
+>> > the rest of the driver is reusable across SoCs?
+>> >
+>> > What does 'ppe' stand for?
+>> >
+>> > What if there are multiple instances of this, which each have their own ppebase?
+>>
+>> In this specific platform,
+>> ppe is the only module controlling all the fifos for all the net controller.
+>> And each controller connect to specific port.
+>> ppe has 2048 channels, sharing by all the controller, only if not overlapped.
+>>
+>> So the static ppebase is required, which I don't like too.
+>> Two inputs required, one is port, which is connect to the controller.
+>> The other is start channel, currently I use id, and start channel is
+>> RX_DESC_NUM * priv->id;  /* start_addr */
+>
+> Ok, thanks for the explanation!
+>
+I thought you are fine with "static void __iomem *ppebase" here.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+>> >
+>> >> +     if (!ppebase) {
+>> >> +             struct device_node *n;
+>> >> +
+>> >> +             n = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-ppebase");
+>> >> +             if (!n) {
+>> >> +                     ret = -EINVAL;
+>> >> +                     netdev_err(ndev, "not find hisilicon,ppebase\n");
+>> >> +                     goto init_fail;
+>> >> +             }
+>> >> +             ppebase = of_iomap(n, 0);
+>> >> +     }
+>> >
+>> > How about using syscon_regmap_lookup_by_phandle() here? That way, you can have
+>> > a more generic abstraction of the ppe, and stick the port and id in there as
+>> > well, e.g.
+>> >
+>> >         ppe-syscon = <&hip04ppe 1 4>; // ppe, port, id
 
-I tested this patch on top of Arnd's randconfig branch[1], it allowed to
-drop db5fbcd0d71e (ARM: efm32: select AUTO_ZRELADDR) from it with zImage
-still being compilable. When checking at91x40 (i.e. the other no-MMU
-platform with a defconfig file), this patch would introduce a change
-because arch/arm/mach-at91/Makefile.boot defines
+Even if using syscon_regmap_lookup_by_phandle, there still have static
+struct regmap, since three controllers
+share one regmap.
 
-	zreladdr-y += 0x20008000
+> It's probably a little simpler to avoid the sub-nodes and instead do
+>
+>>               ppe: ppe at 28c0000 {
+>>                         compatible = "hisilicon,hip04-ppe";
+>>                         reg = <0x28c0000 0x10000>;
+>>                         #address-cells = <1>;
+>>                         #size-cells = <0>;
+>>                 };
+>>                 fe: ethernet at 28b0000 {
+>>                         compatible = "hisilicon,hip04-mac";
+>>                         reg = <0x28b0000 0x10000>;
+>>                         interrupts = <0 413 4>;
+>>                         phy-mode = "mii";
+>>                         port-handle = <&ppe 31>;
+>>                 };
+>
+> In the code, I would create a simple ppe driver that exports
+> a few functions. you need. In the ethernet driver probe() function,
+> you should get a handle to the ppe using
+>
+>         /* look up "port-handle" property of the current device, find ppe and port */
+>         struct hip04_ppe *ppe = hip04_ppe_get(dev->of_node);
+>         if (IS_ERR(ppe))
+>                 return PTR_ERR(ptr); /* this handles -EPROBE_DEFER */
+>
+> and then in other code you can just do
+>
+>         hip04_ppe_set_foo(priv->ppe, foo_config);
+>
+> This is a somewhat more high-level abstraction that syscon, which
+> just gives you a 'struct regmap' structure for doing register-level
+> configuration like you have today.
+>
 
-but CONFIG_PAGE_OFFSET=0x01000000. I think that's a bug and my patch
-does the right thing. Note that the at91x40 case isn't fixed though.
+Do you mean create one additional file like ppe.c with some exported
+function to remove the static ppebase?
+Since the ppe is specifically bounded with ethernet, and does not used
+anywhere else,
+the exported function may not be used anywhere else.
+Is it make it more complicated since there are probe, remove etc.
 
-Best regards
-Uwe
+So I may still prefer using "static void __iomem *ppebase", as it is simpler.
 
-[1] http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/?h=randconfig, commit:e65d61db588a057b5cbc3ba9bc8110819e05d748
-
- arch/arm/boot/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index ec2f8065f955..2d935dd098e5 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -15,6 +15,10 @@ ifneq ($(MACHINE),)
- include $(srctree)/$(MACHINE)/Makefile.boot
- endif
- 
-+ifeq ($(zreladdr-y)$(CONFIG_MMU),)
-+zreladdr-y := $(CONFIG_PAGE_OFFSET)+$(TEXT_OFFSET)
-+endif
-+
- # Note: the following conditions must always be true:
- #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
- #   PARAMS_PHYS must be within 4MB of ZRELADDR
--- 
-1.9.0
+Thanks
