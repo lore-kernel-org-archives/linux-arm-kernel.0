@@ -1,52 +1,44 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Mon, 24 Mar 2014 10:12:33 +0530
-Subject: [PATCH V2] mmc: dw_mmc: exynos: Turn SDIO interrupts on
-In-Reply-To: <532FB4A7.7020700@samsung.com>
-References: <1395635037-24081-1-git-send-email-yuvaraj.cd@samsung.com>
- <532FB4A7.7020700@samsung.com>
-Message-ID: <CAKuRcOKOBebW157R16_KtSR541MwwZ4pyynBRnbvOLm9RK4SAg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 24 Mar 2014 10:39:32 +0530
+Subject: [PATCH 08/62] ARM: davinci: use explicit 'select' for DA850_EVM
+In-Reply-To: <201403211656.06007.arnd@arndb.de>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <1395257399-359545-9-git-send-email-arnd@arndb.de> <532AE351.9000503@ti.com>
+ <201403211656.06007.arnd@arndb.de>
+Message-ID: <532FBE0C.2060903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 9:59 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Yuvaraj.
->
-> NACK. we can use "mmc_of_parese()".
-Thanks Jaehoon for the pointer.I will use "mmc_of_parse()".
->
-> I have sent the patch that use "mmc_of_parse()".
-> https://patchwork.kernel.org/patch/3750681/
->
-> Best Regards,
-> Jaehoon Chung
->
-> On 03/24/2014 01:23 PM, Yuvaraj Kumar C D wrote:
->> The mmc part in exynos supports SDIO interrupts and they work fine, so
->> turn the capability on.  With this I see download speeds increase
->> about 10x.
->>
->> This V1 of this patch is posted to LKML at
->> https://patchwork.kernel.org/patch/2429661/) by Doug Anderson.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c |    3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 0c56faa..240949d 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -2417,6 +2417,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
->>       if (of_get_property(np, "cd-inverted", NULL))
->>               pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
->>
->> +     if (of_find_property(np, "cap-sdio-irq", NULL))
->> +             pdata->caps |= MMC_CAP_SDIO_IRQ;
->> +
->>       return pdata;
->>  }
->>
->>
->
+On Friday 21 March 2014 09:26 PM, Arnd Bergmann wrote:
+
+> From 5eaf7fdfe7c831d3aa24428a6e8d4509ac160db6 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Tue, 18 Feb 2014 12:23:19 +0100
+> Subject: [PATCH] ARM: davinci: use explicit 'select' for DA850_EVM
+> 
+> The DAVINCI_DA850_EVM board uses an unusual method to
+> enable the GPIO_PCA953X and KEYBOARD_GPIO_POLLED symbols,
+> which leads to the dependencies on these symbols being
+> ignored. As GPIO_PCA953X actually requires I2C, that
+> can lead to build failures when I2C is disabled.
+> 
+> This patch removes the duplicate symbol definitions
+> and instead enables them from the davinci_all_defconfig
+> file.
+
+> A different question whether we actually want to automatically
+> enable them at all or rather put them into defconfig,
+> but that should be a separate patch.
+
+This para can be dropped now.
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
