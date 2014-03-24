@@ -1,119 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 24 Mar 2014 18:01:31 +0100
-Subject: [PATCH v3] i2c: new bus driver for efm32
-In-Reply-To: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140324170131.GB7524@katana>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Mar 2014 18:15:02 +0100
+Subject: [PATCH 1/2] ARM: clps711x: Add cpuidle driver
+In-Reply-To: <1395679441.129942365@f386.i.mail.ru>
+References: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
+ <53305094.8010008@linaro.org> <1395679441.129942365@f386.i.mail.ru>
+Message-ID: <53306816.1090809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-> @@ -0,0 +1,34 @@
-> +* Energymicro efm32 i2c controller
-> +
-> +Required properties :
-> +
-> + - reg : Offset and length of the register set for the device
-> + - compatible : should be "efm32,i2c"
+On 03/24/2014 05:44 PM, Alexander Shiyan wrote:
+> Mon, 24 Mar 2014 16:34:44 +0100 ?? Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 03/22/2014 06:44 AM, Alexander Shiyan wrote:
+>>> Add cpuidle support for ARM Cirrus Logic CLPS711X CPUs.
+>>> This CPU has an unique internal register and write to this location
+>>> will put the system into the Idle State by halting the clock to the
+>>> processor until an interrupt is generated.
+>>>
+>>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+>>> ---
+> ...
+>>> +static struct cpuidle_driver clps711x_idle_driver = {
+>>> +	.name		= CLPS711X_CPUIDLE_NAME,
+>>> +	.owner		= THIS_MODULE,
+>>> +	.states[0]	= {
+>>> +		.name		= "HALT",
+>>> +		.desc		= "CLPS711X HALT",
+>>> +		.enter		= clps711x_cpuidle_halt,
+>>> +		.exit_latency	= 1,
+>>
+>> Did you forget target_residency ? Or just not defined it as it is 0 ?
+>
+> Yes, zero value.
 
-Ehrm, come to think of it, shouldn't that actually be "energymicro, efm32-i2c"
-or similar to match the "vendor,product" pattern?
+Ok, thanks. The driver looks good. I will pick it for 3.16.
 
-> +config I2C_EFM32
-> +	tristate "EFM32 I2C controller"
-> +	depends on OF && (ARCH_EFM32 || COMPILE_TEST)
+Thanks
+   -- Daniel
 
-Is EFM32 DT only? Do we need the dependency on OF?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> +	help
-> +	  This driver supports the i2c block found in Energy Micro's EFM32
-> +	  SoCs.
-> +
-
-...
-
-> +static void efm32_i2c_send_next_byte(struct efm32_i2c_ddata *ddata)
-> +{
-> +	struct i2c_msg *cur_msg = &ddata->msgs[ddata->current_msg];
-
-Missing newline.
-
-> +	if (ddata->current_word >= cur_msg->len) {
-> +		/* cur_msg completely transferred */
-> +		ddata->current_word = 0;
-> +		ddata->current_msg += 1;
-> +
-> +		if (ddata->current_msg >= ddata->num_msgs) {
-> +			efm32_i2c_write32(ddata, REG_CMD, REG_CMD_STOP);
-> +			complete(&ddata->done);
-> +		} else {
-> +			efm32_i2c_send_next_msg(ddata);
-> +		}
-> +	} else {
-> +		efm32_i2c_write32(ddata, REG_TXDATA,
-> +				cur_msg->buf[ddata->current_word++]);
-> +	}
-> +}
-> +
-
-...
-
-
-> +static int efm32_i2c_master_xfer(struct i2c_adapter *adap,
-> +		struct i2c_msg *msgs, int num)
-> +{
-> +	struct efm32_i2c_ddata *ddata = i2c_get_adapdata(adap);
-> +	int ret;
-> +
-> +	if (ddata->msgs)
-> +		return -EBUSY;
-> +
-> +	ddata->msgs = msgs;
-> +	ddata->num_msgs = num;
-> +	ddata->current_word = 0;
-> +	ddata->current_msg = 0;
-> +	ddata->retval = -EIO;
-> +
-> +	reinit_completion(&ddata->done);
-> +
-> +	dev_dbg(&ddata->adapter.dev, "state: %08x, status: %08x\n",
-> +			efm32_i2c_read32(ddata, REG_STATE),
-> +			efm32_i2c_read32(ddata, REG_STATUS));
-> +
-> +	efm32_i2c_send_next_msg(ddata);
-> +
-> +	wait_for_completion(&ddata->done);
-> +
-> +	if (ddata->current_msg >= ddata->num_msgs)
-> +		ret = ddata->num_msgs;
-> +	else
-> +		ret = ddata->retval;
-> +
-> +	ddata->msgs = NULL;
-
-Setting NULL should not be needed?
-
-> +
-> +	return ret;
-> +}
-> +
-
-And checkpatch said:
-
-WARNING: braces {} are not necessary for any arm of this statement
-#345: FILE: drivers/i2c/busses/i2c-efm32.c:239:
-+		if (cur_msg->flags & I2C_M_RD) {
-...
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/fa97762e/attachment.sig>
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
