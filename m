@@ -1,42 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Mar 2014 08:36:46 -0500
-Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
-In-Reply-To: <9368307.RXEGmQia1C@wuerfel>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <1395436128-11244-5-git-send-email-robherring2@gmail.com>
- <20140324112203.GD3850@arm.com> <9368307.RXEGmQia1C@wuerfel>
-Message-ID: <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Mar 2014 13:36:42 +0000
+Subject: [PATCH v2 1/5] drivers: input: keyboard: st-keyscan: add keyscan
+ driver
+In-Reply-To: <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
+References: <1395154806-2810-1-git-send-email-gabriel.fernandez@st.com>
+ <1395154806-2810-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20140324133642.GB21665@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
->> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
->> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->> > new file mode 100644
->> > index 0000000..241757a
->> > --- /dev/null
->> > +++ b/drivers/tty/serial/earlycon.c
->> [...]
->> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
->> > +{
->> > +   void __iomem *base;
->> > +#ifdef CONFIG_FIX_EARLYCON_MEM
->> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
->> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
->> > +   base += paddr & ~PAGE_MASK;
->> > +#else
->> > +   base = ioremap_nocache(paddr, size);
->> > +#endif
->>
->> Just curious why not set_fixmap_io (and plain ioremap)?
->
-> Good point. Note that ioremap_nocache() is the same as ioremap()
-> on *all* architectures.
+> This patch adds ST Keyscan driver to use the keypad hw a subset
+> of ST boards provide. Specific board setup will be put in the
+> given dt.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
+> ---
+>  .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
+>  drivers/input/keyboard/Kconfig                     |  12 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
+>  4 files changed, 333 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
+>  create mode 100644 drivers/input/keyboard/st-keyscan.c
 
-I investigated this before adding this to arm64. set_fixmap_io and
-set_fixmap_nocache are not the same settings on x86. Whether the
-mapping type really matters on x86 or not, I don't know. So I added
-the nocache variant to arm64 to avoid a change to x86.
+FWIW: This looks good to me now:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Rob
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
