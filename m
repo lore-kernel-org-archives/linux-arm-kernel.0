@@ -1,42 +1,24 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Mar 2014 16:00:50 -0400 (EDT)
-Subject: [PATCH RFC] ARM: extend fixmap mapping region to support 30 CPUs
-In-Reply-To: <1395652367-12308-1-git-send-email-sdu.liu@huawei.com>
-References: <1395652367-12308-1-git-send-email-sdu.liu@huawei.com>
-Message-ID: <alpine.LFD.2.11.1403241250560.1291@knanqh.ubzr>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Mon, 24 Mar 2014 21:30:35 +0100
+Subject: [PATCH 2/3] IXP4xx: Fix DMA masks.
+In-Reply-To: <20140324145000.4098c8c7@marrow.netinsight.se> ("Simon
+ =?utf-8?B?S8OlZ3N0csO2bSIncw==?= message of "Mon, 24 Mar 2014 14:50:00
+ +0100")
+References: <m3siq9iyt2.fsf@intrepid.localdomain>
+ <m37g7liwdb.fsf@intrepid.localdomain>
+ <20140324145000.4098c8c7@marrow.netinsight.se>
+Message-ID: <m3vbv37310.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Mar 2014, Liu Hua wrote:
+Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
 
-> In 32-bit ARM systems, the fixmap mapping region can support
-> no more than 14 CPUs(total: 896k; one CPU: 64K). And we can
-> configure NR_CPUS up to 32. So there is a mismatch.
-> 
-> This patch extends the fixmapping region downwards to boundary
-> of DMA mapping region(0xffe00000-0xfffe0000). Then the fixmap
-> mapping region can support up to 30 CPUs.
+> I would simply remove the #ifdef CONFIG_PCI statements: dev_is_pci(dev)
+> should return false at compile time if CONFIG_PCI is not set, and then
+> I'd trust the compiler to simply remove all dead code.
 
-You failed to update CONSISTENT_END in your patch.
-
-Hmmm?  Waitaminute...
-
-Well well...
-
-It looks like the static mapping area for DMA was removed from the code 
-by commit e9da6e9905e6 but the information in 
-Documentation/arm/memory.txt was not updated accordingly.
-
-CONSISTENT_END in arch/arm/include/asm/memory.h has no more users and 
-shoule probably be removed.
-
-This means 0xffc00000 to 0xffefffff is no longer used by anything.
-
-> There seems to be no easy way to support 32 CPUs by simply 
-> changing memory layout on ARM Linux. So I also limit the 
-> maximal CPU number one can configure.
-
-I think the above should help you solve your CPU limit easily.
-
-
-Nicolas
+This will be the same with these #ifdefs. I can imagine someone using
+other compiler or e.g. -O0, and without the #ifdefs the link would fail
+due to unavailability of DMA bouncer.
+-- 
+Krzysztof Halasa
