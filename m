@@ -1,54 +1,93 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Mar 2014 14:51:20 -0700
-Subject: [PATCH v5 1/7] clk: sunxi: Remove calls to clk_put
-In-Reply-To: <1394723659-4995-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394723659-4995-1-git-send-email-maxime.ripard@free-electrons.com>
- <1394723659-4995-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140324215120.32624.63543@quantum>
+Date: Mon, 24 Mar 2014 14:57:29 -0700
+Subject: [RFC PATCH v2 0/2] clk: Support for DT assigned clock parents and
+ rates
+In-Reply-To: <532C4816.2080102@st.com>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <53187C13.3040202@st.com> <532AE239.9000800@samsung.com>
+ <20140321014551.21989.57253@quantum> <532C4816.2080102@st.com>
+Message-ID: <20140324215729.32624.19272@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-03-13 08:14:13)
-> Callers of clk_put must disable the clock first. This also means that as long
-> as the clock is enabled the driver should hold a reference to that clock.
-> Hence, the call to clk_put here are bogus and should be removed.
+Quoting Maxime Coquelin (2014-03-21 07:09:26)
+> Hi Mike,
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> On 03/21/2014 02:45 AM, Mike Turquette wrote:
+> > Quoting Sylwester Nawrocki (2014-03-20 05:42:33)
+> >> Hi Maxime,
+> >>
+> >> On 06/03/14 14:45, Maxime Coquelin wrote:
+> >>> Hi Sylwester,
+> >>>
+> >>>        I like the principle of your implementation, but I have two questions:
+> >>>        1 - How can we manage PM with this solution, as the parent/rate will be
+> >>> set only once at probe time?
+> >>>        2 - How to set the parent of a parent clock (which can be shared with
+> >>> other devices)? Same question about the parent rates.
+> >>
+> >> Thanks for your feedback and apologies for late reply.
+> >>
+> >> IIUC your first concern is about a situation when clocks need to be
+> >> reconfigured upon each resume from system sleep or runtime PM resume ?
+> >> As I mentioned in v1 of the RFC I was considering having individual
+> >> drivers calling explicitly the clocks set up routine. Presumably this
+> >> would allow to resolve the power management related issue.
+> >> One example I'm aware the approach as in this RFC wouldn't work is
+> >> when a device in a SoC belongs to a power domain, which needs to be
+> >> first switched on before we can start setting up and the clocks'
+> >> configuration get lost after the power domain switch off.
+> >
+> > I like Sylwester's approach of handling this one-time setup in the
+> > driver core.
+> >
+> > Any kind of fine grained power management should not be hidden by DT,
+> > and by definition that logic belongs in the device driver. It can still
+> > be nicely abstracted away by runtime pm[1].
+> >
+> > Regards,
+> > Mike
+> >
+> > [1] Message-ID: <20140320114238.GQ7528@n2100.arm.linux.org.uk>
+> How can I access this reference?
 
-Looks good to me. There is a balanced clk_put in the module remove
-function?
+I was trying to provide a reference to this thread which is tangentially
+related to this topic:
+
+http://www.spinics.net/lists/arm-kernel/msg317016.html
+
+But it hadn't hit any of the mail archives at the time of my writing so
+I just copied Russell's Message-ID from his email. If you have a copy of
+that email then you can search on Message-ID's for that and you will
+find it. :-)
 
 Regards,
 Mike
 
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 23baad9d934a..7119c02c9fa8 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1290,17 +1290,13 @@ static void __init sunxi_clock_protect(void)
->  
->         /* memory bus clock - sun5i+ */
->         clk = clk_get(NULL, "mbus");
-> -       if (!IS_ERR(clk)) {
-> +       if (!IS_ERR(clk))
->                 clk_prepare_enable(clk);
-> -               clk_put(clk);
-> -       }
->  
->         /* DDR clock - sun4i+ */
->         clk = clk_get(NULL, "pll5_ddr");
-> -       if (!IS_ERR(clk)) {
-> +       if (!IS_ERR(clk))
->                 clk_prepare_enable(clk);
-> -               clk_put(clk);
-> -       }
->  }
->  
->  static void __init sunxi_init_clocks(void)
-> -- 
-> 1.9.0
+> Thanks,
+> Maxime
 > 
+> >
+> >>
+> >> OTOH I suspect devices for which one-time clocks setup is sufficient
+> >> will be quite common. And for these there would need to be a single
+> >> call to the setup routine in probe() I guess, since it wouldn't be
+> >> possible to figure out just from the DT data when the actual call
+> >> should be made.
+> >>
+> >> For a global clocks configuration, I thought about specifying that
+> >> in the clocks controller node, and then to have the setup routine
+> >> called e.g. from of_clk_init(). I think that could work well enough,
+> >> together with the patch [1], adding clock dependencies handling.
+> >> But then the clock frequency set up function would need to be
+> >> modified to respect the clock parent relationships, similarly as
+> >> in patch series [2]. A just noticed [2] recently, after posting
+> >> this RFC (adding Tero at Cc).
+> >>
+> >> --
+> >> Regards,
+> >> Sylwester
+> >>
+> >> [1] http://www.spinics.net/lists/arm-kernel/msg310507.html
+> >> [2] http://www.spinics.net/lists/linux-omap/msg103069.html
