@@ -1,26 +1,29 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Mon, 24 Mar 2014 11:06:39 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140316070917.GA3094@arch.cereza>
- <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
- <20140317204410.GA1118@arch.cereza>
- <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
- <20140319154434.GA3488@arch.cereza>
- <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
- <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
-Message-ID: <CADHgK6tmb2LU0br=80EKMKP8eNjRnMBDyDdmYdq+Yg+uhSQ78g@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 24 Mar 2014 14:34:01 -0400
+Subject: [PATCH 1/3] ARM: kprobes: Prevent known test failures stopping
+ other tests running
+In-Reply-To: <20140324165601.GR7528@n2100.arm.linux.org.uk>
+References: <1394556894-18592-1-git-send-email-tixy@linaro.org>
+ <1394556894-18592-2-git-send-email-tixy@linaro.org>
+ <53304CB3.6040409@linaro.org> <1395679745.3465.41.camel@linaro1.home>
+ <20140324165601.GR7528@n2100.arm.linux.org.uk>
+Message-ID: <53307A99.1070207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/24/14 12:56, Russell King - ARM Linux wrote:
+> On Mon, Mar 24, 2014 at 04:49:05PM +0000, Jon Medhurst (Tixy) wrote:
+>> Yes, I now see this in Russell's patch tracker (with a less verbose
+>> commit message) as patch 7978, and it's marked as "Applied to git-curr
+>> (uprobes branch)". Perhaps it got dropped along with the rest of the
+>> uprobes branch when the config problems were discovered, Russell?
+>
+> If it was applied to the uprobes branch, and it wasn't part of David's
+> uprobes git pull request, then yes, it doesn't exist anymore.
+>
 
-I have no further changes here..  I will submit a separate patch to
-cover Ezequiel's concern.  Any final comments?  Otherwise, I'll submit
-to Russell's system.
+OK.  Just to be absolutely clear:  this doesn't create any new problem, 
+but we do then need it in Tixy's new patchset in order to fix this older 
+bug.
 
-Thanks for the review!
-
-Sebastian
+-dl
