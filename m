@@ -1,134 +1,288 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Mar 2014 16:34:44 +0100
-Subject: [PATCH 1/2] ARM: clps711x: Add cpuidle driver
-In-Reply-To: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
-References: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
-Message-ID: <53305094.8010008@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 24 Mar 2014 15:36:11 +0000
+Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <1395422881-10029-2-git-send-email-broonie@kernel.org>
+References: <1395422881-10029-1-git-send-email-broonie@kernel.org>
+ <1395422881-10029-2-git-send-email-broonie@kernel.org>
+Message-ID: <20140324153611.GA16245@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2014 06:44 AM, Alexander Shiyan wrote:
-> Add cpuidle support for ARM Cirrus Logic CLPS711X CPUs.
-> This CPU has an unique internal register and write to this location
-> will put the system into the Idle State by halting the clock to the
-> processor until an interrupt is generated.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Hi Mark,
+
+On Fri, Mar 21, 2014 at 05:27:59PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Add support for parsing the explicit topology bindings to discover the
+> topology of the system.
+> 
+> Since it is not currently clear how to map multi-level clusters for the
+> scheduler all leaf clusters are presented to the scheduler at the same
+> level. This should be enough to provide good support for current systems.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+
+Please apply the patches attached, that fix some stale comments and
+add of_node_put in paths that could otherwise be broken by return
+statements.
+
+Patch "arm64: kernel: topology: removed stale comment" applies to patch
+1 of this series.
+
+Patch "arm64: kernel: topology updates" applies to patch 2 of this
+series.
+
+Both should be squashed into your original patches. Please have a final
+look and test them, they work for me.
+
+Having said that, on the updated patch 1 and 2 of this series:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
 > ---
->   drivers/cpuidle/Kconfig.arm        |  6 ++++
->   drivers/cpuidle/Makefile           |  1 +
->   drivers/cpuidle/cpuidle-clps711x.c | 64 ++++++++++++++++++++++++++++++++++++++
->   3 files changed, 71 insertions(+)
->   create mode 100644 drivers/cpuidle/cpuidle-clps711x.c
->
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 97ccc31..371e75d 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -13,6 +13,12 @@ config ARM_BIG_LITTLE_CPUIDLE
->   	  define different C-states for little and big cores through the
->   	  multiple CPU idle drivers infrastructure.
->
-> +config ARM_CLPS711X_CPUIDLE
-> +	bool "CPU Idle Driver for CLPS711X processors"
-> +	depends on ARCH_CLPS711X || COMPILE_TEST
-> +	help
-> +	  Select this to enable cpuidle on Cirrus Logic CLPS711X SOCs.
-> +
->   config ARM_HIGHBANK_CPUIDLE
->   	bool "CPU Idle Driver for Calxeda processors"
->   	depends on ARM_PSCI
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index f71ae1b..534fff5 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->   ##################################################################################
->   # ARM SoC drivers
->   obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
-> +obj-$(CONFIG_ARM_CLPS711X_CPUIDLE)	+= cpuidle-clps711x.o
->   obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
->   obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
->   obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
-> diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
-> new file mode 100644
-> index 0000000..5243811
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-clps711x.c
-> @@ -0,0 +1,64 @@
-> +/*
-> + *  CLPS711X CPU idle driver
-> + *
-> + *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define CLPS711X_CPUIDLE_NAME	"clps711x-cpuidle"
-> +
-> +static void __iomem *clps711x_halt;
-> +
-> +static int clps711x_cpuidle_halt(struct cpuidle_device *dev,
-> +				 struct cpuidle_driver *drv, int index)
+> 
+>  - Discard the DT data if any CPUs are omitted from the topology.
+>  - Call of_node_put() where required.
+> 
+>  arch/arm64/kernel/topology.c | 192 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 186 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index ff662b23af5f..d0cb687fb7f5 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -17,10 +17,183 @@
+>  #include <linux/percpu.h>
+>  #include <linux/node.h>
+>  #include <linux/nodemask.h>
+> +#include <linux/of.h>
+>  #include <linux/sched.h>
+>  
+>  #include <asm/topology.h>
+>  
+> +static int __init get_cpu_for_node(struct device_node *node)
 > +{
-> +	writel(0xaa, clps711x_halt);
+> +	struct device_node *cpu_node;
+> +	int cpu;
 > +
-> +	return index;
+> +	cpu_node = of_parse_phandle(node, "cpu", 0);
+> +	if (!cpu_node)
+> +		return -1;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		if (of_get_cpu_node(cpu, NULL) == cpu_node)
+> +			return cpu;
+> +	}
+> +
+> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
+> +	return -1;
 > +}
 > +
-> +static struct cpuidle_driver clps711x_idle_driver = {
-> +	.name		= CLPS711X_CPUIDLE_NAME,
-> +	.owner		= THIS_MODULE,
-> +	.states[0]	= {
-> +		.name		= "HALT",
-> +		.desc		= "CLPS711X HALT",
-> +		.enter		= clps711x_cpuidle_halt,
-> +		.exit_latency	= 1,
-
-Did you forget target_residency ? Or just not defined it as it is 0 ?
-
-> +	},
-> +	.state_count	= 1,
-> +};
-> +
-> +static int __init clps711x_cpuidle_probe(struct platform_device *pdev)
+> +static int __init parse_core(struct device_node *core, int cluster_id,
+> +			     int core_id)
 > +{
-> +	struct resource *res;
+> +	char name[10];
+> +	bool leaf = true;
+> +	int i = 0;
+> +	int cpu;
+> +	struct device_node *t;
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	clps711x_halt = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(clps711x_halt))
-> +		return PTR_ERR(clps711x_halt);
+> +	do {
+> +		snprintf(name, sizeof(name), "thread%d", i);
+> +		t = of_get_child_by_name(core, name);
+> +		if (t) {
+> +			leaf = false;
+> +			cpu = get_cpu_for_node(t);
+> +			if (cpu >= 0) {
+> +				cpu_topology[cpu].cluster_id = cluster_id;
+> +				cpu_topology[cpu].core_id = core_id;
+> +				cpu_topology[cpu].thread_id = i;
+> +			} else {
+> +				pr_err("%s: Can't get CPU for thread\n",
+> +				       t->full_name);
+> +				return -EINVAL;
+> +			}
+> +			of_node_put(t);
+> +		}
+> +		i++;
+> +	} while (t);
 > +
-> +	return cpuidle_register(&clps711x_idle_driver, NULL);
+> +	cpu = get_cpu_for_node(core);
+> +	if (cpu >= 0) {
+> +		if (!leaf) {
+> +			pr_err("%s: Core has both threads and CPU\n",
+> +			       core->full_name);
+> +			return -EINVAL;
+> +		}
+> +
+> +		cpu_topology[cpu].cluster_id = cluster_id;
+> +		cpu_topology[cpu].core_id = core_id;
+> +	} else if (leaf) {
+> +		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
 > +}
 > +
-> +static struct platform_driver clps711x_cpuidle_driver = {
-> +	.driver	= {
-> +		.name	= CLPS711X_CPUIDLE_NAME,
-> +		.owner	= THIS_MODULE,
-> +	},
-> +};
-> +module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+> +static int __init parse_cluster(struct device_node *cluster, int depth)
+> +{
+> +	char name[10];
+> +	bool leaf = true;
+> +	bool has_cores = false;
+> +	struct device_node *c;
+> +	static int cluster_id __initdata;
+> +	int core_id = 0;
+> +	int i, ret;
 > +
-> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-> +MODULE_DESCRIPTION("CLPS711X CPU idle driver");
-> +MODULE_LICENSE("GPL");
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +	/*
+> +	 * First check for child clusters; we currently ignore any
+> +	 * information about the nesting of clusters and present the
+> +	 * scheduler with a flat list of them.
+> +	 */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "cluster%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			ret = parse_cluster(c, depth + 1);
+> +			if (ret != 0)
+> +				return ret;
+> +			leaf = false;
+> +			of_node_put(c);
+> +		}
+> +		i++;
+> +	} while (c);
+> +
+> +	/* Now check for cores */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "core%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			has_cores = true;
+> +
+> +			if (depth == 0)
+> +				pr_err("%s: cpu-map children should be clusters\n",
+> +				       c->full_name);
+> +
+> +			if (leaf) {
+> +				ret = parse_core(c, cluster_id, core_id++);
+> +				if (ret != 0)
+> +					return ret;
+> +			} else {
+> +				pr_err("%s: Non-leaf cluster with core %s\n",
+> +				       cluster->full_name, name);
+> +				return -EINVAL;
+> +			}
+> +			of_node_put(c);
+> +		}
+> +		i++;
+> +	} while (c);
+> +
+> +	if (leaf && !has_cores)
+> +		pr_warn("%s: empty cluster\n", cluster->full_name);
+> +
+> +	if (leaf)
+> +		cluster_id++;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init parse_dt_topology(void)
+> +{
+> +	struct device_node *cn, *map;
+> +	int ret = 0;
+> +	int cpu;
+> +
+> +	cn = of_find_node_by_path("/cpus");
+> +	if (!cn) {
+> +		pr_err("No CPU information found in DT\n");
+> +		return 0;
+> +	}
+> +
+> +	/*
+> +	 * When topology is provided cpu-map is essentially a root
+> +	 * cluster with restricted subnodes.
+> +	 */
+> +	map = of_get_child_by_name(cn, "cpu-map");
+> +	if (!map)
+> +		goto out;
+> +
+> +	ret = parse_cluster(map, 0);
+> +	if (ret != 0)
+> +		goto out;
+> +
+> +	of_node_put(map);
+> +
+> +	/*
+> +	 * Check that all cores are in the topology; the SMP code will
+> +	 * only mark cores described in the DT as possible.
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		if (cpu_topology[cpu].cluster_id == -1) {
+> +			pr_err("CPU%d: No topology information specified\n",
+> +			       cpu);
+> +			ret = -EINVAL;
+> +		}
+> +	}
+> +
+> +out:
+> +	of_node_put(cn);
+> +	return ret;
+> +}
+> +
+>  /*
+>   * cpu topology table
+>   */
+> @@ -71,15 +244,10 @@ void store_cpu_topology(unsigned int cpuid)
+>  	update_siblings_masks(cpuid);
+>  }
+>  
+> -/*
+> - * init_cpu_topology is called at boot when only one cpu is running
+> - * which prevent simultaneous write access to cpu_topology array
+> - */
+> -void __init init_cpu_topology(void)
+> +static void __init reset_cpu_topology(void)
+>  {
+>  	unsigned int cpu;
+>  
+> -	/* init core mask and power*/
+>  	for_each_possible_cpu(cpu) {
+>  		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+>  
+> @@ -93,3 +261,15 @@ void __init init_cpu_topology(void)
+>  		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+>  	}
+>  }
+> +
+> +void __init init_cpu_topology(void)
+> +{
+> +	reset_cpu_topology();
+> +
+> +	/*
+> +	 * Discard anything that was parsed if we hit an error so we
+> +	 * don't use partial information.
+> +	 */
+> +	if (parse_dt_topology())
+> +		reset_cpu_topology();
+> +}
+> -- 
+> 1.9.1
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-arm64-kernel-topology-removed-stale-comment.patch
+Type: text/x-diff
+Size: 936 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/6afd3bc2/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-arm64-kernel-topology-updates.patch
+Type: text/x-diff
+Size: 2896 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/6afd3bc2/attachment-0003.bin>
