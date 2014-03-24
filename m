@@ -1,110 +1,60 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Mon, 24 Mar 2014 12:04:27 +0000
-Subject: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree bindings
-In-Reply-To: <OFC7DD5DAC.D378B300-ON80257CA2.0051ECEE-80257CA2.00529F98@LocalDomain>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>		
- <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
- <1395401031.4554.9.camel@weser.hi.pengutronix.de>	
- <OF03C9E23D.07B7D998-ON80257CA2.004E5877-80257CA2.004E9BFB@eu.necel.com>
- <1395412213.4554.17.camel@weser.hi.pengutronix.de>
- <OFC7DD5DAC.D378B300-ON80257CA2.0051ECEE-80257CA2.00529F98@LocalDomain>
-Message-ID: <OF9DD6173A.94976872-ON80257CA5.0041752F-80257CA5.0042532C@eu.necel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Mar 2014 13:04:57 +0100
+Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
+In-Reply-To: <20140324013556.GF23924@verge.net.au>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <201403211643.24533.arnd@arndb.de> <20140324013556.GF23924@verge.net.au>
+Message-ID: <14100654.IXZcGSFRJS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
-
-On: 21/03/2014 15:02, Phil wrote:
-> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
-bindings
-> 
-> Hi Lucas,
-> 
-> On: 21/03/2014 14:31, Lucas wrote:
-> > Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
-bindings
+On Monday 24 March 2014 10:35:56 Simon Horman wrote:
+> On Fri, Mar 21, 2014 at 04:43:24PM +0100, Arnd Bergmann wrote:
+> > On Thursday 20 March 2014, Simon Horman wrote:
+> > > I wonder if Kconfig for koelsch should be tightened up somehow to
+> > > ensure that PHYLIB is either unselected or builtin.
+> > > 
+> > > Also, a minor nit, I would prefer changes for different boards
+> > > in different patches. But I can split the patch myself if its
+> > > not going to be changed otherwise.
 > > 
-> > Am Freitag, den 21.03.2014, 14:18 +0000 schrieb
-> > Phil.Edworthy at renesas.com:
-> > > Hi Lucas,
-> > > 
-> > > On 21/03/2014 11:24, Lucas wrote:
-> > > > Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device 
-tree 
-> > > bindings
-> > > > 
-> > > > Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
-> > > > > This patch adds the bindings for the rcar PCIE driver. The 
-driver
-> > > > > resides under drivers/pci/host/pcie-rcar.c
-> > > > > 
-> > > > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > > > 
-> > > > I have one question below. If you can answer this with yes after
-> > > > thinking again about it, this is:
-> > > > 
-> > > > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> > > > > ---
-> > > > >  Documentation/devicetree/bindings/pci/rcar-pci.txt | 40 
-> > > ++++++++++++++++++++++
-> > > > >  1 file changed, 40 insertions(+)
-> > > > >  create mode 100644 
-Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > > > > 
-> > > > > diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt 
-b/
-> > > > Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..0e219b0
-> > > > > --- /dev/null
-> > > > > +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > > > > @@ -0,0 +1,40 @@
-> > > > > +* Renesas RCar PCIe interface
-> > > > > +
-> > > > > +Required properties:
-> > > > > +- compatible: should contain one of the following
-> > > > > +   "renesas,r8a7779-pcie", "renesas,r8a7790-pcie", 
-> > > "renesas,r8a7791-pcie"
-> > > > > +- reg: base addresses and lengths of the pcie controller.
-> > > > > +- #address-cells: set to <3>
-> > > > > +- #size-cells: set to <2>
-> > > > > +- device_type: set to "pci"
-> > > > > +- ranges: ranges for the PCI memory and I/O regions
-> > > > > +- interrupts: interrupt values for MSI interrupt
-> > > > > +- #interrupt-cells: set to <1>
-> > > > > +- interrupt-map-mask and interrupt-map: standard PCI properties
-> > > > > +   to define the mapping of the PCIe interface to interrupt
-> > > > > +   numbers.
-> > > > > +- clocks: from common clock binding: handle to pci clock.
-> > > > > +- clock-names: from common clock binding: should be "pcie"
-> > > > 
-> > > > You really only have one PCIe clock? So the controller is 
-generating the
-> > > > PCIe bus clock from it's register clock? No need to enable any 
-other
-> > > > clock for PCIe to work?
-> > > Yes, just the one clock. The PCIe bus clock is an external clock 
-dedicated 
-> > > to PCIe and SATA, and we have no control over it.
-> > > 
-> > Is this some kind of always-on clock? If not you probably want a
-> > reference to it from the PCIe driver even if it's shared between SATA
-> > and PCIe. After all you don't want to end up unconditionally enabling
-> > this clock from the board or SoC level just to have PCIe working, 
-right?
-> Ok, I see, I'll need a reference to a board clock, even if it's always 
-on for 
-> these boards. 
-One small question...
+> > I would prefer to take the entire series directly into arm-soc
+> > this time, if you don't mind.
+> 
+> That I'm happy to go along with though I don't understand the motivation
+> for it. And regardless of how the patches go in I'd prefer if they were
+> split as I suggested above.
 
-The patches added the PCIe host controller to two devices, r8a7790 and 
-r8a7791. The r8a7790-based Lager board doesn't have the necessary hardware 
-to use PCIe, so should I add a dummy pcie_bus clock to the Lager board 
-dts, even though PCIe is not used?
+Sorry, I misunderstood you at first. I thought you meant you only split
+them up when you apply them yourself. It's no problem for me to split
+up this patch as well and then apply it here.
 
-I'm just wondering what the dts file looks like for a board that doesn't 
-support many interfaces. Does it become littered with dummy clocks and 
-regulators?
+> What I'm not so happy about is us potentially moving a problem from being a
+> compile time error, which is easy to observe, to a run-time behavioural
+> problem, which may be much less obvious to the beholder.
 
-Thanks
-Phil
+I agree that it's not nice, but I couldn't come with a better approach,
+and we are doing the same thing on other platforms as well.
+
+The problems are:
+
+* leaving the code as it is today prevents me from running all
+  'make randconfig' kernels successfully. I use this as an important
+  test case for verifying stuff we pull into the arm-soc tree.
+  At the moment, I have a 160-patch series that I want to get merged
+  upstream over time.
+
+* Using 'select PHYLIB' from the platform is nasty because we want
+  to be able to turn off whole subsystems (BLOCK, NET, I2C, ...)
+  in Kconfig independent of the board selection. PHYLIB requires
+  the network code.
+
+* Using 'depends on' to disable the board option if PHYLIB is
+  a module is counterintuitive.
+
+* Makeing PHYLIB always built-in when NETDEVICE is would be a
+  bit wasteful.
+
+I don't have any other ideas for solving this.
+
+	Arnd
