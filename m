@@ -1,37 +1,96 @@
-From: robie.basak@canonical.com (Robie Basak)
-Date: Mon, 24 Mar 2014 09:57:23 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140323032939.GD30885@cbox>
-References: <20140301152756.67A02C40238@trevor.secretlab.ca>
- <20140306085213.GU643@mal.justgohome.co.uk>
- <531843EE.8040102@redhat.com> <53185FB9.1040308@redhat.com>
- <20140306120449.GA29916@mal.justgohome.co.uk>
- <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
- <20140322010206.GF25519@cbox> <532D4505.1090603@redhat.com>
- <20140323031952.GB30885@cbox> <20140323032939.GD30885@cbox>
-Message-ID: <20140324095723.GJ23363@mal.justgohome.co.uk>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 24 Mar 2014 11:00:32 +0100
+Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
+In-Reply-To: <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
+References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
+ <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
+ <CAKohpok1zBsX7n70r=geCOaP-9ONx2QdaUMK6cJeqhFrO1PkUg@mail.gmail.com>
+Message-ID: <20140324110032.7aeae15e@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you all for considering this case in more detail.
+Hi Viresh,
 
-On Sat, Mar 22, 2014 at 08:29:39PM -0700, Christoffer Dall wrote:
-> After thinking about this a bit more, I think I see what we're actually
-> discussing.  It's obvious that if software in a VM makes changes to UEFI
-> variables that are required to be persistent for that VM image to boot
-> again, then the VM image is no longer portable, as per the spec.
+> On 4 March 2014 15:57, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> > Despite this patch set is working and applicable on top of 3.14-rc5,
+> > please regard it solely as a pure RFC.
+> 
+> Okay, I am trying to do a review here and because you have mentioned
+> how different it is from the earlier versions, I am trying with a
+> fresh mind. i.e. with zero memories of earlier discussions :)
+> 
+> LAB was: Legacy Application Boost ??
 
-No longer portable, and given the current state of implementation, no
-longer bootable, since we don't support persistent storage yet;
-certainly not on OpenStack? Or do we have that now?
+Yes, correct.
 
-Are we really pushing ahead with a specification that nobody can
-implement today? How far away are we from a fully compliant
-implementation?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/6e1da7b1/attachment.sig>
+> 
+> Probably mention that in your new threads as well, so that new readers
+> know the details. Also, like other governors, just name it "boost"
+> governor.
+
+I think, that "LAB" name is with us for some time, so it would be a
+pity to discard it.
+
+> 
+> > This patch provides support for LAB governor build on top of
+> > ondemand. Previous version of LAB can be found here:
+> > http://thread.gmane.org/gmane.linux.kernel/1484746/match=cpufreq
+> >
+> > LAB short reminder:
+> >
+> > LAB uses information about how many cores are in "idle" state (the
+> > core idleness is represented as the value between 0 and 100) and
+> > the overall load of the system (from 0 to 100) to decide about
+> > frequency to be set. It is extremely useful with SoCs like
+> > Exynos4412, which can set only one frequency for all cores.
+> 
+> Probably a description of how exactly these two values come into play
+> would have been more interesting here for all. Always think of new
+> followers of your patchset and so add all interesting things about it
+> when you resend it.
+> 
+> If I remember well the logic was more or less like this:
+> - More idle cores means run few running cores at high frequency
+> - Less idle cores means don't run them at very high frequencies
+> 
+> Right?
+
+This is correct. Also, the underlying SoC - Exynos4412 has 4 cores with
+option to set frequency only on all of them.
+
+> 
+> What about making it as simple as:
+> - changing the ondemand governor only instead of adding a new governor
+
+My goal is to not touch the ondemand code. It has matured, so I would
+like to leave it as it is.
+
+> - Keeping the bahavior as is for all platforms not publishing boost
+> frequencies
+
+This is also done - you get the LAB configuration specified in the DT
+for the particular platform/board.
+
+> - If more cores are idle, enable switching to boost frequencies and
+> take them into consideration all the time.
+
+I'm not sure if I have understood you, but something like that is also
+performed in the code.
+
+> - If less cores are idle, disable boost frequencies..
+
+As written above.
+
+> 
+> Lets discuss this first and then I will get into the very details of
+> your implementation.
+
+Discussion about above functionalities requires consulting the
+implementation to be sure that our opinions are the same.
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
