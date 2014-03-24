@@ -1,75 +1,43 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 24 Mar 2014 21:36:20 +0100
-Subject: [PATCH] arm64: SHA-224/SHA-256 using ARMv8 Crypto Extensions
-In-Reply-To: <1395326886-5866-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1395326886-5866-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <201403242136.20547.marex@denx.de>
+Date: Mon, 24 Mar 2014 21:21:58 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <20140321173252.GL7528@n2100.arm.linux.org.uk>
+ <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
+Message-ID: <201403242121.58705.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 20, 2014 at 03:48:06 PM, Ard Biesheuvel wrote:
-> This patch adds support for the SHA-224 and SHA-256 hash algorithms using
-> the NEON based SHA-256 instructions that were introduced in ARM v8.
+On Monday, March 24, 2014 at 06:57:18 PM, robert.daniels at vantagecontrols.com 
+wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 03/21/2014
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+> 11:32:53 AM:
+> > Hmm, rt kernels.  Does this happen without the rt patches applied?
+> 
+> I am not using the rt patches and I still see the problem.  I'm using
+> 3.14.0-rc6+ with
+> fec patches on the i.MX53 Quick Start Board with the latest U-Boot.
+> 
+> When I run my test I will immediately see packet loss with the eventual tx
+> timeout issue.
+> 
+> These are the steps I use to reproduce the problem:
+> 
+> Setup: Desktop (Ubuntu 12.04: webfs, iperf3, /srv/ftp/test.bmp ~27 MB)
+>        i.MX53 Quick Start Board (linux 3.14.0-rc6+ with fec patches:
+> iperf3, wget)
+> 
+> Test:
+> 
+>   Desktop:
+>     iperf3 -s -V
+> 
+>   i.MX53 QSB:
+>     ssh 1> iperf3 -c 192.168.1.101 -u -l 64 -b 55M -V -t 1000
 
-[...]
+I think the UDP test might be lossy, can you try with TCP test please ?
 
-> + * Copyright (c) Alan Smithee.
-
-Email contact is missing here.
-
-[...]
-
-> +static int sha224_init(struct shash_desc *desc)
-> +{
-> +	struct sha256_state *sctx = shash_desc_ctx(desc);
-> +
-> +	*sctx = (struct sha256_state){
-
-This cast is interesting, I don't quite understand it. Can you please explain 
-that to me ?
-
-> +		.state = {
-> +			SHA224_H0, SHA224_H1, SHA224_H2, SHA224_H3,
-> +			SHA224_H4, SHA224_H5, SHA224_H6, SHA224_H7,
-> +		}
-> +	};
-> +	return 0;
-> +}
-
-[...]
-
-> +static int sha224_final(struct shash_desc *desc, u8 *out)
-> +{
-> +	struct sha256_state *sctx = shash_desc_ctx(desc);
-> +	__be32 *dst = (__be32 *)out;
-> +	int i;
-> +
-> +	sha2_final(desc);
-> +
-> +	for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(*dst); i++)
-> +		dst[i] = cpu_to_be32(sctx->state[i]);
-
-Won't this cause unaligned access if *dst is not aligned to 32 bytes ?
-
-Try the crypto tests with this patch to see if this explodes please.
-
-diff --git a/crypto/testmgr.c b/crypto/testmgr.c
-index 7795550..b9b7144 100644
---- a/crypto/testmgr.c
-+++ b/crypto/testmgr.c
-@@ -191,7 +191,8 @@ static int __test_hash(struct crypto_ahash *tfm, struct 
-hash_testvec *template,
-        const char *algo = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
-        unsigned int i, j, k, temp;
-        struct scatterlist sg[8];
--       char result[64];
-+       char _result[68];
-+       char *result = _result + 1;
-        struct ahash_request *req;
-        struct tcrypt_result tresult;
-        void *hash_buff;
-
-[...]
+Best regards,
+Marek Vasut
