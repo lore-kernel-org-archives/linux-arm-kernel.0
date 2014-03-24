@@ -1,131 +1,35 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 24 Mar 2014 22:05:29 +0530
-Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CABb+yY1U_XFQndHq4aumZ+BNbCu3Frrk+x9fM9Dg5nxDT=HfoQ@mail.gmail.com>
-References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
- <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
- <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
- <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
- <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
- <CA+mB=1LRQSpz+Hmtym44x6+KW9ksXj9WQ8UKcHydk-JAWdyP+w@mail.gmail.com>
- <CABb+yY1U_XFQndHq4aumZ+BNbCu3Frrk+x9fM9Dg5nxDT=HfoQ@mail.gmail.com>
-Message-ID: <CA+mB=1KdTaiFQiQ8C3aBZz0ff=CDuGELr-KEszbFpaMsQr56gw@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 24 Mar 2014 20:44:01 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogY2xwczcxMXg6IEFkZCBjcHVpZGxlIGRy?=
+ =?UTF-8?B?aXZlcg==?=
+In-Reply-To: <53305094.8010008@linaro.org>
+References: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
+ <53305094.8010008@linaro.org>
+Message-ID: <1395679441.129942365@f386.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 8:53 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Mon, Mar 24, 2014 at 8:44 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->> On Mon, Mar 24, 2014 at 4:21 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->>> On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>> Hi Jassi,
->>>>
->>>> Thanks for the Acked-by.
->>>>
->>>> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>>>
->>>>>> +
->>>>>> +/**
->>>>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
->>>>>
->>>>> Should be xilinx_vdma_dma_prep_interleaved here.
->>>>
->>>> Ok, I will correct it.  Thanks.
->>>>
->>>>>
->>>>>> +/**
->>>>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
->>>>>> + * Run-time configuration for Axi VDMA, supports:
->>>>>> + * . halt the channel
->>>>>> + * . configure interrupt coalescing and inter-packet delay threshold
->>>>>> + * . start/stop parking
->>>>>> + * . enable genlock
->>>>>> + *
->>>>>> + * @dchan: DMA channel
->>>>>> + * @cfg: VDMA device configuration pointer
->>>>>> + *
->>>>>> + * Return: '0' on success and failure value on error
->>>>>> + */
->>>>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->>>>>> +                                       struct xilinx_vdma_config *cfg)
->>>>>> +{
->>>>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>>>>> +       u32 dmacr;
->>>>>> +
->>>>>> +       if (cfg->reset)
->>>>>> +               return xilinx_vdma_chan_reset(chan);
->>>>>> +
->>>>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
->>>>>> +
->>>>>> +       chan->config.frm_dly = cfg->frm_dly;
->>>>>> +       chan->config.park = cfg->park;
->>>>>> +
->>>>>> +       /* genlock settings */
->>>>>> +       chan->config.gen_lock = cfg->gen_lock;
->>>>>> +       chan->config.master = cfg->master;
->>>>>> +
->>>>>> +       if (cfg->gen_lock && chan->genlock) {
->>>>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
->>>>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
->>>>>> +       }
->>>>>> +
->>>>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
->>>>>> +       if (cfg->park)
->>>>>> +               chan->config.park_frm = cfg->park_frm;
->>>>>> +       else
->>>>>> +               chan->config.park_frm = -1;
->>>>>> +
->>>>>> +       chan->config.coalesc = cfg->coalesc;
->>>>>> +       chan->config.delay = cfg->delay;
->>>>>> +
->>>>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
->>>>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
->>>>>> +               chan->config.coalesc = cfg->coalesc;
->>>>>> +       }
->>>>>> +
->>>>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
->>>>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
->>>>>> +               chan->config.delay = cfg->delay;
->>>>>> +       }
->>>>>> +
->>>>>> +       /* FSync Source selection */
->>>>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
->>>>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
->>>>>> +
->>>>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
->>>>>> +
->>>>>> +       return 0;
->>>>>> +}
->>>>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
->>>>>> +
->>>>> Bypassing the DMAEngine api doesn't seem very neat.
->>>>> Is there currently any client driver that /changes/ this configuration
->>>>> between channel requests? If no, then simply get the configuration
->>>>> from DT node and avoid this api.
->>>>
->>>> This change is recently suggested by Lars in the following patch series,
->>>> "dma: Remove comment about embedding dma_slave_config into custom structs"
->>>>
->>> If some user does indeed need to /change/ the configuration across
->>> channel requests, we can keep function. Is there currently any such
->>> user?
->>
->> Yes, we are planning to push these changes soon to drivers/media/.
->>
-> This is not what I asked though. I asked if some client driver changes
-> the configuration options based on some runtime decision? If yes, then
-> the api is warranted. Otherwise, you might consider getting the static
-> configuration from DT. That's all I suggest.
+Mon, 24 Mar 2014 16:34:44 +0100 ?? Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 03/22/2014 06:44 AM, Alexander Shiyan wrote:
+> > Add cpuidle support for ARM Cirrus Logic CLPS711X CPUs.
+> > This CPU has an unique internal register and write to this location
+> > will put the system into the Idle State by halting the clock to the
+> > processor until an interrupt is generated.
+> >
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+...
+> > +static struct cpuidle_driver clps711x_idle_driver = {
+> > +	.name		= CLPS711X_CPUIDLE_NAME,
+> > +	.owner		= THIS_MODULE,
+> > +	.states[0]	= {
+> > +		.name		= "HALT",
+> > +		.desc		= "CLPS711X HALT",
+> > +		.enter		= clps711x_cpuidle_halt,
+> > +		.exit_latency	= 1,
+> 
+> Did you forget target_residency ? Or just not defined it as it is 0 ?
 
-Yes, the client driver can change the configuration in the runtime
-like the park_frm
-option, for example, decides on which frame to park on.
+Yes, zero value.
 
-Srikanth
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+---
