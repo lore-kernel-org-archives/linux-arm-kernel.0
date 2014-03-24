@@ -1,47 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Mar 2014 10:47:17 +0100
-Subject: [PATCH v7 1/8] clk: sunxi: factors: automatic reparenting support
-In-Reply-To: <20140319233945.21989.12073@quantum>
-References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
- <20140217100215.15040.63745.stgit@pagira.o2s.ch>
- <20140218140516.GG3142@lukather>
- <20140319233945.21989.12073@quantum>
-Message-ID: <20140320094717.GL27873@lukather>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Mon, 24 Mar 2014 15:53:48 +0100
+Subject: imx-drm: screen flickering
+In-Reply-To: <201402012356.45736.marex@denx.de>
+References: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
+ <201401291553.15040.marex@denx.de> <20140130074526.GQ16215@pengutronix.de>
+ <201402012356.45736.marex@denx.de>
+Message-ID: <CAH9NwWcAGM7qL3ADqObL784T6=nDwbZ+6iM1NA79+9reUguMeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 04:39:45PM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-02-18 06:05:16)
-> > On Mon, Feb 17, 2014 at 11:02:15AM +0100, David Lanzend?rfer wrote:
-> > > From: Emilio L?pez <emilio@elopez.com.ar>
-> > > 
-> > > This commit implements .determine_rate, so that our factor clocks can be
-> > > reparented when needed.
-> > > 
-> > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > 
-> > Your signed-off-by is missing here.
-> > 
-> > Once you added it, you can add my Acked-by
-> 
-> Yes the patch looks good to me as well. Am I correct in thinking that it
-> is independent of the MMC clock phase discussion? If it is resubmitted
-> with a proper SoB then I can pick it.
+>
+> On Thursday, January 30, 2014 at 08:45:26 AM, Sascha Hauer wrote:
+> > On Wed, Jan 29, 2014 at 03:53:14PM +0100, Marek Vasut wrote:
+> > > On Wednesday, January 29, 2014 at 12:15:57 PM, Sascha Hauer wrote:
+> > > > Hi Christian,
+> > > >
+> > > > On Tue, Jan 28, 2014 at 09:11:32AM +0100, Christian Gmeiner wrote:
+> > > > > Hi all.
+> > > > >
+> > > > > From time to time it happens that my LVDS display is flickering (look
+> > > > > at scroll bar in the video).
+> > > > > https://drive.google.com/file/d/0B_fznDimUHVubWtvVFlMTkdBbUU/edit?usp
+> > > > > =sha ring
+> > > > >
+> > > > > I really want to find the root cause of it, but I do not know where
+> > > > > to start. I can trigger this
+> > > > > sometimes after xscreensever "blanks" the screen and the screensafer
+> > > > > gets disabled
+> > > > > via user input.
+> > > > >
+> > > > > Any hints?
+> > > >
+> > > > Sorry, no idea. Philipp and me watched the video, but we both haven't
+> > > > seen something like this before.
+> > >
+> > > Isn't it the clock polarity being inverted thing again [1]?
+> >
+> > Could be, at least the result should look similar. I just wonder why it
+> > only happens after a few times doing something. I would expect the clock
+> > is always inverted then.
+>
+> I actually noticed a rather strange behavior when the clock polarity was
+> inverted as well. The flicker was not always there in my case either, but I used
+> parallel LCD .
 
-Yes, it's completely independant of the MMC phase stuff.
+I need to check this polarity thing again.
 
-Emilio, or David, could you resend it?
+I found some time to look deeper into my screen flickering issue and
+did some measurements.
 
-Maxime
+green:   LVDS_0
+blue:     LVDS_1
+purple:  LVDS_2
+yellow:  LVDS_Clk
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140320/2de77768/attachment.sig>
+https://drive.google.com/folderview?id=0B_fznDimUHVuWGZrT0puSldyZ1E&usp=sharing
+
+In theory both measurements should look almost the same but for me it
+looks like LVDS_0 and LVDS_1 are wrong.
+IPU and LDB are - in my eyes - the only two components involved here.
+So I had a look at the imx6 datasheet
+and it could only be the IPU causing this kind of problems as the ldb
+is does nothing really fancy here.
+There is a IPU debug bus but there is quite almost no information on
+how to use it. Also I am not sure if
+it would help me to identify the issue.
+
+greets
+--
+Christian Gmeiner, MSc
+
+https://soundcloud.com/christian-gmeiner
