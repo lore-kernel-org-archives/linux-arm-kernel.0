@@ -1,143 +1,59 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Mon, 24 Mar 2014 12:46:39 +0000
-Subject: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree bindings
-In-Reply-To: <OF85DD7B1D.716DE42D-ON80257CA5.00443087-80257CA5.004447DB@LocalDomain>
-References: <1395397968-6242-1-git-send-email-phil.edworthy@renesas.com>		
- <1395397968-6242-6-git-send-email-phil.edworthy@renesas.com>
- <1395401031.4554.9.camel@weser.hi.pengutronix.de>
- <OF03C9E23D.07B7D998-ON80257CA2.004E5877-80257CA2.004E9BFB@eu.necel.com>
- <1395412213.4554.17.camel@weser.hi.pengutronix.de>
- <OFC7DD5DAC.D378B300-ON80257CA2.0051ECEE-80257CA2.00529F98@LocalDomain>
- <OF9DD6173A.94976872-ON80257CA5.0041752F-80257CA5.0042532C@eu.necel.com>
- <533021F6.2000702@codethink.co.uk>
- <OF85DD7B1D.716DE42D-ON80257CA5.00443087-80257CA5.004447DB@LocalDomain>
-Message-ID: <OF01E3AAFE.D9BF866A-ON80257CA5.0045F63A-80257CA5.00463029@eu.necel.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 24 Mar 2014 13:47:32 +0100
+Subject: [PATCH 5/5] ARM: dts: tx53: Add IPU DI ports and endpoints
+In-Reply-To: <20140322065038.GE5938@dragon>
+References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
+ <1395235721-13847-5-git-send-email-LW@KARO-electronics.de>
+ <20140322065038.GE5938@dragon>
+Message-ID: <20140324134732.43e59627@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hi,
 
-On: 24/03/2014 12:25, Phil wrote:
-> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
-bindings
-> 
-> Hi Ben,
-> 
-> On: 24/03/2014 12:16, Ben wrote:
-> > Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree 
-bindings
+Shawn Guo wrote:
+> On Wed, Mar 19, 2014 at 02:28:41PM +0100, Lothar Wa?mann wrote:
 > > 
-> > On 24/03/14 12:04, Phil.Edworthy at renesas.com wrote:
-> > > Hi Lucas,
-> > >
-> > > On: 21/03/2014 15:02, Phil wrote:
-> > >> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device tree
-> > > bindings
-> > >>
-> > >> Hi Lucas,
-> > >>
-> > >> On: 21/03/2014 14:31, Lucas wrote:
-> > >>> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device 
-tree
-> > > bindings
-> > >>>
-> > >>> Am Freitag, den 21.03.2014, 14:18 +0000 schrieb
-> > >>> Phil.Edworthy at renesas.com:
-> > >>>> Hi Lucas,
-> > >>>>
-> > >>>> On 21/03/2014 11:24, Lucas wrote:
-> > >>>>> Subject: Re: [PATCH v4 5/9] dt-bindings: pci: rcar pcie device
-> > > tree
-> > >>>> bindings
-> > >>>>>
-> > >>>>> Am Freitag, den 21.03.2014, 10:32 +0000 schrieb Phil Edworthy:
-> > >>>>>> This patch adds the bindings for the rcar PCIE driver. The
-> > > driver
-> > >>>>>> resides under drivers/pci/host/pcie-rcar.c
-> > >>>>>>
-> > >>>>>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > >>>>>
-> > >>>>> I have one question below. If you can answer this with yes after
-> > >>>>> thinking again about it, this is:
-> > >>>>>
-> > >>>>> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> > >>>>>> ---
-> > >>>>>>   Documentation/devicetree/bindings/pci/rcar-pci.txt | 40
-> > >>>> ++++++++++++++++++++++
-> > >>>>>>   1 file changed, 40 insertions(+)
-> > >>>>>>   create mode 100644
-> > > Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > >>>>>>
-> > >>>>>> diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > > b/
-> > >>>>> Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > >>>>>> new file mode 100644
-> > >>>>>> index 0000000..0e219b0
-> > >>>>>> --- /dev/null
-> > >>>>>> +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> > >>>>>> @@ -0,0 +1,40 @@
-> > >>>>>> +* Renesas RCar PCIe interface
-> > >>>>>> +
-> > >>>>>> +Required properties:
-> > >>>>>> +- compatible: should contain one of the following
-> > >>>>>> +   "renesas,r8a7779-pcie", "renesas,r8a7790-pcie",
-> > >>>> "renesas,r8a7791-pcie"
-> > >>>>>> +- reg: base addresses and lengths of the pcie controller.
-> > >>>>>> +- #address-cells: set to <3>
-> > >>>>>> +- #size-cells: set to <2>
-> > >>>>>> +- device_type: set to "pci"
-> > >>>>>> +- ranges: ranges for the PCI memory and I/O regions
-> > >>>>>> +- interrupts: interrupt values for MSI interrupt
-> > >>>>>> +- #interrupt-cells: set to <1>
-> > >>>>>> +- interrupt-map-mask and interrupt-map: standard PCI 
-properties
-> > >>>>>> +   to define the mapping of the PCIe interface to interrupt
-> > >>>>>> +   numbers.
-> > >>>>>> +- clocks: from common clock binding: handle to pci clock.
-> > >>>>>> +- clock-names: from common clock binding: should be "pcie"
-> > >>>>>
-> > >>>>> You really only have one PCIe clock? So the controller is
-> > > generating the
-> > >>>>> PCIe bus clock from it's register clock? No need to enable any
-> > > other
-> > >>>>> clock for PCIe to work?
-> > >>>> Yes, just the one clock. The PCIe bus clock is an external clock
-> > > dedicated
-> > >>>> to PCIe and SATA, and we have no control over it.
-> > >>>>
-> > >>> Is this some kind of always-on clock? If not you probably want a
-> > >>> reference to it from the PCIe driver even if it's shared between 
-SATA
-> > >>> and PCIe. After all you don't want to end up unconditionally 
-enabling
-> > >>> this clock from the board or SoC level just to have PCIe working,
-> > > right?
-> > >> Ok, I see, I'll need a reference to a board clock, even if it's 
-always
-> > > on for
-> > >> these boards.
-> > > One small question...
-> > >
-> > > The patches added the PCIe host controller to two devices, r8a7790 
-and
-> > > r8a7791. The r8a7790-based Lager board doesn't have the necessary 
-hardware
-> > > to use PCIe, so should I add a dummy pcie_bus clock to the Lager 
-board
-> > > dts, even though PCIe is not used?
-> > >
-> > > I'm just wondering what the dts file looks like for a board that 
-doesn't
-> > > support many interfaces. Does it become littered with dummy clocks 
-and
-> > > regulators?
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  arch/arm/boot/dts/imx53-tx53-x03x.dts |    7 ++++++-
+> >  1 file changed, 6 insertions(+), 1 deletion(-)
 > > 
-> > The bridge node should be set to disabled by default so it never gets
-> > probed. Any boards that want to use it can over-ride the status to be
-> > enabled.
-> Ok, thanks.
-Hmm, yes it doesn't get probed, but you still get a build problem as the 
-DT entry references an clock that doesn't exist. Maybe I'm missing 
-something...
+> > diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+> > index 0217dde3..43b4b7b 100644
+> > --- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
+> > +++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
+> > @@ -25,12 +25,17 @@
+> >  	soc {
+> >  		display: display at di0 {
+> >  			compatible = "fsl,imx-parallel-display";
+> > -			crtcs = <&ipu 0>;
+> >  			interface-pix-fmt = "rgb24";
+> >  			pinctrl-names = "default";
+> >  			pinctrl-0 = <&pinctrl_rgb24_vga1>;
+> >  			status = "okay";
+> >  
+> > +			port {
+> > +				display0_in: endpoint {
+> > +					remote-endpoint = <&ipu_di0_disp0>;
+> > +				};
+> > +			};
+> > +
+> 
+> I shouldn't apply this until I rebase my branch on 3.15-rc1 where
+> Philipp's OF graph is to be seen, right?
+> 
+That's ok with me.
 
-Phil
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
