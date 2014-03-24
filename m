@@ -1,94 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 24 Mar 2014 19:41:14 +0100
-Subject: [PATCH v3] i2c: new bus driver for efm32
-In-Reply-To: <20140324170131.GB7524@katana>
-References: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140324170131.GB7524@katana>
-Message-ID: <20140324184114.GK23076@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 24 Mar 2014 13:50:27 -0500
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
+In-Reply-To: <53304F76.8090703@ti.com>
+References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
+ <20140321055242.GA1959@saruman.home> <53304F76.8090703@ti.com>
+Message-ID: <20140324185027.GC12500@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 06:01:31PM +0100, Wolfram Sang wrote:
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-> > @@ -0,0 +1,34 @@
-> > +* Energymicro efm32 i2c controller
-> > +
-> > +Required properties :
-> > +
-> > + - reg : Offset and length of the register set for the device
-> > + - compatible : should be "efm32,i2c"
-> 
-> Ehrm, come to think of it, shouldn't that actually be "energymicro, efm32-i2c"
-> or similar to match the "vendor,product" pattern?
-yes.
+Hi,
 
+On Mon, Mar 24, 2014 at 10:29:58AM -0500, Dave Gerlach wrote:
+> On 03/21/2014 12:52 AM, Felipe Balbi wrote:
+> >On Fri, Mar 21, 2014 at 10:50:13AM +0530, Lokesh Vutla wrote:
+> >>From: Dave Gerlach <d-gerlach@ti.com>
+> >>
+> >>Do not reset GPIO5 at boot-up because GPIO5_7 is used
+> >>on AM437x GP-EVM to control VTT regulators on DDR3.
+> >>Without this some GP-EVM boards will fail to boot because
+> >>of DDR3 corruption.
+> >>
+> >>Reported-by: Nishanth Menon <nm@ti.com>
+> >>Tested-by: Nishanth Menon <nm@ti.com>
+> >>Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >>Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> >
+> >every now and again we see a patch like this because yet another board
+> >is using a GPIO to toggle DDR regulators.
+> >
+> >Instead of constantly patching things like this, how about we try
+> >something like below (build-tested only):
 > 
-> > +config I2C_EFM32
-> > +	tristate "EFM32 I2C controller"
-> > +	depends on OF && (ARCH_EFM32 || COMPILE_TEST)
-> 
-> Is EFM32 DT only? Do we need the dependency on OF?
-yes, efm32 is DT only. Still for the COMPILE_TEST branch the OF is
-needed.
- 
-> > +	help
-> > +	  This driver supports the i2c block found in Energy Micro's EFM32
-> > +	  SoCs.
-> > +
-> 
-> ...
-> 
-> > +static int efm32_i2c_master_xfer(struct i2c_adapter *adap,
-> > +		struct i2c_msg *msgs, int num)
-> > +{
-> > +	struct efm32_i2c_ddata *ddata = i2c_get_adapdata(adap);
-> > +	int ret;
-> > +
-> > +	if (ddata->msgs)
-> > +		return -EBUSY;
-> > +
-> > +	ddata->msgs = msgs;
-> > +	ddata->num_msgs = num;
-> > +	ddata->current_word = 0;
-> > +	ddata->current_msg = 0;
-> > +	ddata->retval = -EIO;
-> > +
-> > +	reinit_completion(&ddata->done);
-> > +
-> > +	dev_dbg(&ddata->adapter.dev, "state: %08x, status: %08x\n",
-> > +			efm32_i2c_read32(ddata, REG_STATE),
-> > +			efm32_i2c_read32(ddata, REG_STATUS));
-> > +
-> > +	efm32_i2c_send_next_msg(ddata);
-> > +
-> > +	wait_for_completion(&ddata->done);
-> > +
-> > +	if (ddata->current_msg >= ddata->num_msgs)
-> > +		ret = ddata->num_msgs;
-> > +	else
-> > +		ret = ddata->retval;
-> > +
-> > +	ddata->msgs = NULL;
-> 
-> Setting NULL should not be needed?
-Right, that's a left over from the locking stuff.
- 
-> > +
-> > +	return ret;
-> > +}
-> > +
-> 
-> And checkpatch said:
-> 
-> WARNING: braces {} are not necessary for any arm of this statement
-> #345: FILE: drivers/i2c/busses/i2c-efm32.c:239:
-> +		if (cur_msg->flags & I2C_M_RD) {
-> ...
-ok.
+> Why should we change all of them? Is it correct to leave every single GPIO
+> at the mercy of the bootloader in every situation? The reason we see these
 
-Uwe
+it's not leaving anything at the mercy of the bootloader. It's simply
+looking at the HW itself and asking "what's the current state of this
+GPIO ?"
+
+> patches only every now and again is because it's a special case that should
+
+I wouldn't call it "special". A GPIO block is pretty dumb, its registers
+only give you current pin state, there's virtually no state machine
+involved whatsoever.
+
+> be handled only for that situation. I also don't think it makes sense
+> to make gpio's a unique case that never gets reset while every other
+> IP does by default.
+
+Well, if it doesn't need to be reset, why would you spend that time
+resetting it ? In the GPIO case, you gain nothing by resetting the IP,
+nothing at all, other than "now I'm sure the IP is in
+no-standby/no-idle" but that can be easily read back from SYS[SC]
+registers anyway.
+
+The point is that we have two choices here:
+
+a) every time a new board comes around using GPIO as an enable signal
+for DDR, we spend a few days debugging why it's not booting.
+
+b) make sure no GPIO block is ever reset, so we never go through the
+debugging cycle again.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/2ba8b747/attachment.sig>
