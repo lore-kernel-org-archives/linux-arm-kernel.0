@@ -1,75 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Mar 2014 23:44:43 +0000
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
-Message-ID: <20140324234443.GS7528@n2100.arm.linux.org.uk>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 25 Mar 2014 10:55:01 +1100
+Subject: linux-next: manual merge of the keystone tree with the arm-soc tree
+Message-ID: <20140325105501.e63fcdd78d0d604b4e5309a1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 04:37:20PM -0600, robert.daniels at vantagecontrols.com wrote:
-> Marek Vasut <marex@denx.de> wrote on 03/24/2014 02:21:58 PM:
-> > I think the UDP test might be lossy, can you try with TCP test please ?
-> >
-> > Best regards,
-> > Marek Vasut
-> 
-> Yes, I tried with TCP and there were no problems.
-> I then tried my same test with a crossover cable: no problems.
-> Then I started testing some different network configurations:
-> 
-> 1. Desktop & i.MX53 both connected to the same router: no problems.
-> 2. Desktop & i.MX53 both connected to the same hub: packet loss but no tx
-> timeout
-> 3. Desktop connected to router, hub connected to router, i.MX53 connected
-> to hub: packet loss + tx timeout
-> 
-> So, the packet loss is due to the hub, not the fec driver.
-> I'm not sure why I'm getting the tx timeout.  My router is a Cisco
-> ValetPlus and the hub is a Netgear DS108.
-> The router and desktop are gigabit and the hub is 10/100.
-> 
-> I assumed that the tx timeout should not be happening - is this an
-> incorrect assumption based on my setup?
+Hi Santosh,
 
-The first point is that the timeout should not be happening, because
-when the link is up and running, packets should be transmitted.
+Today's linux-next merge of the keystone tree got a conflict in
+arch/arm/boot/dts/Makefile between commit ba5a37e52194 ("ARM: mvebu: Move
+kirkwood DT boards into mach-mvebu") from the arm-soc tree and commit
+400550ae7e77 ("ARM: dts: Build all keystone dt blobs") from the keystone
+tree.
 
-The second point is that I think you have a setup which tickles a bug
-in the FEC hardware.  What I think is going on is that the driver is
-filling the transmit ring correctly.  For some reason, the FEC is
-either failing to update the header after transmission leaving the
-buffer owned by the FEC (and therefore unable to be reaped), or the
-FEC is skipping over a ring descriptor.
-
-As I hinted in one of my previous replies, I think the only way we're
-truely going to work out what's going on here is to come up with some
-way to mark each packet that is transmitted with where it was in the
-ring, so a tcpdump session on another machine can be used to inspect
-which packets from the ring were actually transmitted on the wire.
-
-Now, you mention packet loss above.  Even on half-duplex networks, I
-would not expect there to be much packet loss because of the
-retransmissions after a collision, and 100Mbit networks handle this
-much better than 10Mbit.  It takes repeated collisions to cause a
-packet to actually be dropped (and a packet being dropped because
-of collisions should be logged by the transmitting host in its
-interface statistics.)
-
-Another possibility is that the FEC isn't properly negotiating with
-the hub, and the two ends are ending up configured differently, or
-that it is negotiating properly but the FEC isn't being configured
-correctly.
-
-Now that we know a little more about your setup, including that it
-seems to be one specific setup which is causing the problems, I'll
-do some more testing - I have an old Allied Telesys 10/100 hub here
-which I'll try putting the iMX6 on and re-run your tests.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/Makefile
+index 94939ee0c10b,49ff796dc02e..000000000000
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -82,9 -81,11 +82,12 @@@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank
+  	ecx-2000.dtb
+  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+  	integratorcp.dtb
++ dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
++ 	k2l-evm.dtb \
++ 	k2e-evm.dtb
+ -dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
+ -dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+ +kirkwood := \
+ +	kirkwood-b3.dtb \
+ +	kirkwood-cloudbox.dtb \
+  	kirkwood-db-88f6281.dtb \
+  	kirkwood-db-88f6282.dtb \
+  	kirkwood-dns320.dtb \
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/43ee91e7/attachment.sig>
