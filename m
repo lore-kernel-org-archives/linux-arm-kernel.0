@@ -1,26 +1,75 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 24 Mar 2014 21:36:25 +0100
-Subject: [PATCH 1/3] IXP4xx: Fix Goramo Multilink GPIO conversion.
-In-Reply-To: <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
- (Linus Walleij's message of "Mon, 24 Mar 2014 16:27:47 +0100")
-References: <m3siq9iyt2.fsf@intrepid.localdomain>
- <m3bnwxiwhj.fsf@intrepid.localdomain>
- <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
-Message-ID: <m3mwgf72ra.fsf@intrepid.localdomain>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Mar 2014 21:36:20 +0100
+Subject: [PATCH] arm64: SHA-224/SHA-256 using ARMv8 Crypto Extensions
+In-Reply-To: <1395326886-5866-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1395326886-5866-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <201403242136.20547.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Thursday, March 20, 2014 at 03:48:06 PM, Ard Biesheuvel wrote:
+> This patch adds support for the SHA-224 and SHA-256 hash algorithms using
+> the NEON based SHA-256 instructions that were introduced in ARM v8.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 
->> arch/arm/mach-ixp4xx/goramo_mlr.c:416: error: 'IXP4XX_GPIO_OUT' undeclared
->> arch/arm/mach-ixp4xx/goramo_mlr.c:421: error: 'IXP4XX_GPIO_IN' undeclared
->>
->> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
->
-> Alternatively can you send this for fixes to arm at kernel.org with Cc:
-> stable added Krzysztof?
+[...]
 
-Given the platform's specifics, I guess it's enough to just fix it in
-mainline.
--- 
-Krzysztof Halasa
+> + * Copyright (c) Alan Smithee.
+
+Email contact is missing here.
+
+[...]
+
+> +static int sha224_init(struct shash_desc *desc)
+> +{
+> +	struct sha256_state *sctx = shash_desc_ctx(desc);
+> +
+> +	*sctx = (struct sha256_state){
+
+This cast is interesting, I don't quite understand it. Can you please explain 
+that to me ?
+
+> +		.state = {
+> +			SHA224_H0, SHA224_H1, SHA224_H2, SHA224_H3,
+> +			SHA224_H4, SHA224_H5, SHA224_H6, SHA224_H7,
+> +		}
+> +	};
+> +	return 0;
+> +}
+
+[...]
+
+> +static int sha224_final(struct shash_desc *desc, u8 *out)
+> +{
+> +	struct sha256_state *sctx = shash_desc_ctx(desc);
+> +	__be32 *dst = (__be32 *)out;
+> +	int i;
+> +
+> +	sha2_final(desc);
+> +
+> +	for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(*dst); i++)
+> +		dst[i] = cpu_to_be32(sctx->state[i]);
+
+Won't this cause unaligned access if *dst is not aligned to 32 bytes ?
+
+Try the crypto tests with this patch to see if this explodes please.
+
+diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+index 7795550..b9b7144 100644
+--- a/crypto/testmgr.c
++++ b/crypto/testmgr.c
+@@ -191,7 +191,8 @@ static int __test_hash(struct crypto_ahash *tfm, struct 
+hash_testvec *template,
+        const char *algo = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
+        unsigned int i, j, k, temp;
+        struct scatterlist sg[8];
+-       char result[64];
++       char _result[68];
++       char *result = _result + 1;
+        struct ahash_request *req;
+        struct tcrypt_result tresult;
+        void *hash_buff;
+
+[...]
