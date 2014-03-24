@@ -1,47 +1,46 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 24 Mar 2014 05:13:41 -0700
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <1395651814.4052.6.camel@dagon.hellion.org.uk>
-References: <20140226183454.GA14639@cbox>
- <20140306085213.GU643@mal.justgohome.co.uk>
- <53185FB9.1040308@redhat.com> <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
- <20140322122354.7644FC418C4@trevor.secretlab.ca>
- <1395651814.4052.6.camel@dagon.hellion.org.uk>
-Message-ID: <CACxGe6vJEXECeUsvMsAMD3soPiPs68aR-izRyou1XmpQCVrGDA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 24 Mar 2014 20:14:48 +0800
+Subject: [PATCH] drm/cma: include <drm/drmP.h> as needed
+Message-ID: <1395663288-30940-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 2:03 AM, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> On Sat, 2014-03-22 at 12:23 +0000, Grant Likely wrote:
->> That isn't actually my position. I absolutely think that VMs /should/
->> implement persistent variables, but the variables are a property of a VM
->> instance, not of the disk image. As far as this spec is concerned, I
->> think portable disk images should operate under the assumption of an
->> empty set of variables, and therefore follow the removable disk
->> requirements in the UEFI spec.
->
-> Just to be sure I understand. You position is:
->      1. A VM image downloaded from www.distro.org should neither contain
->         nor expect any persistent variables to be present.
+The following error and warnings will be seen when compiling a C file
+which includes <drm/drm_gem_cma_helper.h> but without <drm/drmP.h>
+being included before.
 
-yes
+include/drm/drm_gem_cma_helper.h:5:24: error: field ?base? has incomplete type
+include/drm/drm_gem_cma_helper.h: In function ?to_drm_gem_cma_obj?:
+include/drm/drm_gem_cma_helper.h:16:9: warning: initialization from incompatible pointer type [enabled by default]
+include/drm/drm_gem_cma_helper.h: At top level:
+include/drm/drm_gem_cma_helper.h:24:34: warning: ?struct drm_mode_create_dumb? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:24:34: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+include/drm/drm_gem_cma_helper.h:24:34: warning: ?struct drm_device? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:24:34: warning: ?struct drm_file? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:28:10: warning: ?struct drm_device? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:28:10: warning: ?struct drm_file? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:35:3: warning: ?struct drm_device? declared inside parameter list [enabled by default]
+include/drm/drm_gem_cma_helper.h:46:14: warning: ?struct drm_device? declared inside parameter list [enabled by default]
 
->      2. After a VM image is instantiated into a specific VM instance and
->         booted then it is at liberty to set persistent variables (either
->         on first boot or as part of an upgrade) and the VM should ensure
->         that those variables a retained over reboot for that specific
->         instance.
+Fix them by including <drm/drmP.h> in drm_gem_cma_helper.h.
 
-yes
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ include/drm/drm_gem_cma_helper.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
->      3. If a VM does not preserve those variables then the instance
->         should have some sane functional fallback (implied by the
->         removable disk requirements from the UEFI spec).
-
-yes
-
-> Is that right? I'm pretty sure you meant (1), reasonably sure you meant
-> (2) and not at all sure you meant (3) ;-)
->
-> Ian.
->
+diff --git a/include/drm/drm_gem_cma_helper.h b/include/drm/drm_gem_cma_helper.h
+index 89b4d7d..2a3cea9 100644
+--- a/include/drm/drm_gem_cma_helper.h
++++ b/include/drm/drm_gem_cma_helper.h
+@@ -1,6 +1,8 @@
+ #ifndef __DRM_GEM_CMA_HELPER_H__
+ #define __DRM_GEM_CMA_HELPER_H__
+ 
++#include <drm/drmP.h>
++
+ struct drm_gem_cma_object {
+ 	struct drm_gem_object base;
+ 	dma_addr_t paddr;
+-- 
+1.8.3.2
