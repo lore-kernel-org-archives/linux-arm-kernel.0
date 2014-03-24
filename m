@@ -1,118 +1,96 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 24 Mar 2014 20:44:45 +0530
-Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
-References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
- <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
- <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
- <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
- <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
-Message-ID: <CA+mB=1LRQSpz+Hmtym44x6+KW9ksXj9WQ8UKcHydk-JAWdyP+w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Mar 2014 16:18:01 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1395670496-17381-4-git-send-email-zhangfei.gao@linaro.org>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395670496-17381-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <13743364.WZtdi2BZb3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 4:21 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
-> On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
->> Hi Jassi,
->>
->> Thanks for the Acked-by.
->>
->> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>
->>>> +
->>>> +/**
->>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
->>>
->>> Should be xilinx_vdma_dma_prep_interleaved here.
->>
->> Ok, I will correct it.  Thanks.
->>
->>>
->>>> +/**
->>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
->>>> + * Run-time configuration for Axi VDMA, supports:
->>>> + * . halt the channel
->>>> + * . configure interrupt coalescing and inter-packet delay threshold
->>>> + * . start/stop parking
->>>> + * . enable genlock
->>>> + *
->>>> + * @dchan: DMA channel
->>>> + * @cfg: VDMA device configuration pointer
->>>> + *
->>>> + * Return: '0' on success and failure value on error
->>>> + */
->>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->>>> +                                       struct xilinx_vdma_config *cfg)
->>>> +{
->>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>>> +       u32 dmacr;
->>>> +
->>>> +       if (cfg->reset)
->>>> +               return xilinx_vdma_chan_reset(chan);
->>>> +
->>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
->>>> +
->>>> +       chan->config.frm_dly = cfg->frm_dly;
->>>> +       chan->config.park = cfg->park;
->>>> +
->>>> +       /* genlock settings */
->>>> +       chan->config.gen_lock = cfg->gen_lock;
->>>> +       chan->config.master = cfg->master;
->>>> +
->>>> +       if (cfg->gen_lock && chan->genlock) {
->>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
->>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
->>>> +       }
->>>> +
->>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
->>>> +       if (cfg->park)
->>>> +               chan->config.park_frm = cfg->park_frm;
->>>> +       else
->>>> +               chan->config.park_frm = -1;
->>>> +
->>>> +       chan->config.coalesc = cfg->coalesc;
->>>> +       chan->config.delay = cfg->delay;
->>>> +
->>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
->>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
->>>> +               chan->config.coalesc = cfg->coalesc;
->>>> +       }
->>>> +
->>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
->>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
->>>> +               chan->config.delay = cfg->delay;
->>>> +       }
->>>> +
->>>> +       /* FSync Source selection */
->>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
->>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
->>>> +
->>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
->>>> +
->>> Bypassing the DMAEngine api doesn't seem very neat.
->>> Is there currently any client driver that /changes/ this configuration
->>> between channel requests? If no, then simply get the configuration
->>> from DT node and avoid this api.
->>
->> This change is recently suggested by Lars in the following patch series,
->> "dma: Remove comment about embedding dma_slave_config into custom structs"
->>
-> If some user does indeed need to /change/ the configuration across
-> channel requests, we can keep function. Is there currently any such
-> user?
+On Monday 24 March 2014 22:14:56 Zhangfei Gao wrote:
 
-Yes, we are planning to push these changes soon to drivers/media/.
+> +
+> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
+> +{
+> +	struct hip04_priv *priv = netdev_priv(ndev);
+> +	unsigned tx_head = priv->tx_head;
+> +	unsigned tx_tail = priv->tx_tail;
+> +	struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
+> +
+> +	while (tx_tail != tx_head) {
+> +		if (desc->send_addr != 0) {
+> +			if (force)
+> +				desc->send_addr = 0;
+> +			else
+> +				break;
+> +		}
+> +		if (priv->tx_phys[tx_tail]) {
+> +			dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
+> +				priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
+> +			priv->tx_phys[tx_tail] = 0;
+> +		}
+> +		dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
+> +		priv->tx_skb[tx_tail] = NULL;
+> +		tx_tail = TX_NEXT(tx_tail);
+> +		priv->tx_count--;
+> +	}
+> +	priv->tx_tail = tx_tail;
+> +}
 
-Srikanth
+I think you still need to find a solution to ensure that the tx reclaim is
+called eventually through a method other than start_xmit.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> +
+> +	priv->map = syscon_regmap_lookup_by_compatible("hisilicon,hip04-ppe");
+> +	if (IS_ERR(priv->map)) {
+> +		dev_warn(d, "no hisilicon,hip04-ppe\n");
+> +		ret = PTR_ERR(priv->map);
+> +		goto init_fail;
+> +	}
+> +
+> +	n = of_parse_phandle(node, "port-handle", 0);
+> +	if (n) {
+> +		ret = of_property_read_u32(n, "reg", &priv->port);
+> +		if (ret) {
+> +			dev_warn(d, "no reg info\n");
+> +			goto init_fail;
+> +		}
+> +
+> +		ret = of_property_read_u32(n, "channel", &priv->chan);
+> +		if (ret) {
+> +			dev_warn(d, "no channel info\n");
+> +			goto init_fail;
+> +		}
+> +	} else {
+> +		dev_warn(d, "no port-handle\n");
+> +		ret = -EINVAL;
+> +		goto init_fail;
+> +	}
+
+Doing the lookup by "compatible" string doesn't really help you
+at solve the problem of single-instance ppe at all, because that
+function will only ever look at the first one. Use
+syscon_regmap_lookup_by_phandle instead and pass the phandle
+you get from the "port-handle" property.
+
+Also, since you decided to treat the ppe as a dump regmap, I would
+recommend moving the 'reg' and 'channel' properties into arguments
+of the port-handle link, and retting rid of the child nodes of
+the ppe, like:
+
++       ppe: ppe at 28c0000 {
++               compatible = "hisilicon,hip04-ppe", "syscon";
++               reg = <0x28c0000 0x10000>;
++       };
++
++       fe: ethernet at 28b0000 {
++               compatible = "hisilicon,hip04-mac";
++               reg = <0x28b0000 0x10000>;
++               interrupts = <0 413 4>;
++               phy-mode = "mii";
++               port-handle = <&ppe 0xf1 0>;
++       };
+
+
+	Arnd
