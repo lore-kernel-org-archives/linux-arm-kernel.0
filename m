@@ -1,63 +1,79 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 24 Mar 2014 17:17:49 +0100
-Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
- deadlock
-Message-ID: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 24 Mar 2014 17:17:50 +0100
+Subject: [PATCH 1/3] ARM: mm: allow sub-architectures to override PCI I/O
+ memory type
+In-Reply-To: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1395677872-32741-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Will, Catalin,
+Due to a design incompatibility between the PCIe Marvell controller
+and the Cortex-A9, stressing PCIe devices with a lot of traffic
+quickly causes a deadlock.
 
-This patch series adresses a problem that affects the newer Marvell
-Armada 375 and 38x SOCs, based on Cortex-A9+PL310, combined with the
-Marvell PCIe hardware unit. When the hardware I/O coherency is
-enabled, the combination of Cortex-A9/PL310/Marvell PCIe hardware unit
-will quickly cause a deadlock when the PCIe bus is stressed.
+One part of the workaround for this is to have all PCIe regions mapped
+as MT_MEMORY_SO instead of MT_DEVICE. While the arch_ioremap_caller()
+mechanism allows sub-architecture code to override ioremap(), used to
+map PCIe memory regions, there isn't such a mechanism to override the
+behavior of pci_ioremap_io().
 
-The workaround for this problem has been suggested by ARM, and
-consists in two things:
+This commit adds the arch_pci_ioremap_mem_type variable, initialized
+to MT_DEVICE by default, and that sub-architecture code can
+override. We have chosen to expose a single variable rather than
+offering the possibility of overriding the entire pci_ioremap_io(),
+because implementing pci_ioremap_io() requires calling functions
+(get_mem_type()) that are private to the arch/arm/mm/ code.
 
- (1) Map the PCIe regions as strongly-ordered
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/include/asm/io.h | 6 ++++++
+ arch/arm/mm/ioremap.c     | 9 ++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
- (2) Disable the outer cache sync of the PL310 when hardware I/O
-     coherency is used, since it is unneeded and causes the deadlock.
-
-The following three patches address the problem in the following way:
-
- * PATCH 1/3 adds the necessary infrastructure to allow PCIe I/O
-   regions to be mapped as strongly-ordered.
-
- * PATCH 2/3 extends the l2x0 cache driver to be able to pass the
-   information on whether hardware I/O coherency is used or not, and
-   in the former case, disable the outer_cache_sync operation.
-
- * PATCH 3/3 uses both of the added infrastructures, as well as the
-   existing infrastructure to customize the behavior of ioremap() on a
-   per-platform basis, to implement the workaround for the Armada 375
-   and 38x SOCs.
-
-Patches 1/3 and 2/3 apply on 3.14-rc1. Patch 3/3 applies on top of the
-'[PATCH 00/10] ARM: mvebu: Hardware coherency support for Armada 375
-and 38x' patch set. But for now, I'm mainly interested in hearing
-about patches 1/3 and 2/3.
-
-Please let me know what you think about the proposed solution.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (3):
-  ARM: mm: allow sub-architectures to override PCI I/O memory type
-  ARM: mm: add support for HW coherent systems in PL310
-  ARM: mvebu: implement L2/PCIe deadlock workaround
-
- arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
- arch/arm/include/asm/io.h                  |  6 ++++++
- arch/arm/mach-mvebu/board-v7.c             | 31 +++++++++++++++++++++++++++++-
- arch/arm/mm/cache-l2x0.c                   | 22 ++++++++++++++++++++-
- arch/arm/mm/ioremap.c                      |  9 ++++++++-
- 5 files changed, 66 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 8aa4cca..3d23418 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -179,6 +179,12 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ /* PCI fixed i/o mapping */
+ #define PCI_IO_VIRT_BASE	0xfee00000
+ 
++#if defined(CONFIG_PCI)
++void pci_ioremap_set_mem_type(int mem_type);
++#else
++static inline void pci_ioremap_set_mem_type(int mem_type) {}
++#endif
++
+ extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+ 
+ /*
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index f9c32ba..d1e5ad7 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -438,6 +438,13 @@ void __arm_iounmap(volatile void __iomem *io_addr)
+ EXPORT_SYMBOL(__arm_iounmap);
+ 
+ #ifdef CONFIG_PCI
++static int pci_ioremap_mem_type = MT_DEVICE;
++
++void pci_ioremap_set_mem_type(int mem_type)
++{
++	pci_ioremap_mem_type = mem_type;
++}
++
+ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ {
+ 	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+@@ -445,7 +452,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ 	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+ 				  PCI_IO_VIRT_BASE + offset + SZ_64K,
+ 				  phys_addr,
+-				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
++				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
+ #endif
 -- 
 1.8.3.2
