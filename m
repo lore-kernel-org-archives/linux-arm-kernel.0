@@ -1,94 +1,118 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 24 Mar 2014 16:06:20 +0100
-Subject: [PATCH 00/10] ARM: mvebu: Hardware coherency support for Armada
- 375 and 38x
-In-Reply-To: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140324160620.607c77cd@skate>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 24 Mar 2014 20:44:45 +0530
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+ <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+ <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+Message-ID: <CA+mB=1LRQSpz+Hmtym44x6+KW9ksXj9WQ8UKcHydk-JAWdyP+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Gregory, Andrew, Sebastian,
+On Mon, Mar 24, 2014 at 4:21 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> Hi Jassi,
+>>
+>> Thanks for the Acked-by.
+>>
+>> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>
+>>>> +
+>>>> +/**
+>>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+>>>
+>>> Should be xilinx_vdma_dma_prep_interleaved here.
+>>
+>> Ok, I will correct it.  Thanks.
+>>
+>>>
+>>>> +/**
+>>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
+>>>> + * Run-time configuration for Axi VDMA, supports:
+>>>> + * . halt the channel
+>>>> + * . configure interrupt coalescing and inter-packet delay threshold
+>>>> + * . start/stop parking
+>>>> + * . enable genlock
+>>>> + *
+>>>> + * @dchan: DMA channel
+>>>> + * @cfg: VDMA device configuration pointer
+>>>> + *
+>>>> + * Return: '0' on success and failure value on error
+>>>> + */
+>>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>>>> +                                       struct xilinx_vdma_config *cfg)
+>>>> +{
+>>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>>> +       u32 dmacr;
+>>>> +
+>>>> +       if (cfg->reset)
+>>>> +               return xilinx_vdma_chan_reset(chan);
+>>>> +
+>>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
+>>>> +
+>>>> +       chan->config.frm_dly = cfg->frm_dly;
+>>>> +       chan->config.park = cfg->park;
+>>>> +
+>>>> +       /* genlock settings */
+>>>> +       chan->config.gen_lock = cfg->gen_lock;
+>>>> +       chan->config.master = cfg->master;
+>>>> +
+>>>> +       if (cfg->gen_lock && chan->genlock) {
+>>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
+>>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
+>>>> +       }
+>>>> +
+>>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
+>>>> +       if (cfg->park)
+>>>> +               chan->config.park_frm = cfg->park_frm;
+>>>> +       else
+>>>> +               chan->config.park_frm = -1;
+>>>> +
+>>>> +       chan->config.coalesc = cfg->coalesc;
+>>>> +       chan->config.delay = cfg->delay;
+>>>> +
+>>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
+>>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
+>>>> +               chan->config.coalesc = cfg->coalesc;
+>>>> +       }
+>>>> +
+>>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
+>>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
+>>>> +               chan->config.delay = cfg->delay;
+>>>> +       }
+>>>> +
+>>>> +       /* FSync Source selection */
+>>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
+>>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
+>>>> +
+>>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
+>>>> +
+>>>> +       return 0;
+>>>> +}
+>>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+>>>> +
+>>> Bypassing the DMAEngine api doesn't seem very neat.
+>>> Is there currently any client driver that /changes/ this configuration
+>>> between channel requests? If no, then simply get the configuration
+>>> from DT node and avoid this api.
+>>
+>> This change is recently suggested by Lars in the following patch series,
+>> "dma: Remove comment about embedding dma_slave_config into custom structs"
+>>
+> If some user does indeed need to /change/ the configuration across
+> channel requests, we can keep function. Is there currently any such
+> user?
 
-Any news about this patch set? It is not aimed at 3.15 as was discussed
-already with Jason, but since I'd still like to have some early
-comments about this patch series for 3.16, since we would also like to
-land the Armada 375/38x SMP support in 3.16, which will sit on top of
-this series.
+Yes, we are planning to push these changes soon to drivers/media/.
 
-So far, Jason made one comment about runtime detecting the need for the
-Armada 375 coherency workaround, to which I already replied. No other
-comments have been made, unless I missed them, of course.
+Srikanth
 
-Thanks a lot!
-
-Thomas
-
-On Thu,  6 Mar 2014 17:46:25 +0100, Thomas Petazzoni wrote:
-> Jason, Gregory, Andrew, Sebastian,
-> 
-> This set of patches add hardware coherency support for the new Armada
-> 375 and Armada 38x SoCs. The patch set can be divided in three
-> sections:
-> 
->  * Patches 1, 2, 3 and 4 prepare the introduction of the support for
->    new SoC in the existing coherency code.
-> 
->    The main change is that the mvebu-mbus driver no longer pokes into
->    the Device Tree to find whether hardware I/O coherency is available
->    or not: this information is passed as argument to the mvebu-mbus
->    initialization function. This avoids changing the mvebu-mbus driver
->    to add the compatible strings of all possible coherency fabrics,
->    and also avoids encoding specific conditions in the mvebu-mbus
->    driver: on Armada 375 and 38x, the hardware I/O coherency can only
->    be enabled in SMP mode.
-> 
->    These preparation patches had already been sent in the past
->    (http://permalink.gmane.org/gmane.linux.ports.arm.kernel/290780). This
->    round has taken into account the comments I had received on this
->    early version.
-> 
->  * Patches 5, 6, 7 and 8 add the coherency support itself. Patch 4
->    enables the SCU, patch 5 adds I/O coherency support for 375, patch
->    6 adds a major workaround to make coherency support actually work
->    on early 375 SOCs and patch 7 adds I/O coherency support for 38x.
-> 
->  * Patches 9 and 10 add the necessary Device Tree informations to
->    enable the coherency.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (10):
->   ARM: mvebu: prepare coherency code to support more SOCs
->   ARM: mvebu: add a coherency_available() call
->   bus: mvebu: pass the coherency availability information at init time
->   ARM: mvebu: ARM: mvebu: use of_find_matching_node_and_match() in
->     coherency.c
->   ARM: mvebu: enable the ARM SCU on Armada 375 and Armada 38x
->   ARM: mvebu: add Armada 375 support to the coherency code
->   ARM: mvebu: implement Armada 375 coherency workaround
->   ARM: mvebu: add Armada 38x support to the coherency code
->   ARM: mvebu: enable the coherency fabric on Armada 375
->   ARM: mvebu: enable the coherency fabric on Armada 38x
-> 
->  .../devicetree/bindings/arm/coherency-fabric.txt   |  32 ++-
->  arch/arm/boot/dts/armada-375.dtsi                  |  10 +
->  arch/arm/boot/dts/armada-38x.dtsi                  |  10 +
->  arch/arm/mach-kirkwood/board-dt.c                  |   2 +-
->  arch/arm/mach-mvebu/Kconfig                        |   2 +
->  arch/arm/mach-mvebu/board-v7.c                     |  21 +-
->  arch/arm/mach-mvebu/coherency.c                    | 251 +++++++++++++++++++--
->  arch/arm/mach-mvebu/coherency.h                    |   1 +
->  drivers/bus/mvebu-mbus.c                           |  11 +-
->  include/linux/mbus.h                               |   2 +-
->  10 files changed, 305 insertions(+), 37 deletions(-)
-> 
-
-
-
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
