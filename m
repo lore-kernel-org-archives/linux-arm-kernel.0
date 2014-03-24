@@ -1,288 +1,596 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Mar 2014 15:36:11 +0000
-Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <1395422881-10029-2-git-send-email-broonie@kernel.org>
-References: <1395422881-10029-1-git-send-email-broonie@kernel.org>
- <1395422881-10029-2-git-send-email-broonie@kernel.org>
-Message-ID: <20140324153611.GA16245@red-moon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Mar 2014 16:31:36 +0100
+Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
+ infrastructure
+In-Reply-To: <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <53304FD8.70106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On Fri, Mar 21, 2014 at 05:27:59PM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Add support for parsing the explicit topology bindings to discover the
-> topology of the system.
-> 
-> Since it is not currently clear how to map multi-level clusters for the
-> scheduler all leaf clusters are presented to the scheduler at the same
-> level. This should be enough to provide good support for current systems.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+Hi Lorenzo,
 
-Please apply the patches attached, that fix some stale comments and
-add of_node_put in paths that could otherwise be broken by return
-statements.
 
-Patch "arm64: kernel: topology: removed stale comment" applies to patch
-1 of this series.
 
-Patch "arm64: kernel: topology updates" applies to patch 2 of this
-series.
-
-Both should be squashed into your original patches. Please have a final
-look and test them, they work for me.
-
-Having said that, on the updated patch 1 and 2 of this series:
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
+On 03/18/2014 11:20 AM, Lorenzo Pieralisi wrote:
+> On most common ARM systems, the low-power states a CPU can be put into are
+> not discoverable in HW and require device tree bindings to describe
+> the respective power domains, power down protocol and idle states parameters.
+>
+> In order to enable DT based idle states and configure idle drivers, this
+> patch implements the bulk infrastructure required to parse the device tree
+> idle states bindings and functions to initizialize idle driver and protocol
+> back-ends.
+>
+> Protocol back-ends (eg PSCI) must register a protocol initializer with
+> the idle state parser so that upon protocol detection, the parsing code
+> can call the back-end infrastructure to complete the idle driver
+> initialization.
+>
+> Idle state index 0 is always initialized, ie always considered present
+> on all ARM platforms.
+>
+> Code that initializes idle states checks the CPU idle driver cpumask so
+> that multiple CPU idle drivers can be initialized through it in the
+> kernel. The CPU idle driver cpumask defines which idle states should be
+> considered valid for the driver, ie idle states that are valid on a set
+> of cpus the idle driver manages.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
-> 
->  - Discard the DT data if any CPUs are omitted from the topology.
->  - Call of_node_put() where required.
-> 
->  arch/arm64/kernel/topology.c | 192 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 186 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index ff662b23af5f..d0cb687fb7f5 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -17,10 +17,183 @@
->  #include <linux/percpu.h>
->  #include <linux/node.h>
->  #include <linux/nodemask.h>
+>   arch/arm64/Kconfig                   |   4 +
+>   arch/arm64/include/asm/idle_states.h |  20 ++
+>   arch/arm64/kernel/Makefile           |   1 +
+>   arch/arm64/kernel/idle_states.c      | 397 +++++++++++++++++++++++++++++++++++
+>   4 files changed, 422 insertions(+)
+>   create mode 100644 arch/arm64/include/asm/idle_states.h
+>   create mode 100644 arch/arm64/kernel/idle_states.c
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 27bbcfc..3132572 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -295,6 +295,10 @@ config ARCH_SUSPEND_POSSIBLE
+>   config ARM64_CPU_SUSPEND
+>   	def_bool PM_SLEEP
+>
+> +config ARM64_IDLE_STATES
+> +	def_bool CPU_IDLE
+> +	select ARM64_CPU_SUSPEND
+> +
+>   endmenu
+>
+>   menu "CPU Power Management"
+> diff --git a/arch/arm64/include/asm/idle_states.h b/arch/arm64/include/asm/idle_states.h
+> new file mode 100644
+> index 0000000..0b9f9ba
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/idle_states.h
+> @@ -0,0 +1,20 @@
+> +#ifndef __ARM64_IDLE_STATES
+> +#define __ARM64_IDLE_STATES
+> +
+> +struct idle_state {
+> +	u32	index;
+> +	u32	entry_latency;
+> +	u32	exit_latency;
+> +	u32	min_residency;
+> +	u32	param;
+
+Could you add a comment for this 'param' field or change the name to eg 
+'psci_param' ?
+
+> +	struct device_node *node;
+> +	struct idle_state *state;
+
+Why is it needed ?
+
+> +	cpumask_t	cpus;
+
+It sounds strange to have to declare this cpumask here.
+
+> +	bool	logic_state_retained;
+> +	bool	cache_state_retained;
+> +};
+
+IMHO, there is useless duplication of structure definition / declaration.
+
+I suggest to stick as much as possible to the cpuidle structures, that 
+is cpuidle_state and cpuidle_driver.
+
+Instead of using the intermediate, idle_states[CPUIDLE_STATE_MAX], use 
+the drv->states directly and drv->cpumask. That will prevent extra copy 
+and definition/declaration for nothing. And fill the structure directly 
+from parse_idle_states_node / parse_idle_states.
+
+All this comes from the need of the state ordering, right ?
+
+> +struct cpuidle_driver;
+> +
+> +int __init arm_init_idle_driver(struct cpuidle_driver *drv);
+> +#endif
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 2d4554b..2afc9a0 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -19,6 +19,7 @@ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>   arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+>   arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+>   arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+> +arm64-obj-$(CONFIG_ARM64_IDLE_STATES)	+= idle_states.o
+>   arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+>
+>   obj-y					+= $(arm64-obj-y) vdso/
+> diff --git a/arch/arm64/kernel/idle_states.c b/arch/arm64/kernel/idle_states.c
+> new file mode 100644
+> index 0000000..0386cff
+> --- /dev/null
+> +++ b/arch/arm64/kernel/idle_states.c
+> @@ -0,0 +1,397 @@
+> +/*
+> + * ARM device tree idle states parsing code.
+> + *
+> + * Copyright (C) 2014 ARM Ltd.
+> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
 > +#include <linux/of.h>
->  #include <linux/sched.h>
->  
->  #include <asm/topology.h>
->  
-> +static int __init get_cpu_for_node(struct device_node *node)
+> +
+> +#include <asm/idle_states.h>
+> +#include <asm/psci.h>
+> +#include <asm/suspend.h>
+> +
+> +static struct idle_state idle_states[CPUIDLE_STATE_MAX] __initdata;
+> +typedef int (*idle_states_initializer)(struct cpumask *, struct idle_state *,
+> +				       unsigned int);
+> +
+> +struct protocol_init {
+> +	const char *prot;
+> +	idle_states_initializer prot_init;
+> +};
+> +
+> +static const struct protocol_init protocols[] __initconst = {
+> +	{}
+> +};
+> +
+> +static __init const struct protocol_init *get_protocol(const char *str)
 > +{
-> +	struct device_node *cpu_node;
-> +	int cpu;
+> +	int i;
 > +
-> +	cpu_node = of_parse_phandle(node, "cpu", 0);
-> +	if (!cpu_node)
-> +		return -1;
+> +	if (!str)
+> +		return NULL;
 > +
-> +	for_each_possible_cpu(cpu) {
-> +		if (of_get_cpu_node(cpu, NULL) == cpu_node)
-> +			return cpu;
-> +	}
+> +	for (i = 0; protocols[i].prot; i++)
+> +		if (!strcmp(protocols[i].prot, str))
+> +			return &protocols[i];
 > +
-> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
-> +	return -1;
+> +	return NULL;
 > +}
 > +
-> +static int __init parse_core(struct device_node *core, int cluster_id,
-> +			     int core_id)
+> +static void __init idle_state_cpu_mask(int cpu, struct idle_state *idle_state,
+> +				       struct device_node *cn)
 > +{
-> +	char name[10];
-> +	bool leaf = true;
 > +	int i = 0;
-> +	int cpu;
-> +	struct device_node *t;
+> +	struct device_node *cpu_state;
 > +
 > +	do {
-> +		snprintf(name, sizeof(name), "thread%d", i);
-> +		t = of_get_child_by_name(core, name);
-> +		if (t) {
-> +			leaf = false;
-> +			cpu = get_cpu_for_node(t);
-> +			if (cpu >= 0) {
-> +				cpu_topology[cpu].cluster_id = cluster_id;
-> +				cpu_topology[cpu].core_id = core_id;
-> +				cpu_topology[cpu].thread_id = i;
-> +			} else {
-> +				pr_err("%s: Can't get CPU for thread\n",
-> +				       t->full_name);
-> +				return -EINVAL;
-> +			}
-> +			of_node_put(t);
-> +		}
-> +		i++;
-> +	} while (t);
-> +
-> +	cpu = get_cpu_for_node(core);
-> +	if (cpu >= 0) {
-> +		if (!leaf) {
-> +			pr_err("%s: Core has both threads and CPU\n",
-> +			       core->full_name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		cpu_topology[cpu].cluster_id = cluster_id;
-> +		cpu_topology[cpu].core_id = core_id;
-> +	} else if (leaf) {
-> +		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
+> +		cpu_state = of_parse_phandle(cn, "cpu-idle-states", i++);
+> +		if (cpu_state && idle_state->node == cpu_state)
+> +			cpumask_set_cpu(cpu, &idle_state->cpus);
+> +		of_node_put(cpu_state);
+> +	} while (cpu_state);
 > +}
 > +
-> +static int __init parse_cluster(struct device_node *cluster, int depth)
+> +static int __init parse_idle_states_node(struct device_node *parent, int cnt,
+> +					 const cpumask_t *cpus)
 > +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	bool has_cores = false;
-> +	struct device_node *c;
-> +	static int cluster_id __initdata;
-> +	int core_id = 0;
-> +	int i, ret;
+> +	struct device_node *state;
+> +	struct idle_state *idle_state;
+> +	int cpu;
+> +
+> +	for_each_child_of_node(parent, state) {
+> +
+> +		if (!of_device_is_compatible(state, "arm,idle-state")) {
+> +			pr_warn(" %s has child nodes that are not idle states\n",
+> +				parent->full_name);
+> +			continue;
+> +		}
+> +
+> +		idle_state = &idle_states[cnt];
+> +
+> +		pr_debug(" * %s...\n", state->full_name);
+> +
+> +		idle_state->node = state;
+
+It is a bit confusing to use 'state' variable name here, is it possible 
+to change to something like 'node' or whatever ?
+
+> +		/*
+> +		 * Check cpus on which the idle state is valid
+> +		 */
+> +		for_each_possible_cpu(cpu) {
+> +			struct device_node *cn;
+> +
+> +			cn = of_get_cpu_node(cpu, NULL);
+> +			if (!cn) {
+> +				pr_err("missing device node for CPU %d\n", cpu);
+> +				continue;
+> +			}
+> +			idle_state_cpu_mask(cpu, idle_state, cn);
+> +		}
+> +
+> +		/*
+> +		 * The driver cpumask is not a subset of cpus on which the
+> +		 * idle state is valid, hence the idle state is skipped for
+> +		 * this driver.
+> +		 */
+> +		if (!cpumask_subset(cpus, &idle_state->cpus))
+> +			continue;
+> +
+> +		if (of_property_read_u32(state, "index", &idle_state->index)) {
+> +			pr_debug(" * %s missing index property\n",
+> +				     state->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (of_property_read_u32(state, "entry-latency-us",
+> +					 &idle_state->entry_latency)) {
+> +			pr_debug(" * %s missing entry latency property\n",
+> +				     state->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (of_property_read_u32(state, "exit-latency-us",
+> +					 &idle_state->exit_latency)) {
+> +			pr_debug(" * %s missing exit latency property\n",
+> +				     state->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (of_property_read_u32(state, "min-residency-us",
+> +					 &idle_state->min_residency)) {
+> +			pr_debug(" * %s missing min-residency property\n",
+> +				     state->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (of_property_read_u32(state, "entry-method-param",
+> +					 &idle_state->param)) {
+> +			pr_debug(" * %s missing entry-method-param property\n",
+> +				     state->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (++cnt == CPUIDLE_STATE_MAX) {
+> +			pr_warn("Number of parsed states equal static CPU idle state limit\n");
+> +			of_node_put(state);
+> +			break;
+> +		}
+> +	}
+> +
+> +	return cnt;
+> +}
+> +
+> +static int __init parse_idle_states(struct device_node *root, int cnt,
+> +				    const cpumask_t *cpus)
+> +{
+> +	int head_idx, curr_idx;
+> +	struct device_node *curr = root;
 > +
 > +	/*
-> +	 * First check for child clusters; we currently ignore any
-> +	 * information about the nesting of clusters and present the
-> +	 * scheduler with a flat list of them.
+> +	 * Breadth-first DT idle states parsing
+> +	 *
+> +	 * Sweep idle states level in the device tree and use the
+> +	 * idle_states array to stash the visited nodes, as a queue.
+> +	 *
+> +	 * parse_idle_states_node() updates the idle_states array by
+> +	 * initializing entries, stashing the device tree node for the
+> +	 * corresponding state (struct idle_state.node) and incrementing
+> +	 * the idle states counter that is returned so that curr_idx is
+> +	 * kept up-to-date while descending into tree levels.
+> +	 *
+> +	 * Store the initial counter head_idx and curr_idx and use head_idx
+> +	 * as a queue of node indices to be visited.
+> +	 *
+> +	 * When we reach the max number of CPU idle states or
+> +	 * head_idx == curr_idx (empty nodes queue) we are done.
 > +	 */
-> +	i = 0;
+> +	head_idx = curr_idx = cnt;
+> +
 > +	do {
-> +		snprintf(name, sizeof(name), "cluster%d", i);
-> +		c = of_get_child_by_name(cluster, name);
-> +		if (c) {
-> +			ret = parse_cluster(c, depth + 1);
-> +			if (ret != 0)
-> +				return ret;
-> +			leaf = false;
-> +			of_node_put(c);
-> +		}
-> +		i++;
-> +	} while (c);
+> +		curr_idx = parse_idle_states_node(curr, curr_idx, cpus);
+> +		if (curr_idx == CPUIDLE_STATE_MAX || head_idx == curr_idx)
+> +			break;
+> +		/*
+> +		 * idle_states array is updated by parse_idle_states_node(),
+> +		 * we can use the initialized states as a queue of nodes
+> +		 * that need to be checked for their idle states siblings.
+> +		 * head_idx works as a pointer into the queue to get the
+> +		 * next node to be parsed.
+> +		 */
+> +		curr = idle_states[head_idx++].node;
+> +	} while (curr);
 > +
-> +	/* Now check for cores */
-> +	i = 0;
-> +	do {
-> +		snprintf(name, sizeof(name), "core%d", i);
-> +		c = of_get_child_by_name(cluster, name);
-> +		if (c) {
-> +			has_cores = true;
-> +
-> +			if (depth == 0)
-> +				pr_err("%s: cpu-map children should be clusters\n",
-> +				       c->full_name);
-> +
-> +			if (leaf) {
-> +				ret = parse_core(c, cluster_id, core_id++);
-> +				if (ret != 0)
-> +					return ret;
-> +			} else {
-> +				pr_err("%s: Non-leaf cluster with core %s\n",
-> +				       cluster->full_name, name);
-> +				return -EINVAL;
-> +			}
-> +			of_node_put(c);
-> +		}
-> +		i++;
-> +	} while (c);
-> +
-> +	if (leaf && !has_cores)
-> +		pr_warn("%s: empty cluster\n", cluster->full_name);
-> +
-> +	if (leaf)
-> +		cluster_id++;
-> +
-> +	return 0;
+> +	return curr_idx;
 > +}
 > +
-> +static int __init parse_dt_topology(void)
+> +/*
+> + * Sort states according to their index value, higher indexes
+> + * imply higher power savings, as expected by the CPU idle subsystem.
+> + */
+> +static void __init sort_states(int count)
 > +{
-> +	struct device_node *cn, *map;
-> +	int ret = 0;
-> +	int cpu;
+> +	int i, j;
+> +	struct idle_state *idle_state;
 > +
-> +	cn = of_find_node_by_path("/cpus");
-> +	if (!cn) {
-> +		pr_err("No CPU information found in DT\n");
+> +	/*
+> +	 * move pointers instead of entries
+> +	 */
+> +	for (i = 0; i < count; i++)
+> +		idle_states[i].state = &idle_states[i];
+> +
+> +	/*
+> +	 * Selection sort is acceptable here, since the
+> +	 * number of states is small (<=CPUIDLE_STATE_MAX)
+> +	 *
+> +	 * Index starts from 1, we know index 0 is standby wfi and
+> +	 * it is always the idle state with higher power consumption
+> +	 */
+> +	for (i = 1; i < count - 1; i++) {
+> +		u32 elem = i;
+> +		for (j = i+1; j < count; j++) {
+> +			if (idle_states[j].state->index <
+> +					idle_states[elem].state->index)
+> +				elem = j;
+> +		}
+> +		if (i != elem) {
+> +			idle_state = idle_states[i].state;
+> +			idle_states[i].state = idle_states[elem].state;
+> +			idle_states[elem].state = idle_state;
+> +		}
+> +	}
+> +}
+> +
+> +/*
+> + * arm_dt_init_idle_states - Parse DT idle states and initialize the protocol
+> + *			     back-end
+> + *
+> + * @prot: pointer to the protocol initializer. Initialized only if return code
+> + *        is >0
+> + * @cpus: CPU idle driver cpumask
+> + *
+> + * Returns:
+> + *	Number of idle states detected upon success
+> + *	<0 on failure
+> + */
+> +static int __init arm_dt_init_idle_states(const struct protocol_init **prot,
+> +					  const cpumask_t *cpus)
+> +{
+> +	struct device_node *cpups;
+> +	const char *entry_method;
+> +	/* start from 1, stanbywfi is always there */
+> +	int cnt = 1, ret = 0;
+> +
+> +	if (!prot)
+> +		return -EINVAL;
+> +
+> +	cpups = of_find_node_by_path("/cpus/idle-states");
+> +
+> +	if (!cpups)
+> +		return -ENODEV;
+> +
+> +	cnt = parse_idle_states(cpups, cnt, cpus);
+> +
+> +	if (cnt == 1) {
+> +		ret = -ENODATA;
+> +		goto put_node;
+> +	}
+
+If 'cnt' is always 1 when calling parse_idle_states, it would be more 
+logical to do:
+
+cnt = parse_idle_states(cpups, cpus);
+if (cnt < 0) {
+	ret = -ENODATA;
+	goto put_node;
+}
+
+and change parse_idle_states consequently.
+
+> +
+> +	/*
+> +	 * idle driver expects states to sorted in terms of power
+> +	 * consumption
+> +	 */
+> +	sort_states(cnt);
+
+Isn't possible to sort the states with the index when parsing the DT 
+instead ?
+
+> +	if (of_property_read_string(cpups, "entry-method", &entry_method)) {
+> +		pr_warn(" * %s missing entry_method property\n",
+> +			    cpups->full_name);
+> +		ret = -EOPNOTSUPP;
+> +		goto put_node;
+> +	}
+> +
+> +	*prot = get_protocol(entry_method);
+> +	if (!*prot) {
+> +		pr_warn("Missing protocol initializer\n");
+> +		ret = -EOPNOTSUPP;
+> +		goto put_node;
+> +	}
+> +
+> +	pr_debug("detected %u idle states\n", cnt);
+> +
+> +put_node:
+> +	of_node_put(cpups);
+> +	return ret ? : cnt;
+> +}
+> +
+> +/*
+> + * arm_enter_idle_state - Programs CPU to enter the specified state
+> + *
+> + * @dev: cpuidle device
+> + * @drv: cpuidle driver
+> + * @idx: state index
+> + *
+> + * Called from the CPUidle framework to program the device to the
+> + * specified target state selected by the governor.
+> + */
+> +static int arm_enter_idle_state(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int idx)
+> +{
+> +	int ret;
+> +
+> +	if (!idx) {
+> +		/*
+> +		 * idle index 0 is just standby wfi, does not require CPU
+> +		 * to be suspended
+> +		 */
+> +		cpu_do_idle();
+> +		return idx;
+> +	}
+> +
+> +	cpu_pm_enter();
+> +	/*
+> +	 * Pass idle state index to cpu_suspend which in turn will call
+> +	 * the CPU ops suspend protocol with idle index as a parameter
+> +	 */
+> +	ret = cpu_suspend(idx);
+> +
+> +	cpu_pm_exit();
+> +
+> +	return ret ? : idx;
+
+Are we sure the cpu_suspend will always return a negative value ? If the 
+underlying returns 1, like the exynos4/5's cpuidle driver does, that 
+will mess up the cpuidle governor with bad inputs.
+
+> +}
+> +
+> +int __init arm_init_idle_driver(struct cpuidle_driver *drv)
+> +{
+> +	int i,  idle_states_nb;
+> +	struct idle_state *idle_state;
+> +	struct cpuidle_state *s;
+> +	const struct protocol_init *prot;
+> +
+> +	drv->states[0].exit_latency = 1;
+> +	drv->states[0].target_residency = 1;
+> +	drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
+> +	drv->states[0].enter = arm_enter_idle_state;
+> +	strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
+> +	strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
+
+The drv->states[0].name|desc is an array but I hope with some cleanups 
+in the acpi cpuidle driver, we can change it to a const char *.
+
+Is it possible to change it as:
+drv->states[0].name = "ARM WFI";
+drv->states[0].desc = "ARM WFI";
+
+?
+
+> +	idle_states_nb = arm_dt_init_idle_states(&prot, drv->cpumask);
+> +
+> +	if (idle_states_nb < 0) {
+> +		/*
+> +		 * No DT based idle states detected
+> +		 * Initialize driver count and exit successfully.
+> +		 */
+> +		drv->state_count = 1;
 > +		return 0;
 > +	}
-> +
+
+If we are not able to initialize the cpuidle driver, wouldn't make sense 
+to let the default idle function instead of defining a single state 
+driver ? If no cpuidle driver is registered, the idle mainloop will 
+switch to the default idle function. That should save the system to 
+enter the cpuidle framework and the governor with all its computations 
+for nothing, no ?
+
 > +	/*
-> +	 * When topology is provided cpu-map is essentially a root
-> +	 * cluster with restricted subnodes.
+> +	 * We finally have some idle states to initialize.
+> +	 * Driver state 0 corresponds to WFI, start from index 1 and count up
+> +	 * to idle_states_nb (parsed idle states + WFI).
+> +	 * arm_dt_init_idle_states() ensures that CPUIDLE_STATE_MAX is not
+> +	 * exceeded.
 > +	 */
-> +	map = of_get_child_by_name(cn, "cpu-map");
-> +	if (!map)
-> +		goto out;
+
+I don't know the arm64 architecture but on armv7 there are some 
+implementations which do not support the WFI instruction alone (eg. 
+omap4), if that could happen for arm64, the driver is assuming WFI is 
+always supported.
+
+> +	s = &drv->states[1];
+> +	for (i = 1; i < idle_states_nb; i++, s++) {
+> +		idle_state = idle_states[i].state;
+> +		if (!idle_state)
+> +			break;
 > +
-> +	ret = parse_cluster(map, 0);
-> +	if (ret != 0)
-> +		goto out;
+> +		strncpy(s->name, idle_state->node->name, CPUIDLE_NAME_LEN);
+> +		strncpy(s->desc, idle_state->node->name, CPUIDLE_DESC_LEN);
+
+Same comment than above.
+
 > +
-> +	of_node_put(map);
-> +
-> +	/*
-> +	 * Check that all cores are in the topology; the SMP code will
-> +	 * only mark cores described in the DT as possible.
-> +	 */
-> +	for_each_possible_cpu(cpu) {
-> +		if (cpu_topology[cpu].cluster_id == -1) {
-> +			pr_err("CPU%d: No topology information specified\n",
-> +			       cpu);
-> +			ret = -EINVAL;
-> +		}
+> +		s->exit_latency =
+> +			idle_state->entry_latency + idle_state->exit_latency;
+> +		s->target_residency = idle_state->min_residency;
+> +		/*
+> +		 * TBD: flag for timers is set implicitly for now but must be
+> +		 * linked to power domains.
+> +		 */
+> +		if (!idle_state->logic_state_retained)
+> +			s->flags |= CPUIDLE_FLAG_TIMER_STOP;
+
+The exynos use per cpu timer which are not local, so they are not shut 
+down when 'logic_state_retained' is reached (If I refer to the calxeda 
+driver, it should be the same). Is the TBD comment describing such case ?
+
+> +		s->flags |= CPUIDLE_FLAG_TIME_VALID;
+> +		s->enter = arm_enter_idle_state;
 > +	}
 > +
-> +out:
-> +	of_node_put(cn);
-> +	return ret;
-> +}
-> +
->  /*
->   * cpu topology table
->   */
-> @@ -71,15 +244,10 @@ void store_cpu_topology(unsigned int cpuid)
->  	update_siblings_masks(cpuid);
->  }
->  
-> -/*
-> - * init_cpu_topology is called at boot when only one cpu is running
-> - * which prevent simultaneous write access to cpu_topology array
-> - */
-> -void __init init_cpu_topology(void)
-> +static void __init reset_cpu_topology(void)
->  {
->  	unsigned int cpu;
->  
-> -	/* init core mask and power*/
->  	for_each_possible_cpu(cpu) {
->  		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
->  
-> @@ -93,3 +261,15 @@ void __init init_cpu_topology(void)
->  		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
->  	}
->  }
-> +
-> +void __init init_cpu_topology(void)
-> +{
-> +	reset_cpu_topology();
-> +
 > +	/*
-> +	 * Discard anything that was parsed if we hit an error so we
-> +	 * don't use partial information.
+> +	 * If we are here, we have a protocol back-end to initialize.
+> +	 *
+> +	 * If protocol initializer fails reset states count to 1 (wfi)
 > +	 */
-> +	if (parse_dt_topology())
-> +		reset_cpu_topology();
+> +	if (prot->prot_init(drv->cpumask, idle_states, idle_states_nb))
+> +		i = 1;
+
+It should fail instead, as mentioned above with the single-state-driver 
+comment.
+
+> +
+> +	pr_info("idle states initialized, prototocol: %s states count: %u",
+> +		prot->prot, i);
+> +
+> +	drv->state_count = i;
+> +	return 0;
 > +}
-> -- 
-> 1.9.1
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm64-kernel-topology-removed-stale-comment.patch
-Type: text/x-diff
-Size: 936 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/6afd3bc2/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-arm64-kernel-topology-updates.patch
-Type: text/x-diff
-Size: 2896 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/6afd3bc2/attachment-0003.bin>
+
+
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
