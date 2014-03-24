@@ -1,66 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Mar 2014 10:45:10 +0000
-Subject: [RESEND][PATCH 1/2] lib/scatterlist: Make ARCH_HAS_SG_CHAIN an
- actual Kconfig
-In-Reply-To: <1395529151.2143.64.camel@dabdike.int.hansenpartnership.com>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
- <1395512032-20575-2-git-send-email-lauraa@codeaurora.org>
- <1395523881.2143.58.camel@dabdike.int.hansenpartnership.com>
- <20140322222306.GM7528@n2100.arm.linux.org.uk>
- <1395527860.2143.61.camel@dabdike.int.hansenpartnership.com>
- <20140322225201.GN7528@n2100.arm.linux.org.uk>
- <1395529151.2143.64.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <20140324104510.GQ7528@n2100.arm.linux.org.uk>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 24 Mar 2014 10:47:53 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <53300BF4.2000309@redhat.com>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor .secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk> <531843EE. 8040102@redhat.com>
+ <53185FB9.1040308@redhat.com>
+ <20140306120449.GA29916@ mal.justgohome.co.uk>
+ <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+ < 20140322010206.GF25519@cbox>
+ <20140322122354.7644FC418C4@trevor.secretlab.ca>
+ <1395651814.4052.6.camel@dagon.hellion.org.uk>
+ <53300BF4.2000309@redhat.com>
+Message-ID: <1395658073.19365.39.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 03:59:11PM -0700, James Bottomley wrote:
-> On Sat, 2014-03-22 at 22:52 +0000, Russell King - ARM Linux wrote:
-> > And I'm disagreeing with that statement which implies that it's something
-> > that is an architecture wide property for any particular architecture.
-> > 
-> > Right now in mainline, if ARM has IOMMU support enabled, then SG_CHAIN
-> > support will also be enabled.  I've a patch out of tree which I've been
-> > using for years which enables SG_CHAIN for a particular SoC (Dove).
-> > Otherwise, it doesn't have support for SG_CHAIN.
-> > 
-> > PARISC on the other hand (as you list) has no support to enable SG_CHAIN
-> > under any circumstances.
-> > 
-> > Where we're disagreeing is whether this is something that is always-on or
-> > always-off for any particular architecture.
+On Mon, 2014-03-24 at 11:41 +0100, Paolo Bonzini wrote:
+> Il 24/03/2014 10:03, Ian Campbell ha scritto:
+> >> > That isn't actually my position. I absolutely think that VMs /should/
+> >> > implement persistent variables, but the variables are a property of a VM
+> >> > instance, not of the disk image. As far as this spec is concerned, I
+> >> > think portable disk images should operate under the assumption of an
+> >> > empty set of variables, and therefore follow the removable disk
+> >> > requirements in the UEFI spec.
+> > Just to be sure I understand. You position is:
+> >      1. A VM image downloaded from www.distro.org should neither contain
+> >         nor expect any persistent variables to be present.
+
+I suppose for completeness I should have had 1a here:
+        When a VM image is instantiated into a specific VM instance then
+        it must not expect or require any persistent variables to be
+        present.
+
+> >      2. After a VM image is instantiated into a specific VM instance and
+> >         booted then it is at liberty to set persistent variables (either
+> >         on first boot or as part of an upgrade) and the VM should ensure
+> >         that those variables a retained over reboot for that specific
+> >         instance.
+> >      3. If a VM does not preserve those variables then the instance
+> >         should have some sane functional fallback (implied by the
+> >         removable disk requirements from the UEFI spec).
+> >
+> > Is that right? I'm pretty sure you meant (1), reasonably sure you meant
+> > (2) and not at all sure you meant (3) ;-)
 > 
-> Actually, I don't disagree with that.  PA used to share sb_iommu with
-> ia64 (it's the same chipset for the HP versions), but we can't now
-> because ia64 is chained and we're not and there's no way to say chained
-> for this platform but not for these other more legacy ones.  If you have
-> a proposal for this, I'd be interested, so I don't have to do an all or
-> nothing conversion, but the config option isn't it because our platform
-> configuration is runtime determined (we usually select every driver and
-> let the actual one be chosen at runtime from the config table).
+> At least I do. :)
 
-At runtime, it's obviously a lot harder to resolve.  However, that's not
-what we're trying to do with this patch.
+You did mean it, or you do think Grant meant it? ;-)
 
-The main issue is that Laura is trying to add SG chain support to ARM64.
-At the moment, ARM64 uses the asm-generic version of scatterlist.h
-directly.
-
-Her first spin of the patch involved creating
-arch/arm64/include/asm/scatterlist.h, which was nothing more than an
-include of the asm-generic header file of the same name, and the
-definition of ARCH_HAS_SG_CHAIN.  That seemed to be extremely wasteful
-and sub-optimal way to handle this.
-
-Moving this symbol into the Kconfig means that ARM64 no longer has to
-have this additional file (and probably a bunch of other architectures
-fall into that same camp) and the ARM specific CONFIG_ARM_HAS_SG_CHAIN
-can be eliminated in favour of the now generic cross-arch config symbol.
-
-We have plenty of other Kconfig symbols which control similar features
-throughout the kernel source, there is no reason that this one should
-not be the same.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ian.
