@@ -1,109 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Mar 2014 10:03:26 +0100
-Subject: [PATCH 03/20] mmc: mmci: Update DT documentation
-In-Reply-To: <CAL_JsqJbaxayELNt+d1VSfFyD58eRYQM=d15RaFcFQKbot3iaw@mail.gmail.com>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
- <1395404057-27835-4-git-send-email-ulf.hansson@linaro.org>
- <CAL_JsqJbaxayELNt+d1VSfFyD58eRYQM=d15RaFcFQKbot3iaw@mail.gmail.com>
-Message-ID: <CAPDyKFpHW1TgtNoKieG+7cws-wPwc335sSCNo5LoBixAX=9Fbg@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 24 Mar 2014 09:03:34 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140322122354.7644FC418C4@trevor.secretlab.ca>
+References: <20140226183454.GA14639@cbox>
+ <20140301152756.67A02C40238@trevor .secretlab.ca>
+ <20140306085213.GU643@mal.justgohome.co.uk> <531843EE. 8040102@redhat.com>
+ <53185FB9.1040308@redhat.com>
+ <20140306120449.GA29916@ mal.justgohome.co.uk>
+ <20140307122418.2F2C4C408EC@trevor.secretlab.ca>
+ < 20140322010206.GF25519@cbox>
+ <20140322122354.7644FC418C4@trevor.secretlab.ca>
+Message-ID: <1395651814.4052.6.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2014 16:03, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Mar 21, 2014 at 7:14 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> Document how to configure the regulator supplies and add an example of
->> a typical mmci DT node.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/mmc/mmci.txt |   35 ++++++++++++++++++++++--
->>  1 file changed, 33 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
->> index 2b584ca..d167562 100644
->> --- a/Documentation/devicetree/bindings/mmc/mmci.txt
->> +++ b/Documentation/devicetree/bindings/mmc/mmci.txt
->> @@ -9,7 +9,38 @@ by mmc.txt and the properties used by the mmci driver.
->>  Required properties:
->>  - compatible             : contains "arm,pl18x", "arm,primecell".
->>  - arm,primecell-periphid : contains the PrimeCell Peripheral ID.
->
-> This should not be required. This is only for if the peripheral ID is
-> wrong in the h/w.
+On Sat, 2014-03-22 at 12:23 +0000, Grant Likely wrote:
+> That isn't actually my position. I absolutely think that VMs /should/
+> implement persistent variables, but the variables are a property of a VM
+> instance, not of the disk image. As far as this spec is concerned, I
+> think portable disk images should operate under the assumption of an
+> empty set of variables, and therefore follow the removable disk
+> requirements in the UEFI spec.
 
-You are right, I will move it to the optional section and add better
-comment for it.
+Just to be sure I understand. You position is:
+     1. A VM image downloaded from www.distro.org should neither contain
+        nor expect any persistent variables to be present.
+     2. After a VM image is instantiated into a specific VM instance and
+        booted then it is at liberty to set persistent variables (either
+        on first boot or as part of an upgrade) and the VM should ensure
+        that those variables a retained over reboot for that specific
+        instance.
+     3. If a VM does not preserve those variables then the instance
+        should have some sane functional fallback (implied by the
+        removable disk requirements from the UEFI spec).
 
->
->> +- vmmc-supply            : phandle to the regulator device tree node.
->
-> You cannot add new required properties as that breaks the ABI. The
-> exception is if you *know* it is okay to break all users of this
-> binding.
+Is that right? I'm pretty sure you meant (1), reasonably sure you meant
+(2) and not at all sure you meant (3) ;-)
 
-It's okay, this is already supported by the users.
-
->
->>  Optional properties:
->> -- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
->> -- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
->> +- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
->> +- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
->> +- vqmmc-supply           : phandle to the regulator device tree node.
->
-> Is this a standard property? If not, explain what vmmc and vgmmc are
-> for and what the difference is.
-
-Currently both vqmmc and vmmc are handled through an API provided by
-the mmc core. It's up to each mmc host driver to use it. So, yes -
-this is a standard mmc binding, but it depends on the host if it's
-supported.
-
-I suppose I could add it as an optional binding for the generic mmc
-bindings and then keep them here for mmci as well?
-
->
->> +
->> +Example:
->> +
->> +sdi0_per1 at 80126000 {
->> +       compatible = "arm,pl18x", "arm,primecell";
->> +       arm,primecell-periphid = <0x10480180>;
->
-> Drop this from the example.
->
->> +       reg = <0x80126000 0x1000>;
->> +       interrupts = <0 60 IRQ_TYPE_LEVEL_HIGH>;
->> +
->> +       dmas = <&dma 29 0 0x2>, /* Logical - DevToMem */
->> +              <&dma 29 0 0x0>; /* Logical - MemToDev */
->> +       dma-names = "rx", "tx";
->> +
->> +       clocks = <&prcc_kclk 1 5>, <&prcc_pclk 1 5>;
->> +       clock-names = "sdi", "apb_pclk";
->> +
->> +       max-frequency = <100000000>;
->> +       bus-width = <4>;
->> +       mmc-cap-sd-highspeed;
->> +       mmc-cap-mmc-highspeed;
->> +       cd-gpios  = <&gpio2 31 0x4>; // 95
->> +
->> +       vmmc-supply = <&ab8500_ldo_aux3_reg>;
->> +       vqmmc-supply = <&vmmci>;
->> +
->> +       pinctrl-names = "default", "sleep";
->> +       pinctrl-0 = <&sdi0_default_mode>;
->> +       pinctrl-1 = <&sdi0_sleep_mode>;
->> +};
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Thanks for reviewing!
-
-Kind regards
-Ulf Hansson
+Ian.
