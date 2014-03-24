@@ -1,88 +1,98 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 24 Mar 2014 10:47:44 +0000
-Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
-In-Reply-To: <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
-References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
- <1392339850-18686-3-git-send-email-keescook@chromium.org>
- <20140214162257.GB2331@e103592.cambridge.arm.com>
- <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
- <20140217123415.GA2182@e103592.cambridge.arm.com>
- <532F2C48.6050509@codeaurora.org>
- <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
-Message-ID: <1395658064.3465.7.camel@linaro1.home>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 24 Mar 2014 17:59:03 +0800
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140324095902.GB11377@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-03-23 at 16:21 -0600, Kees Cook wrote:
-> On Sun, Mar 23, 2014 at 12:47 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > On 2/17/2014 4:34 AM, Dave Martin wrote:
-> >> On Fri, Feb 14, 2014 at 11:11:07AM -0800, Kees Cook wrote:
-> >>> On Fri, Feb 14, 2014 at 8:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> >>>> On Thu, Feb 13, 2014 at 05:04:10PM -0800, Kees Cook wrote:
-> >>>>> Introduce "CONFIG_DEBUG_RODATA" to mostly match the x86 config, though
-> >>>>> the behavior is different: it depends on STRICT_KERNMEM_PERMS, which
-> >>>>> sets rodata read-only (but executable), where as this option additionally
-> >>>>> splits rodata from the kernel text (resulting in potentially more memory
-> >>>>> lost to padding) and sets it non-executable as well. The end result is
-> >>>>> that on builds with CONFIG_DEBUG_RODATA=y (like x86) the rodata with be
-> >>>>> marked purely read-only.
-> >>>>
-> >>>> This triggers an Oops in kexec, because we have a block of code in .text
-> >>>> which is a template for generating baremetal code to relocate the new
-> >>>> kernel, and some literal words are written into it before copying.
-> >>>
-> >>> You're writing into the text area? I would imagine that
-> >>> CONFIG_ARM_KERNMEM_PERMS would break that. However, that's not the
-> >>> right place to be building code -- shouldn't the module area be used
-> >>> for that?
-> >>>
-> >>>> Possibly this should be in .rodata, not .text.
-> >>>
-> >>> Well, rodata should be neither writable nor executable.
-> >>
-> >> We're not writing into code exactly.
-> >>
-> >> This code is never executed in-place in vmlinux.  It gets copied, and
-> >> only copies are ever executed.
-> >>
-> >> Some pointers and offsets get poked into the code to configure it.
-> >>
-> >> I think it would be better simply to put the code in .rodata, and
-> >> poke paramaters into the copy, not the original -- but that's a bit
-> >> more awkward to code up, since the values can't be poked simply by
-> >> writing global variables.
-> >>
-> >>>
-> >>>> There may be a few other instances of this kind of thing.
-> >>>
-> >>> This config will certainly find them! :) But, that's why it's behind a config.
-> >>
-> >> I haven't tested exhaustively, but it think this is sufficient for a
-> >> Tested-by.  The patch does seem to be doing what it is intended to
-> >> do, and doesn't seem to be triggering false positives all over the
-> >> place.
-> >>
-> >>>
-> >>>> Are you aware of similar situations on other arches?
-> >>>
-> >>> I think there were some problems a long time ago on x86 for rodata too.
-> >>
-> >> It would be good to get this kexec case fixed -- I'll try to hack up
-> >> a separate patch.
-> >>
-> >
-> > FWIW, we've hit issues not just with kexec but kprobes as well. The same
-> > problems exist with this series:
+On Fri, Mar 21, 2014 at 11:50:17AM +0100, Lothar Wa?mann wrote:
+> With a flash-based BBT there is no reason to move the Factory Bad
+> Block Marker from the data area buffer (to where it is mapped by the
+> GPMI NAND controller) to the OOB buffer. Thus, make this feature
+> configurable via DT. This is required for the Ka-Ro electronics
+> platforms.
 > 
-> For this stage, how about I make this "depends on KEXEC=n &&
-> KPROBES=n"? 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  Documentation/devicetree/bindings/mtd/gpmi-nand.txt |    3 +++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c              |   10 +++++++---
+>  2 files changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> index 458d596..f28949a 100644
+> --- a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> @@ -25,6 +25,9 @@ Optional properties:
+>                         discoverable or this property is not enabled,
+>                         the software may chooses an implementation-defined
+>                         ECC scheme.
+> +  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
+> +                       area with the byte in the data area but rely on the
+> +                       BBT for identifying bad blocks.
 
-There's also ftrace (CONFIG_DYNAMIC_FTRACE I believe) which modifies
-kernel code with a call to probe_kernel_write(), which GDB uses as well.
- 
-And grepping for the patch_text() function also shows
-__arch_jump_label_transform() modifies kernel code. Not sure how and
-when that gets used.
+Please add the following:
+       "NOTE: This property is not supported by the imx23 and imx28"
+>  
+>  The device tree may optionally contain sub-nodes describing partitions of the
+>  address space. See partition.txt for more detail.
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> index bb77f75..98562eb 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -1632,9 +1632,6 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+>  	struct bch_geometry *bch_geo = &this->bch_geometry;
+>  	int ret;
+>  
+> -	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+> -	this->swap_block_mark = !GPMI_IS_MX23(this);
+> -
+>  	/* Set up the medium geometry */
+>  	ret = gpmi_set_geometry(this);
+>  	if (ret)
+> @@ -1701,6 +1698,13 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+>  	if (of_get_nand_on_flash_bbt(this->dev->of_node))
+>  		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+>  
+> +	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+> +	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
+> +		this->swap_block_mark = !GPMI_IS_MX23(this);
 
--- 
-Tixy
+the code should like this:
+----------------------------------------------
+	this->swap_block_mark = !GPMI_IS_MX23(this);
+
+	if (!GPMI_IS_IMX23(this) && !GPMI_IS_MX28(this) &&
+		of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
+		this->swap_block_mark = false;
+----------------------------------------------
+          
+> +
+> +	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
+> +		this->swap_block_mark ? "en" : "dis");
+> +
+>  	/*
+>  	 * Allocate a temporary DMA buffer for reading ID in the
+>  	 * nand_scan_ident().
+
+There are some bugs in the gpmi driver which is caused by the assumption that
+we always enable the swapping except the imx23. 
+
+So, there are some places should be changed with this patch:
+   [1] the subpage hook,
+        Please also change the gpmi_ecc_read_subpage() too.
+
+   [2] the OOB hook,
+   	Please also change the gpmi_ecc_read_oob(). 
+
+
+   [3] the markbad hook,
+   	Please also change the gpmi_block_markbad() . 
+
+thanks
+Huang Shijie
+        
+
+	
