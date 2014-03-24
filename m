@@ -1,98 +1,106 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 24 Mar 2014 17:59:03 +0800
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
-References: <532BCFCC.4080205@freescale.com>
- <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140324095902.GB11377@localhost>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Mon, 24 Mar 2014 16:21:19 +0530
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+ <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+Message-ID: <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 11:50:17AM +0100, Lothar Wa?mann wrote:
-> With a flash-based BBT there is no reason to move the Factory Bad
-> Block Marker from the data area buffer (to where it is mapped by the
-> GPMI NAND controller) to the OOB buffer. Thus, make this feature
-> configurable via DT. This is required for the Ka-Ro electronics
-> platforms.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  Documentation/devicetree/bindings/mtd/gpmi-nand.txt |    3 +++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c              |   10 +++++++---
->  2 files changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-> index 458d596..f28949a 100644
-> --- a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-> @@ -25,6 +25,9 @@ Optional properties:
->                         discoverable or this property is not enabled,
->                         the software may chooses an implementation-defined
->                         ECC scheme.
-> +  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
-> +                       area with the byte in the data area but rely on the
-> +                       BBT for identifying bad blocks.
-
-Please add the following:
-       "NOTE: This property is not supported by the imx23 and imx28"
->  
->  The device tree may optionally contain sub-nodes describing partitions of the
->  address space. See partition.txt for more detail.
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index bb77f75..98562eb 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -1632,9 +1632,6 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
->  	struct bch_geometry *bch_geo = &this->bch_geometry;
->  	int ret;
->  
-> -	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
-> -	this->swap_block_mark = !GPMI_IS_MX23(this);
-> -
->  	/* Set up the medium geometry */
->  	ret = gpmi_set_geometry(this);
->  	if (ret)
-> @@ -1701,6 +1698,13 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
->  	if (of_get_nand_on_flash_bbt(this->dev->of_node))
->  		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
->  
-> +	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
-> +	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
-> +		this->swap_block_mark = !GPMI_IS_MX23(this);
-
-the code should like this:
-----------------------------------------------
-	this->swap_block_mark = !GPMI_IS_MX23(this);
-
-	if (!GPMI_IS_IMX23(this) && !GPMI_IS_MX28(this) &&
-		of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
-		this->swap_block_mark = false;
-----------------------------------------------
-          
-> +
-> +	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
-> +		this->swap_block_mark ? "en" : "dis");
-> +
->  	/*
->  	 * Allocate a temporary DMA buffer for reading ID in the
->  	 * nand_scan_ident().
-
-There are some bugs in the gpmi driver which is caused by the assumption that
-we always enable the swapping except the imx23. 
-
-So, there are some places should be changed with this patch:
-   [1] the subpage hook,
-        Please also change the gpmi_ecc_read_subpage() too.
-
-   [2] the OOB hook,
-   	Please also change the gpmi_ecc_read_oob(). 
-
-
-   [3] the markbad hook,
-   	Please also change the gpmi_block_markbad() . 
-
-thanks
-Huang Shijie
-        
-
-	
+On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
+> Hi Jassi,
+>
+> Thanks for the Acked-by.
+>
+> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>
+>>> +
+>>> +/**
+>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+>>
+>> Should be xilinx_vdma_dma_prep_interleaved here.
+>
+> Ok, I will correct it.  Thanks.
+>
+>>
+>>> +/**
+>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
+>>> + * Run-time configuration for Axi VDMA, supports:
+>>> + * . halt the channel
+>>> + * . configure interrupt coalescing and inter-packet delay threshold
+>>> + * . start/stop parking
+>>> + * . enable genlock
+>>> + *
+>>> + * @dchan: DMA channel
+>>> + * @cfg: VDMA device configuration pointer
+>>> + *
+>>> + * Return: '0' on success and failure value on error
+>>> + */
+>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>>> +                                       struct xilinx_vdma_config *cfg)
+>>> +{
+>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>> +       u32 dmacr;
+>>> +
+>>> +       if (cfg->reset)
+>>> +               return xilinx_vdma_chan_reset(chan);
+>>> +
+>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
+>>> +
+>>> +       chan->config.frm_dly = cfg->frm_dly;
+>>> +       chan->config.park = cfg->park;
+>>> +
+>>> +       /* genlock settings */
+>>> +       chan->config.gen_lock = cfg->gen_lock;
+>>> +       chan->config.master = cfg->master;
+>>> +
+>>> +       if (cfg->gen_lock && chan->genlock) {
+>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
+>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
+>>> +       }
+>>> +
+>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
+>>> +       if (cfg->park)
+>>> +               chan->config.park_frm = cfg->park_frm;
+>>> +       else
+>>> +               chan->config.park_frm = -1;
+>>> +
+>>> +       chan->config.coalesc = cfg->coalesc;
+>>> +       chan->config.delay = cfg->delay;
+>>> +
+>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
+>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
+>>> +               chan->config.coalesc = cfg->coalesc;
+>>> +       }
+>>> +
+>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
+>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
+>>> +               chan->config.delay = cfg->delay;
+>>> +       }
+>>> +
+>>> +       /* FSync Source selection */
+>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
+>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
+>>> +
+>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+>>> +
+>> Bypassing the DMAEngine api doesn't seem very neat.
+>> Is there currently any client driver that /changes/ this configuration
+>> between channel requests? If no, then simply get the configuration
+>> from DT node and avoid this api.
+>
+> This change is recently suggested by Lars in the following patch series,
+> "dma: Remove comment about embedding dma_slave_config into custom structs"
+>
+If some user does indeed need to /change/ the configuration across
+channel requests, we can keep function. Is there currently any such
+user?
