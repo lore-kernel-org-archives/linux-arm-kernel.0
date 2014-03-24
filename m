@@ -1,37 +1,35 @@
-From: chris@printf.net (Chris Ball)
-Date: Mon, 24 Mar 2014 13:29:22 +0000
-Subject: [PATCH v2 3/4] rename ARCH_BCM to ARCH_BCM_MOBILE (mmc)
-In-Reply-To: <20140312214524.GS25092@beef> (Matt Porter's message of "Wed, 12
- Mar 2014 17:45:24 -0400")
-References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
- <1379956836-5866-4-git-send-email-bcm@fixthebug.org>
- <20140312214524.GS25092@beef>
-Message-ID: <86pplbwwr1.fsf@void.printf.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 24 Mar 2014 14:33:50 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix compilation breakage
+In-Reply-To: <20140321191739.GT27873@lukather>
+References: <1394204370-22979-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140307160836.GM21483@n2100.arm.linux.org.uk>
+ <20140310105808.GE2815@lukather>
+ <20140310112929.GY21483@n2100.arm.linux.org.uk>
+ <CAP=VYLqCmG6fRmPPABoW4xg_tFgGh2pji=f5ML=cBgCu4zZocg@mail.gmail.com>
+ <20140321191739.GT27873@lukather>
+Message-ID: <20140324133349.GA2631@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Mar 12 2014, Matt Porter wrote:
-> On Mon, Sep 23, 2013 at 10:20:35AM -0700, Christian Daudt wrote:
->> Currently ARCH_BCM has been used for Broadcom
->> Mobile V7 based SoCs. In order to allow other Broadcom
->> SoCs to also use mach-bcm directory and files, this patch
->> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
->> uses ARCH_BCM to define any Broadcom chip residing
->> in mach-bcm directory.
->> 
->> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
->> Acked-by: Olof Johansson <olof@lixom.net>
->
-> Hi Chris,
->
-> Could you please take this patch for 3.15? It was missed for 3.14.
+> > Looping linux-next into the CC since this is the cause of the failure
+> > in orion5x_defconfig there, and no point in anyone else re-doing the
+> > same bisect.
+> 
+> I sent a fix for this that hasn't been picked up yet:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/239069.html
+> 
+> IIRC, Wolfram's away until Monday, so I guess it will be merged some
+> time next week.
 
-Sorry about that -- it's in mmc-next for 3.15 now.
+I'd love to apply the fix but the reset framework update is not in
+linux-next yet.
 
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <chris@printf.net>   <http://printf.net/>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/c9931237/attachment.sig>
