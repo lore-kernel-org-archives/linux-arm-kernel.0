@@ -1,77 +1,137 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 24 Mar 2014 15:17:29 +0100
-Subject: [PATCH RFC] ixp4xx_eth: Allow setting the MDIO bus name in platform
- data
-Message-ID: <20140324151729.1b8e3bb5@marrow.netinsight.se>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 24 Mar 2014 22:14:54 +0800
+Subject: [PATCH 1/3] Documentation: add Device tree bindings for Hisilicon
+ hip04 ethernet
+In-Reply-To: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1395670496-17381-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows using e.g., a fixed MDIO bus with the ixp4xx_eth driver.
-Example:
+This patch adds the Device Tree bindings for the Hisilicon hip04
+Ethernet controller, including 100M / 1000M controller.
 
-  static struct eth_plat_info board_plat_eth_internal[] = {
-	{
-		.mdio_bus_id	= "fixed-0",
-		.phy		= 31,
-		.rxq		= 4,
-		.txreadyq	= 21,
-		.hwaddr		= {0x02, 0x00, 0x00, 0x00, 0x00, 0x00},
-	}
-  };
-
-  static struct platform_device board_eth_internal = {
-	.name			= "ixp4xx_eth",
-	.id			= IXP4XX_ETH_NPEC,
-	.dev.platform_data	= board_plat_eth_internal,
-  };
-
-Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 ---
-I'm unsure if this is the correct way of doing it for the legacy ixp4xx
-platform. It seems most boards which use the fixed PHYs are DT-based			
-PPC ones.
+ .../bindings/net/hisilicon-hip04-net.txt           |  110 ++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
 
- arch/arm/mach-ixp4xx/include/mach/platform.h |    1 +
- drivers/net/ethernet/xscale/ixp4xx_eth.c     |    7 ++++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ixp4xx/include/mach/platform.h b/arch/arm/mach-ixp4xx/include/mach/platform.h
-index 75c4c65..c6114b9 100644
---- a/arch/arm/mach-ixp4xx/include/mach/platform.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
-@@ -97,6 +97,7 @@ struct ixp4xx_pata_data {
- 
- /* Information about built-in Ethernet MAC interfaces */
- struct eth_plat_info {
-+	const char *mdio_bus_id; /* MDIO bus name. NULL is the ixp4xx_eth bus */
- 	u8 phy;		/* MII PHY ID, 0 - 31 */
- 	u8 rxq;		/* configurable, currently 0 - 31 only */
- 	u8 txreadyq;
-diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-index e540e51..31fe055 100644
---- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
-+++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-@@ -1410,6 +1410,7 @@ static int eth_init_one(struct platform_device *pdev)
- 	struct net_device *dev;
- 	struct eth_plat_info *plat = dev_get_platdata(&pdev->dev);
- 	u32 regs_phys;
-+	const char *mdio_bus_id;
- 	char phy_id[MII_BUS_ID_SIZE + 3];
- 	int err;
- 
-@@ -1477,8 +1478,12 @@ static int eth_init_one(struct platform_device *pdev)
- 	__raw_writel(DEFAULT_CORE_CNTRL, &port->regs->core_control);
- 	udelay(50);
- 
-+	mdio_bus_id = mdio_bus->id;
-+	if (plat->mdio_bus_id)
-+		mdio_bus_id = plat->mdio_bus_id;
+diff --git a/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+new file mode 100644
+index 0000000..bd8ad3b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+@@ -0,0 +1,110 @@
++Hisilicon hip04 Ethernet Controller
 +
- 	snprintf(phy_id, MII_BUS_ID_SIZE + 3, PHY_ID_FMT,
--		mdio_bus->id, plat->phy);
-+		mdio_bus_id, plat->phy);
- 	port->phydev = phy_connect(dev, phy_id, &ixp4xx_adjust_link,
- 				   PHY_INTERFACE_MODE_MII);
- 	if (IS_ERR(port->phydev)) {
++* Ethernet controller node
++
++Required properties:
++- compatible: should be "hisilicon,hip04-mac".
++- reg: address and length of the register set for the device.
++- interrupts: interrupt for the device.
++- port-handle: phandle, specifies a reference to a node representing
++  the connected port
++- phy-mode: see ethernet.txt [1].
++
++Optional properties:
++- phy-handle: see ethernet.txt [1].
++
++[1] Documentation/devicetree/bindings/net/ethernet.txt
++
++
++* Ethernet ppe node:
++Control rx & tx fifos of all ethernet controllers.
++Have 2048 recv channels shared by all ethernet controllers, only if no overlap.
++
++Required properties:
++- #address-cells : Should be <1>
++- #size-cells : Should be <0>
++- compatible: "hisilicon,hip04-ppe", "syscon".
++- reg: address and length of the register set for the device.
++
++==Child node==
++
++Required properties:
++- reg: port physical number, range from 0 to 0x1f.
++- channel: recv channel start from channel * number (RX_DESC_NUM).
++
++
++* MDIO bus node:
++
++Required properties:
++
++- compatible: should be "hisilicon,hip04-mdio".
++- Inherits from MDIO bus node binding [2]
++[2] Documentation/devicetree/bindings/net/phy.txt
++
++Example:
++	mdio {
++		compatible = "hisilicon,hip04-mdio";
++		reg = <0x28f1000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++			marvell,reg-init = <18 0x14 0 0x8001>;
++		};
++
++		phy1: ethernet-phy at 1 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <1>;
++			marvell,reg-init = <18 0x14 0 0x8001>;
++		};
++	};
++
++	ppe: ppe at 28c0000 {
++		compatible = "hisilicon,hip04-ppe", "syscon";
++		reg = <0x28c0000 0x10000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		eth0_port: port at 1f {
++			reg = <0x1f>;
++			channel = <0>;
++		};
++
++		eth1_port: port at 0 {
++			reg = <0>;
++			channel = <1>;
++		};
++
++		eth2_port: port at 8 {
++			reg = <8>;
++			channel = <2>;
++		};
++	};
++
++	fe: ethernet at 28b0000 {
++		compatible = "hisilicon,hip04-mac";
++		reg = <0x28b0000 0x10000>;
++		interrupts = <0 413 4>;
++		phy-mode = "mii";
++		port-handle = <&eth0_port>;
++	};
++
++	ge0: ethernet at 2800000 {
++		compatible = "hisilicon,hip04-mac";
++		reg = <0x2800000 0x10000>;
++		interrupts = <0 402 4>;
++		phy-mode = "sgmii";
++		port-handle = <&eth1_port>;
++		phy-handle = <&phy0>;
++	};
++
++	ge8: ethernet at 2880000 {
++		compatible = "hisilicon,hip04-mac";
++		reg = <0x2880000 0x10000>;
++		interrupts = <0 410 4>;
++		phy-mode = "sgmii";
++		port-handle = <&eth2_port>;
++		phy-handle = <&phy1>;
++	};
 -- 
-1.7.9.6
+1.7.9.5
