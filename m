@@ -1,65 +1,103 @@
 From: brezillonboris@gmail.com (Boris BREZILLON)
-Date: Mon, 24 Mar 2014 09:27:12 +0100
-Subject: [PATCH v2 00/11] ARM: at91: rework main and slow clk implementation
-Message-ID: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+Date: Mon, 24 Mar 2014 09:27:14 +0100
+Subject: [PATCH v2 02/11] clk: at91: update main clk documentation
+In-Reply-To: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1395649643-9146-3-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Update main clk documentation to match main clk implementation rework.
 
-This series introduce the real clock model (as described in atmel datasheets)
-for slow and main clocks.
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+ .../devicetree/bindings/clock/at91-clock.txt       |   56 ++++++++++++++++----
+ 1 file changed, 47 insertions(+), 9 deletions(-)
 
-The modifications introduced by this series break the DT compat, but, as the
-at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
-eval boards) I think it won't impact a lot of users.
-
-Nicolas, Mike, if this series is accepted, I'd like to get it merged as soon as
-possible to prevent other developpers from using a deprecated DT binding.
-Moreover, I think this series should go through the same path for both clk
-and DT changes (whatever path is chosen: either at91 or clk tree) because the
-changes are tightly coupled.
-
-Best Regards,
-
-Boris
-
-Changes since v1:
-- fix sam9rl main clk definition 
-
-Boris BREZILLON (11):
-  clk: at91: rework main clk implementation
-  clk: at91: update main clk documentation
-  clk: at91: add slow clks driver
-  clk: at91: add slow clk documentation
-  ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
-  ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
-  ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
-  ARM: at91/dt: move at91sam9261 SoC to the new main clock model
-  ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
-  ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
-  ARM: at91/dt: define sam9rlek crystal frequencies
-
- .../devicetree/bindings/clock/at91-clock.txt       |  128 ++++-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   10 +
- arch/arm/boot/dts/at91sam9261.dtsi                 |   10 +-
- arch/arm/boot/dts/at91sam9261ek.dts                |    4 +
- arch/arm/boot/dts/at91sam9rl.dtsi                  |   47 +-
- arch/arm/boot/dts/at91sam9rlek.dts                 |    8 +
- arch/arm/boot/dts/sama5d3.dtsi                     |   61 +-
- arch/arm/boot/dts/sama5d3xcm.dtsi                  |   10 +
- drivers/clk/at91/Makefile                          |    4 +-
- drivers/clk/at91/clk-main.c                        |  581 +++++++++++++++++---
- drivers/clk/at91/clk-slow.c                        |  467 ++++++++++++++++
- drivers/clk/at91/pmc.c                             |   12 +
- drivers/clk/at91/pmc.h                             |    9 +
- drivers/clk/at91/sckc.c                            |   57 ++
- drivers/clk/at91/sckc.h                            |   22 +
- include/linux/clk/at91_pmc.h                       |    1 +
- 16 files changed, 1343 insertions(+), 88 deletions(-)
- create mode 100644 drivers/clk/at91/clk-slow.c
- create mode 100644 drivers/clk/at91/sckc.c
- create mode 100644 drivers/clk/at91/sckc.h
-
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index cd5e239..9a7025b 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -15,8 +15,13 @@ Required properties:
+ 		All at91 specific clocks (clocks defined below) must be child
+ 		node of the PMC node.
+ 
++	"atmel,at91rm9200-clk-main-osc"
++	"atmel,at91sam9x5-clk-main-rc-osc"
++		at91 main clk sources
++
++	"atmel,at91sam9x5-clk-main"
+ 	"atmel,at91rm9200-clk-main":
+-		at91 main oscillator
++		at91 main clock
+ 
+ 	"atmel,at91rm9200-clk-master" or
+ 	"atmel,at91sam9x5-clk-master":
+@@ -85,24 +90,57 @@ For example:
+ 		/* put at91 clocks here */
+ 	};
+ 
++Required properties for main clock oscillator:
++- interrupt-parent : must reference the PMC node.
++- interrupts : shall be set to "<0>".
++- clock-frequency : define the internal RC oscillator frequency.
++
++Optional properties:
++- clock-accuracy : define the internal RC oscillator accuracy.
++
++For example:
++	main_rc_osc: main_rc_osc {
++		compatible = "atmel,at91sam9x5-clk-main-rc-osc";
++		interrupt-parent = <&pmc>;
++		interrupts = <0>;
++		clock-frequency = <12000000>;
++		clock-accuracy = <50000000>;
++	};
++
++Required properties for main clock internal RC oscillator:
++- interrupt-parent : must reference the PMC node.
++- interrupts : shall be set to "<0>".
++- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : shall encode the main osc source clk sources (see atmel datasheet).
++
++Optional properties:
++- atmel,osc-bypass : boolean property. Specified if a clock signal is provided
++  on XIN.
++
++  clock signal is directly provided on XIN pin.
++
++For example:
++	main_osc: main_osc {
++		compatible = "atmel,at91rm9200-clk-main-osc";
++		interrupt-parent = <&pmc>;
++		interrupts = <0>;
++		#clock-cells = <0>;
++		clocks = <&main_xtal>;
++	};
++
+ Required properties for main clock:
+ - interrupt-parent : must reference the PMC node.
+ - interrupts : shall be set to "<0>".
+ - #clock-cells : from common clock binding; shall be set to 0.
+-- clocks (optional if clock-frequency is provided) : shall be the slow clock
+-	phandle. This clock is used to calculate the main clock rate if
+-	"clock-frequency" is not provided.
+-- clock-frequency : the main oscillator frequency.Prefer the use of
+-	"clock-frequency" over automatic clock rate calculation.
++- clocks : shall encode the main clk sources (see atmel datasheet).
+ 
+ For example:
+ 	main: mainck {
+-		compatible = "atmel,at91rm9200-clk-main";
++		compatible = "atmel,at91sam9x5-clk-main";
+ 		interrupt-parent = <&pmc>;
+ 		interrupts = <0>;
+ 		#clock-cells = <0>;
+-		clocks = <&ck32k>;
+-		clock-frequency = <18432000>;
++		clocks = <&main_rc_osc &main_osc>;
+ 	};
+ 
+ Required properties for master clock:
 -- 
 1.7.9.5
