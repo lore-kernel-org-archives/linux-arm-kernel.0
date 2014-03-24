@@ -1,88 +1,141 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 24 Mar 2014 11:50:49 +0530
-Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
-References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
- <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
-Message-ID: <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 24 Mar 2014 07:47:42 +0100
+Subject: [RFC v3 0/5] cpufreq:LAB: Support for LAB governor.
+In-Reply-To: <20140318101736.501844d1@amdc2363>
+References: <1367590072-10496-1-git-send-email-jonghwa3.lee@samsung.com>
+ <1393928852-22725-1-git-send-email-l.majewski@samsung.com>
+ <20140317163824.3c5480b3@amdc2363>
+ <CAKohpokz9SknhPH_sgGE6Q8DB+QtaJKSwMG4WgfmWet9skMKUA@mail.gmail.com>
+ <20140318101736.501844d1@amdc2363>
+Message-ID: <20140324074742.00181c21@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+Hi Viresh,
 
-> +
-> +/**
-> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+> Hi Viresh,
+> 
+> > On 17 March 2014 21:08, Lukasz Majewski <l.majewski@samsung.com>
+> > wrote:
+> > >> Despite this patch set is working and applicable on top of
+> > >> 3.14-rc5, please regard it solely as a pure RFC.
+> > >>
+> > >> This patch provides support for LAB governor build on top of
+> > >> ondemand. Previous version of LAB can be found here:
+> > >> http://thread.gmane.org/gmane.linux.kernel/1484746/match=cpufreq
+> > >>
+> > >> LAB short reminder:
+> > >>
+> > >> LAB uses information about how many cores are in "idle" state
+> > >> (the core idleness is represented as the value between 0 and
+> > >> 100) and the overall load of the system (from 0 to 100) to
+> > >> decide about frequency to be set. It is extremely useful with
+> > >> SoCs like Exynos4412, which can set only one frequency for all
+> > >> cores.
+> > >>
+> > >> Important design decisions:
+> > >>
+> > >> - Reuse well established ondemand governor's internal code. To do
+> > >> this I had to expose some previously static internal ondemand
+> > >> code. This allowed smaller LAB code when compared to previous
+> > >> version.
+> > >>
+> > >> - LAB works on top of ondemand, which means that one via device
+> > >> tree attributes can specify if and when e.g. BOOST shall be
+> > >> enabled or if any particular frequency shall be imposed. For
+> > >> situation NOT important from the power consumption reduction
+> > >> viewpoint the ondemand is used to set proper frequency.
+> > >>
+> > >> - It is only possible to either compile in or not the LAB into
+> > >> the kernel. There is no "M" option for Kconfig. It is done on
+> > >> purpose, since ondemand itself can be also compiled as a module
+> > >> and then it would be possible to remove ondemand when LAB is
+> > >> working on top of it.
+> > >>
+> > >> - The LAB operation is specified (and thereof extendable) via
+> > >> device tree lab-ctrl-freq attribute defined at /cpus/cpu0.
+> > >>
+> > >>
+> > >> Problems:
+> > >> - How the governor will work for big.LITTLE systems (especially
+> > >> Global Task Scheduling).
+> > >> - Will there be agreement to expose internal ondemand code to be
+> > >> reused for more specialized governors.
+> > >>
+> > >> Test HW:
+> > >>       Exynos4412 - Trats2 board.
+> > >> Above patches were posted on top of Linux 3.14-rc5
+> > >> (SHA1: 3f9590c281c66162bf8ae9b7b2d987f0a89043c6)
+> > >>
+> > >
+> > > Any comments about those patches?
+> > 
+> > Sorry for being late on reviewing these..
+> > 
+> > I tried to go through the patches but didn't looked at the minutest
+> > of the details. Its been a long time when you first sent this
+> > patchset. And the memories have corrupted by now :) ..
+> 
+> Unfortunately memory is volatile ... since LAB governor is a follow up
+> of BOOST, which review and inclusion took considerable time, some
+> details could be forgotten. 
+> 
+> > 
+> > To get context back, can we discuss again the fundamentals behind
+> > this new governor you are proposing. And then we can discuss about
+> > it again, its pros/cons, etc..
+> 
+> Please consider following links:
+> 
+> The original implementation - threads:
+> http://thread.gmane.org/gmane.linux.power-management.general/32523/match=lab
+> http://thread.gmane.org/gmane.linux.kernel/1484746/match=lab
+> 
+> 
+> LAB justification data:
+> http://article.gmane.org/gmane.linux.kernel/1472381
+> 
+> 
+> > People are reluctant in getting another governor in and want to give
+> > existing governors a try if possible.
+> 
+> As I've stated in the covering letter, this code is an extension of
+> Ondemand.
+> 
+> This is totally different from what have been posted previously (v1,
+> v2).
+> The first LAB proposal was written with some parts copied from
+> Ondemand. It was a separate, standalone governor.
+> 
+> 
+> The approach proposed in those patches is very different. It simply
+> reuses Ondemand code as much as possible (timers, default attributes
+> exported to sysfs, etc.).
+> 
+> On top of the Ondemand we have the LAB, which thereof is its optional
+> extension. The existing code is reused and can be easily extracted as
+> a common code.
+> 
+> > 
+> > So, please explain the basics behind your governor again and then
+> > we can put our arguments again..
+> > 
+> 
+> I hope that provided overview is sufficient. More in depth
+> information can be found in posted patches or provided LKML archives.
+> 
 
-Should be xilinx_vdma_dma_prep_interleaved here.
+Viresh, will you find time for reviewing this RFC in a near future?
 
-> +/**
-> + * xilinx_vdma_channel_set_config - Configure VDMA channel
-> + * Run-time configuration for Axi VDMA, supports:
-> + * . halt the channel
-> + * . configure interrupt coalescing and inter-packet delay threshold
-> + * . start/stop parking
-> + * . enable genlock
-> + *
-> + * @dchan: DMA channel
-> + * @cfg: VDMA device configuration pointer
-> + *
-> + * Return: '0' on success and failure value on error
-> + */
-> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
-> +                                       struct xilinx_vdma_config *cfg)
-> +{
-> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> +       u32 dmacr;
-> +
-> +       if (cfg->reset)
-> +               return xilinx_vdma_chan_reset(chan);
-> +
-> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
-> +
-> +       chan->config.frm_dly = cfg->frm_dly;
-> +       chan->config.park = cfg->park;
-> +
-> +       /* genlock settings */
-> +       chan->config.gen_lock = cfg->gen_lock;
-> +       chan->config.master = cfg->master;
-> +
-> +       if (cfg->gen_lock && chan->genlock) {
-> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
-> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
-> +       }
-> +
-> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
-> +       if (cfg->park)
-> +               chan->config.park_frm = cfg->park_frm;
-> +       else
-> +               chan->config.park_frm = -1;
-> +
-> +       chan->config.coalesc = cfg->coalesc;
-> +       chan->config.delay = cfg->delay;
-> +
-> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
-> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
-> +               chan->config.coalesc = cfg->coalesc;
-> +       }
-> +
-> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
-> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
-> +               chan->config.delay = cfg->delay;
-> +       }
-> +
-> +       /* FSync Source selection */
-> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
-> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
-> +
-> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
-> +
-Bypassing the DMAEngine api doesn't seem very neat.
-Is there currently any client driver that /changes/ this configuration
-between channel requests? If no, then simply get the configuration
-from DT node and avoid this api.
+> > --
+> > viresh
+> 
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
