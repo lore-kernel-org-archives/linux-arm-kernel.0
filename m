@@ -1,106 +1,146 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 24 Mar 2014 16:21:19 +0530
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 24 Mar 2014 11:59:47 +0100
 Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
  Engine driver support
-In-Reply-To: <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+In-Reply-To: <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
 References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
  <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
  <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
  <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
-Message-ID: <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+ <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+Message-ID: <53301023.8080301@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> Hi Jassi,
->
-> Thanks for the Acked-by.
->
-> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+Hi Vinod,
+
+sorry for top posting.
+
+is there any chance to get this driver to the 3.15?
+Or have you already closed your dma repo for new drivers?
+
+The driver should be in pretty good shape after long review.
+>From email below Srikanth got ACK from Jassi
+and there should be a small fix which Srikanth will send in v7
+which I hope will be the last version.
+
+Thanks,
+Michal
+
+On 03/24/2014 11:51 AM, Jassi Brar wrote:
+> On 24 March 2014 14:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> Hi Jassi,
 >>
->>> +
->>> +/**
->>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+>> Thanks for the Acked-by.
 >>
->> Should be xilinx_vdma_dma_prep_interleaved here.
->
-> Ok, I will correct it.  Thanks.
->
+>> On Mon, Mar 24, 2014 at 11:50 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Tue, Mar 18, 2014 at 12:36 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>
+>>>> +
+>>>> +/**
+>>>> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
+>>>
+>>> Should be xilinx_vdma_dma_prep_interleaved here.
 >>
->>> +/**
->>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
->>> + * Run-time configuration for Axi VDMA, supports:
->>> + * . halt the channel
->>> + * . configure interrupt coalescing and inter-packet delay threshold
->>> + * . start/stop parking
->>> + * . enable genlock
->>> + *
->>> + * @dchan: DMA channel
->>> + * @cfg: VDMA device configuration pointer
->>> + *
->>> + * Return: '0' on success and failure value on error
->>> + */
->>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->>> +                                       struct xilinx_vdma_config *cfg)
->>> +{
->>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>> +       u32 dmacr;
->>> +
->>> +       if (cfg->reset)
->>> +               return xilinx_vdma_chan_reset(chan);
->>> +
->>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
->>> +
->>> +       chan->config.frm_dly = cfg->frm_dly;
->>> +       chan->config.park = cfg->park;
->>> +
->>> +       /* genlock settings */
->>> +       chan->config.gen_lock = cfg->gen_lock;
->>> +       chan->config.master = cfg->master;
->>> +
->>> +       if (cfg->gen_lock && chan->genlock) {
->>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
->>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
->>> +       }
->>> +
->>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
->>> +       if (cfg->park)
->>> +               chan->config.park_frm = cfg->park_frm;
->>> +       else
->>> +               chan->config.park_frm = -1;
->>> +
->>> +       chan->config.coalesc = cfg->coalesc;
->>> +       chan->config.delay = cfg->delay;
->>> +
->>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
->>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
->>> +               chan->config.coalesc = cfg->coalesc;
->>> +       }
->>> +
->>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
->>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
->>> +               chan->config.delay = cfg->delay;
->>> +       }
->>> +
->>> +       /* FSync Source selection */
->>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
->>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
->>> +
->>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
->>> +
->>> +       return 0;
->>> +}
->>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
->>> +
->> Bypassing the DMAEngine api doesn't seem very neat.
->> Is there currently any client driver that /changes/ this configuration
->> between channel requests? If no, then simply get the configuration
->> from DT node and avoid this api.
->
-> This change is recently suggested by Lars in the following patch series,
-> "dma: Remove comment about embedding dma_slave_config into custom structs"
->
-If some user does indeed need to /change/ the configuration across
-channel requests, we can keep function. Is there currently any such
-user?
+>> Ok, I will correct it.  Thanks.
+>>
+>>>
+>>>> +/**
+>>>> + * xilinx_vdma_channel_set_config - Configure VDMA channel
+>>>> + * Run-time configuration for Axi VDMA, supports:
+>>>> + * . halt the channel
+>>>> + * . configure interrupt coalescing and inter-packet delay threshold
+>>>> + * . start/stop parking
+>>>> + * . enable genlock
+>>>> + *
+>>>> + * @dchan: DMA channel
+>>>> + * @cfg: VDMA device configuration pointer
+>>>> + *
+>>>> + * Return: '0' on success and failure value on error
+>>>> + */
+>>>> +int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>>>> +                                       struct xilinx_vdma_config *cfg)
+>>>> +{
+>>>> +       struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>>> +       u32 dmacr;
+>>>> +
+>>>> +       if (cfg->reset)
+>>>> +               return xilinx_vdma_chan_reset(chan);
+>>>> +
+>>>> +       dmacr = vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR);
+>>>> +
+>>>> +       chan->config.frm_dly = cfg->frm_dly;
+>>>> +       chan->config.park = cfg->park;
+>>>> +
+>>>> +       /* genlock settings */
+>>>> +       chan->config.gen_lock = cfg->gen_lock;
+>>>> +       chan->config.master = cfg->master;
+>>>> +
+>>>> +       if (cfg->gen_lock && chan->genlock) {
+>>>> +               dmacr |= XILINX_VDMA_DMACR_GENLOCK_EN;
+>>>> +               dmacr |= cfg->master << XILINX_VDMA_DMACR_MASTER_SHIFT;
+>>>> +       }
+>>>> +
+>>>> +       chan->config.frm_cnt_en = cfg->frm_cnt_en;
+>>>> +       if (cfg->park)
+>>>> +               chan->config.park_frm = cfg->park_frm;
+>>>> +       else
+>>>> +               chan->config.park_frm = -1;
+>>>> +
+>>>> +       chan->config.coalesc = cfg->coalesc;
+>>>> +       chan->config.delay = cfg->delay;
+>>>> +
+>>>> +       if (cfg->coalesc <= XILINX_VDMA_DMACR_FRAME_COUNT_MAX) {
+>>>> +               dmacr |= cfg->coalesc << XILINX_VDMA_DMACR_FRAME_COUNT_SHIFT;
+>>>> +               chan->config.coalesc = cfg->coalesc;
+>>>> +       }
+>>>> +
+>>>> +       if (cfg->delay <= XILINX_VDMA_DMACR_DELAY_MAX) {
+>>>> +               dmacr |= cfg->delay << XILINX_VDMA_DMACR_DELAY_SHIFT;
+>>>> +               chan->config.delay = cfg->delay;
+>>>> +       }
+>>>> +
+>>>> +       /* FSync Source selection */
+>>>> +       dmacr &= ~XILINX_VDMA_DMACR_FSYNCSRC_MASK;
+>>>> +       dmacr |= cfg->ext_fsync << XILINX_VDMA_DMACR_FSYNCSRC_SHIFT;
+>>>> +
+>>>> +       vdma_ctrl_write(chan, XILINX_VDMA_REG_DMACR, dmacr);
+>>>> +
+>>>> +       return 0;
+>>>> +}
+>>>> +EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+>>>> +
+>>> Bypassing the DMAEngine api doesn't seem very neat.
+>>> Is there currently any client driver that /changes/ this configuration
+>>> between channel requests? If no, then simply get the configuration
+>>> from DT node and avoid this api.
+>>
+>> This change is recently suggested by Lars in the following patch series,
+>> "dma: Remove comment about embedding dma_slave_config into custom structs"
+>>
+> If some user does indeed need to /change/ the configuration across
+> channel requests, we can keep function. Is there currently any such
+> user?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/eb31b79d/attachment.sig>
