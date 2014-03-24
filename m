@@ -1,57 +1,61 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Mon, 24 Mar 2014 14:50:00 +0100
-Subject: [PATCH 2/3] IXP4xx: Fix DMA masks.
-In-Reply-To: <m37g7liwdb.fsf@intrepid.localdomain>
-References: <m3siq9iyt2.fsf@intrepid.localdomain>
- <m37g7liwdb.fsf@intrepid.localdomain>
-Message-ID: <20140324145000.4098c8c7@marrow.netinsight.se>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Mar 2014 14:47:39 +0100
+Subject: [PATCH 61/62] ARM: sunxi: fix build for THUMB2_KERNEL
+In-Reply-To: <6006528.k1jnepzDNv@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <CAL_JsqL_XkF6VRAJdgRmZvX6uud3S8OqvzoTqc9hy2PNDUv5kw@mail.gmail.com>
+ <4626847.CFbp3XOTnf@wuerfel> <6006528.k1jnepzDNv@wuerfel>
+Message-ID: <20140324134739.GF5416@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Mar 2014 01:36:48 +0100
-Krzysztof Halasa <khc@pm.waw.pl> wrote:
-
-> Now, devices will have 32-bit default DMA masks (0xFFFFFFFF) as per DMA API.
+On Fri, Mar 21, 2014 at 05:24:21PM +0100, Arnd Bergmann wrote:
+> On Friday 21 March 2014 17:05:09 Arnd Bergmann wrote:
+> > On Friday 21 March 2014 10:54:49 Rob Herring wrote:
+> > > The first things secondary_startup do are:
+> > > 
+> > > -set BE mode
+> > > -if in HYP mode, install hyp vectors and drop to SVC
+> > > -set the CPSR to a know value (safe_svcmode_maskall r9)
+> > > 
+> > > So this code is completely redundant and unnecessary. If there were
+> > > some reason for it, then it should be in secondary_startup.
+> > 
+> > Ah, thanks for the clarification. Shall we just delete the file then
+> > and jump straight to secondary_startup?
 > 
-> Fixes:
-> $ ifconfig eth0 up
->
-> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+> Maxime, can you test the new version?
+> 
+> From 2f6220cee15e45446c43e5c43affa85a6c407b31 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Sun, 16 Mar 2014 18:04:54 +0100
+> Subject: [PATCH] ARM: sunxi: fix build for THUMB2_KERNEL
+> 
+> Building an SMP kernel for the sunxi platform with THUMB2 instructions
+> fails with this error at the moment:
+> 
+> headsmp.S:7: Error: Thumb encoding does not support an immediate here -- `msr cpsr_fsxc,#0xd3'
+> 
+> Since the generic secondary_startup function already does
+> the same thing in a safe way, we can just drop the private
+> sunxi implementation and jump straight to secondary_startup.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Tested-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+With the additional changes you mentionned later that unbreaks the
+compilation, you have my acked-by.
 
-> +#ifdef CONFIG_PCI
-> +static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
-> +{
-> +	return (dma_addr + size) > SZ_64M;
-> +}
-> +
-> +static int ixp4xx_platform_notify_remove(struct device *dev)
-> +{
-> +	if (dev_is_pci(dev))
-> +		dmabounce_unregister_dev(dev);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +/*
-> + * Setup DMA mask to 64MB on PCI devices and 4 GB on all other things.
-> + */
-> +static int ixp4xx_platform_notify(struct device *dev)
-> +{
-> +	dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +#ifdef CONFIG_PCI
-> +	if (dev_is_pci(dev)) {
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(28); /* 64 MB */
-> +		dmabounce_register_dev(dev, 2048, 4096, ixp4xx_needs_bounce);
-> +		return 0;
-> +	}
-> +#endif
+Maxime
 
-I would simply remove the #ifdef CONFIG_PCI statements: dev_is_pci(dev)
-should return false at compile time if CONFIG_PCI is not set, and then
-I'd trust the compiler to simply remove all dead code.
-
-// Simon
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/92693cd9/attachment-0001.sig>
