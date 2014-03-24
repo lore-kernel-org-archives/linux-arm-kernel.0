@@ -1,60 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Mar 2014 13:04:57 +0100
-Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
-In-Reply-To: <20140324013556.GF23924@verge.net.au>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403211643.24533.arnd@arndb.de> <20140324013556.GF23924@verge.net.au>
-Message-ID: <14100654.IXZcGSFRJS@wuerfel>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 24 Mar 2014 13:06:58 +0100
+Subject: [PATCH v6 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CABb+yY13sheOvhVUkYNAO7t16egnPdf5x_fSvNuXVsU4E=W1Eg@mail.gmail.com>
+References: <1395083192-3224-1-git-send-email-sthokal@xilinx.com>
+ <1395083192-3224-3-git-send-email-sthokal@xilinx.com>
+ <CABb+yY1z1Rr-EyJaeHQDb+thmKZVk5V93avokx6Z_EEuQFHyrw@mail.gmail.com>
+ <CA+mB=1Lwq=Z3E+K7KTCgDKdmEQ8s5DMsAQVLVijdNPknNzx+SA@mail.gmail.com>
+ <CAJe_Zhdnz+bdFiAqPgdH5hOTfzYUsoMyd0qpoWkeDAqqU+itSQ@mail.gmail.com>
+ <53301023.8080301@monstr.eu>
+ <CABb+yY13sheOvhVUkYNAO7t16egnPdf5x_fSvNuXVsU4E=W1Eg@mail.gmail.com>
+Message-ID: <53301FE2.4080705@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 March 2014 10:35:56 Simon Horman wrote:
-> On Fri, Mar 21, 2014 at 04:43:24PM +0100, Arnd Bergmann wrote:
-> > On Thursday 20 March 2014, Simon Horman wrote:
-> > > I wonder if Kconfig for koelsch should be tightened up somehow to
-> > > ensure that PHYLIB is either unselected or builtin.
-> > > 
-> > > Also, a minor nit, I would prefer changes for different boards
-> > > in different patches. But I can split the patch myself if its
-> > > not going to be changed otherwise.
-> > 
-> > I would prefer to take the entire series directly into arm-soc
-> > this time, if you don't mind.
+On 03/24/2014 12:02 PM, Jassi Brar wrote:
+> On Mon, Mar 24, 2014 at 4:29 PM, Michal Simek <monstr@monstr.eu> wrote:
+>> Hi Vinod,
+>>
+>> sorry for top posting.
+>>
+>> is there any chance to get this driver to the 3.15?
+>> Or have you already closed your dma repo for new drivers?
+>>
+>> The driver should be in pretty good shape after long review.
+>> From email below Srikanth got ACK from Jassi
+>> and there should be a small fix which Srikanth will send in v7
+>> which I hope will be the last version.
+>>
+> +1  Any change may come incrementally.
 > 
-> That I'm happy to go along with though I don't understand the motivation
-> for it. And regardless of how the patches go in I'd prefer if they were
-> split as I suggested above.
+> Btw, here's the ack
+>    Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> 
 
-Sorry, I misunderstood you at first. I thought you meant you only split
-them up when you apply them yourself. It's no problem for me to split
-up this patch as well and then apply it here.
+Ok. That's even better. The reason why I am asking for finishing
+this is that we would like to start to pushing changes to
+the media tree which depends on this driver.
 
-> What I'm not so happy about is us potentially moving a problem from being a
-> compile time error, which is easy to observe, to a run-time behavioural
-> problem, which may be much less obvious to the beholder.
+Thanks,
+Michal
 
-I agree that it's not nice, but I couldn't come with a better approach,
-and we are doing the same thing on other platforms as well.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-The problems are:
 
-* leaving the code as it is today prevents me from running all
-  'make randconfig' kernels successfully. I use this as an important
-  test case for verifying stuff we pull into the arm-soc tree.
-  At the moment, I have a 160-patch series that I want to get merged
-  upstream over time.
-
-* Using 'select PHYLIB' from the platform is nasty because we want
-  to be able to turn off whole subsystems (BLOCK, NET, I2C, ...)
-  in Kconfig independent of the board selection. PHYLIB requires
-  the network code.
-
-* Using 'depends on' to disable the board option if PHYLIB is
-  a module is counterintuitive.
-
-* Makeing PHYLIB always built-in when NETDEVICE is would be a
-  bit wasteful.
-
-I don't have any other ideas for solving this.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140324/815b86ac/attachment.sig>
