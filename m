@@ -1,132 +1,174 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 25 Mar 2014 15:54:46 -0700
-Subject: [RFC PATCH v2 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <5331664E.2050008@samsung.com>
-References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
- <1393870975-21020-1-git-send-email-s.nawrocki@samsung.com>
- <5331664E.2050008@samsung.com>
-Message-ID: <20140325225446.5762.15937@quantum>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 25 Mar 2014 23:57:11 +0100
+Subject: [PATCH v4 12/13] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <20140214170046.GA32564@e102568-lin.cambridge.arm.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
+ <20140214170046.GA32564@e102568-lin.cambridge.arm.com>
+Message-ID: <533209C7.6060302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-03-25 04:19:42)
-> On 03/03/14 19:22, Sylwester Nawrocki wrote:
-> > This function adds a notifier callback run before a driver is bound
-> > to a device. It will configure any parent clocks and clock frequencies
-> > according to values of 'clock-parents' and 'clock-rates' DT properties
-> > respectively.
-> > 
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > Changes since v1:
-> >  - the helper function to parse and set assigned clock parents and
-> >    rates made public so it is available to clock providers to call
-> >    directly;
-> >  - dropped the platform bus notification and call of_clk_device_setup()
-> >    is is now called from the driver core, rather than from the
-> >    notification callback;
-> >  - s/of_clk_get_list_entry/of_clk_get_by_property.
-> > ---
-> >  .../devicetree/bindings/clock/clock-bindings.txt   |   23 ++++++
-> >  drivers/base/dd.c                                  |    5 ++
-> >  drivers/clk/clk.c                                  |   77 ++++++++++++++++++++
-> >  include/linux/clk-provider.h                       |    6 ++
-> >  4 files changed, 111 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > index 7c52c29..eb8d547 100644
-> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > @@ -115,3 +115,26 @@ clock signal, and a UART.
-> >    ("pll" and "pll-switched").
-> >  * The UART has its baud clock connected the external oscillator and its
-> >    register clock connected to the PLL clock (the "pll-switched" signal)
-> > +
-> > +==Assigned clock parents and rates==
-> > +
-> > +Some platforms require static configuration of (parts of) the clock controller
-> > +often determined by the board design. Such a configuration can be specified in
-> > +a clock consumer node through clock-parents and clock-rates DT properties.
-> > +The former should contain list of parent clocks in form of phandle and clock
-> > +specifier pairs, the latter the list of assigned clock frequency values
-> > +(one cell each).
-> > +
-> > +    uart at a000 {
-> > +        compatible = "fsl,imx-uart";
-> > +        reg = <0xa000 0x1000>;
-> > +        ...
-> > +        clocks = <&clkcon 0>, <&clkcon 3>;
-> > +        clock-names = "baud", "mux";
-> > +
-> > +        clock-parents = <0>, <&pll 1>;
+On 14/02/2014 18:00, Lorenzo Pieralisi wrote:
+> On Thu, Feb 13, 2014 at 05:33:35PM +0000, Gregory CLEMENT wrote:
 > 
-> I have some doubts here, i.e. the order in which clocks are being 
-> configured may be important in some cases. Should the binding then be
-> specifying that the clocks will be configured in a sequence exactly 
-> as listed in the clock-parents property ?
+> [...]
+> 
+>> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
+>> new file mode 100644
+>> index 000000000000..57c69812e79d
+>> --- /dev/null
+>> +++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
+>> @@ -0,0 +1,120 @@
+>> +/*
+>> + * Marvell Armada 370 and Armada XP SoC cpuidle driver
+>> + *
+>> + * Copyright (C) 2013 Marvell
+>> + *
+>> + * Nadav Haklai <nadavh@marvell.com>
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + */
+>> +
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/module.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/suspend.h>
+>> +#include <asm/suspend.h>
+>> +#include <linux/smp.h>
+>> +#include <asm/cpuidle.h>
+>> +#include <asm/smp_plat.h>
+>> +#include <linux/platform_device.h>
+>> +#include <asm/cp15.h>
+>> +#include <asm/cacheflush.h>
+> 
+> You should order them <linux/...>, then <asm/...>
 
-That's a good point, and I think we should re-examine the role of a DT
-binding for this purpose. From my limited experience with DT, it seems
-to be really bad at anything involving sequencing. It doesn't give us
-function pointers/callbacks in the way that the old board files used to.
-
-So I think the binding you proposed is still a good idea, but only for
-the very simple case. If your platform has some detailed integration
-requirements that have corner cases like you describe below, then this
-DT binding might not be a good place to put the info.
-
-A platform that provides its own pm runtime backend could neatly manage
-this by having a call to pm_runtime_get deal with these integration
-details such that the driver does not have to be aware of them. (caveat:
-that assumes in the example below that the only thing you want to do is
-set up your clocks once and then never touch them again)
-
-Regards,
-Mike
+OK done in v5
 
 > 
-> E.g. consider part of a clock controller where one of frequencies fed to
-> a consumer device cannot exceed given value:
+>> +
+>> +#define ARMADA_370_XP_MAX_STATES	3
 > 
->                 mux1
->  200 MHz   0 .--------.
-> ----->-------|--.     |
->              |   \____|__                    f1 
->  400 MHz   1 |        |  `-+------------------->--
-> ----->-------|-       |    |
->              '--------'    |      mux2
->                            | 0 .---------.
->                            `---|--.      |   f2
->                                |   \_____|_,---->--
->                  100 MHz     1 |         |   (max. 200 MHz)
->                  ----->--------|         | 
->                                '---------'              
+> Is this macro really needed ?
+
+Well most of the other driver use it. And instead of having
+this number directly written in the state_count field I prefer
+to using a name for this value. But I think it is more a matter
+of taste here.
+
 > 
-> In this case we want to set frequency f1 to 400 MHz and f2 to 100 MHz.
-> To ensure f2 doesn't exceed 200 MHz at any time, mux2 has to be switched 
-> to position '1' first and then mux 1 to position '1'.
+>> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
+>> +extern void armada_370_xp_pmsu_idle_prepare(bool deepidle);
+>> +extern void ll_clear_cpu_coherent(void);
+>> +extern void ll_set_cpu_coherent(void);
+>> +
+>> +noinline static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+>> +{
+>> +	armada_370_xp_pmsu_idle_prepare(deepidle);
+>> +
+>> +	v7_exit_coherency_flush(all);
 > 
-> > +        clock-rates = <460800>;
+> The macro above clears the C bit in SCTLR and exit coherency (clears SMP
+> bit in SCTLR), let's keep this in mind, see below.
 > 
-> For clock-rates it's a bit more complicated, since it might require
-> setting up frequency of some clocks twice - first to a low and then 
-> to a higher value. Such details could likely be handled by bindings 
-> of individual devices. Also we could assume the clock tree 
-> (re)configuration is being done when any consumer clocks are masked 
-> at the consumer clock gates.
+>> +	ll_clear_cpu_coherent();
 > 
-> I'm no sure if we should sort the clocks to ensure any parents are set
-> before the child clocks, or should we rely on the sequence specified 
-> in devicetree ? I'd assume sorting it wouldn't hurt, there should not 
-> be relatively many clocks in a single dt node.
+> And the macro above uses ldr/str exclusives, and this is done with MMU
+> on and off (on cold-boot before jumping to secondary_startup and also
+> before jumping to cpu_resume in armada_370_xp_cpu_resume).
 > 
-> > +    };
-> > +
-> > +In this example the pll is set as parent of "mux" clock and frequency of "baud"
-> > +clock is specified as 460800 Hz.
+> Can you explain to me how load/store exclusives work on this platform ?
 > 
-> --
+> ARM ARM A3.4.5
+> 
+> "It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can be
+> performed to a memory region with the Device or Strongly-ordered memory
+> attribute. Unless the implementation documentation explicitly states that
+> LDREX and STREX operations to a memory region with the Device or
+> Strongly-ordered attribute are permitted, the effect of such operations is
+> UNPREDICTABLE."
+> 
+
+Armada XP has an exclusive monitor that can track transactions to Device and/or
+SO and as such also when MMU is disabled the exclusive transactions will be
+functional.
+
+> At least code must be commented and an explanation on why this works has
+> to be given.
+
+I have added this information in comment for the v5.
+> 
+>> +
+>> +	dsb();
+>> +
+>> +	wfi();
+>> +
+>> +	ll_set_cpu_coherent();
+>> +
+>> +	asm volatile(
+>> +	"mrc	p15, 0, %0, c1, c0, 0 \n\t"
+>> +	"tst	%0, #(1 << 2) \n\t"
+>> +	"orreq	r0, %0, #(1 << 2) \n\t"
+>> +	"mcreq	p15, 0, %0, c1, c0, 0 \n\t"
+>> +	"isb	"
+>> +	: : "r" (0));
+> 
+> First of all, complex code like this must be commented.
+> 
+> Moreover, this sequence is wrong. If wfi completes the kernel would explode.
+> 
+> 1) where is the SMP bit in SCTLR restored ?
+It is restored in this uncommeted piece of code. I added comment
+now in the v5.
+
+> 2) where are tlbs flushed (ie processors run out of coherency for _some_
+>    time, so tlbs might be stale) ?
+
+Right it was missing, I added it.
+
+> 
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
+>> +				struct cpuidle_driver *drv,
+>> +				int index)
+>> +{
+>> +	bool deepidle = false;
+>> +	cpu_pm_enter();
+>> +
+>> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
+>> +		deepidle = true;
+>> +
+>> +	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
+>> +
+>> +	cpu_pm_exit();
+>> +
+>> +	return index;
+> 
+> You should check the cpu_suspend return value and demote the idle state
+> accordingly, if it failed.
+
+Done in v5.
+
+> 
 > Thanks,
-> Sylwester
+> Lorenzo
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
