@@ -1,59 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:49 +0000
-Subject: [RFC 32/47] mtd: nand: stm_nand_bch: scan for BBMs and build
- memory-resident BBT
+Date: Tue, 25 Mar 2014 08:19:43 +0000
+Subject: [RFC 26/47] mtd: nand: stm_nand_bch: populate IBBT BCH Header
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-27-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If at start-up time we can't find our own pre-built memory-resident BBT
-(e.g. at first run) this routine will search for factory set BBMs and
-duplicate them into our own BBT for local consumption.
+The STM NAND BCH Controller driver has extended the IBBT header with
+some extra convenience properties. This function populates both those
+and the standard header specified by 'struct nand_ibbt_header'.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 29eeee8..d7d97720 100644
+index e1c71be..2d03113 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -703,6 +703,33 @@ static int nandi_scan_bad_block_markers_block(struct nandi_controller *nandi,
- 	return 0;
+@@ -26,6 +26,7 @@
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/stm_nand.h>
+ #include <linux/mtd/partitions.h>
++#include <generated/utsrelease.h>
+ 
+ #include "stm_nand_regs.h"
+ #include "stm_nand_dt.h"
+@@ -524,6 +525,22 @@ static int bbt_is_block_bad(uint8_t *bbt, uint32_t block)
+ 	return bbt_get_block_mark(bbt, block) == BBT_MARK_GOOD ? 0 : 1;
  }
  
-+/* Scan for BBMs and build memory-resident BBT */
-+static int nandi_scan_build_bbt(struct nandi_controller *nandi,
-+				struct nandi_bbt_info *bbt_info)
++/* Populate IBBT BCH Header */
++static void bch_fill_ibbt_header(struct nandi_controller *nandi,
++				 struct nand_ibbt_bch_header *ibbt_header,
++				 int bak, uint8_t vers)
 +{
-+	struct mtd_info *mtd = &nandi->info.mtd;
-+	struct nand_chip *chip = mtd->priv;
-+	uint32_t page_size = mtd->writesize;
-+	uint8_t *bbt = bbt_info->bbt;
-+	uint32_t block;
++	const char author[] = "STLinux " UTS_RELEASE " (stm-nand-bch)";
 +
-+	dev_dbg(nandi->dev,
-+		"scan device for bad-block markers [bbt options = 0x%02x]\n",
-+		chip->bbt_options);
++	memcpy(ibbt_header->base.signature, ibbt_sigs[bak], NAND_IBBT_SIGLEN);
++	ibbt_header->base.version = vers;
++	memset(ibbt_header->base.schema, NAND_IBBT_SCHEMA, 4);
 +
-+	memset(bbt, 0xff, page_size);
-+	bbt_info->bbt_vers[0] = 0;
-+	bbt_info->bbt_vers[1] = 0;
-+	bbt_info->bbt_block[0] = nandi->blocks_per_device - 1;
-+	bbt_info->bbt_block[1] = nandi->blocks_per_device - 2;
-+
-+	for (block = 0; block < nandi->blocks_per_device; block++)
-+		if (nandi_scan_bad_block_markers_block(nandi, block))
-+			bbt_set_block_mark(bbt, block, BBT_MARK_BAD_FACTORY);
-+
-+	return 0;
++	memset(ibbt_header->schema, NAND_IBBT_SCHEMA, 4);
++	memset(ibbt_header->ecc_size, bch_ecc_sizes[nandi->bch_ecc_mode], 4);
++	memcpy(ibbt_header->author, author, sizeof(author));
 +}
 +
- /* Populate IBBT BCH Header */
- static void bch_fill_ibbt_header(struct nandi_controller *nandi,
- 				 struct nand_ibbt_bch_header *ibbt_header,
+ /* Scan block for IBBT signature */
+ static int bch_find_ibbt_sig(struct nandi_controller *nandi,
+ 			     uint32_t block, int *bak, uint8_t *vers,
 -- 
 1.8.3.2
