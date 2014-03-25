@@ -1,43 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Mar 2014 17:00:21 +0100
-Subject: [PATCH] Xen: do hv callback accounting only on x86
-In-Reply-To: <5057041.71iuvlcH4G@wuerfel>
-References: <5057041.71iuvlcH4G@wuerfel>
-Message-ID: <12121341.4lKFpaRMcO@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 25 Mar 2014 17:31:38 +0100
+Subject: [PATCH 0/5] ARM: shmobile: r8a7790: enable IIC(B) cores
+In-Reply-To: <2570845.PngjMN9sWk@avalon>
+References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
+ <2570845.PngjMN9sWk@avalon>
+Message-ID: <20140325163137.GD6374@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 March 2014 16:52:25 Arnd Bergmann wrote:
-> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-> index 5dd2ddf..8b91c256 100644
-> --- a/drivers/xen/events/events_base.c
-> +++ b/drivers/xen/events/events_base.c
-> @@ -1235,6 +1235,7 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
->  #ifdef CONFIG_X86
->         exit_idle();
->  #endif
-> +       inc_irq_stat(irq_hv_callback_count);
-> 
->         __xen_evtchn_do_upcall();
-> 
-> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-> index d5a3de8..dfa12a4 100644
-> --- a/drivers/xen/events/events_base.c
-> +++ b/drivers/xen/events/events_base.c
-> @@ -1248,8 +1248,8 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
->         irq_enter();
->  #ifdef CONFIG_X86
->         exit_idle();
-> -#endif
->         inc_irq_stat(irq_hv_callback_count);
-> +#endif
->  
->         __xen_evtchn_do_upcall();
 
-That was unintended: the first half of this email is actually the patch
-that introduced the bug, while the second half is my workaround.
-The way it's formatted, you won't be able to apply it without removing
-the first half again. I'll wait if the approach is ok first and then
-resend it properly if needed.
+> > This series allows r8a7790 boards to use the alternative IIC(B) controller
+> > handled by the i2c-sh_mobile driver. Since both i2c cores always use the
+> > same pins only in a different function group, you can easily use this or
+> > that core for your devices. For that reason, there is currently no
+> > enablement on the Lager board, since it needs discussion which core we want
+> > to have on which bus. sh_mobile seems more stable currently, so I'd vote
+> > for that.
+> 
+> Do you have a short list of pros and cons from a hardware point of view ?
 
-	Arnd
+iic has DMA capability for which we don't have software support yet.
+Other than that, I guess it is just details and I haven't looked that deep
+into the datasheets yet. That might be coming after this DT enablement.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/9a455eb8/attachment.sig>
