@@ -1,110 +1,173 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:20:02 +0000
-Subject: [RFC 45/47] mtd: nand: stm_nand_bch: read and write buffers (FLEX)
+Date: Tue, 25 Mar 2014 08:20:00 +0000
+Subject: [RFC 43/47] mtd: nand: stm_nand_bch: read and write functions (BCH)
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-46-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-44-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-read or write in 4 Byte chunks at a time until there is less than
-8 Bytes remaining, at which point split down into reading the
-reset a single Byte at a time.
+Helper function for bch_mtd_read() and bch_mtd_write() to handle
+multi-page or non-aligned reads and writes respectively.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 72 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 143 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index f5b0a00..975326e 100644
+index 389ccee..bcaed32 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -686,6 +686,75 @@ static void flex_addr(struct nandi_controller *nandi,
- 	writel(addr, nandi->base + NANDHAM_FLEX_ADD);
+@@ -507,6 +507,149 @@ static uint8_t bch_write_page(struct nandi_controller *nandi,
+ 	return status;
  }
  
-+static void flex_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
++/* Helper function for bch_mtd_read to handle multi-page or non-aligned reads */
++static int bch_read(struct nandi_controller *nandi,
++		    loff_t from, size_t len,
++		    size_t *retlen, u_char *buf)
 +{
-+	struct nand_chip *chip = mtd->priv;
-+	struct nandi_controller *nandi = chip->priv;
-+	int aligned;
++	struct mtd_ecc_stats stats;
++	uint32_t page_size = nandi->info.mtd.writesize;
++	uint32_t col_offs;
++	loff_t page_mask;
++	loff_t page_offs;
++	int ecc_errs, max_ecc_errs = 0;
++	int page_num;
++	size_t bytes;
++	uint8_t *p;
++	bool bounce = false;
 +
-+	emiss_nandi_select(STM_NANDI_HAMMING);
++	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
++		(unsigned long long)len, from);
 +
-+	/* Read bytes until buf is 4-byte aligned */
-+	while (len && ((unsigned int)buf & 0x3)) {
-+		*buf++ = (uint8_t)(readl(nandi->base + NANDHAM_FLEX_DATA)
-+				   & 0xff);
-+		len--;
-+	};
++	stats = nandi->info.mtd.ecc_stats;
++	page_mask = (loff_t)page_size - 1;
++	col_offs  = (uint32_t)(from & page_mask);
++	page_offs = from & ~page_mask;
++	page_num  = (int)(page_offs >> nandi->page_shift);
 +
-+	/* Use 'BEATS_4'/readsl */
-+	if (len > 8) {
-+		aligned = len & ~0x3;
-+		writel(FLEX_DATA_CFG_BEATS_4 | FLEX_DATA_CFG_CSN,
-+		       nandi->base + NANDHAM_FLEX_DATAREAD_CONFIG);
-+
-+		readsl(nandi->base + NANDHAM_FLEX_DATA, buf, aligned >> 2);
-+
-+		buf += aligned;
-+		len -= aligned;
-+
-+		writel(FLEX_DATA_CFG_BEATS_1 | FLEX_DATA_CFG_CSN,
-+		       nandi->base + NANDHAM_FLEX_DATAREAD_CONFIG);
-+	}
-+
-+	/* Mop up remaining bytes */
 +	while (len > 0) {
-+		*buf++ = (uint8_t)(readl(nandi->base + NANDHAM_FLEX_DATA)
-+				   & 0xff);
-+		len--;
++		bytes = min((page_size - col_offs), len);
++
++		if ((bytes != page_size) ||
++		    ((unsigned int)buf & (NANDI_BCH_DMA_ALIGNMENT - 1)) ||
++		    (!virt_addr_valid(buf))) /* vmalloc'd buffer! */
++			bounce = true;
++
++		if (page_num == nandi->cached_page) {
++			memcpy(buf, nandi->page_buf + col_offs, bytes);
++			goto done;
++		}
++
++		p = bounce ? nandi->page_buf : buf;
++
++		ecc_errs = bch_read_page(nandi, page_offs, p);
++		if (bounce)
++			memcpy(buf, p + col_offs, bytes);
++
++		if (ecc_errs < 0) {
++			dev_err(nandi->dev,
++				"%s: uncorrectable error at 0x%012llx\n",
++				__func__, page_offs);
++			nandi->info.mtd.ecc_stats.failed++;
++
++			/* Do not cache uncorrectable pages */
++			if (bounce)
++				nandi->cached_page = -1;
++
++			goto done;
++		}
++
++		if (ecc_errs) {
++			dev_info(nandi->dev,
++				 "%s: corrected %u error(s) at 0x%012llx\n",
++				 __func__, ecc_errs, page_offs);
++
++			nandi->info.mtd.ecc_stats.corrected += ecc_errs;
++
++			if (ecc_errs > max_ecc_errs)
++				max_ecc_errs = ecc_errs;
++		}
++
++		if (bounce)
++			nandi->cached_page = page_num;
++
++done:
++		buf += bytes;
++		len -= bytes;
++
++		if (retlen)
++			*retlen += bytes;
++
++		/* We are now page-aligned */
++		page_offs += page_size;
++		page_num++;
++		col_offs = 0;
 +	}
++
++	/* Return '-EBADMSG' on uncorrectable errors */
++	if (nandi->info.mtd.ecc_stats.failed - stats.failed)
++		return -EBADMSG;
++
++	return max_ecc_errs;
 +}
 +
-+static void flex_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
++/* Helper function for mtd_write, to handle multi-page and non-aligned writes */
++static int bch_write(struct nandi_controller *nandi,
++		     loff_t to, size_t len,
++		     size_t *retlen, const uint8_t *buf)
 +{
-+	struct nand_chip *chip = mtd->priv;
-+	struct nandi_controller *nandi = chip->priv;
-+	int aligned;
++	uint32_t page_size = nandi->info.mtd.writesize;
++	int page_num;
++	bool bounce = false;
++	const uint8_t *p = NULL;
++	uint8_t ret;
 +
-+	/* Write bytes until buf is 4-byte aligned */
-+	while (len && ((unsigned int)buf & 0x3)) {
-+		writel(*buf++, nandi->base + NANDHAM_FLEX_DATA);
-+		len--;
-+	};
++	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
++		(unsigned long long)len, to);
 +
-+	/* USE 'BEATS_4/writesl */
-+	if (len > 8) {
-+		aligned = len & ~0x3;
-+		writel(FLEX_DATA_CFG_BEATS_4 | FLEX_DATA_CFG_CSN,
-+		       nandi->base + NANDHAM_FLEX_DATAWRITE_CONFIG);
-+		writesl(nandi->base + NANDHAM_FLEX_DATA, buf, aligned >> 2);
-+		buf += aligned;
-+		len -= aligned;
-+		writel(FLEX_DATA_CFG_BEATS_1 | FLEX_DATA_CFG_CSN,
-+		       nandi->base + NANDHAM_FLEX_DATAWRITE_CONFIG);
++	BUG_ON(len & (page_size - 1));
++	BUG_ON(to & (page_size - 1));
++
++	if (((unsigned long)buf & (NANDI_BCH_DMA_ALIGNMENT - 1)) ||
++	    !virt_addr_valid(buf)) { /* vmalloc'd buffer! */
++		bounce = true;
 +	}
 +
-+	/* Mop up remaining bytes */
++	page_num = (int)(to >> nandi->page_shift);
++
 +	while (len > 0) {
-+		writel(*buf++, nandi->base + NANDHAM_FLEX_DATA);
-+		len--;
++		if (bounce) {
++			memcpy(nandi->page_buf, buf, page_size);
++			p = nandi->page_buf;
++			nandi->cached_page = -1;
++		} else {
++			p = buf;
++		}
++
++		if (nandi->cached_page == page_num)
++			nandi->cached_page = -1;
++
++		ret = bch_write_page(nandi, to, p);
++		if (ret & NAND_STATUS_FAIL)
++			return -EIO;
++
++		to += page_size;
++		page_num++;
++		buf += page_size;
++		len -= page_size;
++
++		if (retlen)
++			*retlen += page_size;
 +	}
++
++	return 0;
 +}
 +
  /*
-  * Hamming-FLEX operations (optimised replacements for nand_base.c versions)
+  * Hamming-FLEX operations
   */
-@@ -1743,6 +1812,9 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
- 	chip->priv = nandi;
- 	chip->ecc.layout = &info->ecclayout;
- 
-+	chip->read_buf = flex_read_buf;
-+	chip->write_buf = flex_write_buf;
-+
- 	chip->bbt_options |= NAND_BBT_USE_FLASH;
- 
- 	/* mtd_info */
 -- 
 1.8.3.2
