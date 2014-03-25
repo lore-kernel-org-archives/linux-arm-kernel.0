@@ -1,99 +1,32 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 25 Mar 2014 16:34:49 +0530
-Subject: [PATCH v2 2/3] arm64: dts: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <4827584.NY6fTFPNNK@wuerfel>
-References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
- <1395652179-9216-3-git-send-email-mohun106@gmail.com>
- <4827584.NY6fTFPNNK@wuerfel>
-Message-ID: <CAC8NTUUjLotVbrY1h3pv8HcEhxFuOYyaC6o+2FjpTU_X=DCJ=A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Mar 2014 12:06:46 +0100
+Subject: [PATCH] drm/bridge: PTN3460 needs DRM_KMS_HELPER
+Message-ID: <17602160.PV0AMDU1du@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+The recently added PTN3460 device driver uses interfaces that
+are provided by the KMS helper infrastructure, so we should
+explicitly select that to avoid this linker error:
 
-On Mon, Mar 24, 2014 at 3:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 14:39:38 mohun106 at gmail.com wrote:
->> +       soc {
->> +               compatible = "simple-bus";
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->> +
->> +               clocks {
->> +                       #address-cells = <2>;
->> +                       #size-cells = <2>;
->> +                       ranges;
->> +
->> +                       refclk50mhz: refclk50mhz {
->> +                               compatible = "fixed-clock";
->> +                               #clock-cells = <0>;
->> +                               clock-frequency = <50000000>;
->> +                               clock-output-names = "refclk50mhz";
->> +                       };
->> +               };
->> +
->> +               ahci0: host-bus-adapter at 810000000000 {
->> +                       compatible = "snps,spear-ahci";
->> +                       reg = <0x8100 0x0 0x0 0x1100>;
->> +                       interrupts = <1 32 4>;
->> +               };
->
->
-> The use of "snps,spear-ahci" by itself seems wrong here: that is
-> the specific implementation used in the ST "spear" SoC. I don't know
-> why we don't already have a "generic-ahci" binding, but please add
-> one so you can match against that.
->
-> I would also recommend adding a more specific string for your soc.
-> If you want to keep compatibility with older kernels, you can keep
-> the spear string as well, but it would be nicer to drop that.
-> If you can find out what version the synopsys macro has, that would
-> be ideal.
->
-> You could end up for instance with
->
->         compatible = "cavium,thunder-123456-ahci", "snps,ahci-1.23.45",
->                         "snps,spear-ahci", "generic-ahci";
->
-> The driver only needs to match the last one of these, but if we
-> find that we have to work around some bug, it's good to have the
-> option of determining the exact version.
+ERROR: "drm_helper_probe_single_connector_modes" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
+ERROR: "drm_helper_connector_dpms" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
 
-OK.
+We have to drop the I2C dependency to avoid a circular dependency
+chain, but that's ok because DRM already selects I2C.
 
->
->> +               nic0: ethernet at 843000000000 {
->> +                       compatible = "smsc,lan9115";
->> +                       reg-io-width = <4>;
->> +                       reg = <0x8430 0x0 0x0 0x1000>;
->> +                       interrupts = <1 31 4>;
->> +               };
->> +
->> +               uaa0: uart at 87e024000000 {
->> +                       compatible = "arm,pl011", "arm,primecell";
->> +                       reg = <0x87e0 0x24000000 0x0 0x1000>;
->> +                       interrupts = <1 21 4>;
->> +                       clocks = <&refclk50mhz>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               uaa1: uart at 87e025000000 {
->> +                       compatible = "arm,pl011", "arm,primecell";
->> +                       reg = <0x87e0 0x25000000 0x0 0x1000>;
->> +                       interrupts = <1 22 4>;
->> +                       clocks = <&refclk50mhz>;
->> +                       clock-names = "apb_pclk";
->
-> The generic name for uarts in DT is "serial", not "uart" (yes, a
-> lot of others get this wrong, too).
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I found this today doing randconfig builds on linux-next.
 
-OK :)
-But I think lack of consistency in DT among various ARM platforms is
-source of this confusion.
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index f8db069..884923f 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -1,4 +1,5 @@
+ config DRM_PTN3460
+ 	tristate "PTN3460 DP/LVDS bridge"
+-	depends on DRM && I2C
++	depends on DRM
++	select DRM_KMS_HELPER
+ 	---help---
