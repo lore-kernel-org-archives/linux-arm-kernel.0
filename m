@@ -1,82 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 26 Mar 2014 00:05:14 +0100
-Subject: [PATCH 04/20] mmc: mmci: Move signal directions bits into DT
- include file
-In-Reply-To: <CACRpkdZSr380FVHkx3uOMFKxKYsExoL-1WYhxVpirFMVc+T3Yw@mail.gmail.com>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
- <1395404057-27835-5-git-send-email-ulf.hansson@linaro.org>
- <CACRpkdZSr380FVHkx3uOMFKxKYsExoL-1WYhxVpirFMVc+T3Yw@mail.gmail.com>
-Message-ID: <CAPDyKFq=PUcFkT901W15KXThzS4cKMJvZToW3JDc3SkXck9VHA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Mar 2014 23:10:47 +0000
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <201403250202.42268.marex@denx.de>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <201403250202.42268.marex@denx.de>
+Message-ID: <20140325231047.GU7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2014 22:22, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Mar 21, 2014 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->
->> These bits is currently used from platform data, but will be needed
->> from DT as well, so let's make them available.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> (...)
->> +#define MCI_ST_DATA31DIREN     (1 << 5)
->> +#define MCI_ST_FBCLKEN         (1 << 7)
->> +#define MCI_ST_DATA74DIREN     (1 << 8)
->
-> Isn't MCI_ST_FBCLKEN = feedback clock enable and nothing
-> to do with directions really?
+On Tue, Mar 25, 2014 at 02:02:42AM +0100, Marek Vasut wrote:
+> I think we might be seeing something similar on i.MX28 in U-Boot too,
+> but I dare not to correlate this and the in-kernel FEC issue. We also
+> sporadically see the FEC not transmitting a packet.
 
-You do have a point here, but then we are about to go into the details. :-)
+That could be the ERR006358 problem.
 
-What MCI_ST_FBCLKEN means, is that the internal logic in the primecell
-can decide whether to use the signal from clockout pin or the
-feebackclock pin, when its latching incoming signals on the data bus.
+This occurs when you've transmitted a packet previously, and the
+indicator in FEC_X_DES_ACTIVE remains set at the point in time when
+you load the next packet.  The subsequent write to FEC_X_DES_ACTIVE
+has no effect on the TX side, which has already shut down.
 
-That said, we for sure need a dt binding for bit as well, since this
-is not possible to figure out how pins are routed in runtime.
+The work-around for that which is in the kernel is to look at the
+previous packet status: if that indicates it has been sent immediately
+after setting everything up for the next packet (remembering to take
+care of the store buffers between the CPU and memory), then you need to
+re-ping the transmitter after a short delay.
 
-Also, I do believe it is very closely related to the other sigdir
-pins, since it's all about how pins is being routed, even if it's as
-you say - in this case a matter of signal directions.
+(I've cocked that work-around up today... it can happen quite frequently
+depending on your workload.)
 
-So, I guess we have two options here; Either move the MCI_ST_FBCLKEN
-out of the signal-direction binding and invent a separate binding for
-it, or just keep them as is.
-
->
-> Or can you convince me ...
->
-> Maybe we should just have single strings for these
-> things in the binding instead, like:
->
-> @@ -118,6 +119,10 @@
->                         bus-width = <4>;
->                         mmc-cap-sd-highspeed;
->                         mmc-cap-mmc-highspeed;
-> +                       st,signal-direction-data2;
-> +                       st,signal-direction-cmd;
-> +                       st,signal-direction-data0;
-> +                       st,feedback-clock-enable;
->                         vmmc-supply = <&ab8500_ldo_aux3_reg>;
->                         vqmmc-supply = <&vmmci>;
->                         pinctrl-names = "default", "sleep";
-
-I guess this is an option. To me it just seems a bit silly to have one
-separate binding for each single bit, but maybe it becomes clearer?
-
->
-> And for FBCLKEN is that really something that should
-> be configured... in the device tree after all?
-
-We need a DT binding, see above.
-
->
-> Yours,
-> Linus Walleij
-
-Thanks for reviewing.
-
-Please tell me your ideas on how to proceed, I happy to change to
-whatever you like. :-)
-
-Kind regards
-Ulf Hansson
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
