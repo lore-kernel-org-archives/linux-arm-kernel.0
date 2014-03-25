@@ -1,29 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 25 Mar 2014 10:32:32 +0100
-Subject: [PATCH 00/10] ARM: mvebu: Hardware coherency support for Armada
- 375 and 38x
-In-Reply-To: <20140324160620.607c77cd@skate>
-References: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140324160620.607c77cd@skate>
-Message-ID: <20140325093232.GH14983@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Mar 2014 10:37:00 +0100
+Subject: [PATCH] ARM: ux500: remove pointless cache setup args
+In-Reply-To: <20140321140308.GJ7528@n2100.arm.linux.org.uk>
+References: <1395410113-19965-1-git-send-email-linus.walleij@linaro.org>
+ <20140321140308.GJ7528@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdapfLCMp_wpkybVXLhtHPRMX2Yo49M-BxAXyAK7HySeSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 04:06:20PM +0100, Thomas Petazzoni wrote:
-> Jason, Gregory, Andrew, Sebastian,
-> 
-> Any news about this patch set? It is not aimed at 3.15 as was discussed
-> already with Jason, but since I'd still like to have some early
-> comments about this patch series for 3.16, since we would also like to
-> land the Armada 375/38x SMP support in 3.16, which will sit on top of
-> this series.
+On Fri, Mar 21, 2014 at 3:03 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Mar 21, 2014 at 02:55:13PM +0100, Linus Walleij wrote:
+>> This removes the setup of the l2x0 lines that are essentially
+>> just noops bouncing on the hardware as the cache registers are
+>> protected in the secure world and there is no point in writing
+>> them. Put in (0, ~0) to the l2x0_of_init() function as
+>> suggested by Russell and cut the complex code out.
+>>
+>> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Russell: I don't know how this fits with other changes hitting
+>> the l2x0 code, this file is pretty much stand-alone and
+>> orthogonal to any other stuff hitting the Ux500 code, so I
+>> can put it in your patch tracker if you want to take it or
+>> some version of it into your tree.
+>
+> I already have something which does a similar modification.  Here's
+> the existing commits in order (copy'n'pasted with gpm so whitespace
+> damaged):
 
-Hi Thomas
+All looking good, Acked-by.
 
-I took a look at them. The XOR code is interesting. I guess it is not
-good for performance. A loud debug message would be useful to know
-when the workaround has been turned on.
+I can do any additional cleanups on top of this once it
+lands upstream.
 
-Once you send a rebase on 3.15 i can send an ACK.
-
-     Andrew
+Yours,
+Linus Walleij
