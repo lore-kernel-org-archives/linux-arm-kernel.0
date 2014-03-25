@@ -1,76 +1,53 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 25 Mar 2014 23:48:19 +0100
-Subject: [PATCH v5 08/14] ARM: dts: mvebu: Introduce a new compatible for the
- PMSU node
+Date: Tue, 25 Mar 2014 23:48:17 +0100
+Subject: [PATCH v5 06/14] ARM: mvebu: Low level function to disable HW
+ coherency support
 In-Reply-To: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1395787705-31061-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1395787705-31061-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial binding for PMSU were wrong. It didn't take into account
-all the registers from the PMSU and in the other hand refereed to
-registers which are not part of PMSU. This commit introduces a new
-compatible for the PMSU node and annotates the previous one as
-obsolete. However we still continue to support it during a few
-releases.
+When going to deep idle we need to disable the SoC snooping (aka
+hardware coherency support). Playing with the coherency fabric
+requires to use assembly code to be sure that the compiler doesn't
+reorder the instructions nor do wrong optimization.
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt         | 14 ++++++--------
- arch/arm/boot/dts/armada-xp.dtsi                           | 11 ++++++++---
- 2 files changed, 14 insertions(+), 11 deletions(-)
+ arch/arm/mach-mvebu/coherency_ll.S | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 926b4d6aae7e..976188770079 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -4,17 +4,15 @@ Available on Marvell SOCs: Armada 370 and Armada XP
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index c7179a03891d..6e1b31fb1a94 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -102,6 +102,26 @@ ENTRY(ll_enable_coherency)
+ 	mov	pc, lr
+ ENDPROC(ll_enable_coherency)
  
- Required properties:
++ENTRY(ll_disable_coherency)
++	/*
++	 * r0 being untouched in ll_get_coherency_base and
++	 * ll_get_cpuid, we can use it to save lr modifing it with the
++	 * following bl
++	 */
++	mov r0, lr
++	bl	ll_get_coherency_base
++	bl	ll_get_cpuid
++	mov lr, r0
++	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
++1:
++	ldrex	r2, [r0]
++	bic	r2, r2, r3
++	strex	r1, r2, [r0]
++	cmp	r1, #0
++	bne	1b
++	dsb
++	mov	pc, lr
++ENDPROC(ll_disable_coherency)
  
--- compatible: "marvell,armada-370-xp-pmsu"
-+- compatible: should be "marvell,armada-370-pmsu", whereas
-+  "marvell,armada-370-xp-pmsu" is deprecated and will be removed
- 
--- reg: Should contain PMSU registers location and length. First pair
--  for the per-CPU SW Reset Control registers, second pair for the
--  Power Management Service Unit.
-+- reg: Should contain PMSU registers location and length.
- 
- Example:
- 
--armada-370-xp-pmsu at d0022000 {
--	compatible = "marvell,armada-370-xp-pmsu";
--	reg = <0xd0022100 0x430>,
--	      <0xd0020800 0x20>;
-+armada-370-xp-pmsu at 22000 {
-+	compatible = "marvell,armada-370-pmsu";
-+	reg = <0x22000 0x1000>;
- };
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index abb9f9dcc525..0c455f5458df 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -117,9 +117,14 @@
- 				clock-names = "nbclk", "fixed";
- 			};
- 
--			armada-370-xp-pmsu at 22000 {
--				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x400>, <0x20800 0x20>;
-+			cpurst at 20800 {
-+				compatible = "marvell,armada-xp-cpu-reset";
-+				reg = <0x20800 0x20>;
-+			};
-+
-+			armada-370-pmsu at 22000 {
-+				compatible = "marvell,armada-370-pmsu";
-+				reg = <0x22000 0x400>;
- 			};
- 
- 			eth2: ethernet at 30000 {
+ 	.align 2
+ 3:
 -- 
 1.8.1.2
