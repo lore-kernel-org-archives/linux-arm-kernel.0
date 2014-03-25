@@ -1,128 +1,121 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:41 +0000
-Subject: [RFC 24/47] mtd: nand: stm_nand_bch: find IBBT signature
+Date: Tue, 25 Mar 2014 08:19:57 +0000
+Subject: [RFC 40/47] mtd: nand: stm_nand_bch: MTD erase (BCH)
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-25-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-41-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Scan block for IBBT signature, either "Bbt0" or "1tbB" from
-pre-specified data block.
+Carry out the normal checks, then attempt to erase a given block.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 91 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 85 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 6323590..5bcaabbc 100644
+index 75c5c9b..55f4a4c 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -43,6 +43,37 @@ static int bch_ecc_sizes[] = {
- 	[BCH_NO_ECC] = 0,
- };
- 
-+/*
-+ * Inband Bad Block Table (IBBT)
-+ */
-+#define NAND_IBBT_NBLOCKS	4
-+#define NAND_IBBT_SIGLEN	4
-+#define NAND_IBBT_PRIMARY	0
-+#define NAND_IBBT_MIRROR	1
-+#define NAND_IBBT_SCHEMA	0x10
-+#define NAND_IBBT_BCH_SCHEMA	0x10
-+
-+static uint8_t ibbt_sigs[2][NAND_IBBT_SIGLEN] = {
-+	{'B', 'b', 't', '0'},
-+	{'1', 't', 'b', 'B'},
-+};
-+
-+/* IBBT header */
-+struct nand_ibbt_header {
-+	uint8_t	signature[4];		/* "Bbt0" or "1tbB" signature */
-+	uint8_t version;		/* BBT version ("age") */
-+	uint8_t reserved[3];		/* padding */
-+	uint8_t schema[4];		/* "base" schema (x4) */
-+} __packed;
-+
-+/* Extend IBBT header with some stm-nand-bch niceties */
-+struct nand_ibbt_bch_header {
-+	struct nand_ibbt_header base;
-+	uint8_t schema[4];		/* "private" schema (x4) */
-+	uint8_t ecc_size[4];		/* ECC bytes (0, 32, 54) (x4) */
-+	char	author[64];		/* Arbitrary string for S/W to use */
-+} __packed;
-+
- /* Bad Block Table (BBT) */
- struct nandi_bbt_info {
- 	uint32_t	bbt_size;		/* Size of bad-block table */
-@@ -464,6 +495,66 @@ static uint8_t bch_write_page(struct nandi_controller *nandi,
- 	return status;
+@@ -1218,6 +1218,89 @@ static int flex_do_write_ops(struct nandi_controller *nandi,
+ 	return 0;
  }
  
-+/* Scan block for IBBT signature */
-+static int bch_find_ibbt_sig(struct nandi_controller *nandi,
-+			     uint32_t block, int *bak, uint8_t *vers,
-+			     char *author)
++static int bch_mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 +{
-+	struct mtd_info *mtd = &nandi->info.mtd;
-+	struct nand_ibbt_bch_header *ibbt_header;
-+	loff_t offs;
-+	uint8_t *buf = nandi->page_buf;
-+	int match_sig;
-+	unsigned int b;
-+	unsigned int i;
++	struct nand_chip *chip = mtd->priv;
++	struct nandi_controller *nandi = chip->priv;
++	uint64_t block_mask = mtd->erasesize - 1;
++	uint64_t offs_cached;
++	loff_t offs = instr->addr;
++	size_t len = instr->len;
++	uint8_t status;
++	int ret;
 +
-+	nandi->cached_page = -1;
++	dev_dbg(nandi->dev, "%s: 0x%012llx @ 0x%012llx\n", __func__,
++		(unsigned long long)len, offs);
 +
-+	/* Load last page of block */
-+	offs = (loff_t)block << nandi->block_shift;
-+	offs += mtd->erasesize - mtd->writesize;
-+	if (bch_read_page(nandi, offs, buf) < 0) {
-+		dev_info(nandi->dev,
-+			 "Uncorrectable ECC error while scanning BBT signature at block %u [0x%012llx]\n",
-+			 block, offs);
-+		return 0;
++	if (offs & block_mask) {
++		dev_err(nandi->dev,
++			"attempt to erase from non-block-aligned offset\n");
++		return -EINVAL;
 +	}
-+	ibbt_header = (struct nand_ibbt_bch_header *)buf;
 +
-+	/* Test IBBT signature */
-+	match_sig = 0;
-+	for (b = 0; b < 2 && !match_sig; b++) {
-+		match_sig = 1;
-+		for (i = 0; i < NAND_IBBT_SIGLEN; i++) {
-+			if (ibbt_header->base.signature[i] != ibbt_sigs[b][i]) {
-+				match_sig = 0;
-+				break;
-+			}
++	if (len & block_mask) {
++		dev_err(nandi->dev,
++			"attempt to erase non-block-aligned length\n");
++		return -EINVAL;
++	}
++
++	if ((offs + len) > mtd->size) {
++		dev_err(nandi->dev, "attempt to erase past end of device\n");
++		return -EINVAL;
++	}
++
++	nand_get_device(mtd, FL_ERASING);
++	instr->fail_addr = MTD_FAIL_ADDR_UNKNOWN;
++
++	if (flex_check_wp(nandi)) {
++		dev_dbg(nandi->dev, "device is write-protected\n");
++		instr->state = MTD_ERASE_FAILED;
++		goto erase_exit;
++	}
++
++	/* Offset of block containing cached page */
++	offs_cached = ((uint64_t)nandi->cached_page << nandi->page_shift) &
++		~block_mask;
++
++	instr->state = MTD_ERASING;
++	while (len) {
++		if (mtd_block_isbad(mtd, offs)) {
++			dev_err(nandi->dev,
++				"attempt to erase a bad block at 0x%012llx\n",
++				offs);
++			instr->state = MTD_ERASE_FAILED;
++			instr->fail_addr = offs;
++			goto erase_exit;
 +		}
 +
++		if (offs == offs_cached)
++			nandi->cached_page = -1;
++
++		status = bch_erase_block(nandi, offs);
++
++		if (status & NAND_STATUS_FAIL) {
++			dev_err(nandi->dev,
++				"failed to erase block at 0x%012llx\n", offs);
++			instr->state = MTD_ERASE_FAILED;
++			instr->fail_addr = offs;
++			goto erase_exit;
++		}
++
++		len -= mtd->erasesize;
++		offs += mtd->erasesize;
 +	}
++	instr->state = MTD_ERASE_DONE;
 +
-+	if (!match_sig)
-+		return 0; /* Failed to match IBBT signature */
++ erase_exit:
++	nand_release_device(mtd);
 +
-+	/* Test IBBT schema */
-+	for (i = 0; i < 4; i++)
-+		if (ibbt_header->base.schema[i] != NAND_IBBT_SCHEMA)
-+			return 0;
++	ret = instr->state == MTD_ERASE_DONE ? 0 : -EIO;
++	if (ret == 0)
++		mtd_erase_callback(instr);
 +
-+	/* Test IBBT BCH schema */
-+	for (i = 0; i < 4; i++)
-+		if (ibbt_header->schema[i] != NAND_IBBT_BCH_SCHEMA)
-+			return 0;
-+
-+	/* We have a match */
-+	*vers = ibbt_header->base.version;
-+	*bak = b - 1;
-+	strncpy(author, ibbt_header->author, 64);
-+
-+	return 1;
++	return ret;
 +}
 +
- /*
-  * Initialisation
-  */
+ static void nandi_dump_bad_blocks(struct nandi_controller *nandi)
+ {
+ 	int bad_count = 0;
+@@ -1321,6 +1404,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 	mtd->oobavail = 0;
+ 	mtd->subpage_sft = 0;
+ 
++	mtd->_erase = bch_mtd_erase;
++
+ 	mtd->_point = NULL;
+ 	mtd->_unpoint = NULL;
+ 	mtd->_lock = NULL;
 -- 
 1.8.3.2
