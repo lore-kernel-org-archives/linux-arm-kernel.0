@@ -1,31 +1,39 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 25 Mar 2014 16:24:04 -0600
+Date: Tue, 25 Mar 2014 16:35:10 -0600
 Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
+In-Reply-To: <20140325222404.GC14718@obsidianresearch.com>
 References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
  <20140325202249.GA10378@obsidianresearch.com>
  <20140325213638.5aba54b6@skate>
  <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
-Message-ID: <20140325222404.GC14718@obsidianresearch.com>
+ <20140325222404.GC14718@obsidianresearch.com>
+Message-ID: <20140325223510.GD14718@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 10:03:29PM +0000, Neil Greatorex wrote:
+On Tue, Mar 25, 2014 at 04:24:04PM -0600, Jason Gunthorpe wrote:
+> On Tue, Mar 25, 2014 at 10:03:29PM +0000, Neil Greatorex wrote:
+> 
+> > I then replaced it with mdelay(1000) out of interest, and it succeeded
+> > in detecting the card at boot. It then proceeded exactly as described
+> > by Willy in his later e-mail (it successfully registers an MSI-X
+> > interrupt for one port, and then proceeds to implode).
+> 
+> Seem to confirm not enough time after reset..
+> 
+> Try this (untested) debugging patch:
 
-> I then replaced it with mdelay(1000) out of interest, and it succeeded
-> in detecting the card at boot. It then proceeded exactly as described
-> by Willy in his later e-mail (it successfully registers an MSI-X
-> interrupt for one port, and then proceeds to implode).
+Sorry, it has a mistake, that is not how you detect CRS on this chip..
 
-Seem to confirm not enough time after reset..
+CRS might be something the driver has to emulate as well.....
 
-Try this (untested) debugging patch:
+This is better.. CRS will be bit 19 in the ICR
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index b8f2fc9..74e2e20 100644
+index b8f2fc9..658a33f 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -999,6 +999,34 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+@@ -999,6 +999,36 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
  
  		mvebu_pcie_set_local_dev_nr(port, 1);
  
@@ -43,33 +51,22 @@ index b8f2fc9..74e2e20 100644
 +				 mvebu_pcie_link_up(port));
 +		}
 +
-+		/* Turn on CRS Software Visibility */
-+		mvebu_writel(port, mvebu_readl(port, PCIE_CTRL_OFF) | BIT(31),
-+			     PCIE_CTRL_OFF);
++		/* Clear and report the ICR */
++		mvebu_writel(port, 0, 0x1900);
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
 +
 +		/* Read the vendor ID from the connected device */
 +		mvebu_writel(port, PCIE_CONF_ADDR(1, 0, 0), PCIE_CONF_ADDR_OFF);
 +		dev_info(&pdev->dev, "Vendor ID is %x\n",
 +			 mvebu_readl(port, PCIE_CONF_DATA_OFF));
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
 +		msleep(1000);
 +		mvebu_writel(port, PCIE_CONF_ADDR(1, 0, 0), PCIE_CONF_ADDR_OFF);
 +		dev_info(&pdev->dev, "Try 2: Vendor ID is %x\n",
 +			 mvebu_readl(port, PCIE_CONF_DATA_OFF));
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
 +
 +
  		port->dn = child;
  		spin_lock_init(&port->conf_lock);
  		mvebu_sw_pci_bridge_init(port);
-
-Also, are you using the "reset-gpios" DT property? If so, ensure the
-delay is at least 100 ms.
-
-There is still an oddball problem:
-
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01) (prog-if 00 [Normal decode])
-	Bus: primary=00, secondary=01, subordinate=02, sec-latency=0
-
-I think the subordinate bus should be 01 - not sure what is going on
-there... Maybe related to the rescan problem..
-
-Jason
