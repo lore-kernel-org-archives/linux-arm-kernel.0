@@ -1,61 +1,155 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:42 +0000
-Subject: [RFC 25/47] mtd: nand: stm_nand_bch: bad block marking helpers
+Date: Tue, 25 Mar 2014 08:19:40 +0000
+Subject: [RFC 23/47] mtd: nand: stm_nand_bch: read and write page (BCH)
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-26-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-24-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bad Block Markers (BBMs) keep track of unusable/unsuitable memory
-blocks which can prevent unnecessary data loss. These helpers aid in
-reading and writing to/from the Bad Block Tables (BBTs) where the BBMs
-are stored.
+Use DMA to read and/or write a single page of data.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 119 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 119 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 5bcaabbc..e1c71be 100644
+index 7874d85..6323590 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -495,6 +495,35 @@ static uint8_t bch_write_page(struct nandi_controller *nandi,
- 	return status;
+@@ -21,6 +21,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+ #include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
+ #include <linux/completion.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/stm_nand.h>
+@@ -345,6 +346,124 @@ static int check_erased_page(uint8_t *data, uint32_t page_size, int max_zeros)
+ 	return zeros;
  }
  
-+/*
-+ * Bad Block Tables/Bad Block Markers
-+ */
-+#define BBT_MARK_BAD_FACTORY	0x0
-+#define BBT_MARK_BAD_WEAR	0x1
-+#define BBT_MARK_GOOD		0x3
-+
-+static void bbt_set_block_mark(uint8_t *bbt, uint32_t block, uint8_t mark)
++/* Returns the number of ECC errors, or '-1' for uncorrectable error */
++static int bch_read_page(struct nandi_controller *nandi,
++			 loff_t offs,
++			 uint8_t *buf)
 +{
-+	unsigned int byte = block >> 2;
-+	unsigned int shift = (block & 0x3) << 1;
++	struct bch_prog *prog = &bch_prog_read_page;
++	uint32_t page_size = nandi->info.mtd.writesize;
++	unsigned long list_phys;
++	unsigned long buf_phys;
++	uint32_t ecc_err;
++	int ret = 0;
 +
-+	bbt[byte] &= ~(0x3 << shift);
-+	bbt[byte] |= ((mark & 0x3) << shift);
++	dev_dbg(nandi->dev, "%s: offs = 0x%012llx\n", __func__, offs);
++
++	BUG_ON((unsigned long)buf & (NANDI_BCH_DMA_ALIGNMENT - 1));
++	BUG_ON(offs & (NANDI_BCH_DMA_ALIGNMENT - 1));
++
++	emiss_nandi_select(STM_NANDI_BCH);
++
++	nandi_enable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
++	reinit_completion(&nandi->seq_completed);
++
++	/* Reset ECC stats */
++	writel(CFG_RESET_ECC_ALL | CFG_ENABLE_AFM,
++	       nandi->base + NANDBCH_CONTROLLER_CFG);
++	writel(CFG_ENABLE_AFM, nandi->base + NANDBCH_CONTROLLER_CFG);
++
++	prog->addr = (uint32_t)((offs >> (nandi->page_shift - 8)) & 0xffffff00);
++
++	buf_phys = dma_map_single(NULL, buf, page_size, DMA_FROM_DEVICE);
++
++	memset(nandi->buf_list, 0x00, NANDI_BCH_BUF_LIST_SIZE);
++	nandi->buf_list[0] = buf_phys | (nandi->sectors_per_page - 1);
++
++	list_phys = dma_map_single(NULL, nandi->buf_list,
++				   NANDI_BCH_BUF_LIST_SIZE, DMA_TO_DEVICE);
++
++	writel(list_phys, nandi->base + NANDBCH_BUFFER_LIST_PTR);
++
++	bch_load_prog_cpu(nandi, prog);
++
++	bch_wait_seq(nandi);
++
++	nandi_disable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
++
++	dma_unmap_single(NULL, list_phys, NANDI_BCH_BUF_LIST_SIZE,
++			 DMA_TO_DEVICE);
++	dma_unmap_single(NULL, buf_phys, page_size, DMA_FROM_DEVICE);
++
++	/* Use the maximum per-sector ECC count! */
++	ecc_err = readl(nandi->base + NANDBCH_ECC_SCORE_REG_A) & 0xff;
++	if (ecc_err == 0xff) {
++		/*
++		 * Downgrade uncorrectable ECC error for an erased page,
++		 * tolerating 'sectors_per_page' bits at zero.
++		 */
++		ret = check_erased_page(buf, page_size,
++					nandi->sectors_per_page);
++		if (ret >= 0)
++			dev_dbg(nandi->dev,
++				"%s: erased page detected: \n"
++				"  downgrading uncorrectable ECC error.\n",
++				__func__);
++	} else {
++		ret = (int)ecc_err;
++	}
++
++	return ret;
 +}
 +
-+static uint8_t bbt_get_block_mark(uint8_t *bbt, uint32_t block)
++/* Returns the status of the NAND device following the write operation */
++static uint8_t bch_write_page(struct nandi_controller *nandi,
++			      loff_t offs, const uint8_t *buf)
 +{
-+	unsigned int byte = block >> 2;
-+	unsigned int shift = (block & 0x3) << 1;
++	struct bch_prog *prog = &bch_prog_write_page;
++	uint32_t page_size = nandi->info.mtd.writesize;
++	uint8_t *p = (uint8_t *)buf;
++	unsigned long list_phys;
++	unsigned long buf_phys;
++	uint8_t status;
 +
-+	return (bbt[byte] >> shift) & 0x3;
++	dev_dbg(nandi->dev, "%s: offs = 0x%012llx\n", __func__, offs);
++
++	BUG_ON((unsigned int)buf & (NANDI_BCH_DMA_ALIGNMENT - 1));
++	BUG_ON(offs & (page_size - 1));
++
++	emiss_nandi_select(STM_NANDI_BCH);
++
++	nandi_enable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
++	reinit_completion(&nandi->seq_completed);
++
++	prog->addr = (uint32_t)((offs >> (nandi->page_shift - 8)) & 0xffffff00);
++
++	buf_phys = dma_map_single(NULL, p, page_size, DMA_TO_DEVICE);
++	memset(nandi->buf_list, 0x00, NANDI_BCH_BUF_LIST_SIZE);
++	nandi->buf_list[0] = buf_phys | (nandi->sectors_per_page - 1);
++
++	list_phys = dma_map_single(NULL, nandi->buf_list,
++				   NANDI_BCH_BUF_LIST_SIZE, DMA_TO_DEVICE);
++
++	writel(list_phys, nandi->base + NANDBCH_BUFFER_LIST_PTR);
++
++	bch_load_prog_cpu(nandi, prog);
++
++	bch_wait_seq(nandi);
++
++	nandi_disable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
++
++	dma_unmap_single(NULL, list_phys, NANDI_BCH_BUF_LIST_SIZE,
++			 DMA_TO_DEVICE);
++	dma_unmap_single(NULL, buf_phys, page_size, DMA_FROM_DEVICE);
++
++	status = (uint8_t)(readl(nandi->base +
++				 NANDBCH_CHECK_STATUS_REG_A) & 0xff);
++
++	return status;
 +}
 +
-+static int bbt_is_block_bad(uint8_t *bbt, uint32_t block)
-+{
-+	return bbt_get_block_mark(bbt, block) == BBT_MARK_GOOD ? 0 : 1;
-+}
-+
- /* Scan block for IBBT signature */
- static int bch_find_ibbt_sig(struct nandi_controller *nandi,
- 			     uint32_t block, int *bak, uint8_t *vers,
+ /*
+  * Initialisation
+  */
 -- 
 1.8.3.2
