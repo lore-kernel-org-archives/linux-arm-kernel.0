@@ -1,103 +1,35 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 25 Mar 2014 14:47:41 -0300
-Subject: [PATCH] ARM: dts: imx35-pdk: Add initial device tree support
-Message-ID: <1395769661-14815-1-git-send-email-fabio.estevam@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Mar 2014 18:54:28 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1395768102.12610.159.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+ <21873900.AIOr1ryy37@wuerfel>
+ <1395768102.12610.159.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <7101996.LQrASEuksF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for UART, eSDHC and NAND.
+On Tuesday 25 March 2014 10:21:42 Eric Dumazet wrote:
+> On Tue, 2014-03-25 at 18:05 +0100, Arnd Bergmann wrote:
+> > On Tuesday 25 March 2014 10:00:30 Florian Fainelli wrote:
+> >
+> > > Using a timer to ensure completion of TX packets is a trick that
+> > > worked in the past, but now that the networking stack got smarter,
+> > > this might artificially increase the processing time of packets in the
+> > > transmit path, and this will defeat features like TCP small queues
+> > > etc.. as could be seen with the mvneta driver [1]. The best way really
+> > > is to rely on TX completion interrupts when those exist as they cannot
+> > > lie about the hardware status (in theory) and they should provide the
+> > > fastest way to complete TX packets.
+> > 
+> > By as Zhangfei Gao pointed out, this hardware does not have a working
+> > TX completion interrupt. Using timers to do this has always just been
+> > a workaround for broken hardware IMHO.
+> 
+> For this kind of drivers, calling skb_orphan() from ndo_start_xmit() is
+> mandatory.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/Makefile      |  1 +
- arch/arm/boot/dts/imx35-pdk.dts | 67 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx35-pdk.dts
+Cool, thanks for the information, I was wondering already if there was
+a way to deal with hardware like this.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 23d7768..56dc515 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -144,6 +144,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-phytec-phycard-s-rdk.dtb \
- 	imx31-bug.dtb \
- 	imx35-eukrea-mbimxsd35-baseboard.dtb \
-+	imx35-pdk.dtb \
- 	imx50-evk.dtb \
- 	imx51-apf51.dtb \
- 	imx51-apf51dev.dtb \
-diff --git a/arch/arm/boot/dts/imx35-pdk.dts b/arch/arm/boot/dts/imx35-pdk.dts
-new file mode 100644
-index 0000000..db69ff0
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-pdk.dts
-@@ -0,0 +1,67 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ * Copyright 2014 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx35.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX35 Product Development Kit";
-+	compatible = "fsl,imx35-pdk", "fsl,imx35";
-+
-+	memory {
-+		reg = <0x80000000 0x8000000>;
-+	};
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx35-pdk {
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				MX35_PAD_SD1_CMD__ESDHC1_CMD		0x80000000
-+				MX35_PAD_SD1_CLK__ESDHC1_CLK		0x80000000
-+				MX35_PAD_SD1_DATA0__ESDHC1_DAT0		0x80000000
-+				MX35_PAD_SD1_DATA1__ESDHC1_DAT1		0x80000000
-+				MX35_PAD_SD1_DATA2__ESDHC1_DAT2		0x80000000
-+				MX35_PAD_SD1_DATA3__ESDHC1_DAT3		0x80000000
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX35_PAD_TXD1__UART1_TXD_MUX		0x1c5
-+				MX35_PAD_RXD1__UART1_RXD_MUX		0x1c5
-+				MX35_PAD_CTS1__UART1_CTS		0x1c5
-+				MX35_PAD_RTS1__UART1_RTS		0x1c5
-+			>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <16>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
--- 
-1.8.1.2
+	Arnd
