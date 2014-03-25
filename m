@@ -1,72 +1,84 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 25 Mar 2014 16:51:15 +0000
-Subject: [PATCH v9 2/5] kernel: missing include in cputime.c
-In-Reply-To: <alpine.DEB.2.02.1403251204240.8273@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1403251204240.8273@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1403251642310.20389@kaball.uk.xensource.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 25 Mar 2014 10:54:21 -0600
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <235376049.yyfljDtinu@wuerfel>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+ <235376049.yyfljDtinu@wuerfel>
+Message-ID: <20140325165421.GB30641@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
-I am sorry for the confusion, I have already asked you this question and
-you have already kindly given me feedback on it. I have even addressed
-the problem and resent.
+On Tue, Mar 25, 2014 at 08:44:36AM +0100, Arnd Bergmann wrote:
 
-However I wrongly tagged my emails and patch series.
-The right patch are v7 and v8, without #ifdef CONFIG_PARAVIRT in
-cputime.c:
-
-http://marc.info/?l=linux-kernel&m=138920709703581&w=2
-
-also appended below. I am very sorry for the confusion.
-Would that be OK for you?
-
-diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index 9994791..9f9b76a 100644
---- a/kernel/sched/cputime.c
-+++ b/kernel/sched/cputime.c
-@@ -5,6 +5,7 @@
- #include <linux/static_key.h>
- #include <linux/context_tracking.h>
- #include "sched.h"
-+#include <asm/paravirt.h>
- 
- 
- #ifdef CONFIG_IRQ_TIME_ACCOUNTING
-
-On Tue, 25 Mar 2014, Stefano Stabellini wrote:
-> Peter,
-> is this patch OK for you?
+> I have no idea how this would work with the standard interrupt-map property,
+> since the legacy interrupt host is now the same device as the pci host.
 > 
-> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
-> > steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
-> > currently missing among the included header files.
-> > Add include asm/paravirt.h.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: mingo at redhat.com
-> > CC: peterz at infradead.org
-> > ---
-> >  kernel/sched/cputime.c |    3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-> > index 9994791..951833e 100644
-> > --- a/kernel/sched/cputime.c
-> > +++ b/kernel/sched/cputime.c
-> > @@ -5,6 +5,9 @@
-> >  #include <linux/static_key.h>
-> >  #include <linux/context_tracking.h>
-> >  #include "sched.h"
-> > +#ifdef CONFIG_PARAVIRT
-> > +#include <asm/paravirt.h>
-> > +#endif
-> >  
-> >  
-> >  #ifdef CONFIG_IRQ_TIME_ACCOUNTING
-> > -- 
-> > 1.7.10.4
-> > 
+> Maybe it's better to move the legacy irqchip handling entirely out of
+> the driver and use a separate device node for the registers so it can
+> come with its own #interrupt-cells, and then refer to this irqchip from
+> the interrupt-map.
+
+The other DW PCI-E drivers are being fixed to use interrupt-map, so I
+think this driver should be fixed before it goes in as well.
+
+Other PCI-E hosts have handled this particular problem with a
+construction like this:
+
+       pcie at 21800000 {
+               compatible = "ti,keystone2-pcie";
+               device_type = "pci";
+               #address-cells = <3>;
+               #size-cells = <2>;
+               #interrupt-cells = <1>;
+	       reg = ..
+
+               pcie_intc: interrupt-controller {
+                  interrupt-controller;
+		  #address-cells = <0>;
+                  #interrupt-cells = <1>;
+               }
+
+               interrupts =  ... enough to decode INTx;
+
+	       interrtup-map = <0 0 0 1 &pcie_intc 1>, // INT A
+	                       <0 0 0 2 &pcie_intc 2>, // INT B
+                               <0 0 0 3 &pcie_intc 3>, // INT C
+                               <0 0 0 4 &pcie_intc 4>; // INT D
+       }
+
+When the legacy irq domain is created it should be bound to the
+pcie_intc node, not to pcie node.
+
+ks_pcie_map_irq should be removed.
+
+> > +#ifdef CONFIG_PCIE_KEYSTONE
+> > +/*
+> > + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+> > + * Force this configuration for all EP including bridges.
+> > + */
+> > +static void quirk_limit_readrequest(struct pci_dev *dev)
+> > +{
+> > +	pcie_set_readrq(dev, 256);
+> > +}
+> > +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+> > +#endif /* CONFIG_TI_KEYSTONE_PCIE */
 > 
+> You can't do this:
+> 
+> A quirk for a specific hardware must not be enabled by compile-time options.
+> You have to find a different way to do this.
+
+This configuration should happen automatically by the PCI core if the
+config spaces are correct. See pcie_write_mrrs, pcie_write_mps,
+pcie_bus_configure_settings, etc.
+
+Your host will need to conform to the PCI spec and provide a root
+port bridge header for this to work.
+
+Also, even in the keystone case the MRRS should not be globally forced
+like this, there may be other bridges in the system with a 128 byte
+MPS.
+
+Jason
