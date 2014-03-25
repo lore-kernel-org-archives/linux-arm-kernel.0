@@ -1,108 +1,118 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:47 +0000
-Subject: [RFC 30/47] mtd: nand: stm_nand_bch: read and write raw (FLEX)
+Date: Tue, 25 Mar 2014 08:19:50 +0000
+Subject: [RFC 33/47] mtd: nand: stm_nand_bch: search for and load
+ flash-resident BBT
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-34-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once the correct READ/WRITE(SEQIN) commands and address locations have
-been sent to the Controller, these calls are able to read/write the
-requested information from the FLEX_DATA register.
+If a BBT already exists in flash, it's this function's task to locate
+it and load it into the driver for local consumption.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 77 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 87 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index baecc40..4812431 100644
+index d7d97720..d1d84c1 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -537,6 +537,83 @@ static void flex_addr(struct nandi_controller *nandi,
- 	writel(addr, nandi->base + NANDHAM_FLEX_ADD);
+@@ -973,6 +973,93 @@ static int bch_find_ibbt_sig(struct nandi_controller *nandi,
+ 	return 1;
  }
  
-+static int flex_read_raw(struct nandi_controller *nandi,
-+			 uint32_t page_addr,
-+			 uint32_t col_addr,
-+			 uint8_t *buf, uint32_t len)
++/* Search for and load Flash-resident BBT, updating Primary/Mirror if req'd */
++static int bch_load_bbt(struct nandi_controller *nandi,
++			struct nandi_bbt_info *bbt_info)
 +{
-+	dev_dbg(nandi->dev, "%s %u bytes at [0x%06x,0x%04x]\n",
-+		__func__, len, page_addr, col_addr);
++	unsigned int update = 0;
++	uint32_t block;
++	loff_t offs;
++	uint8_t vers;
++	char author[64];
++	int bak;
 +
-+	BUG_ON(len & 0x3);
-+	BUG_ON((unsigned long)buf & 0x3);
++	dev_dbg(nandi->dev, "looking for Flash-resident BBTs\n");
 +
-+	emiss_nandi_select(STM_NANDI_HAMMING);
-+	nandi_enable_interrupts(nandi, NAND_INT_RBN);
-+	reinit_completion(&nandi->rbn_completed);
++	bbt_info->bbt_block[0] = 0;
++	bbt_info->bbt_block[1] = 0;
++	bbt_info->bbt_vers[0] = 0;
++	bbt_info->bbt_vers[1] = 0;
 +
-+	writel(FLEX_DATA_CFG_BEATS_4 | FLEX_DATA_CFG_CSN,
-+	       nandi->base + NANDHAM_FLEX_DATAREAD_CONFIG);
++	/* Look for IBBT signatures */
++	for (block = nandi->blocks_per_device - NAND_IBBT_NBLOCKS;
++	     block < nandi->blocks_per_device;
++	     block++) {
++		offs = (loff_t)block << nandi->block_shift;
 +
-+	flex_cmd(nandi, NAND_CMD_READ0);
-+	flex_addr(nandi, col_addr, 2);
-+	flex_addr(nandi, page_addr, nandi->extra_addr ? 3 : 2);
-+	flex_cmd(nandi, NAND_CMD_READSTART);
++		if (bch_find_ibbt_sig(nandi, block, &bak, &vers, author)) {
++			dev_dbg(nandi->dev,
++				"found BBT [%s:%u] at 0x%012llx [%u] (%s)\n",
++				bbt_strs[bak], vers, offs, block,
++				author);
 +
-+	flex_wait_rbn(nandi);
++			if (bbt_info->bbt_block[bak] == 0 ||
++			    ((int8_t)(bbt_info->bbt_vers[bak] - vers)) < 0) {
++				bbt_info->bbt_block[bak] = block;
++				bbt_info->bbt_vers[bak] = vers;
++			}
++		}
++	}
 +
-+	readsl(nandi->base + NANDHAM_FLEX_DATA, buf, len / 4);
++	/* What have we found? */
++	if (bbt_info->bbt_block[0] == 0 && bbt_info->bbt_block[1] == 0) {
++		/* no primary, no mirror: return error */
++		return 1;
++	} else if (bbt_info->bbt_block[0] == 0) {
++		/* no primary: use mirror, update primary */
++		bak = 1;
++		update = NAND_IBBT_UPDATE_PRIMARY;
++		bbt_info->bbt_block[0] = nandi->blocks_per_device - 1;
++	} else if (bbt_info->bbt_block[1] == 0) {
++		/* no mirror: use primary, update mirror */
++		bak = 0;
++		update = NAND_IBBT_UPDATE_MIRROR;
++		bbt_info->bbt_block[1] = nandi->blocks_per_device - 1;
++	} else if (bbt_info->bbt_vers[0] == bbt_info->bbt_vers[1]) {
++		/* primary == mirror: use primary, no update required */
++		bak = 0;
++	} else if ((int8_t)(bbt_info->bbt_vers[1] -
++			    bbt_info->bbt_vers[0]) < 0) {
++		/* primary > mirror: use primary, update mirror */
++		bak = 0;
++		update = NAND_IBBT_UPDATE_MIRROR;
++	} else {
++		/* mirror > primary: use mirror, update primary */
++		bak = 1;
++		update = NAND_IBBT_UPDATE_PRIMARY;
++	}
 +
-+	nandi_disable_interrupts(nandi, NAND_INT_RBN);
++	vers = bbt_info->bbt_vers[bak];
++	block = bbt_info->bbt_block[bak];
++	offs = block << nandi->block_shift;
++	dev_info(nandi->dev, "using BBT [%s:%u] at 0x%012llx [%u]\n",
++		 bbt_strs[bak], vers, offs, block);
 +
-+	writel(FLEX_DATA_CFG_BEATS_1 | FLEX_DATA_CFG_CSN,
-+	       nandi->base + NANDHAM_FLEX_DATAREAD_CONFIG);
++	/* Read BBT data */
++	if (bch_read_page(nandi, offs, bbt_info->bbt) < 0) {
++		dev_err(nandi->dev,
++			"error while reading BBT %s:%u] at 0x%012llx [%u]\n",
++			bbt_strs[bak], vers, offs, block);
++		return 1;
++	}
++
++	/* Update other BBT if required */
++	if (update)
++		bch_update_bbts(nandi, bbt_info, update, vers);
 +
 +	return 0;
 +}
 +
-+static int flex_write_raw(struct nandi_controller *nandi,
-+			  uint32_t page_addr,
-+			  uint32_t col_addr,
-+			  uint8_t *buf, uint32_t len)
-+{
-+	uint8_t status;
-+
-+	dev_dbg(nandi->dev, "%s %u bytes at [0x%06x,0x%04x]\n",
-+		__func__, len, page_addr, col_addr);
-+
-+	BUG_ON(len & 0x3);
-+	BUG_ON((unsigned long)buf & 0x3);
-+
-+	emiss_nandi_select(STM_NANDI_HAMMING);
-+	nandi_enable_interrupts(nandi, NAND_INT_RBN);
-+	reinit_completion(&nandi->rbn_completed);
-+
-+	writel(FLEX_DATA_CFG_BEATS_4 | FLEX_DATA_CFG_CSN,
-+	       nandi->base + NANDHAM_FLEX_DATAWRITE_CONFIG);
-+
-+	flex_cmd(nandi, NAND_CMD_SEQIN);
-+	flex_addr(nandi, col_addr, 2);
-+	flex_addr(nandi, page_addr, nandi->extra_addr ? 3 : 2);
-+
-+	writesl(nandi->base + NANDHAM_FLEX_DATA, buf, len / 4);
-+
-+	flex_cmd(nandi, NAND_CMD_PAGEPROG);
-+
-+	flex_wait_rbn(nandi);
-+
-+	nandi_disable_interrupts(nandi, NAND_INT_RBN);
-+
-+	writel(FLEX_DATA_CFG_BEATS_1 | FLEX_DATA_CFG_CSN,
-+	       nandi->base + NANDHAM_FLEX_DATAWRITE_CONFIG);
-+
-+	flex_cmd(nandi, NAND_CMD_STATUS);
-+
-+	status = (uint8_t)(readl(nandi->base + NANDHAM_FLEX_DATA) & 0xff);
-+
-+	return status;
-+}
-+
  /*
-  * Bad Block Tables/Bad Block Markers
+  * Initialisation
   */
 -- 
 1.8.3.2
