@@ -1,157 +1,132 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 25 Mar 2014 23:48:24 +0100
-Subject: [PATCH v5 13/14] cpuidle: mvebu: Add initial CPU idle support for
- Armada 370/XP SoC
-In-Reply-To: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1395787705-31061-14-git-send-email-gregory.clement@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 25 Mar 2014 15:54:46 -0700
+Subject: [RFC PATCH v2 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <5331664E.2050008@samsung.com>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <1393870975-21020-1-git-send-email-s.nawrocki@samsung.com>
+ <5331664E.2050008@samsung.com>
+Message-ID: <20140325225446.5762.15937@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the wfi, cpu idle and cpu deep idle power states support for the
-Armada XP SoCs.
+Quoting Sylwester Nawrocki (2014-03-25 04:19:42)
+> On 03/03/14 19:22, Sylwester Nawrocki wrote:
+> > This function adds a notifier callback run before a driver is bound
+> > to a device. It will configure any parent clocks and clock frequencies
+> > according to values of 'clock-parents' and 'clock-rates' DT properties
+> > respectively.
+> > 
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > Changes since v1:
+> >  - the helper function to parse and set assigned clock parents and
+> >    rates made public so it is available to clock providers to call
+> >    directly;
+> >  - dropped the platform bus notification and call of_clk_device_setup()
+> >    is is now called from the driver core, rather than from the
+> >    notification callback;
+> >  - s/of_clk_get_list_entry/of_clk_get_by_property.
+> > ---
+> >  .../devicetree/bindings/clock/clock-bindings.txt   |   23 ++++++
+> >  drivers/base/dd.c                                  |    5 ++
+> >  drivers/clk/clk.c                                  |   77 ++++++++++++++++++++
+> >  include/linux/clk-provider.h                       |    6 ++
+> >  4 files changed, 111 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > index 7c52c29..eb8d547 100644
+> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > @@ -115,3 +115,26 @@ clock signal, and a UART.
+> >    ("pll" and "pll-switched").
+> >  * The UART has its baud clock connected the external oscillator and its
+> >    register clock connected to the PLL clock (the "pll-switched" signal)
+> > +
+> > +==Assigned clock parents and rates==
+> > +
+> > +Some platforms require static configuration of (parts of) the clock controller
+> > +often determined by the board design. Such a configuration can be specified in
+> > +a clock consumer node through clock-parents and clock-rates DT properties.
+> > +The former should contain list of parent clocks in form of phandle and clock
+> > +specifier pairs, the latter the list of assigned clock frequency values
+> > +(one cell each).
+> > +
+> > +    uart at a000 {
+> > +        compatible = "fsl,imx-uart";
+> > +        reg = <0xa000 0x1000>;
+> > +        ...
+> > +        clocks = <&clkcon 0>, <&clkcon 3>;
+> > +        clock-names = "baud", "mux";
+> > +
+> > +        clock-parents = <0>, <&pll 1>;
+> 
+> I have some doubts here, i.e. the order in which clocks are being 
+> configured may be important in some cases. Should the binding then be
+> specifying that the clocks will be configured in a sequence exactly 
+> as listed in the clock-parents property ?
 
-All the latencies and the power consumption values used at the
-"armada_370_xp_idle_driver" structure are preliminary and will be
-modified in the future after running some measurements and analysis.
+That's a good point, and I think we should re-examine the role of a DT
+binding for this purpose. From my limited experience with DT, it seems
+to be really bad at anything involving sequencing. It doesn't give us
+function pointers/callbacks in the way that the old board files used to.
 
-Based on the work of Nadav Haklai.
+So I think the binding you proposed is still a good idea, but only for
+the very simple case. If your platform has some detailed integration
+requirements that have corner cases like you describe below, then this
+DT binding might not be a good place to put the info.
 
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/cpuidle/Kconfig.arm             |  5 ++
- drivers/cpuidle/Makefile                |  1 +
- drivers/cpuidle/cpuidle-armada-370-xp.c | 93 +++++++++++++++++++++++++++++++++
- 3 files changed, 99 insertions(+)
- create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
+A platform that provides its own pm runtime backend could neatly manage
+this by having a call to pm_runtime_get deal with these integration
+details such that the driver does not have to be aware of them. (caveat:
+that assumes in the example below that the only thing you want to do is
+set up your clocks once and then never touch them again)
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 97ccc31dbdd8..5bb94780d377 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -1,6 +1,11 @@
- #
- # ARM CPU Idle drivers
- #
-+config ARM_ARMADA_370_XP_CPUIDLE
-+	bool "CPU Idle Driver for Armada 370/XP family processors"
-+	depends on ARCH_MVEBU
-+	help
-+	  Select this to enable cpuidle on Armada 370/XP processors.
- 
- config ARM_BIG_LITTLE_CPUIDLE
- 	bool "Support for ARM big.LITTLE processors"
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index f71ae1b373c5..9902d052bd87 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
- ##################################################################################
- # ARM SoC drivers
-+obj-$(CONFIG_ARM_ARMADA_370_XP_CPUIDLE) += cpuidle-armada-370-xp.o
- obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
-diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-new file mode 100644
-index 000000000000..6b98608c222e
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
-@@ -0,0 +1,93 @@
-+/*
-+ * Marvell Armada 370 and Armada XP SoC cpuidle driver
-+ *
-+ * Copyright (C) 2013 Marvell
-+ *
-+ * Nadav Haklai <nadavh@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ */
-+
-+#include <linux/cpu_pm.h>
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/suspend.h>
-+#include <linux/platform_device.h>
-+#include <asm/cpuidle.h>
-+
-+#define ARMADA_370_XP_MAX_STATES	3
-+#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
-+
-+static int (*armada_370_xp_cpu_suspend)(int);
-+
-+static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv,
-+				int index)
-+{
-+	int ret;
-+	bool deepidle = false;
-+	cpu_pm_enter();
-+
-+	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
-+		deepidle = true;
-+
-+	ret = armada_370_xp_cpu_suspend(deepidle);
-+	if (ret)
-+		return ret;
-+
-+	cpu_pm_exit();
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver armada_370_xp_idle_driver = {
-+	.name			= "armada_370_xp_idle",
-+	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-+	.states[1]		= {
-+		.enter			= armada_370_xp_enter_idle,
-+		.exit_latency		= 10,
-+		.power_usage		= 50,
-+		.target_residency	= 100,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "MV CPU IDLE",
-+		.desc			= "CPU power down",
-+	},
-+	.states[2]		= {
-+		.enter			= armada_370_xp_enter_idle,
-+		.exit_latency		= 100,
-+		.power_usage		= 5,
-+		.target_residency	= 1000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID |
-+						ARMADA_370_XP_FLAG_DEEP_IDLE,
-+		.name			= "MV CPU DEEP IDLE",
-+		.desc			= "CPU and L2 Fabric power down",
-+	},
-+	.state_count = ARMADA_370_XP_MAX_STATES,
-+};
-+
-+static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
-+{
-+
-+	armada_370_xp_cpu_suspend = (void *)(pdev->dev.platform_data);
-+	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-+}
-+
-+static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
-+	.driver = {
-+		.name = "cpuidle-armada-370-xp",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = armada_370_xp_cpuidle_probe,
-+};
-+
-+module_platform_driver(armada_370_xp_cpuidle_plat_driver);
-+
-+MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-+MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
-+MODULE_LICENSE("GPL");
--- 
-1.8.1.2
+Regards,
+Mike
+
+> 
+> E.g. consider part of a clock controller where one of frequencies fed to
+> a consumer device cannot exceed given value:
+> 
+>                 mux1
+>  200 MHz   0 .--------.
+> ----->-------|--.     |
+>              |   \____|__                    f1 
+>  400 MHz   1 |        |  `-+------------------->--
+> ----->-------|-       |    |
+>              '--------'    |      mux2
+>                            | 0 .---------.
+>                            `---|--.      |   f2
+>                                |   \_____|_,---->--
+>                  100 MHz     1 |         |   (max. 200 MHz)
+>                  ----->--------|         | 
+>                                '---------'              
+> 
+> In this case we want to set frequency f1 to 400 MHz and f2 to 100 MHz.
+> To ensure f2 doesn't exceed 200 MHz at any time, mux2 has to be switched 
+> to position '1' first and then mux 1 to position '1'.
+> 
+> > +        clock-rates = <460800>;
+> 
+> For clock-rates it's a bit more complicated, since it might require
+> setting up frequency of some clocks twice - first to a low and then 
+> to a higher value. Such details could likely be handled by bindings 
+> of individual devices. Also we could assume the clock tree 
+> (re)configuration is being done when any consumer clocks are masked 
+> at the consumer clock gates.
+> 
+> I'm no sure if we should sort the clocks to ensure any parents are set
+> before the child clocks, or should we rely on the sequence specified 
+> in devicetree ? I'd assume sorting it wouldn't hurt, there should not 
+> be relatively many clocks in a single dt node.
+> 
+> > +    };
+> > +
+> > +In this example the pll is set as parent of "mux" clock and frequency of "baud"
+> > +clock is specified as 460800 Hz.
+> 
+> --
+> Thanks,
+> Sylwester
