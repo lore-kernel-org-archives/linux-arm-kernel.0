@@ -1,41 +1,60 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 25 Mar 2014 15:44:06 -0700
-Subject: Tegra baseline test results for v3.14-rc8
-Message-ID: <533206B6.5030905@nvidia.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 25 Mar 2014 19:45:55 -0300
+Subject: [PATCH] ARM: machine_power_off should not return
+In-Reply-To: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
+References: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <20140325224554.GC12185@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.14-rc8.
-Logs and other details at:
+Let's Cc: LAKML, and To: Russell.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc8/20140324200103/
+Russell, any comments on this?
 
+Without this patch we got the heartbeat's reboot_notifier called twice while
+testing the recent hibernation patches, which was unexpected and produced a
+kernel panic: https://lkml.org/lkml/2014/3/19/363
 
-Test summary
-------------
+Instead of fixing the heartbeat LED trigger, or the hibernation code, it
+seems better to fix the ARM machine_power_off, as it's not supposed to return.
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+On Mar 24, Sebastian Capella wrote:
+> Add loop to prevent return from machine_power_off if
+> pm_power_off is null or does not halt the system.
+> This caused a panic during hibernation testing on Kirkwood
+> Openblocks A6 board.
+> 
+> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Len Brown <len.brown@intel.com>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>  arch/arm/kernel/process.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index f58b723..6ffdc2c 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -217,6 +217,8 @@ void machine_power_off(void)
+>  
+>  	if (pm_power_off)
+>  		pm_power_off();
+> +	while (1)
+> +		cpu_relax();
+>  }
+>  
+>  /*
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15)):
-    text     data      bss    total  kernel
-   +1080      -16        0    +1064  multi_v7_defconfig
-   +1076      -16        0    +1060  tegra_defconfig
-
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
