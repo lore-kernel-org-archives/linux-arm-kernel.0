@@ -1,50 +1,45 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 25 Mar 2014 11:48:59 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <5331CD43.1010601@ahsoftware.de>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140316070917.GA3094@arch.cereza>
- <CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>
- <20140317204410.GA1118@arch.cereza>
- <CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>
- <20140319154434.GA3488@arch.cereza>
- <CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
- <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
- <5331CD43.1010601@ahsoftware.de>
-Message-ID: <CADHgK6tqYH=47LJkJfg3ktormiJHimc3dQxg5vTAJm8H0NO6Wg@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 25 Mar 2014 19:51:37 +0100
+Subject: [PATCH v4 0/4] ata: ahci_platform related cleanups
+Message-ID: <1395773501-6663-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hi,
 
-Thanks for your comments.
+This patch series:
+- fixes ahci_platform_data->suspend() handling
+- moves library AHCI platform code to its own file
+- adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
+- updates DaVinci DA850 platform code
 
-I've posted a different solution for arm only here, that just causes a
-while loop in machine_power_off in the event it's called but does not
-halt.
+Changes since v3:
+- updated for ahci_xgene
 
-https://lkml.org/lkml/2014/3/24/299
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-On 25 March 2014 11:38, Alexander Holler <holler@ahsoftware.de> wrote:
-> Both states, power off and sys halt, do sound pretty final and I would
-> assume something is broken, if power off is called before sys halt or vice
-> versa. At least I would never expect that the reboot/poweroff/syshalt
-> notifier may be called twice (and thats why the heartbeat-trigger may
-> crash).
->
-> But just in case, changing that behaviour in ledtrig-heartbeat.c would be
-> pretty easy, just remove the heartbeat_reboot_notifier (which plays nice and
-> deregisters the trigger on reboot) and use the panic_notifier (which doesn't
-> unregister the trigger but just turns off the led) for reboot too. Another
-> solution would be to unregister the reboot_notifier in the reboot_nofifier
-> itself. I've just seen one watchdog driver (drivers/rtc/rtc-m41t80.c) which
-> does that. But I still think such shouldn't be necessary (and I haven't had
-> a look at other reboot_notifier users).
 
-I hope this will all be handled by the loop in machine_power_off, so
-maybe this will not be needed.
+Bartlomiej Zolnierkiewicz (4):
+  ata: ahci_platform: fix ahci_platform_data->suspend method handling
+  ata: move library code from ahci_platform.c to libahci_platform.c
+  ata: add new-style AHCI platform driver for DaVinci DA850 AHCI
+    controller
+  ARM: davinci: da850: update SATA AHCI support
 
-Thanks!
+ arch/arm/mach-davinci/da850.c         |   2 +-
+ arch/arm/mach-davinci/devices-da8xx.c |  99 +------
+ drivers/ata/Kconfig                   |  16 +-
+ drivers/ata/Makefile                  |  11 +-
+ drivers/ata/ahci_da850.c              | 114 +++++++
+ drivers/ata/ahci_platform.c           | 508 -------------------------------
+ drivers/ata/libahci_platform.c        | 541 ++++++++++++++++++++++++++++++++++
+ 7 files changed, 682 insertions(+), 609 deletions(-)
+ create mode 100644 drivers/ata/ahci_da850.c
+ create mode 100644 drivers/ata/libahci_platform.c
 
-Sebastian
+-- 
+1.8.2.3
