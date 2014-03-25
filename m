@@ -1,82 +1,82 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:35 +0000
-Subject: [RFC 18/47] mtd: nand: stm_nand_bch: ensure configuration is
- compatible with this driver
+Date: Tue, 25 Mar 2014 08:19:34 +0000
+Subject: [RFC 17/47] mtd: nand: stm_nand_bch: automatically set EEC mode if
+ requested
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some chip characteristics have known incompatibilities with the function
-of this driver. Here we check for this characteristics and refuse to run
-if they are present.
+Here we automatically select the strongest ECC scheme compatible with
+the size of the OOB.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 39 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/stm_nand_bch.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 60a7800..365a73b 100644
+index f5a3e80..60a7800 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -142,6 +142,36 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
+@@ -32,6 +32,13 @@
+ /* NANDi BCH Controller properties */
+ #define NANDI_BCH_SECTOR_SIZE			1024
+ 
++/* BCH ECC sizes */
++static int bch_ecc_sizes[] = {
++	[BCH_18BIT_ECC] = 32,
++	[BCH_30BIT_ECC] = 54,
++	[BCH_NO_ECC] = 0,
++};
++
+ /* Bad Block Table (BBT) */
+ struct nandi_bbt_info {
+ 	uint32_t	bbt_size;		/* Size of bad-block table */
+@@ -135,6 +142,25 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
  	writel(val, nandi->base + NANDBCH_INT_EN);
  }
  
-+/*
-+ * Initialisation
-+ */
-+static int bch_check_compatibility(struct nandi_controller *nandi,
-+				   struct mtd_info *mtd,
-+				   struct nand_chip *chip)
++/* Select strongest ECC scheme compatible with OOB size */
++static int bch_set_ecc_auto(struct nandi_controller *nandi,
++			    struct mtd_info *mtd)
 +{
-+	if (chip->bits_per_cell > 1)
-+		dev_warn(nandi->dev, "MLC NAND not fully supported\n");
++	int oob_bytes_per_sector = mtd->oobsize / nandi->sectors_per_page;
++	int try_ecc_modes[] = { BCH_30BIT_ECC, BCH_18BIT_ECC, -1 };
++	int m, ecc_mode;
 +
-+	if (chip->options & NAND_BUSWIDTH_16) {
-+		dev_err(nandi->dev, "x16 NAND not supported\n");
-+		return false;
++	for (m = 0; try_ecc_modes[m] >= 0; m++) {
++		ecc_mode = try_ecc_modes[m];
++		if (oob_bytes_per_sector >= bch_ecc_sizes[ecc_mode]) {
++			nandi->bch_ecc_mode = ecc_mode;
++			return 0;
++		}
 +	}
 +
-+	if (nandi->blocks_per_device / 4 > mtd->writesize) {
-+		/* Need to implement multi-page BBT support... */
-+		dev_err(nandi->dev, "BBT too big to fit in single page\n");
-+		return false;
-+	}
-+
-+	if (bch_ecc_sizes[nandi->bch_ecc_mode] * nandi->sectors_per_page >
-+	    mtd->oobsize) {
-+		dev_err(nandi->dev, "insufficient OOB for selected ECC\n");
-+		return false;
-+	}
-+
-+	return true;
++	return -EINVAL;
 +}
 +
- /* Select strongest ECC scheme compatible with OOB size */
- static int bch_set_ecc_auto(struct nandi_controller *nandi,
- 			    struct mtd_info *mtd)
-@@ -737,7 +767,7 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
- 	struct nandi_info *info;
- 	struct nand_chip *chip;
- 	struct mtd_info *mtd;
--	int err;
-+	int compatible, err;
+ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 				   struct mtd_info *mtd, struct nand_chip *chip)
+ {
+@@ -792,6 +818,20 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 			     0x10000) ? true : false;
+ 	mtd->writebufsize = mtd->writesize;
  
- 	if (!pdata) {
- 		if (!np) {
-@@ -832,6 +862,13 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
- 	info->ecclayout.eccbytes =
- 		nandi->sectors_per_page * bch_ecc_sizes[nandi->bch_ecc_mode];
- 
-+	compatible = bch_check_compatibility(nandi, mtd, chip);
-+	if (!compatible) {
-+		dev_err(nandi->dev,
-+			"NAND device incompatible with NANDi/BCH Controller\n");
-+		return -EINVAL;
++	/* Set ECC mode */
++	if (pdata->bch_ecc_cfg == BCH_ECC_AUTO) {
++		err = bch_set_ecc_auto(nandi, mtd);
++		if (err) {
++			dev_err(nandi->dev, "insufficient OOB for BCH ECC\n");
++			return err;
++		}
++	} else {
++		nandi->bch_ecc_mode = pdata->bch_ecc_cfg;
 +	}
++
++	info->ecclayout.eccbytes =
++		nandi->sectors_per_page * bch_ecc_sizes[nandi->bch_ecc_mode];
 +
  	return 0;
  }
