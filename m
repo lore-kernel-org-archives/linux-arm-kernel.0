@@ -1,90 +1,67 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:38 +0000
-Subject: [RFC 21/47] mtd: nand: stm_nand_bch: provide shared BCH operations
+Date: Tue, 25 Mar 2014 08:19:46 +0000
+Subject: [RFC 29/47] mtd: nand: stm_nand_bch: add Hamming-FLEX operations
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-30-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Including one for programming the BCH sequence, taking care not to
-program two registers marked 'reserved' in the NANDi specification.
-Failing to take this precaution results in an imprecise data exception
-on ARM platforms. We also add an operation which waits on a completion
-timeout (released by the IRQ handler) and finally another which
-utilises the two aforementioned operations in order to erase a single
-block.
+Including; a check for Ready/NotBusy (RBn) (i.e. wait for current
+operation to finish and a method to issue Flex commands to the
+controller.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 55 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index fafde22..2042cdd 100644
+index a4f3e46..baecc40 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -264,6 +264,61 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
+@@ -502,6 +502,42 @@ static uint8_t bch_write_page(struct nandi_controller *nandi,
  }
  
  /*
-+ * BCH Operations
++ * Hamming-FLEX operations
 + */
-+static inline void bch_load_prog_cpu(struct nandi_controller *nandi,
-+				     struct bch_prog *prog)
-+{
-+	uint32_t *src = (uint32_t *)prog;
-+	uint32_t *dst = (uint32_t *)(nandi->base + NANDBCH_ADDRESS_REG_1);
-+	int i;
-+
-+	for (i = 0; i < 16; i++) {
-+		/* Skip registers marked as "reserved" */
-+		if (i != 11 && i != 14)
-+			writel(*src, dst);
-+		dst++;
-+		src++;
-+	}
-+}
-+
-+static void bch_wait_seq(struct nandi_controller *nandi)
++static int flex_wait_rbn(struct nandi_controller *nandi)
 +{
 +	int ret;
 +
-+	ret = wait_for_completion_timeout(&nandi->seq_completed, HZ/2);
++	ret = wait_for_completion_timeout(&nandi->rbn_completed, HZ/2);
 +	if (!ret)
-+		dev_err(nandi->dev, "BCH Seq timeout\n");
++		dev_err(nandi->dev, "FLEX RBn timeout\n");
++
++	return ret;
 +}
 +
-+static uint8_t bch_erase_block(struct nandi_controller *nandi,
-+			       loff_t offs)
++static void flex_cmd(struct nandi_controller *nandi, uint8_t cmd)
 +{
-+	struct bch_prog *prog = &bch_prog_erase_block;
-+	uint8_t status;
++	uint32_t val;
 +
-+	dev_dbg(nandi->dev, "%s: offs = 0x%012llx\n", __func__, offs);
++	val = (FLEX_CMD_CSN | FLEX_CMD_BEATS_1 | cmd);
++	writel(val, nandi->base + NANDHAM_FLEX_CMD);
++}
 +
-+	prog->extra = (uint32_t)(offs >> nandi->page_shift);
++static void flex_addr(struct nandi_controller *nandi,
++		      uint32_t addr, int cycles)
++{
++	addr &= 0x00ffffff;
 +
-+	emiss_nandi_select(STM_NANDI_BCH);
++	BUG_ON(cycles < 1);
++	BUG_ON(cycles > 3);
 +
-+	nandi_enable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
-+	reinit_completion(&nandi->seq_completed);
++	addr |= (FLEX_ADDR_CSN | FLEX_ADDR_ADD8_VALID);
++	addr |= (cycles & 0x3) << 28;
 +
-+	bch_load_prog_cpu(nandi, prog);
-+
-+	bch_wait_seq(nandi);
-+
-+	nandi_disable_interrupts(nandi, NANDBCH_INT_SEQNODESOVER);
-+
-+	status = (uint8_t)(readl(nandi->base +
-+				 NANDBCH_CHECK_STATUS_REG_A) & 0xff);
-+
-+	return status;
++	writel(addr, nandi->base + NANDHAM_FLEX_ADD);
 +}
 +
 +/*
-  * Initialisation
+  * Bad Block Tables/Bad Block Markers
   */
- static int bch_check_compatibility(struct nandi_controller *nandi,
+ #define BBT_MARK_BAD_FACTORY	0x0
 -- 
 1.8.3.2
