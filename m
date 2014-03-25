@@ -1,48 +1,160 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 25 Mar 2014 18:34:39 -0500
-Subject: [PATCH 0/3] Fix stmmac-socfpga allmodconfig breakage in arm-soc
-Message-ID: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
+Date: Tue, 25 Mar 2014 18:34:41 -0500
+Subject: [PATCH 2/3] dts: socfpga: Fix ethernet entries for the stmmac
+In-Reply-To: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
+References: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1395790482-3957-3-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Hi,
+* Replaced the parent/child DT nodes with a combined node
+* Renamed the device node from 'ethernet0' to 'ethernet'
+  as the standard name.
 
-These 3 patches are based on Arnd's patch to fix the allmodconfig for the
-dwmac-socfpga implementation. I just broke the patch out into drivers,
-dts, and dts documentation.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/boot/dts/socfpga.dtsi                |   51 +++++++++----------------
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    |    5 +--
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |    5 +--
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    5 +--
+ arch/arm/boot/dts/socfpga_vt.dts              |    5 +--
+ 5 files changed, 22 insertions(+), 49 deletions(-)
 
-The original patch is here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241518.html
-
-Arnd mentioned that he was thinking about just removing the dwmac-socfpga
-and send out the new verion to the netdev tree, but I haven't seen it. So
-just in case this solution might work, here are the patches.
-
-These patches are based on arm-soc/for-next.
-
-Thanks,
-
-Dinh Nguyen (3):
-  net: stmmac: improve binding and fix build
-  dts: socfpga: Fix ethernet entries for the stmmac
-  dts: documentation: Update documentation for the stmmac ethernet
-    controller
-
- .../devicetree/bindings/net/socfpga-dwmac.txt      |   38 ++++------
- Documentation/devicetree/bindings/net/stmmac.txt   |    6 ++
- arch/arm/boot/dts/socfpga.dtsi                     |   51 +++++---------
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |    5 +-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |    5 +-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |    5 +-
- arch/arm/boot/dts/socfpga_vt.dts                   |    5 +-
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |   10 +++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    2 +-
- .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |   73 +++-----------------
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    1 +
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    3 +
- 12 files changed, 67 insertions(+), 137 deletions(-)
-
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 404553c..953801c 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -450,43 +450,28 @@
+ 				};
+ 			};
+ 
+-		ethernet0: ethernet0 {
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			compatible = "altr,socfpga-stmmac";
+-			altr,sysmgr-syscon = <&sysmgr 0x60>;
++		gmac0: ethernet at ff700000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			status = "disabled";
+-			ranges;
+-
+-			gmac0: gmac0 at ff700000 {
+-				compatible = "snps,dwmac-3.70a", "snps,dwmac";
+-				reg = <0xff700000 0x2000>;
+-				interrupts = <0 115 4>;
+-				interrupt-names = "macirq";
+-				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-				clocks = <&emac0_clk>;
+-				clock-names = "stmmaceth";
+-			};
++			altr,sysmgr-syscon = <&sysmgr 0x60>;
++			reg = <0xff700000 0x2000>;
++			interrupts = <0 115 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
+ 		};
+ 
+-		ethernet1: ethernet1 {
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			compatible = "altr,socfpga-stmmac";
+-			altr,sysmgr-syscon = <&sysmgr 0x60>;
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			status = "disabled";
+-			ranges;
+-
+-			gmac1: gmac1 at ff702000 {
+-				device_type = "network";
+-				compatible = "snps,dwmac-3.70a", "snps,dwmac";
+-				reg = <0xff702000 0x2000>;
+-				interrupts = <0 120 4>;
+-				interrupt-names = "macirq";
+-				mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-				clocks = <&emac1_clk>;
+-				clock-names = "stmmaceth";
+-			};
++			altr,sysmgr-syscon = <&sysmgr 0x60>;
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+index 2d6b38b..a87ee1c 100644
+--- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+@@ -46,11 +46,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index 26c63a0..ae16d97 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -39,11 +39,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 469bb5c..b79e2a2 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -39,11 +39,8 @@
+ 	};
+ };
+ 
+-&ethernet1 {
+-	status = "okay";
+-};
+-
+ &gmac1 {
++	status = "okay";
+ 	phy-mode = "rgmii";
+ 
+ 	rxd0-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 91f6ccf..87d6f75 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -87,10 +87,7 @@
+ 	};
+ };
+ 
+-&ethernet0 {
+-        status = "okay";
+-};
+-
+ &gmac0 {
++	status = "okay";
+ 	phy-mode = "gmii";
+ };
 -- 
 1.7.9.5
