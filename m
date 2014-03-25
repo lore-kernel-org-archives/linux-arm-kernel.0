@@ -1,38 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 25 Mar 2014 14:06:27 -0700
-Subject: [PATCH] ata: limit sata_rcar host driver to ARCH_SHMOBILE
-In-Reply-To: <20140325191324.GA3279@htj.dyndns.org>
-References: <9835622.nRa3VdL61G@amdc1032>
- <20140325191324.GA3279@htj.dyndns.org>
-Message-ID: <20140325210627.GF27673@verge.net.au>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 25 Mar 2014 15:12:40 -0600
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140325213638.5aba54b6@skate>
+References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
+ <20140325202249.GA10378@obsidianresearch.com>
+ <20140325213638.5aba54b6@skate>
+Message-ID: <20140325211240.GB14718@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 03:13:24PM -0400, Tejun Heo wrote:
-> On Tue, Mar 25, 2014 at 08:10:27PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > Limit sata_rcar host driver to ARCH_SHMOBILE as Renesas R-Car SATA
-> > support is specific to Renesas SoCs and the driver to work requires
-> > suitable device tree node (or platform device) to be defined.
-> > 
-> > Cc: Simon Horman <horms@verge.net.au>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/ata/Kconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > Index: b/drivers/ata/Kconfig
-> > ===================================================================
-> > --- a/drivers/ata/Kconfig	2014-03-25 19:52:31.952327027 +0100
-> > +++ b/drivers/ata/Kconfig	2014-03-25 19:57:21.104322097 +0100
-> > @@ -298,6 +298,7 @@ config SATA_PROMISE
-> >  
-> >  config SATA_RCAR
-> >  	tristate "Renesas R-Car SATA support"
-> > +	depends on ARCH_SHMOBILE
-> 
-> COMPILE_TEST?
+On Tue, Mar 25, 2014 at 09:36:38PM +0100, Thomas Petazzoni wrote:
 
-I think the following would make sense:
+> We have recently identified a weird thing on Armada 38x, maybe previous
+> revisions are affected as well. We haven't fully understood the problem
+> yet, but the following patch allows PCIe devices to be detected in all
+> situations on Armada 38x. It seems like setting the local device number
+> requires "some time" to be taken into account.
 
-	depends on ARCH_SHMOBILE || COMPILE_TEST
+What was the value of mvebu_pcie_link_up around this point?
+
+PHY training would be the most likely time sensitive thing to muck up
+discovery..
+
+Jason
