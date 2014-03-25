@@ -1,37 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 26 Mar 2014 00:33:58 +0100
-Subject: [PATCH 1/2] ARM: mvebu: ensure the mdio node has a clock reference on
- Armada 370/XP
-In-Reply-To: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1395790439-21332-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 25 Mar 2014 20:34:24 -0300
+Subject: [PATCH] net: mvneta: use devm_ioremap_resource() instead of
+ of_iomap()
+In-Reply-To: <1395790015-20929-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395790015-20929-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140325233424.GA14158@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvmdio driver accesses some register of the Ethernet unit. It
-therefore takes a reference and enables a clock. However, on Armada
-370/XP, no clock specification was given in the Device Tree, which
-leads the mvmdio driver to fail when being used as a module and loaded
-before the mvneta driver: it tries to access a register from a
-hardware unit that isn't clocked.
+On Mar 26, Thomas Petazzoni wrote:
+[..]
+> @@ -2774,6 +2775,7 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
+>  static int mvneta_probe(struct platform_device *pdev)
+>  {
+>  	const struct mbus_dram_target_info *dram_target_info;
+> +	struct resource *res;
+>  	struct device_node *dn = pdev->dev.of_node;
+>  	struct device_node *phy_node;
+>  	u32 phy_addr;
+> @@ -2838,9 +2840,15 @@ static int mvneta_probe(struct platform_device *pdev)
+>  
+>  	clk_prepare_enable(pp->clk);
+>  
+> -	pp->base = of_iomap(dn, 0);
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		err = -ENODEV;
+> +		goto err_clk;
+> +	}
+> +
+> +	pp->base = devm_ioremap_resource(&pdev->dev, res);
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index bbb40f6..bb77970 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -230,6 +230,7 @@
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
- 				reg = <0x72004 0x4>;
-+				clocks = <&gateclk 4>;
- 			};
- 
- 			eth1: ethernet at 74000 {
+When you use devm_ioremap_resource, you don't need to have error handling
+in platform_get_resource. Take a look at the comment at lib/devres.c.
 -- 
-1.8.3.2
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
