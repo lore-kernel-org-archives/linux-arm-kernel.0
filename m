@@ -1,178 +1,50 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 25 Mar 2014 23:48:11 +0100
-Subject: [PATCH v5 00/14] CPU idle for Armada XP
-Message-ID: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 25 Mar 2014 23:48:22 +0100
+Subject: [PATCH v5 11/14] ARM: mvebu: Set the start address of a CPU in a
+ separate function
+In-Reply-To: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1395787705-31061-12-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Setting the start (or boot) address of a CPU is no more used only
+during SMP bring up, but it will also be used by the CPU idle
+functions or later by the CPU hot plug ones.
 
-This patch set adds the CPU idle support for Armada XP and prepares
-the support for Armada 370. This was based on the work of Nadav
-Haklai.
+This commit moves it in a separate function.
 
-As for the last version there were many changes done, see the
-changelog for the details. And again I think that I should have
-managed to comply with all the reviewer wishes.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pmsu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-A notable change is that patches 7 and 8 are here to have a coherent
-series, but they will be part of a different series which will be send
-soon, so don't focus too much on it. These 2 patches introduce a new
-compatible string for PMSU which will be needed for CPU idle
-(obviously) but also for the SMP support for Armada 375 and Armada
-38x. So instead of having SMP for Armada 375/38x depending on CPU idle
-for Armada XP or the opposite we choose to submit soon a small series
-needed for those two bigger series.
-
-Most of the patches modify the mvebu code in order to prepare the
-support for CPU idle, hence the patches 2 to 6 and from 9 to 12 should
-go to mvebu subsystem (and then arm-soc).
-
-The first patch should go through ARM subsystem and should be taken by
-Russell King. I made few change on it following Lorenzo advice and
-now it will reuse the cpu v7 suspend and resume function and just do
-specific operation before calling them.
-
-The 13th patch 'cpuidle: mvebu: Add initial cpu idle support for
-Armada 370/XP SoC' is the only one who should go to the cpuidle
-subsystem. But of course I would like that Daniel Lezcano or Rafael
-J. Wysocki have a look on the whole series and especially patches 10,
-12 and 14.
-
-The 14th patch should go to mvebu subsystem.
-
-The whole series is also available in the branch CPU-idle-ArmadaXP-v5
-at https://github.com/MISL-EBU-System-SW/mainline-public.git
-
-Thanks,
-
-Changelog:
-v4 -> v5:
-
-* Call v7 version of suspend and resume from the pj4b callback instead
-  of copying the code, following Lorenzo advice.
-
-* Split the low level functions to manipulate HW coherency
-
-* Reorder the included headers in cpuidle-armada-370-xp.c
-
-* Added comment in the inline asm part of armada_370_xp_cpu_suspend
-  function where the CR_C is restored.
-
-* Added comment about the fact that Armada XP can us ldrex/strex
-  without MMU enabled
-
-* Fixed commit logs
-
-* Added the acked-by from Thomas Petazzoni
-
-* Extend the pmsu registers instead of adding a new set of register
-
-* Move the pm initialization outside of the board file in a
-  arch_initcall
-
-* Move most of the architecture specific code in arch/arm/mach-mvebu
-  and use platform device data file to pass the callback as suggested
-  by Daniel.
-
-* Added the tlb flush if the wfi failed.
-
-* Check the cpu_suspend return value
-
-* rebased on mvebu/for-next to be in sync all the change made in mach-mvebu
-
-v3 -> v4:
-
-* factorized the code in coherency_ll.S and make it autodetect as mush
-  as possible
-
-* reordered the introduction of the device tree binding
-
-* removed all the EXPORT_SYMBOL_GPL as the driver can only be built
-  into the kernel and never be built as a module.
-
-* moved the armada_370_xp_pmsu_enable_l2_powerdown_onidle function in
-  armada_370_cp.c file during the initialization of the platform.
-
-* fixed various coding style issue and typos pointed by Thomas
-
-* fixed all the coding issue style, made the comments more coherent
-  and add more comment in the suspend-armada-370-xp.S file.
-
-* moved all the device tree related check from
-  armada_370_xp_cpuidle_probe to armada_370_xp_dt_init.
-
-* used cpu_pm_enter() instead of directly calling platform code in
-  Armada_370_xp_enter_idle.
-
-* convert the sequence to disable the coherency to the one used in
-  TC2.
-
-* Rebased on v3.14-rc1
-
-v2 -> v3:
-
-* Converted the driver to use module_platform_driver. This lead to the
-  introduction of a new patch (PATCH 11). Pointed by Daniel Lezcano.
-
-* Used PUIDLE_DRIVER_FLAGS_MASK to store the deep idle information,
-  suggested by Daniel Lezcano.
-
-* Removed cpu_init call from armada_370_xp_enter_idle
-  function. Pointed by Lorenzo Pieralisi.
-
-* Rebased on v3.12-rc5
-
-
-v1 -> v2:
-
-* Removed the pm_level kernel parameter. As Kevin Hilman pointed, its
-  usage can be replaced by using
-  /sys/devices/system/cpu/cpu*/cpuidle/state*/disable or the kernel
-  parameter cpuidle.off.
-
-* Used BIT() macro (reported by Ezequiel)
-
-* Made the function more readable the
-  armada_370_xp_pmsu_idle_prepare() function (reported by Thomas)
-
-* Moved the config entry in Kconfig.arm, and rename the config symbol
-  according the pattern used by other arm cpu: ARM_"soc name"_CPUIDLE
-
-* Moved the build rule under the new ARM SoC section in the Makefile
-
-* Rebased on Linus Torvalds master branch of Thursday September 12
-
-Gregory CLEMENT (14):
-  ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
-  ARM: mvebu: remove the address parameter for ll_set_cpu_coherent
-  ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
-  ARM: mvebu: Remove the unused argument of set_cpu_coherent()
-  ARM: mvebu: Split low level functions to manipulate HW coherency
-  ARM: mvebu: Low level function to disable HW coherency support
-  ARM: mvebu: Extend the pmsu registers
-  ARM: dts: mvebu: Introduce a new compatible for the PMSU node
-  ARM: mvebu: Allow to power down L2 cache controller in idle mode
-  ARM: mvebu: Add the PMSU related part of the cpu idle functions
-  ARM: mvebu: Set the start address of a CPU in a separate function
-  ARM: mvebu: Register notifier callback for the cpuidle transition
-  cpuidle: mvebu: Add initial CPU idle support for Armada 370/XP SoC
-  ARM: mvebu: register the cpuidle driver for the Armada XP SoCs
-
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  14 +-
- arch/arm/boot/dts/armada-xp.dtsi                   |  11 +-
- arch/arm/mach-mvebu/coherency.c                    |  16 +-
- arch/arm/mach-mvebu/coherency.h                    |   2 +-
- arch/arm/mach-mvebu/coherency_ll.S                 | 124 +++++++---
- arch/arm/mach-mvebu/headsmp.S                      |  15 +-
- arch/arm/mach-mvebu/platsmp.c                      |   2 +-
- arch/arm/mach-mvebu/pmsu.c                         | 251 ++++++++++++++++++++-
- arch/arm/mm/proc-v7.S                              |  28 ++-
- drivers/cpuidle/Kconfig.arm                        |   5 +
- drivers/cpuidle/Makefile                           |   1 +
- drivers/cpuidle/cpuidle-armada-370-xp.c            |  93 ++++++++
- 12 files changed, 490 insertions(+), 72 deletions(-)
- create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
-
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index c45029f0c0b4..3fc25d94e893 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -76,6 +76,12 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
+ };
+ 
++static void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
++{
++	writel(virt_to_phys(start_addr), pmsu_mp_base +
++		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++}
++
+ #ifdef CONFIG_SMP
+ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ {
+@@ -88,8 +94,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ 
+ 	hw_cpu = cpu_logical_map(cpu_id);
+ 
+-	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+-			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
+ 
+ 	/* Release CPU from reset by clearing reset bit*/
+ 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
 -- 
 1.8.1.2
