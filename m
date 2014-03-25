@@ -1,48 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 00:42:23 +0100
-Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
-In-Reply-To: <CACRpkdYPvoobHqG4oQaJbrXDZQwYP6H9n7MSuXDt3MonNsC5jw@mail.gmail.com>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403201148.16239.arnd@arndb.de>
- <CACRpkdYPvoobHqG4oQaJbrXDZQwYP6H9n7MSuXDt3MonNsC5jw@mail.gmail.com>
-Message-ID: <4776688.CZBeEWFJox@wuerfel>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 26 Mar 2014 00:36:49 +0100
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <5331CD43.1010601@ahsoftware.de>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>	<1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>	<20140316070917.GA3094@arch.cereza>	<CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>	<20140317204410.GA1118@arch.cereza>	<CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>	<20140319154434.GA3488@arch.cereza>	<CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
+ <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
+ <5331CD43.1010601@ahsoftware.de>
+Message-ID: <53321311.8060604@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 March 2014 21:34:21 Linus Walleij wrote:
-> On Thu, Mar 20, 2014 at 11:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Nevermind, I'll drop this patch for now, I just had an idea to do it
-> > better: Since Linus and I are trying to get Integrator and Realview
-> > moved over into ARCH_MULTIPLATFORM anyway, I'll defer the CPU selection
-> > question until that's done.
-> 
-> Integrator is blocked by one single thing: <mach/memory.h>
-> bus_to_virt/virt_to_bus.
-> 
-> If we can get some consensus on Santosh's patches
-> (or however we want to solve that) I'll do multiplatform for
-> Integrator any day.
+Am 25.03.2014 19:38, schrieb Alexander Holler:
 
-Yes, I know. My point is that once the two are multiplatform, we wouldn't
-do the CPU selection patches like this anymore. Instead, I would just do
+> reboot too. Another solution would be to unregister the reboot_notifier
+> in the reboot_nofifier itself. I've just seen one watchdog driver
+> (drivers/rtc/rtc-m41t80.c) which does that. But I still think such
 
-config CPU_ARM920T
-	bool "Support ARM920T processor" if ARCH_MULTI_V4T
-	...
+That, btw. is broken. ;)
 
-config CPU_ARM926T
-	bool "Support ARM920T processor" if ARCH_MULTI_V5
-	...
+Right after having send the mail, I've became that intuition, had a look 
+and ... notifier.h does state the following:
 
-...
+  * atomic_notifier_chain_unregister(), 
+blocking_notifier_chain_unregister(),
+  * and srcu_notifier_chain_unregister() _must not_ be called from within
+  * the call chain.
 
-In a multiplatform kernel, there is nothing wrong with just letting
-users turn on arbitrary combinations of CPUs as long as they are
-compatible at run-time (i.e. not v5+v7 combined). This will also let
-you run qemu images using the MACH_VIRT target and any CPU emulation.
+(The reboot-notifier chain is of type blocking_notifier_chain)
 
-Of course, most platforms will still select the CPUs they actually
-use, but you can always add more.
+So I've picked up one user of reboot_notifier by random and had the luck 
+to choose a broken one. ;)
 
-	Arnd
+I will make a patch and will have a look if the same failure can be 
+found elsewhere. There aren't that much users of the reboot-notifier, so 
+it shouldn't cost me that much time.
+
+Regards,
+
+Alexander Holler
