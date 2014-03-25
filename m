@@ -1,45 +1,51 @@
-From: amurray@embedded-bits.co.uk (Andrew Murray)
-Date: Tue, 25 Mar 2014 11:46:41 +0000
-Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
- designware core driver
-In-Reply-To: <20140325103525.GA14789@ulmo>
-References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
- <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
- <235376049.yyfljDtinu@wuerfel> <20140325103525.GA14789@ulmo>
-Message-ID: <CAPcvp5Gy8uNW3UULi8jYk7GNbmgTd2B_qOEAXnP4H4Wq3v9BCw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Mar 2014 11:48:31 +0000
+Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
+ <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
+ <20140217175552.GB8361@arm.com>
+ <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
+Message-ID: <53316D0F.7040600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2014 10:35, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Tue, Mar 25, 2014 at 08:44:36AM +0100, Arnd Bergmann wrote:
->> On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
-> [...]
->> > +/* Keystone PCIe driver does not allow module unload */
->> > +static int __init ks_pcie_init(void)
->> > +{
->> > +   return platform_driver_probe(&ks_pcie_driver, ks_pcie_probe);
->> > +}
->> > +subsys_initcall(ks_pcie_init);
+On 25/03/14 11:19, Stefano Stabellini wrote:
+> On Mon, 17 Feb 2014, Catalin Marinas wrote:
+>> On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
+>>> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
+>>>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+>>>> Necessary duplication of paravirt.h and paravirt.c with ARM.
+>>>>
+>>>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+>>>> runtime pvops patching needed.
+>>>>
+>>>> This allows us to make use of steal_account_process_tick for stolen
+>>>> ticks accounting.
+>>>>
+>>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>>> CC: will.deacon at arm.com
+>>>> CC: nico at linaro.org
+>>>> CC: marc.zyngier at arm.com
+>>>> CC: cov at codeaurora.org
+>>>> CC: arnd at arndb.de
+>>>> CC: olof at lixom.net
+>>>> CC: Catalin.Marinas at arm.com
+>>>
+>>> Catalin, Will, are you happy with this patch for 3.15?
 >>
->> Why subsys_initcall?
->>
->> We should probably try to fix unloading soon.
->
-> I did some work on this a few months ago but never got around to
-> cleaning up the patches. Let me see if I can resurrect that work.
+>> It's pretty small and looks fine to me. However, I would like someone
+>> with more virtualisation experience than me to ack it (e.g. Marc Z).
+> 
+> Ping? Marc, could you please give it a review?
 
-I think there may be merit in these drivers using subsys_init. I've
-not had time to investigate, but as far as I can remember this causes
-issues with piceport.
+Yup, that looks OK to me. It's a generic feature anyway, so I don't see
+any harm in enabling it for Xen. We may also use it for KVM at some point.
 
-For ARM32 host drivers, pci_fixup_irqs (arch/arm/kernel/bios32.c) must
-be called before init_service_irqs (portdrv_core.c) otherwise pcieport
-acts on invalid information in dev->irq and breaks. It seems that its
-possible for the portbus driver to pick up new devices before bios32
-has been able to fixup the irqs. Making the host bridge drivers subsys
-will overcome this. I guess this hasn't been an issue in the past as
-host bridge drivers were always in the arch/ directories.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-In any case it may be worth testing this driver with PCIEPORTBUS enabled.
-
-Andrew Murray
+	M.
+-- 
+Jazz is not dead. It just smells funny...
