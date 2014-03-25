@@ -1,71 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 25 Mar 2014 12:32:54 +0100
-Subject: [PATCH] clocksource: exynos_mct: Fix stall after CPU hotplugging
-In-Reply-To: <1395744087-8655-1-git-send-email-k.kozlowski@samsung.com>
-References: <1395744087-8655-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53316966.90600@samsung.com>
+From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
+Date: Tue, 25 Mar 2014 12:37:39 +0100
+Subject: [PATCH RFC] ixp4xx_eth: Allow setting the MDIO bus name in
+ platform data
+In-Reply-To: <CAGVrzcaJ5LKE_HAvsmbnFxYsLbNwi9h9UYrz60AQ3z4DOZKwYw@mail.gmail.com>
+References: <20140324151729.1b8e3bb5@marrow.netinsight.se>
+ <m3r45r72u9.fsf@intrepid.localdomain>
+ <CAGVrzcaJ5LKE_HAvsmbnFxYsLbNwi9h9UYrz60AQ3z4DOZKwYw@mail.gmail.com>
+Message-ID: <20140325123739.05017fcf@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Mon, 24 Mar 2014 13:42:29 -0700
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Two comments inline.
+> 2014-03-24 13:34 GMT-07:00 Krzysztof Halasa <khc@pm.waw.pl>:
+> > Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
+> >
+> >> Allows using e.g., a fixed MDIO bus with the ixp4xx_eth driver.
+> >> Example:
+> >
+> >
+> > Why do we need it? I'm not sure I know what constitutes a "fixed MDIO
+> > bus".
+> 
+> This is a software emulation MDIO bus for when your Ethernet MAC is
+> connected to a PHY which does not appear on the MDIO bus. This is
+> typically used to provide the Ethernet driver with a link that is
+> always seen as UP, when you cannot directly query it via MDIO/MDC.
 
-On 25.03.2014 11:41, Krzysztof Kozlowski wrote:
+Yes, exactly. We have a board which uses two of the ipx4xx NPE:s, one
+which uses a real PHY via the ixp4xx_eth MDIO bus and one which uses
+the fixed PHY driver.
 
-[snip]
+To support this, we need this patch as the driver would otherwise
+always look for the PHY on the ixp4xx_eth MDIO bus.
 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 48f76bc05da0..0b49b09dd1a9 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -339,7 +339,14 @@ static void exynos4_mct_tick_start(unsigned long cycles,
->   static int exynos4_tick_set_next_event(unsigned long cycles,
->   				       struct clock_event_device *evt)
->   {
-> -	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
-> +	/*
-> +	 * In case of hotplugging non-boot CPU, the set_next_event could be
-> +	 * called on CPU0 by ISR before IRQ affinity is set to proper CPU.
-
-Hmm, is this a desired behavior? I guess this is a question for Thomas 
-and Daniel.
-
-> +	 * Thus for accessing proper MCT Lx timer, 'per_cpu' for cpumask
-> +	 * in event must be used instead of 'this_cpu_ptr'.
-> +	 */
-> +	struct mct_clock_event_device *mevt = &per_cpu(percpu_mct_tick,
-> +			cpumask_first(evt->cpumask));
->
->   	exynos4_mct_tick_start(cycles, mevt);
->
-> @@ -371,23 +378,13 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
->
->   static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
->   {
-> -	struct clock_event_device *evt = &mevt->evt;
-> -
-> -	/*
-> -	 * This is for supporting oneshot mode.
-> -	 * Mct would generate interrupt periodically
-> -	 * without explicit stopping.
-> -	 */
-> -	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
-> -		exynos4_mct_tick_stop(mevt);
-> -
->   	/* Clear the MCT tick interrupt */
->   	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
->   		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
->   		return 1;
-> -	} else {
-> -		return 0;
->   	}
-> +
-> +	return 0;
-
-Nobody seems to be checking return value of this function (and I don't 
-see what it could be used for anyway), so I guess it could be simply 
-made void.
-
-Best regards,
-Tomasz
+// Simon
