@@ -1,35 +1,27 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Tue, 25 Mar 2014 15:13:24 -0400
-Subject: [PATCH] ata: limit sata_rcar host driver to ARCH_SHMOBILE
-In-Reply-To: <9835622.nRa3VdL61G@amdc1032>
-References: <9835622.nRa3VdL61G@amdc1032>
-Message-ID: <20140325191324.GA3279@htj.dyndns.org>
+Date: Tue, 25 Mar 2014 15:17:45 -0400
+Subject: [PATCH v4 0/4] ata: ahci_platform related cleanups
+In-Reply-To: <1395773501-6663-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1395773501-6663-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20140325191745.GB3279@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 08:10:27PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Limit sata_rcar host driver to ARCH_SHMOBILE as Renesas R-Car SATA
-> support is specific to Renesas SoCs and the driver to work requires
-> suitable device tree node (or platform device) to be defined.
+On Tue, Mar 25, 2014 at 07:51:37PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
 > 
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/ata/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
+> This patch series:
+> - fixes ahci_platform_data->suspend() handling
+> - moves library AHCI platform code to its own file
+> - adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
+> - updates DaVinci DA850 platform code
 > 
-> Index: b/drivers/ata/Kconfig
-> ===================================================================
-> --- a/drivers/ata/Kconfig	2014-03-25 19:52:31.952327027 +0100
-> +++ b/drivers/ata/Kconfig	2014-03-25 19:57:21.104322097 +0100
-> @@ -298,6 +298,7 @@ config SATA_PROMISE
->  
->  config SATA_RCAR
->  	tristate "Renesas R-Car SATA support"
-> +	depends on ARCH_SHMOBILE
+> Changes since v3:
+> - updated for ahci_xgene
 
-COMPILE_TEST?
+Aplied 1-4 to libata/for-3.15.
+
+Thanks!
 
 -- 
 tejun
