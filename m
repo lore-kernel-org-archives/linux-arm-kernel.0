@@ -1,60 +1,123 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 25 Mar 2014 16:01:26 +0800
-Subject: [RFC PATCH] ASoC: wm8904: add CCF support
-In-Reply-To: <20140324110616.GG2269@sirena.org.uk>
-References: <1395370262-23305-1-git-send-email-voice.shen@atmel.com>
- <20140321103747.GK23372@e106331-lin.cambridge.arm.com>
- <20140321115511.GM11706@sirena.org.uk> <532F9557.2000402@atmel.com>
- <20140324110616.GG2269@sirena.org.uk>
-Message-ID: <533137D6.9010006@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Mar 2014 09:12:38 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <CAMj5BkjbrHevQhf4kbFhN5THHLw4nQwdpt2h6WJH02mKhdq8oQ@mail.gmail.com>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+ <13743364.WZtdi2BZb3@wuerfel>
+ <CAMj5BkjbrHevQhf4kbFhN5THHLw4nQwdpt2h6WJH02mKhdq8oQ@mail.gmail.com>
+Message-ID: <17142825.cN9DfpvuLc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tuesday 25 March 2014 12:06:31 Zhangfei Gao wrote:
+> Dear Arnd
+> 
+> On Mon, Mar 24, 2014 at 11:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 24 March 2014 22:14:56 Zhangfei Gao wrote:
+> >
+> >> +
+> >> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
+> >> +{
+> >> +     struct hip04_priv *priv = netdev_priv(ndev);
+> >> +     unsigned tx_head = priv->tx_head;
+> >> +     unsigned tx_tail = priv->tx_tail;
+> >> +     struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
+> >> +
+> >> +     while (tx_tail != tx_head) {
+> >> +             if (desc->send_addr != 0) {
+> >> +                     if (force)
+> >> +                             desc->send_addr = 0;
+> >> +                     else
+> >> +                             break;
+> >> +             }
+> >> +             if (priv->tx_phys[tx_tail]) {
+> >> +                     dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
+> >> +                             priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
+> >> +                     priv->tx_phys[tx_tail] = 0;
+> >> +             }
+> >> +             dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
+> >> +             priv->tx_skb[tx_tail] = NULL;
+> >> +             tx_tail = TX_NEXT(tx_tail);
+> >> +             priv->tx_count--;
+> >> +     }
+> >> +     priv->tx_tail = tx_tail;
+> >> +}
+> >
+> > I think you still need to find a solution to ensure that the tx reclaim is
+> > called eventually through a method other than start_xmit.
+> 
+> In the iperf stress test, if move reclaim to poll, there is some
+> error, sometimes sending zero packets.
+> While keep reclaim in the xmit to reclaim transmitted packets looks
+> stable in the test,
+> There TX_DESC_NUM desc can be used.
 
-On 03/24/2014 07:06 PM, Mark Brown wrote:
-> On Mon, Mar 24, 2014 at 10:15:51AM +0800, Bo Shen wrote:
->> On 03/21/2014 07:55 PM, Mark Brown wrote:
->>> On Fri, Mar 21, 2014 at 10:37:47AM +0000, Mark Rutland wrote:
->>>> On Fri, Mar 21, 2014 at 02:51:02AM +0000, Bo Shen wrote:
->
->>>>> +  - wlf,sysclk-from-mclk: set the sys clock is driven from mclk,
->
->>>> Why can the kernel not decide this?
->
->>> It can.
->
->> I really don't know how it decided by kernel (hardcode in machine driver ?),
->> can you point me directly? Thanks.
->
-> It can just look to see if there is a suitable system clock present,
-> this shouldn't be hard.  If there's a clock connected at a suitable
-> rate it should use that, otherwise if there's a clock at an unsuitable
-> rate it should either change the rate of the clock or use the FLL.
+What I meant is that you need a correct implementation, presumably
+you added a bug when you moved the function to poll(), and also you
+forgot to add a timer.
 
-I try to implement this, I think we can write the wm8904 dt as simple as 
-following, can it be acceptable?
+> >> +     priv->map = syscon_regmap_lookup_by_compatible("hisilicon,hip04-ppe");
+> >> +     if (IS_ERR(priv->map)) {
+> >> +             dev_warn(d, "no hisilicon,hip04-ppe\n");
+> >> +             ret = PTR_ERR(priv->map);
+> >> +             goto init_fail;
+> >> +     }
+> >> +
+> >> +     n = of_parse_phandle(node, "port-handle", 0);
+> >> +     if (n) {
+> >> +             ret = of_property_read_u32(n, "reg", &priv->port);
+> >> +             if (ret) {
+> >> +                     dev_warn(d, "no reg info\n");
+> >> +                     goto init_fail;
+> >> +             }
+> >> +
+> >> +             ret = of_property_read_u32(n, "channel", &priv->chan);
+> >> +             if (ret) {
+> >> +                     dev_warn(d, "no channel info\n");
+> >> +                     goto init_fail;
+> >> +             }
+> >> +     } else {
+> >> +             dev_warn(d, "no port-handle\n");
+> >> +             ret = -EINVAL;
+> >> +             goto init_fail;
+> >> +     }
+> >
+> > Doing the lookup by "compatible" string doesn't really help you
+> > at solve the problem of single-instance ppe at all, because that
+> > function will only ever look at the first one. Use
+> > syscon_regmap_lookup_by_phandle instead and pass the phandle
+> > you get from the "port-handle" property.
+> 
+> Did some experiment, the only ppe base is got from syscon probe.
+> And looking up by "compatible" did work for three controllers at the same time.
 
-Case 1: using SoC provided clock
-wm8904:wm8904 at 1a {
-	compatible = "wlf,wm8904";
-	reg = <0x1a>;
-	clocks = <&pck0>;
-	clock-name = "mclk";
-}
+The point is that it won't work for more than one ppe instance.
 
-Case 2: using external crystal (For this case, I have no idea to put to 
-CCF, so need "wlf,xtal-clk-freq" property).
-wm8904:wm8904 at 1a {
-	compatible = "wlf,wm8904";
-	reg = <0x1a>;
-	wlf,xtal-clk-freq = <12000000>;
-}
+> > Also, since you decided to treat the ppe as a dump regmap, I would
+> > recommend moving the 'reg' and 'channel' properties into arguments
+> > of the port-handle link, and retting rid of the child nodes of
+> > the ppe, like:
+> >
+> > +       ppe: ppe at 28c0000 {
+> > +               compatible = "hisilicon,hip04-ppe", "syscon";
+> > +               reg = <0x28c0000 0x10000>;
+> > +       };
+> > +
+> > +       fe: ethernet at 28b0000 {
+> > +               compatible = "hisilicon,hip04-mac";
+> > +               reg = <0x28b0000 0x10000>;
+> > +               interrupts = <0 413 4>;
+> > +               phy-mode = "mii";
+> > +               port-handle = <&ppe 0xf1 0>;
+> > +       };
+> >
+> 
+> Would you mind giving more hints about how to parse the args.
+> I am thinking of using of_parse_phandle_with_args, is that correct method?
 
-Then we use these clocks to configure FLL.
+I would just use of_property_read_u32_array() to read all three cells,
+then pass the first cell entry into syscon_regmap_lookup_by_phandle.
+of_parse_phandle_with_args() is what you would use if you were registering
+a higher-level driver for the ppe rather than using syscon.
 
-Btw, I see the "wm2000.c" retrieve the clock, however not see the usage 
-cases for it.
-
-Best Regards,
-Bo Shen
+	Arnd
