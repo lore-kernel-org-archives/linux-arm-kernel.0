@@ -1,51 +1,70 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 25 Mar 2014 10:11:48 +0100
-Subject: [PATCH v3] i2c: new bus driver for efm32
-In-Reply-To: <20140325090700.GL23076@pengutronix.de>
-References: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140324170131.GB7524@katana>
- <20140325090700.GL23076@pengutronix.de>
-Message-ID: <20140325091148.GA2570@katana>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 25 Mar 2014 10:16:25 +0100
+Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
+In-Reply-To: <14100654.IXZcGSFRJS@wuerfel>
+References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
+ <201403211643.24533.arnd@arndb.de>
+ <20140324013556.GF23924@verge.net.au> <14100654.IXZcGSFRJS@wuerfel>
+Message-ID: <20140325091625.GM23076@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 10:07:00AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Mar 24, 2014 at 06:01:31PM +0100, Wolfram Sang wrote:
-> > And checkpatch said:
+On Mon, Mar 24, 2014 at 01:04:57PM +0100, Arnd Bergmann wrote:
+> On Monday 24 March 2014 10:35:56 Simon Horman wrote:
+> > On Fri, Mar 21, 2014 at 04:43:24PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 20 March 2014, Simon Horman wrote:
+> > > > I wonder if Kconfig for koelsch should be tightened up somehow to
+> > > > ensure that PHYLIB is either unselected or builtin.
+> > > > 
+> > > > Also, a minor nit, I would prefer changes for different boards
+> > > > in different patches. But I can split the patch myself if its
+> > > > not going to be changed otherwise.
+> > > 
+> > > I would prefer to take the entire series directly into arm-soc
+> > > this time, if you don't mind.
 > > 
-> > WARNING: braces {} are not necessary for any arm of this statement
-> > #345: FILE: drivers/i2c/busses/i2c-efm32.c:239:
-> > +		if (cur_msg->flags & I2C_M_RD) {
-> > ...
-> hmm the whole block reads:
+> > That I'm happy to go along with though I don't understand the motivation
+> > for it. And regardless of how the patches go in I'd prefer if they were
+> > split as I suggested above.
 > 
->         case REG_STATE_STATE_DATA:
->                 if (cur_msg->flags & I2C_M_RD) {
->                         efm32_i2c_recv_next_byte(ddata);
->                 } else {
->                         /* wait for Ack or Nack of slave */
->                 }
->                 break;
+> Sorry, I misunderstood you at first. I thought you meant you only split
+> them up when you apply them yourself. It's no problem for me to split
+> up this patch as well and then apply it here.
 > 
-> so just removing the braces does the wrong thing. Is this a false
-> positive checkpatch warning? Andy? Joe?
+> > What I'm not so happy about is us potentially moving a problem from being a
+> > compile time error, which is easy to observe, to a run-time behavioural
+> > problem, which may be much less obvious to the beholder.
 > 
-> I can make it:
+> I agree that it's not nice, but I couldn't come with a better approach,
+> and we are doing the same thing on other platforms as well.
 > 
-> 		if (cur_msg->flags & I2C_M_RD)
-> 			efm32_i2c_recv_next_byte(ddata);
-> 		/* in the write case wait for Ack or Nack of slave */
+> The problems are:
 > 
-> but I consider the version above more readable.
+> * leaving the code as it is today prevents me from running all
+>   'make randconfig' kernels successfully. I use this as an important
+>   test case for verifying stuff we pull into the arm-soc tree.
+>   At the moment, I have a 160-patch series that I want to get merged
+>   upstream over time.
+> 
+> * Using 'select PHYLIB' from the platform is nasty because we want
+>   to be able to turn off whole subsystems (BLOCK, NET, I2C, ...)
+>   in Kconfig independent of the board selection. PHYLIB requires
+>   the network code.
+> 
+> * Using 'depends on' to disable the board option if PHYLIB is
+>   a module is counterintuitive.
+> 
+> * Makeing PHYLIB always built-in when NETDEVICE is would be a
+>   bit wasteful.
+maybe let the board
 
-Well, OK, I let you decide.
+	select PHYLIB if NETDEVICE
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/5ba78bba/attachment.sig>
+is a nice compromise?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
