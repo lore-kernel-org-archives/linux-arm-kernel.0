@@ -1,67 +1,43 @@
-From: kim.phillips@linaro.org (Kim Phillips)
-Date: Tue, 25 Mar 2014 17:08:14 -0500
-Subject: [PATCH 2/2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
-In-Reply-To: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
-Message-ID: <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 25 Mar 2014 23:11:19 +0100
+Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
+In-Reply-To: <1395658064.3465.7.camel@linaro1.home>
+References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
+ <1392339850-18686-3-git-send-email-keescook@chromium.org>
+ <20140214162257.GB2331@e103592.cambridge.arm.com>
+ <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
+ <20140217123415.GA2182@e103592.cambridge.arm.com>
+ <532F2C48.6050509@codeaurora.org>
+ <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
+ <1395658064.3465.7.camel@linaro1.home>
+Message-ID: <CAH+eYFBB2vRnpnDXna0ZAoxVF8ViQauEUT90rWwirWHNW0W63Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the correct memory type for device MMIO mappings: PAGE_S2_DEVICE.
+2014-03-24 11:47 GMT+01:00 Jon Medhurst (Tixy) <tixy@linaro.org>:
+> On Sun, 2014-03-23 at 16:21 -0600, Kees Cook wrote:
+>> For this stage, how about I make this "depends on KEXEC=n &&
+>> KPROBES=n"?
+>
+> There's also ftrace (CONFIG_DYNAMIC_FTRACE I believe) which modifies
+> kernel code with a call to probe_kernel_write(), which GDB uses as well.
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
----
- arch/arm/kvm/mmu.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+x86 handles this by making all kernel text R/W around the place where
+ftrace does the modifications.  This is called under stop_machine().
+See 16239630974516a887 ("ftrace, x86: make kernel text writable only
+for conversions").
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7789857..a354610 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -652,6 +652,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	pgprot_t mem_type = PAGE_S2;
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -702,6 +703,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_pfn(pfn))
- 		return -EFAULT;
- 
-+	if (kvm_is_mmio_pfn(pfn))
-+		mem_type = PAGE_S2_DEVICE;
-+
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-@@ -709,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
--		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-+		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
- 		new_pmd = pmd_mkhuge(new_pmd);
- 		if (writable) {
- 			kvm_set_s2pmd_writable(&new_pmd);
-@@ -718,13 +722,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
--		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-+		pte_t new_pte = pfn_pte(pfn, mem_type);
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-+				     mem_type == PAGE_S2_DEVICE);
- 	}
- 
- 
--- 
-1.9.1
+> And grepping for the patch_text() function also shows
+> __arch_jump_label_transform() modifies kernel code. Not sure how and
+> when that gets used.
+
+It gets used when "Optimize very unlikely/likely branches"
+(CONFIG_JUMP_LABEL) is enabled.  These "very unlikely/likely branches"
+are used, among other things, for controlling tracepoints and some
+scheduler/networking features.
+
+x86 handles jump labels (and kprobes) by mapping the page being
+modified read-write around the modification.  See text_poke().
+
+See also this ARM patch from Kyle Martin which I don't think has been merged:
+http://marc.info/?l=linux-arm-kernel&m=139291862727863&w=2
