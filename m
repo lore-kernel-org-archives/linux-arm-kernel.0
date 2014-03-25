@@ -1,53 +1,48 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 25 Mar 2014 14:14:07 +0100
-Subject: [PATCH 4/5] ARM: dts: tx53: add simple-panel support
-In-Reply-To: <20140322064653.GC5938@dragon>
-References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
- <1395235721-13847-4-git-send-email-LW@KARO-electronics.de>
- <20140322064653.GC5938@dragon>
-Message-ID: <20140325141407.75b0750e@ipc1.ka-ro>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 25 Mar 2014 09:17:33 -0400
+Subject: linux-next: manual merge of the keystone tree with the arm-soc
+ tree
+In-Reply-To: <20140325012353.GA25643@saruman.home>
+References: <20140325105501.e63fcdd78d0d604b4e5309a1@canb.auug.org.au>
+ <5330C703.5030705@ti.com> <20140325012353.GA25643@saruman.home>
+Message-ID: <533181ED.6040702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo wrote:
-> On Wed, Mar 19, 2014 at 02:28:40PM +0100, Lothar Wa?mann wrote:
-> > 
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> >  arch/arm/boot/dts/imx53-tx53-x13x.dts |   12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-> > index 26b918e..86a964d 100644
-> > --- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
-> > +++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-> > @@ -63,6 +63,18 @@
-> >  		default-brightness-level = <50>;
-> >  	};
-> >  
-> > +	panel0 {
-> > +		compatible = "simple-panel";
+On Monday 24 March 2014 09:23 PM, Balbi, Felipe wrote:
+> On Mon, Mar 24, 2014 at 08:00:03PM -0400, Santosh Shilimkar wrote:
+>> On Monday 24 March 2014 07:55 PM, Stephen Rothwell wrote:
+>>> Hi Santosh,
+>>>
+>>> Today's linux-next merge of the keystone tree got a conflict in
+>>> arch/arm/boot/dts/Makefile between commit ba5a37e52194 ("ARM: mvebu: Move
+>>> kirkwood DT boards into mach-mvebu") from the arm-soc tree and commit
+>>> 400550ae7e77 ("ARM: dts: Build all keystone dt blobs") from the keystone
+>>> tree.
+>>>
+>>> I fixed it up (see below) and can carry the fix as necessary (no action
+>>> is required).
+>>>
+>> Looks fine. Thanks
 > 
-> From what I can see, "simple-panel" is not a documented compatible.
+> wow, not even a mention of my original patch [1]. I also couldn't find
+> your patch [2] anywhere in the mailing list archives, not even google
+> could find it. The only place that commit was ever mentioned was this
+> very thread.
 > 
-There is Documentation/devicetree/bindings/panel/simple-panel.txt
-which describes the bindings for drivers/gpu/drm/panel/panel-simple.c.
-"simple-panel" is the common compatible for all panels that the driver
-supports. If no compatible for a specific panel is given, the
-driver supports a generic panel with an ENABLE GPIO, an attached
-backlight and a regulator. This is what's being used here. 
+I thought, we closed the thread mentioning about the patch applied
+on the same thread. [1]
 
+> The patch I wrote was valid for v3.14-rc7 (the base where it was
+> written), I'd expect to, at a minimum, have a mention or a Reported-by
+> or at least see your patch in the mailing list.
+> 
+> Anyway, it's just a patch. Nevermind.
+> 
+I missed to add the reported-by tag and also should have just pasted
+the patch in the reply. Sorry about that.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+regards,
+Santosh
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+[1] http://www.spinics.net/lists/devicetree/msg27351.html
