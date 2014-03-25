@@ -1,114 +1,31 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Tue, 25 Mar 2014 12:06:31 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <13743364.WZtdi2BZb3@wuerfel>
-References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
- <1395670496-17381-4-git-send-email-zhangfei.gao@linaro.org>
- <13743364.WZtdi2BZb3@wuerfel>
-Message-ID: <CAMj5BkjbrHevQhf4kbFhN5THHLw4nQwdpt2h6WJH02mKhdq8oQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Mar 2014 22:27:25 -0700
+Subject: [PATCH v0 01/15] drivers: clk: st: Support for DIVMUX and PreDiv
+ Clocks
+In-Reply-To: <1393514668-17440-2-git-send-email-gabriel.fernandez@st.com>
+References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
+ <1393514668-17440-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20140325052725.32624.39974@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd
+Quoting Gabriel FERNANDEZ (2014-02-27 07:24:14)
+> +/**
+> + * DOC: Clock mux with a programmable divider on each of its three inputs.
+> + *      The mux has an input setting which effectively gates its output.
+> + *
+> + * Traits of this clock:
+> + * prepare - clk_(un)prepare only ensures parent is (un)prepared
 
-On Mon, Mar 24, 2014 at 11:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 22:14:56 Zhangfei Gao wrote:
->
->> +
->> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
->> +{
->> +     struct hip04_priv *priv = netdev_priv(ndev);
->> +     unsigned tx_head = priv->tx_head;
->> +     unsigned tx_tail = priv->tx_tail;
->> +     struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
->> +
->> +     while (tx_tail != tx_head) {
->> +             if (desc->send_addr != 0) {
->> +                     if (force)
->> +                             desc->send_addr = 0;
->> +                     else
->> +                             break;
->> +             }
->> +             if (priv->tx_phys[tx_tail]) {
->> +                     dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
->> +                             priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
->> +                     priv->tx_phys[tx_tail] = 0;
->> +             }
->> +             dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
->> +             priv->tx_skb[tx_tail] = NULL;
->> +             tx_tail = TX_NEXT(tx_tail);
->> +             priv->tx_count--;
->> +     }
->> +     priv->tx_tail = tx_tail;
->> +}
->
-> I think you still need to find a solution to ensure that the tx reclaim is
-> called eventually through a method other than start_xmit.
+Minor nitpick but it doesn't look like .prepare or .unprepare are
+supported below. It looks like this copy/paste comment applies to most
+of the clk patches as well.
 
-In the iperf stress test, if move reclaim to poll, there is some
-error, sometimes sending zero packets.
-While keep reclaim in the xmit to reclaim transmitted packets looks
-stable in the test,
-There TX_DESC_NUM desc can be used.
+It's a small problem and doesn't require a patch respin. But perhaps can
+be cleaned up some day in the future.
 
->
->> +
->> +     priv->map = syscon_regmap_lookup_by_compatible("hisilicon,hip04-ppe");
->> +     if (IS_ERR(priv->map)) {
->> +             dev_warn(d, "no hisilicon,hip04-ppe\n");
->> +             ret = PTR_ERR(priv->map);
->> +             goto init_fail;
->> +     }
->> +
->> +     n = of_parse_phandle(node, "port-handle", 0);
->> +     if (n) {
->> +             ret = of_property_read_u32(n, "reg", &priv->port);
->> +             if (ret) {
->> +                     dev_warn(d, "no reg info\n");
->> +                     goto init_fail;
->> +             }
->> +
->> +             ret = of_property_read_u32(n, "channel", &priv->chan);
->> +             if (ret) {
->> +                     dev_warn(d, "no channel info\n");
->> +                     goto init_fail;
->> +             }
->> +     } else {
->> +             dev_warn(d, "no port-handle\n");
->> +             ret = -EINVAL;
->> +             goto init_fail;
->> +     }
->
-> Doing the lookup by "compatible" string doesn't really help you
-> at solve the problem of single-instance ppe at all, because that
-> function will only ever look at the first one. Use
-> syscon_regmap_lookup_by_phandle instead and pass the phandle
-> you get from the "port-handle" property.
+Do you want me to take these patches directly or are you just looking
+for an Ack?
 
-Did some experiment, the only ppe base is got from syscon probe.
-And looking up by "compatible" did work for three controllers at the same time.
-
->
-> Also, since you decided to treat the ppe as a dump regmap, I would
-> recommend moving the 'reg' and 'channel' properties into arguments
-> of the port-handle link, and retting rid of the child nodes of
-> the ppe, like:
->
-> +       ppe: ppe at 28c0000 {
-> +               compatible = "hisilicon,hip04-ppe", "syscon";
-> +               reg = <0x28c0000 0x10000>;
-> +       };
-> +
-> +       fe: ethernet at 28b0000 {
-> +               compatible = "hisilicon,hip04-mac";
-> +               reg = <0x28b0000 0x10000>;
-> +               interrupts = <0 413 4>;
-> +               phy-mode = "mii";
-> +               port-handle = <&ppe 0xf1 0>;
-> +       };
->
-
-Would you mind giving more hints about how to parse the args.
-I am thinking of using of_parse_phandle_with_args, is that correct method?
-
-Thanks
+Regards,
+Mike
