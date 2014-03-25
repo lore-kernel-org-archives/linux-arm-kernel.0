@@ -1,76 +1,136 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:28 +0000
-Subject: [RFC 11/47] mtd: nand: stm_nand_bch: add Power Management
+Date: Tue, 25 Mar 2014 08:19:24 +0000
+Subject: [RFC 07/47] mtd: nand: stm_nand_bch: initialise the BCH Controller
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate the standard PM call-backs for; suspend, resume and restore.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-q
 ---
- drivers/mtd/nand/stm_nand_bch.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 56 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/mtd/stm_nand.h    | 20 +++++++++++++++
+ 2 files changed, 76 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 8ab8e7b..e1ebf92 100644
+index 76a0d02..1a93f8d 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -415,12 +415,51 @@ static int stm_nand_bch_remove(struct platform_device *pdev)
+@@ -14,6 +14,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+@@ -102,6 +103,56 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
+ 	writel(val, nandi->base + NANDBCH_INT_EN);
+ }
+ 
++static void nandi_init_bch(struct nandi_controller *nandi, int emi_bank)
++{
++	dev_dbg(nandi->dev, "%s\n", __func__);
++
++	/* Initialise BCH Controller */
++	emiss_nandi_select(STM_NANDI_BCH);
++
++	/* Reset and disable boot-mode controller */
++	writel(BOOT_CFG_RESET, nandi->base + NANDBCH_BOOTBANK_CFG);
++	udelay(1);
++	writel(0x00000000, nandi->base + NANDBCH_BOOTBANK_CFG);
++
++	/* Reset AFM controller */
++	writel(CFG_RESET, nandi->base + NANDBCH_CONTROLLER_CFG);
++	udelay(1);
++	writel(0x00000000, nandi->base + NANDBCH_CONTROLLER_CFG);
++
++	/* Set EMI Bank */
++	writel(0x1 << emi_bank, nandi->base + NANDBCH_FLEX_MUXCTRL);
++
++	/* Reset ECC stats */
++	writel(0x7f0, nandi->base + NANDBCH_CONTROLLER_CFG);
++	udelay(1);
++
++	/* Enable AFM */
++	writel(CFG_ENABLE_AFM, nandi->base + NANDBCH_CONTROLLER_CFG);
++
++	/* Configure Read DMA Plugs (values supplied by Validation) */
++	writel(0x00000005, nandi->dma + EMISS_NAND_RD_DMA_PAGE_SIZE);
++	writel(0x00000005, nandi->dma + EMISS_NAND_RD_DMA_MAX_OPCODE_SIZE);
++	writel(0x00000002, nandi->dma + EMISS_NAND_RD_DMA_MIN_OPCODE_SIZE);
++	writel(0x00000001, nandi->dma + EMISS_NAND_RD_DMA_MAX_CHUNK_SIZE);
++	writel(0x00000000, nandi->dma + EMISS_NAND_RD_DMA_MAX_MESSAGE_SIZE);
++
++	/* Configure Write DMA Plugs (values supplied by Validation) */
++	writel(0x00000005, nandi->dma + EMISS_NAND_WR_DMA_PAGE_SIZE);
++	writel(0x00000005, nandi->dma + EMISS_NAND_WR_DMA_MAX_OPCODE_SIZE);
++	writel(0x00000002, nandi->dma + EMISS_NAND_WR_DMA_MIN_OPCODE_SIZE);
++	writel(0x00000001, nandi->dma + EMISS_NAND_WR_DMA_MAX_CHUNK_SIZE);
++	writel(0x00000000, nandi->dma + EMISS_NAND_WR_DMA_MAX_MESSAGE_SIZE);
++
++	nandi_enable_interrupts(nandi, NAND_INT_ENABLE);
++}
++
++static void nandi_init_controller(struct nandi_controller *nandi,
++				  int emi_bank)
++{
++	nandi_init_bch(nandi, emi_bank);
++}
++
+ static int remap_named_resource(struct platform_device *pdev,
+ 				char *name,
+ 				void __iomem **io_ptr)
+@@ -174,6 +225,7 @@ nandi_init_resources(struct platform_device *pdev)
+ static int stm_nand_bch_probe(struct platform_device *pdev)
+ {
+ 	struct stm_plat_nand_bch_data *pdata = pdev->dev.platform_data;
++	struct stm_nand_bank_data *bank;
+ 	struct nandi_controller *nandi;
+ 
+ 	if (!pdata) {
+@@ -190,6 +242,10 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 	init_completion(&nandi->seq_completed);
+ 	init_completion(&nandi->rbn_completed);
+ 
++	bank = pdata->bank;
++	if (bank)
++		nandi_init_controller(nandi, bank->csn);
++
  	return 0;
  }
  
-+#ifdef CONFIG_PM
-+static int stm_nand_bch_suspend(struct device *dev)
-+{
-+	struct nandi_controller *nandi = dev_get_drvdata(dev);
+diff --git a/include/linux/mtd/stm_nand.h b/include/linux/mtd/stm_nand.h
+index da2006c..99a69ca 100644
+--- a/include/linux/mtd/stm_nand.h
++++ b/include/linux/mtd/stm_nand.h
+@@ -17,6 +17,26 @@
+ 
+ #include <linux/io.h>
+ 
++/*
++ * Board-level specification relating to a 'bank' of NAND Flash
++ */
++struct stm_nand_bank_data {
++	int			csn;
++	int			nr_partitions;
++	struct mtd_partition	*partitions;
++	unsigned int		options;
++	unsigned int		bbt_options;
 +
-+	nandi_clk_disable(nandi);
++	struct nand_timing_spec *timing_spec;
 +
-+	return 0;
-+}
-+static int stm_nand_bch_resume(struct device *dev)
-+{
-+	struct nandi_controller *nandi = dev_get_drvdata(dev);
-+
-+	nandi_clk_enable(nandi);
-+
-+	return 0;
-+}
-+
-+static int stm_nand_bch_restore(struct device *dev)
-+{
-+	struct nandi_controller *nandi = dev_get_drvdata(dev);
-+	struct stm_plat_nand_bch_data *pdata = dev->platform_data;
-+	struct stm_nand_bank_data *bank = pdata->bank;
-+
-+	nandi_init_controller(nandi, bank->csn);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops stm_nand_bch_pm_ops = {
-+	.suspend = stm_nand_bch_suspend,
-+	.resume = stm_nand_bch_resume,
-+	.restore = stm_nand_bch_restore,
++	/*
++	 * No. of IP clk cycles by which to 'relax' the timing configuration.
++	 * Required on some boards to to accommodate board-level limitations.
++	 * Used in conjunction with 'nand_timing_spec' and ONFI configuration.
++	 */
++	int			timing_relax;
 +};
-+#else
-+static const struct dev_pm_ops stm_nand_bch_pm_ops;
-+#endif
 +
- static struct platform_driver stm_nand_bch_driver = {
- 	.probe	= stm_nand_bch_probe ,
- 	.remove	= stm_nand_bch_remove,
- 	.driver	= {
- 		.name	= "stm-nand-bch",
- 		.owner	= THIS_MODULE,
-+		.pm	= &stm_nand_bch_pm_ops,
- 	},
- };
- module_platform_driver(stm_nand_bch_driver);
+ struct stm_plat_nand_bch_data {
+ 	struct stm_nand_bank_data *bank;
+ 	enum stm_nand_bch_ecc_config bch_ecc_cfg;
 -- 
 1.8.3.2
