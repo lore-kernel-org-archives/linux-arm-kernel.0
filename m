@@ -1,43 +1,38 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 25 Mar 2014 22:03:04 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140325212010.17711434@skate>
-References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
- <20140325212010.17711434@skate>
-Message-ID: <20140325210304.GD19862@1wt.eu>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 25 Mar 2014 14:06:27 -0700
+Subject: [PATCH] ata: limit sata_rcar host driver to ARCH_SHMOBILE
+In-Reply-To: <20140325191324.GA3279@htj.dyndns.org>
+References: <9835622.nRa3VdL61G@amdc1032>
+ <20140325191324.GA3279@htj.dyndns.org>
+Message-ID: <20140325210627.GF27673@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 25, 2014 at 03:13:24PM -0400, Tejun Heo wrote:
+> On Tue, Mar 25, 2014 at 08:10:27PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> > Limit sata_rcar host driver to ARCH_SHMOBILE as Renesas R-Car SATA
+> > support is specific to Renesas SoCs and the driver to work requires
+> > suitable device tree node (or platform device) to be defined.
+> > 
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  drivers/ata/Kconfig |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > Index: b/drivers/ata/Kconfig
+> > ===================================================================
+> > --- a/drivers/ata/Kconfig	2014-03-25 19:52:31.952327027 +0100
+> > +++ b/drivers/ata/Kconfig	2014-03-25 19:57:21.104322097 +0100
+> > @@ -298,6 +298,7 @@ config SATA_PROMISE
+> >  
+> >  config SATA_RCAR
+> >  	tristate "Renesas R-Car SATA support"
+> > +	depends on ARCH_SHMOBILE
+> 
+> COMPILE_TEST?
 
-On Tue, Mar 25, 2014 at 09:20:10PM +0100, Thomas Petazzoni wrote:
-> Willy Tarreau has also reported issues with igb cards on Marvell
-> platforms using the pci-mvebu driver. I think in his case the card was
-> detected even at boot time, but he had similar MSI-X issues later on.
+I think the following would make sense:
 
-To be precise on this, originally the card was not detected at all,
-neither by the kernel nor by U-Boot. But one of your patches to
-renumber the PCI end points made it appear and work well. Later,
-the MSI-X issue surfaced after the following patch was merged :
-
-   36dd1f3 PCI: mvebu: Disable prefetchable memory support in PCI-to-PCI bridge
-
-Reverting it solves the issue but as we discussed, doing this is
-just a workaround as the patch is fine. I tracked down the oops
-to be caused by something related to the NIC failing to register
-an MSI-X interrupt for both ports but one only, trying to rollback
-to do MSI only for both ports and there failing on this part which
-dereferences the pointer returned in *value that's zero while it
-used to be -1 before the patch. That's all I know, I added maybe
-200 printks all around but don't know the PCI code and did not have
-enough time to track it down further nor to make a detailed bug
-report. I don't even know whether it's what the NIC driver does,
-what the PCI stack does or what the MVEBU PCI driver does which is
-at fault, or even any combination of them.
-
-In the mean time if you want to test your NIC, try reverting the
-patch above, but keep in mind that without this patch, other NICs
-were reported to fail in some conditions (realtek IIRC).
-
-Regards,
-Willy
+	depends on ARCH_SHMOBILE || COMPILE_TEST
