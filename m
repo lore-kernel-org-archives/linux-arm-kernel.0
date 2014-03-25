@@ -1,60 +1,57 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 25 Mar 2014 12:39:39 -0400
-Subject: [PATCH] ARM: Use 64-bit DMA addresses for LPAE+VirtIO-MMIO
-In-Reply-To: <4272242.L9VmujUH59@wuerfel>
-References: <1395250522-30031-1-git-send-email-cov@codeaurora.org>
- <532C96B9.4090805@codeaurora.org>
- <90DB5198-051A-48EC-B577-5342BD706713@arm.com> <4272242.L9VmujUH59@wuerfel>
-Message-ID: <5331B14B.7040103@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 25 Mar 2014 17:48:12 +0100
+Subject: [PATCH 4/5] ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
+In-Reply-To: <CANqRtoQhi=vgLkYQciJska6XogyiJ1REO6HBOHNsPP3ajbq+Ag@mail.gmail.com>
+References: <1394573078-20767-1-git-send-email-wsa@the-dreams.de>
+ <1394573078-20767-5-git-send-email-wsa@the-dreams.de>
+ <CANqRtoQhi=vgLkYQciJska6XogyiJ1REO6HBOHNsPP3ajbq+Ag@mail.gmail.com>
+Message-ID: <20140325164812.GE6374@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 03/21/2014 07:52 PM, Arnd Bergmann wrote:
-> On Friday 21 March 2014 23:27:24 Catalin Marinas wrote:
->> On 21 Mar 2014, at 19:44, Christopher Covington <cov@codeaurora.org> wrote:
->>> On 03/21/2014 12:27 PM, Catalin Marinas wrote:
->>>>> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
->>>>> index 1f8fed9..a62bcc9 100644
->>>>> --- a/arch/arm/mm/Kconfig
->>>>> +++ b/arch/arm/mm/Kconfig
->>>>> @@ -617,6 +617,7 @@ config ARM_LPAE
->>>>>     bool "Support for the Large Physical Address Extension"
->>>>>     depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
->>>>>             !CPU_32v4 && !CPU_32v3
->>>>> +   select ARCH_DMA_ADDR_T_64BIT if VIRTIO_MMIO
->>>>
->>>> That's the wrong place to enable ARCH_DMA_ADDR_T_64BIT. Do you have a
->>>> platform with >32-bit physical address space? If yes, it should be
->>>> selected there.
->>>
->>> The platforms I'm currently using are models like the Versatile Express
->>> RTSM/FVP. I can respin with changes to ARCH_VEXPRESS and ARCH_VIRT instead.
->>
->> But do you use RAM beyond 32-bit on such models?
+On Wed, Mar 12, 2014 at 08:05:26PM +0900, Magnus Damm wrote:
+> Hi Wolfram,
 > 
-> I think the more important question here is what the normal behavior is
-> for these platforms. I believe in most cases you don't have RAM above
-> the boundary, so we should not enable the option by default as it can
-> have noticeable overhead (we'd turn it on all the time if it didn't).
+> On Wed, Mar 12, 2014 at 6:24 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> > From: Wolfram Sang <wsa@sang-engineering.com>
+> >
+> > Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> > ---
+> > Note: Adding clocks whilst keeping the current sorting is very likely to
+> > break a previously working clock IMO. Imagine adding PCIEC clock inbetween IIC0
+> > and IIC1 here. Adding chronologically and grouped by similar function blocks is
+> > easier to track. An example addition could then look like:
+> >
+> >         R8A7790_CLK_TPU0
+> >         R8A7790_CLK_SDHI3 R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> >         R8A7790_CLK_MMCIF1 R8A7790_CLK_MMCIF0
+> >         R8A7790_CLK_CMT1
+> >         R8A7790_CLK_IIC2 R8A7790_CLK_IIC1 R8A7790_CLK_IIC0
+> > +       R8A7790_CLK_PCIEC
+> 
+> Can you please care to explain a bit more about why you see a risk
+> here? Is it a risk for typo or something else?
 
-I don't understand why people concerned with the overhead of 64-bit pointers
-to memory are turning on LPAE.
+The risk here is if you put something in the "middle" then there is a
+chance you might be off, and, for example, mix up parent clocks.
+Especially when you need to reformat paragraphs because of too long
+lines. Yeah, all this can be avoided by careful review, but this review
+really needs to be careful.
 
-> In either case, platforms that need this support can always
-> 'select' it, while a kernel built only for platforms that don't
-> need it can offer this as a user-selectable option.
+> It looks to me that this is just a matter about adding the entry at
+> the right position in several places.
 
-I was hoping to fix the issue of things mysteriously breaking at runtime,
-regardless of what the user or randconfig selects. I'll have to investigate
-the details, but it seems like one could enforce zone DMA at run-time if the
-memory size is greater than the DMA pointers are able to address.
+Yes. IMO adding it with the pattern I sketched above will make it a
+piece of cake since the diff is a lot more simple than the patch I
+originally submitted.
 
-Thanks,
-Christopher
+That being said, I will keep the current sorting for consistency reasons
+but I personally made up my mind ;)
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/622e9684/attachment.sig>
