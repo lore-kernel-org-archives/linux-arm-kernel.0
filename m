@@ -1,90 +1,251 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Mar 2014 07:33:46 +0000
-Subject: [PATCH v2 02/19] arm64: initial support for GICv3
-In-Reply-To: <CABg9mcucJ_UouRbJ_Urirz6ita5uUvYuQkmeA1-Df00KSjFcnA@mail.gmail.com>
-References: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
- <1395316386-12617-3-git-send-email-marc.zyngier@arm.com>
- <CAMDttNew0S7xVVKge7AAR3W6bdQzKdvN9Z7cHPDUCq=jZ98q1A@mail.gmail.com>
- <533012B8.2070303@arm.com>
- <CABg9mcucJ_UouRbJ_Urirz6ita5uUvYuQkmeA1-Df00KSjFcnA@mail.gmail.com>
-Message-ID: <5331315A.9010001@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Mar 2014 08:44:36 +0100
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <235376049.yyfljDtinu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/14 06:35, Z Lim wrote:
-> Hi Marc,
-> 
-> On Mon, Mar 24, 2014 at 4:10 AM, Marc Zyngier <marc.zyngier@arm.com
-> <mailto:marc.zyngier@arm.com>> wrote:
->>
->> Hi Zi,
->>
->> On 22/03/14 01:21, Zi Shen Lim wrote:
->> > Hi Marc,
->> >
->> > On Thu, Mar 20, 2014 at 4:52 AM, Marc Zyngier <marc.zyngier@arm.com
-> <mailto:marc.zyngier@arm.com>
->> > <mailto:marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>>> wrote:
->> > <snip>
->> >
->> >
->> >     +       /*
->> >     +        * Find out how many interrupts are supported.
->> >     +        * The GIC only supports up to 1020 interrupt sources
->> >     (SGI+PPI+SPI)
->> >     +        */
->> >     +       gic_irqs = readl_relaxed(gic_data.dist_base + GICD_TYPER) &
->> >     0x1f;
->> >     +       gic_irqs = (gic_irqs + 1) * 32;
->> >     +       if (gic_irqs > 1020)
->> >     +               gic_irqs = 1020;
->> >     +       gic_data.irq_nr = gic_irqs;
->> >     +
->> >     +       gic_data.domain = irq_domain_add_linear(node, gic_irqs - 16,
->> >     +                                               &gic_irq_domain_ops,
->> >     &gic_data);
->> >
->> >
->> > Why gic_irqs - 16?
->>
->> Because we keep the SGIs (all 16 of them) for the core kernel (drivers
->> are not allowed to request them).
->>
->> >
->> >     __irq_domain_add(of_node, size, size, 0, ops, host_data);
->> >
->> >         domain->hwirq_max = hwirq_max;
->> >
->> >
->> > So hwirq_max is effectively set to actual_hwirq_max-16.
->> >
->> > Later, the following warning can be triggered:
->> >
->> >     int irq_domain_associate(struct irq_domain *domain, unsigned int
-> virq,
->> >                              irq_hw_number_t hwirq)
->> >     {
->> >             struct irq_data *irq_data = irq_get_irq_data(virq);
->> >             int ret;
->> >
->> >             if (WARN(hwirq >= domain->hwirq_max,
->> >                      "error: hwirq 0x%x is too large for %s\n",
->> >     (int)hwirq, domain->name))
->> >                     return -EINVAL;
->>
->> Do you actually see this warning being triggered? I don't. We're using a
->> linear domain that doesn't call into this function.
-> 
-> I see this warning :(
-> You can trigger it when a device's INT# falls within [gic_irqs-16,
-> gic_irqs), which lines up with the -16 above.
+On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
+> +
+> +int k2_pcie_platform_setup(struct platform_device *pdev)
+> +{
+> +	struct resource *phy_base_r, *devstat_r;
+> +	void __iomem *phy_base, *devstat;
+> +	u32 val;
+> +	int i;
+> +
+> +	devstat_r = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> +						 "reg_devcfg");
+> +	if (!devstat_r)
+> +		return -ENODEV;
 
-Ah, got you. Hmmm. I may have to be slightly more creative then.
+It seems you have a distinct register set for the PHY that you are
+driving here. Why not make this part generic PHY API driver?
 
-Thanks a lot for the report, I'll fix that as quickly as possible.
+> +static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+> +{
+> +	struct pcie_port *pp = &ks_pcie->pp;
+> +	int count = 0;
+> +
+> +	dw_pcie_setup_rc(pp);
+> +
+> +	/* check if the link is up or not */
+> +	while (!dw_pcie_link_up(pp)) {
+> +		mdelay(100);
+> +		count++;
+> +		if (count == 10)
+> +			return -EINVAL;
+> +	}
+> +	return 0;
+> +}
 
-Cheers,
+You are blocking the CPU for up to one second here, which is really
+nasty. Please find a way to move the code into a context where you
+can sleep and use msleep() instead, or better use an interrupt if the
+hardware supports that and use wait_for_completion().
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +
+> +static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
+> +	u32 offset = irq - ks_pcie->msi_host_irqs[0], pending, vector;
+> +	struct pcie_port *pp = &ks_pcie->pp;
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +	int src, virq;
+
+Did I understand this right that the MSI implementation can be used
+by any dw-pcie hardware of the same version? If so, it would be good
+to move it into an extra file so it can be shared with the next host
+driver that uses this version.
+
+> +/**
+> + * ks_pcie_set_outbound_trans() - Set PHYADDR <-> BUSADDR
+> + * mapping for outbound
+> + */
+> +static void ks_pcie_set_outbound_trans(struct keystone_pcie *ks_pcie)
+
+> +static void ks_pcie_set_inbound_trans(struct pcie_port *pp)
+
+Why do you need to set this up from the kernel? Please move the
+translation window setup into the boot loader if you can.
+
+> +static struct hw_pci keystone_pcie_hw = {
+> +	.nr_controllers	= 1,
+> +	.setup		= dw_pcie_setup,
+> +	.scan		= ks_pcie_scan_bus,
+> +	.swizzle        = pci_common_swizzle,
+> +	.add_bus	= dw_pcie_add_bus,
+> +	.map_irq	= ks_pcie_map_irq,
+> +};
+
+This can just be a local variable in the probe function.
+
+> +
+> +static int ks_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> +{
+> +	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+> +	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
+> +
+> +	dev_info(pp->dev, "ks_pcie_map_irq: pin %d\n", pin);
+> +
+> +	if (!pin || pin > ks_pcie->num_legacy_host_irqs) {
+> +		dev_err(pp->dev, "pci irq pin out of range\n");
+> +		return -1;
+> +	}
+> +
+> +	/* pin has values from 1-4 */
+> +	return (ks_pcie->virqs[pin - 1] >= 0) ?
+> +		ks_pcie->virqs[pin - 1] : -1;
+> +}
+> +
+> +
+> +static void ack_irq(struct irq_data *d)
+> +{
+> +}
+> +
+> +static void mask_irq(struct irq_data *d)
+> +{
+> +}
+> +
+> +static void unmask_irq(struct irq_data *d)
+> +{
+> +}
+> +
+> +static struct irq_chip ks_pcie_legacy_irq_chip = {
+> +	.name = "PCIe-LEGACY-IRQ",
+> +	.irq_ack = ack_irq,
+> +	.irq_mask = mask_irq,
+> +	.irq_unmask = unmask_irq,
+> +};
+
+Can you use the generic irqchip code here?
+
+> +	/*
+> +	 * support upto MAX_LEGACY_HOST_IRQS host and legacy IRQs.
+> +	 * In dt from index 0 to 3
+> +	 */
+> +	for (i = 0; i < MAX_LEGACY_HOST_IRQS; i++) {
+> +		ks_pcie->legacy_host_irqs[i] = irq_of_parse_and_map(np, i);
+> +		if (ks_pcie->legacy_host_irqs[i] < 0)
+> +			break;
+> +		ks_pcie->num_legacy_host_irqs++;
+> +	}
+> +
+> +	if (ks_pcie->num_legacy_host_irqs) {
+> +		ks_pcie->legacy_irqd = irq_domain_add_linear(np,
+> +					ks_pcie->num_legacy_host_irqs,
+> +					&irq_domain_simple_ops, NULL);
+> +
+> +		if (!ks_pcie->legacy_irqd) {
+> +			dev_err(dev,
+> +				"Failed to add irq domain for legacy irqs\n");
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
+> +		ks_pcie->virqs[i] =
+> +			irq_create_mapping(ks_pcie->legacy_irqd, i);
+> +		irq_set_chip_and_handler(ks_pcie->virqs[i],
+> +			&ks_pcie_legacy_irq_chip, handle_level_irq);
+> +		irq_set_chip_data(ks_pcie->virqs[i], ks_pcie);
+> +		set_irq_flags(ks_pcie->virqs[i], IRQF_VALID);
+> +
+> +		if (ks_pcie->legacy_host_irqs[i] >= 0) {
+> +			irq_set_handler_data(ks_pcie->legacy_host_irqs[i],
+> +				ks_pcie);
+> +			irq_set_chained_handler(ks_pcie->legacy_host_irqs[i],
+> +				ks_pcie_legacy_irq_handler);
+> +		}
+> +		set_irq_flags(ks_pcie->legacy_host_irqs[i], IRQF_VALID);
+> +	}
+
+I have no idea how this would work with the standard interrupt-map property,
+since the legacy interrupt host is now the same device as the pci host.
+
+Maybe it's better to move the legacy irqchip handling entirely out of
+the driver and use a separate device node for the registers so it can
+come with its own #interrupt-cells, and then refer to this irqchip from
+the interrupt-map.
+
+> +	ks_pcie->clk = devm_clk_get(&pdev->dev, "pcie");
+> +	if (IS_ERR(ks_pcie->clk)) {
+> +		dev_err(&pdev->dev, "Failed to get pcie rc clock\n");
+> +		return PTR_ERR(ks_pcie->clk);
+> +	}
+> +	ret = clk_prepare_enable(ks_pcie->clk);
+> +	if (ret)
+> +		return ret;
+
+Could you move the clock handling into the generic dw-pcie code?
+
+> +
+> +/* Keystone PCIe driver does not allow module unload */
+> +static int __init ks_pcie_init(void)
+> +{
+> +	return platform_driver_probe(&ks_pcie_driver, ks_pcie_probe);
+> +}
+> +subsys_initcall(ks_pcie_init);
+
+Why subsys_initcall?
+
+We should probably try to fix unloading soon.
+
+> diff --git a/drivers/pci/host/pcie-ks-pdata.h b/drivers/pci/host/pcie-ks-pdata.h
+> new file mode 100644
+> index 0000000..a7626de
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-ks-pdata.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (C) 2013-2014 Texas Instruments., Ltd.
+> + *		http://www.ti.com
+> + *
+> + * Author: Murali Karicheri <m-karicheri2@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/* platform specific setup for k2 pcie */
+> +int k2_pcie_platform_setup(struct platform_device *pdev);
+> +
+> +/* keystone pcie pdata configurations */
+> +struct keystone_pcie_pdata {
+> +	int (*setup)(struct platform_device *pdev);
+> +};
+
+This should all go away once you have a proper PHY driver.
+
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index 3a02717..7c3f777 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -3461,3 +3461,15 @@ int pci_dev_specific_acs_enabled(struct pci_dev *dev, u16 acs_flags)
+>  
+>  	return -ENOTTY;
+>  }
+> +
+> +#ifdef CONFIG_PCIE_KEYSTONE
+> +/*
+> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+> + * Force this configuration for all EP including bridges.
+> + */
+> +static void quirk_limit_readrequest(struct pci_dev *dev)
+> +{
+> +	pcie_set_readrq(dev, 256);
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+> +#endif /* CONFIG_TI_KEYSTONE_PCIE */
+
+You can't do this:
+
+A quirk for a specific hardware must not be enabled by compile-time options.
+You have to find a different way to do this.
+
+	Arnd
