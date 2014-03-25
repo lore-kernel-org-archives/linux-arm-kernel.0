@@ -1,45 +1,57 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Mar 2014 17:38:47 -0700
-Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
-In-Reply-To: <20140321081217.GD26674@tbergstrom-lnx.Nvidia.com>
-References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
- <53172239.3030705@ti.com> <20140320212308.21989.36094@quantum>
- <20140321081217.GD26674@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140325003847.32624.58084@quantum>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 25 Mar 2014 02:02:42 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140324234443.GS7528@n2100.arm.linux.org.uk>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+Message-ID: <201403250202.42268.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2014-03-21 01:12:17)
-> On Thu, Mar 20, 2014 at 10:23:08PM +0100, Mike Turquette wrote:
-> > Quoting Tero Kristo (2014-03-05 05:10:17)
-> > > Ping.
+On Tuesday, March 25, 2014 at 12:44:43 AM, Russell King - ARM Linux wrote:
+> On Mon, Mar 24, 2014 at 04:37:20PM -0600, robert.daniels at vantagecontrols.com 
+wrote:
+> > Marek Vasut <marex@denx.de> wrote on 03/24/2014 02:21:58 PM:
+> > > I think the UDP test might be lossy, can you try with TCP test please ?
 > > > 
-> > > Mike, any feedback on this?
+> > > Best regards,
+> > > Marek Vasut
 > > 
-> > Hi Tero,
+> > Yes, I tried with TCP and there were no problems.
+> > I then tried my same test with a crossover cable: no problems.
+> > Then I started testing some different network configurations:
 > > 
-> > Have you seen Sylwester's approach[1]? I prefer it since it is more
-> > device-oriented and less "centralized". The clock consumer enumerates
-> > the default parent or rate of a consumed clock. This can be made to work
+> > 1. Desktop & i.MX53 both connected to the same router: no problems.
+> > 2. Desktop & i.MX53 both connected to the same hub: packet loss but no tx
+> > timeout
+> > 3. Desktop connected to router, hub connected to router, i.MX53 connected
+> > to hub: packet loss + tx timeout
+> > 
+> > So, the packet loss is due to the hub, not the fec driver.
+> > I'm not sure why I'm getting the tx timeout.  My router is a Cisco
+> > ValetPlus and the hub is a Netgear DS108.
+> > The router and desktop are gigabit and the hub is 10/100.
+> > 
+> > I assumed that the tx timeout should not be happening - is this an
+> > incorrect assumption based on my setup?
 > 
-> That assumes driver writers are aware of the clock tree topology. IME that's
-> seldomly the case.
-
-It assumes no such thing.
-
-The point of Sylwester's patch is that if a driver consumes a clock and
-needs to do the very typical setup regarding that clock's rate or
-parent, then we now have a sensible way to express that in DT.
-
-One of the strengths of DT is that the C code does not have to know all
-of the details about topology or how things are hooked up. We can hide
-some of those cute embedded nonsense hacks in DTS and the device
-integrator can manage it there.
-
-Regards,
-Mike
-
+> The first point is that the timeout should not be happening, because
+> when the link is up and running, packets should be transmitted.
 > 
-> Cheers,
-> 
-> Peter.
+> The second point is that I think you have a setup which tickles a bug
+> in the FEC hardware.  What I think is going on is that the driver is
+> filling the transmit ring correctly.  For some reason, the FEC is
+> either failing to update the header after transmission leaving the
+> buffer owned by the FEC (and therefore unable to be reaped), or the
+> FEC is skipping over a ring descriptor.
+
+I think we might be seeing something similar on i.MX28 in U-Boot too, but I dare 
+not to correlate this and the in-kernel FEC issue. We also sporadically see the 
+FEC not transmitting a packet. I am just raising this since I want to update you 
+all there is something like that as well.
+
+[...]
+
+Best regards,
+Marek Vasut
