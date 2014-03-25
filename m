@@ -1,51 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Mar 2014 11:48:31 +0000
-Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
- <20140217175552.GB8361@arm.com>
- <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
-Message-ID: <53316D0F.7040600@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 25 Mar 2014 11:51:33 +0000
+Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
+ infrastructure
+In-Reply-To: <CAL_JsqJikdsna7KUjEwZ0qj-fdcC50M7e3e1D0LgfQuUuJQ0SA@mail.gmail.com>
+References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
+ <20140318180856.GB792@e102568-lin.cambridge.arm.com>
+ <CADHgK6uwUDndVHQaWU=3R7A16hc4PYJCAfMLi3uBnrDjYidPXg@mail.gmail.com>
+ <20140319172338.GA31368@e102568-lin.cambridge.arm.com>
+ <CADHgK6vGf0gfVoAWO2FiXzCf-Sf_P_u+d7Dg04xn1O5t2LeKwg@mail.gmail.com>
+ <CAL_JsqJikdsna7KUjEwZ0qj-fdcC50M7e3e1D0LgfQuUuJQ0SA@mail.gmail.com>
+Message-ID: <20140325115133.GA17526@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/14 11:19, Stefano Stabellini wrote:
-> On Mon, 17 Feb 2014, Catalin Marinas wrote:
->> On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
->>> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
->>>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
->>>> Necessary duplication of paravirt.h and paravirt.c with ARM.
->>>>
->>>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
->>>> runtime pvops patching needed.
->>>>
->>>> This allows us to make use of steal_account_process_tick for stolen
->>>> ticks accounting.
->>>>
->>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> CC: will.deacon at arm.com
->>>> CC: nico at linaro.org
->>>> CC: marc.zyngier at arm.com
->>>> CC: cov at codeaurora.org
->>>> CC: arnd at arndb.de
->>>> CC: olof at lixom.net
->>>> CC: Catalin.Marinas at arm.com
->>>
->>> Catalin, Will, are you happy with this patch for 3.15?
->>
->> It's pretty small and looks fine to me. However, I would like someone
->> with more virtualisation experience than me to ack it (e.g. Marc Z).
+On Mon, Mar 24, 2014 at 05:46:47PM +0000, Rob Herring wrote:
+> On Thu, Mar 20, 2014 at 1:19 PM, Sebastian Capella
+> <sebastian.capella@linaro.org> wrote:
+> > On 19 March 2014 10:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> >> Rob is asking a property describing hw, and honestly unless we define
+> >> a power consumption property value (defining what it means will be rather
+> >> complicated though) I'd rather remove index altogether and use min_residency
+> >> as a comparison value instead.
+> >
+> > I like having a separate ranking for power to sort the states.  To me
+> > it seems that min residency could be ambiguous for this.  We could
+> > have states with inverted min_residencies: where a lower consumption
+> > state has a lower target residency because the cost is recovered more
+> > quickly.  Such a state might have higher latency for exit, so even
+> > though the lower min_residency/lower power state is clearly
+> > preferable, selection of the lower power state may be prevented by
+> > kernel latency constraints.
 > 
-> Ping? Marc, could you please give it a review?
+> Perhaps you can add the min residency and exit latency times.
 
-Yup, that looks OK to me. It's a generic feature anyway, so I don't see
-any harm in enabling it for Xen. We may also use it for KVM at some point.
+I do not think we should mix exit latency with power consumption
+ranking, they are used and define different things.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The problem is that min_residency is extremely hard to define (see
+discussion below).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+http://www.spinics.net/lists/arm-kernel/msg316147.html
+
+What should min_residency represent ? As Anti correctly pointed out, it should
+be compared to a shallower idle state, but to define "shallower" we need
+a ranking, do not we ?
+
+If we say "min_residency is the time required for the processor to stay
+in the idle state in order to maximize power savings" (and I tried to do that),
+that's wrong by definition, because there might be a deeper idle state saving
+more power when entered for a time within the next event.
+
+state 1 - min residency 10 us
+state 2 - min residency 20 us
+
+If we sleep for 1 second, state 2 must be entered, not 1 and the problem
+is always the same, state 1 10us compares to state 0 (break even time
+against state 0).
+
+So, we are back to square one. How should min_residency be defined ?
+If it is the break even time against a shallower idle state, we have
+to know what's the shallower idle state, so we need a power ranking for
+idle states.
+
+> Another piece to consider is the affinity level of the state should
+> probably be the basis for 1st order sorting.
+
+I would like to see the idle states as a flat list, when you say
+affinity you mean a cpumask ? Affinity level in the PSCI power state
+parameter ? In the MPIDR ?
+
+Thanks,
+Lorenzo
