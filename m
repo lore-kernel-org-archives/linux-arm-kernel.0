@@ -1,28 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Mar 2014 11:11:39 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 6/8] ARM: sunxi: dt: Add
- x-powers-axp209.dtsi file
-In-Reply-To: <20140322143157.GB20668@localhost.fastwebnet.it>
+Date: Tue, 25 Mar 2014 11:11:00 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 2/8] mfd: AXP20x: Add bindings
+ documentation
+In-Reply-To: <20140322141157.GA20668@localhost.fastwebnet.it>
 References: <1394898225-28452-1-git-send-email-carlo@caione.org>
- <1394898225-28452-7-git-send-email-carlo@caione.org>
- <20140318090450.GV27873@lukather>
- <20140322143157.GB20668@localhost.fastwebnet.it>
-Message-ID: <20140325101139.GB6120@lukather>
+ <1394898225-28452-3-git-send-email-carlo@caione.org>
+ <20140318084505.GT27873@lukather>
+ <20140322141157.GA20668@localhost.fastwebnet.it>
+Message-ID: <20140325101100.GA6120@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 03:31:57PM +0100, Carlo Caione wrote:
+On Sat, Mar 22, 2014 at 03:11:57PM +0100, Carlo Caione wrote:
+> > > +
+> > > +Example:
+> > > +
+> > > +axp: axp20x at 34 {
+> > > +	reg = <0x34>;
+> > > +	interrupt-parent = <&nmi_intc>;
+> > > +	interrupts = <0 8>;
+> > > +
 > > > +	compatible = "x-powers,axp209";
 > > > +	interrupt-controller;
 > > > +	#interrupt-cells = <1>;
+> > > +
+> > > +	regulators {
 > > 
-> > However, I'd move this out of it, and in the board file, so that we
-> > actually get an idea by looking at the board DTS of what device we are
-> > actually registering at this given address, and what it's capable of.
+> > Do we really need that subnode ? it looks useless, and we already know
+> > that we are defining regulators here.
 > 
-> Do you mean the whole dtsi or just those three lines?
+> What do you mean? We are defining the MFD and regulators are just one of
+> the subsystem here.
 
-Just those three lines.
+I mean that it's useless.
+
+> Moveover I'm using the "regulators" node in the
+> regulators driver (using of_find_node_by_name()) to get the regulators
+> configuration.
+
+Can't you just use the of_node field of whatever struct device you
+get?
 
 -- 
 Maxime Ripard, Free Electrons
@@ -34,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/9be5dc49/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/f773fca7/attachment.sig>
