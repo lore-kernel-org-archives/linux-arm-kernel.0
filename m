@@ -1,57 +1,79 @@
 From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 25 Mar 2014 16:56:38 +0000
-Subject: [PATCH v5 3/9] ARM: shmobile: r8a7790: Add PCIe clock device tree
- nodes
+Date: Tue, 25 Mar 2014 16:56:41 +0000
+Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for R8A7790
 In-Reply-To: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
 References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1395766604-30926-4-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1395766604-30926-7-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree clock nodes for PCIe
+This patch adds the device tree nodes for R8A7790
 
 Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            | 7 ++++---
- include/dt-bindings/clock/r8a7790-clock.h | 1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+v5:
+ - Renesas SoCs compatible string has peripheral before device name
+ - Add PCIe bus clock reference
+ - Add additional interrupt bindings
+ - Use dma-ranges property to specify inbound memory regions
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 10 ++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi      | 24 ++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index a55c5f8..bbbcb63 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -139,6 +139,16 @@
+ 		states = <3300000 1
+ 			  1800000 0>;
+ 	};
++
++	clocks {
++		/* External PCIe bus clock - not used */
++		pcie_bus_clk: pcie_bus_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "pcie_bus";
++		};
++	};
+ };
+ 
+ &extal_clk {
 diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index da69afc..df9ec61 100644
+index df9ec61..dbcea57 100644
 --- a/arch/arm/boot/dts/r8a7790.dtsi
 +++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -704,16 +704,17 @@
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
- 			clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
- 				 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>,
--				 <&mmc0_clk>, <&rclk_clk>;
-+				 <&mmc0_clk>, <&rclk_clk>, <&mp_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
- 				R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
- 				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
--				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1
-+				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1 R8A7790_CLK_PCIE
- 			>;
- 			clock-output-names =
- 				"tpu0", "mmcif1", "sdhi3", "sdhi2",
--				"sdhi1", "sdhi0", "mmcif0", "cmt1";
-+				"sdhi1", "sdhi0", "mmcif0", "cmt1",
-+				"pcie";
- 		};
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index 6548a5f..840dbc8 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -57,6 +57,7 @@
- #define R8A7790_CLK_SDHI1		13
- #define R8A7790_CLK_SDHI0		14
- #define R8A7790_CLK_MMCIF0		15
-+#define R8A7790_CLK_PCIE		19
- #define R8A7790_CLK_SSUSB		28
- #define R8A7790_CLK_CMT1		29
- #define R8A7790_CLK_USBDMAC0		30
+@@ -821,4 +821,28 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	pcie: pcie at fe000000 {
++		compatible = "renesas,pcie-r8a7790";
++		reg = <0 0xfe000000 0 0x80000>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++		/* Map all possible DDR as inbound ranges */
++		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
++			      0x43000000 1 0x80000000 1 0x80000000 0 0x80000000>;
++		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH
++			      0 117 IRQ_TYPE_LEVEL_HIGH
++			      0 118 IRQ_TYPE_LEVEL_HIGH>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7790_CLK_PCIE>, <&pcie_bus_clk>;
++		clock-names = "pcie", "pcie_bus";
++		status = "disabled";
++	};
+ };
 -- 
 1.9.0
