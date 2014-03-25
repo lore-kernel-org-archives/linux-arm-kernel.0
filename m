@@ -1,15 +1,15 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 25 Mar 2014 18:49:23 +0800
-Subject: [PATCH 10/19] arm: dts: add cooling properties on omap4430 cpu node
+Date: Tue, 25 Mar 2014 18:49:24 +0800
+Subject: [PATCH 11/19] arm: dts: add cooling properties on omap4460 cpu node
 In-Reply-To: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
 References: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1395744572-20014-11-git-send-email-alex.shi@linaro.org>
+Message-ID: <1395744572-20014-12-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eduardo Valentin <eduardo.valentin@ti.com>
 
-OMAP4430 devices can reach high temperatures and thus
+OMAP4460 devices can reach high temperatures and thus
 needs to have cpufreq-cooling on systems running on it.
 
 This patch adds the required cooling device properties
@@ -17,34 +17,39 @@ so that cpufreq-cpu0 driver loads the cooling device.
 
 Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Cc: Tony Lindgren <tony@atomide.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
+Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-(cherry picked from commit 72af5e6d0c3e01655c1c1fc7c7ca94a2b663611e)
+(cherry picked from commit 616a66351d6cd4a9bdb20fe49ee2505d9cc8a0db)
 
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/boot/dts/omap443x.dtsi | 5 +++++
+ arch/arm/boot/dts/omap4460.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index cccf39a..d2deba0 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -22,6 +22,11 @@
- 				1008000 1375000
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 2cf227c..e21fc05 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -20,6 +20,11 @@
+ 				920000  1313000
  			>;
  			clock-latency = <300000>; /* From legacy driver */
 +
 +			/* cooling options */
 +			cooling-min-level = <0>;
-+			cooling-max-level = <3>;
++			cooling-max-level = <2>;
 +			#cooling-cells = <2>; /* min followed by max */
  		};
  	};
- };
+ 
 -- 
 1.8.1.2
