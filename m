@@ -1,52 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Mar 2014 15:36:12 -0700
-Subject: [PATCH 12/18] ARM: OMAP3: PM: remove access to PRM_VOLTCTRL
- register
-In-Reply-To: <1393949958-816-13-git-send-email-t-kristo@ti.com>
-References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
- <1393949958-816-13-git-send-email-t-kristo@ti.com>
-Message-ID: <20140325223612.GA26395@atomide.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 25 Mar 2014 15:44:06 -0700
+Subject: Tegra baseline test results for v3.14-rc8
+Message-ID: <533206B6.5030905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140304 08:23]:
-> There is a solitary write to this register every wakeup from off-mode,
-> which isn't doing anything, so remove it.
+Here are some basic Tegra test results for Linux v3.14-rc8.
+Logs and other details at:
 
-Argh, this chunk of code is for sure the the thing that's blocking all
-the voltage scaling for idle modes that twl4030 is supposed to do!
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc8/20140324200103/
 
-AFAIK we must have AUTO_SLEEP, AUTO_RET and AUTO_OFF bits set in
-PRM_VOLTCTRL for twl4030 to scale anything. They must be set if we're
-scaling over I2C4 or using the pins as triggers. Unless these bits
-are set, VC won't send any SLEEP, RET or OFF commands.
 
-Looks like we're not even set these bits anywhere like we should?
+Test summary
+------------
 
-I think we should enabled these bits in vc.c init, and never clear?
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Nishant and Kevin, any comments?
- 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/mach-omap2/pm34xx.c |    4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 0eecf6f..2fa9478 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -282,10 +282,6 @@ void omap_sram_idle(void)
->  			omap3_sram_restore_context();
->  			omap2_sms_restore_context();
->  		}
-> -		if (core_next_state == PWRDM_POWER_OFF)
-> -			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
-> -					       OMAP3430_GR_MOD,
-> -					       OMAP3_PRM_VOLTCTRL_OFFSET);
->  	}
->  	omap3_intc_resume_idle();
->  
-> -- 
-> 1.7.9.5
-> 
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15)):
+    text     data      bss    total  kernel
+   +1080      -16        0    +1064  multi_v7_defconfig
+   +1076      -16        0    +1060  tegra_defconfig
+
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
