@@ -1,68 +1,51 @@
-From: luis.henriques@canonical.com (Luis Henriques)
-Date: Tue, 25 Mar 2014 12:09:08 +0000
-Subject: [3.11.y.z extended stable] Patch "clocksource: vf_pit_timer: use
- complement for sched_clock reading" has been added to staging queue
-Message-ID: <1395749348-23679-1-git-send-email-luis.henriques@canonical.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 25 Mar 2014 12:12:01 +0000
+Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <53316D0F.7040600@arm.com>
+References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
+ <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
+ <20140217175552.GB8361@arm.com>
+ <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
+ <53316D0F.7040600@arm.com>
+Message-ID: <alpine.DEB.2.02.1403251211540.20389@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+On Tue, 25 Mar 2014, Marc Zyngier wrote:
+> On 25/03/14 11:19, Stefano Stabellini wrote:
+> > On Mon, 17 Feb 2014, Catalin Marinas wrote:
+> >> On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
+> >>> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
+> >>>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+> >>>> Necessary duplication of paravirt.h and paravirt.c with ARM.
+> >>>>
+> >>>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> >>>> runtime pvops patching needed.
+> >>>>
+> >>>> This allows us to make use of steal_account_process_tick for stolen
+> >>>> ticks accounting.
+> >>>>
+> >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>>> CC: will.deacon at arm.com
+> >>>> CC: nico at linaro.org
+> >>>> CC: marc.zyngier at arm.com
+> >>>> CC: cov at codeaurora.org
+> >>>> CC: arnd at arndb.de
+> >>>> CC: olof at lixom.net
+> >>>> CC: Catalin.Marinas at arm.com
+> >>>
+> >>> Catalin, Will, are you happy with this patch for 3.15?
+> >>
+> >> It's pretty small and looks fine to me. However, I would like someone
+> >> with more virtualisation experience than me to ack it (e.g. Marc Z).
+> > 
+> > Ping? Marc, could you please give it a review?
+> 
+> Yup, that looks OK to me. It's a generic feature anyway, so I don't see
+> any harm in enabling it for Xen. We may also use it for KVM at some point.
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-    clocksource: vf_pit_timer: use complement for sched_clock reading
-
-to the linux-3.11.y-queue branch of the 3.11.y.z extended stable tree 
-which can be found at:
-
- http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.11.y-queue
-
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
-
-For more information about the 3.11.y.z tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
-
-Thanks.
--Luis
-
-------
-
->From 1a35c24db888b0a2b48933680ed8fd490bddf680 Mon Sep 17 00:00:00 2001
-From: Stefan Agner <stefan@agner.ch>
-Date: Wed, 5 Mar 2014 23:11:08 +0100
-Subject: clocksource: vf_pit_timer: use complement for sched_clock reading
-
-commit 224aa3ed45c8735ae02bb2ecca002409fa6aa772 upstream.
-
-Vybrids PIT register is monitonic decreasing. However, sched_clock
-reading needs to be monitonic increasing. Use bitwise not to get
-the complement of the clock register. This fixes the clock going
-backward. Also, the clock now starts at 0 since we load the
-register with the maximum value at start.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: daniel.lezcano at linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux at arm.linux.org.uk
-Link: http://lkml.kernel.org/r/d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan at agner.ch
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
----
- drivers/clocksource/vf_pit_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
-index 587e020..e559095 100644
---- a/drivers/clocksource/vf_pit_timer.c
-+++ b/drivers/clocksource/vf_pit_timer.c
-@@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
-
- static unsigned int pit_read_sched_clock(void)
- {
--	return __raw_readl(clksrc_base + PITCVAL);
-+	return ~__raw_readl(clksrc_base + PITCVAL);
- }
-
- static int __init pit_clocksource_init(unsigned long rate)
---
-1.9.1
+Thanks!
