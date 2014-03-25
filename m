@@ -1,81 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:23 +0000
-Subject: [RFC 06/47] mtd: nand: stm_nand_bch: change between BCH and Hamming
- modes
+Date: Tue, 25 Mar 2014 08:19:28 +0000
+Subject: [RFC 11/47] mtd: nand: stm_nand_bch: add Power Management
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EMISS is a device which, amongst other things, controls various
-flash memory modes. We make use of it here merely to flip the
-HAMMING_NOT_BCH bit dependant on whether we wish to operate in Hamming
-or BCH modes. The STM BCH driver makes good use of the helper introduced
-here.
+Populate the standard PM call-backs for; suspend, resume and restore.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- include/linux/mtd/stm_nand.h | 42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
 
-diff --git a/include/linux/mtd/stm_nand.h b/include/linux/mtd/stm_nand.h
-index 9210d5c..da2006c 100644
---- a/include/linux/mtd/stm_nand.h
-+++ b/include/linux/mtd/stm_nand.h
-@@ -15,6 +15,8 @@
- #ifndef __LINUX_STM_NAND_H
- #define __LINUX_STM_NAND_H
+q
+---
+ drivers/mtd/nand/stm_nand_bch.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
+index 8ab8e7b..e1ebf92 100644
+--- a/drivers/mtd/nand/stm_nand_bch.c
++++ b/drivers/mtd/nand/stm_nand_bch.c
+@@ -415,12 +415,51 @@ static int stm_nand_bch_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-+#include <linux/io.h>
-+
- struct stm_plat_nand_bch_data {
- 	struct stm_nand_bank_data *bank;
- 	enum stm_nand_bch_ecc_config bch_ecc_cfg;
-@@ -30,4 +32,44 @@ struct stm_plat_nand_bch_data {
- 	bool flashss;
- };
- 
-+#define EMISS_BASE				0xfef01000
-+#define EMISS_CONFIG				0x0000
-+#define EMISS_CONFIG_HAMMING_NOT_BCH		(0x1 << 6)
-+
-+enum nandi_controllers {
-+	STM_NANDI_UNCONFIGURED,
-+	STM_NANDI_HAMMING,
-+	STM_NANDI_BCH
-+};
-+
-+static inline void emiss_nandi_select(enum nandi_controllers controller)
++#ifdef CONFIG_PM
++static int stm_nand_bch_suspend(struct device *dev)
 +{
-+	unsigned v;
-+	void __iomem *emiss_config_base;
++	struct nandi_controller *nandi = dev_get_drvdata(dev);
 +
-+	emiss_config_base = ioremap(EMISS_BASE, 4);
-+	if (!emiss_config_base) {
-+		pr_err("%s: failed to ioremap EMISS\n", __func__);
-+		return;
-+	}
++	nandi_clk_disable(nandi);
 +
-+	v = readl(emiss_config_base + EMISS_CONFIG);
++	return 0;
++}
++static int stm_nand_bch_resume(struct device *dev)
++{
++	struct nandi_controller *nandi = dev_get_drvdata(dev);
 +
-+	if (controller == STM_NANDI_HAMMING) {
-+		if (v & EMISS_CONFIG_HAMMING_NOT_BCH)
-+			goto out;
-+		v |= EMISS_CONFIG_HAMMING_NOT_BCH;
-+	} else {
-+		if (!(v & EMISS_CONFIG_HAMMING_NOT_BCH))
-+			goto out;
-+		v &= ~EMISS_CONFIG_HAMMING_NOT_BCH;
-+	}
++	nandi_clk_enable(nandi);
 +
-+	writel(v, emiss_config_base + EMISS_CONFIG);
-+	readl(emiss_config_base + EMISS_CONFIG);
-+
-+out:
-+	iounmap(emiss_config_base);
++	return 0;
 +}
 +
- #endif /* __LINUX_STM_NAND_H */
++static int stm_nand_bch_restore(struct device *dev)
++{
++	struct nandi_controller *nandi = dev_get_drvdata(dev);
++	struct stm_plat_nand_bch_data *pdata = dev->platform_data;
++	struct stm_nand_bank_data *bank = pdata->bank;
++
++	nandi_init_controller(nandi, bank->csn);
++
++	return 0;
++}
++
++static const struct dev_pm_ops stm_nand_bch_pm_ops = {
++	.suspend = stm_nand_bch_suspend,
++	.resume = stm_nand_bch_resume,
++	.restore = stm_nand_bch_restore,
++};
++#else
++static const struct dev_pm_ops stm_nand_bch_pm_ops;
++#endif
++
+ static struct platform_driver stm_nand_bch_driver = {
+ 	.probe	= stm_nand_bch_probe ,
+ 	.remove	= stm_nand_bch_remove,
+ 	.driver	= {
+ 		.name	= "stm-nand-bch",
+ 		.owner	= THIS_MODULE,
++		.pm	= &stm_nand_bch_pm_ops,
+ 	},
+ };
+ module_platform_driver(stm_nand_bch_driver);
 -- 
 1.8.3.2
