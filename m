@@ -1,19 +1,22 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 25 Mar 2014 22:27:35 +0100
-Subject: [PATCH v7 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
- controller
-In-Reply-To: <1395256879-8475-1-git-send-email-carlo@caione.org>
-Message-ID: <20140325212735.GA4853@localhost.fastwebnet.it>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Mar 2014 22:37:02 +0100
+Subject: [PATCH 08/20] ARM: ux500: Convert to the common mmc DT bindings
+ for highspeed mode
+In-Reply-To: <1395404057-27835-9-git-send-email-ulf.hansson@linaro.org>
+References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
+ <1395404057-27835-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdb8K-9NJepFg5aeDsTqdKEwT=xms8PZb=vrbhguQzEa=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 08:21:16PM +0100, Carlo Caione wrote:
-> Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
-> Three register are present to (un)mask, control and acknowledge NMI.
-> These two patches add a new irqchip driver in cascade with GIC.
+On Fri, Mar 21, 2014 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Hi Thomas,
-Is this ok with the Maxime ACKs?
+> The mmci host driver supports the common mmc DT parser, which enables
+> us to use the use common names instead.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
--- 
-Carlo Caione
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
