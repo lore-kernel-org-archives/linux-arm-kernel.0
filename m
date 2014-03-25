@@ -1,36 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Mar 2014 23:10:47 +0000
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <201403250202.42268.marex@denx.de>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <201403250202.42268.marex@denx.de>
-Message-ID: <20140325231047.GU7528@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 26 Mar 2014 00:25:40 +0100
+Subject: [PATCH 0/2] net: mvneta: fix usage as a module
+Message-ID: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 02:02:42AM +0100, Marek Vasut wrote:
-> I think we might be seeing something similar on i.MX28 in U-Boot too,
-> but I dare not to correlate this and the in-kernel FEC issue. We also
-> sporadically see the FEC not transmitting a packet.
+David,
 
-That could be the ERR006358 problem.
+The following set of two patches fix the usage of the mvneta driver
+when built as a module, and used in RGMII configurations. It is
+somewhat similar to a previous fix that was made by Arnaud Patard, but
+which was limited to SGMII configurations.
 
-This occurs when you've transmitted a packet previously, and the
-indicator in FEC_X_DES_ACTIVE remains set at the point in time when
-you load the next packet.  The subsequent write to FEC_X_DES_ACTIVE
-has no effect on the TX side, which has already shut down.
+Thanks,
 
-The work-around for that which is in the kernel is to look at the
-previous packet status: if that indicates it has been sent immediately
-after setting everything up for the next packet (remembering to take
-care of the store buffers between the CPU and memory), then you need to
-re-ping the transmitter after a short delay.
+Thomas
 
-(I've cocked that work-around up today... it can happen quite frequently
-depending on your workload.)
+Thomas Petazzoni (2):
+  net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
+  net: mvneta: fix usage as a module on RGMII configurations
+
+ drivers/net/ethernet/marvell/mvneta.c | 43 ++++++++---------------------------
+ 1 file changed, 9 insertions(+), 34 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.2
