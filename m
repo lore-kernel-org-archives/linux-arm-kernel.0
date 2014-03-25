@@ -1,28 +1,47 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Tue, 25 Mar 2014 07:03:58 +0100
-Subject: [ARM ATTEND] Following discussions
-Message-ID: <53311C4E.9020708@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 25 Mar 2014 09:28:01 +0200
+Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
+In-Reply-To: <20140325003847.32624.58084@quantum>
+References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
+ <53172239.3030705@ti.com> <20140320212308.21989.36094@quantum>
+ <20140321081217.GD26674@tbergstrom-lnx.Nvidia.com>
+ <20140325003847.32624.58084@quantum>
+Message-ID: <20140325072801.GH6922@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Mar 25, 2014 at 01:38:47AM +0100, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2014-03-21 01:12:17)
+> > On Thu, Mar 20, 2014 at 10:23:08PM +0100, Mike Turquette wrote:
+> > > Quoting Tero Kristo (2014-03-05 05:10:17)
+> > > > Ping.
+> > > > 
+> > > > Mike, any feedback on this?
+> > > 
+> > > Hi Tero,
+> > > 
+> > > Have you seen Sylwester's approach[1]? I prefer it since it is more
+> > > device-oriented and less "centralized". The clock consumer enumerates
+> > > the default parent or rate of a consumed clock. This can be made to work
+> > 
+> > That assumes driver writers are aware of the clock tree topology. IME that's
+> > seldomly the case.
+> 
+> It assumes no such thing.
+> 
+> The point of Sylwester's patch is that if a driver consumes a clock and
+> needs to do the very typical setup regarding that clock's rate or
+> parent, then we now have a sensible way to express that in DT.
+> 
+> One of the strengths of DT is that the C code does not have to know all
+> of the details about topology or how things are hooked up. We can hide
+> some of those cute embedded nonsense hacks in DTS and the device
+> integrator can manage it there.
 
-As a contributor to atmel's at91 platform (and recently allwinner's sunxi)
-I'm interested in following the ARM summit.
-Moreover, I'll be involved in even more ARM related developments as part
-of my future job at Free Electrons.
+It would be much better to specify this as part of the clock provider binding
+though, as the person writing those, generally knows what topology needs to be
+setup. The driver writer writing the consumer node often doesn't.
 
-I'm particularly interested in DT bindings discussions to both follow DT
-bindings progress/status on several subsystems and learn about their
-limitations.
+Cheers,
 
-But more generally I'm interested in knowing where Linux dev for ARM 
-platforms
-is heading towards:
-- are there any new subsystems in the pipeline ?
-- are there any planned refactor in existing subsystems (or arch code) ?
-- ...
-
-Best Regards,
-
-Boris
+Peter.
