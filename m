@@ -1,148 +1,148 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Mar 2014 16:17:18 +0100
-Subject: [PATCH 3/3] ARM: kprobes: Fix test code compilation errors for
- ARMv4 targets
-In-Reply-To: <1395759284.3478.88.camel@linaro1.home>
-References: <1394556894-18592-1-git-send-email-tixy@linaro.org>
- <6485768.fvJS4nr3cP@wuerfel> <1395759284.3478.88.camel@linaro1.home>
-Message-ID: <4547839.aLXsq7v8z4@wuerfel>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue, 25 Mar 2014 16:23:26 +0100
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+In-Reply-To: <20140321151126.GR23372@e106331-lin.cambridge.arm.com>
+References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
+ <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
+ <20140321151126.GR23372@e106331-lin.cambridge.arm.com>
+Message-ID: <CAFrcx1=TSsaDK0xgtJSQUtvUnwicrXNU-nYAcMOi4B=nTU_Qwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 March 2014 14:54:44 Jon Medhurst wrote:
-> On Tue, 2014-03-25 at 14:42 +0100, Arnd Bergmann wrote:
-> > On Tuesday 25 March 2014 09:27:29 David Long wrote:
-> > > On 03/11/14 12:54, Jon Medhurst wrote:
-> > > > Conditionally compile kprobes test cases for ARMv5 instructions to avoid
-> > > > compilation errors with ARMv4 targets like:
-> > > >
-> > > > /tmp/cc7Tx8ST.s:16740: Error: selected processor does not support ARM mode `clz r0,r0'
-> > > >
-> > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > > 
-> > > This looks OK to me.  Feel free to add my ack.
-> > 
-> > Ah, I had a similar patch in my 'randconfig-fixes' series.
-> 
-> Where's that?
+Hi Mark,
 
-http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=arm-randconfig
+On 21 March 2014 16:11, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Jean,
+>
+> On Wed, Mar 19, 2014 at 09:42:33AM +0000, Jean Pihet wrote:
+>> Introducing perf_regs_load function, which is going
+>> to be used for dwarf unwind test in following patches.
+>>
+>> It takes single argument as a pointer to the regs dump
+>> buffer and populates it with current registers values, as
+>> expected by the perf built-in unwinding test.
+>>
+>> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+>> Cc: Steve Capper <steve.capper@linaro.org>
+>> Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+>> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+>> Cc: Ingo Molnar <mingo@kernel.org>
+>> Cc: Namhyung Kim <namhyung@kernel.org>
+>> Cc: Paul Mackerras <paulus@samba.org>
+>> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>> Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+>> Cc: David Ahern <dsahern@gmail.com>
+>> Cc: Jiri Olsa <jolsa@redhat.com>
+>> ---
+>>  tools/perf/arch/arm64/Makefile            |  1 +
+>>  tools/perf/arch/arm64/include/perf_regs.h |  2 ++
+>>  tools/perf/arch/arm64/tests/regs_load.S   | 39 +++++++++++++++++++++++++++++++
+>>  3 files changed, 42 insertions(+)
+>>  create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+>>
+>> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+>> index 67e9b3d..9b8f87e 100644
+>> --- a/tools/perf/arch/arm64/Makefile
+>> +++ b/tools/perf/arch/arm64/Makefile
+>> @@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+>>  endif
+>>  ifndef NO_LIBUNWIND
+>>  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
+>> +LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+>>  endif
+>> diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
+>> index 2359546..1e052f1 100644
+>> --- a/tools/perf/arch/arm64/include/perf_regs.h
+>> +++ b/tools/perf/arch/arm64/include/perf_regs.h
+>> @@ -9,6 +9,8 @@
+>>  #define PERF_REG_IP  PERF_REG_ARM64_PC
+>>  #define PERF_REG_SP  PERF_REG_ARM64_SP
+>>
+>> +void perf_regs_load(u64 *regs);
+>> +
+>>  static inline const char *perf_reg_name(int id)
+>>  {
+>>       switch (id) {
+>> diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+>> new file mode 100644
+>> index 0000000..92ab968
+>> --- /dev/null
+>> +++ b/tools/perf/arch/arm64/tests/regs_load.S
+>> @@ -0,0 +1,39 @@
+>> +#include <linux/linkage.h>
+>> +
+>> +/*
+>> + * Implementation of void perf_regs_load(u64 *regs);
+>> + *
+>> + * This functions fills in the 'regs' buffer from the actual registers values,
+>> + * in the way the perf built-in unwinding test expects them:
+>> + * - the PC at the time at the call to this function. Since this function
+>> + *   is called using a bl instruction, the PC value is taken from LR,
+>
+> Is it guaranteed that this function is always invoked with a branch with
+> link instruction, or is that just what current compiler versions are
+> doing? I couldn't see where we would get that guarantee from.
+The current compiler implements the call as a bl instruction.
 
-> >  I noticed three
-> > other configurations that are broken with kprobes-test:
-> > 
-> > - ARMv3 (enabled by ARCH_RPC)
-> 
-> Didn't know we support < ARMv4!
+> If it is called with a branch with link, then the LR value will be the
+> PC at call time + 4, rather than just the exact PC at call time. If not
+> then we don't have a guaranteed relationship between the PC at call time
+> and the current LR value.
+>
+> If the only place that perf_regs_load is used is a single test which
+> doesn't care about the precise PC at the time of the call, then it's
+> probably OK to use the LR value, but we should be careful to document
+> what the faked-up PC actually is and how we expect it to be used.
+The code is only used by an unwinding test. The unwinding code
+resolves the function name from an address range found in the dwarf
+information so in principle it is ok to use the PC/LR at the time of
+the call to a function.
 
-We don't really (any more). RPC is a v4 CPU, but we build the kernel
-pretending it is v3 to work around some issue I don't remember.
+Is the comment above OK or do you want an update of the code as well?
 
-> > - ARMv7-M (enabled by ARCH_EFM32)
-> 
-> I guess that problem is because randconfig is enabling HAVE_KPROBES,
-> even though it wouldn't normally be selected, because we have
-> 
->    config ARCH_ARM
-> 	select HAVE_KPROBES if !XIP_KERNEL
-> 
-> and ARCH_EFM32 is XIP_KERNEL.
+>
+>> + * - the current SP (not touched by this function),
+>> + * - the current value of LR is merely retrieved and stored because the
+>> + *   value before the call to this function is unknown at this time; it will
+>> + *   be unwound from the dwarf information in unwind__get_entries.
+>> + */
+>> +
+>> +.text
+>> +.type perf_regs_load,%function
+>> +ENTRY(perf_regs_load)
+>> +     stp x0,  x1,  [x0], #16 // store x0..x29
+>> +     stp x2,  x3,  [x0], #16
+>> +     stp x4,  x5,  [x0], #16
+>> +     stp x6,  x7,  [x0], #16
+>> +     stp x8,  x9,  [x0], #16
+>> +     stp x10, x11, [x0], #16
+>> +     stp x12, x13, [x0], #16
+>> +     stp x14, x15, [x0], #16
+>> +     stp x16, x17, [x0], #16
+>> +     stp x18, x19, [x0], #16
+>> +     stp x20, x21, [x0], #16
+>> +     stp x22, x23, [x0], #16
+>> +     stp x24, x25, [x0], #16
+>> +     stp x26, x27, [x0], #16
+>> +     stp x28, x29, [x0], #16
+>> +     mov x1,  sp
+>> +     stp x30, x1,  [x0], #16 // store lr and sp
+>> +     str x30, [x0]           // store pc as lr in order to skip the call
+>> +                             //  to this function
+>
+> It might be better to word this a "store the lr in place of the pc". To
+> me at least the current wording implies the opposite of what the code
+> seems to be doing.
+Ok the last comment can be updated.
 
-Right. EFM32 can in theory run without XIP_KERNEL, but the only
-board we support doesn't have enough RAM for that.
+Thanks!
+Jean
 
-> I think this problem goes all the way back to the commit which added
-> HAVE_KPROBES to all arches (3f550096dede4430f83b16457da83bf429155ac2)
-> That replaced 
-> 
->    config KPROBES
-> 	depends on ... (ARM && !XIP_KERNEL)
-> 
-> with the current select if !XIP_KERNEL, which made it possible to enable
-> kprobes for XIP when before we couldn't. And presumably that was for a
-> good reason like it doesn't work on XIP?
-
-The text segment is very read-only in XIP_KERNEL, so anything that tries
-to overwrite instructions can't work.
-
-> Not sure at the moment how best to fix that. (Making ARM_KPROBES_TEST
-> depend on !XIP_KERNEL doesn't solve the underlying problem of KPROBES
-> feature still being enabled for XIP kernels.)
-
-Regardless of XIP, there is the other problem of ARMv7-M support, which
-in particular only has THUMB2 instructions:
-
-  CC      arch/arm/kernel/kprobes.o
-/tmp/cclbjgU2.s: Assembler messages:
-	/tmp/cclbjgU2.s:701: Error: selected processor does not support Thumb mode `rfeia sp!'
-make[3]: *** [arch/arm/kernel/kprobes.o] Error 1
-  CC      arch/arm/kernel/kprobes-thumb.o
-/tmp/ccwlnR1o.s: Assembler messages:
-/tmp/ccwlnR1o.s:315: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r0'
-/tmp/ccwlnR1o.s:317: Error: selected processor does not support requested special purpose register -- `mrs r0,cpsr'
-/tmp/ccwlnR1o.s:673: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r3'
-/tmp/ccwlnR1o.s:675: Error: selected processor does not support requested special purpose register -- `mrs r3,cpsr'
-/tmp/ccwlnR1o.s:919: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r8'
-/tmp/ccwlnR1o.s:923: Error: selected processor does not support requested special purpose register -- `mrs r9,cpsr'
-/tmp/ccwlnR1o.s:960: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r8'
-/tmp/ccwlnR1o.s:964: Error: selected processor does not support requested special purpose register -- `mrs r9,cpsr'
-make[3]: *** [arch/arm/kernel/kprobes-thumb.o] Error 1
-  CC      arch/arm/kernel/kprobes-test.o
-/tmp/ccVIP6jA.s: Assembler messages:
-/tmp/ccVIP6jA.s:1354: Error: selected processor does not support ARM opcodes
-/tmp/ccVIP6jA.s:1355: Error: attempt to use an ARM instruction on a Thumb-only processor -- `orr lr,lr,#1'
-/tmp/ccVIP6jA.s:1356: Error: attempt to use an ARM instruction on a Thumb-only processor -- `ldr pc,1f'
-make[3]: *** [arch/arm/kernel/kprobes-test.o] Error 1
-  CC      arch/arm/kernel/kprobes-test-thumb.o
-/tmp/ccN8WTB4.s: Assembler messages:
-/tmp/ccN8WTB4.s:2032: Error: selected processor does not support ARM opcodes
-/tmp/ccN8WTB4.s:2033: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
-/tmp/ccN8WTB4.s:2034: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
-/tmp/ccN8WTB4.s:4183: Error: selected processor does not support ARM opcodes
-/tmp/ccN8WTB4.s:4184: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
-/tmp/ccN8WTB4.s:4185: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
-/tmp/ccN8WTB4.s:4222: Error: selected processor does not support ARM opcodes
-/tmp/ccN8WTB4.s:4223: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
-/tmp/ccN8WTB4.s:4224: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
-/tmp/ccN8WTB4.s:5618: Error: selected processor does not support Thumb mode `rfedb sp'
-/tmp/ccN8WTB4.s:5639: Error: selected processor does not support Thumb mode `rfeia sp'
-/tmp/ccN8WTB4.s:5660: Error: selected processor does not support Thumb mode `rfedb sp!'
-/tmp/ccN8WTB4.s:5681: Error: selected processor does not support Thumb mode `rfeia sp!'
-/tmp/ccN8WTB4.s:6489: Error: selected processor does not support ARM opcodes
-/tmp/ccN8WTB4.s:6490: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
-/tmp/ccN8WTB4.s:6491: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
-/tmp/ccN8WTB4.s:6528: Error: selected processor does not support ARM opcodes
-/tmp/ccN8WTB4.s:6529: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
-/tmp/ccN8WTB4.s:6530: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
-/tmp/ccN8WTB4.s:7521: Error: selected processor does not support Thumb mode `strexd r0,r1,[r2]'
-/tmp/ccN8WTB4.s:7584: Error: selected processor does not support Thumb mode `ldrexd r0,[r1]'
-/tmp/ccN8WTB4.s:15321: Error: selected processor does not support Thumb mode `pkhbt r0,r0,r1'
-/tmp/ccN8WTB4.s:15350: Error: selected processor does not support Thumb mode `pkhbt r14,r12,r10,lsl#2'
-/tmp/ccN8WTB4.s:15379: Error: selected processor does not support Thumb mode `pkhtb r0,r0,r1'
-/tmp/ccN8WTB4.s:15408: Error: selected processor does not support Thumb mode `pkhtb r14,r12,r10,asr#2'
-/tmp/ccN8WTB4.s:18355: Error: selected processor does not support Thumb mode `ssat16 r0,#12,r0'
-
-> > - CPU_ENDIAN_BE32 (enabled by building a big-endian kernel on ARMv5 or older)
-> 
-> > Should we treat those the same way, or just disable Kprobes for this case
-> > if nobody cares?
-> 
-> For CPU_ENDIAN_BE32 I have a feeling that the kprobes code wouldn't
-> work, would have to think more about why I have that feeling. If it
-> doesn't, we come back to the problem that arch code can't add
-> dependencies to CONFIG_KPROBES as things stand.
-
-The error message I get here is
-
-arnd at wuerfel:~/arm-soc$ make O=build/0xCD5BF01B_defconfig/  -skj40
-/git/arm-soc/Makefile:629: Cannot use CONFIG_CC_STACKPROTECTOR_STRONG: -fstack-protector-strong not supported by compiler
-/git/arm-soc/arch/arm/kernel/patch.c: In function '__patch_text':
-/git/arm-soc/arch/arm/kernel/patch.c:35:4: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
-    insn = __opcode_to_mem_thumb32(insn);
-    ^
-
-
-I've filed that for now in the "wontfix" category, but I though I'd bring
-it up anyway.
-
-	Arnd
+>
+> Cheers,
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
