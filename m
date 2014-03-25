@@ -1,229 +1,192 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 25 Mar 2014 11:27:55 +0000
-Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <alpine.DEB.2.02.1402171232220.27926@kaball.uk.xensource.com>
-References: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140121180750.GO30706@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1402171232220.27926@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1403251127270.8273@kaball.uk.xensource.com>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Tue, 25 Mar 2014 16:59:40 +0530
+Subject: [PATCH v2 2/3] arm64: dts: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <20140324102512.GC10341@e106331-lin.cambridge.arm.com>
+References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
+ <1395652179-9216-3-git-send-email-mohun106@gmail.com>
+ <20140324102512.GC10341@e106331-lin.cambridge.arm.com>
+Message-ID: <CAC8NTUXjj6WNMOyRbiCdRanFTp3p9f_kv4FExaStwnO1wYtcvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Feb 2014, Stefano Stabellini wrote:
-> On Tue, 21 Jan 2014, Will Deacon wrote:
-> > On Tue, Jan 21, 2014 at 01:44:24PM +0000, Stefano Stabellini wrote:
-> > > Remove !GENERIC_ATOMIC64 build dependency:
-> > > - introduce xen_atomic64_xchg
-> > > - use it to implement xchg_xen_ulong
-> > > 
-> > > Remove !CPU_V6 build dependency:
-> > > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-> > >   CONFIG_CPU_V6
-> > > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > CC: arnd at arndb.de
-> > > CC: linux at arm.linux.org.uk
-> > > CC: will.deacon at arm.com
-> > > CC: catalin.marinas at arm.com
-> > > CC: linux-arm-kernel at lists.infradead.org
-> > > CC: linux-kernel at vger.kernel.org
-> > > CC: xen-devel at lists.xenproject.org
-> > 
-> >   Reviewed-by: Will Deacon <will.deacon@arm.com>
-> 
-> Russell, are you OK with this patch for 3.15?
+Hi Mark,
 
-Ping?
-Is there anything else that I need to do here?
-Do you want me to submit to your patch tracking system?
+On Mon, Mar 24, 2014 at 3:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Mon, Mar 24, 2014 at 09:09:38AM +0000, mohun106 at gmail.com wrote:
+>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>>
+>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>> ---
+>>  arch/arm64/boot/dts/Makefile    |    1 +
+>>  arch/arm64/boot/dts/thunder.dts |  160 +++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 161 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>> index c52bdb0..9cc8740 100644
+>> --- a/arch/arm64/boot/dts/Makefile
+>> +++ b/arch/arm64/boot/dts/Makefile
+>> @@ -1,3 +1,4 @@
+>> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
+>>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>>
+>> diff --git a/arch/arm64/boot/dts/thunder.dts b/arch/arm64/boot/dts/thunder.dts
+>> new file mode 100644
+>> index 0000000..190e01a
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/thunder.dts
+>> @@ -0,0 +1,160 @@
+>> +/*
+>> + * Cavium Thunder DTS file
+>> + *
+>> + * Copyright (C) 2013, Cavium Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of
+>> + * the License, or (at your option) any later version.
+>> + */
+>> +/dts-v1/;
+>> +
+>> +/memreserve/ 0x80000000 0x00010000;
+>
+> Please add a comment as to what this is protecting (from the looks of
+> it, the spinning CPUs and the cpu release address). We are admittedly
+> lacking these on existing DTs (and I'll fix that up), but it would be
+> good to get into the habit now given it has been a source of confusion
+> for some.
 
-> 
-> > Changes in v4:
-> > - avoid moving and renaming atomic64_xchg
-> > - introduce xen_atomic64_xchg
-> > - fix asm comment in __cmpxchg8 and __cmpxchg16.
-> > 
-> > ---
-> >  arch/arm/Kconfig                   |    3 +-
-> >  arch/arm/include/asm/cmpxchg.h     |   60 ++++++++++++++++++++++++------------
-> >  arch/arm/include/asm/sync_bitops.h |   24 ++++++++++++++-
-> >  arch/arm/include/asm/xen/events.h  |   32 ++++++++++++++++++-
-> >  4 files changed, 95 insertions(+), 24 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index c1f1a7e..ae54ae0 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1881,8 +1881,7 @@ config XEN_DOM0
-> >  config XEN
-> >  	bool "Xen guest support on ARM (EXPERIMENTAL)"
-> >  	depends on ARM && AEABI && OF
-> > -	depends on CPU_V7 && !CPU_V6
-> > -	depends on !GENERIC_ATOMIC64
-> > +	depends on CPU_V7
-> >  	select ARM_PSCI
-> >  	select SWIOTLB_XEN
-> >  	help
-> > diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-> > index df2fbba..a17cff1 100644
-> > --- a/arch/arm/include/asm/cmpxchg.h
-> > +++ b/arch/arm/include/asm/cmpxchg.h
-> > @@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
-> >   * cmpxchg only support 32-bits operands on ARMv6.
-> >   */
-> >  
-> > +static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
-> > +				      unsigned long new)
-> > +{
-> > +	unsigned long oldval, res;
-> > +
-> > +	do {
-> > +		asm volatile("@ __cmpxchg8\n"
-> > +		"	ldrexb	%1, [%2]\n"
-> > +		"	mov	%0, #0\n"
-> > +		"	teq	%1, %3\n"
-> > +		"	strexbeq %0, %4, [%2]\n"
-> > +			: "=&r" (res), "=&r" (oldval)
-> > +			: "r" (ptr), "Ir" (old), "r" (new)
-> > +			: "memory", "cc");
-> > +	} while (res);
-> > +
-> > +	return oldval;
-> > +}
-> > +
-> > +static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
-> > +				      unsigned long new)
-> > +{
-> > +	unsigned long oldval, res;
-> > +
-> > +	do {
-> > +		asm volatile("@ __cmpxchg16\n"
-> > +		"	ldrexh	%1, [%2]\n"
-> > +		"	mov	%0, #0\n"
-> > +		"	teq	%1, %3\n"
-> > +		"	strexheq %0, %4, [%2]\n"
-> > +			: "=&r" (res), "=&r" (oldval)
-> > +			: "r" (ptr), "Ir" (old), "r" (new)
-> > +			: "memory", "cc");
-> > +	} while (res);
-> > +
-> > +	return oldval;
-> > +}
-> > +
-> >  static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-> >  				      unsigned long new, int size)
-> >  {
-> > @@ -141,28 +179,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-> >  	switch (size) {
-> >  #ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
-> >  	case 1:
-> > -		do {
-> > -			asm volatile("@ __cmpxchg1\n"
-> > -			"	ldrexb	%1, [%2]\n"
-> > -			"	mov	%0, #0\n"
-> > -			"	teq	%1, %3\n"
-> > -			"	strexbeq %0, %4, [%2]\n"
-> > -				: "=&r" (res), "=&r" (oldval)
-> > -				: "r" (ptr), "Ir" (old), "r" (new)
-> > -				: "memory", "cc");
-> > -		} while (res);
-> > +		oldval = __cmpxchg8(ptr, old, new);
-> >  		break;
-> >  	case 2:
-> > -		do {
-> > -			asm volatile("@ __cmpxchg1\n"
-> > -			"	ldrexh	%1, [%2]\n"
-> > -			"	mov	%0, #0\n"
-> > -			"	teq	%1, %3\n"
-> > -			"	strexheq %0, %4, [%2]\n"
-> > -				: "=&r" (res), "=&r" (oldval)
-> > -				: "r" (ptr), "Ir" (old), "r" (new)
-> > -				: "memory", "cc");
-> > -		} while (res);
-> > +		oldval = __cmpxchg16(ptr, old, new);
-> >  		break;
-> >  #endif
-> >  	case 4:
-> > diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-> > index 63479ee..942659a 100644
-> > --- a/arch/arm/include/asm/sync_bitops.h
-> > +++ b/arch/arm/include/asm/sync_bitops.h
-> > @@ -21,7 +21,29 @@
-> >  #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
-> >  #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
-> >  #define sync_test_bit(nr, addr)		test_bit(nr, addr)
-> > -#define sync_cmpxchg			cmpxchg
-> >  
-> > +static inline unsigned long sync_cmpxchg(volatile void *ptr,
-> > +										 unsigned long old,
-> > +										 unsigned long new)
-> > +{
-> > +	unsigned long oldval;
-> > +	int size = sizeof(*(ptr));
-> > +
-> > +	smp_mb();
-> > +	switch (size) {
-> > +	case 1:
-> > +		oldval = __cmpxchg8(ptr, old, new);
-> > +		break;
-> > +	case 2:
-> > +		oldval = __cmpxchg16(ptr, old, new);
-> > +		break;
-> > +	default:
-> > +		oldval = __cmpxchg(ptr, old, new, size);
-> > +		break;
-> > +	}
-> > +	smp_mb();
-> > +
-> > +	return oldval;
-> > +}
-> >  
-> >  #endif
-> > diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-> > index 8b1f37b..2032ee6 100644
-> > --- a/arch/arm/include/asm/xen/events.h
-> > +++ b/arch/arm/include/asm/xen/events.h
-> > @@ -16,7 +16,37 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
-> >  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
-> >  }
-> >  
-> > -#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-> > +#ifdef CONFIG_GENERIC_ATOMIC64
-> > +/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
-> > + * atomic64_xchg function because it is implemented using spin locks.
-> > + * Here we need proper atomic instructions to read and write memory
-> > + * shared with the hypervisor.
-> > + */
-> > +static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
-> > +{
-> > +	u64 result;
-> > +	unsigned long tmp;
-> > +
-> > +	smp_mb();
-> > +
-> > +	__asm__ __volatile__("@ xen_atomic64_xchg\n"
-> > +"1:	ldrexd	%0, %H0, [%3]\n"
-> > +"	strexd	%1, %4, %H4, [%3]\n"
-> > +"	teq	%1, #0\n"
-> > +"	bne	1b"
-> > +	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
-> > +	: "r" (&ptr->counter), "r" (new)
-> > +	: "cc");
-> > +
-> > +	smp_mb();
-> > +
-> > +	return result;
-> > +}
-> > +#else
-> > +#define xen_atomic64_xchg atomic64_xchg
-> > +#endif
-> > +
-> > +#define xchg_xen_ulong(ptr, val) xen_atomic64_xchg(container_of((ptr),	\
-> >  							    atomic64_t,	\
-> >  							    counter), (val))
-> >  
-> > -- 
-> > 1.7.10.4
-> 
+OK.
+
+>
+>> +
+>> +/ {
+>> +     model = "Cavium Thunder";
+>> +     compatible = "cavium,thunder";
+>> +     interrupt-parent = <&gic0>;
+>> +     #address-cells = <2>;
+>> +     #size-cells = <2>;
+>> +
+>> +     aliases {
+>> +             serial0 = &uaa0;
+>> +             serial1 = &uaa1;
+>> +     };
+>> +
+>> +     cpus {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <0>;
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "cavium,thunder", "arm,armv8";
+>
+> This is the same as the compatible string for the SoC, which isn't a
+> good idea. Compatible strings should be globally unique.
+>
+> As far as I am aware, "Thunder" is the name of the SoC, not the CPU in
+> the SoC. Is there a name for the CPU in the Thunder SoC?
+>
+> Whatever name you have should be documented.
+
+OK. I will change it to a specific name.
+
+>
+> [...]
+>
+>> +     memory at 0 {
+>> +             device_type = "memory";
+>> +             reg = <0x0 0x0 0x0 0x80000000>;
+>> +     };
+>> +
+>> +     gic0: interrupt-controller at 801000000000 {
+>
+> Please break the 32-bit halves of the unit-address with a comma (e.g.
+> 8010,00000000); it makes it easier to read the address. If you could
+> also do this on other unit-addresses it would be helpful.
+
+OK.
+
+>
+>> +             compatible = "arm,gic-v3";
+>> +             #interrupt-cells = <3>;
+>> +             #address-cells = <0>;
+>> +             interrupt-controller;
+>> +             reg = <0x8010 0x0 0x0 0x10000>,         /* GICD */
+>> +                   <0x8010 0x80000000 0x0 0x100000>; /* GICR */
+>
+> For legibility it would be nice for list entries to be consistently
+> padded to the same length.
+
+OK.
+
+>
+>> +             interrupts = <1 9 0xf04>;
+>> +     };
+>> +
+>> +     timer {
+>> +             compatible = "arm,armv8-timer";
+>> +             interrupts = <1 13 0xff01>,
+>> +                          <1 14 0xff01>,
+>> +                          <1 11 0xff01>,
+>> +                          <1 10 0xff01>;
+>> +     };
+>> +
+>> +     soc {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>> +
+>> +             clocks {
+>> +                     #address-cells = <2>;
+>> +                     #size-cells = <2>;
+>> +                     ranges;
+>> +
+>> +                     refclk50mhz: refclk50mhz {
+>> +                             compatible = "fixed-clock";
+>> +                             #clock-cells = <0>;
+>> +                             clock-frequency = <50000000>;
+>> +                             clock-output-names = "refclk50mhz";
+>> +                     };
+>> +             };
+>
+> I don't think the clocks node adds anything here. It's missing a
+> compatible string list, and as clocks isn't a special reserved node
+> name, it and its children aren't supposed to be probed.
+>
+> Why not just put the refclk50mhz directly under the parent node (the soc
+> simple-bus)?
+
+OK.
+
+>
+> [...]
+>
+>> +             uaa0: uart at 87e024000000 {
+>> +                     compatible = "arm,pl011", "arm,primecell";
+>> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+>> +                     interrupts = <1 21 4>;
+>> +                     clocks = <&refclk50mhz>;
+>> +                     clock-names = "apb_pclk";
+>
+> Is this also feeding the UARTCLK?
+
+Right now, this is for an internal emulation platform for our chip. So
+all these clock definitions are not applicable.
+In real chip, there will be other clock definitions coming.
+
+>
+>> +             };
+>> +
+>> +             uaa1: uart at 87e025000000 {
+>> +                     compatible = "arm,pl011", "arm,primecell";
+>> +                     reg = <0x87e0 0x25000000 0x0 0x1000>;
+>> +                     interrupts = <1 22 4>;
+>> +                     clocks = <&refclk50mhz>;
+>> +                     clock-names = "apb_pclk";
+>
+> Likewise?
+>
+> Cheers,
+> Mark.
