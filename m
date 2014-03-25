@@ -1,25 +1,55 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 25 Mar 2014 13:56:45 -0600
-Subject: [PATCH v5 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <20140325140510.GF17163@e106497-lin.cambridge.arm.com>
-References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
- <1395270762-6055-2-git-send-email-tinamdar@apm.com>
- <CA+sq2CchcWBieGEH33AJFj6HYy-yiJFgzX94Gtsoho2k3z65eA@mail.gmail.com>
- <CACoXjcn2LuhJsNLpCgfvqT6AQEb1pw70N9GNfgCgZ88myGMNBg@mail.gmail.com>
- <20140325140510.GF17163@e106497-lin.cambridge.arm.com>
-Message-ID: <CAErSpo5uyJxvYk42pf0mxRNO6ZSFmQW4AHfe1qGBMDoUiD0BHw@mail.gmail.com>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Tue, 25 Mar 2014 20:07:59 +0000
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+Message-ID: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 8:05 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+Hi all,
 
-> ... I'm a bit baffled by pci_claim_resource()
-> as it doesn't seem to be used by some architectures. Does it mean it
-> is not needed unless you have some BIOS setting up resources for you
-> and in that case you need to go and claim the resource?
+I've recently acquired a mini-PCIe Intel dual Gigabit Ethernet card
+and was hoping to add it to my Globalscale Mirabox (based on the
+Marvell Armada 370 SoC).
 
-Many architectures don't use pci_claim_resource() yet.  I'm trying to
-unify this so all architectures do use it, but it's taking me a long
-time to get this done.
+I have built the kernel from
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux based on
+v3.14.0-rc8, with CONFIG_PCI_MVEBU=y and CONFIG_IGB=m.
 
-Bjorn
+When the system boots, it doesn't detect the PCIe card. Here's the
+output of lspci:
+
+mirabox ~ # lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+
+Output from dmesg after boot: https://gist.github.com/ngreatorex/9769713
+Output of "lspci -vvv" after boot: https://gist.github.com/ngreatorex/9769732
+
+Now for the strange part - if I do an "echo 1 > /sys/bus/pci/rescan"
+it detects the network card, but I get an oops. It doesn't work,
+presumably due to the oops, but it shows up in lspci:
+
+mirabox ~ # lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+01:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network
+Connection (rev 01)
+01:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network
+Connection (rev 01)
+02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev ff)
+03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+
+Output from dmesg including the oops: https://gist.github.com/ngreatorex/9769438
+Output of "lspci -vvv" now: https://gist.github.com/ngreatorex/9769327
+
+I'm afraid that I have zero knowledge of PCI so I'm not sure where to
+start with debugging this. I would appreciate it if someone could give
+me some pointers? If you want any extra debugging information then
+just ask...
+
+Cheers,
+Neil
+
+PS. I suspect the problem is with the pci-mvebu driver rather than the
+igb driver, so I haven't sent to the igb maintainers...
