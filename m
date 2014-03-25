@@ -1,63 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 14:58:02 +0000
-Subject: [RFC 01/47] mtd: nand: export useful functions from core driver
-In-Reply-To: <20140325125755.GD665@arch.cereza>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-2-git-send-email-lee.jones@linaro.org>
- <20140325125755.GD665@arch.cereza>
-Message-ID: <20140325145802.GC24823@lee--X1>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 25 Mar 2014 10:02:21 -0500
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
+In-Reply-To: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
+References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <53319A7D.1060904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Mar 2014, Ezequiel Garcia wrote:
-
-> On Mar 25, Lee Jones wrote:
-> > These functions are utilised by the STM BCH NAND Controller driver.
-> > 
-> [..]
-> > -static int nand_suspend(struct mtd_info *mtd)
-> > +int nand_suspend(struct mtd_info *mtd)
-> >  {
-> >  	return nand_get_device(mtd, FL_PM_SUSPENDED);
-> >  }
-> > +EXPORT_SYMBOL(nand_suspend);
-> >  
-> >  /**
-> >   * nand_resume - [MTD Interface] Resume the NAND flash
-> >   * @mtd: MTD device structure
-> >   */
-> > -static void nand_resume(struct mtd_info *mtd)
-> > +void nand_resume(struct mtd_info *mtd)
-> >  {
-> >  	struct nand_chip *chip = mtd->priv;
-> >  
-> > @@ -2776,6 +2779,7 @@ static void nand_resume(struct mtd_info *mtd)
-> >  		pr_err("%s called for a chip which is not in suspended state\n",
-> >  			__func__);
-> >  }
-> > +EXPORT_SYMBOL(nand_resume);
-> >  
+On 03/21/2014 12:20 AM, Lokesh Vutla wrote:
+> From: Dave Gerlach <d-gerlach@ti.com>
 > 
-> The patch that adds the PM support for the driver makes no use of these.
+> Do not reset GPIO5 at boot-up because GPIO5_7 is used
+> on AM437x GP-EVM to control VTT regulators on DDR3.
+> Without this some GP-EVM boards will fail to boot because
+> of DDR3 corruption.
 > 
-> Can you detail why do you need to export these?
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Tested-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> This is applied on top of current linux-next.
+> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git master
+> 
+>  arch/arm/boot/dts/am437x-gp-evm.dts |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+> index df8798e..a055f7f 100644
+> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+> @@ -117,6 +117,11 @@
+>  	status = "okay";
+>  };
+>  
+> +&gpio5 {
+> +	status = "okay";
+> +	ti,no-reset-on-init;
+> +};
+> +
+>  &mmc1 {
+>  	status = "okay";
+>  	vmmc-supply = <&vmmcsd_fixed>;
+> 
 
-Please see RFC PATCH 9:
 
-mtd: nand: stm_nand_bch: introduce and initialise some important data structures
+Tony,
+any chance of having this in 3.15 cycle?
 
-static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
-                                   struct mtd_info *mtd, struct nand_chip *chip)
-{
+as of today's linux-next tag, the only platform I have that does not
+boot is due to the lack of this patch.
 
-[...]
-       mtd->_sync = nand_sync;
-       mtd->_suspend = nand_suspend;
-       mtd->_resume = nand_resume;
-}
+
+next-20140325-omap2plus_defconfig
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20o6CfGL8
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2Ogu1zPtD
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2m2WhHYO8
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2jOybaVno
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21tt52N4b
+ 6: am43xx-gpevm:  Boot FAIL: http://slexy.org/raw/s21eDQmFWJ
+ 7: beagleboard:  Boot PASS: http://slexy.org/raw/s2q7vzrZHb
+ 8: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2HCAJVz0H
+ 9: beaglebone:  Boot PASS: http://slexy.org/raw/s2NioACYsM
+10: craneboard:  Boot PASS: http://slexy.org/raw/s2s7jyo52c
+11:       dra7:  Boot PASS: http://slexy.org/raw/s2OQ1BMerx
+12:        ldp:  Boot PASS: http://slexy.org/raw/s2cWgQrdjb
+13: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2lOaznVLO
+14:    sdp2430:  Boot PASS: http://slexy.org/raw/s21RCJlUDU
+15:    sdp3430:  Boot PASS: http://slexy.org/raw/s2181J9eWO
+16:    sdp4430:  Boot PASS: http://slexy.org/raw/s20UumAiXK
+17: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s21ypXvTNc
+TOTAL = 17 boards, Booted Boards = 16, No Boot boards = 1
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Nishanth Menon
