@@ -1,100 +1,88 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:48 +0000
-Subject: [RFC 31/47] mtd: nand: stm_nand_bch: scan block for BBM(s) according
- to specified BBT options
+Date: Tue, 25 Mar 2014 08:19:58 +0000
+Subject: [RFC 41/47] mtd: nand: stm_nand_bch: MTD mark and check for bad
+ blocks (BCH)
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-32-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-42-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Search the specified (first and, second or last) page in a block for
-the BBT. Support Hamming or Advanced Flex Mode (AFM) BBMs too.
+Use the local BBM helpers to check for and mark bad blocks.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 62 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 51 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 4812431..29eeee8 100644
+index 55f4a4c..38658b8 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -643,6 +643,66 @@ static int bbt_is_block_bad(uint8_t *bbt, uint32_t block)
- 	return bbt_get_block_mark(bbt, block) == BBT_MARK_GOOD ? 0 : 1;
+@@ -1218,6 +1218,55 @@ static int flex_do_write_ops(struct nandi_controller *nandi,
+ 	return 0;
  }
  
-+/* Scan page for BBM(s), according to specified BBT options */
-+static int nandi_scan_bad_block_markers_page(struct nandi_controller *nandi,
-+					     uint32_t page)
++static int bch_mtd_block_isbad(struct mtd_info *mtd, loff_t offs)
 +{
-+	struct mtd_info *mtd = &nandi->info.mtd;
 +	struct nand_chip *chip = mtd->priv;
-+	uint8_t *oob_buf = nandi->oob_buf;
-+	int i, e;
++	struct nandi_controller *nandi = chip->priv;
 +
-+	/* Read the OOB area */
-+	flex_read_raw(nandi, page, mtd->writesize, oob_buf, mtd->oobsize);
++	uint32_t block;
 +
-+	if (oob_buf[chip->badblockpos] == 0xff)
-+		return 0;
++	/* Check for invalid offset */
++	if (offs > mtd->size)
++		return -EINVAL;
 +
-+	/* Tolerate 'alien' Hamming Boot Mode ECC */
-+	e = 0;
-+	for (i = 0; i < mtd->oobsize; i += 16)
-+		e += hweight8(oob_buf[i + 3] ^ 'B');
-+	if (e <= 1)
-+		return 0;
++	block = offs >> nandi->block_shift;
 +
-+	/* Tolerate 'alien' Hamming AFM ECC */
-+	e = 0;
-+	for (i = 0; i < mtd->oobsize; i += 16) {
-+		e += hweight8(oob_buf[i + 3] ^ 'A');
-+		e += hweight8(oob_buf[i + 4] ^ 'F');
-+		e += hweight8(oob_buf[i + 5] ^ 'M');
-+		if (e <= 1)
-+			return 0;
-+	}
++	/* Protect blocks reserved for BBTs */
++	if (block >= (nandi->blocks_per_device - NAND_IBBT_NBLOCKS))
++		return 1;
 +
-+	return 1;
++	return bbt_is_block_bad(nandi->info.bbt_info.bbt, block);
 +}
 +
-+/* Scan block for BBM(s), according to specified BBT options */
-+static int nandi_scan_bad_block_markers_block(struct nandi_controller *nandi,
-+					      uint32_t block)
-+
++static int bch_mtd_block_markbad(struct mtd_info *mtd, loff_t offs)
 +{
-+	struct mtd_info *mtd = &nandi->info.mtd;
 +	struct nand_chip *chip = mtd->priv;
-+	uint32_t pages_per_block = mtd->erasesize >> nandi->page_shift;
-+	uint32_t page = block << (nandi->block_shift - nandi->page_shift);
++	struct nandi_controller *nandi = chip->priv;
 +
-+	if (nandi_scan_bad_block_markers_page(nandi, page))
-+		return 1;
++	uint32_t block;
++	int ret;
 +
-+	if ((chip->bbt_options & NAND_BBT_SCAN2NDPAGE) &&
-+	    nandi_scan_bad_block_markers_page(nandi, page + 1))
-+		return 1;
++	/* Is block already considered bad? (will also catch invalid offsets) */
++	ret = mtd_block_isbad(mtd, offs);
++	if (ret < 0)
++		return ret;
++	if (ret == 1)
++		return 0;
 +
-+	if ((chip->bbt_options & NAND_BBT_SCANLASTPAGE) &&
-+	    nandi_scan_bad_block_markers_page(nandi,
-+					      page + pages_per_block - 1))
-+		return 1;
++	/* Mark bad */
++	block = offs >> nandi->block_shift;
++	bbt_set_block_mark(nandi->info.bbt_info.bbt, block, BBT_MARK_BAD_WEAR);
 +
-+	return 0;
++	/* Update BBTs, incrementing bbt_vers */
++	nand_get_device(mtd, FL_WRITING);
++	ret = bch_update_bbts(nandi, &nandi->info.bbt_info,
++			      NAND_IBBT_UPDATE_BOTH,
++			      nandi->info.bbt_info.bbt_vers[0] + 1);
++	nand_release_device(mtd);
++
++	return ret;
 +}
 +
- /* Populate IBBT BCH Header */
- static void bch_fill_ibbt_header(struct nandi_controller *nandi,
- 				 struct nand_ibbt_bch_header *ibbt_header,
-@@ -957,6 +1017,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
- 	chip->priv = nandi;
- 	chip->ecc.layout = &info->ecclayout;
+ static int bch_mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1405,6 +1454,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 	mtd->subpage_sft = 0;
  
-+	chip->bbt_options |= NAND_BBT_USE_FLASH;
-+
- 	/* mtd_info */
- 	mtd->owner = THIS_MODULE;
- 	mtd->type = MTD_NANDFLASH;
+ 	mtd->_erase = bch_mtd_erase;
++	mtd->_block_isbad = bch_mtd_block_isbad;
++	mtd->_block_markbad = bch_mtd_block_markbad;
+ 
+ 	mtd->_point = NULL;
+ 	mtd->_unpoint = NULL;
 -- 
 1.8.3.2
