@@ -1,96 +1,99 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 25 Mar 2014 18:49:16 +0800
-Subject: [PATCH 03/19] drivers: thermal: make usage of CONFIG_THERMAL_HWMON
- optional
-In-Reply-To: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
-References: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1395744572-20014-4-git-send-email-alex.shi@linaro.org>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Tue, 25 Mar 2014 16:34:49 +0530
+Subject: [PATCH v2 2/3] arm64: dts: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <4827584.NY6fTFPNNK@wuerfel>
+References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
+ <1395652179-9216-3-git-send-email-mohun106@gmail.com>
+ <4827584.NY6fTFPNNK@wuerfel>
+Message-ID: <CAC8NTUUjLotVbrY1h3pv8HcEhxFuOYyaC6o+2FjpTU_X=DCJ=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eduardo Valentin <eduardo.valentin@ti.com>
+Hi Arnd
 
-When registering a new thermal_device, the thermal framework
-will always add a hwmon sysfs interface.
+On Mon, Mar 24, 2014 at 3:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 March 2014 14:39:38 mohun106 at gmail.com wrote:
+>> +       soc {
+>> +               compatible = "simple-bus";
+>> +               #address-cells = <2>;
+>> +               #size-cells = <2>;
+>> +               ranges;
+>> +
+>> +               clocks {
+>> +                       #address-cells = <2>;
+>> +                       #size-cells = <2>;
+>> +                       ranges;
+>> +
+>> +                       refclk50mhz: refclk50mhz {
+>> +                               compatible = "fixed-clock";
+>> +                               #clock-cells = <0>;
+>> +                               clock-frequency = <50000000>;
+>> +                               clock-output-names = "refclk50mhz";
+>> +                       };
+>> +               };
+>> +
+>> +               ahci0: host-bus-adapter at 810000000000 {
+>> +                       compatible = "snps,spear-ahci";
+>> +                       reg = <0x8100 0x0 0x0 0x1100>;
+>> +                       interrupts = <1 32 4>;
+>> +               };
+>
+>
+> The use of "snps,spear-ahci" by itself seems wrong here: that is
+> the specific implementation used in the ST "spear" SoC. I don't know
+> why we don't already have a "generic-ahci" binding, but please add
+> one so you can match against that.
+>
+> I would also recommend adding a more specific string for your soc.
+> If you want to keep compatibility with older kernels, you can keep
+> the spear string as well, but it would be nicer to drop that.
+> If you can find out what version the synopsys macro has, that would
+> be ideal.
+>
+> You could end up for instance with
+>
+>         compatible = "cavium,thunder-123456-ahci", "snps,ahci-1.23.45",
+>                         "snps,spear-ahci", "generic-ahci";
+>
+> The driver only needs to match the last one of these, but if we
+> find that we have to work around some bug, it's good to have the
+> option of determining the exact version.
 
-This patch adds a flag to make this behavior optional. Now
-when registering a new thermal device, the caller can
-optionally inform if hwmon interface is desirable. This can
-be done by means of passing a thermal_zone_params.no_hwmon == true.
+OK.
 
-In order to keep same behavior as of today, all current
-calls will by default create the hwmon interface.
+>
+>> +               nic0: ethernet at 843000000000 {
+>> +                       compatible = "smsc,lan9115";
+>> +                       reg-io-width = <4>;
+>> +                       reg = <0x8430 0x0 0x0 0x1000>;
+>> +                       interrupts = <1 31 4>;
+>> +               };
+>> +
+>> +               uaa0: uart at 87e024000000 {
+>> +                       compatible = "arm,pl011", "arm,primecell";
+>> +                       reg = <0x87e0 0x24000000 0x0 0x1000>;
+>> +                       interrupts = <1 21 4>;
+>> +                       clocks = <&refclk50mhz>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               uaa1: uart at 87e025000000 {
+>> +                       compatible = "arm,pl011", "arm,primecell";
+>> +                       reg = <0x87e0 0x25000000 0x0 0x1000>;
+>> +                       interrupts = <1 22 4>;
+>> +                       clocks = <&refclk50mhz>;
+>> +                       clock-names = "apb_pclk";
+>
+> The generic name for uarts in DT is "serial", not "uart" (yes, a
+> lot of others get this wrong, too).
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: linux-acpi at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
-Cc: Zhang Rui <rui.zhang@intel.com>
-Suggested-by: Wei Ni <wni@nvidia.com>
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-(cherry picked from commit ccba4ffd9eff6120a20cc7656458ac554aec4b0c)
+OK :)
+But I think lack of consistency in DT among various ARM platforms is
+source of this confusion.
 
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- Documentation/thermal/sysfs-api.txt | 5 +++++
- drivers/thermal/thermal_core.c      | 8 +++++---
- include/linux/thermal.h             | 8 ++++++++
- 3 files changed, 18 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
-index a71bd5b..37c5486 100644
---- a/Documentation/thermal/sysfs-api.txt
-+++ b/Documentation/thermal/sysfs-api.txt
-@@ -142,6 +142,11 @@ temperature) and throttle appropriate devices.
-     This is an optional feature where some platforms can choose not to
-     provide this data.
-     .governor_name: Name of the thermal governor used for this zone
-+    .no_hwmon: a boolean to indicate if the thermal to hwmon sysfs interface
-+               is required. when no_hwmon == false, a hwmon sysfs interface
-+               will be created. when no_hwmon == true, nothing will be done.
-+               In case the thermal_zone_params is NULL, the hwmon interface
-+               will be created (for backward compatibility).
-     .num_tbps: Number of thermal_bind_params entries for this zone
-     .tbp: thermal_bind_params entries
- 
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index a3d1976..4f4b788 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -1460,9 +1460,11 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
- 
- 	mutex_unlock(&thermal_governor_lock);
- 
--	result = thermal_add_hwmon_sysfs(tz);
--	if (result)
--		goto unregister;
-+	if (!tz->tzp || !tz->tzp->no_hwmon) {
-+		result = thermal_add_hwmon_sysfs(tz);
-+		if (result)
-+			goto unregister;
-+	}
- 
- 	mutex_lock(&thermal_list_lock);
- 	list_add_tail(&tz->node, &thermal_tz_list);
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index a386a1c..b4a975f 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -214,6 +214,14 @@ struct thermal_bind_params {
- /* Structure to define Thermal Zone parameters */
- struct thermal_zone_params {
- 	char governor_name[THERMAL_NAME_LENGTH];
-+
-+	/*
-+	 * a boolean to indicate if the thermal to hwmon sysfs interface
-+	 * is required. when no_hwmon == false, a hwmon sysfs interface
-+	 * will be created. when no_hwmon == true, nothing will be done
-+	 */
-+	bool no_hwmon;
-+
- 	int num_tbps;	/* Number of tbp entries */
- 	struct thermal_bind_params *tbp;
- };
--- 
-1.8.1.2
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
