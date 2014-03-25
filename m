@@ -1,39 +1,100 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Mar 2014 08:50:59 +0100
-Subject: [PATCH v5 1/7] clk: sunxi: Remove calls to clk_put
-In-Reply-To: <20140324215120.32624.63543@quantum>
-References: <1394723659-4995-1-git-send-email-maxime.ripard@free-electrons.com>
- <1394723659-4995-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140324215120.32624.63543@quantum>
-Message-ID: <20140325075059.GL5416@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Mar 2014 08:19:48 +0000
+Subject: [RFC 31/47] mtd: nand: stm_nand_bch: scan block for BBM(s) according
+ to specified BBT options
+In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-32-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Search the specified (first and, second or last) page in a block for
+the BBT. Support Hamming or Advanced Flex Mode (AFM) BBMs too.
 
-On Mon, Mar 24, 2014 at 02:51:20PM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-03-13 08:14:13)
-> > Callers of clk_put must disable the clock first. This also means that as long
-> > as the clock is enabled the driver should hold a reference to that clock.
-> > Hence, the call to clk_put here are bogus and should be removed.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Looks good to me. There is a balanced clk_put in the module remove
-> function?
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/nand/stm_nand_bch.c | 62 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
-Actually, this is not part of any module, it's part of the function
-called through CLK_OF_DECLARE, so there's never a remove function for
-this code.
-
+diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
+index 4812431..29eeee8 100644
+--- a/drivers/mtd/nand/stm_nand_bch.c
++++ b/drivers/mtd/nand/stm_nand_bch.c
+@@ -643,6 +643,66 @@ static int bbt_is_block_bad(uint8_t *bbt, uint32_t block)
+ 	return bbt_get_block_mark(bbt, block) == BBT_MARK_GOOD ? 0 : 1;
+ }
+ 
++/* Scan page for BBM(s), according to specified BBT options */
++static int nandi_scan_bad_block_markers_page(struct nandi_controller *nandi,
++					     uint32_t page)
++{
++	struct mtd_info *mtd = &nandi->info.mtd;
++	struct nand_chip *chip = mtd->priv;
++	uint8_t *oob_buf = nandi->oob_buf;
++	int i, e;
++
++	/* Read the OOB area */
++	flex_read_raw(nandi, page, mtd->writesize, oob_buf, mtd->oobsize);
++
++	if (oob_buf[chip->badblockpos] == 0xff)
++		return 0;
++
++	/* Tolerate 'alien' Hamming Boot Mode ECC */
++	e = 0;
++	for (i = 0; i < mtd->oobsize; i += 16)
++		e += hweight8(oob_buf[i + 3] ^ 'B');
++	if (e <= 1)
++		return 0;
++
++	/* Tolerate 'alien' Hamming AFM ECC */
++	e = 0;
++	for (i = 0; i < mtd->oobsize; i += 16) {
++		e += hweight8(oob_buf[i + 3] ^ 'A');
++		e += hweight8(oob_buf[i + 4] ^ 'F');
++		e += hweight8(oob_buf[i + 5] ^ 'M');
++		if (e <= 1)
++			return 0;
++	}
++
++	return 1;
++}
++
++/* Scan block for BBM(s), according to specified BBT options */
++static int nandi_scan_bad_block_markers_block(struct nandi_controller *nandi,
++					      uint32_t block)
++
++{
++	struct mtd_info *mtd = &nandi->info.mtd;
++	struct nand_chip *chip = mtd->priv;
++	uint32_t pages_per_block = mtd->erasesize >> nandi->page_shift;
++	uint32_t page = block << (nandi->block_shift - nandi->page_shift);
++
++	if (nandi_scan_bad_block_markers_page(nandi, page))
++		return 1;
++
++	if ((chip->bbt_options & NAND_BBT_SCAN2NDPAGE) &&
++	    nandi_scan_bad_block_markers_page(nandi, page + 1))
++		return 1;
++
++	if ((chip->bbt_options & NAND_BBT_SCANLASTPAGE) &&
++	    nandi_scan_bad_block_markers_page(nandi,
++					      page + pages_per_block - 1))
++		return 1;
++
++	return 0;
++}
++
+ /* Populate IBBT BCH Header */
+ static void bch_fill_ibbt_header(struct nandi_controller *nandi,
+ 				 struct nand_ibbt_bch_header *ibbt_header,
+@@ -957,6 +1017,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 	chip->priv = nandi;
+ 	chip->ecc.layout = &info->ecclayout;
+ 
++	chip->bbt_options |= NAND_BBT_USE_FLASH;
++
+ 	/* mtd_info */
+ 	mtd->owner = THIS_MODULE;
+ 	mtd->type = MTD_NANDFLASH;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140325/56e1f89c/attachment.sig>
+1.8.3.2
