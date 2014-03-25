@@ -1,90 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:20:01 +0000
-Subject: [RFC 44/47] mtd: nand: stm_nand_bch: MTD read and write (BCH)
+Date: Tue, 25 Mar 2014 08:19:44 +0000
+Subject: [RFC 27/47] mtd: nand: stm_nand_bch: write IBBT to Flash
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-45-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTD interfaces: Standard set of callbacks for MTD functionality.
+Write BBT contents to the first page of a specified block, then
+update the IBBT header and write it to last page of the same block.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 54 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index bcaed32..f5b0a00 100644
+index 2d03113..76ed99b 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -1226,6 +1226,58 @@ static int bch_load_bbt(struct nandi_controller *nandi,
+@@ -541,6 +541,35 @@ static void bch_fill_ibbt_header(struct nandi_controller *nandi,
+ 	memcpy(ibbt_header->author, author, sizeof(author));
  }
  
- /*
-+ * MTD Interface: Standard set of callbacks for MTD functionality
-+ */
-+static int bch_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
-+			size_t *retlen, uint8_t *buf)
++/* Write IBBT to Flash */
++static int bch_write_bbt_data(struct nandi_controller *nandi,
++			      struct nandi_bbt_info *bbt_info,
++			      uint32_t block, int bak, uint8_t vers)
 +{
-+	struct nand_chip *chip = mtd->priv;
-+	struct nandi_controller *nandi = chip->priv;
-+	int ret;
++	uint32_t page_size = nandi->info.mtd.writesize;
++	uint32_t block_size = nandi->info.mtd.erasesize;
++	struct nand_ibbt_bch_header *ibbt_header =
++		(struct nand_ibbt_bch_header *)nandi->page_buf;
++	loff_t offs;
 +
-+	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
-+		(unsigned long long)len, from);
++	nandi->cached_page = -1;
 +
-+	nand_get_device(mtd, FL_READING);
++	/* Write BBT contents to first page of block */
++	offs = (loff_t)block << nandi->block_shift;
++	if (bch_write_page(nandi, offs, bbt_info->bbt) & NAND_STATUS_FAIL)
++		return 1;
 +
-+	ret = bch_read(nandi, from, len, retlen, buf);
++	/* Update IBBT header and write to last page of block */
++	memset(ibbt_header, 0xff, nandi->info.mtd.writesize);
++	bch_fill_ibbt_header(nandi, ibbt_header, bak, vers);
++	offs += block_size - page_size;
++	if (bch_write_page(nandi, offs, (uint8_t *)ibbt_header) &
++	    NAND_STATUS_FAIL)
++		return 1;
 +
-+	nand_release_device(mtd);
-+
-+	return ret;
++	return 0;
 +}
 +
-+static int bch_mtd_write(struct mtd_info *mtd, loff_t to, size_t len,
-+			 size_t *retlen, const uint8_t *buf)
-+{
-+	struct nand_chip *chip = mtd->priv;
-+	struct nandi_controller *nandi = chip->priv;
-+	uint32_t page_mask = mtd->writesize - 1;
-+	int ret;
-+
-+	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
-+		(unsigned long long)len, to);
-+
-+	if ((to & page_mask) || (len & page_mask)) {
-+		dev_err(nandi->dev, "attempt to write non-page-aligned data\n");
-+		return -EINVAL;
-+	}
-+
-+	nand_get_device(mtd, FL_WRITING);
-+
-+	if (flex_check_wp(nandi)) {
-+		dev_dbg(nandi->dev, "device is write-protected\n");
-+		return -EIO;
-+	}
-+
-+	ret = bch_write(nandi, to, len, retlen, buf);
-+
-+	nand_release_device(mtd);
-+
-+	return ret;
-+}
-+
-+/*
-  * Helper function for mtd_read_oob(): handles multi-page transfers
-  * and mapping between BCH sectors and MTD page+OOB data.
-  */
-@@ -1701,6 +1753,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
- 	mtd->oobavail = 0;
- 	mtd->subpage_sft = 0;
- 
-+	mtd->_read = bch_mtd_read;
-+	mtd->_write = bch_mtd_write;
- 	mtd->_erase = bch_mtd_erase;
- 	mtd->_read_oob = bch_mtd_read_oob;
- 	mtd->_write_oob = bch_mtd_write_oob;
+ /* Scan block for IBBT signature */
+ static int bch_find_ibbt_sig(struct nandi_controller *nandi,
+ 			     uint32_t block, int *bak, uint8_t *vers,
 -- 
 1.8.3.2
