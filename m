@@ -1,55 +1,88 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:43 +0000
-Subject: [RFC 26/47] mtd: nand: stm_nand_bch: populate IBBT BCH Header
+Date: Tue, 25 Mar 2014 08:19:37 +0000
+Subject: [RFC 20/47] mtd: nand: stm_nand_bch: initialise working buffers
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-27-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STM NAND BCH Controller driver has extended the IBBT header with
-some extra convenience properties. This function populates both those
-and the standard header specified by 'struct nand_ibbt_header'.
+Initialise working buffers, accomodating DMA alignment constraints.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 45 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index e1c71be..2d03113 100644
+index 351f5e2..fafde22 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/nand.h>
- #include <linux/mtd/stm_nand.h>
- #include <linux/mtd/partitions.h>
-+#include <generated/utsrelease.h>
+@@ -31,6 +31,9 @@
  
- #include "stm_nand_regs.h"
- #include "stm_nand_dt.h"
-@@ -524,6 +525,22 @@ static int bbt_is_block_bad(uint8_t *bbt, uint32_t block)
- 	return bbt_get_block_mark(bbt, block) == BBT_MARK_GOOD ? 0 : 1;
+ /* NANDi BCH Controller properties */
+ #define NANDI_BCH_SECTOR_SIZE			1024
++#define NANDI_BCH_DMA_ALIGNMENT			64
++#define NANDI_BCH_MAX_BUF_LIST			8
++#define NANDI_BCH_BUF_LIST_SIZE			(4 * NANDI_BCH_MAX_BUF_LIST)
+ 
+ /* BCH ECC sizes */
+ static int bch_ecc_sizes[] = {
+@@ -762,6 +765,44 @@ static void nandi_init_controller(struct nandi_controller *nandi,
+ 	nandi_init_hamming(nandi, emi_bank);
  }
  
-+/* Populate IBBT BCH Header */
-+static void bch_fill_ibbt_header(struct nandi_controller *nandi,
-+				 struct nand_ibbt_bch_header *ibbt_header,
-+				 int bak, uint8_t vers)
++/* Initialise working buffers, accomodating DMA alignment constraints */
++static int nandi_init_working_buffers(struct nandi_controller *nandi,
++				      struct nandi_bbt_info *bbt_info,
++				      struct mtd_info *mtd)
 +{
-+	const char author[] = "STLinux " UTS_RELEASE " (stm-nand-bch)";
++	uint32_t bbt_buf_size;
++	uint32_t buf_size;
 +
-+	memcpy(ibbt_header->base.signature, ibbt_sigs[bak], NAND_IBBT_SIGLEN);
-+	ibbt_header->base.version = vers;
-+	memset(ibbt_header->base.schema, NAND_IBBT_SCHEMA, 4);
++	/*	- Page and OOB */
++	buf_size = mtd->writesize + mtd->oobsize + NANDI_BCH_DMA_ALIGNMENT;
 +
-+	memset(ibbt_header->schema, NAND_IBBT_SCHEMA, 4);
-+	memset(ibbt_header->ecc_size, bch_ecc_sizes[nandi->bch_ecc_mode], 4);
-+	memcpy(ibbt_header->author, author, sizeof(author));
++	/*	- BBT data (page-size aligned) */
++	bbt_info->bbt_size = nandi->blocks_per_device >> 2; /* 2 bits/block */
++	bbt_buf_size = ALIGN(bbt_info->bbt_size, mtd->writesize);
++	buf_size += bbt_buf_size + NANDI_BCH_DMA_ALIGNMENT;
++
++	/*	- BCH BUF list */
++	buf_size += NANDI_BCH_BUF_LIST_SIZE + NANDI_BCH_DMA_ALIGNMENT;
++
++	/* Allocate bufffer */
++	nandi->buf = devm_kzalloc(nandi->dev, buf_size, GFP_KERNEL);
++	if (!nandi->buf) {
++		dev_err(nandi->dev, "failed to allocate working buffers\n");
++		return -ENOMEM;
++	}
++
++	/* Set/Align buffer pointers */
++	nandi->page_buf = PTR_ALIGN(nandi->buf, NANDI_BCH_DMA_ALIGNMENT);
++	nandi->oob_buf  = nandi->page_buf + mtd->writesize;
++	bbt_info->bbt   = PTR_ALIGN(nandi->oob_buf + mtd->oobsize,
++				    NANDI_BCH_DMA_ALIGNMENT);
++	nandi->buf_list = (uint32_t *)PTR_ALIGN(bbt_info->bbt + bbt_buf_size,
++						NANDI_BCH_DMA_ALIGNMENT);
++	nandi->cached_page = -1;
++
++	return 0;
 +}
 +
- /* Scan block for IBBT signature */
- static int bch_find_ibbt_sig(struct nandi_controller *nandi,
- 			     uint32_t block, int *bak, uint8_t *vers,
+ static int remap_named_resource(struct platform_device *pdev,
+ 				char *name,
+ 				void __iomem **io_ptr)
+@@ -990,6 +1031,10 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 	/* Tune BCH programs according to device found and ECC mode */
+ 	bch_configure_progs(nandi);
+ 
++	err = nandi_init_working_buffers(nandi, bbt_info, mtd);
++	if (err)
++		return err;
++
+ 	return 0;
+ }
+ 
 -- 
 1.8.3.2
