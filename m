@@ -1,26 +1,58 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 25 Mar 2014 18:41:25 +0800
-Subject: [PATCH v2 0/3] [media] atmel-isi: Add DT support for Atmel ISI driver
-Message-ID: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+Date: Tue, 25 Mar 2014 18:41:26 +0800
+Subject: [PATCH v2 1/3] [media] atmel-isi: add v4l2 async probe support
+In-Reply-To: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1395744087-5753-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add DT support for atmel ISI driver. It can support the
-common v4l2 DT interfaces.
-
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 v1 --> v2:
-  modified the device tree binding document to remove the a optional property.
+ no change.
 
-Josh Wu (3):
-  [media] atmel-isi: add v4l2 async probe support
-  [media] atmel-isi: convert the pdata from pointer to structure
-  [media] atmel-isi: add primary DT support
+ drivers/media/platform/soc_camera/atmel-isi.c |    5 +++++
+ include/media/atmel-isi.h                     |    4 ++++
+ 2 files changed, 9 insertions(+)
 
- .../devicetree/bindings/media/atmel-isi.txt        |   50 +++++++++++++++++
- drivers/media/platform/soc_camera/atmel-isi.c      |   56 +++++++++++++++-----
- include/media/atmel-isi.h                          |    4 ++
- 3 files changed, 98 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
-
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index a1a95fe..9d977c5 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -989,6 +989,11 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	soc_host->v4l2_dev.dev	= &pdev->dev;
+ 	soc_host->nr		= pdev->id;
+ 
++	if (isi->pdata.asd_sizes) {
++		soc_host->asd = isi->pdata.asd;
++		soc_host->asd_sizes = isi->pdata.asd_sizes;
++	}
++
+ 	ret = soc_camera_host_register(soc_host);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Unable to register soc camera host\n");
+diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+index 2b02347..c2e5703 100644
+--- a/include/media/atmel-isi.h
++++ b/include/media/atmel-isi.h
+@@ -106,6 +106,8 @@
+ #define ISI_DATAWIDTH_8				0x01
+ #define ISI_DATAWIDTH_10			0x02
+ 
++struct v4l2_async_subdev;
++
+ struct isi_platform_data {
+ 	u8 has_emb_sync;
+ 	u8 emb_crc_sync;
+@@ -118,6 +120,8 @@ struct isi_platform_data {
+ 	u32 frate;
+ 	/* Using for ISI_MCK */
+ 	u32 mck_hz;
++	struct v4l2_async_subdev **asd;	/* Flat array, arranged in groups */
++	int *asd_sizes;		/* 0-terminated array of asd group sizes */
+ };
+ 
+ #endif /* __ATMEL_ISI_H__ */
 -- 
 1.7.9.5
