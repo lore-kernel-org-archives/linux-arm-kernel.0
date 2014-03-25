@@ -1,71 +1,83 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Mar 2014 09:21:07 -0400
-Subject: [PATCH] arm: boot: dts: build keystone devicetree blob
-In-Reply-To: <20140321144328.GC12310@saruman.home>
-References: <1394639330-1288-1-git-send-email-balbi@ti.com>
- <53208CDD.7030106@ti.com> <532C4F40.5010903@ti.com>
- <20140321144328.GC12310@saruman.home>
-Message-ID: <533182C3.9060708@ti.com>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 25 Mar 2014 09:27:29 -0400
+Subject: [PATCH 3/3] ARM: kprobes: Fix test code compilation errors for
+ ARMv4 targets
+In-Reply-To: <1394556894-18592-4-git-send-email-tixy@linaro.org>
+References: <1394556894-18592-1-git-send-email-tixy@linaro.org>
+ <1394556894-18592-4-git-send-email-tixy@linaro.org>
+Message-ID: <53318441.1060306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014 10:43 AM, Felipe Balbi wrote:
-> On Fri, Mar 21, 2014 at 10:40:00AM -0400, Santosh Shilimkar wrote:
->> On Wednesday 12 March 2014 12:35 PM, Santosh Shilimkar wrote:
->>> On Wednesday 12 March 2014 11:48 PM, Felipe Balbi wrote:
->>>> Currently, even when building keystone only
->>>> kernel builds, DTB won't get build because
->>>> we lack a Makefile rule to get it compiled.
->>>>
->>>> This patch adds that rule so mainline kernel
->>>> users have a chance to use up-to-date DTB on
->>>> keystone 2 platforms.
->>>>
->>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
->>>> ---
->>>>
->>> We have been building dtbs with explicit command
->>> instead of dtbs since it was just one dtb so far
->>> supported. Was planning to add the rule once more
->>> boards get added. Now with Lamarr and Edision in
->>> for next merge window, will do that post 3.15-rc1.
->>>
->> Just to close the loop, I added a patch as part
->> of my 3.15 fixes which builds all keystone dt
->> blobs.
-> 
-> cool, thanks
-> 
-Here is the updated patch which I commited to fixes branch.
-Sorry to miss your reported-by tag. I just missed it.
+On 03/11/14 12:54, Jon Medhurst wrote:
+> Conditionally compile kprobes test cases for ARMv5 instructions to avoid
+> compilation errors with ARMv4 targets like:
+>
+> /tmp/cc7Tx8ST.s:16740: Error: selected processor does not support ARM mode `clz r0,r0'
+>
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+>   arch/arm/kernel/kprobes-test-arm.c |    8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+> index 8a7428b..f9ed7cf 100644
+> --- a/arch/arm/kernel/kprobes-test-arm.c
+> +++ b/arch/arm/kernel/kprobes-test-arm.c
+> @@ -216,6 +216,7 @@ void kprobe_arm_test_cases(void)
+>   	TEST_BB_R("bx	r",7,2f,"")
+>   	TEST_BF_R("bxeq	r",14,2f,"")
+>
+> +#if __LINUX_ARM_ARCH__ >= 5
+>   	TEST_R("clz	r0, r",0, 0x0,"")
+>   	TEST_R("clzeq	r7, r",14,0x1,"")
+>   	TEST_R("clz	lr, r",7, 0xffffffff,"")
+> @@ -337,6 +338,7 @@ void kprobe_arm_test_cases(void)
+>   	TEST_UNSUPPORTED(".word 0xe16f02e1 @ smultt pc, r1, r2")
+>   	TEST_UNSUPPORTED(".word 0xe16002ef @ smultt r0, pc, r2")
+>   	TEST_UNSUPPORTED(".word 0xe1600fe1 @ smultt r0, r1, pc")
+> +#endif
+>
+>   	TEST_GROUP("Multiply and multiply-accumulate")
+>
+> @@ -559,6 +561,7 @@ void kprobe_arm_test_cases(void)
+>   	TEST_UNSUPPORTED("ldrsht	r1, [r2], #48")
+>   #endif
+>
+> +#if __LINUX_ARM_ARCH__ >= 5
+>   	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
+>   	TEST_RPR(  "strccd	r",8, VAL2,", [r",13,0, ", r",12,48,"]")
+>   	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
+> @@ -595,6 +598,7 @@ void kprobe_arm_test_cases(void)
+>   	TEST_UNSUPPORTED(".word 0xe1efc3d0	@ ldrd r12, [pc, #48]!")
+>   	TEST_UNSUPPORTED(".word 0xe0c9f3d0	@ ldrd pc, [r9], #48")
+>   	TEST_UNSUPPORTED(".word 0xe0c9e3d0	@ ldrd lr, [r9], #48")
+> +#endif
+>
+>   	TEST_GROUP("Miscellaneous")
+>
+> @@ -1227,7 +1231,9 @@ void kprobe_arm_test_cases(void)
+>   	TEST_COPROCESSOR( "mrc"two"	0, 0, r0, cr0, cr0, 0")
+>
+>   	COPROCESSOR_INSTRUCTIONS_ST_LD("","e")
+> +#if __LINUX_ARM_ARCH__ >= 5
+>   	COPROCESSOR_INSTRUCTIONS_MC_MR("","e")
+> +#endif
+>   	TEST_UNSUPPORTED("svc	0")
+>   	TEST_UNSUPPORTED("svc	0xffffff")
+>
+> @@ -1287,7 +1293,9 @@ void kprobe_arm_test_cases(void)
+>   	TEST(	"blx	__dummy_thumb_subroutine_odd")
+>   #endif /* __LINUX_ARM_ARCH__ >= 6 */
+>
+> +#if __LINUX_ARM_ARCH__ >= 5
+>   	COPROCESSOR_INSTRUCTIONS_ST_LD("2","f")
+> +#endif
+>   #if __LINUX_ARM_ARCH__ >= 6
+>   	COPROCESSOR_INSTRUCTIONS_MC_MR("2","f")
+>   #endif
+>
 
->From 400550ae7e778302a45d2952ac75907903e2610c Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Tue, 18 Mar 2014 16:02:34 -0400
-Subject: [PATCH] ARM: dts: Build all keystone dt blobs
+This looks OK to me.  Feel free to add my ack.
 
-Now we have additional two SOC/boards supported, so add
-make file rule so that all device tree blobs can be build
-for keystone with 'make dtbs'.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/boot/dts/Makefile |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9d6a8b..49ff796 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -81,6 +81,9 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
-+dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
-+	k2l-evm.dtb \
-+	k2e-evm.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
- dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-db-88f6281.dtb \
--- 
-1.7.9.5
+-dl
