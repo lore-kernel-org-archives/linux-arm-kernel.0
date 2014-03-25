@@ -1,58 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:39 +0000
-Subject: [RFC 22/47] mtd: nand: stm_nand_bch: check erased page for zeros
+Date: Tue, 25 Mar 2014 08:19:32 +0000
+Subject: [RFC 15/47] mtd: nand: stm_nand_bch: add compatible page size check
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Detect an erased page, tolerating and correcting up to a specified number
-of bits at '0'. Downgrade uncorrectable ECC error for an erased page,
-tolerating 'sectors_per_page' bits at '0'.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 2042cdd..7874d85 100644
+index fbcd1b9..93fe835 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -319,6 +319,33 @@ static uint8_t bch_erase_block(struct nandi_controller *nandi,
- }
+@@ -29,6 +29,9 @@
+ #include "stm_nand_regs.h"
+ #include "stm_nand_dt.h"
  
- /*
-+ * Detect an erased page, tolerating and correcting up to a specified number of
-+ * bits at '0'.  (For many devices, it is now deemed within spec for an erased
-+ * page to include a number of bits at '0', either as a result of read-disturb
-+ * behaviour or 'stuck-at-zero' failures.)  Returns the number of corrected
-+ * bits, or a '-1' if we have exceeded the maximum number of bits at '0' (likely
-+ * to be a genuine uncorrectable ECC error).  In the latter case, the data must
-+ * be returned unmodified, in accordance with the MTD API.
-+ */
-+static int check_erased_page(uint8_t *data, uint32_t page_size, int max_zeros)
-+{
-+	uint8_t *b = data;
-+	int zeros = 0;
-+	int i;
++/* NANDi BCH Controller properties */
++#define NANDI_BCH_SECTOR_SIZE			1024
 +
-+	for (i = 0; i < page_size; i++) {
-+		zeros += hweight8(~*b++);
-+		if (zeros > max_zeros)
-+			return -1;
+ /* Bad Block Table (BBT) */
+ struct nandi_bbt_info {
+ 	uint32_t	bbt_size;		/* Size of bad-block table */
+@@ -774,6 +777,12 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 		dev_warn(&pdev->dev, "No timing data available\n");
+ 	}
+ 
++	if (mtd->writesize < NANDI_BCH_SECTOR_SIZE) {
++		dev_err(nandi->dev,
++			"page size incompatible with BCH ECC sector\n");
++		return -EINVAL;
 +	}
 +
-+	if (zeros)
-+		memset(data, 0xff, page_size);
-+
-+	return zeros;
-+}
-+
-+/*
-  * Initialisation
-  */
- static int bch_check_compatibility(struct nandi_controller *nandi,
+ 	return 0;
+ }
+ 
 -- 
 1.8.3.2
