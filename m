@@ -1,40 +1,114 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 24 Mar 2014 22:34:44 -0500
-Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
-Message-ID: <1395718484-20424-1-git-send-email-joelf@ti.com>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Tue, 25 Mar 2014 12:06:31 +0800
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <13743364.WZtdi2BZb3@wuerfel>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395670496-17381-4-git-send-email-zhangfei.gao@linaro.org>
+ <13743364.WZtdi2BZb3@wuerfel>
+Message-ID: <CAMj5BkjbrHevQhf4kbFhN5THHLw4nQwdpt2h6WJH02mKhdq8oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Loading kernel at offset 0x10000 works only for zImage, but not for Image,
-because the kernel expect the start of decompressed kernel (.head.text) to be
-at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
-TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
-arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
-have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
-offset Qemu loads it at is 0x10000.
+Dear Arnd
 
-With zImage, this need is met because zImage loads the uncompressed Image
-correctly, however when loading an Image and executing directly Qemu is
-required it to load it at the correct location. Doing so, doesn't break Qemu's
-zImage loading. With this patch, both zImage and Image work correctly.
+On Mon, Mar 24, 2014 at 11:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 March 2014 22:14:56 Zhangfei Gao wrote:
+>
+>> +
+>> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
+>> +{
+>> +     struct hip04_priv *priv = netdev_priv(ndev);
+>> +     unsigned tx_head = priv->tx_head;
+>> +     unsigned tx_tail = priv->tx_tail;
+>> +     struct tx_desc *desc = &priv->tx_desc[priv->tx_tail];
+>> +
+>> +     while (tx_tail != tx_head) {
+>> +             if (desc->send_addr != 0) {
+>> +                     if (force)
+>> +                             desc->send_addr = 0;
+>> +                     else
+>> +                             break;
+>> +             }
+>> +             if (priv->tx_phys[tx_tail]) {
+>> +                     dma_unmap_single(&ndev->dev, priv->tx_phys[tx_tail],
+>> +                             priv->tx_skb[tx_tail]->len, DMA_TO_DEVICE);
+>> +                     priv->tx_phys[tx_tail] = 0;
+>> +             }
+>> +             dev_kfree_skb_irq(priv->tx_skb[tx_tail]);
+>> +             priv->tx_skb[tx_tail] = NULL;
+>> +             tx_tail = TX_NEXT(tx_tail);
+>> +             priv->tx_count--;
+>> +     }
+>> +     priv->tx_tail = tx_tail;
+>> +}
+>
+> I think you still need to find a solution to ensure that the tx reclaim is
+> called eventually through a method other than start_xmit.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- hw/arm/boot.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In the iperf stress test, if move reclaim to poll, there is some
+error, sometimes sending zero packets.
+While keep reclaim in the xmit to reclaim transmitted packets looks
+stable in the test,
+There TX_DESC_NUM desc can be used.
 
-diff --git a/hw/arm/boot.c b/hw/arm/boot.c
-index dc62918..566b5c2 100644
---- a/hw/arm/boot.c
-+++ b/hw/arm/boot.c
-@@ -23,7 +23,7 @@
-  * They have different preferred image load offsets from system RAM base.
-  */
- #define KERNEL_ARGS_ADDR 0x100
--#define KERNEL_LOAD_ADDR 0x00010000
-+#define KERNEL_LOAD_ADDR 0x00008000
- #define KERNEL64_LOAD_ADDR 0x00080000
- 
- typedef enum {
--- 
-1.7.9.5
+>
+>> +
+>> +     priv->map = syscon_regmap_lookup_by_compatible("hisilicon,hip04-ppe");
+>> +     if (IS_ERR(priv->map)) {
+>> +             dev_warn(d, "no hisilicon,hip04-ppe\n");
+>> +             ret = PTR_ERR(priv->map);
+>> +             goto init_fail;
+>> +     }
+>> +
+>> +     n = of_parse_phandle(node, "port-handle", 0);
+>> +     if (n) {
+>> +             ret = of_property_read_u32(n, "reg", &priv->port);
+>> +             if (ret) {
+>> +                     dev_warn(d, "no reg info\n");
+>> +                     goto init_fail;
+>> +             }
+>> +
+>> +             ret = of_property_read_u32(n, "channel", &priv->chan);
+>> +             if (ret) {
+>> +                     dev_warn(d, "no channel info\n");
+>> +                     goto init_fail;
+>> +             }
+>> +     } else {
+>> +             dev_warn(d, "no port-handle\n");
+>> +             ret = -EINVAL;
+>> +             goto init_fail;
+>> +     }
+>
+> Doing the lookup by "compatible" string doesn't really help you
+> at solve the problem of single-instance ppe at all, because that
+> function will only ever look at the first one. Use
+> syscon_regmap_lookup_by_phandle instead and pass the phandle
+> you get from the "port-handle" property.
+
+Did some experiment, the only ppe base is got from syscon probe.
+And looking up by "compatible" did work for three controllers at the same time.
+
+>
+> Also, since you decided to treat the ppe as a dump regmap, I would
+> recommend moving the 'reg' and 'channel' properties into arguments
+> of the port-handle link, and retting rid of the child nodes of
+> the ppe, like:
+>
+> +       ppe: ppe at 28c0000 {
+> +               compatible = "hisilicon,hip04-ppe", "syscon";
+> +               reg = <0x28c0000 0x10000>;
+> +       };
+> +
+> +       fe: ethernet at 28b0000 {
+> +               compatible = "hisilicon,hip04-mac";
+> +               reg = <0x28b0000 0x10000>;
+> +               interrupts = <0 413 4>;
+> +               phy-mode = "mii";
+> +               port-handle = <&ppe 0xf1 0>;
+> +       };
+>
+
+Would you mind giving more hints about how to parse the args.
+I am thinking of using of_parse_phandle_with_args, is that correct method?
+
+Thanks
