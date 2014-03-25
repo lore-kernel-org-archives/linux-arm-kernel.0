@@ -1,44 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 25 Mar 2014 09:57:55 -0300
-Subject: [RFC 01/47] mtd: nand: export useful functions from core driver
-In-Reply-To: <1395735604-26706-2-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Mar 2014 13:11:39 +0000
+Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
+In-Reply-To: <20140325125050.GB665@arch.cereza>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140325125755.GD665@arch.cereza>
+ <20140325125050.GB665@arch.cereza>
+Message-ID: <20140325131139.GB24823@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 25, Lee Jones wrote:
-> These functions are utilised by the STM BCH NAND Controller driver.
+On Tue, 25 Mar 2014, Ezequiel Garcia wrote:
+
+> Hi Lee,
 > 
-[..]
-> -static int nand_suspend(struct mtd_info *mtd)
-> +int nand_suspend(struct mtd_info *mtd)
->  {
->  	return nand_get_device(mtd, FL_PM_SUSPENDED);
->  }
-> +EXPORT_SYMBOL(nand_suspend);
->  
->  /**
->   * nand_resume - [MTD Interface] Resume the NAND flash
->   * @mtd: MTD device structure
->   */
-> -static void nand_resume(struct mtd_info *mtd)
-> +void nand_resume(struct mtd_info *mtd)
->  {
->  	struct nand_chip *chip = mtd->priv;
->  
-> @@ -2776,6 +2779,7 @@ static void nand_resume(struct mtd_info *mtd)
->  		pr_err("%s called for a chip which is not in suspended state\n",
->  			__func__);
->  }
-> +EXPORT_SYMBOL(nand_resume);
->  
+> On Mar 25, Lee Jones wrote:
+> > 
+> > This patch-set was written against kernel version v3.4, but applies
+> > cleanly to v3.13-rc7 which it is currently based. I understand that
+> > the core has changed significantly since and that some of the
+> > infrastructure this driver provides is now available either through
+> > the framework or similar means. I'm looking for someone with inside
+> > knowledge to draw attention to those areas so we can align with the
+> > most recent API.
+> > 
+> 
+> Please push a git branch. It will be nice to have a way of seeing the 'big
+> picture' without applying the 47 patches.
 
-The patch that adds the PM support for the driver makes no use of these.
+Sure:
 
-Can you detail why do you need to export these?
+  git://git.linaro.org/people/lee.jones/linux-3.0-ux500.git tb-st-mtd-nand-bch
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
