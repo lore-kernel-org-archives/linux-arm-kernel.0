@@ -1,38 +1,45 @@
-From: simon.kagstrom@netinsight.net (Simon =?UTF-8?B?S8OlZ3N0csO2bQ==?=)
-Date: Tue, 25 Mar 2014 12:37:39 +0100
-Subject: [PATCH RFC] ixp4xx_eth: Allow setting the MDIO bus name in
- platform data
-In-Reply-To: <CAGVrzcaJ5LKE_HAvsmbnFxYsLbNwi9h9UYrz60AQ3z4DOZKwYw@mail.gmail.com>
-References: <20140324151729.1b8e3bb5@marrow.netinsight.se>
- <m3r45r72u9.fsf@intrepid.localdomain>
- <CAGVrzcaJ5LKE_HAvsmbnFxYsLbNwi9h9UYrz60AQ3z4DOZKwYw@mail.gmail.com>
-Message-ID: <20140325123739.05017fcf@marrow.netinsight.se>
+From: amurray@embedded-bits.co.uk (Andrew Murray)
+Date: Tue, 25 Mar 2014 11:46:41 +0000
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <20140325103525.GA14789@ulmo>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+ <235376049.yyfljDtinu@wuerfel> <20140325103525.GA14789@ulmo>
+Message-ID: <CAPcvp5Gy8uNW3UULi8jYk7GNbmgTd2B_qOEAXnP4H4Wq3v9BCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Mar 2014 13:42:29 -0700
-Florian Fainelli <f.fainelli@gmail.com> wrote:
+On 25 March 2014 10:35, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Tue, Mar 25, 2014 at 08:44:36AM +0100, Arnd Bergmann wrote:
+>> On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
+> [...]
+>> > +/* Keystone PCIe driver does not allow module unload */
+>> > +static int __init ks_pcie_init(void)
+>> > +{
+>> > +   return platform_driver_probe(&ks_pcie_driver, ks_pcie_probe);
+>> > +}
+>> > +subsys_initcall(ks_pcie_init);
+>>
+>> Why subsys_initcall?
+>>
+>> We should probably try to fix unloading soon.
+>
+> I did some work on this a few months ago but never got around to
+> cleaning up the patches. Let me see if I can resurrect that work.
 
-> 2014-03-24 13:34 GMT-07:00 Krzysztof Halasa <khc@pm.waw.pl>:
-> > Simon K?gstr?m <simon.kagstrom@netinsight.net> writes:
-> >
-> >> Allows using e.g., a fixed MDIO bus with the ixp4xx_eth driver.
-> >> Example:
-> >
-> >
-> > Why do we need it? I'm not sure I know what constitutes a "fixed MDIO
-> > bus".
-> 
-> This is a software emulation MDIO bus for when your Ethernet MAC is
-> connected to a PHY which does not appear on the MDIO bus. This is
-> typically used to provide the Ethernet driver with a link that is
-> always seen as UP, when you cannot directly query it via MDIO/MDC.
+I think there may be merit in these drivers using subsys_init. I've
+not had time to investigate, but as far as I can remember this causes
+issues with piceport.
 
-Yes, exactly. We have a board which uses two of the ipx4xx NPE:s, one
-which uses a real PHY via the ixp4xx_eth MDIO bus and one which uses
-the fixed PHY driver.
+For ARM32 host drivers, pci_fixup_irqs (arch/arm/kernel/bios32.c) must
+be called before init_service_irqs (portdrv_core.c) otherwise pcieport
+acts on invalid information in dev->irq and breaks. It seems that its
+possible for the portbus driver to pick up new devices before bios32
+has been able to fixup the irqs. Making the host bridge drivers subsys
+will overcome this. I guess this hasn't been an issue in the past as
+host bridge drivers were always in the arch/ directories.
 
-To support this, we need this patch as the driver would otherwise
-always look for the PHY on the ixp4xx_eth MDIO bus.
+In any case it may be worth testing this driver with PCIEPORTBUS enabled.
 
-// Simon
+Andrew Murray
