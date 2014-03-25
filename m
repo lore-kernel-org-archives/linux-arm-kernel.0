@@ -1,29 +1,68 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 25 Mar 2014 09:50:50 -0300
-Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
-In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 25 Mar 2014 09:53:29 -0300
+Subject: [RFC 35/47] mtd: nand: stm_nand_bch: dump bad blocks
+In-Reply-To: <1395735604-26706-36-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140325125050.GB665@arch.cereza>
+ <1395735604-26706-36-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140325125329.GC665@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
 On Mar 25, Lee Jones wrote:
+> Inform the user of any known bad blocks during initialisation.
+> Conversely, if there aren't any known bad blocks, let the user know
+> the good news.
 > 
-> This patch-set was written against kernel version v3.4, but applies
-> cleanly to v3.13-rc7 which it is currently based. I understand that
-> the core has changed significantly since and that some of the
-> infrastructure this driver provides is now available either through
-> the framework or similar means. I'm looking for someone with inside
-> knowledge to draw attention to those areas so we can align with the
-> most recent API.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/nand/stm_nand_bch.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
+> diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
+> index 6698b1f..abbb4d9 100644
+> --- a/drivers/mtd/nand/stm_nand_bch.c
+> +++ b/drivers/mtd/nand/stm_nand_bch.c
+> @@ -1060,6 +1060,28 @@ static int bch_load_bbt(struct nandi_controller *nandi,
+>  	return 0;
+>  }
+>  
+> +static void nandi_dump_bad_blocks(struct nandi_controller *nandi)
+> +{
+> +	int bad_count = 0;
+> +	uint32_t block;
+> +	uint8_t *bbt = nandi->info.bbt_info.bbt;
+> +	uint8_t mark;
+> +
+> +	pr_info("BBT:\n");
+> +	for (block = 0; block < nandi->blocks_per_device; block++) {
+> +		mark = bbt_get_block_mark(bbt, block);
+> +		if (mark != BBT_MARK_GOOD) {
+> +			pr_info("\t\tBlock 0x%08x [%05u] marked bad [%s]\n",
+> +				block << nandi->block_shift, block,
+> +				(mark == BBT_MARK_BAD_FACTORY) ?
+> +				"Factory" : "Wear");
+> +			bad_count++;
+> +		}
+> +	}
+> +	if (bad_count == 0)
+> +		pr_info("\t\tNo bad blocks listed in BBT\n");
+> +}
+> +
+>  /*
+>   * Initialisation
+>   */
+> @@ -1849,6 +1871,8 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+>  			return err;
+>  	}
+>  
+> +	nandi_dump_bad_blocks(nandi);
+> +
 
-Please push a git branch. It will be nice to have a way of seeing the 'big
-picture' without applying the 47 patches.
+Hm... this looks suspicious. Are you sure you need this?
 
-Thanks!
+The NAND BBT code prints the bad blocks at initialization-time. If that's
+not the case for you, perhaps we should be fixing that in the BBT code,
+rather than at a driver's level.
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
