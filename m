@@ -1,67 +1,143 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:20:04 +0000
-Subject: [RFC 47/47] mtd: nand: stm_nand_bch: catch unsupported calls
+Date: Tue, 25 Mar 2014 08:19:59 +0000
+Subject: [RFC 42/47] mtd: nand: stm_nand_bch: add read and write OOB (BCH)
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-48-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-43-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display a BUG() message and return appropriate/expected value.
+Provide functions to read and write to the Out-Of-Bounds (OOB) area.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 107 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 4103d4f..e732bf3 100644
+index 38658b8..389ccee 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -852,6 +852,31 @@ static void flex_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
- 	}
+@@ -1218,6 +1218,111 @@ static int flex_do_write_ops(struct nandi_controller *nandi,
+ 	return 0;
  }
  
-+/* Catch calls to non-supported functions */
-+static uint16_t flex_read_word_bug(struct mtd_info *mtd)
++static char *mtd_oob_mode_strs[] = {"PLACE", "AUTO", "RAW"};
++
++static int bch_mtd_read_and_write_oob(struct mtd_info *mtd, loff_t tofrom,
++				      struct mtd_oob_ops *ops,
++				      bool read)
 +{
-+	BUG();
-+	return 0;
++	struct nand_chip *chip = mtd->priv;
++	struct nandi_controller *nandi = chip->priv;
++	uint32_t page_mask = mtd->writesize - 1;
++	int ret;
++
++	dev_dbg(nandi->dev, "%s: 0x%012llx [page = %u, oob = %u mode = %s]\n",
++		__func__, tofrom,
++		(ops->datbuf ? ops->len : 0),
++		(ops->oobbuf ? ops->ooblen : 0),
++		mtd_oob_mode_strs[ops->mode]);
++
++	if (!ops->oobbuf && ops->mode != MTD_OPS_RAW) {
++		if (read)
++			return mtd_read(mtd, tofrom, ops->len,
++					&ops->retlen, ops->datbuf);
++		else
++			return mtd_write(mtd, tofrom, ops->len,
++					 &ops->retlen, ops->datbuf);
++	}
++
++	ops->oobretlen = 0;
++	ops->retlen = 0;
++
++	/*
++	 * We report OOB as unavailable (i.e. oobavail = 0), therefore nothing
++	 * should call this
++	 */
++	if (ops->oobbuf && ops->mode == MTD_OPS_AUTO_OOB)
++		return -ENOTSUPP;
++
++	/* Not currently supported by MTD */
++	if (ops->datbuf && ops->oobbuf && ops->mode == MTD_OPS_PLACE_OOB)
++		return -ENOTSUPP;
++
++	/* Do not allow oob reads with ooboffs */
++	if (ops->oobbuf && ops->ooboffs)
++		return -ENOTSUPP;
++
++	/* Do not allow reads past end of device */
++	if (ops->datbuf && (tofrom + ops->len) > mtd->size) {
++		dev_err(nandi->dev, "attempt %s beyond end of device\n",
++			read ? "read" : "write");
++		return -EINVAL;
++	}
++
++	if (ops->oobbuf &&
++	    (tofrom + mtd->writesize * (ops->ooblen / mtd->oobsize))
++	    > mtd->size) {
++		dev_err(nandi->dev, "attempt %s beyond end of device\n",
++			read ? "read" : "write");
++		return -EINVAL;
++	}
++
++	/* Do not allow non-aligned reads/writes */
++	if ((tofrom & page_mask) ||
++	    (ops->datbuf && (ops->len & page_mask)) ||
++	    (ops->oobbuf && (ops->ooblen % mtd->oobsize))) {
++		dev_err(nandi->dev, "attempt to %s non-aligned data\n",
++			read ? "read" : "write");
++		return -EINVAL;
++	}
++
++	/* Do not allow inconsistent data and oob lengths */
++	if (ops->datbuf && ops->oobbuf &&
++	    (ops->len / mtd->writesize != ops->ooblen / mtd->oobsize)) {
++		dev_err(nandi->dev,
++			"data length inconsistent with oob length\n");
++		return -EINVAL;
++	}
++
++	nand_get_device(mtd, read ? FL_READING : FL_WRITING);
++
++	if (!read && flex_check_wp(nandi)) {
++		dev_dbg(nandi->dev, "device is write-protected\n");
++		return -EIO;
++	}
++
++	if (read)
++		ret = flex_do_read_ops(nandi, tofrom, ops);
++	else
++		ret = flex_do_write_ops(nandi, tofrom, ops);
++
++	nand_release_device(mtd);
++
++	return ret;
 +}
 +
-+static int flex_block_bad_bug(struct mtd_info *mtd, loff_t ofs, int getchip)
++static int bch_mtd_read_oob(struct mtd_info *mtd, loff_t from,
++			    struct mtd_oob_ops *ops)
 +{
-+	BUG();
-+	return 1;
++	return bch_mtd_read_and_write_oob(mtd, from, ops, true);
 +}
 +
-+static int flex_block_markbad_bug(struct mtd_info *mtd, loff_t ofs)
++static int bch_mtd_write_oob(struct mtd_info *mtd, loff_t to,
++			     struct mtd_oob_ops *ops)
 +{
-+	BUG();
-+	return 1;
++	return bch_mtd_read_and_write_oob(mtd, to, ops, false);
 +}
 +
-+int flex_scan_bbt_bug(struct mtd_info *mtd)
-+{
-+	BUG();
-+	return 1;
-+}
-+
- /*
-  * Hamming-FLEX operations (optimised replacements for nand_base.c versions)
-  */
-@@ -1916,7 +1941,12 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
- 	chip->read_buf = flex_read_buf;
- 	chip->write_buf = flex_write_buf;
+ static int bch_mtd_block_isbad(struct mtd_info *mtd, loff_t offs)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1454,6 +1559,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 	mtd->subpage_sft = 0;
  
-+	chip->read_word = flex_read_word_bug;
-+	chip->block_bad = flex_block_bad_bug;
-+	chip->block_markbad = flex_block_markbad_bug;
-+
- 	chip->bbt_options |= NAND_BBT_USE_FLASH;
-+	chip->scan_bbt = flex_scan_bbt_bug;
+ 	mtd->_erase = bch_mtd_erase;
++	mtd->_read_oob = bch_mtd_read_oob;
++	mtd->_write_oob = bch_mtd_write_oob;
+ 	mtd->_block_isbad = bch_mtd_block_isbad;
+ 	mtd->_block_markbad = bch_mtd_block_markbad;
  
- 	/* mtd_info */
- 	mtd->owner = THIS_MODULE;
 -- 
 1.8.3.2
