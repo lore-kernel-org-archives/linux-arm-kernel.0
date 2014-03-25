@@ -1,39 +1,48 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 25 Mar 2014 20:34:24 -0300
-Subject: [PATCH] net: mvneta: use devm_ioremap_resource() instead of
- of_iomap()
-In-Reply-To: <1395790015-20929-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395790015-20929-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140325233424.GA14158@arch.cereza>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 25 Mar 2014 18:34:39 -0500
+Subject: [PATCH 0/3] Fix stmmac-socfpga allmodconfig breakage in arm-soc
+Message-ID: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 26, Thomas Petazzoni wrote:
-[..]
-> @@ -2774,6 +2775,7 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
->  static int mvneta_probe(struct platform_device *pdev)
->  {
->  	const struct mbus_dram_target_info *dram_target_info;
-> +	struct resource *res;
->  	struct device_node *dn = pdev->dev.of_node;
->  	struct device_node *phy_node;
->  	u32 phy_addr;
-> @@ -2838,9 +2840,15 @@ static int mvneta_probe(struct platform_device *pdev)
->  
->  	clk_prepare_enable(pp->clk);
->  
-> -	pp->base = of_iomap(dn, 0);
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		err = -ENODEV;
-> +		goto err_clk;
-> +	}
-> +
-> +	pp->base = devm_ioremap_resource(&pdev->dev, res);
+From: Dinh Nguyen <dinguyen@altera.com>
 
-When you use devm_ioremap_resource, you don't need to have error handling
-in platform_get_resource. Take a look at the comment at lib/devres.c.
+Hi,
+
+These 3 patches are based on Arnd's patch to fix the allmodconfig for the
+dwmac-socfpga implementation. I just broke the patch out into drivers,
+dts, and dts documentation.
+
+The original patch is here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241518.html
+
+Arnd mentioned that he was thinking about just removing the dwmac-socfpga
+and send out the new verion to the netdev tree, but I haven't seen it. So
+just in case this solution might work, here are the patches.
+
+These patches are based on arm-soc/for-next.
+
+Thanks,
+
+Dinh Nguyen (3):
+  net: stmmac: improve binding and fix build
+  dts: socfpga: Fix ethernet entries for the stmmac
+  dts: documentation: Update documentation for the stmmac ethernet
+    controller
+
+ .../devicetree/bindings/net/socfpga-dwmac.txt      |   38 ++++------
+ Documentation/devicetree/bindings/net/stmmac.txt   |    6 ++
+ arch/arm/boot/dts/socfpga.dtsi                     |   51 +++++---------
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts         |    5 +-
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |    5 +-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |    5 +-
+ arch/arm/boot/dts/socfpga_vt.dts                   |    5 +-
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |   10 +++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |    2 +-
+ .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |   73 +++-----------------
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    1 +
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    3 +
+ 12 files changed, 67 insertions(+), 137 deletions(-)
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.9.5
