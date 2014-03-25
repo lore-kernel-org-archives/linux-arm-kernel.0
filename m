@@ -1,71 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 25 Mar 2014 11:19:55 +0000
-Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <20140217175552.GB8361@arm.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
- <20140217175552.GB8361@arm.com>
-Message-ID: <alpine.DEB.2.02.1403251119050.8273@kaball.uk.xensource.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 25 Mar 2014 20:15:11 +0900
+Subject: [PATCH] drm/bridge: PTN3460 needs DRM_KMS_HELPER
+In-Reply-To: <17602160.PV0AMDU1du@wuerfel>
+References: <17602160.PV0AMDU1du@wuerfel>
+Message-ID: <CAAQKjZOsi9d+O3BDm-n9eyvc9uFHKp-a23yyjhtpFca3-X3J9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Feb 2014, Catalin Marinas wrote:
-> On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
-> > On Thu, 9 Jan 2014, Stefano Stabellini wrote:
-> > > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> > > Necessary duplication of paravirt.h and paravirt.c with ARM.
-> > > 
-> > > The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> > > runtime pvops patching needed.
-> > > 
-> > > This allows us to make use of steal_account_process_tick for stolen
-> > > ticks accounting.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > CC: will.deacon at arm.com
-> > > CC: nico at linaro.org
-> > > CC: marc.zyngier at arm.com
-> > > CC: cov at codeaurora.org
-> > > CC: arnd at arndb.de
-> > > CC: olof at lixom.net
-> > > CC: Catalin.Marinas at arm.com
-> > 
-> > Catalin, Will, are you happy with this patch for 3.15?
-> 
-> It's pretty small and looks fine to me. However, I would like someone
-> with more virtualisation experience than me to ack it (e.g. Marc Z).
+2014-03-25 20:06 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> The recently added PTN3460 device driver uses interfaces that
+> are provided by the KMS helper infrastructure, so we should
+> explicitly select that to avoid this linker error:
+>
+> ERROR: "drm_helper_probe_single_connector_modes" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
+> ERROR: "drm_helper_connector_dpms" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
+>
 
-Ping? Marc, could you please give it a review?
+Ah, right. Exynos drm selects DRM_KMS_HELPER so I cannot see build error.
+
+Thanks,
+Inki Dae
 
 
-> Some nitpicks:
-> 
-> > > +config PARAVIRT
-> > > +	bool "Enable paravirtualization code"
-> > > +	---help---
-> > > +	  This changes the kernel so it can modify itself when it is run
-> > > +	  under a hypervisor, potentially improving performance significantly
-> > > +	  over full virtualization.
-> > > +
-> > > +config PARAVIRT_TIME_ACCOUNTING
-> > > +	bool "Paravirtual steal time accounting"
-> > > +	select PARAVIRT
-> > > +	default n
-> > > +	---help---
-> 
-> For consistency with this file, just use "help" rather than
-> "---help---".
-> 
-> > > --- /dev/null
-> > > +++ b/arch/arm64/include/asm/paravirt.h
-> > > @@ -0,0 +1,20 @@
-> > > +#ifndef _ASM_ARM64_PARAVIRT_H
-> > > +#define _ASM_ARM64_PARAVIRT_H
-> 
-> __ASM_PARAVIRT_H for consistency.
-> 
-> -- 
-> Catalin
-> 
+> We have to drop the I2C dependency to avoid a circular dependency
+> chain, but that's ok because DRM already selects I2C.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> I found this today doing randconfig builds on linux-next.
+>
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index f8db069..884923f 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -1,4 +1,5 @@
+>  config DRM_PTN3460
+>         tristate "PTN3460 DP/LVDS bridge"
+> -       depends on DRM && I2C
+> +       depends on DRM
+> +       select DRM_KMS_HELPER
+>         ---help---
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
