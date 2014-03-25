@@ -1,48 +1,53 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 25 Mar 2014 13:13:19 +0000
-Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
-In-Reply-To: <1395718484-20424-1-git-send-email-joelf@ti.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
-Message-ID: <CAFEAcA8dSvW8rBvxgquj6fnd7YsNKFUc5+SWrGt1PVEQP0S9ag@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 25 Mar 2014 14:14:07 +0100
+Subject: [PATCH 4/5] ARM: dts: tx53: add simple-panel support
+In-Reply-To: <20140322064653.GC5938@dragon>
+References: <1395235721-13847-1-git-send-email-LW@KARO-electronics.de>
+ <1395235721-13847-4-git-send-email-LW@KARO-electronics.de>
+ <20140322064653.GC5938@dragon>
+Message-ID: <20140325141407.75b0750e@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2014 03:34, Joel Fernandes <joelf@ti.com> wrote:
-> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
-> because the kernel expect the start of decompressed kernel (.head.text) to be
-> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
-> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
-> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
-> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
-> offset Qemu loads it at is 0x10000.
->
-> With zImage, this need is met because zImage loads the uncompressed Image
-> correctly, however when loading an Image and executing directly Qemu is
-> required it to load it at the correct location. Doing so, doesn't break Qemu's
-> zImage loading. With this patch, both zImage and Image work correctly.
->
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  hw/arm/boot.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/hw/arm/boot.c b/hw/arm/boot.c
-> index dc62918..566b5c2 100644
-> --- a/hw/arm/boot.c
-> +++ b/hw/arm/boot.c
-> @@ -23,7 +23,7 @@
->   * They have different preferred image load offsets from system RAM base.
->   */
->  #define KERNEL_ARGS_ADDR 0x100
-> -#define KERNEL_LOAD_ADDR 0x00010000
-> +#define KERNEL_LOAD_ADDR 0x00008000
->  #define KERNEL64_LOAD_ADDR 0x00080000
+Hi,
 
-The patch and rationale seem plausible, but I'm a bit
-reluctant to apply this this close to 2.0 release, because
-QEMU has loaded images at this address for 8 years without
-anybody complaining, and I worry that we might accidentally
-break some other use case somehow.
+Shawn Guo wrote:
+> On Wed, Mar 19, 2014 at 02:28:40PM +0100, Lothar Wa?mann wrote:
+> > 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  arch/arm/boot/dts/imx53-tx53-x13x.dts |   12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> > index 26b918e..86a964d 100644
+> > --- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> > +++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
+> > @@ -63,6 +63,18 @@
+> >  		default-brightness-level = <50>;
+> >  	};
+> >  
+> > +	panel0 {
+> > +		compatible = "simple-panel";
+> 
+> From what I can see, "simple-panel" is not a documented compatible.
+> 
+There is Documentation/devicetree/bindings/panel/simple-panel.txt
+which describes the bindings for drivers/gpu/drm/panel/panel-simple.c.
+"simple-panel" is the common compatible for all panels that the driver
+supports. If no compatible for a specific panel is given, the
+driver supports a generic panel with an ENABLE GPIO, an attached
+backlight and a regulator. This is what's being used here. 
 
-thanks
--- PMM
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
