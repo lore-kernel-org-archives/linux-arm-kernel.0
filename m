@@ -1,54 +1,71 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 25 Mar 2014 17:00:55 +0530
-Subject: [PATCH v2 3/3] Documentation: add devicetree bindings for Cavium
- Thunder SoC
-In-Reply-To: <4189666.qlSmlZKNNW@wuerfel>
-References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
- <1395652179-9216-4-git-send-email-mohun106@gmail.com>
- <4189666.qlSmlZKNNW@wuerfel>
-Message-ID: <CAC8NTUXBqLbZyBOzq=DZYY4xOMZo0Z4L6VtQUYsmWc2m4onapw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 25 Mar 2014 12:32:54 +0100
+Subject: [PATCH] clocksource: exynos_mct: Fix stall after CPU hotplugging
+In-Reply-To: <1395744087-8655-1-git-send-email-k.kozlowski@samsung.com>
+References: <1395744087-8655-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <53316966.90600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 4:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 14:39:39 mohun106 at gmail.com wrote:
->> diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
->> new file mode 100644
->> index 0000000..6ea0a34
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
->> @@ -0,0 +1,9 @@
->> +Cavium Thunder platform device tree bindings
->> +---------------------------------------------
->> +
->> +Boards with Cavium's Thunder SoC shall have following properties.
->> +
->> +Root Node
->> +---------
->> +Required root node properties:
->> +    - compatible = "cavium,thunder";
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
->> index 333f4ae..f6cadf1 100644
->> --- a/Documentation/devicetree/bindings/arm/cpus.txt
->> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
->> @@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
->>                             "arm,cortex-r4"
->>                             "arm,cortex-r5"
->>                             "arm,cortex-r7"
->> +                           "cavium,thunder"
->>                             "faraday,fa526"
->>                             "intel,sa110"
->>                             "intel,sa1100"
->
->
-> It seems very confusing to use the same name for both the SoC and the
-> CPU core. Can you guarantee that there will never be another SoC with
-> the same core, or a different CPU core in a SoC with the same name?
->
-> If not, please be more specific here and use the exact model names
-> rather than the product names.
+Hi Krzysztof,
 
-OK, will fix this once I discuss this internally.
+Two comments inline.
 
+On 25.03.2014 11:41, Krzysztof Kozlowski wrote:
+
+[snip]
+
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 48f76bc05da0..0b49b09dd1a9 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -339,7 +339,14 @@ static void exynos4_mct_tick_start(unsigned long cycles,
+>   static int exynos4_tick_set_next_event(unsigned long cycles,
+>   				       struct clock_event_device *evt)
+>   {
+> -	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+> +	/*
+> +	 * In case of hotplugging non-boot CPU, the set_next_event could be
+> +	 * called on CPU0 by ISR before IRQ affinity is set to proper CPU.
+
+Hmm, is this a desired behavior? I guess this is a question for Thomas 
+and Daniel.
+
+> +	 * Thus for accessing proper MCT Lx timer, 'per_cpu' for cpumask
+> +	 * in event must be used instead of 'this_cpu_ptr'.
+> +	 */
+> +	struct mct_clock_event_device *mevt = &per_cpu(percpu_mct_tick,
+> +			cpumask_first(evt->cpumask));
 >
->         Arnd
+>   	exynos4_mct_tick_start(cycles, mevt);
+>
+> @@ -371,23 +378,13 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+>
+>   static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+>   {
+> -	struct clock_event_device *evt = &mevt->evt;
+> -
+> -	/*
+> -	 * This is for supporting oneshot mode.
+> -	 * Mct would generate interrupt periodically
+> -	 * without explicit stopping.
+> -	 */
+> -	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> -		exynos4_mct_tick_stop(mevt);
+> -
+>   	/* Clear the MCT tick interrupt */
+>   	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
+>   		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+>   		return 1;
+> -	} else {
+> -		return 0;
+>   	}
+> +
+> +	return 0;
+
+Nobody seems to be checking return value of this function (and I don't 
+see what it could be used for anyway), so I guess it could be simply 
+made void.
+
+Best regards,
+Tomasz
