@@ -1,50 +1,46 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 25 Mar 2014 17:00:59 +0800
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
-Message-ID: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 25 Mar 2014 10:07:00 +0100
+Subject: [PATCH v3] i2c: new bus driver for efm32
+In-Reply-To: <20140324170131.GB7524@katana>
+References: <1395414236-22647-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140324170131.GB7524@katana>
+Message-ID: <20140325090700.GL23076@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 74397174989e5 (arm64: Fix duplicated Kconfig entries),
-I still get a duplicate Power management options section in linux-next
-git repo, may be due to some merge conflicts, anyway, fix that in this
-patch.
+Hello,
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
-Based on linux-next repo, weird, did I miss something?
----
- arch/arm64/Kconfig |   12 ------------
- 1 file changed, 12 deletions(-)
+On Mon, Mar 24, 2014 at 06:01:31PM +0100, Wolfram Sang wrote:
+> And checkpatch said:
+> 
+> WARNING: braces {} are not necessary for any arm of this statement
+> #345: FILE: drivers/i2c/busses/i2c-efm32.c:239:
+> +		if (cur_msg->flags & I2C_M_RD) {
+> ...
+hmm the whole block reads:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d9f23ad..6085dca 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -317,24 +317,12 @@ config ARCH_SUSPEND_POSSIBLE
- config ARM64_CPU_SUSPEND
- 	def_bool PM_SLEEP
- 
--endmenu
--
--menu "CPU Power Management"
--
- source "drivers/cpuidle/Kconfig"
- 
- source "drivers/cpufreq/Kconfig"
- 
- endmenu
- 
--menu "Power management options"
--
--source "kernel/power/Kconfig"
--
--source "drivers/cpufreq/Kconfig"
--
--endmenu
--
- source "net/Kconfig"
- 
- source "drivers/Kconfig"
+        case REG_STATE_STATE_DATA:
+                if (cur_msg->flags & I2C_M_RD) {
+                        efm32_i2c_recv_next_byte(ddata);
+                } else {
+                        /* wait for Ack or Nack of slave */
+                }
+                break;
+
+so just removing the braces does the wrong thing. Is this a false
+positive checkpatch warning? Andy? Joe?
+
+I can make it:
+
+		if (cur_msg->flags & I2C_M_RD)
+			efm32_i2c_recv_next_byte(ddata);
+		/* in the write case wait for Ack or Nack of slave */
+
+but I consider the version above more readable.
+
+Best regards
+Uwe
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
