@@ -1,192 +1,54 @@
 From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 25 Mar 2014 16:59:40 +0530
-Subject: [PATCH v2 2/3] arm64: dts: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140324102512.GC10341@e106331-lin.cambridge.arm.com>
+Date: Tue, 25 Mar 2014 17:00:55 +0530
+Subject: [PATCH v2 3/3] Documentation: add devicetree bindings for Cavium
+ Thunder SoC
+In-Reply-To: <4189666.qlSmlZKNNW@wuerfel>
 References: <1395652179-9216-1-git-send-email-mohun106@gmail.com>
- <1395652179-9216-3-git-send-email-mohun106@gmail.com>
- <20140324102512.GC10341@e106331-lin.cambridge.arm.com>
-Message-ID: <CAC8NTUXjj6WNMOyRbiCdRanFTp3p9f_kv4FExaStwnO1wYtcvg@mail.gmail.com>
+ <1395652179-9216-4-git-send-email-mohun106@gmail.com>
+ <4189666.qlSmlZKNNW@wuerfel>
+Message-ID: <CAC8NTUXBqLbZyBOzq=DZYY4xOMZo0Z4L6VtQUYsmWc2m4onapw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, Mar 24, 2014 at 3:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> On Mon, Mar 24, 2014 at 09:09:38AM +0000, mohun106 at gmail.com wrote:
->> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>
->> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> ---
->>  arch/arm64/boot/dts/Makefile    |    1 +
->>  arch/arm64/boot/dts/thunder.dts |  160 +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 161 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index c52bdb0..9cc8740 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,3 +1,4 @@
->> +dtb-$(CONFIG_ARCH_THUNDER) += thunder.dtb
->>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->>
->> diff --git a/arch/arm64/boot/dts/thunder.dts b/arch/arm64/boot/dts/thunder.dts
+On Mon, Mar 24, 2014 at 4:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 March 2014 14:39:39 mohun106 at gmail.com wrote:
+>> diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
 >> new file mode 100644
->> index 0000000..190e01a
+>> index 0000000..6ea0a34
 >> --- /dev/null
->> +++ b/arch/arm64/boot/dts/thunder.dts
->> @@ -0,0 +1,160 @@
->> +/*
->> + * Cavium Thunder DTS file
->> + *
->> + * Copyright (C) 2013, Cavium Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + */
->> +/dts-v1/;
+>> +++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+>> @@ -0,0 +1,9 @@
+>> +Cavium Thunder platform device tree bindings
+>> +---------------------------------------------
 >> +
->> +/memreserve/ 0x80000000 0x00010000;
->
-> Please add a comment as to what this is protecting (from the looks of
-> it, the spinning CPUs and the cpu release address). We are admittedly
-> lacking these on existing DTs (and I'll fix that up), but it would be
-> good to get into the habit now given it has been a source of confusion
-> for some.
-
-OK.
-
->
+>> +Boards with Cavium's Thunder SoC shall have following properties.
 >> +
->> +/ {
->> +     model = "Cavium Thunder";
->> +     compatible = "cavium,thunder";
->> +     interrupt-parent = <&gic0>;
->> +     #address-cells = <2>;
->> +     #size-cells = <2>;
->> +
->> +     aliases {
->> +             serial0 = &uaa0;
->> +             serial1 = &uaa1;
->> +     };
->> +
->> +     cpus {
->> +             #address-cells = <2>;
->> +             #size-cells = <0>;
->> +             cpu at 0 {
->> +                     device_type = "cpu";
->> +                     compatible = "cavium,thunder", "arm,armv8";
+>> +Root Node
+>> +---------
+>> +Required root node properties:
+>> +    - compatible = "cavium,thunder";
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 333f4ae..f6cadf1 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
+>>                             "arm,cortex-r4"
+>>                             "arm,cortex-r5"
+>>                             "arm,cortex-r7"
+>> +                           "cavium,thunder"
+>>                             "faraday,fa526"
+>>                             "intel,sa110"
+>>                             "intel,sa1100"
 >
-> This is the same as the compatible string for the SoC, which isn't a
-> good idea. Compatible strings should be globally unique.
 >
-> As far as I am aware, "Thunder" is the name of the SoC, not the CPU in
-> the SoC. Is there a name for the CPU in the Thunder SoC?
+> It seems very confusing to use the same name for both the SoC and the
+> CPU core. Can you guarantee that there will never be another SoC with
+> the same core, or a different CPU core in a SoC with the same name?
 >
-> Whatever name you have should be documented.
+> If not, please be more specific here and use the exact model names
+> rather than the product names.
 
-OK. I will change it to a specific name.
+OK, will fix this once I discuss this internally.
 
 >
-> [...]
->
->> +     memory at 0 {
->> +             device_type = "memory";
->> +             reg = <0x0 0x0 0x0 0x80000000>;
->> +     };
->> +
->> +     gic0: interrupt-controller at 801000000000 {
->
-> Please break the 32-bit halves of the unit-address with a comma (e.g.
-> 8010,00000000); it makes it easier to read the address. If you could
-> also do this on other unit-addresses it would be helpful.
-
-OK.
-
->
->> +             compatible = "arm,gic-v3";
->> +             #interrupt-cells = <3>;
->> +             #address-cells = <0>;
->> +             interrupt-controller;
->> +             reg = <0x8010 0x0 0x0 0x10000>,         /* GICD */
->> +                   <0x8010 0x80000000 0x0 0x100000>; /* GICR */
->
-> For legibility it would be nice for list entries to be consistently
-> padded to the same length.
-
-OK.
-
->
->> +             interrupts = <1 9 0xf04>;
->> +     };
->> +
->> +     timer {
->> +             compatible = "arm,armv8-timer";
->> +             interrupts = <1 13 0xff01>,
->> +                          <1 14 0xff01>,
->> +                          <1 11 0xff01>,
->> +                          <1 10 0xff01>;
->> +     };
->> +
->> +     soc {
->> +             compatible = "simple-bus";
->> +             #address-cells = <2>;
->> +             #size-cells = <2>;
->> +             ranges;
->> +
->> +             clocks {
->> +                     #address-cells = <2>;
->> +                     #size-cells = <2>;
->> +                     ranges;
->> +
->> +                     refclk50mhz: refclk50mhz {
->> +                             compatible = "fixed-clock";
->> +                             #clock-cells = <0>;
->> +                             clock-frequency = <50000000>;
->> +                             clock-output-names = "refclk50mhz";
->> +                     };
->> +             };
->
-> I don't think the clocks node adds anything here. It's missing a
-> compatible string list, and as clocks isn't a special reserved node
-> name, it and its children aren't supposed to be probed.
->
-> Why not just put the refclk50mhz directly under the parent node (the soc
-> simple-bus)?
-
-OK.
-
->
-> [...]
->
->> +             uaa0: uart at 87e024000000 {
->> +                     compatible = "arm,pl011", "arm,primecell";
->> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
->> +                     interrupts = <1 21 4>;
->> +                     clocks = <&refclk50mhz>;
->> +                     clock-names = "apb_pclk";
->
-> Is this also feeding the UARTCLK?
-
-Right now, this is for an internal emulation platform for our chip. So
-all these clock definitions are not applicable.
-In real chip, there will be other clock definitions coming.
-
->
->> +             };
->> +
->> +             uaa1: uart at 87e025000000 {
->> +                     compatible = "arm,pl011", "arm,primecell";
->> +                     reg = <0x87e0 0x25000000 0x0 0x1000>;
->> +                     interrupts = <1 22 4>;
->> +                     clocks = <&refclk50mhz>;
->> +                     clock-names = "apb_pclk";
->
-> Likewise?
->
-> Cheers,
-> Mark.
+>         Arnd
