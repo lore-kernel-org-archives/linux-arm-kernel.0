@@ -1,70 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 25 Mar 2014 10:16:25 +0100
-Subject: [PATCH 60/62] ARM: shmobile: work around CONFIG_PHYLIB=m
-In-Reply-To: <14100654.IXZcGSFRJS@wuerfel>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403211643.24533.arnd@arndb.de>
- <20140324013556.GF23924@verge.net.au> <14100654.IXZcGSFRJS@wuerfel>
-Message-ID: <20140325091625.GM23076@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 25 Mar 2014 10:32:32 +0100
+Subject: [PATCH 00/10] ARM: mvebu: Hardware coherency support for Armada
+ 375 and 38x
+In-Reply-To: <20140324160620.607c77cd@skate>
+References: <1394124395-20030-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140324160620.607c77cd@skate>
+Message-ID: <20140325093232.GH14983@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 01:04:57PM +0100, Arnd Bergmann wrote:
-> On Monday 24 March 2014 10:35:56 Simon Horman wrote:
-> > On Fri, Mar 21, 2014 at 04:43:24PM +0100, Arnd Bergmann wrote:
-> > > On Thursday 20 March 2014, Simon Horman wrote:
-> > > > I wonder if Kconfig for koelsch should be tightened up somehow to
-> > > > ensure that PHYLIB is either unselected or builtin.
-> > > > 
-> > > > Also, a minor nit, I would prefer changes for different boards
-> > > > in different patches. But I can split the patch myself if its
-> > > > not going to be changed otherwise.
-> > > 
-> > > I would prefer to take the entire series directly into arm-soc
-> > > this time, if you don't mind.
-> > 
-> > That I'm happy to go along with though I don't understand the motivation
-> > for it. And regardless of how the patches go in I'd prefer if they were
-> > split as I suggested above.
+On Mon, Mar 24, 2014 at 04:06:20PM +0100, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
 > 
-> Sorry, I misunderstood you at first. I thought you meant you only split
-> them up when you apply them yourself. It's no problem for me to split
-> up this patch as well and then apply it here.
-> 
-> > What I'm not so happy about is us potentially moving a problem from being a
-> > compile time error, which is easy to observe, to a run-time behavioural
-> > problem, which may be much less obvious to the beholder.
-> 
-> I agree that it's not nice, but I couldn't come with a better approach,
-> and we are doing the same thing on other platforms as well.
-> 
-> The problems are:
-> 
-> * leaving the code as it is today prevents me from running all
->   'make randconfig' kernels successfully. I use this as an important
->   test case for verifying stuff we pull into the arm-soc tree.
->   At the moment, I have a 160-patch series that I want to get merged
->   upstream over time.
-> 
-> * Using 'select PHYLIB' from the platform is nasty because we want
->   to be able to turn off whole subsystems (BLOCK, NET, I2C, ...)
->   in Kconfig independent of the board selection. PHYLIB requires
->   the network code.
-> 
-> * Using 'depends on' to disable the board option if PHYLIB is
->   a module is counterintuitive.
-> 
-> * Makeing PHYLIB always built-in when NETDEVICE is would be a
->   bit wasteful.
-maybe let the board
+> Any news about this patch set? It is not aimed at 3.15 as was discussed
+> already with Jason, but since I'd still like to have some early
+> comments about this patch series for 3.16, since we would also like to
+> land the Armada 375/38x SMP support in 3.16, which will sit on top of
+> this series.
 
-	select PHYLIB if NETDEVICE
+Hi Thomas
 
-is a nice compromise?
+I took a look at them. The XOR code is interesting. I guess it is not
+good for performance. A loud debug message would be useful to know
+when the workaround has been turned on.
 
-Best regards
-Uwe
+Once you send a rebase on 3.15 i can send an ACK.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+     Andrew
