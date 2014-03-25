@@ -1,60 +1,72 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 25 Mar 2014 19:45:55 -0300
-Subject: [PATCH] ARM: machine_power_off should not return
-In-Reply-To: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
-References: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140325224554.GC12185@arch.cereza>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 25 Mar 2014 23:48:15 +0100
+Subject: [PATCH v5 04/14] ARM: mvebu: Remove the unused argument of
+ set_cpu_coherent()
+In-Reply-To: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1395787705-31061-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's Cc: LAKML, and To: Russell.
+set_cpu_coherent() took the SMP group ID as parameter. But this
+parameter was never used, and the CPU always uses the SMP group 0. So
+we can remove this parameter.
 
-Russell, any comments on this?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 4 ++--
+ arch/arm/mach-mvebu/coherency.h | 2 +-
+ arch/arm/mach-mvebu/platsmp.c   | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-Without this patch we got the heartbeat's reboot_notifier called twice while
-testing the recent hibernation patches, which was unexpected and produced a
-kernel panic: https://lkml.org/lkml/2014/3/19/363
-
-Instead of fixing the heartbeat LED trigger, or the hibernation code, it
-seems better to fix the ARM machine_power_off, as it's not supposed to return.
-
-On Mar 24, Sebastian Capella wrote:
-> Add loop to prevent return from machine_power_off if
-> pm_power_off is null or does not halt the system.
-> This caused a panic during hibernation testing on Kirkwood
-> Openblocks A6 board.
-> 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  arch/arm/kernel/process.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index f58b723..6ffdc2c 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -217,6 +217,8 @@ void machine_power_off(void)
->  
->  	if (pm_power_off)
->  		pm_power_off();
-> +	while (1)
-> +		cpu_relax();
->  }
->  
->  /*
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 51010dbbf7e4..ad61251f7faf 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -46,7 +46,7 @@ static struct of_device_id of_coherency_table[] = {
+ /* Function defined in coherency_ll.S */
+ int ll_set_cpu_coherent(void);
+ 
+-int set_cpu_coherent(int smp_group_id)
++int set_cpu_coherent(void)
+ {
+ 	if (!coherency_base) {
+ 		pr_warn("Can't make current CPU cache coherent.\n");
+@@ -140,7 +140,7 @@ int __init coherency_init(void)
+ 		sync_cache_w(&coherency_phys_base);
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+-		set_cpu_coherent(0);
++		set_cpu_coherent();
+ 		of_node_put(np);
+ 	}
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index c7e5df368d98..dff16612dd93 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -15,8 +15,8 @@
+ #define __MACH_370_XP_COHERENCY_H
+ 
+ extern unsigned long coherency_phys_base;
++int set_cpu_coherent(void);
+ 
+-int set_cpu_coherent(int smp_group_id);
+ int coherency_init(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index a99d71a747f0..f2f1830063c8 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -102,7 +102,7 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	set_secondary_cpus_clock();
+ 	flush_cache_all();
+-	set_cpu_coherent(0);
++	set_cpu_coherent();
+ 
+ 	/*
+ 	 * In order to boot the secondary CPUs we need to ensure
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.2
