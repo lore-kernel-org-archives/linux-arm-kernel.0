@@ -1,39 +1,39 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 26 Mar 2014 00:36:49 +0100
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <5331CD43.1010601@ahsoftware.de>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>	<1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>	<20140316070917.GA3094@arch.cereza>	<CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>	<20140317204410.GA1118@arch.cereza>	<CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>	<20140319154434.GA3488@arch.cereza>	<CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
- <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
- <5331CD43.1010601@ahsoftware.de>
-Message-ID: <53321311.8060604@ahsoftware.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 26 Mar 2014 00:56:15 +0100
+Subject: [PATCH 0/2] pinctrl: rockchip: fix handling of first pinbank
+In-Reply-To: <20140325194357.GA27520@gmail.com>
+References: <1395700561-3793-1-git-send-email-b.galvani@gmail.com>
+ <2790002.5U2DHYmUbK@diego> <20140325194357.GA27520@gmail.com>
+Message-ID: <1647754.qr1tAySXax@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.03.2014 19:38, schrieb Alexander Holler:
+Am Dienstag, 25. M?rz 2014, 20:43:59 schrieb Beniamino Galvani:
+> On Tue, Mar 25, 2014 at 12:14:42AM +0100, Heiko St?bner wrote:
+> > GPIO0 only has the second two IOMUX registers:
+> > - GRF_GPIO0C_IOMUX at 0x68
+> > - GRF_GPIO0D_IOMUX at 0x6c
+> > which I guess is where my mistake comes from.
 
-> reboot too. Another solution would be to unregister the reboot_notifier
-> in the reboot_nofifier itself. I've just seen one watchdog driver
-> (drivers/rtc/rtc-m41t80.c) which does that. But I still think such
+[...] 
 
-That, btw. is broken. ;)
+> On radxa rock schematic pins GPIO0A* and GPIO0B* are labeled only as
+> gpios, without alternate functions like other pins; my guess is that
+> on rk3188 they can only act as gpios and so mux registers are not
+> needed for them.
 
-Right after having send the mail, I've became that intuition, had a look 
-and ... notifier.h does state the following:
+That was my guess too - especially as the registers are also missing.
 
-  * atomic_notifier_chain_unregister(), 
-blocking_notifier_chain_unregister(),
-  * and srcu_notifier_chain_unregister() _must not_ be called from within
-  * the call chain.
+Therefore I put together the following two patches to go on top of
+your patch and also make rockchip_set_mux honor this situation.
 
-(The reboot-notifier chain is of type blocking_notifier_chain)
 
-So I've picked up one user of reboot_notifier by random and had the luck 
-to choose a broken one. ;)
+Heiko Stuebner (2):
+  pinctrl: rockchip: add return value to rockchip_set_mux
+  pinctrl: rockchip: handle first half of rk3188-bank0 correctly
 
-I will make a patch and will have a look if the same failure can be 
-found elsewhere. There aren't that much users of the reboot-notifier, so 
-it shouldn't cost me that much time.
+ drivers/pinctrl/pinctrl-rockchip.c | 46 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 39 insertions(+), 7 deletions(-)
 
-Regards,
-
-Alexander Holler
+-- 
+1.9.0
