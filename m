@@ -1,39 +1,19 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Mar 2014 22:23:25 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140325211240.GB14718@obsidianresearch.com>
-References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
- <20140325202249.GA10378@obsidianresearch.com>
- <20140325213638.5aba54b6@skate>
- <20140325211240.GB14718@obsidianresearch.com>
-Message-ID: <20140325222325.253f4bd0@skate>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 25 Mar 2014 22:27:35 +0100
+Subject: [PATCH v7 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
+ controller
+In-Reply-To: <1395256879-8475-1-git-send-email-carlo@caione.org>
+Message-ID: <20140325212735.GA4853@localhost.fastwebnet.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+On Wed, Mar 19, 2014 at 08:21:16PM +0100, Carlo Caione wrote:
+> Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
+> Three register are present to (un)mask, control and acknowledge NMI.
+> These two patches add a new irqchip driver in cascade with GIC.
 
-On Tue, 25 Mar 2014 15:12:40 -0600, Jason Gunthorpe wrote:
-> On Tue, Mar 25, 2014 at 09:36:38PM +0100, Thomas Petazzoni wrote:
-> 
-> > We have recently identified a weird thing on Armada 38x, maybe previous
-> > revisions are affected as well. We haven't fully understood the problem
-> > yet, but the following patch allows PCIe devices to be detected in all
-> > situations on Armada 38x. It seems like setting the local device number
-> > requires "some time" to be taken into account.
-> 
-> What was the value of mvebu_pcie_link_up around this point?
-> 
-> PHY training would be the most likely time sensitive thing to muck up
-> discovery..
+Hi Thomas,
+Is this ok with the Maxime ACKs?
 
-The link is up, but the PCIe device is not visible under the right
-bus/device number until we call mvebu_pcie_set_local_dev_nr(), and wait
-about 50-100 microseconds. By "not visible", I mean reading the
-vendor/product ID from the PCI configuration space returns
-0xffff:0xffff, while after waiting 50-100 us, the right value is read.
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Carlo Caione
