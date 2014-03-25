@@ -1,74 +1,96 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 25 Mar 2014 18:49:26 +0800
-Subject: [PATCH 13/19] arm: dts: add omap5 CORE thermal data
+Date: Tue, 25 Mar 2014 18:49:16 +0800
+Subject: [PATCH 03/19] drivers: thermal: make usage of CONFIG_THERMAL_HWMON
+ optional
 In-Reply-To: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
 References: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1395744572-20014-14-git-send-email-alex.shi@linaro.org>
+Message-ID: <1395744572-20014-4-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eduardo Valentin <eduardo.valentin@ti.com>
 
-This patch changes a dtsi file to contain the thermal data
-for CORE domain on OMAP5 and later SoCs. This data will
-enable a thermal shutdown at 125C.
+When registering a new thermal_device, the thermal framework
+will always add a hwmon sysfs interface.
 
-This thermal data can be reused across TI SoC devices.
+This patch adds a flag to make this behavior optional. Now
+when registering a new thermal device, the caller can
+optionally inform if hwmon interface is desirable. This can
+be done by means of passing a thermal_zone_params.no_hwmon == true.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree at vger.kernel.org
+In order to keep same behavior as of today, all current
+calls will by default create the hwmon interface.
+
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: linux-acpi at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: Zhang Rui <rui.zhang@intel.com>
+Suggested-by: Wei Ni <wni@nvidia.com>
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-(cherry picked from commit dcb5004fceeb15f0fdfc4a2b8cd68c6ad515a80b)
+(cherry picked from commit ccba4ffd9eff6120a20cc7656458ac554aec4b0c)
 
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/boot/dts/omap5-core-thermal.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap5-core-thermal.dtsi
+ Documentation/thermal/sysfs-api.txt | 5 +++++
+ drivers/thermal/thermal_core.c      | 8 +++++---
+ include/linux/thermal.h             | 8 ++++++++
+ 3 files changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5-core-thermal.dtsi b/arch/arm/boot/dts/omap5-core-thermal.dtsi
-new file mode 100644
-index 0000000..19212ac
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5-core-thermal.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * Device Tree Source for OMAP543x SoC CORE thermal
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ * Contact: Eduardo Valentin <eduardo.valentin@ti.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
+index a71bd5b..37c5486 100644
+--- a/Documentation/thermal/sysfs-api.txt
++++ b/Documentation/thermal/sysfs-api.txt
+@@ -142,6 +142,11 @@ temperature) and throttle appropriate devices.
+     This is an optional feature where some platforms can choose not to
+     provide this data.
+     .governor_name: Name of the thermal governor used for this zone
++    .no_hwmon: a boolean to indicate if the thermal to hwmon sysfs interface
++               is required. when no_hwmon == false, a hwmon sysfs interface
++               will be created. when no_hwmon == true, nothing will be done.
++               In case the thermal_zone_params is NULL, the hwmon interface
++               will be created (for backward compatibility).
+     .num_tbps: Number of thermal_bind_params entries for this zone
+     .tbp: thermal_bind_params entries
+ 
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index a3d1976..4f4b788 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -1460,9 +1460,11 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+ 
+ 	mutex_unlock(&thermal_governor_lock);
+ 
+-	result = thermal_add_hwmon_sysfs(tz);
+-	if (result)
+-		goto unregister;
++	if (!tz->tzp || !tz->tzp->no_hwmon) {
++		result = thermal_add_hwmon_sysfs(tz);
++		if (result)
++			goto unregister;
++	}
+ 
+ 	mutex_lock(&thermal_list_lock);
+ 	list_add_tail(&tz->node, &thermal_tz_list);
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index a386a1c..b4a975f 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -214,6 +214,14 @@ struct thermal_bind_params {
+ /* Structure to define Thermal Zone parameters */
+ struct thermal_zone_params {
+ 	char governor_name[THERMAL_NAME_LENGTH];
 +
-+#include <dt-bindings/thermal/thermal.h>
++	/*
++	 * a boolean to indicate if the thermal to hwmon sysfs interface
++	 * is required. when no_hwmon == false, a hwmon sysfs interface
++	 * will be created. when no_hwmon == true, nothing will be done
++	 */
++	bool no_hwmon;
 +
-+core_thermal: core_thermal {
-+	polling-delay-passive = <250>; /* milliseconds */
-+	polling-delay = <1000>; /* milliseconds */
-+
-+			/* sensor       ID */
-+	thermal-sensors = <&bandgap     2>;
-+
-+	trips {
-+		core_crit: core_crit {
-+			temperature = <125000>; /* milliCelsius */
-+			hysteresis = <2000>; /* milliCelsius */
-+			type = "critical";
-+		};
-+	};
-+};
+ 	int num_tbps;	/* Number of tbp entries */
+ 	struct thermal_bind_params *tbp;
+ };
 -- 
 1.8.1.2
