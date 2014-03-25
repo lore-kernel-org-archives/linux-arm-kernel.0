@@ -1,47 +1,90 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 25 Mar 2014 09:28:01 +0200
-Subject: [PATCH 0/4] clk: dt: add support for default rate/parent
-In-Reply-To: <20140325003847.32624.58084@quantum>
-References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
- <53172239.3030705@ti.com> <20140320212308.21989.36094@quantum>
- <20140321081217.GD26674@tbergstrom-lnx.Nvidia.com>
- <20140325003847.32624.58084@quantum>
-Message-ID: <20140325072801.GH6922@tbergstrom-lnx.Nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Mar 2014 07:33:46 +0000
+Subject: [PATCH v2 02/19] arm64: initial support for GICv3
+In-Reply-To: <CABg9mcucJ_UouRbJ_Urirz6ita5uUvYuQkmeA1-Df00KSjFcnA@mail.gmail.com>
+References: <1395316386-12617-1-git-send-email-marc.zyngier@arm.com>
+ <1395316386-12617-3-git-send-email-marc.zyngier@arm.com>
+ <CAMDttNew0S7xVVKge7AAR3W6bdQzKdvN9Z7cHPDUCq=jZ98q1A@mail.gmail.com>
+ <533012B8.2070303@arm.com>
+ <CABg9mcucJ_UouRbJ_Urirz6ita5uUvYuQkmeA1-Df00KSjFcnA@mail.gmail.com>
+Message-ID: <5331315A.9010001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 01:38:47AM +0100, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2014-03-21 01:12:17)
-> > On Thu, Mar 20, 2014 at 10:23:08PM +0100, Mike Turquette wrote:
-> > > Quoting Tero Kristo (2014-03-05 05:10:17)
-> > > > Ping.
-> > > > 
-> > > > Mike, any feedback on this?
-> > > 
-> > > Hi Tero,
-> > > 
-> > > Have you seen Sylwester's approach[1]? I prefer it since it is more
-> > > device-oriented and less "centralized". The clock consumer enumerates
-> > > the default parent or rate of a consumed clock. This can be made to work
-> > 
-> > That assumes driver writers are aware of the clock tree topology. IME that's
-> > seldomly the case.
+On 25/03/14 06:35, Z Lim wrote:
+> Hi Marc,
 > 
-> It assumes no such thing.
+> On Mon, Mar 24, 2014 at 4:10 AM, Marc Zyngier <marc.zyngier@arm.com
+> <mailto:marc.zyngier@arm.com>> wrote:
+>>
+>> Hi Zi,
+>>
+>> On 22/03/14 01:21, Zi Shen Lim wrote:
+>> > Hi Marc,
+>> >
+>> > On Thu, Mar 20, 2014 at 4:52 AM, Marc Zyngier <marc.zyngier@arm.com
+> <mailto:marc.zyngier@arm.com>
+>> > <mailto:marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>>> wrote:
+>> > <snip>
+>> >
+>> >
+>> >     +       /*
+>> >     +        * Find out how many interrupts are supported.
+>> >     +        * The GIC only supports up to 1020 interrupt sources
+>> >     (SGI+PPI+SPI)
+>> >     +        */
+>> >     +       gic_irqs = readl_relaxed(gic_data.dist_base + GICD_TYPER) &
+>> >     0x1f;
+>> >     +       gic_irqs = (gic_irqs + 1) * 32;
+>> >     +       if (gic_irqs > 1020)
+>> >     +               gic_irqs = 1020;
+>> >     +       gic_data.irq_nr = gic_irqs;
+>> >     +
+>> >     +       gic_data.domain = irq_domain_add_linear(node, gic_irqs - 16,
+>> >     +                                               &gic_irq_domain_ops,
+>> >     &gic_data);
+>> >
+>> >
+>> > Why gic_irqs - 16?
+>>
+>> Because we keep the SGIs (all 16 of them) for the core kernel (drivers
+>> are not allowed to request them).
+>>
+>> >
+>> >     __irq_domain_add(of_node, size, size, 0, ops, host_data);
+>> >
+>> >         domain->hwirq_max = hwirq_max;
+>> >
+>> >
+>> > So hwirq_max is effectively set to actual_hwirq_max-16.
+>> >
+>> > Later, the following warning can be triggered:
+>> >
+>> >     int irq_domain_associate(struct irq_domain *domain, unsigned int
+> virq,
+>> >                              irq_hw_number_t hwirq)
+>> >     {
+>> >             struct irq_data *irq_data = irq_get_irq_data(virq);
+>> >             int ret;
+>> >
+>> >             if (WARN(hwirq >= domain->hwirq_max,
+>> >                      "error: hwirq 0x%x is too large for %s\n",
+>> >     (int)hwirq, domain->name))
+>> >                     return -EINVAL;
+>>
+>> Do you actually see this warning being triggered? I don't. We're using a
+>> linear domain that doesn't call into this function.
 > 
-> The point of Sylwester's patch is that if a driver consumes a clock and
-> needs to do the very typical setup regarding that clock's rate or
-> parent, then we now have a sensible way to express that in DT.
-> 
-> One of the strengths of DT is that the C code does not have to know all
-> of the details about topology or how things are hooked up. We can hide
-> some of those cute embedded nonsense hacks in DTS and the device
-> integrator can manage it there.
+> I see this warning :(
+> You can trigger it when a device's INT# falls within [gic_irqs-16,
+> gic_irqs), which lines up with the -16 above.
 
-It would be much better to specify this as part of the clock provider binding
-though, as the person writing those, generally knows what topology needs to be
-setup. The driver writer writing the consumer node often doesn't.
+Ah, got you. Hmmm. I may have to be slightly more creative then.
+
+Thanks a lot for the report, I'll fix that as quickly as possible.
 
 Cheers,
 
-Peter.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
