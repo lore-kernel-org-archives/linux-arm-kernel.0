@@ -1,77 +1,148 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 25 Mar 2014 10:02:21 -0500
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
-In-Reply-To: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
-References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <53319A7D.1060904@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Mar 2014 16:17:18 +0100
+Subject: [PATCH 3/3] ARM: kprobes: Fix test code compilation errors for
+ ARMv4 targets
+In-Reply-To: <1395759284.3478.88.camel@linaro1.home>
+References: <1394556894-18592-1-git-send-email-tixy@linaro.org>
+ <6485768.fvJS4nr3cP@wuerfel> <1395759284.3478.88.camel@linaro1.home>
+Message-ID: <4547839.aLXsq7v8z4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 12:20 AM, Lokesh Vutla wrote:
-> From: Dave Gerlach <d-gerlach@ti.com>
+On Tuesday 25 March 2014 14:54:44 Jon Medhurst wrote:
+> On Tue, 2014-03-25 at 14:42 +0100, Arnd Bergmann wrote:
+> > On Tuesday 25 March 2014 09:27:29 David Long wrote:
+> > > On 03/11/14 12:54, Jon Medhurst wrote:
+> > > > Conditionally compile kprobes test cases for ARMv5 instructions to avoid
+> > > > compilation errors with ARMv4 targets like:
+> > > >
+> > > > /tmp/cc7Tx8ST.s:16740: Error: selected processor does not support ARM mode `clz r0,r0'
+> > > >
+> > > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > > 
+> > > This looks OK to me.  Feel free to add my ack.
+> > 
+> > Ah, I had a similar patch in my 'randconfig-fixes' series.
 > 
-> Do not reset GPIO5 at boot-up because GPIO5_7 is used
-> on AM437x GP-EVM to control VTT regulators on DDR3.
-> Without this some GP-EVM boards will fail to boot because
-> of DDR3 corruption.
+> Where's that?
+
+http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=arm-randconfig
+
+> >  I noticed three
+> > other configurations that are broken with kprobes-test:
+> > 
+> > - ARMv3 (enabled by ARCH_RPC)
 > 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Tested-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> This is applied on top of current linux-next.
-> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git master
+> Didn't know we support < ARMv4!
+
+We don't really (any more). RPC is a v4 CPU, but we build the kernel
+pretending it is v3 to work around some issue I don't remember.
+
+> > - ARMv7-M (enabled by ARCH_EFM32)
 > 
->  arch/arm/boot/dts/am437x-gp-evm.dts |    5 +++++
->  1 file changed, 5 insertions(+)
+> I guess that problem is because randconfig is enabling HAVE_KPROBES,
+> even though it wouldn't normally be selected, because we have
 > 
-> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-> index df8798e..a055f7f 100644
-> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-> @@ -117,6 +117,11 @@
->  	status = "okay";
->  };
->  
-> +&gpio5 {
-> +	status = "okay";
-> +	ti,no-reset-on-init;
-> +};
-> +
->  &mmc1 {
->  	status = "okay";
->  	vmmc-supply = <&vmmcsd_fixed>;
+>    config ARCH_ARM
+> 	select HAVE_KPROBES if !XIP_KERNEL
 > 
+> and ARCH_EFM32 is XIP_KERNEL.
+
+Right. EFM32 can in theory run without XIP_KERNEL, but the only
+board we support doesn't have enough RAM for that.
+
+> I think this problem goes all the way back to the commit which added
+> HAVE_KPROBES to all arches (3f550096dede4430f83b16457da83bf429155ac2)
+> That replaced 
+> 
+>    config KPROBES
+> 	depends on ... (ARM && !XIP_KERNEL)
+> 
+> with the current select if !XIP_KERNEL, which made it possible to enable
+> kprobes for XIP when before we couldn't. And presumably that was for a
+> good reason like it doesn't work on XIP?
+
+The text segment is very read-only in XIP_KERNEL, so anything that tries
+to overwrite instructions can't work.
+
+> Not sure at the moment how best to fix that. (Making ARM_KPROBES_TEST
+> depend on !XIP_KERNEL doesn't solve the underlying problem of KPROBES
+> feature still being enabled for XIP kernels.)
+
+Regardless of XIP, there is the other problem of ARMv7-M support, which
+in particular only has THUMB2 instructions:
+
+  CC      arch/arm/kernel/kprobes.o
+/tmp/cclbjgU2.s: Assembler messages:
+	/tmp/cclbjgU2.s:701: Error: selected processor does not support Thumb mode `rfeia sp!'
+make[3]: *** [arch/arm/kernel/kprobes.o] Error 1
+  CC      arch/arm/kernel/kprobes-thumb.o
+/tmp/ccwlnR1o.s: Assembler messages:
+/tmp/ccwlnR1o.s:315: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r0'
+/tmp/ccwlnR1o.s:317: Error: selected processor does not support requested special purpose register -- `mrs r0,cpsr'
+/tmp/ccwlnR1o.s:673: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r3'
+/tmp/ccwlnR1o.s:675: Error: selected processor does not support requested special purpose register -- `mrs r3,cpsr'
+/tmp/ccwlnR1o.s:919: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r8'
+/tmp/ccwlnR1o.s:923: Error: selected processor does not support requested special purpose register -- `mrs r9,cpsr'
+/tmp/ccwlnR1o.s:960: Error: selected processor does not support requested special purpose register -- `msr cpsr_fs,r8'
+/tmp/ccwlnR1o.s:964: Error: selected processor does not support requested special purpose register -- `mrs r9,cpsr'
+make[3]: *** [arch/arm/kernel/kprobes-thumb.o] Error 1
+  CC      arch/arm/kernel/kprobes-test.o
+/tmp/ccVIP6jA.s: Assembler messages:
+/tmp/ccVIP6jA.s:1354: Error: selected processor does not support ARM opcodes
+/tmp/ccVIP6jA.s:1355: Error: attempt to use an ARM instruction on a Thumb-only processor -- `orr lr,lr,#1'
+/tmp/ccVIP6jA.s:1356: Error: attempt to use an ARM instruction on a Thumb-only processor -- `ldr pc,1f'
+make[3]: *** [arch/arm/kernel/kprobes-test.o] Error 1
+  CC      arch/arm/kernel/kprobes-test-thumb.o
+/tmp/ccN8WTB4.s: Assembler messages:
+/tmp/ccN8WTB4.s:2032: Error: selected processor does not support ARM opcodes
+/tmp/ccN8WTB4.s:2033: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
+/tmp/ccN8WTB4.s:2034: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
+/tmp/ccN8WTB4.s:4183: Error: selected processor does not support ARM opcodes
+/tmp/ccN8WTB4.s:4184: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
+/tmp/ccN8WTB4.s:4185: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
+/tmp/ccN8WTB4.s:4222: Error: selected processor does not support ARM opcodes
+/tmp/ccN8WTB4.s:4223: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
+/tmp/ccN8WTB4.s:4224: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
+/tmp/ccN8WTB4.s:5618: Error: selected processor does not support Thumb mode `rfedb sp'
+/tmp/ccN8WTB4.s:5639: Error: selected processor does not support Thumb mode `rfeia sp'
+/tmp/ccN8WTB4.s:5660: Error: selected processor does not support Thumb mode `rfedb sp!'
+/tmp/ccN8WTB4.s:5681: Error: selected processor does not support Thumb mode `rfeia sp!'
+/tmp/ccN8WTB4.s:6489: Error: selected processor does not support ARM opcodes
+/tmp/ccN8WTB4.s:6490: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
+/tmp/ccN8WTB4.s:6491: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
+/tmp/ccN8WTB4.s:6528: Error: selected processor does not support ARM opcodes
+/tmp/ccN8WTB4.s:6529: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr lr,2f+1'
+/tmp/ccN8WTB4.s:6530: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx lr'
+/tmp/ccN8WTB4.s:7521: Error: selected processor does not support Thumb mode `strexd r0,r1,[r2]'
+/tmp/ccN8WTB4.s:7584: Error: selected processor does not support Thumb mode `ldrexd r0,[r1]'
+/tmp/ccN8WTB4.s:15321: Error: selected processor does not support Thumb mode `pkhbt r0,r0,r1'
+/tmp/ccN8WTB4.s:15350: Error: selected processor does not support Thumb mode `pkhbt r14,r12,r10,lsl#2'
+/tmp/ccN8WTB4.s:15379: Error: selected processor does not support Thumb mode `pkhtb r0,r0,r1'
+/tmp/ccN8WTB4.s:15408: Error: selected processor does not support Thumb mode `pkhtb r14,r12,r10,asr#2'
+/tmp/ccN8WTB4.s:18355: Error: selected processor does not support Thumb mode `ssat16 r0,#12,r0'
+
+> > - CPU_ENDIAN_BE32 (enabled by building a big-endian kernel on ARMv5 or older)
+> 
+> > Should we treat those the same way, or just disable Kprobes for this case
+> > if nobody cares?
+> 
+> For CPU_ENDIAN_BE32 I have a feeling that the kprobes code wouldn't
+> work, would have to think more about why I have that feeling. If it
+> doesn't, we come back to the problem that arch code can't add
+> dependencies to CONFIG_KPROBES as things stand.
+
+The error message I get here is
+
+arnd at wuerfel:~/arm-soc$ make O=build/0xCD5BF01B_defconfig/  -skj40
+/git/arm-soc/Makefile:629: Cannot use CONFIG_CC_STACKPROTECTOR_STRONG: -fstack-protector-strong not supported by compiler
+/git/arm-soc/arch/arm/kernel/patch.c: In function '__patch_text':
+/git/arm-soc/arch/arm/kernel/patch.c:35:4: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
+    insn = __opcode_to_mem_thumb32(insn);
+    ^
 
 
-Tony,
-any chance of having this in 3.15 cycle?
+I've filed that for now in the "wontfix" category, but I though I'd bring
+it up anyway.
 
-as of today's linux-next tag, the only platform I have that does not
-boot is due to the lack of this patch.
-
-
-next-20140325-omap2plus_defconfig
- 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20o6CfGL8
- 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2Ogu1zPtD
- 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2m2WhHYO8
- 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2jOybaVno
- 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21tt52N4b
- 6: am43xx-gpevm:  Boot FAIL: http://slexy.org/raw/s21eDQmFWJ
- 7: beagleboard:  Boot PASS: http://slexy.org/raw/s2q7vzrZHb
- 8: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2HCAJVz0H
- 9: beaglebone:  Boot PASS: http://slexy.org/raw/s2NioACYsM
-10: craneboard:  Boot PASS: http://slexy.org/raw/s2s7jyo52c
-11:       dra7:  Boot PASS: http://slexy.org/raw/s2OQ1BMerx
-12:        ldp:  Boot PASS: http://slexy.org/raw/s2cWgQrdjb
-13: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2lOaznVLO
-14:    sdp2430:  Boot PASS: http://slexy.org/raw/s21RCJlUDU
-15:    sdp3430:  Boot PASS: http://slexy.org/raw/s2181J9eWO
-16:    sdp4430:  Boot PASS: http://slexy.org/raw/s20UumAiXK
-17: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s21ypXvTNc
-TOTAL = 17 boards, Booted Boards = 16, No Boot boards = 1
-
--- 
-Regards,
-Nishanth Menon
+	Arnd
