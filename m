@@ -1,32 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Mar 2014 21:20:10 +0100
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 25 Mar 2014 14:22:49 -0600
 Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
 In-Reply-To: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
 References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
-Message-ID: <20140325212010.17711434@skate>
+Message-ID: <20140325202249.GA10378@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Neil Greatorex,
+On Tue, Mar 25, 2014 at 08:07:59PM +0000, Neil Greatorex wrote:
 
-On Tue, 25 Mar 2014 20:07:59 +0000, Neil Greatorex wrote:
-
-> I've recently acquired a mini-PCIe Intel dual Gigabit Ethernet card
-> and was hoping to add it to my Globalscale Mirabox (based on the
-> Marvell Armada 370 SoC).
-> 
-> I have built the kernel from
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux based on
-> v3.14.0-rc8, with CONFIG_PCI_MVEBU=y and CONFIG_IGB=m.
-> 
-> When the system boots, it doesn't detect the PCIe card. Here's the
-> output of lspci:
-> 
 > mirabox ~ # lspci
 > 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
 > 00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
 > 02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
-> 
+
+A starting guess is that something to do with the reset sequence is
+not long enough. PCI requires a certain time in-reset before a device
+is required to respond to configuration... Depending on what your
+bootloader does Linux might be the first thing to enable the link. Add
+a 1 second sleep to the mvebu driver before the bus scan and see if
+that helps?
+
 > Output from dmesg after boot: https://gist.github.com/ngreatorex/9769713
 > Output of "lspci -vvv" after boot: https://gist.github.com/ngreatorex/9769732
 > 
@@ -41,30 +35,27 @@ On Tue, 25 Mar 2014 20:07:59 +0000, Neil Greatorex wrote:
 > Connection (rev 01)
 > 01:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network
 > Connection (rev 01)
+
 > 02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev ff)
-> 03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
-> 
-> Output from dmesg including the oops: https://gist.github.com/ngreatorex/9769438
-> Output of "lspci -vvv" now: https://gist.github.com/ngreatorex/9769327
-> 
+> 03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02) (prog-if 30 [XHCI])
+ ^^^^^^^^^^^
+
+That is *really* weird looking - plus this:
+
+02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev ff) (prog-if ff)
+        !!! Unknown header type 7f
+        Kernel driver in use: xhci_hcd
+
+Something really wonky happend here during the rescan. It looks like
+for some reason the USB controller was seen on the wrong port for a
+short time!? It would be awesome to track this down..
+
 > I'm afraid that I have zero knowledge of PCI so I'm not sure where to
 > start with debugging this. I would appreciate it if someone could give
 > me some pointers? If you want any extra debugging information then
 > just ask...
 
-Willy Tarreau has also reported issues with igb cards on Marvell
-platforms using the pci-mvebu driver. I think in his case the card was
-detected even at boot time, but he had similar MSI-X issues later on.
-Willy gave me one of these cards last month, but I haven't had the time
-to look into the problem yet.
+Hopefully Thomas can comment on the MSI oops.. But it might very well
+be related to the xhci controller going insane.
 
-I'll try to find some time to debug this in the near future, at which
-point I'll most likely get back to you with some patches to test things.
-
-Thanks for the report!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason
