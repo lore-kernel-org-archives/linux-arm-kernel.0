@@ -1,173 +1,142 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:20:00 +0000
-Subject: [RFC 43/47] mtd: nand: stm_nand_bch: read and write functions (BCH)
+Date: Tue, 25 Mar 2014 08:20:03 +0000
+Subject: [RFC 46/47] mtd: nand: mtd_nand_bch: add remaining FLEX functions
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-44-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-47-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Helper function for bch_mtd_read() and bch_mtd_write() to handle
-multi-page or non-aligned reads and writes respectively.
+Including a dummy function for selecting chips which isn't supported by
+our driver, the wait function as requested by the NAND sub system, a read
+Byte function also requested by NAND and finally a command function which
+provides a partial implementation of MTD/NAND Interface, based on
+Hamming-FLEX operation which allows us to make use of nand_base.c functions
+where possible (i.e.nand_scan_ident()).
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 143 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 143 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 101 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 389ccee..bcaed32 100644
+index 975326e..4103d4f 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -507,6 +507,149 @@ static uint8_t bch_write_page(struct nandi_controller *nandi,
- 	return status;
+@@ -686,6 +686,103 @@ static void flex_addr(struct nandi_controller *nandi,
+ 	writel(addr, nandi->base + NANDHAM_FLEX_ADD);
  }
  
-+/* Helper function for bch_mtd_read to handle multi-page or non-aligned reads */
-+static int bch_read(struct nandi_controller *nandi,
-+		    loff_t from, size_t len,
-+		    size_t *retlen, u_char *buf)
++/*
++ * Partial implementation of MTD/NAND Interface, based on Hamming-FLEX
++ * operation.
++ *
++ * Allows us to make use of nand_base.c functions where possible
++ * (e.g. nand_scan_ident() and friends).
++ */
++static void flex_command_lp(struct mtd_info *mtd, unsigned int command,
++			    int column, int page)
 +{
-+	struct mtd_ecc_stats stats;
-+	uint32_t page_size = nandi->info.mtd.writesize;
-+	uint32_t col_offs;
-+	loff_t page_mask;
-+	loff_t page_offs;
-+	int ecc_errs, max_ecc_errs = 0;
-+	int page_num;
-+	size_t bytes;
-+	uint8_t *p;
-+	bool bounce = false;
++	struct nand_chip *chip = mtd->priv;
++	struct nandi_controller *nandi = chip->priv;
 +
-+	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
-+		(unsigned long long)len, from);
++	emiss_nandi_select(STM_NANDI_HAMMING);
 +
-+	stats = nandi->info.mtd.ecc_stats;
-+	page_mask = (loff_t)page_size - 1;
-+	col_offs  = (uint32_t)(from & page_mask);
-+	page_offs = from & ~page_mask;
-+	page_num  = (int)(page_offs >> nandi->page_shift);
-+
-+	while (len > 0) {
-+		bytes = min((page_size - col_offs), len);
-+
-+		if ((bytes != page_size) ||
-+		    ((unsigned int)buf & (NANDI_BCH_DMA_ALIGNMENT - 1)) ||
-+		    (!virt_addr_valid(buf))) /* vmalloc'd buffer! */
-+			bounce = true;
-+
-+		if (page_num == nandi->cached_page) {
-+			memcpy(buf, nandi->page_buf + col_offs, bytes);
-+			goto done;
-+		}
-+
-+		p = bounce ? nandi->page_buf : buf;
-+
-+		ecc_errs = bch_read_page(nandi, page_offs, p);
-+		if (bounce)
-+			memcpy(buf, p + col_offs, bytes);
-+
-+		if (ecc_errs < 0) {
-+			dev_err(nandi->dev,
-+				"%s: uncorrectable error at 0x%012llx\n",
-+				__func__, page_offs);
-+			nandi->info.mtd.ecc_stats.failed++;
-+
-+			/* Do not cache uncorrectable pages */
-+			if (bounce)
-+				nandi->cached_page = -1;
-+
-+			goto done;
-+		}
-+
-+		if (ecc_errs) {
-+			dev_info(nandi->dev,
-+				 "%s: corrected %u error(s) at 0x%012llx\n",
-+				 __func__, ecc_errs, page_offs);
-+
-+			nandi->info.mtd.ecc_stats.corrected += ecc_errs;
-+
-+			if (ecc_errs > max_ecc_errs)
-+				max_ecc_errs = ecc_errs;
-+		}
-+
-+		if (bounce)
-+			nandi->cached_page = page_num;
-+
-+done:
-+		buf += bytes;
-+		len -= bytes;
-+
-+		if (retlen)
-+			*retlen += bytes;
-+
-+		/* We are now page-aligned */
-+		page_offs += page_size;
-+		page_num++;
-+		col_offs = 0;
++	switch (command) {
++	case NAND_CMD_READOOB:
++		/* Emulate NAND_CMD_READOOB */
++		column += mtd->writesize;
++		command = NAND_CMD_READ0;
++		break;
++	case NAND_CMD_READ0:
++	case NAND_CMD_ERASE1:
++	case NAND_CMD_SEQIN:
++	case NAND_CMD_RESET:
++	case NAND_CMD_PARAM:
++		/* Prime RBn wait */
++		nandi_enable_interrupts(nandi, NAND_INT_RBN);
++		reinit_completion(&nandi->rbn_completed);
++		break;
++	case NAND_CMD_READID:
++	case NAND_CMD_STATUS:
++	case NAND_CMD_ERASE2:
++		break;
++	default:
++		/* Catch unexpected commands */
++		BUG();
 +	}
 +
-+	/* Return '-EBADMSG' on uncorrectable errors */
-+	if (nandi->info.mtd.ecc_stats.failed - stats.failed)
-+		return -EBADMSG;
++	/*
++	 * Command Cycle
++	 */
++	flex_cmd(nandi, command);
 +
-+	return max_ecc_errs;
++	/*
++	 * Address Cycles
++	 */
++	if (column != -1)
++		flex_addr(nandi, column,
++			  (command == NAND_CMD_READID) ? 1 : 2);
++
++	if (page != -1)
++		flex_addr(nandi, page, nandi->extra_addr ? 3 : 2);
++
++	/* Complete 'READ0' command */
++	if (command == NAND_CMD_READ0)
++		flex_cmd(nandi, NAND_CMD_READSTART);
++
++	/* Wait for RBn, if required                        */
++	/* (Note, other commands may handle wait elsewhere) */
++	if (command == NAND_CMD_RESET ||
++	    command == NAND_CMD_READ0 ||
++	    command == NAND_CMD_PARAM) {
++		flex_wait_rbn(nandi);
++		nandi_disable_interrupts(nandi, NAND_INT_RBN);
++	}
 +}
 +
-+/* Helper function for mtd_write, to handle multi-page and non-aligned writes */
-+static int bch_write(struct nandi_controller *nandi,
-+		     loff_t to, size_t len,
-+		     size_t *retlen, const uint8_t *buf)
++static uint8_t flex_read_byte(struct mtd_info *mtd)
 +{
-+	uint32_t page_size = nandi->info.mtd.writesize;
-+	int page_num;
-+	bool bounce = false;
-+	const uint8_t *p = NULL;
-+	uint8_t ret;
++	struct nand_chip *chip = mtd->priv;
++	struct nandi_controller *nandi = chip->priv;
 +
-+	dev_dbg(nandi->dev, "%s: %llu @ 0x%012llx\n", __func__,
-+		(unsigned long long)len, to);
++	emiss_nandi_select(STM_NANDI_HAMMING);
 +
-+	BUG_ON(len & (page_size - 1));
-+	BUG_ON(to & (page_size - 1));
-+
-+	if (((unsigned long)buf & (NANDI_BCH_DMA_ALIGNMENT - 1)) ||
-+	    !virt_addr_valid(buf)) { /* vmalloc'd buffer! */
-+		bounce = true;
-+	}
-+
-+	page_num = (int)(to >> nandi->page_shift);
-+
-+	while (len > 0) {
-+		if (bounce) {
-+			memcpy(nandi->page_buf, buf, page_size);
-+			p = nandi->page_buf;
-+			nandi->cached_page = -1;
-+		} else {
-+			p = buf;
-+		}
-+
-+		if (nandi->cached_page == page_num)
-+			nandi->cached_page = -1;
-+
-+		ret = bch_write_page(nandi, to, p);
-+		if (ret & NAND_STATUS_FAIL)
-+			return -EIO;
-+
-+		to += page_size;
-+		page_num++;
-+		buf += page_size;
-+		len -= page_size;
-+
-+		if (retlen)
-+			*retlen += page_size;
-+	}
-+
-+	return 0;
++	return (uint8_t)(readl(nandi->base + NANDHAM_FLEX_DATA) & 0xff);
 +}
 +
- /*
-  * Hamming-FLEX operations
-  */
++static int flex_wait_func(struct mtd_info *mtd, struct nand_chip *chip)
++{
++	struct nandi_controller *nandi = chip->priv;
++
++	emiss_nandi_select(STM_NANDI_HAMMING);
++
++	flex_wait_rbn(nandi);
++
++	flex_cmd(nandi, NAND_CMD_STATUS);
++
++	return (int)(readl(nandi->base + NANDHAM_FLEX_DATA) & 0xff);
++}
++
++/* Multi-CS devices not supported */
++static void flex_select_chip(struct mtd_info *mtd, int chipnr)
++{
++
++}
++
+ static void flex_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1812,6 +1909,10 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
+ 	chip->priv = nandi;
+ 	chip->ecc.layout = &info->ecclayout;
+ 
++	chip->cmdfunc = flex_command_lp;
++	chip->read_byte = flex_read_byte;
++	chip->select_chip = flex_select_chip;
++	chip->waitfunc = flex_wait_func;
+ 	chip->read_buf = flex_read_buf;
+ 	chip->write_buf = flex_write_buf;
+ 
 -- 
 1.8.3.2
