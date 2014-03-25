@@ -1,138 +1,106 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:26 +0000
-Subject: [RFC 09/47] mtd: nand: stm_nand_bch: introduce and initialise some
- important data structures
+Date: Tue, 25 Mar 2014 08:19:25 +0000
+Subject: [RFC 08/47] mtd: nand: stm_nand_bch: supply clock support
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide some more in-depth structures which will be used heavily within
-the driver. We also add a convenience function, used to set the default
-values.
+Add support for clocks when, and only when, they are supplied. It is
+not yet compulsory to provide the BCH and EMI clocks, as Common Clk isn't
+supported Mainline yet. Until an implementation lands upstream all clocks
+located on STM boards default to always-on.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 76 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 49 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index cc0159e..7333ad6 100644
+index 1a93f8d..cc0159e 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -21,10 +21,30 @@
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ #include <linux/interrupt.h>
  #include <linux/device.h>
  #include <linux/platform_device.h>
- #include <linux/completion.h>
-+#include <linux/mtd/nand.h>
- #include <linux/mtd/stm_nand.h>
- 
- #include "stm_nand_regs.h"
- 
-+/* Bad Block Table (BBT) */
-+struct nandi_bbt_info {
-+	uint32_t	bbt_size;		/* Size of bad-block table */
-+	uint32_t	bbt_vers[2];		/* Version (Primary/Mirror) */
-+	uint32_t	bbt_block[2];		/* Block No. (Primary/Mirror) */
-+	uint8_t		*bbt;			/* Table data */
-+};
-+
-+/* Collection of MTD/NAND device information */
-+struct nandi_info {
-+	struct mtd_info		mtd;		/* MTD info */
-+	struct nand_chip	chip;		/* NAND chip info */
-+
-+	struct nand_ecclayout	ecclayout;	/* MTD ECC layout */
-+	struct nandi_bbt_info	bbt_info;	/* Bad Block Table */
-+	int			nr_parts;	/* Number of MTD partitions */
-+	struct	mtd_partition	*parts;		/* MTD partitions */
-+};
-+
- /* NANDi Controller (Hamming/BCH) */
+@@ -28,6 +29,9 @@
  struct nandi_controller {
  	void __iomem		*base;		/* Controller base*/
-@@ -60,6 +80,8 @@ struct nandi_controller {
- 
- 	int			cached_page;	/* page number of page in */
- 						/* 'page_buf'             */
+ 	void __iomem		*dma;		/* DMA control base */
 +
-+	struct nandi_info	info;		/* NAND device info */
- };
- 
- /*
-@@ -107,6 +129,46 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
++	struct clk		*bch_clk;
++	struct clk		*emi_clk;
+ 						/* IRQ-triggered Completions: */
+ 	struct completion	seq_completed;	/*   SEQ Over */
+ 	struct completion	rbn_completed;	/*   RBn */
+@@ -103,6 +107,44 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
  	writel(val, nandi->base + NANDBCH_INT_EN);
  }
  
-+static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
-+				   struct mtd_info *mtd, struct nand_chip *chip)
++static void nandi_clk_enable(struct nandi_controller *nandi)
 +{
-+	struct nandi_info *info = &nandi->info;
-+	int i;
-+
-+	/* ecclayout */
-+	info->ecclayout.eccbytes = mtd->oobsize;
-+	for (i = 0; i < 64; i++)
-+		info->ecclayout.eccpos[i] = i;
-+	info->ecclayout.oobfree[0].offset = 0;
-+	info->ecclayout.oobfree[0].length = 0;
-+	info->ecclayout.oobavail = 0;
-+
-+	/* nand_chip */
-+	chip->controller = &chip->hwcontrol;
-+	spin_lock_init(&chip->controller->lock);
-+	init_waitqueue_head(&chip->controller->wq);
-+	chip->state = FL_READY;
-+	chip->priv = nandi;
-+	chip->ecc.layout = &info->ecclayout;
-+
-+	/* mtd_info */
-+	mtd->owner = THIS_MODULE;
-+	mtd->type = MTD_NANDFLASH;
-+	mtd->flags = MTD_CAP_NANDFLASH;
-+	mtd->ecclayout = &info->ecclayout;
-+	mtd->oobavail = 0;
-+	mtd->subpage_sft = 0;
-+
-+	mtd->_point = NULL;
-+	mtd->_unpoint = NULL;
-+	mtd->_lock = NULL;
-+	mtd->_unlock = NULL;
-+
-+	mtd->_sync = nand_sync;
-+	mtd->_suspend = nand_suspend;
-+	mtd->_resume = nand_resume;
++	if (nandi->emi_clk)
++		clk_prepare_enable(nandi->emi_clk);
++	if (nandi->bch_clk)
++		clk_prepare_enable(nandi->bch_clk);
 +}
 +
- static void nandi_clk_enable(struct nandi_controller *nandi)
- {
- 	if (nandi->emi_clk)
-@@ -271,7 +333,11 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
- {
- 	struct stm_plat_nand_bch_data *pdata = pdev->dev.platform_data;
- 	struct stm_nand_bank_data *bank;
-+	struct nandi_bbt_info *bbt_info;
- 	struct nandi_controller *nandi;
-+	struct nandi_info *info;
-+	struct nand_chip *chip;
-+	struct mtd_info *mtd;
- 
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "no platform data found\n");
-@@ -291,6 +357,16 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
- 	if (bank)
- 		nandi_init_controller(nandi, bank->csn);
- 
-+	info            = &nandi->info;
-+	chip            = &info->chip;
-+	bbt_info        = &info->bbt_info;
-+	mtd             = &info->mtd;
-+	mtd->priv       = chip;
-+	mtd->name       = dev_name(&pdev->dev);
-+	mtd->dev.parent = &pdev->dev;
++static void nandi_clk_disable(struct nandi_controller *nandi)
++{
++	if (nandi->emi_clk)
++		clk_disable_unprepare(nandi->emi_clk);
++	if (nandi->bch_clk)
++		clk_disable_unprepare(nandi->bch_clk);
++}
 +
-+	nandi_set_mtd_defaults(nandi, mtd, chip);
++static struct clk *nandi_clk_setup(struct nandi_controller *nandi,
++				   char *clkname)
++{
++	struct clk *clk;
++	int ret;
++
++	clk = clk_get(nandi->dev, clkname);
++	if (IS_ERR_OR_NULL(clk)) {
++		dev_warn(nandi->dev, "Failed to get %s clock\n", clkname);
++		return NULL;
++	}
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		dev_warn(nandi->dev, "Failed to enable %s clock\n", clkname);
++		clk_put(clk);
++		return NULL;
++	}
++
++	return clk;
++}
++
+ static void nandi_init_bch(struct nandi_controller *nandi, int emi_bank)
+ {
+ 	dev_dbg(nandi->dev, "%s\n", __func__);
+@@ -217,6 +259,9 @@ nandi_init_resources(struct platform_device *pdev)
+ 		return ERR_PTR(err);
+ 	}
+ 
++	nandi->emi_clk = nandi_clk_setup(nandi, "emi_clk");
++	nandi->bch_clk = nandi_clk_setup(nandi, "bch_clk");
++
+ 	platform_set_drvdata(pdev, nandi);
+ 
+ 	return nandi;
+@@ -251,6 +296,10 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 
+ static int stm_nand_bch_remove(struct platform_device *pdev)
+ {
++	struct nandi_controller *nandi = platform_get_drvdata(pdev);
++
++	nandi_clk_disable(nandi);
 +
  	return 0;
  }
