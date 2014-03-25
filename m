@@ -1,75 +1,145 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 25 Mar 2014 11:51:33 +0000
-Subject: [PATCH RFC 1/4] arm64: kernel: implement DT based idle states
- infrastructure
-In-Reply-To: <CAL_JsqJikdsna7KUjEwZ0qj-fdcC50M7e3e1D0LgfQuUuJQ0SA@mail.gmail.com>
-References: <1395138028-19630-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395138028-19630-2-git-send-email-lorenzo.pieralisi@arm.com>
- <CAL_Jsq+M8fCreXrd7R1m=3_LKD_+jma3Pha06hRoTPMpcOb1_g@mail.gmail.com>
- <20140318180856.GB792@e102568-lin.cambridge.arm.com>
- <CADHgK6uwUDndVHQaWU=3R7A16hc4PYJCAfMLi3uBnrDjYidPXg@mail.gmail.com>
- <20140319172338.GA31368@e102568-lin.cambridge.arm.com>
- <CADHgK6vGf0gfVoAWO2FiXzCf-Sf_P_u+d7Dg04xn1O5t2LeKwg@mail.gmail.com>
- <CAL_JsqJikdsna7KUjEwZ0qj-fdcC50M7e3e1D0LgfQuUuJQ0SA@mail.gmail.com>
-Message-ID: <20140325115133.GA17526@e102568-lin.cambridge.arm.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Tue, 25 Mar 2014 12:59:21 +0100
+Subject: [RFC v2 PATCH] ASoC: wm8904: add CCF support
+In-Reply-To: <1395741416-23981-1-git-send-email-voice.shen@atmel.com>
+References: <1395741416-23981-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <53316F99.6080709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 05:46:47PM +0000, Rob Herring wrote:
-> On Thu, Mar 20, 2014 at 1:19 PM, Sebastian Capella
-> <sebastian.capella@linaro.org> wrote:
-> > On 19 March 2014 10:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >> Rob is asking a property describing hw, and honestly unless we define
-> >> a power consumption property value (defining what it means will be rather
-> >> complicated though) I'd rather remove index altogether and use min_residency
-> >> as a comparison value instead.
-> >
-> > I like having a separate ranking for power to sort the states.  To me
-> > it seems that min residency could be ambiguous for this.  We could
-> > have states with inverted min_residencies: where a lower consumption
-> > state has a lower target residency because the cost is recovered more
-> > quickly.  Such a state might have higher latency for exit, so even
-> > though the lower min_residency/lower power state is clearly
-> > preferable, selection of the lower power state may be prevented by
-> > kernel latency constraints.
-> 
-> Perhaps you can add the min residency and exit latency times.
+Hello Bo,
 
-I do not think we should mix exit latency with power consumption
-ranking, they are used and define different things.
+Le 25/03/2014 10:56, Bo Shen a ?crit :
+> Enable WM8904 to support common clock framework.
+>    - Now it supports use SoC provided clock or external oscillator
+>      as MCLK.
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+>   Documentation/devicetree/bindings/sound/wm8904.txt | 48 ++++++++++++++++++++++
+>   sound/soc/codecs/wm8904.c                          | 17 ++++++++
+>   2 files changed, 65 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/sound/wm8904.txt
+>
+> diff --git a/Documentation/devicetree/bindings/sound/wm8904.txt b/Documentation/devicetree/bindings/sound/wm8904.txt
+> new file mode 100644
+> index 0000000..bcf4aa0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/wm8904.txt
+> @@ -0,0 +1,48 @@
+> +WM8904 audio CODEC
+> +
+> +This device supports I2C only.
+> +
+> +Required properties:
+> +  - compatible: "wlf,wm8904"
+> +  - reg: the I2C address of the device.
+> +  - clocks and clock-names: reference to
+> +    <Documentation/devicetree/bindings/clock/clock-bindings.txt>
+> +
+> +Pins on the device (for linking into audio routes):
+> +
+> +  * IN1L
+> +  * IN1R
+> +  * IN2L
+> +  * IN2R
+> +  * IN3L
+> +  * IN3R
+> +  * HPOUTL
+> +  * HPOUTR
+> +  * LINEOUTL
+> +  * LINEOUTR
+> +  * MICBIAS
+> +
+> +Examples:
+> +
+> +1. Using SoC provided clock as mclk:
+> +codec: wm8904 at 1a {
+> +	compatible = "wlf,wm8904";
+> +	reg = <0x1a>;
+> +	clocks = <&pck0>;
+> +	clock-names = "mclk";
+> +};
 
-The problem is that min_residency is extremely hard to define (see
-discussion below).
 
-http://www.spinics.net/lists/arm-kernel/msg316147.html
+> +
+> +2. Using external oscillator as mclk:
+> +codec: wm8904 at 1a {
+> +	compatible = "wlf,wm8904";
+> +	reg = <0x1a>;
+> +
+> +	wm8904_osc {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		#clock-frequency = <12000000>;
+> +	}
+> +
+> +	clocks = <&wm8904_osc>;
+> +	clock-names = "mclk";
+> +};
 
-What should min_residency represent ? As Anti correctly pointed out, it should
-be compared to a shallower idle state, but to define "shallower" we need
-a ranking, do not we ?
+I think there is a misunderstanding here (and it certainly comes from my
+explanations during our last talk :)): both cases should be handled the same
+way because an external oscillator is no more or less than an external clk
+(we don't care how this clk is generated).
 
-If we say "min_residency is the time required for the processor to stay
-in the idle state in order to maximize power savings" (and I tried to do that),
-that's wrong by definition, because there might be a deeper idle state saving
-more power when entered for a time within the next event.
+I suggested to put the osc node inside the wm8904 one but I thought you were
+trying to represent the internal 12MHz clk generated when using the fll free
+running mode.
 
-state 1 - min residency 10 us
-state 2 - min residency 20 us
-
-If we sleep for 1 second, state 2 must be entered, not 1 and the problem
-is always the same, state 1 10us compares to state 0 (break even time
-against state 0).
-
-So, we are back to square one. How should min_residency be defined ?
-If it is the break even time against a shallower idle state, we have
-to know what's the shallower idle state, so we need a power ranking for
-idle states.
-
-> Another piece to consider is the affinity level of the state should
-> probably be the basis for 1st order sorting.
-
-I would like to see the idle states as a flat list, when you say
-affinity you mean a cpumask ? Affinity level in the PSCI power state
-parameter ? In the MPIDR ?
-
-Thanks,
-Lorenzo
+> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+> index 49c35c3..4db6a26 100644
+> --- a/sound/soc/codecs/wm8904.c
+> +++ b/sound/soc/codecs/wm8904.c
+> @@ -11,6 +11,7 @@
+>    * published by the Free Software Foundation.
+>    */
+>   
+> +#include <linux/clk.h>
+>   #include <linux/module.h>
+>   #include <linux/moduleparam.h>
+>   #include <linux/init.h>
+> @@ -49,6 +50,7 @@ static const char *wm8904_supply_names[WM8904_NUM_SUPPLIES] = {
+>   /* codec private data */
+>   struct wm8904_priv {
+>   	struct regmap *regmap;
+> +	struct clk *mclk;
+>   
+>   	enum wm8904_type devtype;
+>   
+> @@ -1828,6 +1830,9 @@ static int wm8904_set_bias_level(struct snd_soc_codec *codec,
+>   
+>   	switch (level) {
+>   	case SND_SOC_BIAS_ON:
+> +		if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +			if (wm8904->mclk)
+> +				clk_prepare_enable(wm8904->mclk);
+>   		break;
+>   
+>   	case SND_SOC_BIAS_PREPARE:
+> @@ -1894,6 +1899,9 @@ static int wm8904_set_bias_level(struct snd_soc_codec *codec,
+>   
+>   		regulator_bulk_disable(ARRAY_SIZE(wm8904->supplies),
+>   				       wm8904->supplies);
+> +		if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +			if (wm8904->mclk)
+> +				clk_disable_unprepare(wm8904->mclk);
+>   		break;
+>   	}
+>   	codec->dapm.bias_level = level;
+> @@ -2139,6 +2147,15 @@ static int wm8904_i2c_probe(struct i2c_client *i2c,
+>   		return ret;
+>   	}
+>   
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		wm8904->mclk = devm_clk_get(&i2c->dev, "mclk");
+> +		if (IS_ERR(wm8904->mclk)) {
+> +			dev_err(&i2c->dev, "Failed to get MCLK\n");
+> +			ret = PTR_ERR(wm8904->mclk);
+> +			goto err_enable;
+> +		}
+> +	}
+> +
+>   	ret = regmap_read(wm8904->regmap, WM8904_SW_RESET_AND_ID, &val);
+>   	if (ret < 0) {
+>   		dev_err(&i2c->dev, "Failed to read ID register: %d\n", ret);
