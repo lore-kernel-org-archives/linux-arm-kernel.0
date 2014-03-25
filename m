@@ -1,54 +1,63 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 25 Mar 2014 23:48:23 +0100
-Subject: [PATCH v5 12/14] ARM: mvebu: Register notifier callback for the
- cpuidle transition
+Date: Tue, 25 Mar 2014 23:48:20 +0100
+Subject: [PATCH v5 09/14] ARM: mvebu: Allow to power down L2 cache controller
+ in idle mode
 In-Reply-To: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1395787705-31061-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1395787705-31061-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to have well encapsulated code, we use notifier callbacks for
-CPU_PM_ENTER and CPU_PM_EXIT inside the mvebu power management code.
+This commit adds a function which adjusts the PMSU configuration to
+automatically power down the L2 and coherency fabric when we enter a
+certain idle state.
+
+This feature is part of the Power Management Service Unit of the
+Armada 370 and Armada XP SoCs.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/mach-mvebu/pmsu.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 3fc25d94e893..5812ff4a9b63 100644
+index 865bcb651e01..3cfb56f980f3 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -16,6 +16,7 @@
-  * other SOC units
-  */
+@@ -30,8 +30,15 @@ static void __iomem *pmsu_reset_base;
+ #define PMSU_BASE_OFFSET    0x100
+ #define PMSU_REG_SIZE	    0x1000
  
-+#include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of_address.h>
-@@ -266,4 +267,22 @@ static noinline void armada_370_xp_pmsu_idle_restore(void)
- 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+-#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
+-#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
++/* PMSU MP registers */
++#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
++
++/* PMSU reset registers */
++#define PMSU_RESET_CTL_OFFSET(cpu)	    (cpu * 0x8)
++
++/* PMSU fabric registers */
++#define L2C_NFABRIC_PM_CTL		    0x4
++#define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+ 
+ static struct of_device_id of_pmsu_table[] = {
+ 	{
+@@ -111,4 +118,17 @@ static int __init armada_370_xp_pmsu_init(void)
+ 	return 0;
  }
  
-+static int armada_370_xp_cpu_pm_notify(struct notifier_block *self,
-+				    unsigned long action, void *hcpu)
++static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
 +{
-+	if (action == CPU_PM_ENTER) {
-+		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
-+		armada_370_xp_pmsu_set_start_addr(armada_370_xp_cpu_resume,
-+						hw_cpu);
-+	} else if (action == CPU_PM_EXIT) {
-+		armada_370_xp_pmsu_idle_restore();
-+	}
++	u32 reg;
 +
-+	return NOTIFY_OK;
++	if (pmsu_mp_base == NULL)
++		return;
++
++	/* Enable L2 & Fabric powerdown in Deep-Idle mode - Fabric */
++	reg = readl(pmsu_mp_base + L2C_NFABRIC_PM_CTL);
++	reg |= L2C_NFABRIC_PM_CTL_PWR_DOWN;
++	writel(reg, pmsu_mp_base + L2C_NFABRIC_PM_CTL);
 +}
-+
-+static struct notifier_block armada_370_xp_cpu_pm_notifier = {
-+	.notifier_call = armada_370_xp_cpu_pm_notify,
-+};
 +
  early_initcall(armada_370_xp_pmsu_init);
 -- 
