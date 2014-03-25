@@ -1,47 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Mar 2014 22:22:45 +0100
-Subject: [PATCH 04/20] mmc: mmci: Move signal directions bits into DT
- include file
-In-Reply-To: <1395404057-27835-5-git-send-email-ulf.hansson@linaro.org>
-References: <1395404057-27835-1-git-send-email-ulf.hansson@linaro.org>
- <1395404057-27835-5-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdZSr380FVHkx3uOMFKxKYsExoL-1WYhxVpirFMVc+T3Yw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 25 Mar 2014 22:22:58 +0100
+Subject: [PATCH v3] clk: berlin: add support for berlin plls
+In-Reply-To: <1395775772-19685-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395775772-19685-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5331F3B2.9000602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 21, 2014 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On 03/25/2014 08:29 PM, Alexandre Belloni wrote:
+> This drivers allows to provide DT clocks for the cpu and system PLLs found on
+> Marvell Berlin SoCs.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-> These bits is currently used from platform data, but will be needed
-> from DT as well, so let's make them available.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-(...)
-> +#define MCI_ST_DATA31DIREN     (1 << 5)
-> +#define MCI_ST_FBCLKEN         (1 << 7)
-> +#define MCI_ST_DATA74DIREN     (1 << 8)
+Tested on BG2 and BG2CD, therefore
 
-Isn't MCI_ST_FBCLKEN = feedback clock enable and nothing
-to do with directions really?
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Or can you convince me ...
-
-Maybe we should just have single strings for these
-things in the binding instead, like:
-
-@@ -118,6 +119,10 @@
-                        bus-width = <4>;
-                        mmc-cap-sd-highspeed;
-                        mmc-cap-mmc-highspeed;
-+                       st,signal-direction-data2;
-+                       st,signal-direction-cmd;
-+                       st,signal-direction-data0;
-+                       st,feedback-clock-enable;
-                        vmmc-supply = <&ab8500_ldo_aux3_reg>;
-                        vqmmc-supply = <&vmmci>;
-                        pinctrl-names = "default", "sleep";
-
-And for FBCLKEN is that really something that should
-be configured... in the device tree after all?
-
-Yours,
-Linus Walleij
+> ---
+> Changes in v3:
+>  - removed empty lines a the end of the files
+>  - vcodiv are now arrays filled with zeros by default
+>  - use an u64 temporary variable to calculate the rate
+>  - warn when refdiv or vcodiv are zero
+> 
+> ---
+>  drivers/clk/Makefile              |   1 +
+>  drivers/clk/berlin/Makefile       |   4 ++
+>  drivers/clk/berlin/common.h       |  35 ++++++++++++
+>  drivers/clk/berlin/pll-berlin2.c  |  40 +++++++++++++
+>  drivers/clk/berlin/pll-berlin2q.c |  40 +++++++++++++
+>  drivers/clk/berlin/pll.c          | 114 ++++++++++++++++++++++++++++++++++++++
+>  6 files changed, 234 insertions(+)
+>  create mode 100644 drivers/clk/berlin/Makefile
+>  create mode 100644 drivers/clk/berlin/common.h
+>  create mode 100644 drivers/clk/berlin/pll-berlin2.c
+>  create mode 100644 drivers/clk/berlin/pll-berlin2q.c
+>  create mode 100644 drivers/clk/berlin/pll.c
