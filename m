@@ -1,85 +1,155 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:37 +0000
-Subject: [RFC 20/47] mtd: nand: stm_nand_bch: initialise working buffers
+Date: Tue, 25 Mar 2014 08:19:36 +0000
+Subject: [RFC 19/47] mtd: nand: stm_nand_bch: configure BCH read/write/erase
+ programs
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise working buffers, accomodating DMA alignment constraints.
+Tune BCH programs according to device found and ECC mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 45 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 121 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 351f5e2..fafde22 100644
+index 365a73b..351f5e2 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -31,6 +31,9 @@
+@@ -97,6 +97,124 @@ struct nandi_controller {
+ 	struct nandi_info	info;		/* NAND device info */
+ };
  
- /* NANDi BCH Controller properties */
- #define NANDI_BCH_SECTOR_SIZE			1024
-+#define NANDI_BCH_DMA_ALIGNMENT			64
-+#define NANDI_BCH_MAX_BUF_LIST			8
-+#define NANDI_BCH_BUF_LIST_SIZE			(4 * NANDI_BCH_MAX_BUF_LIST)
- 
- /* BCH ECC sizes */
- static int bch_ecc_sizes[] = {
-@@ -762,6 +765,44 @@ static void nandi_init_controller(struct nandi_controller *nandi,
- 	nandi_init_hamming(nandi, emi_bank);
- }
- 
-+/* Initialise working buffers, accomodating DMA alignment constraints */
-+static int nandi_init_working_buffers(struct nandi_controller *nandi,
-+				      struct nandi_bbt_info *bbt_info,
-+				      struct mtd_info *mtd)
++/* BCH 'program' structure */
++struct bch_prog {
++	u32	multi_cs_addr[3];
++	u32	multi_cs_config;
++	u8	seq[16];
++	u32	addr;
++	u32	extra;
++	u8	cmd[4];
++	u32	reserved1;
++	u32	gen_cfg;
++	u32	delay;
++	u32	reserved2;
++	u32	seq_cfg;
++};
++
++/* BCH template programs (modified on-the-fly) */
++static struct bch_prog bch_prog_read_page = {
++	.cmd = {
++		NAND_CMD_READ0,
++		NAND_CMD_READSTART,
++	},
++	.seq = {
++		BCH_ECC_SCORE(0),
++		BCH_CMD_ADDR,
++		BCH_CL_CMD_1,
++		BCH_DATA_2_SECTOR,
++		BCH_STOP,
++	},
++	.gen_cfg = (GEN_CFG_DATA_8_NOT_16 |
++		    GEN_CFG_EXTRA_ADD_CYCLE |
++		    GEN_CFG_LAST_SEQ_NODE),
++	.seq_cfg = SEQ_CFG_GO_STOP,
++};
++
++static struct bch_prog bch_prog_write_page = {
++	.cmd = {
++		NAND_CMD_SEQIN,
++		NAND_CMD_PAGEPROG,
++		NAND_CMD_STATUS,
++	},
++	.seq = {
++		BCH_CMD_ADDR,
++		BCH_DATA_4_SECTOR,
++		BCH_CL_CMD_1,
++		BCH_CL_CMD_2,
++		BCH_OP_ERR,
++		BCH_STOP,
++	},
++	.gen_cfg = (GEN_CFG_DATA_8_NOT_16 |
++		    GEN_CFG_EXTRA_ADD_CYCLE |
++		    GEN_CFG_LAST_SEQ_NODE),
++	.seq_cfg = (SEQ_CFG_GO_STOP |
++		    SEQ_CFG_DATA_WRITE),
++};
++
++static struct bch_prog bch_prog_erase_block = {
++	.seq = {
++		BCH_CL_CMD_1,
++		BCH_AL_EX_0,
++		BCH_AL_EX_1,
++		BCH_AL_EX_2,
++		BCH_CL_CMD_2,
++		BCH_CL_CMD_3,
++		BCH_OP_ERR,
++		BCH_STOP,
++	},
++	.cmd = {
++		NAND_CMD_ERASE1,
++		NAND_CMD_ERASE1,
++		NAND_CMD_ERASE2,
++		NAND_CMD_STATUS,
++	},
++	.gen_cfg = (GEN_CFG_DATA_8_NOT_16 |
++		    GEN_CFG_EXTRA_ADD_CYCLE |
++		    GEN_CFG_LAST_SEQ_NODE),
++	.seq_cfg = (SEQ_CFG_GO_STOP |
++		    SEQ_CFG_ERASE),
++};
++
++/* Configure BCH read/write/erase programs */
++static void bch_configure_progs(struct nandi_controller *nandi)
 +{
-+	uint32_t bbt_buf_size;
-+	uint32_t buf_size;
++	uint8_t data_opa = ffs(nandi->sectors_per_page) - 1;
++	uint8_t data_instr = BCH_INSTR(BCH_OPC_DATA, data_opa);
++	uint32_t gen_cfg_ecc = nandi->bch_ecc_mode << GEN_CFG_ECC_SHIFT;
 +
-+	/*	- Page and OOB */
-+	buf_size = mtd->writesize + mtd->oobsize + NANDI_BCH_DMA_ALIGNMENT;
++	/* Set 'DATA' instruction */
++	bch_prog_read_page.seq[3] = data_instr;
++	bch_prog_write_page.seq[1] = data_instr;
 +
-+	/*	- BBT data (page-size aligned) */
-+	bbt_info->bbt_size = nandi->blocks_per_device >> 2; /* 2 bits/block */
-+	bbt_buf_size = ALIGN(bbt_info->bbt_size, mtd->writesize);
-+	buf_size += bbt_buf_size + NANDI_BCH_DMA_ALIGNMENT;
++	/* Set ECC mode */
++	bch_prog_read_page.gen_cfg |= gen_cfg_ecc;
++	bch_prog_write_page.gen_cfg |= gen_cfg_ecc;
++	bch_prog_erase_block.gen_cfg |= gen_cfg_ecc;
 +
-+	/*	- BCH BUF list */
-+	buf_size += NANDI_BCH_BUF_LIST_SIZE + NANDI_BCH_DMA_ALIGNMENT;
++	/*
++	 * Template sequences above are defined for devices that use 5 address
++	 * cycles for page Read/Write operations (and 3 for Erase operations).
++	 * Update sequences for devices that use 4 address cycles.
++	 */
++	if (!nandi->extra_addr) {
++		/* Clear 'GEN_CFG_EXTRA_ADD_CYCLE' flag */
++		bch_prog_read_page.gen_cfg &= ~GEN_CFG_EXTRA_ADD_CYCLE;
++		bch_prog_write_page.gen_cfg &= ~GEN_CFG_EXTRA_ADD_CYCLE;
++		bch_prog_erase_block.gen_cfg &= ~GEN_CFG_EXTRA_ADD_CYCLE;
 +
-+	/* Allocate bufffer */
-+	nandi->buf = devm_kzalloc(nandi->dev, buf_size, GFP_KERNEL);
-+	if (!nandi->buf) {
-+		dev_err(nandi->dev, "failed to allocate working buffers\n");
-+		return -ENOMEM;
++		/* Configure Erase sequence for 2 address cycles */
++		/* (page address) */
++		bch_prog_erase_block.seq[0] = BCH_CL_CMD_1;
++		bch_prog_erase_block.seq[1] = BCH_AL_EX_0;
++		bch_prog_erase_block.seq[2] = BCH_AL_EX_1;
++		bch_prog_erase_block.seq[3] = BCH_CL_CMD_2;
++		bch_prog_erase_block.seq[4] = BCH_CL_CMD_3;
++		bch_prog_erase_block.seq[5] = BCH_OP_ERR;
++		bch_prog_erase_block.seq[6] = BCH_STOP;
 +	}
-+
-+	/* Set/Align buffer pointers */
-+	nandi->page_buf = PTR_ALIGN(nandi->buf, NANDI_BCH_DMA_ALIGNMENT);
-+	nandi->oob_buf  = nandi->page_buf + mtd->writesize;
-+	bbt_info->bbt   = PTR_ALIGN(nandi->oob_buf + mtd->oobsize,
-+				    NANDI_BCH_DMA_ALIGNMENT);
-+	nandi->buf_list = (uint32_t *)PTR_ALIGN(bbt_info->bbt + bbt_buf_size,
-+						NANDI_BCH_DMA_ALIGNMENT);
-+	nandi->cached_page = -1;
-+
-+	return 0;
 +}
 +
- static int remap_named_resource(struct platform_device *pdev,
- 				char *name,
- 				void __iomem **io_ptr)
-@@ -990,6 +1031,10 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
- 	/* Tune BCH programs according to device found and ECC mode */
- 	bch_configure_progs(nandi);
+ /*
+  * NANDi Interrupts (shared by Hamming and BCH controllers)
+  */
+@@ -869,6 +987,9 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
-+	err = nandi_init_working_buffers(nandi, bbt_info, mtd);
-+	if (err)
-+		return err;
++	/* Tune BCH programs according to device found and ECC mode */
++	bch_configure_progs(nandi);
 +
  	return 0;
  }
