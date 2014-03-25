@@ -1,27 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Mar 2014 21:34:21 +0100
-Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
-In-Reply-To: <201403201148.16239.arnd@arndb.de>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <20140319204946.GK7528@n2100.arm.linux.org.uk>
- <8120199.tJr1GuP6ec@wuerfel> <201403201148.16239.arnd@arndb.de>
-Message-ID: <CACRpkdYPvoobHqG4oQaJbrXDZQwYP6H9n7MSuXDt3MonNsC5jw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 25 Mar 2014 13:57:31 -0700
+Subject: [PATCH v5 8/9] ARM: koelsch: Add PCIe to defconfig
+In-Reply-To: <1395766604-30926-9-git-send-email-phil.edworthy@renesas.com>
+References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
+ <1395766604-30926-9-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <20140325205731.GB27673@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 11:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Please update the subject of this patch to:
 
-> Nevermind, I'll drop this patch for now, I just had an idea to do it
-> better: Since Linus and I are trying to get Integrator and Realview
-> moved over into ARCH_MULTIPLATFORM anyway, I'll defer the CPU selection
-> question until that's done.
+ARM: shmobile: koelsch: Add PCIe to defconfig
 
-Integrator is blocked by one single thing: <mach/memory.h>
-bus_to_virt/virt_to_bus.
-
-If we can get some consensus on Santosh's patches
-(or however we want to solve that) I'll do multiplatform for
-Integrator any day.
-
-Yours,
-Linus Walleij
+On Tue, Mar 25, 2014 at 04:56:43PM +0000, Phil Edworthy wrote:
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> ---
+>  arch/arm/configs/koelsch_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+> index 86faab5..ec14547 100644
+> --- a/arch/arm/configs/koelsch_defconfig
+> +++ b/arch/arm/configs/koelsch_defconfig
+> @@ -15,6 +15,9 @@ CONFIG_MACH_KOELSCH=y
+>  CONFIG_CPU_BPREDICT_DISABLE=y
+>  CONFIG_PL310_ERRATA_588369=y
+>  CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_PCI=y
+> +CONFIG_PCI_MSI=y
+> +CONFIG_PCI_RCAR_GEN2_PCIE=y
+>  CONFIG_SMP=y
+>  CONFIG_SCHED_MC=y
+>  CONFIG_NR_CPUS=8
+> -- 
+> 1.9.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
