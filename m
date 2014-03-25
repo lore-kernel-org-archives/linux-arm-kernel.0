@@ -1,121 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Mar 2014 08:19:57 +0000
-Subject: [RFC 40/47] mtd: nand: stm_nand_bch: MTD erase (BCH)
+Date: Tue, 25 Mar 2014 08:19:52 +0000
+Subject: [RFC 35/47] mtd: nand: stm_nand_bch: dump bad blocks
 In-Reply-To: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
 References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395735604-26706-41-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395735604-26706-36-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Carry out the normal checks, then attempt to erase a given block.
+Inform the user of any known bad blocks during initialisation.
+Conversely, if there aren't any known bad blocks, let the user know
+the good news.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/nand/stm_nand_bch.c | 85 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+ drivers/mtd/nand/stm_nand_bch.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-index 75c5c9b..55f4a4c 100644
+index 6698b1f..abbb4d9 100644
 --- a/drivers/mtd/nand/stm_nand_bch.c
 +++ b/drivers/mtd/nand/stm_nand_bch.c
-@@ -1218,6 +1218,89 @@ static int flex_do_write_ops(struct nandi_controller *nandi,
+@@ -1060,6 +1060,28 @@ static int bch_load_bbt(struct nandi_controller *nandi,
  	return 0;
  }
  
-+static int bch_mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
++static void nandi_dump_bad_blocks(struct nandi_controller *nandi)
 +{
-+	struct nand_chip *chip = mtd->priv;
-+	struct nandi_controller *nandi = chip->priv;
-+	uint64_t block_mask = mtd->erasesize - 1;
-+	uint64_t offs_cached;
-+	loff_t offs = instr->addr;
-+	size_t len = instr->len;
-+	uint8_t status;
-+	int ret;
++	int bad_count = 0;
++	uint32_t block;
++	uint8_t *bbt = nandi->info.bbt_info.bbt;
++	uint8_t mark;
 +
-+	dev_dbg(nandi->dev, "%s: 0x%012llx @ 0x%012llx\n", __func__,
-+		(unsigned long long)len, offs);
-+
-+	if (offs & block_mask) {
-+		dev_err(nandi->dev,
-+			"attempt to erase from non-block-aligned offset\n");
-+		return -EINVAL;
-+	}
-+
-+	if (len & block_mask) {
-+		dev_err(nandi->dev,
-+			"attempt to erase non-block-aligned length\n");
-+		return -EINVAL;
-+	}
-+
-+	if ((offs + len) > mtd->size) {
-+		dev_err(nandi->dev, "attempt to erase past end of device\n");
-+		return -EINVAL;
-+	}
-+
-+	nand_get_device(mtd, FL_ERASING);
-+	instr->fail_addr = MTD_FAIL_ADDR_UNKNOWN;
-+
-+	if (flex_check_wp(nandi)) {
-+		dev_dbg(nandi->dev, "device is write-protected\n");
-+		instr->state = MTD_ERASE_FAILED;
-+		goto erase_exit;
-+	}
-+
-+	/* Offset of block containing cached page */
-+	offs_cached = ((uint64_t)nandi->cached_page << nandi->page_shift) &
-+		~block_mask;
-+
-+	instr->state = MTD_ERASING;
-+	while (len) {
-+		if (mtd_block_isbad(mtd, offs)) {
-+			dev_err(nandi->dev,
-+				"attempt to erase a bad block at 0x%012llx\n",
-+				offs);
-+			instr->state = MTD_ERASE_FAILED;
-+			instr->fail_addr = offs;
-+			goto erase_exit;
++	pr_info("BBT:\n");
++	for (block = 0; block < nandi->blocks_per_device; block++) {
++		mark = bbt_get_block_mark(bbt, block);
++		if (mark != BBT_MARK_GOOD) {
++			pr_info("\t\tBlock 0x%08x [%05u] marked bad [%s]\n",
++				block << nandi->block_shift, block,
++				(mark == BBT_MARK_BAD_FACTORY) ?
++				"Factory" : "Wear");
++			bad_count++;
 +		}
-+
-+		if (offs == offs_cached)
-+			nandi->cached_page = -1;
-+
-+		status = bch_erase_block(nandi, offs);
-+
-+		if (status & NAND_STATUS_FAIL) {
-+			dev_err(nandi->dev,
-+				"failed to erase block at 0x%012llx\n", offs);
-+			instr->state = MTD_ERASE_FAILED;
-+			instr->fail_addr = offs;
-+			goto erase_exit;
-+		}
-+
-+		len -= mtd->erasesize;
-+		offs += mtd->erasesize;
 +	}
-+	instr->state = MTD_ERASE_DONE;
-+
-+ erase_exit:
-+	nand_release_device(mtd);
-+
-+	ret = instr->state == MTD_ERASE_DONE ? 0 : -EIO;
-+	if (ret == 0)
-+		mtd_erase_callback(instr);
-+
-+	return ret;
++	if (bad_count == 0)
++		pr_info("\t\tNo bad blocks listed in BBT\n");
 +}
 +
- static void nandi_dump_bad_blocks(struct nandi_controller *nandi)
- {
- 	int bad_count = 0;
-@@ -1321,6 +1404,8 @@ static void nandi_set_mtd_defaults(struct nandi_controller *nandi,
- 	mtd->oobavail = 0;
- 	mtd->subpage_sft = 0;
+ /*
+  * Initialisation
+  */
+@@ -1849,6 +1871,8 @@ static int stm_nand_bch_probe(struct platform_device *pdev)
+ 			return err;
+ 	}
  
-+	mtd->_erase = bch_mtd_erase;
++	nandi_dump_bad_blocks(nandi);
 +
- 	mtd->_point = NULL;
- 	mtd->_unpoint = NULL;
- 	mtd->_lock = NULL;
+ 	return 0;
+ }
+ 
 -- 
 1.8.3.2
