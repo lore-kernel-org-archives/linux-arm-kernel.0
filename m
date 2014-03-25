@@ -1,50 +1,46 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 25 Mar 2014 10:21:42 -0700
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <21873900.AIOr1ryy37@wuerfel>
-References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
- <17142825.cN9DfpvuLc@wuerfel>
- <CAGVrzcbNbc1fyq1cuox8SVZHq1ADNah3CfyXSR--4ZWkf2EtTw@mail.gmail.com>
- <21873900.AIOr1ryy37@wuerfel>
-Message-ID: <1395768102.12610.159.camel@edumazet-glaptop2.roam.corp.google.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 25 Mar 2014 18:26:11 +0100
+Subject: [PATCH v3 0/4] ata: ahci_platform related cleanups
+Message-ID: <1395768375-21123-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-03-25 at 18:05 +0100, Arnd Bergmann wrote:
-> On Tuesday 25 March 2014 10:00:30 Florian Fainelli wrote:
-> > 2014-03-25 1:12 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
-> > > On Tuesday 25 March 2014 12:06:31 Zhangfei Gao wrote:
-> > >> Dear Arnd
-> > >>
-> > >> On Mon, Mar 24, 2014 at 11:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >> > On Monday 24 March 2014 22:14:56 Zhangfei Gao wrote:
-> > >> >
-...
-> > >> > I think you still need to find a solution to ensure that the tx reclaim is
-> > >> > called eventually through a method other than start_xmit.
-> > >>
-> > >> In the iperf stress test, if move reclaim to poll, there is some
-> > >> error, sometimes sending zero packets.
-> > >> While keep reclaim in the xmit to reclaim transmitted packets looks
-> > >> stable in the test,
-> > >> There TX_DESC_NUM desc can be used.
-> > >
-> > > What I meant is that you need a correct implementation, presumably
-> > > you added a bug when you moved the function to poll(), and also you
-> > > forgot to add a timer.
-> > 
-> > Using a timer to ensure completion of TX packets is a trick that
-> > worked in the past, but now that the networking stack got smarter,
-> > this might artificially increase the processing time of packets in the
-> > transmit path, and this will defeat features like TCP small queues
-> > etc.. as could be seen with the mvneta driver [1]. The best way really
-> > is to rely on TX completion interrupts when those exist as they cannot
-> > lie about the hardware status (in theory) and they should provide the
-> > fastest way to complete TX packets.
-> 
-> By as Zhangfei Gao pointed out, this hardware does not have a working
-> TX completion interrupt. Using timers to do this has always just been
-> a workaround for broken hardware IMHO.
+Hi,
 
-For this kind of drivers, calling skb_orphan() from ndo_start_xmit() is
-mandatory.
+This patch series:
+- fixes ahci_platform_data->suspend() handling
+- moves library AHCI platform code to its own file
+- adds a new-style AHCI platform driver for DaVinci DA850 AHCI controller
+- updates DaVinci DA850 platform code
+
+Changes since v2:
+- merged changes from Sekhar
+- splitted out DaVinci DA850 platform changes into separate patch
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (4):
+  ata: ahci_platform: fix ahci_platform_data->suspend method handling
+  ata: move library code from ahci_platform.c to libahci_platform.c
+  ata: add new-style AHCI platform driver for DaVinci DA850 AHCI
+    controller
+  ARM: davinci: da850: update SATA AHCI support
+
+ arch/arm/mach-davinci/da850.c         |   2 +-
+ arch/arm/mach-davinci/devices-da8xx.c |  99 +------
+ drivers/ata/Kconfig                   |  14 +-
+ drivers/ata/Makefile                  |   9 +-
+ drivers/ata/ahci_da850.c              | 114 +++++++
+ drivers/ata/ahci_platform.c           | 508 -------------------------------
+ drivers/ata/libahci_platform.c        | 541 ++++++++++++++++++++++++++++++++++
+ 7 files changed, 680 insertions(+), 607 deletions(-)
+ create mode 100644 drivers/ata/ahci_da850.c
+ create mode 100644 drivers/ata/libahci_platform.c
+
+-- 
+1.8.2.3
