@@ -1,103 +1,37 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 25 Mar 2014 14:00:16 -0700
-Subject: [PATCH v5 7/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7791 Koelsch board
-In-Reply-To: <1395766604-30926-8-git-send-email-phil.edworthy@renesas.com>
+Date: Tue, 25 Mar 2014 14:02:04 -0700
+Subject: [PATCH v5 9/9] ARM: koelsch: Add HAVE_ARM_ARCH_TIMER to defconfig
+In-Reply-To: <1395766604-30926-10-git-send-email-phil.edworthy@renesas.com>
 References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <1395766604-30926-8-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20140325210016.GC27673@verge.net.au>
+ <1395766604-30926-10-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <20140325210204.GD27673@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 04:56:42PM +0000, Phil Edworthy wrote:
-> This patch adds the device tree nodes for the R8A7791 Koelsch board
+Please update the subject of this patch to:
 
-Please split this patch into two patches.
+ARM: shmobile: koelsch: Add HAVE_ARM_ARCH_TIMER to defconfig
 
-1. A patch that updates arch/arm/boot/dts/r8a7791.dtsi
-
-   I suggest calling that patch
-   "ARM: shmobile: r8a7791: Add PCI device nodes"
-
-2. A patch that updates arch/arm/boot/dts/r8a7791-koelsch.dts
-
-   I suggest calling that patch
-   "ARM: shmobile: koelsch: Add PCI device nodes"
-
+On Tue, Mar 25, 2014 at 04:56:44PM +0000, Phil Edworthy wrote:
+> This is fixes a boot problem when the R-Car PCIe driver is enabled.
+> 
 > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 > ---
-> v5:
->  - Renesas SoCs compatible string has peripheral before device name
->  - Add PCIe bus clock reference
->  - Add additional interrupt bindings
->  - Use dma-ranges property to specify inbound memory regions
-> ---
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 14 ++++++++++++++
->  arch/arm/boot/dts/r8a7791.dtsi        | 24 ++++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
+>  arch/arm/configs/koelsch_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> index ee23b7b..3130a0c 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -204,6 +204,16 @@
->  		states = <3300000 1
->  			  1800000 0>;
->  	};
-> +
-> +	clocks {
-> +		/* External PCIe bus clock */
-> +		pcie_bus_clk: pcie_bus_clk {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <100000000>;
-> +			clock-output-names = "pcie_bus";
-> +		};
-> +	};
->  };
->  
->  &extal_clk {
-> @@ -382,3 +392,7 @@
->  		spi-cpha;
->  	};
->  };
-> +
-> +&pcie {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index ccfba57..7a4be4c 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -836,4 +836,28 @@
->  		#size-cells = <0>;
->  		status = "disabled";
->  	};
-> +
-> +	pcie: pcie at fe000000 {
-> +		compatible = "renesas,pcie-r8a7791";
-> +		reg = <0 0xfe000000 0 0x80000>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-> +			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-> +			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-> +			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-> +		/* Map all possible DDR as inbound ranges */
-> +		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
-> +			      0x43000000 2 0x00000000 2 0x00000000 1 0x00000000>;
-> +		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH
-> +			      0 117 IRQ_TYPE_LEVEL_HIGH
-> +			      0 118 IRQ_TYPE_LEVEL_HIGH>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 0>;
-> +		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7791_CLK_PCIE>, <&pcie_bus_clk>;
-> +		clock-names = "pcie", "pcie_bus";
-> +		status = "disabled";
-> +	};
->  };
+> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+> index ec14547..67666b6 100644
+> --- a/arch/arm/configs/koelsch_defconfig
+> +++ b/arch/arm/configs/koelsch_defconfig
+> @@ -15,6 +15,7 @@ CONFIG_MACH_KOELSCH=y
+>  CONFIG_CPU_BPREDICT_DISABLE=y
+>  CONFIG_PL310_ERRATA_588369=y
+>  CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_HAVE_ARM_ARCH_TIMER=y
+>  CONFIG_PCI=y
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_RCAR_GEN2_PCIE=y
 > -- 
 > 1.9.0
 > 
