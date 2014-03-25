@@ -1,33 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Mar 2014 10:53:14 -0300
-Subject: [PATCH v4][ 3/8] usb: chipidea: usbmisc: Add USB support for
- i.MX25/i.MX35 CPUs
-In-Reply-To: <20140314065124.GB23870@shlinux1.ap.freescale.net>
-References: <1394702326-25558-1-git-send-email-denis@eukrea.com>
- <1394702326-25558-3-git-send-email-denis@eukrea.com>
- <20140314065124.GB23870@shlinux1.ap.freescale.net>
-Message-ID: <CAOMZO5Dt4q_Q4DnUpHLdvqOE=30SJvApOVZYR0Hu+j-5JMnCnA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Mar 2014 14:54:32 +0100
+Subject: [PATCH] clocksource: exynos_mct: Fix stall after CPU hotplugging
+In-Reply-To: <53316966.90600@samsung.com>
+References: <1395744087-8655-1-git-send-email-k.kozlowski@samsung.com>
+ <53316966.90600@samsung.com>
+Message-ID: <1395755672.24026.0.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, 2014-03-25 at 12:32 +0100, Tomasz Figa wrote:
+> Hi Krzysztof,
+> 
+> Two comments inline.
+> 
+> On 25.03.2014 11:41, Krzysztof Kozlowski wrote:
+> 
+> [snip]
+> 
+> > diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> > index 48f76bc05da0..0b49b09dd1a9 100644
+> > --- a/drivers/clocksource/exynos_mct.c
+> > +++ b/drivers/clocksource/exynos_mct.c
+> > @@ -339,7 +339,14 @@ static void exynos4_mct_tick_start(unsigned long cycles,
+> >   static int exynos4_tick_set_next_event(unsigned long cycles,
+> >   				       struct clock_event_device *evt)
+> >   {
+> > -	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+> > +	/*
+> > +	 * In case of hotplugging non-boot CPU, the set_next_event could be
+> > +	 * called on CPU0 by ISR before IRQ affinity is set to proper CPU.
+> 
+> Hmm, is this a desired behavior? I guess this is a question for Thomas 
+> and Daniel.
+> 
+> > +	 * Thus for accessing proper MCT Lx timer, 'per_cpu' for cpumask
+> > +	 * in event must be used instead of 'this_cpu_ptr'.
+> > +	 */
+> > +	struct mct_clock_event_device *mevt = &per_cpu(percpu_mct_tick,
+> > +			cpumask_first(evt->cpumask));
+> >
+> >   	exynos4_mct_tick_start(cycles, mevt);
+> >
+> > @@ -371,23 +378,13 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+> >
+> >   static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+> >   {
+> > -	struct clock_event_device *evt = &mevt->evt;
+> > -
+> > -	/*
+> > -	 * This is for supporting oneshot mode.
+> > -	 * Mct would generate interrupt periodically
+> > -	 * without explicit stopping.
+> > -	 */
+> > -	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+> > -		exynos4_mct_tick_stop(mevt);
+> > -
+> >   	/* Clear the MCT tick interrupt */
+> >   	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
+> >   		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+> >   		return 1;
+> > -	} else {
+> > -		return 0;
+> >   	}
+> > +
+> > +	return 0;
+> 
+> Nobody seems to be checking return value of this function (and I don't 
+> see what it could be used for anyway), so I guess it could be simply 
+> made void.
 
-On Fri, Mar 14, 2014 at 3:51 AM, Peter Chen <peter.chen@freescale.com> wrote:
-> On Thu, Mar 13, 2014 at 10:18:41AM +0100, Denis Carikli wrote:
->> This adds the i.MX25 and the i.MX35 support in the
->> ChipIdea usbmisc driver.
->>
->> The i.MX25 and i.MX35 usb controllers are similar enough to be
->> able to use the same code.
->>
->> Signed-off-by: Denis Carikli <denis@eukrea.com>
-...
-> Applied, thanks.
+I'll send a another patch for it.
 
-Where is your git tree located?
-
-I still don't see this patch applied in linux-next.
-
-Regards,
-
-Fabio Estevam
+Best regards,
+Krzysztof
