@@ -1,39 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Mar 2014 22:22:58 +0100
-Subject: [PATCH v3] clk: berlin: add support for berlin plls
-In-Reply-To: <1395775772-19685-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1395775772-19685-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5331F3B2.9000602@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 25 Mar 2014 22:23:25 +0100
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140325211240.GB14718@obsidianresearch.com>
+References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
+ <20140325202249.GA10378@obsidianresearch.com>
+ <20140325213638.5aba54b6@skate>
+ <20140325211240.GB14718@obsidianresearch.com>
+Message-ID: <20140325222325.253f4bd0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2014 08:29 PM, Alexandre Belloni wrote:
-> This drivers allows to provide DT clocks for the cpu and system PLLs found on
-> Marvell Berlin SoCs.
+Dear Jason Gunthorpe,
+
+On Tue, 25 Mar 2014 15:12:40 -0600, Jason Gunthorpe wrote:
+> On Tue, Mar 25, 2014 at 09:36:38PM +0100, Thomas Petazzoni wrote:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Tested on BG2 and BG2CD, therefore
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-> ---
-> Changes in v3:
->  - removed empty lines a the end of the files
->  - vcodiv are now arrays filled with zeros by default
->  - use an u64 temporary variable to calculate the rate
->  - warn when refdiv or vcodiv are zero
+> > We have recently identified a weird thing on Armada 38x, maybe previous
+> > revisions are affected as well. We haven't fully understood the problem
+> > yet, but the following patch allows PCIe devices to be detected in all
+> > situations on Armada 38x. It seems like setting the local device number
+> > requires "some time" to be taken into account.
 > 
-> ---
->  drivers/clk/Makefile              |   1 +
->  drivers/clk/berlin/Makefile       |   4 ++
->  drivers/clk/berlin/common.h       |  35 ++++++++++++
->  drivers/clk/berlin/pll-berlin2.c  |  40 +++++++++++++
->  drivers/clk/berlin/pll-berlin2q.c |  40 +++++++++++++
->  drivers/clk/berlin/pll.c          | 114 ++++++++++++++++++++++++++++++++++++++
->  6 files changed, 234 insertions(+)
->  create mode 100644 drivers/clk/berlin/Makefile
->  create mode 100644 drivers/clk/berlin/common.h
->  create mode 100644 drivers/clk/berlin/pll-berlin2.c
->  create mode 100644 drivers/clk/berlin/pll-berlin2q.c
->  create mode 100644 drivers/clk/berlin/pll.c
+> What was the value of mvebu_pcie_link_up around this point?
+> 
+> PHY training would be the most likely time sensitive thing to muck up
+> discovery..
+
+The link is up, but the PCIe device is not visible under the right
+bus/device number until we call mvebu_pcie_set_local_dev_nr(), and wait
+about 50-100 microseconds. By "not visible", I mean reading the
+vendor/product ID from the PCI configuration space returns
+0xffff:0xffff, while after waiting 50-100 us, the right value is read.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
