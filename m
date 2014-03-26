@@ -1,62 +1,39 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 26 Mar 2014 13:23:19 +0000
-Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
-In-Reply-To: <20140326110141.GY7528@n2100.arm.linux.org.uk>
-References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
- <20140326102317.GA26040@linaro.org>
- <20140326110141.GY7528@n2100.arm.linux.org.uk>
-Message-ID: <20140326132318.GA30750@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Mar 2014 09:28:42 -0500
+Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
+ <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+Message-ID: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 11:01:41AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 26, 2014 at 10:23:19AM +0000, Steve Capper wrote:
-> > If there are no objections, I was going to put the following into
-> > Russell's patch system:
-> > 	arm: mm: Double logical invert for pte accessors
-> > 	arm: mm: Switch back to L_PTE_WRITE
-> 
-> I'm not all that happy with double inversions - I think they just serve
-> to cause confusion (and it was confusing, which is why I removed it.)
-> I'll only take them if you have a really good reason why you want to
-> bring it back.
+On Wed, Mar 19, 2014 at 6:12 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> This patch adds the device tree nodes for APM X-Gene PCIe controller and
+> PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
+> nodes are added.
 
-Hi Russell,
-The problem I'm trying to solve is for LPAE, where we have flags in the
-upper 32 bits of a page table entry that are tested for with a bitwise
-and, then subsequently downcast by a store to 32-bit integer:
+[snip]
 
-	gather_stats(page, md, pte_dirty(*pte), 1);
-and,
+> +               pcie0: pcie at 1f2b0000 {
+> +                       status = "disabled";
+> +                       device_type = "pci";
+> +                       compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+> +                       #interrupt-cells = <1>;
+> +                       #size-cells = <2>;
+> +                       #address-cells = <3>;
+> +                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+> +                               0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
 
-	static inline unsigned long huge_pte_write(pte_t pte)
-	{
-		return pte_write(pte);
-	}
+Where is the right place for config space? This binding has it here
+and others have it in ranges. Given that config space type is defined
+for ranges, I would think that is the right place. But Liviu's patches
+do not process config space entries in ranges. Perhaps we need a
+config space resource populated in the bridge struct.
 
-(and other cases that may arise in future).
+Rob
 
-We erroneously get false returned in situations where we shouldn't, and
-it's tricky to track this down.
 
-My reasoning was that applying double logical inverts to all the pte
-accessors that don't already have one ensures that we get values that
-are safe to downcast, and this is safe for cases where new accessors
-are added and the convention is followed and for where bit layouts are
-changed.
-
-I agree that this is confusing (and does look rather ugly), and I would
-happily try alternatives.
-
-I had tried to create a helper macro, pte_isset, but this didn't attract
-any positive comments:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235380.html
-
-I tried bool types, but it looked a little too cumbersome to me.
-
-Would the double logical invert be more acceptable if it were better
-commented?
-
-Cheers,
--- 
-Steve
+> +                       reg-names = "csr", "cfg";
+> +                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+> +                                 0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
