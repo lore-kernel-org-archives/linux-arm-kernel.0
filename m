@@ -1,129 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 26 Mar 2014 10:55:58 +0100
-Subject: [PATCH v5 07/14] ARM: mvebu: Extend the pmsu registers
-In-Reply-To: <53329EFE.4040705@free-electrons.com>
-References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
- <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
- <20140326003027.GJ28304@titan.lakedaemon.net>
- <53329EFE.4040705@free-electrons.com>
-Message-ID: <5332A42E.9030409@gmail.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Wed, 26 Mar 2014 10:46:35 +0100
+Subject: [patch added to the 3.12 stable tree] clocksource: vf_pit_timer: use
+ complement for sched_clock reading
+In-Reply-To: <1395827220-11701-1-git-send-email-jslaby@suse.cz>
+References: <1395827220-11701-1-git-send-email-jslaby@suse.cz>
+Message-ID: <1395827220-11701-8-git-send-email-jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2014 10:33 AM, Gregory CLEMENT wrote:
-> On 26/03/2014 01:30, Jason Cooper wrote:
->> On Tue, Mar 25, 2014 at 11:48:18PM +0100, Gregory CLEMENT wrote:
->>> The initial binding for PMSU were wrong. It didn't take into account
->>> all the registers from the PMSU and moreover it referred to registers
->>> which are not part of PMSU.
->>>
->>> The Power Management Unit Service block also controls the Coherency
->>> Fabric subsystem. These registers are needed for the CPU idle
->>> implementation for the Armada 370/XP, it allows to enter a deep CPU
->>> idle state where the Coherency Fabric and the L2 cache are powered
->>> down.
->>>
->>> This commit add support for a new compatible for the PMSU node
->>> including the block related to the coherency fabric. It also keeps
->>> compatibility with the old binding
->>>
->>> This patch also adds warnings if one of the base registers set can't
->>> be ioremapped.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> ---
->>>   arch/arm/mach-mvebu/pmsu.c | 47 +++++++++++++++++++++++++++++++++++++++++-----
->>>   1 file changed, 42 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
->>> index d71ef53107c4..865bcb651e01 100644
->>> --- a/arch/arm/mach-mvebu/pmsu.c
->>> +++ b/arch/arm/mach-mvebu/pmsu.c
->>> @@ -27,11 +27,21 @@
->>>   static void __iomem *pmsu_mp_base;
->>>   static void __iomem *pmsu_reset_base;
->>>
->>> -#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
->>> +#define PMSU_BASE_OFFSET    0x100
->>> +#define PMSU_REG_SIZE	    0x1000
->>> +
->>> +#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
->>>   #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
->>>
->>>   static struct of_device_id of_pmsu_table[] = {
->>> -	{.compatible = "marvell,armada-370-xp-pmsu"},
->>> +	{
->>> +		.compatible = "marvell,armada-370-pmsu",
->>> +		.data = (void *) false,
->>
->> This looks sketchy to me.
->
-> Could you elaborate it?
->
-> For a boolean I didn't saw the point to use a pointer.
+From: Stefan Agner <stefan@agner.ch>
 
-Isn't the different compatible boolean enough?
-You can use of_device_is_compatible() below.
+This patch has been added to the 3.12 stable tree. If you have any
+objections, please let us know.
 
->>> +	},
->>> +	{
->>> +		.compatible = "marvell,armada-370-xp-pmsu",
->>> +		.data = (void *) true, /* legacy */
->>
->> Same.
->>
->>> +	},
->>>   	{ /* end of list */ },
->>>   };
->>>
->>> @@ -59,15 +69,42 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
->>>   }
->>>   #endif
->>>
->>> +static void __init armada_370_xp_pmsu_legacy_init(struct device_node *np)
->>> +{
->>> +	u32 addr;
->>> +	pr_warn("*** Warning ***  Using an old binding which will be deprecated\n");
->>
->> This should be noted in the binding docs...
+===============
 
-pr_warn(FW_{WARN,BUG} "deprecated pmsu binding\n");
+commit 224aa3ed45c8735ae02bb2ecca002409fa6aa772 upstream.
 
-[...]
->>>   	np = of_find_matching_node(NULL, of_pmsu_table);
->>>   	if (np) {
->>> +		const struct of_device_id *match =
->>> +			of_match_node(of_pmsu_table, np);
->>> +		BUG_ON(!match);
->>> +
->>>   		pr_info("Initializing Power Management Service Unit\n");
->>> -		pmsu_mp_base = of_iomap(np, 0);
->>> -		pmsu_reset_base = of_iomap(np, 1);
->>> +
->>> +		if (match->data) /* legacy */
->>> +			armada_370_xp_pmsu_legacy_init(np);
+Vybrids PIT register is monitonic decreasing. However, sched_clock
+reading needs to be monitonic increasing. Use bitwise not to get
+the complement of the clock register. This fixes the clock going
+backward. Also, the clock now starts at 0 since we load the
+register with the maximum value at start.
 
-if (of_device_is_compatible(np, "marvell,armada-370-xp-pmsu"))
-	armada_370_xp_pmsu_legacy_init(np);
-else
-	...
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: daniel.lezcano at linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux at arm.linux.org.uk
+Link: http://lkml.kernel.org/r/d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan at agner.ch
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/clocksource/vf_pit_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sebastian
-
->> And if a new compatible string actually needs data passed?
->
-> in this case we would have to update the of_pmsu_table, so this
-> code could be also updated if needed in the same time. So I don't
-> see the problem, maybe I miss something.
->
-> But the plan is really to remove this legacy part later (after a
-> few kernel release)
->
->>
->>> +		else
->>> +			pmsu_mp_base = of_iomap(np, 0);
->>> +		WARN_ON(!pmsu_mp_base);
->>> +		of_node_put(np);
->>> +
->>> +		/*
->>> +		 * This temporaty hack will be removed as soon as we
+diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+index 587e0202a70b..e5590953630e 100644
+--- a/drivers/clocksource/vf_pit_timer.c
++++ b/drivers/clocksource/vf_pit_timer.c
+@@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
+ 
+ static unsigned int pit_read_sched_clock(void)
+ {
+-	return __raw_readl(clksrc_base + PITCVAL);
++	return ~__raw_readl(clksrc_base + PITCVAL);
+ }
+ 
+ static int __init pit_clocksource_init(unsigned long rate)
+-- 
+1.9.1
