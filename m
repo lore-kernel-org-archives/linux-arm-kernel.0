@@ -1,64 +1,32 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 26 Mar 2014 15:35:11 +0000
-Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
-References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
- <1395270762-6055-3-git-send-email-tinamdar@apm.com>
- <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
-Message-ID: <20140326153511.GR17163@e106497-lin.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 26 Mar 2014 16:39:50 +0100
+Subject: [PATCH] ata: fix Calxeda Highbank SATA driver dependencies
+Message-ID: <2920312.TnoQcCR5HX@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 02:28:42PM +0000, Rob Herring wrote:
-> On Wed, Mar 19, 2014 at 6:12 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-> > This patch adds the device tree nodes for APM X-Gene PCIe controller and
-> > PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
-> > nodes are added.
-> 
-> [snip]
-> 
-> > +               pcie0: pcie at 1f2b0000 {
-> > +                       status = "disabled";
-> > +                       device_type = "pci";
-> > +                       compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
-> > +                       #interrupt-cells = <1>;
-> > +                       #size-cells = <2>;
-> > +                       #address-cells = <3>;
-> > +                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
-> > +                               0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
-> 
-> Where is the right place for config space? This binding has it here
-> and others have it in ranges. Given that config space type is defined
-> for ranges, I would think that is the right place. But Liviu's patches
-> do not process config space entries in ranges. Perhaps we need a
-> config space resource populated in the bridge struct.
+Make sata_highbank host driver depend on ARCH_HIGHBANK config option
+as Calxeda Highbank SATA support is specific to Calxeda Highbank
+SoCs and the driver to work requires suitable device tree node to
+be defined.  Additionally allow the driver build if COMPILE_TEST
+config option is set.
 
-Rob,
+Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/ata/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Have a look at the discussion between Will and Arnd on the subject of virtual PCI
-host controller for arm 32bit. My understanding is that config space is described
-via reg entries.
-
-See here: http://archive.arm.linux.org.uk/lurker/message/20140205.190947.b3c3e464.en.html
-
-Best regards,
-Liviu
-
-> 
-> Rob
-> 
-> 
-> > +                       reg-names = "csr", "cfg";
-> > +                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
-> > +                                 0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Index: b/drivers/ata/Kconfig
+===================================================================
+--- a/drivers/ata/Kconfig	2014-03-26 15:32:57.455119357 +0100
++++ b/drivers/ata/Kconfig	2014-03-26 15:49:59.919101924 +0100
+@@ -264,6 +264,7 @@ config SATA_DWC_VDEBUG
+ 
+ config SATA_HIGHBANK
+ 	tristate "Calxeda Highbank SATA support"
++	depends on ARCH_HIGHBANK || COMPILE_TEST
+ 	help
+ 	  This option enables support for the Calxeda Highbank SoC's
+ 	  onboard SATA.
