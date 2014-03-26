@@ -1,39 +1,46 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 19:27:48 +0530
-Subject: [RFC PATCH 08/12] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
- used for PHY
+Date: Wed, 26 Mar 2014 19:27:50 +0530
+Subject: [RFC PATCH 10/12] ARM: dts: dra7: Add dt data for PCIe PHY
 In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
 References: <1395842272-15267-1-git-send-email-kishon@ti.com>
-Message-ID: <1395842272-15267-9-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-11-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added missing 32khz clock used by PCIe PHY.
-The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
+Added dt data for PCIe PHY as a child node of ocp2scp3.
+The documention for this node can be found @ ../bindings/phy/ti-phy.txt.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 9e0bb09..5f13189 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1165,6 +1165,14 @@
- 		reg = <0x021c>, <0x0220>;
- 	};
- 
-+	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
-+		compatible = "ti,gate-clock";
-+		clocks = <&sys_32k_ck>;
-+		#clock-cells = <0>;
-+		reg = <0x13b0>;
-+		ti,bit-shift = <8>;
-+	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 73c61d0..7ac372b 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -683,6 +683,22 @@
+ 				clock-names = "sysclk";
+ 				#phy-cells = <0>;
+ 			};
 +
- 	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
- 		compatible = "ti,divider-clock";
- 		clocks = <&apll_pcie_ck>;
++			pcie1_phy: pciephy at 4a094000 {
++				compatible = "ti,phy-pipe3-pcie";
++				ctrl-module = <&omap_control_pcie1phy>;
++				clocks = <&dpll_pcie_ref_ck>,
++					 <&dpll_pcie_ref_m2ldo_ck>,
++					 <&optfclk_pciephy_32khz>,
++					 <&optfclk_pciephy_clk>,
++					 <&optfclk_pciephy_div_clk>,
++					 <&optfclk_pciephy_div>;
++				clock-names = "dpll_ref", "dpll_ref_m2",
++					      "wkupclk", "refclk",
++					      "div-clk", "phy-div";
++				#phy-cells = <0>;
++				ti,hwmods = "pcie1-phy";
++			};
+ 		};
+ 
+ 		sata: sata at 4a141100 {
 -- 
 1.7.9.5
