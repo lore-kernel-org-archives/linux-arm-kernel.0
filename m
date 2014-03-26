@@ -1,42 +1,38 @@
 From: mhei@heimpold.de (Michael Heimpold)
-Date: Wed, 26 Mar 2014 23:35:03 +0100
-Subject: [PATCH 2/3] arm: mxs: dt: imx28-duckbill: fix phy reset gpio
+Date: Wed, 26 Mar 2014 23:35:04 +0100
+Subject: [PATCH 3/3] arm: mxs: dt: imx28-duckbill: use symbolic names from
+ gpio.h
 In-Reply-To: <1395873319-28286-1-git-send-email-mhei@heimpold.de>
 References: <1395873319-28286-1-git-send-email-mhei@heimpold.de>
-Message-ID: <1395873319-28286-3-git-send-email-mhei@heimpold.de>
+Message-ID: <1395873319-28286-4-git-send-email-mhei@heimpold.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a copy & paste error: on duckbills the GPIO used for resetting
-the ethernet phy differs from FSL's MX28EVK board.
+Use GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW instead of 0 and 1.
 
-Reported-by: Stefan Wahren <info@lategoodbye.de>
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 ---
  arch/arm/boot/dts/imx28-duckbill.dts |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-index a697870..91c1a9a 100644
+index 91c1a9a..ce1a7ef 100644
 --- a/arch/arm/boot/dts/imx28-duckbill.dts
 +++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -39,7 +39,7 @@
- 				hog_pins_a: hog at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--						MX28_PAD_ENET0_RX_CLK__GPIO_4_13 /* PHY Reset */
-+						MX28_PAD_SSP0_DATA7__GPIO_2_7 /* PHY Reset */
- 					>;
- 					fsl,drive-strength = <MXS_DRIVE_4mA>;
- 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-@@ -82,7 +82,7 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
- 			phy-supply = <&reg_3p3v>;
--			phy-reset-gpios = <&gpio4 13 0>;
-+			phy-reset-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
- 			phy-reset-duration = <100>;
- 			status = "okay";
+@@ -110,12 +110,12 @@
+ 
+ 		status {
+ 			label = "duckbill:green:status";
+-			gpios = <&gpio3 5 0>;
++			gpios = <&gpio3 5 GPIO_ACTIVE_HIGH>;
  		};
+ 
+ 		failure {
+ 			label = "duckbill:red:status";
+-			gpios = <&gpio3 4 0>;
++			gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
+ };
 -- 
 1.7.10.4
