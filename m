@@ -1,86 +1,67 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 26 Mar 2014 17:49:06 +0530
-Subject: [PATCH] arm64: dts: Add more serial port nodes in APM X-Gene device
- tree
-Message-ID: <1395836346-9350-1-git-send-email-vkale@apm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 26 Mar 2014 13:59:48 +0100
+Subject: [PATCH v5 07/14] ARM: mvebu: Extend the pmsu registers
+In-Reply-To: <5332C267.3080908@gmail.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+ <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
+ <5332C267.3080908@gmail.com>
+Message-ID: <20140326135948.3f2669fc@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APM X-Gene Storm SoC supports 4 serial ports. This patch adds device nodes
-for serial ports 1 to 3 (a device node for serial port 0 is already present
-in the dts file).
-This patch also sets the compatible property of serial nodes to "ns16550a".
+Dear Sebastian Hesselbarth,
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
----
- arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
- arch/arm64/boot/dts/apm-storm.dtsi  | 36 +++++++++++++++++++++++++++++++++++-
- 2 files changed, 39 insertions(+), 1 deletion(-)
+On Wed, 26 Mar 2014 13:04:55 +0100, Sebastian Hesselbarth wrote:
+> On 03/25/2014 11:48 PM, Gregory CLEMENT wrote:
+> > The initial binding for PMSU were wrong. It didn't take into account
+> > all the registers from the PMSU and moreover it referred to registers
+> > which are not part of PMSU.
+> >
+> > The Power Management Unit Service block also controls the Coherency
+> > Fabric subsystem. These registers are needed for the CPU idle
+> > implementation for the Armada 370/XP, it allows to enter a deep CPU
+> > idle state where the Coherency Fabric and the L2 cache are powered
+> > down.
+> >
+> > This commit add support for a new compatible for the PMSU node
+> > including the block related to the coherency fabric. It also keeps
+> > compatibility with the old binding
+> >
+> > This patch also adds warnings if one of the base registers set can't
+> > be ioremapped.
+> >
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >   arch/arm/mach-mvebu/pmsu.c | 47 +++++++++++++++++++++++++++++++++++++++++-----
+> >   1 file changed, 42 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> > index d71ef53107c4..865bcb651e01 100644
+> > --- a/arch/arm/mach-mvebu/pmsu.c
+> > +++ b/arch/arm/mach-mvebu/pmsu.c
+> [...]
+> > +static void __init armada_370_xp_pmsu_legacy_init(struct device_node *np)
+> > +{
+> > +	u32 addr;
+> > +	pr_warn("*** Warning ***  Using an old binding which will be deprecated\n");
+> > +	/* We just need the adress, we already know the size */
+> > +	addr = be32_to_cpu(*of_get_address(np, 0, NULL, NULL));
+> > +	addr -= PMSU_BASE_OFFSET;
+> > +	pmsu_mp_base = ioremap(addr, PMSU_REG_SIZE);
+> > +	of_node_put(np);
+> 
+> When messing with OF passed resources, I suggest to use
+> of_address_to_resource() and work on the struct resource
+> instead. The be32_to_cpu pointing to an immediate just looks
+> strange.
 
-diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-index 1247ca1..6541962 100644
---- a/arch/arm64/boot/dts/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm-mustang.dts
-@@ -24,3 +24,7 @@
- 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
- 	};
- };
-+
-+&serial0 {
-+	status = "ok";
-+};
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d37d736..2277b5c 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -179,13 +179,47 @@
- 		};
- 
- 		serial0: serial at 1c020000 {
-+			status = "disabled";
- 			device_type = "serial";
--			compatible = "ns16550";
-+			compatible = "ns16550a";
- 			reg = <0 0x1c020000 0x0 0x1000>;
- 			reg-shift = <2>;
- 			clock-frequency = <10000000>; /* Updated by bootloader */
- 			interrupt-parent = <&gic>;
- 			interrupts = <0x0 0x4c 0x4>;
- 		};
-+
-+		serial1: serial at 1c021000 {
-+			status = "disabled";
-+			device_type = "serial";
-+			compatible = "ns16550a";
-+			reg = <0 0x1c021000 0x0 0x1000>;
-+			reg-shift = <2>;
-+			clock-frequency = <10000000>; /* Updated by bootloader */
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x4d 0x4>;
-+		};
-+
-+		serial2: serial at 1c022000 {
-+			status = "disabled";
-+			device_type = "serial";
-+			compatible = "ns16550a";
-+			reg = <0 0x1c022000 0x0 0x1000>;
-+			reg-shift = <2>;
-+			clock-frequency = <10000000>; /* Updated by bootloader */
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x4e 0x4>;
-+		};
-+
-+		serial3: serial at 1c023000 {
-+			status = "disabled";
-+			device_type = "serial";
-+			compatible = "ns16550a";
-+			reg = <0 0x1c023000 0x0 0x1000>;
-+			reg-shift = <2>;
-+			clock-frequency = <10000000>; /* Updated by bootloader */
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x4f 0x4>;
-+		};
- 	};
- };
+I'm working on a revised patch set for these PMSU changes, as I also
+need them as a preparation for the SMP support on Armada 375/38x. And
+my revised patch set makes the manipulations on the 'struct resource',
+as you suggest.
+
+Thomas
 -- 
-1.8.2.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
