@@ -1,59 +1,89 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 26 Mar 2014 11:07:09 +0100
-Subject: [PATCH v2] ARM: dts: exynos4210-trats: add max8997 IRQ
-Message-ID: <1395828429-11023-1-git-send-email-r.baldyga@samsung.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Wed, 26 Mar 2014 10:12:31 +0000
+Subject: [PATCH v5 2/9] PCI: host: rcar: Add MSI support
+In-Reply-To: <5331B733.8090802@codethink.co.uk>
+References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
+ <1395766604-30926-3-git-send-email-phil.edworthy@renesas.com>
+ <5331B733.8090802@codethink.co.uk>
+Message-ID: <OF62BCE896.5AFD55D6-ON80257CA7.0037C4A7-80257CA7.00381353@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IRQ line specification for the MAX8997 chip and necessary
-pinctrl group to configure pull-up and driver strength of the pin.
-It's needed for proper handling of IRQs coming from MAX8997 multifunction
-device (IRQs are used by PMIC, MUIC and RTC).
+Hi Ben,
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
----
+On: 25/03/2014 17:05, Ben wrote:
+> Subject: Re: [PATCH v5 2/9] PCI: host: rcar: Add MSI support
+> 
+> On 25/03/14 16:56, Phil Edworthy wrote:
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > ---
+> > v5:
+> >   - Return IRQ_NONE from MSI isr when there is no pending MSI
+> >   - Add additional interrupt bindings
+> > +
+> > +static void rcar_msi_free(struct rcar_msi *chip, unsigned long irq)
+> > +{
+> > +   struct device *dev = chip->chip.dev;
+> > +
+> > +   mutex_lock(&chip->lock);
+> > +
+> > +   if (!test_bit(irq, chip->used))
+> > +      dev_err(dev, "trying to free unused MSI#%lu\n", irq);
+> 
+> Does the upper level not check for this?
+Yes, the default_teardown_msi_irqs function checks for unused MSIs, so we 
+don't really need to check here.
 
-Changelog:
 
-v2:
-- Corrected commit message.
+> > +   else
+> > +      clear_bit(irq, chip->used);
+> > +
+> > +   mutex_unlock(&chip->lock);
+> 
+> 
+> > +}
+> > +
+> > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+> > +{
+> > +   struct rcar_pcie *pcie = data;
+> > +   struct rcar_msi *msi = &pcie->msi;
+> > +   unsigned long reg;
+> > +
+> > +   reg = pci_read_reg(pcie, PCIEMSIFR);
+> > +
+> > +   /* MSI & INTx share an interrupt - we only handle MSI here */
+> > +   if (!reg)
+> > +      return IRQ_NONE;
+> > +
+> > +   while (reg) {
+> > +      unsigned int index = find_first_bit(&reg, 32);
+> > +      unsigned int irq;
+> > +
+> > +      /* clear the interrupt */
+> > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
+> > +
+> > +      irq = irq_find_mapping(msi->domain, index);
+> > +      if (irq) {
+> > +         if (test_bit(index, msi->used))
+> > +            generic_handle_irq(irq);
+> > +         else
+> > +            dev_info(pcie->dev, "unhandled MSI\n");
+> > +      } else {
+> > +         /*
+> > +          * that's weird who triggered this?
+> > +          * just clear it
+> > +          */
+> > +         dev_info(pcie->dev, "unexpected MSI\n");
+> > +      }
+> 
+> You may want to change this to something that is either rate-limited
+> or is say debug level so it does not spam the console if something
+> does go wrong.
+I'll change that to debug level.
 
-v1: https://lkml.org/lkml/2014/3/14/124
+> Also the comment could easily be made one line
+>    /* Weird, unknown MSI IRQ, just clear it */
+Sure!
 
- arch/arm/boot/dts/exynos4210-trats.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 662b482..5629eef 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -156,6 +156,14 @@
- 		};
- 	};
- 
-+	pinctrl at 11000000 {
-+		max8997_irq: max8997-irq {
-+			samsung,pins = "gpx0-7";
-+			samsung,pin-pud = <3>;
-+			samsung,pin-drv = <0>;
-+		};
-+	};
-+
- 	i2c at 13890000 {
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-slave-addr = <0x10>;
-@@ -187,6 +195,11 @@
- 		max8997_pmic at 66 {
- 			compatible = "maxim,max8997-pmic";
- 
-+			pinctrl-0 = <&max8997_irq>;
-+			pinctrl-names = "default";
-+
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <7 0>;
- 			reg = <0x66>;
- 
- 			max8997,pmic-buck1-uses-gpio-dvs;
--- 
-1.7.9.5
+Thanks
+Phil
