@@ -1,29 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 Mar 2014 11:01:05 +0000
-Subject: [PATCH V2 1/3] arm: mm: Double logical invert for pte accessors
-In-Reply-To: <1393328334-27285-2-git-send-email-steve.capper@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Mar 2014 11:01:41 +0000
+Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
+In-Reply-To: <20140326102317.GA26040@linaro.org>
 References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
- <1393328334-27285-2-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140326110104.GC6971@arm.com>
+ <20140326102317.GA26040@linaro.org>
+Message-ID: <20140326110141.GY7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 11:38:52AM +0000, Steve Capper wrote:
-> Long descriptors on ARM are 64 bits, and some pte functions such as
-> pte_dirty return a bitwise-and of a flag with the pte value. If the
-> flag to be tested resides in the upper 32 bits of the pte, then we run
-> into the danger of the result being dropped if downcast.
-> 
-> For example:
->         gather_stats(page, md, pte_dirty(*pte), 1);
-> where pte_dirty(*pte) is downcast to an int.
-> 
-> Functions such as huge_pte_write also perform a downcast to unsigned
-> long (which is 32 bits).
-> 
-> This patch adds a double logical invert to all the pte_ accessors to
-> ensure predictable downcasting.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+On Wed, Mar 26, 2014 at 10:23:19AM +0000, Steve Capper wrote:
+> If there are no objections, I was going to put the following into
+> Russell's patch system:
+> 	arm: mm: Double logical invert for pte accessors
+> 	arm: mm: Switch back to L_PTE_WRITE
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I'm not all that happy with double inversions - I think they just serve
+to cause confusion (and it was confusing, which is why I removed it.)
+I'll only take them if you have a really good reason why you want to
+bring it back.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
