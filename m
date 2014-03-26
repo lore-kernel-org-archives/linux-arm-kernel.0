@@ -1,53 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 12:52:31 +0100
-Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <OF362EF259.A035C442-ON80257CA7.003E97FF-80257CA7.003F9959@eu.necel.com>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <5228683.eofaEcInBi@wuerfel>
- <OF362EF259.A035C442-ON80257CA7.003E97FF-80257CA7.003F9959@eu.necel.com>
-Message-ID: <17762778.T67iL7T7u4@wuerfel>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 26 Mar 2014 12:55:02 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <5332AEE7.2040402@freescale.com>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+ <5332AEE7.2040402@freescale.com>
+Message-ID: <20140326125502.0e8d0657@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 March 2014 11:34:41 Phil.Edworthy at renesas.com wrote:
-> > But the ranges you specified in the property don't actually fit in those
-> > constraints: you have a range with size 0x8000000 and start 0x40000000,
-> > which you say can't be programmed into the hardware.
+Hi,
+
+Huang Shijie wrote:
+> ? 2014?03?26? 16:51, Lothar Wa?mann ??:
+> > I don't see why this should not be supported on i.MX28 (i.MX23 doesn't
+> > do byteswapping anyway, so this wouldn't change anything for i.MX23).
+> > The partitions used by Linux need not necessarily be accessible for the
+> > Boot ROM code (and vice versa).
+> But the first partition used to store the u-boot is accessible for the ROM.
 > 
-> Actually, the driver checks the dma-ranges against these constraints, and 
-> if necessary will create multiple mappings to fulfil the requested 
-> dma-ranges.
+Whether this partition is available to Linux depends on the partition table
+passed in the DT.
 
-Ok, I didn't notice. My initial suggestion was to not put that logic
-into the driver but instead specify in the host bridge binding that each
-entry in the dma-ranges property has to meet the hardware constraints.
+> Please see "Figure 12-13" in the 12.12.1.12:
+>    "In order to preserve the BI (bad block information), flash updater 
+> or gang programmer
+> applications need to swap Bad Block Information (BI) data to byte 0 of 
+> metadata area for
+> every page before programming NAND Flash. ROM when loading firmware, 
+> copies back
+> the value at metadata[0] to BI offset in page data. The following figure 
+> shows how the
+> factory bad block marker is preserved."
+> 
+The inspection of the BB markers is only a fallback for the case that
+there is no DBBT. From the same chapter that you quoted above:
+| ROM uses DBBT to skip any bad block that falls within firmware data
+| on NAND Flash device.
+| If the address of DBBT Search Area in FCB is 0, ROM will rely on
+| factory marked bad block markers to find out if a block is good or bad.
 
-As long as you don't have too much complexity to detect this case, I'm
-fine with it either way.
- 
-> > > Still, my comment about the OF PCI range code treating both 32 and 
-> 64-bit 
-> > > types the same way means that PCIe host driver has to assume it's a 
-> 64-bit 
-> > > mapping.
-> > 
-> > I was thinking more of PCI devices than the host itself. If the host
-> > driver can verify that all mappings are in the first 4GB and cover all 
-> of
-> > RAM, we won't have to use an swiotlb for devices that don't support 
-> 64-bit
-> > DMA, which is a very significant performance difference.
-> Ok, I think I understand. However, all the other PCI host drivers just do 
-> 1-to-1 mapping between PCI and CPU addresses, right? Whilst it might be 
-> nice be able to support mapping CPU addresses > 4GiB to PCI addresses 
-> under 4GiB, can that be something to consider later on?
+Thus, even the boot ROM of i.MX28 can well live without blockmark
+swapping.
 
-Yes, fair enough. The current version is much simpler, so that's ok.
-Just keep it in mind if you run into performance problems. Also, note
-that we don't actually support swiotlb on arm32 yet, so your current
-code is broken for an PCI DMA master that is not 64-bit capable.
-We need swiotlb on arm32 anyway, and that will fix this problem, but
-adding the hack I described would also fix it.
 
-	Arnd
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
