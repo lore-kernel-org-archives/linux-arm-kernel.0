@@ -1,54 +1,44 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 25 Mar 2014 22:39:17 -0700
-Subject: [PATCH v6] can: xilinx CAN controller support
-In-Reply-To: <5ff46a21-3047-40ff-9221-f08e476f9ce6@VA3EHSMHS030.ehs.local>
-References: <5ff46a21-3047-40ff-9221-f08e476f9ce6@VA3EHSMHS030.ehs.local>
-Message-ID: <1395812357.3726.14.camel@joe-AO722>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Wed, 26 Mar 2014 05:56:34 +0000
+Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201403260442.42970.marex@denx.de>
+References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
+ <201403230449.51515.marex@denx.de>
+ <1e17ce716618472f9a0146c48f20b976@BL2PR03MB338.namprd03.prod.outlook.com>
+ <201403260442.42970.marex@denx.de>
+Message-ID: <cd88de7e04734400b897c0e2bcf07eab@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-26 at 10:56 +0530, Kedareswara rao Appana wrote:
-> This patch adds xilinx CAN controller support.
-> This driver supports both ZYNQ CANPS and Soft IP
-> AXI CAN controller.
+On Wednesday, March 26, 2014 at 11:43:27 AM, Marek Vasut wrote:
+> On Wednesday, March 26, 2014 at 04:08:27 AM, Yao Yuan wrote:
+> 
+> [...]
+> 
+> > > > +		i2c_imx->use_dma = false;
+> > > > +	} else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr))
+> {
+> > > > +		dev_info(&pdev->dev,
+> > > > +				"can't request dma chan, faild use dma.\n");
+> > > > +		i2c_imx->use_dma = false;
+> > > > +	} else {
+> > > > +		i2c_imx->use_dma = true;
+> > > > +	}
+> > >
+> > > Can you not just check if i2c_imx->dma is valid pointer or NULL
+> pointer ?
+> > > Then you won't need a separate variable, for this purpose ... right ?
+> >
+> > Sorry and I think what I know is just to check whether it is NULL.
+> > Then for the second question, maybe there are some other ways, But I
+> > think it is more tidy and easier understanding for using a separate
+> > variable, for this purpose.
+> 
+> You are just wasting space and duplicating data, unless I am wrong.
+> 
 
-Just trivial notes about dmesg logging output.
+Well, Do you have a better idea? Although I think it's necessary.
 
-> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-[]
-> +static int set_reset_mode(struct net_device *ndev)
-> +{
-[]
-> +			netdev_warn(ndev, "timedout waiting for config mode\n");
 
-timed out
-
-> +static int xcan_set_bittiming(struct net_device *ndev)
-> +{
-[]
-> +	if (!is_config_mode) {
-> +		netdev_alert(ndev,
-> +			"BUG! Cannot set bittiming can is notin config mode\n");
-
-"Cannot set bit timing - CAN is not in config mode\n"
-
-> +static int xcan_chip_start(struct net_device *ndev)
-> +{
-
-> +			netdev_warn(ndev,
-> +				"time out waiting for correct mode\n");
-
-Please be consistent.  Maybe
-"timed out waiting for correct mode\n"
-
-> +static int xcan_open(struct net_device *ndev)
-> +{
-> +	struct xcan_priv *priv = netdev_priv(ndev);
-> +	int ret;
-> +
-> +	ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
-> +			ndev->name, ndev);
-> +	if (ret < 0) {
-> +		netdev_err(ndev, "Irq allocation for CAN failed\n");
-
-irq is almost always lower case.
+Best regards,
+Yuan Yao
