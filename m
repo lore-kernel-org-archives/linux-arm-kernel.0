@@ -1,113 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Mar 2014 11:00:24 +0000
-Subject: [PATCH] ARM: rockchip: convert smp bringup to
- CPU_METHOD_OF_DECLARE
-In-Reply-To: <1632873.urGeGsUMPH@diego>
-References: <1632873.urGeGsUMPH@diego>
-Message-ID: <20140326110024.GR10341@e106331-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 Mar 2014 11:00:30 +0000
+Subject: [PATCH V2 3/3] arm: mm: Switch back to L_PTE_WRITE
+In-Reply-To: <1393328334-27285-4-git-send-email-steve.capper@linaro.org>
+References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
+ <1393328334-27285-4-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140326110030.GB6971@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 10:27:35AM +0000, Heiko St?bner wrote:
-> With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
-> to reference the relevant smp_ops in the board file, but instead it can
-> simply be set by the enable-method property of the cpu nodes.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
->  arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
->  arch/arm/boot/dts/rk3188.dtsi                  | 1 +
->  arch/arm/mach-rockchip/core.h                  | 2 --
->  arch/arm/mach-rockchip/platsmp.c               | 3 ++-
->  arch/arm/mach-rockchip/rockchip.c              | 1 -
->  6 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 333f4ae..2501d5d 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
->  			    "qcom,gcc-msm8660"
->  			    "qcom,kpss-acc-v1"
->  			    "qcom,kpss-acc-v2"
-> +			    "rockchip,rk3066-smp"
+On Tue, Feb 25, 2014 at 11:38:54AM +0000, Steve Capper wrote:
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -86,6 +86,7 @@
+>  #define L_PTE_DIRTY            (_AT(pteval_t, 1) << 55)        /* unused */
+>  #define L_PTE_SPECIAL          (_AT(pteval_t, 1) << 56)        /* unused */
+>  #define L_PTE_NONE             (_AT(pteval_t, 1) << 57)        /* PROT_NONE */
+> +#define L_PTE_WRITE            (_AT(pteval_t, 1) << 58)
 
-We should document what what these actually mean, so as to be a hardware
-description and not a Linux internals description.
+I think we could rename L_PTE_RDONLY just to PTE_RDONLY since it's a
+hardware bit and only used by LPAE.
 
-Mark.
+Otherwise:
 
->  
->  	- cpu-release-addr
->  		Usage: required for systems that have an "enable-method"
-> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-> index 4d4dfbb..90b354d 100644
-> --- a/arch/arm/boot/dts/rk3066a.dtsi
-> +++ b/arch/arm/boot/dts/rk3066a.dtsi
-> @@ -24,6 +24,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "rockchip,rk3066-smp";
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index bb36596..7ad5103 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -24,6 +24,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "rockchip,rk3066-smp";
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
-> index e2e7c9d..39bca96 100644
-> --- a/arch/arm/mach-rockchip/core.h
-> +++ b/arch/arm/mach-rockchip/core.h
-> @@ -18,5 +18,3 @@ extern char rockchip_secondary_trampoline_end;
->  
->  extern unsigned long rockchip_boot_fn;
->  extern void rockchip_secondary_startup(void);
-> -
-> -extern struct smp_operations rockchip_smp_ops;
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index dbfa5a2..a18b7f2 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -178,7 +178,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->  		pmu_set_power_domain(0 + i, false);
->  }
->  
-> -struct smp_operations rockchip_smp_ops __initdata = {
-> +static struct smp_operations rockchip_smp_ops __initdata = {
->  	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
->  	.smp_boot_secondary	= rockchip_boot_secondary,
->  };
-> +CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
-> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-> index d211d6f..4499b0a 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -39,7 +39,6 @@ static const char * const rockchip_board_dt_compat[] = {
->  };
->  
->  DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-> -	.smp		= smp_ops(rockchip_smp_ops),
->  	.init_machine	= rockchip_dt_init,
->  	.dt_compat	= rockchip_board_dt_compat,
->  MACHINE_END
-> -- 
-> 1.9.0
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
