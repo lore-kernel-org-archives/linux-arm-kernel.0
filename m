@@ -1,27 +1,26 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Wed, 26 Mar 2014 10:23:21 +0800
-Subject: [PATCH] arm64: Fix memory layout typo
-Message-ID: <1395800601-17088-1-git-send-email-zhangwm@marvell.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 26 Mar 2014 11:29:31 +0900
+Subject: [PATCH 1/2] ARM: tegra: enable fhandle in tegra_defconfig
+Message-ID: <1395800972-26483-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- Documentation/arm64/memory.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+CONFIG_FHANDLE is required by systemd >= 210 to spawn a serial TTY.
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 5e054bf..c2765e2 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -39,7 +39,7 @@ ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
- 
- ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
- 
--ffffffbffbe10000	ffffffbcffffffff	  ~2MB		[guard]
-+ffffffbffbe10000	ffffffbffbffffff	  ~2MB		[guard]
- 
- ffffffbffc000000	ffffffbfffffffff	  64MB		modules
- 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 131b8d6ff9d3..2926281368ab 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -1,4 +1,5 @@
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_IKCONFIG=y
 -- 
-1.7.9.5
+1.9.1
