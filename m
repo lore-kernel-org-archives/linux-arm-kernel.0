@@ -1,54 +1,120 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 10:09:30 +0100
-Subject: [PATCH 0/2] ARM: mvebu: add a clock for mdio nodes on Armada
- 370/38x/XP
-In-Reply-To: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5332994A.1050202@free-electrons.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Wed, 26 Mar 2014 09:12:22 +0000
+Subject: [PATCH v5 5/9] dt-bindings: pci: rcar pcie device tree bindings
+In-Reply-To: <5331E576.2000202@cogentembedded.com>
+References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
+ <1395766604-30926-6-git-send-email-phil.edworthy@renesas.com>
+ <5331E576.2000202@cogentembedded.com>
+Message-ID: <OF926D4427.71CAF95D-ON80257CA7.00321EAE-80257CA7.0032919D@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/2014 00:33, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
+Hi Sergei,
+
+On: 25/03/2014 19:22, Sergei wrote:
+> Subject: Re: [PATCH v5 5/9] dt-bindings: pci: rcar pcie device tree 
+bindings
 > 
-> Here is a set of two patches that add a clock specification to the
-> mdio node on Armada 370/XP and Armada 38x. This allows the mvmdio
-> driver to work properly when loaded as a module, before mvneta is
-> loaded.
+> Hello.
 > 
-> I've separated the Armada 370/XP and Armada 38x fixes in two patches,
-> because the Armada 370/XP fix should be pushed to stable, while the
-> Armada 38x does not need to be pushed to stable since Armada 38x
-> support only appears in 3.15.
+> On 03/25/2014 07:56 PM, Phil Edworthy wrote:
 > 
-> Thanks,
+> > This patch adds the bindings for the R-Car PCIe driver. The driver
+> > resides under drivers/pci/host/pcie-rcar.c
 > 
-> Thomas
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > ---
+> > v5:
+> >   - Add PCIe bus clock reference
+> >   - Add additional interrupt bindings
+> >   - Use dma-ranges property to specify inbound memory regions
+> > ---
+> >   Documentation/devicetree/bindings/pci/rcar-pci.txt | 44 
+++++++++++++++++++++++
+> >   1 file changed, 44 insertions(+)
+> >   create mode 100644 
+Documentation/devicetree/bindings/pci/rcar-pci.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/
+> Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > new file mode 100644
+> > index 0000000..61bf5ef
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > @@ -0,0 +1,44 @@
+> > +* Renesas RCar PCIe interface
+> > +
+> > +Required properties:
+> > +- compatible: should contain one of the following
+> > +   "renesas,pcie-r8a7779", "renesas,pcie-r8a7790", 
+"renesas,pcie-r8a7791"
+> > +- reg: base addresses and lengths of the pcie controller.
+> 
+>     Hmm, need "registers" at end. And why plural?
+Ok, & yes it should be singular.
+
+
+> > +- #address-cells: set to <3>
+> > +- #size-cells: set to <2>
+> > +- device_type: set to "pci"
+> > +- ranges: ranges for the PCI memory and I/O regions.
+> > +- dma-ranges: ranges for the inbound memory regions.
+> > +- interrupts: two interrupt sources for MSI interrupts, followed by 
+interrupt
+> > +   source for hardware related interrupts (e.g. link speed change).
+> > +- #interrupt-cells: set to <1>
+> > +- interrupt-map-mask and interrupt-map: standard PCI properties
+> > +   to define the mapping of the PCIe interface to interrupt
+> > +   numbers.
+> > +- clocks: from common clock binding: handle to pci clock.
+> 
+>     s/handle/phandle/, s/pci/PCI/.
+>     Actually, it's a clock specifier consisting not only of phandle but 
+also 
+> of clock #. Looking at your example, it's even a pair of clock 
+specifiers.
+Right, and yes it's two clocks - I missed that when adding the PCI bus 
+clock.
+
+ 
+> > +- clock-names: from common clock binding: should be "pcie" and 
+"pcie_bus".
+> > +
+> > +Example:
+> > +
+> > +SoC specific DT Entry:
+> > +
+> > +   pcie: pcie at fe000000 {
+> > +      compatible = "renesas,pcie-r8a7791";
+> > +      reg = <0 0xfe000000 0 0x80000>;
+> > +      #address-cells = <3>;
+> > +      #size-cells = <2>;
+> > +      device_type = "pci";
+> > +      ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
+> > +           0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
+> > +           0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
+> > +           0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
+> > +      dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x40000000
+> > +               0x42000000 2 0x00000000 2 0x00000000 0 0x40000000>;
+> 
+>     Hmm, this prop looks board-dependent...
+Initially I thought that it would be board dependent and map the actual 
+DDR available. However, I then considered that it is probably ok to map 
+all possible DDR ranges that the device is capable of using. I'm ok with 
+either approach though...
+
+
+> > +      interrupts = <0 116 4 0 117 4 0 118 4>;
+> > +      #interrupt-cells = <1>;
+> > +      interrupt-map-mask = <0 0 0 0>;
+> > +      interrupt-map = <0 0 0 0 &gic 0 116 4>;
+> > +      clocks = <&mstp3_clks R8A7791_CLK_PCIE>, <&pcie_bus_clk>;
+> > +      clock-names = "pcie", "pcie_bus";
+> > +      status = "disabled";
+> > +   };
+> 
+> WBR, Sergei
 > 
 
-For both patches:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
-
-> Thomas Petazzoni (2):
->   ARM: mvebu: ensure the mdio node has a clock reference on Armada
->     370/XP
->   ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x
-> 
->  arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
->  arch/arm/boot/dts/armada-38x.dtsi    | 1 +
->  2 files changed, 2 insertions(+)
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
+Phil
