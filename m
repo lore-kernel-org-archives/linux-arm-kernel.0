@@ -1,60 +1,113 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Mar 2014 10:59:40 +0000
-Subject: [PATCH] ARM: machine_power_off should not return
-In-Reply-To: <20140326101227.GC941@arch.cereza>
-References: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
- <20140325224554.GC12185@arch.cereza>
- <20140326005115.GW7528@n2100.arm.linux.org.uk>
- <20140326101227.GC941@arch.cereza>
-Message-ID: <20140326105940.GX7528@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Mar 2014 11:00:24 +0000
+Subject: [PATCH] ARM: rockchip: convert smp bringup to
+ CPU_METHOD_OF_DECLARE
+In-Reply-To: <1632873.urGeGsUMPH@diego>
+References: <1632873.urGeGsUMPH@diego>
+Message-ID: <20140326110024.GR10341@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 07:12:27AM -0300, Ezequiel Garcia wrote:
-> On Mar 26, Russell King - ARM Linux wrote:
-> > On Tue, Mar 25, 2014 at 07:45:55PM -0300, Ezequiel Garcia wrote:
-> > > 
-> > > Without this patch we got the heartbeat's reboot_notifier called twice while
-> > > testing the recent hibernation patches, which was unexpected and produced a
-> > > kernel panic: https://lkml.org/lkml/2014/3/19/363
-> > 
-> > I don't see why we should make this change.  kernel/reboot.c handles
-> > this function returning, so other places should do too.
-> > 
-> > Even on x86, this function can return:
-> > 
-> [..]
-> > 
-> > Therefore, I'd say... it's a bug in the hibernation code - or we probably
-> > have many buggy architectures.  I'd suggest fixing the hibernation code
-> > rather than stuffing some workaround like an endless loop into every
-> > architecture.
-> > 
+On Wed, Mar 26, 2014 at 10:27:35AM +0000, Heiko St?bner wrote:
+> With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
+> to reference the relevant smp_ops in the board file, but instead it can
+> simply be set by the enable-method property of the cpu nodes.
 > 
-> Which is exactly what Sebastian did first:
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+>  arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
+>  arch/arm/boot/dts/rk3188.dtsi                  | 1 +
+>  arch/arm/mach-rockchip/core.h                  | 2 --
+>  arch/arm/mach-rockchip/platsmp.c               | 3 ++-
+>  arch/arm/mach-rockchip/rockchip.c              | 1 -
+>  6 files changed, 5 insertions(+), 4 deletions(-)
 > 
-> https://lkml.org/lkml/2014/3/20/605
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 333f4ae..2501d5d 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+>  			    "qcom,gcc-msm8660"
+>  			    "qcom,kpss-acc-v1"
+>  			    "qcom,kpss-acc-v2"
+> +			    "rockchip,rk3066-smp"
+
+We should document what what these actually mean, so as to be a hardware
+description and not a Linux internals description.
+
+Mark.
+
+>  
+>  	- cpu-release-addr
+>  		Usage: required for systems that have an "enable-method"
+> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+> index 4d4dfbb..90b354d 100644
+> --- a/arch/arm/boot/dts/rk3066a.dtsi
+> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> @@ -24,6 +24,7 @@
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		enable-method = "rockchip,rk3066-smp";
+>  
+>  		cpu at 0 {
+>  			device_type = "cpu";
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index bb36596..7ad5103 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -24,6 +24,7 @@
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		enable-method = "rockchip,rk3066-smp";
+>  
+>  		cpu at 0 {
+>  			device_type = "cpu";
+> diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
+> index e2e7c9d..39bca96 100644
+> --- a/arch/arm/mach-rockchip/core.h
+> +++ b/arch/arm/mach-rockchip/core.h
+> @@ -18,5 +18,3 @@ extern char rockchip_secondary_trampoline_end;
+>  
+>  extern unsigned long rockchip_boot_fn;
+>  extern void rockchip_secondary_startup(void);
+> -
+> -extern struct smp_operations rockchip_smp_ops;
+> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+> index dbfa5a2..a18b7f2 100644
+> --- a/arch/arm/mach-rockchip/platsmp.c
+> +++ b/arch/arm/mach-rockchip/platsmp.c
+> @@ -178,7 +178,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+>  		pmu_set_power_domain(0 + i, false);
+>  }
+>  
+> -struct smp_operations rockchip_smp_ops __initdata = {
+> +static struct smp_operations rockchip_smp_ops __initdata = {
+>  	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
+>  	.smp_boot_secondary	= rockchip_boot_secondary,
+>  };
+> +CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+> index d211d6f..4499b0a 100644
+> --- a/arch/arm/mach-rockchip/rockchip.c
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -39,7 +39,6 @@ static const char * const rockchip_board_dt_compat[] = {
+>  };
+>  
+>  DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+> -	.smp		= smp_ops(rockchip_smp_ops),
+>  	.init_machine	= rockchip_dt_init,
+>  	.dt_compat	= rockchip_board_dt_compat,
+>  MACHINE_END
+> -- 
+> 1.9.0
 > 
-> But Pavel asked to fix ARM's machine_power_off instead.
 > 
-> Also, looking at the other architectures, it seems this API is not well
-> defined: some of them have an infinite loop, some don't. So it's hard to
-> say the function is supposed to return or not.
-
-I'm going by x86 (which I regard as definitive) and the generic power-off
-kernel code (which I've looked at all the way back to 2.6.12-rc2).
-
-The hibernation code path should really be fixed - the paths in
-kernel/reboot.c have coped for 9+ with all of these platform hooks
-returning, and it's only the silly switch() in the hibernation code
-that doesn't use a "default" case to handle the kernel_halt() case
-which is the real cause of the problem.
-
-As you've found, calling kernel_power_off() followed by kernel_halt()
-leads to bugs in drivers: this is not an architecture thing, it's partly
-a hibernation code failure for doing that, and partly a driver bug for
-trying to unregister something that it's already unregistered.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
