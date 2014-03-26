@@ -1,55 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 26 Mar 2014 11:04:29 +0100
-Subject: [PATCH v7 2/3] ARM: sun7i/sun6i: dts: Add NMI irqchip support
-In-Reply-To: <20140326093946.GE6120@lukather>
-References: <1395256879-8475-1-git-send-email-carlo@caione.org>
- <1395256879-8475-3-git-send-email-carlo@caione.org>
- <53329243.8090604@redhat.com> <20140326093946.GE6120@lukather>
-Message-ID: <5332A62D.90302@redhat.com>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Wed, 26 Mar 2014 11:07:09 +0100
+Subject: [PATCH v2] ARM: dts: exynos4210-trats: add max8997 IRQ
+Message-ID: <1395828429-11023-1-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds IRQ line specification for the MAX8997 chip and necessary
+pinctrl group to configure pull-up and driver strength of the pin.
+It's needed for proper handling of IRQs coming from MAX8997 multifunction
+device (IRQs are used by PMIC, MUIC and RTC).
 
-On 03/26/2014 10:39 AM, Maxime Ripard wrote:
-> On Wed, Mar 26, 2014 at 09:39:31AM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 03/19/2014 08:21 PM, Carlo Caione wrote:
->>> This patch adds DTS entries for NMI controller as child of GIC.
->>>
->>> Signed-off-by: Carlo Caione <carlo@caione.org>
->>
->> Note this breaks the kernel on sun6i / A31 since we don't have a
->> pmic driver there yet, and thus the nmi gets constantly fired without
->> anything clearing it.
->>
->> So the sun6i section needs a status = "disabled"; until we actually have pmic
->> support.
-> 
-> I guess it also applies to the A20, since the PMIC patches will
-> probably get merged later on?
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
 
-Could be I've never tried it on the A20 without also having the pmic driver
-build into the kernel. Thinking more about this, I think this actually is
-a bug in the nmi irqchip driver, it should not unmask the gic irq until
-it gets an unmask for its child irq itself.
+Changelog:
 
-Otherwise we can still get the same problem if ie the pmic driver is
-a module, etc.
+v2:
+- Corrected commit message.
 
-Hmm, looking at the code I see that it already masks (sets enable to 0)
-the irq in sunxi_sc_nmi_irq_init. Note that this really should be
-done before the irq_set_chained_handler call though, as from then on
-the gic irq is unmasked, so we may get spurious irqs until the
-sunxi_sc_nmi_write calls are done.
+v1: https://lkml.org/lkml/2014/3/14/124
 
-I don't think this will solve the A31 problem though, I wonder if
-the enable reg-offset we've for the A31 is correct, maybe it should
-be 8 like with the A20 ?
+ arch/arm/boot/dts/exynos4210-trats.dts |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-I'll give this a try when I can find some time for this.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 662b482..5629eef 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -156,6 +156,14 @@
+ 		};
+ 	};
+ 
++	pinctrl at 11000000 {
++		max8997_irq: max8997-irq {
++			samsung,pins = "gpx0-7";
++			samsung,pin-pud = <3>;
++			samsung,pin-drv = <0>;
++		};
++	};
++
+ 	i2c at 13890000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-slave-addr = <0x10>;
+@@ -187,6 +195,11 @@
+ 		max8997_pmic at 66 {
+ 			compatible = "maxim,max8997-pmic";
+ 
++			pinctrl-0 = <&max8997_irq>;
++			pinctrl-names = "default";
++
++			interrupt-parent = <&gpx0>;
++			interrupts = <7 0>;
+ 			reg = <0x66>;
+ 
+ 			max8997,pmic-buck1-uses-gpio-dvs;
+-- 
+1.7.9.5
