@@ -1,118 +1,97 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 21:05:43 +0100
-Subject: [PATCH 00/44] outer cache changes
-In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <53333317.7020900@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 26 Mar 2014 14:12:43 -0600
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
+ <20140325202249.GA10378@obsidianresearch.com>
+ <20140325213638.5aba54b6@skate>
+ <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
+ <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+Message-ID: <20140326201243.GA1536@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Mar 26, 2014 at 07:31:12PM +0000, Neil Greatorex wrote:
+> > Sorry, it has a mistake, that is not how you detect CRS on this chip..
+> >
+> > CRS might be something the driver has to emulate as well.....
+> >
+> > This is better.. CRS will be bit 19 in the ICR
 
-On 17/03/2014 01:13, Russell King - ARM Linux wrote:
-> This patch series is where I'm currently at with the total mess which
-> is L2 cache support.  That's putting it mildly.  This isn't intended
-> for anyone to pick up - this is still mostly in development.
+> I ran your patch. The dmesg output is available at
+> https://gist.github.com/ngreatorex/9790164
 > 
-> I need help with the Aurora/Tauros3/Broadcom stuff, as that remains
-> addicted to the old buggy code that we used to have (eg, if you build
-> a v6+v7 kernel, all PL310 errata get disabled.  If CONFIG_CACHE_PL310
-> is enabled and you actually have a L2C-220, the necessary waits will
-> be omitted.  If you enable erratum 588369 and set the .set_debug
-> method to NULL or have a PL310 later than R3P0, you're opening a
-> race condition. etc.)
-> 
-> One of the potentially explosive issues is the utter crap and fscked
-> state of DT implementation here, much of which /can't/ now be fixed
-> without breaking existing DT based booting with existing files,
-> because we have a mixture of DT properties combined with platform
-> specific code setting various L2C configuration parameters (sometimes
-> writing directly to the registers.)
-> 
-> For example, I've made a start at trying to prevent any further additions
-> of platform code writing to the L2C-310's power control register by
-> adding a couple of properties - but we can't delete the direct register
-> write in iMX6 code without breaking existing DT descriptions.
-> 
-> The same goes for the mess which is the auxillary control register,
-> or now the prefetch control register.  Or the erratum 752271 which
-> iMX6 implements in their own SoC specific code.
-> 
-> Here's the *big* explosive question: how have we ended up in this mess?
-> A bigger question: why was none of this caught at review time?  An even
-> bigger question (which I believe is at the root of much of the pain that
-> people feel with DT): why aren't device properties being thought out
-> better - by that I mean, why isn't the question "are the properties you
-> are proposing for device X sufficient to describe all it's configurable
-> parameters, and if not, what are you omitting?" being asked when new
-> device bindings are being proposed.
-> 
-> You can see the extent of the L2C crap from the diffstat below - every
-> arch/arm/mach-* file touched here is a symptom of failing to adequately
-> describe the properties that platforms need to specify.  It's a failing
-> of DT process.  It's a failing of review of SoC code.
-> 
+> I'm afraid the output doesn't mean much to me :-)
 
-I had a quick look on this series and it is a really good improvement of
-the code. I didn't notice anything suspicious regarding the Aurora L2
-cache controller.
+This is the relevant bit:
 
-Then I have applied this series on 3.14-rc8 using our mvebu_defconfig. And
-made some performance tests using cachebench. So I tested it on:
+[    0.136040] mvebu-pcie pcie-controller.3: ICR is 0
+[    0.161162] mvebu-pcie pcie-controller.3: Vendor ID is ffffffff
+[    0.161170] mvebu-pcie pcie-controller.3: ICR is 800200
+[    1.170071] mvebu-pcie pcie-controller.3: Try 2: Vendor ID is ffffffff
+[    1.170083] mvebu-pcie pcie-controller.3: ICR is 808200 
 
-- an Armada XP based board which use the Aurora cache controller with the
-aurora-system-cache flavor.
+#1 The ICR indicates PexLinkFail and NFErrDet after the first vendor
+   read. I think PexLinkFail is very surprising, documentation says it
+   means there was an error on the link and it re-trained. Perhaps it
+   is a side effect of #2..
 
-- an Armada 370 based board which use the Aurora cache controller with the
-aurora-outer-cache.
+#2 It looks like I botched the format of the configuration since the NIC
+   didn't respond, I think I see why.
 
-I didn't notice any regression in both case.
+#3 After sleeping the PEX detected a UR or CA TLP, which is not
+   necessarily surprising, considering #2..
 
-So at least you can add my
+So, we need a result that actually reads the vendor id..
 
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Here is a revision, I suspect the error with the debugging was not
+calling mvebu_pcie_set_local_bus_nr, so a type 1 transaction was being
+produced. I am looking for the 2nd Vendor ID to return 80861521.
 
+Also, are you using the "reset-gpios" DT property?
 
-Thanks for your work,
-
-Gregory
-
-
-> Anyway, here's the diffstat so far.  Not Cc'ing anyone this time around
-> (the Cc list is huge), so it's all on LAKML.
-> 
->  Documentation/devicetree/bindings/arm/l2cc.txt |    2 +
->  arch/arm/Kconfig                               |   51 -
->  arch/arm/boot/dts/imx6qdl.dtsi                 |    2 +
->  arch/arm/boot/dts/imx6sl.dtsi                  |    2 +
->  arch/arm/include/asm/hardware/cache-l2x0.h     |   63 +-
->  arch/arm/include/asm/outercache.h              |   67 +-
->  arch/arm/mach-cns3xxx/core.c                   |    8 +-
->  arch/arm/mach-highbank/highbank.c              |   12 +-
->  arch/arm/mach-imx/system.c                     |    8 +-
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c      |    2 +-
->  arch/arm/mach-omap2/omap4-common.c             |   58 +-
->  arch/arm/mach-prima2/l2x0.c                    |    5 +-
->  arch/arm/mach-prima2/pm.c                      |    1 -
->  arch/arm/mach-realview/realview_pbx.c          |    4 +-
->  arch/arm/mach-spear/platsmp.c                  |   19 +-
->  arch/arm/mach-spear/spear13xx.c                |    6 +-
->  arch/arm/mach-sti/board-dt.c                   |    8 +-
->  arch/arm/mach-tegra/sleep.h                    |    8 +-
->  arch/arm/mach-ux500/cache-l2x0.c               |   23 +-
->  arch/arm/mach-vexpress/ct-ca9x4.c              |    4 +-
->  arch/arm/mm/Kconfig                            |   51 +
->  arch/arm/mm/Makefile                           |    1 +
->  arch/arm/mm/cache-feroceon-l2.c                |    1 -
->  arch/arm/mm/cache-l2x0.c                       | 1354 +++++++++++++++++-------
->  arch/arm/mm/l2c-common.c                       |   20 +
->  arch/arm/plat-samsung/s5p-sleep.S              |    8 +-
->  26 files changed, 1221 insertions(+), 567 deletions(-)
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index b8f2fc9..6da4983 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -999,6 +999,38 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 
+ 		mvebu_pcie_set_local_dev_nr(port, 1);
+ 
++		/* Wait for the link to come up */
++		if (!mvebu_pcie_link_up(port)) {
++			unsigned int I;
++
++			dev_info(&pdev->dev, "Waiting for link up\n");
++			for (I = 0; I != 100; I++) {
++				udelay(100);
++				if (mvebu_pcie_link_up(port))
++					break;
++			}
++			dev_info(&pdev->dev, "Link is %u\n",
++				 mvebu_pcie_link_up(port));
++		}
++
++		/* Clear and report the ICR */
++		mvebu_writel(port, 0, 0x1900);
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
++
++		/* Read the vendor ID from the connected device */
++		mvebu_pcie_set_local_bus_nr(port, 1);
++		mvebu_writel(port, PCIE_CONF_ADDR(1, 0, 0), PCIE_CONF_ADDR_OFF);
++		dev_info(&pdev->dev, "Vendor ID is %x\n",
++			 mvebu_readl(port, PCIE_CONF_DATA_OFF));
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
++		mvebu_writel(port, 0, 0x1900);
++		msleep(1000);
++		mvebu_writel(port, PCIE_CONF_ADDR(1, 0, 0), PCIE_CONF_ADDR_OFF);
++		dev_info(&pdev->dev, "Try 2: Vendor ID is %x\n",
++			 mvebu_readl(port, PCIE_CONF_DATA_OFF));
++		dev_info(&pdev->dev, "ICR is %x\n", mvebu_readl(port, 0x1900));
++
++
+ 		port->dn = child;
+ 		spin_lock_init(&port->conf_lock);
+ 		mvebu_sw_pci_bridge_init(port);
