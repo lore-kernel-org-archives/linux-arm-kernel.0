@@ -1,69 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 11:38:32 +0100
-Subject: [PATCH v5 14/14] ARM: mvebu: register the cpuidle driver for
- the Armada XP SoCs
-In-Reply-To: <20140326113159.48c3c405@skate>
-References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
- <1395787705-31061-15-git-send-email-gregory.clement@free-electrons.com>
- <20140326113159.48c3c405@skate>
-Message-ID: <5332AE28.3040403@free-electrons.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 26 Mar 2014 18:41:43 +0800
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <20140326095156.3e5585b8@ipc1.ka-ro>
+References: <532BCFCC.4080205@freescale.com>	<1395399017-19005-1-git-send-email-LW@KARO-electronics.de>	<20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+Message-ID: <5332AEE7.2040402@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/2014 11:31, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Tue, 25 Mar 2014 23:48:25 +0100, Gregory CLEMENT wrote:
-> 
->> +int __init armada_370_xp_cpu_pm_init(void)
->> +{
->> +	if (!((of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu") ||
->> +				of_find_compatible_node(NULL, NULL, "marvell,armada-370-pmsu"))
->> +			&& of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric")
->> +			&& of_machine_is_compatible("marvell,armadaxp")))
->> +		return 0;
-> 
-> Instead of this big single condition, maybe it could be split in a
-> nicer way:
-> 
-> 	/*
-> 	 * Check that all the requirements are available to enable
-> 	 * cpuidle. So far, it is only supported on Armada XP, cpuidle
-> 	 * needs the coherency fabric and the PMSU enabled
->          */
-> 
-> 	if (!of_machine_is_compatible("marvell,armadaxp"))
-> 		return 0;
-> 
-> 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> 	if (!np)
-> 		return 0;
-> 	of_node_put(np);
-> 
-> 	np = of_find_matching_node(NULL, of_pmsu_table);
+? 2014?03?26? 16:51, Lothar Wa?mann ??:
+> I don't see why this should not be supported on i.MX28 (i.MX23 doesn't
+> do byteswapping anyway, so this wouldn't change anything for i.MX23).
+> The partitions used by Linux need not necessarily be accessible for the
+> Boot ROM code (and vice versa).
+But the first partition used to store the u-boot is accessible for the ROM.
 
-Oh yes the pmsu table! I was concerned by this big condition, yesterday but
-I didn't find a proper solution due to the test to the 2 comaptible string:
-I forgot the pmsu table.
+Please see "Figure 12-13" in the 12.12.1.12:
+   "In order to preserve the BI (bad block information), flash updater 
+or gang programmer
+applications need to swap Bad Block Information (BI) data to byte 0 of 
+metadata area for
+every page before programming NAND Flash. ROM when loading firmware, 
+copies back
+the value at metadata[0] to BI offset in page data. The following figure 
+shows how the
+factory bad block marker is preserved."
 
-I will do this change (I mean using the pmsu table but also splitting the
-condition in small chunk).
+So please the imx28 should _NOT_ support this feature.
 
-Thanks,
-
-Gregory
-
-
-> 	if (!np)
-> 		return 0;
-> 	of_node_put(np);
-> 
-> Thomas
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+thanks
+Huang Shijie
