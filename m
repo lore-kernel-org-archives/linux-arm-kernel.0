@@ -1,54 +1,135 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Mar 2014 00:11:35 +0000
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <20140324234443.GS7528@n2100.arm.linux.org.uk>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
-Message-ID: <20140326001135.GV7528@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 25 Mar 2014 20:30:27 -0400
+Subject: [PATCH v5 07/14] ARM: mvebu: Extend the pmsu registers
+In-Reply-To: <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+ <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140326003027.GJ28304@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 11:44:43PM +0000, Russell King - ARM Linux wrote:
-> Now, you mention packet loss above.  Even on half-duplex networks, I
-> would not expect there to be much packet loss because of the
-> retransmissions after a collision, and 100Mbit networks handle this
-> much better than 10Mbit.  It takes repeated collisions to cause a
-> packet to actually be dropped (and a packet being dropped because
-> of collisions should be logged by the transmitting host in its
-> interface statistics.)
+On Tue, Mar 25, 2014 at 11:48:18PM +0100, Gregory CLEMENT wrote:
+> The initial binding for PMSU were wrong. It didn't take into account
+> all the registers from the PMSU and moreover it referred to registers
+> which are not part of PMSU.
 > 
-> Another possibility is that the FEC isn't properly negotiating with
-> the hub, and the two ends are ending up configured differently, or
-> that it is negotiating properly but the FEC isn't being configured
-> correctly.
+> The Power Management Unit Service block also controls the Coherency
+> Fabric subsystem. These registers are needed for the CPU idle
+> implementation for the Armada 370/XP, it allows to enter a deep CPU
+> idle state where the Coherency Fabric and the L2 cache are powered
+> down.
 > 
-> Now that we know a little more about your setup, including that it
-> seems to be one specific setup which is causing the problems, I'll
-> do some more testing - I have an old Allied Telesys 10/100 hub here
-> which I'll try putting the iMX6 on and re-run your tests.
+> This commit add support for a new compatible for the PMSU node
+> including the block related to the coherency fabric. It also keeps
+> compatibility with the old binding
+> 
+> This patch also adds warnings if one of the base registers set can't
+> be ioremapped.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 47 +++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 42 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index d71ef53107c4..865bcb651e01 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -27,11 +27,21 @@
+>  static void __iomem *pmsu_mp_base;
+>  static void __iomem *pmsu_reset_base;
+>  
+> -#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
+> +#define PMSU_BASE_OFFSET    0x100
+> +#define PMSU_REG_SIZE	    0x1000
+> +
+> +#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
+>  #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
+>  
+>  static struct of_device_id of_pmsu_table[] = {
+> -	{.compatible = "marvell,armada-370-xp-pmsu"},
+> +	{
+> +		.compatible = "marvell,armada-370-pmsu",
+> +		.data = (void *) false,
 
-PC --- 100Mbit hub --- iMX6S
+This looks sketchy to me.
 
-iperf (2.0.5) -c PC -r reports:
+> +	},
+> +	{
+> +		.compatible = "marvell,armada-370-xp-pmsu",
+> +		.data = (void *) true, /* legacy */
 
-iMX6 Tx: [  5]  0.0-10.0 sec  85.5 MBytes  71.5 Mbits/sec
-iMX6 Rx: [  3]  0.0-10.0 sec   103 MBytes  86.2 Mbits/sec
+Same.
 
-However, there's a marked difference when the iMX6 sends - the
-collision LED is almost permanently on at full brightness, whereas
-when the PC is sending, it's almost always off.
+> +	},
+>  	{ /* end of list */ },
+>  };
+>  
+> @@ -59,15 +69,42 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+>  }
+>  #endif
+>  
+> +static void __init armada_370_xp_pmsu_legacy_init(struct device_node *np)
+> +{
+> +	u32 addr;
+> +	pr_warn("*** Warning ***  Using an old binding which will be deprecated\n");
 
-I'm seeing lots of late collisions and CRC errors in the statistics
-registers.
+This should be noted in the binding docs...
 
-It looks to me like the iMX6's transmitter is blathering at any moment,
-not taking any notice whether there's already a carrier on the RX side.
-I'm not yet sure what to make of this yet.
+> +	/* We just need the adress, we already know the size */
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+nit. s/adress/address/
+
+> +	addr = be32_to_cpu(*of_get_address(np, 0, NULL, NULL));
+> +	addr -= PMSU_BASE_OFFSET;
+> +	pmsu_mp_base = ioremap(addr, PMSU_REG_SIZE);
+> +	of_node_put(np);
+> +}
+> +
+>  static int __init armada_370_xp_pmsu_init(void)
+>  {
+>  	struct device_node *np;
+> -
+
+Please leave this empty line.
+
+>  	np = of_find_matching_node(NULL, of_pmsu_table);
+>  	if (np) {
+> +		const struct of_device_id *match =
+> +			of_match_node(of_pmsu_table, np);
+> +		BUG_ON(!match);
+> +
+>  		pr_info("Initializing Power Management Service Unit\n");
+> -		pmsu_mp_base = of_iomap(np, 0);
+> -		pmsu_reset_base = of_iomap(np, 1);
+> +
+> +		if (match->data) /* legacy */
+> +			armada_370_xp_pmsu_legacy_init(np);
+
+And if a new compatible string actually needs data passed?
+
+> +		else
+> +			pmsu_mp_base = of_iomap(np, 0);
+> +		WARN_ON(!pmsu_mp_base);
+> +		of_node_put(np);
+> +
+> +		/*
+> +		 * This temporaty hack will be removed as soon as we
+
+nit. s/temporaty/temporary/
+
+thx,
+
+Jason.
+
+> +		 * get the proper reset controler support
+> +		 */
+> +		np = of_find_compatible_node(NULL, NULL, "marvell,armada-xp-cpu-reset");
+> +		pmsu_reset_base = of_iomap(np, 0);
+> +		WARN_ON(!pmsu_reset_base);
+>  		of_node_put(np);
+>  	}
+>  
+> -- 
+> 1.8.1.2
+> 
