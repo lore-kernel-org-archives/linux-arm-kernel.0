@@ -1,40 +1,51 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 26 Mar 2014 09:55:46 +0000
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <4392030.XayIa35sfH@wuerfel>
-References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
- <21873900.AIOr1ryy37@wuerfel>
- <CAGVrzcZNM2gUHqq2m2jcaqs-AoWKo_DszYu5ozs2vTR6kFY0kA@mail.gmail.com>
- <4392030.XayIa35sfH@wuerfel>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D0F6E9407@AcuExch.aculab.com>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Wed, 26 Mar 2014 09:55:04 +0000
+Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
+ R8A7790
+In-Reply-To: <14997425.EPjrKhVy10@wuerfel>
+References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
+ <1395766604-30926-7-git-send-email-phil.edworthy@renesas.com>
+ <14997425.EPjrKhVy10@wuerfel>
+Message-ID: <OF61E4A09E.4D57F668-ON80257CA7.0035A569-80257CA7.00367A70@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann
-> On Tuesday 25 March 2014 10:16:28 Florian Fainelli wrote:
-> >
-> > Ok, well that's really unfortunate, to achieve the best of everything,
-> > the workaround should probably look like:
-> >
-> > - keep reclaiming TX buffers in ndo_start_xmit() in case you push more
-> > packets to the NICs than your timer can free
-> > - reclaim TX buffers in NAPI poll() context for "symetrical" workloads
-> > where e.g: TCP ACKs received allow you to complete TX buffers
-> > - have a timer like you suggest which should help with transmit only
-> > workloads at a slow rate
+Hi Arnd,
+
+On: 25/03/2014 18:42, Arnd wrote:
+> Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes 
+for R8A7790
 > 
-> Yes, that is what I was thinking, but with orphaning the tx skbs,
-> we can probably be a little smarter. Note that in order to check
-> the state of the queue, we have to do a read from uncached memory,
-> since the hardware also doesn't support cache coherent DMA.
-> We don't want to do that too often.
+> On Tuesday 25 March 2014 16:56:41 Phil Edworthy wrote:
+> > +               /* Map all possible DDR as inbound ranges */
+> > +               dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 
+0x80000000
+> > +                             0x43000000 1 0x80000000 1 0x80000000 0 
+0x80000000>;
+> 
+> Typo: 0x43000000 should be 0x42000000 I guess.
+I used 0x43000000 as this is a 64-bit type. The OF PCI range code 
+currently treats both 32 and 64-bit types the same way, but I thought it 
+would be good to set this in case we ever need to use it.
+ 
+> Since you control the mapping, I wonder if you could also do this as
+> 
+>                dma-ranges = <0x42000000 0 0x00000000 0 0x40000000 0 
+0x80000000
+>                              0x43000000 0 0x80000000 1 0x80000000 0 
+0x80000000>;
+> 
+> i.e. map all the RAM into PCI bus addresses below the 32-bit boundary.
+> This would be really nice from the perspective that now all PCI
+> devices could access all of RAM without using an IOMMU or the
+> relying on 64-bit master capability.
+> 
+> The downside of this is that you'd probably need a custom dma_map_ops
+> wrapper.
+Since the OF PCi range code treats both 32 and 64-bit types the same way, 
+my PCIe driver only creates 64-bit mappings. In addition, the PCIe 
+controller has to use a 64-bit mapping for anything over 2GiB. Based on 
+this, I think it's sensible to leave the mappings as 1-to-1.
 
-Possibly you can check for all the pending transmits having
-completed - the most likely case. Instead of checking them
-individually?
-
-You should limit the number of tx bytes as well as the number
-of tx frames - buffering a ring full of large frames subverts
-some of the algorithms higher up the stack.
-
-	David
+Thanks
+Phil
