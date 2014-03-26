@@ -1,22 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 23:17:53 +0100
-Subject: [PATCH] ARM: update multi_v7_defconfig for Tegra
-In-Reply-To: <1395435418-1376-1-git-send-email-swarren@wwwdotorg.org>
-References: <1395435418-1376-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201403262317.53217.arnd@arndb.de>
+Date: Wed, 26 Mar 2014 23:20:37 +0100
+Subject: [PATCH 1/2] ARM: tegra: enable fhandle in tegra_defconfig
+In-Reply-To: <53333303.70709@wwwdotorg.org>
+References: <1395800972-26483-1-git-send-email-acourbot@nvidia.com>
+ <53333303.70709@wwwdotorg.org>
+Message-ID: <201403262320.37195.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wednesday 26 March 2014, Stephen Warren wrote:
+> On 03/25/2014 08:29 PM, Alexandre Courbot wrote:
+> > CONFIG_FHANDLE is required by systemd >= 210 to spawn a serial TTY.
 > 
-> This patch adds the same options to multi_v7_defconfig as were added to
-> tegra_defconfig in commit d1c912c1001f "ARM: tegra: defconfig updates".
-> (CONFIG_POWER_RESET_AS3722 is already enabled here.)
+> The series,
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 > 
-> Suggested-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Patch 1/2,
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> (although not with the new systemd version that requires the change, but
+> rather for regressions in Ubuntu 12.04)
+> 
+> 
 
-Applied on next/boards branch
+Applied both to next/boards, thanks!
 
 	Arnd
