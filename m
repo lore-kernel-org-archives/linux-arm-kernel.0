@@ -1,49 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 26 Mar 2014 14:19:07 +0100
-Subject: [PATCH] ARM: ux500: u8500_defconfig: Enable PARTITION_ADVANCED
-Message-ID: <1395839947-2534-1-git-send-email-ulf.hansson@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Mar 2014 08:19:39 -0700
+Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <20140321035233.32624.98694@quantum>
+References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
+ <531068F4.3060903@free-electrons.com>
+ <20140321035233.32624.98694@quantum>
+Message-ID: <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are both (e)MMC/SD-card support in ux500, thus it's reasonable to
-support partitions for block devices as default.
+[+ imx6 maintainers ]
 
-While updating the defconfig, we rebase it towards Kconfig changes.
+On Thu, Mar 20, 2014 at 8:52 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Gregory CLEMENT (2014-02-28 02:46:12)
+>> Hi Mike,
+>>
+>> On 24/02/2014 19:10, Gregory CLEMENT wrote:
+>> > Until now the clock providers were initialized in the order found in
+>> > the device tree. This led to have the dependencies between the clocks
+>> > not respected: children clocks could be initialized before their
+>> > parent clocks.
+>> >
+>> > Instead of forcing each platform to manage its own initialization order,
+>> > this patch adds this work inside the framework itself.
+>> >
+>> > Using the data of the device tree the of_clk_init function now delayed
+>> > the initialization of a clock provider if its parent provider was not
+>> > ready yet.
+>> >
+>> > The strict dependency check (all parents of a given clk must be
+>> > initialized) was added by Boris BREZILLON
+>>
+>> Are you ok with this version?
+>> Will you take it for 3.15?
+>> Or maybe you expected that it will be part of a pull request?
+>>
+>> However as it is modifying the core of the framework I thought that you
+>> would take it and apply yourself.
+>
+> Hi Gregory,
+>
+> I have taken this into clk-next. If no regressions pop up over the next
+> few days then it should go into 3.15.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+$SUBJECT patch (as commit 1771b10d605) is in -next has been fingered
+by bisection to be the reason behind boot failures[1] on imx6 wand
+boards in the last several -next kernels.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 65f7788..1ee8da3 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -7,6 +7,7 @@ CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
-@@ -37,6 +38,8 @@ CONFIG_PHONET=y
- # CONFIG_WIRELESS is not set
- CONFIG_CAIF=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
- CONFIG_SENSORS_BH1780=y
-@@ -110,8 +113,6 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- # CONFIG_MISC_FILESYSTEMS is not set
--- 
-1.7.9.5
+Reverting the patch on top of next/master gets these boards booting again.
+
+The boot failures result in no console output, so I haven't done any
+further debugging.
+
+Kevin
+
+[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002927.html
