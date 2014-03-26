@@ -1,59 +1,62 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 26 Mar 2014 00:28:05 -0700
-Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
-In-Reply-To: <20140325220045.GA12185@arch.cereza>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
- <20140325220045.GA12185@arch.cereza>
-Message-ID: <20140326072805.GB31517@norris-Latitude-E6410>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 26 Mar 2014 10:00:31 +0200
+Subject: [PATCH 12/18] ARM: OMAP3: PM: remove access to PRM_VOLTCTRL
+ register
+In-Reply-To: <20140325223612.GA26395@atomide.com>
+References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
+ <1393949958-816-13-git-send-email-t-kristo@ti.com>
+ <20140325223612.GA26395@atomide.com>
+Message-ID: <5332891F.9070002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 07:00:45PM -0300, Ezequiel Garcia wrote:
-> After taking a quick glance at the whole driver I noticed you have something
-> strange going on. AFAIK, the typical NAND driver probe() should be one of
-> these two:
-> 
-> * Call nand_scan() which calls nand_scan_ident() + nand_scan_tail().
-> 
-> * Call nand_scan_ident() to identify the NAND device geometry, do some
->   driver specific initialization, fill some hooks, and finally call
->   nand_scan_tail() to complete the initialization.
-> 
-> You driver call nand_scan_ident() and then does some bad block scan, and
-> fills some callbacks on its own, but never calls nand_scan_tail().
-> 
-> The call to nand_scan_tail() would remove the need to export those NAND
-> core functions, and remove the need to scan and print the bad blocks.
-> I don't know if you have a real reason for not doing it this way, or
-> maybe it's the way this driver was originally written.
-> 
-> Care to review this and re-spin the driver? You'll have a more nicer
-> driver, and more framework-compliant.
+On 03/26/2014 12:36 AM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [140304 08:23]:
+>> There is a solitary write to this register every wakeup from off-mode,
+>> which isn't doing anything, so remove it.
+>
+> Argh, this chunk of code is for sure the the thing that's blocking all
+> the voltage scaling for idle modes that twl4030 is supposed to do!
+>
+> AFAIK we must have AUTO_SLEEP, AUTO_RET and AUTO_OFF bits set in
+> PRM_VOLTCTRL for twl4030 to scale anything. They must be set if we're
+> scaling over I2C4 or using the pins as triggers. Unless these bits
+> are set, VC won't send any SLEEP, RET or OFF commands.
+>
+> Looks like we're not even set these bits anywhere like we should?
+>
+> I think we should enabled these bits in vc.c init, and never clear?
 
-A hearty +1 to this. You are avoiding much of the core of the NAND
-framework by avoiding the nand_chip callbacks and nand_scan_tail(), and
-by reimplementing the BBT. I will have to NAK to some of the patches
-that EXPORT the nand_base private core (e.g., nand_get_device()), and I
-will most likely NAK the custom BBT implementation (please improve
-nand_bbt.c as needed).
+The bits should be set according to the target sleep mode I believe, 
+e.g. for retention we should set only AUTO_RET, and for off-mode 
+AUTO_OFF. You can't have AUTO_OFF enabled if you are going to retention 
+only as far as I recall, this potentially caused some problems.
 
-> Also, if you plan to target v3.16 on this, I'd suggest that you pick
-> some pack of features and submit those first, reducing the amount of code
-> to be reviewed. For instance, you may choose to leave some of the ECC bits
-> aside for now.
-> 
-> It's just a suggestion to get at least some of the code merged quicker,
-> don't take me too seriously on this.
+-Tero
 
-That's a possible approach if it still leaves your driver functional.
-But I wouldn't trim the driver too much just for sake of reviewing.
-
-BTW, why do you call this driver stm_nand_bch? BCH is a particular type
-of ECC algorithm, not unique at all to ST's hardware. Can you drop the
-_bch and make it just stm_nand? Also, you might want to change the
-namespacing on some of your functions; for instance, I don't think you
-can own the name bch_write(). Possibly prefix things with stm_* or
-stm_nand_* where reasonable.
-
-Brian
+>
+> Nishant and Kevin, any comments?
+>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/pm34xx.c |    4 ----
+>>   1 file changed, 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index 0eecf6f..2fa9478 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -282,10 +282,6 @@ void omap_sram_idle(void)
+>>   			omap3_sram_restore_context();
+>>   			omap2_sms_restore_context();
+>>   		}
+>> -		if (core_next_state == PWRDM_POWER_OFF)
+>> -			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+>> -					       OMAP3430_GR_MOD,
+>> -					       OMAP3_PRM_VOLTCTRL_OFFSET);
+>>   	}
+>>   	omap3_intc_resume_idle();
+>>
+>> --
+>> 1.7.9.5
+>>
