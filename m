@@ -1,45 +1,34 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Mar 2014 18:12:31 +0100
-Subject: [PATCH] ata: fix Marvell SATA driver dependencies
-In-Reply-To: <20140326165904.70de238d@alan.etchedpixels.co.uk>
-References: <5138028.BSQbEP7RRB@amdc1032> <20140326162302.GG25349@lunn.ch>
- <20140326165904.70de238d@alan.etchedpixels.co.uk>
-Message-ID: <4852939.9jMb8Bv2x2@amdc1032>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Mar 2014 10:15:39 -0700
+Subject: [PATCH V2 1/5] ARM: shmobile: r8a7791: add IIC0/1 clock macros
+In-Reply-To: <20140326062933.GA2664@katana>
+References: <1394450820-8158-1-git-send-email-wsa@the-dreams.de>
+ <9236675.ot3B0M2rgc@avalon>
+ <CANqRtoSYTSZV-wxXBeGWYnPLPGZNL3WEtXgHh1U8CQxAEhx5zQ@mail.gmail.com>
+ <20140326062933.GA2664@katana>
+Message-ID: <20140326171539.GA6886@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wednesday, March 26, 2014 04:59:04 PM One Thousand Gnomes wrote:
-> On Wed, 26 Mar 2014 17:23:02 +0100
-> Andrew Lunn <andrew@lunn.ch> wrote:
+On Wed, Mar 26, 2014 at 07:29:33AM +0100, Wolfram Sang wrote:
 > 
-> > On Wed, Mar 26, 2014 at 05:19:02PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > > Make sata_mv host driver depend on PCI || ARCH_KIRKWOOD || ARCH_MVEBU ||
-> > > ARCH_ORION5X config options as Marvell SATA support covers both Marvell
-> > > PCI devices and Marvell Kirkwood, Armada 370/XP and Orion5x SoCs (for
-> > > non-PCI devices the driver to work requires suitable device tree node to
-> > > be defined).  Additionally allow the driver build if COMPILE_TEST config
-> > > option is set.
-> > 
-> > Hi Bartlomiej
-> > 
-> > I _think_ there are a few powerpc platforms which can also make use of
-> > this driver
+> > To clarify, I can't seem to find any cover letter for this series, so
+> > instead I will with this email reply to [1/1]. Here is also a list of
+> > the patches that I believe are part of this series, please correct me
+> > if I'm wrong:
 > 
-> The hardware can show up in just about anything so I think this patch
-> should be dropped
+> You are absolutely right.
+> 
+> > They all look good to me!
+> > 
+> > Acked-by: Magnus Damm <damm@opensource.se>
+> 
+> Thanks!
+> 
+> > Simon, can you please pick up these changes? I believe there are no
+> > special dependencies.
+> 
+> The dependencies (pfc entries and new compatible for the driver) are
+> already in linux-next.
 
-In theory maybe but in practice it for sure won't show up if the vendor
-has its own SATA solution and at least in the ARM world it seems frequent
-to have its own AHCI variant nowadays.  Moreover even if the new usage
-shows up it is not enough to enable driver for it to make it work as
-you also need to add a node describing your SATA MV variant to your SoC
-device tree file (which requires updating kernel source anyway).
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thanks, I have queued these up.
