@@ -1,96 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 26 Mar 2014 15:05:34 +0100
-Subject: [PATCH v2 5/5] ARM: shmobile: r8a7790: add IIC(B) cores to dtsi
-In-Reply-To: <1395773789-17249-6-git-send-email-wsa@the-dreams.de>
-References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
- <1395773789-17249-6-git-send-email-wsa@the-dreams.de>
-Message-ID: <3372432.uDFHLQLanr@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Mar 2014 15:03:56 +0100
+Subject: [PATCH] ARM: realview: basic device tree implementation
+In-Reply-To: <CAL_JsqKYR1aujNhOASivsg-ED6xDPCsSCcGVnQn5vy4sD1PhAQ@mail.gmail.com>
+References: <1395826060-26662-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqKYR1aujNhOASivsg-ED6xDPCsSCcGVnQn5vy4sD1PhAQ@mail.gmail.com>
+Message-ID: <9768087.NlERCxKjPM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-Thank you for the patch.
-
-On Tuesday 25 March 2014 19:56:29 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
+On Wednesday 26 March 2014 08:59:32 Rob Herring wrote:
+> On Wed, Mar 26, 2014 at 4:27 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >  menu "RealView platform type"
+> >         depends on ARCH_REALVIEW
+> >
+> > +config REALVIEW_DT
+> > +       bool "Support RealView(R) Device Tree based boot"
+> > +       select ARM_GIC
+> > +       select USE_OF
+> > +       select SOC_BUS
+> > +       select MFD_SYSCON
 > 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> Change since V1:
+> Sort.
 > 
-> * renamed i2c4-7 to iic0-3
-> 
->  arch/arm/boot/dts/r8a7790.dtsi | 44
-> ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 44 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 21e6602c630b..b78d718479e0 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -24,6 +24,10 @@
->  		i2c1 = &i2c1;
->  		i2c2 = &i2c2;
->  		i2c3 = &i2c3;
-> +		i2c4 = &iic0;
-> +		i2c5 = &iic1;
-> +		i2c6 = &iic2;
-> +		i2c7 = &iic3;
->  		spi0 = &qspi;
->  		spi1 = &msiof0;
->  		spi2 = &msiof1;
-> @@ -236,6 +240,46 @@
->  		status = "disabled";
->  	};
-> 
-> +	iic0: i2c at e6500000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6500000 0 0x425>;
-> +		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	iic1: i2c at e6510000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6510000 0 0x425>;
-> +		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC1>;
-> +		status = "disabled";
-> +	};
-> +
-> +	iic2: i2c at e6520000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe6520000 0 0x425>;
-> +		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp3_clks R8A7790_CLK_IIC2>;
-> +		status = "disabled";
-> +	};
-> +
-> +	iic3: i2c at e60b0000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
-> +		reg = <0 0xe60b0000 0 0x425>;
-> +		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp9_clks R8A7790_CLK_IICDVFS>;
-> +		status = "disabled";
-> +	};
-> +
->  	mmcif0: mmcif at ee200000 {
->  		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
->  		reg = <0 0xee200000 0 0x80>;
+> This will probably need to be coordinated with Arnd's cpu selection rework.
 
--- 
-Regards,
+Ignore my cpu selection patches here, we'll do those later.
 
-Laurent Pinchart
+
+	Arnd
