@@ -1,91 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 26 Mar 2014 09:30:00 +0100
-Subject: [PATCHv2] net: mvneta: use devm_ioremap_resource() instead of
- of_iomap()
-Message-ID: <1395822600-30469-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 26 Mar 2014 09:39:31 +0100
+Subject: [PATCH v7 2/3] ARM: sun7i/sun6i: dts: Add NMI irqchip support
+In-Reply-To: <1395256879-8475-3-git-send-email-carlo@caione.org>
+References: <1395256879-8475-1-git-send-email-carlo@caione.org>
+ <1395256879-8475-3-git-send-email-carlo@caione.org>
+Message-ID: <53329243.8090604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta driver currently uses of_iomap(), which has two drawbacks:
-it doesn't request the resource, and it isn't devm-style so some error
-handling is needed.
+Hi,
 
-This commit switches to use devm_ioremap_resource() instead, which
-automatically requests the resource (so the I/O registers region shows
-up properly in /proc/iomem), and also is devm-style, which allows to
-get rid of some error handling to unmap the I/O registers region.
+On 03/19/2014 08:21 PM, Carlo Caione wrote:
+> This patch adds DTS entries for NMI controller as child of GIC.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes since v1:
+Note this breaks the kernel on sun6i / A31 since we don't have a
+pmic driver there yet, and thus the nmi gets constantly fired without
+anything clearing it.
 
- - Remove error handling of platform_get_resource(), since
-   devm_ioremap_resource already checks if the resource is NULL, and
-   properly returns an error in this case. Reported by Ezequiel Garcia.
+So the sun6i section needs a status = "disabled"; until we actually have pmic
+support.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Regards,
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index f418f4f..fef3631 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <net/ip.h>
- #include <net/ipv6.h>
-+#include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_mdio.h>
-@@ -2774,6 +2775,7 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
- static int mvneta_probe(struct platform_device *pdev)
- {
- 	const struct mbus_dram_target_info *dram_target_info;
-+	struct resource *res;
- 	struct device_node *dn = pdev->dev.of_node;
- 	struct device_node *phy_node;
- 	u32 phy_addr;
-@@ -2838,9 +2840,10 @@ static int mvneta_probe(struct platform_device *pdev)
- 
- 	clk_prepare_enable(pp->clk);
- 
--	pp->base = of_iomap(dn, 0);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	pp->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (pp->base == NULL) {
--		err = -ENOMEM;
-+		err = PTR_ERR(pp->base);
- 		goto err_clk;
- 	}
- 
-@@ -2848,7 +2851,7 @@ static int mvneta_probe(struct platform_device *pdev)
- 	pp->stats = alloc_percpu(struct mvneta_pcpu_stats);
- 	if (!pp->stats) {
- 		err = -ENOMEM;
--		goto err_unmap;
-+		goto err_clk;
- 	}
- 
- 	for_each_possible_cpu(cpu) {
-@@ -2913,8 +2916,6 @@ err_deinit:
- 	mvneta_deinit(pp);
- err_free_stats:
- 	free_percpu(pp->stats);
--err_unmap:
--	iounmap(pp->base);
- err_clk:
- 	clk_disable_unprepare(pp->clk);
- err_free_irq:
-@@ -2934,7 +2935,6 @@ static int mvneta_remove(struct platform_device *pdev)
- 	mvneta_deinit(pp);
- 	clk_disable_unprepare(pp->clk);
- 	free_percpu(pp->stats);
--	iounmap(pp->base);
- 	irq_dispose_mapping(dev->irq);
- 	free_netdev(dev);
- 
--- 
-1.8.3.2
+Hans
+
+> ---
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+>  2 files changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 5256ad9..eea6033 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -190,6 +190,14 @@
+>  		#size-cells = <1>;
+>  		ranges;
+>  
+> +		nmi_intc: interrupt-controller at 01f00c0c {
+> +			compatible = "allwinner,sun6i-a31-sc-nmi";
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			reg = <0x01f00c0c 0x38>;
+> +			interrupts = <0 0 4>;
+> +		};
+> +
+>  		pio: pinctrl at 01c20800 {
+>  			compatible = "allwinner,sun6i-a31-pinctrl";
+>  			reg = <0x01c20800 0x400>;
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 6f25cf5..7637f12 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -339,6 +339,14 @@
+>  		#size-cells = <1>;
+>  		ranges;
+>  
+> +		nmi_intc: interrupt-controller at 01c00030 {
+> +			compatible = "allwinner,sun7i-a20-sc-nmi";
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			reg = <0x01c00030 0x0c>;
+> +			interrupts = <0 0 4>;
+> +		};
+> +
+>  		emac: ethernet at 01c0b000 {
+>  			compatible = "allwinner,sun4i-a10-emac";
+>  			reg = <0x01c0b000 0x1000>;
+> 
