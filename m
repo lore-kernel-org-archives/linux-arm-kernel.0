@@ -1,21 +1,81 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 26 Mar 2014 11:42:30 -0400
-Subject: [PATCH] ata: sata_highbank: remove superfluous cast
-In-Reply-To: <11638294.fp3ZK6zVlg@amdc1032>
-References: <11638294.fp3ZK6zVlg@amdc1032>
-Message-ID: <20140326154230.GG7171@htj.dyndns.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 26 Mar 2014 17:02:40 +0100
+Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
+References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
+ <531068F4.3060903@free-electrons.com> <20140321035233.32624.98694@quantum>
+ <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
+Message-ID: <5332FA20.4010206@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 04:41:00PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> hpriv->plat_data is 'void *' so there is no need to cast it to
-> 'struct ecx_plat_data *'.
+On 26/03/2014 16:19, Kevin Hilman wrote:
+> [+ imx6 maintainers ]
 > 
-> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> On Thu, Mar 20, 2014 at 8:52 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>> Quoting Gregory CLEMENT (2014-02-28 02:46:12)
+>>> Hi Mike,
+>>>
+>>> On 24/02/2014 19:10, Gregory CLEMENT wrote:
+>>>> Until now the clock providers were initialized in the order found in
+>>>> the device tree. This led to have the dependencies between the clocks
+>>>> not respected: children clocks could be initialized before their
+>>>> parent clocks.
+>>>>
+>>>> Instead of forcing each platform to manage its own initialization order,
+>>>> this patch adds this work inside the framework itself.
+>>>>
+>>>> Using the data of the device tree the of_clk_init function now delayed
+>>>> the initialization of a clock provider if its parent provider was not
+>>>> ready yet.
+>>>>
+>>>> The strict dependency check (all parents of a given clk must be
+>>>> initialized) was added by Boris BREZILLON
+>>>
+>>> Are you ok with this version?
+>>> Will you take it for 3.15?
+>>> Or maybe you expected that it will be part of a pull request?
+>>>
+>>> However as it is modifying the core of the framework I thought that you
+>>> would take it and apply yourself.
+>>
+>> Hi Gregory,
+>>
+>> I have taken this into clk-next. If no regressions pop up over the next
+>> few days then it should go into 3.15.
+> 
+> $SUBJECT patch (as commit 1771b10d605) is in -next has been fingered
+> by bisection to be the reason behind boot failures[1] on imx6 wand
+> boards in the last several -next kernels.
+> 
+> Reverting the patch on top of next/master gets these boards booting again.
+> 
+> The boot failures result in no console output, so I haven't done any
+> further debugging.
 
-Applied to libata/for-3.15.  Thanks.
+I don't have any imx6 board, but should it be possible for you or the imx6
+maintainer to add earlyprintk to see exactly what happen here?
+
+
+Thanks,
+
+Gregory
+
+
+> 
+> Kevin
+> 
+> [1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002927.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 
 -- 
-tejun
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
