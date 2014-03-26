@@ -1,87 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 26 Mar 2014 08:26:27 +0100
-Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <8984936f9e914442995d79039543cb58@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
- <201403260726.36812.marex@denx.de>
- <8984936f9e914442995d79039543cb58@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201403260826.28114.marex@denx.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 26 Mar 2014 00:28:05 -0700
+Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
+In-Reply-To: <20140325220045.GA12185@arch.cereza>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
+ <20140325220045.GA12185@arch.cereza>
+Message-ID: <20140326072805.GB31517@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 26, 2014 at 08:08:28 AM, Yao Yuan wrote:
-> On Wednesday, March 26, 2014 at 02:27:46 PM, Marek Vasut wrote:
-> > On Wednesday, March 26, 2014 at 06:56:34 AM, Yao Yuan wrote:
-> > > On Wednesday, March 26, 2014 at 11:43:27 AM, Marek Vasut wrote:
-> > > > On Wednesday, March 26, 2014 at 04:08:27 AM, Yao Yuan wrote:
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > > > +		i2c_imx->use_dma = false;
-> > > > > > > +	} else if (i2c_imx_dma_request(i2c_imx,
-> > > > > > > +(dma_addr_t)phy_addr))
-> > > > 
-> > > > {
-> > > > 
-> > > > > > > +		dev_info(&pdev->dev,
-> > > > > > > +				"can't request dma chan, faild use dma.
-> > 
-> > \n");
-> > 
-> > > > > > > +		i2c_imx->use_dma = false;
-> > > > > > > +	} else {
-> > > > > > > +		i2c_imx->use_dma = true;
-> > > > > > > +	}
-> > > > > > 
-> > > > > > Can you not just check if i2c_imx->dma is valid pointer or NULL
-> > > > 
-> > > > pointer ?
-> > > > 
-> > > > > > Then you won't need a separate variable, for this purpose ...
-> > 
-> > right ?
-> > 
-> > > > > Sorry and I think what I know is just to check whether it is NULL.
-> > > > > Then for the second question, maybe there are some other ways, But
-> > > > > I think it is more tidy and easier understanding for using a
-> > > > > separate variable, for this purpose.
-> > > > 
-> > > > You are just wasting space and duplicating data, unless I am wrong.
-> > > 
-> > > Well, Do you have a better idea? Although I think it's necessary.
-> > 
-> > I think we disconnected here, sorry. Why can you not use (i2c_imx->dma !=
-> > NULL) instead of (i2c_imx->use_dma == true) please ?
+On Tue, Mar 25, 2014 at 07:00:45PM -0300, Ezequiel Garcia wrote:
+> After taking a quick glance at the whole driver I noticed you have something
+> strange going on. AFAIK, the typical NAND driver probe() should be one of
+> these two:
 > 
-> But there are two judge conditions. But only the "i2c_imx->dma", but also
-> whether "i2c_imx_dma_request" success.
+> * Call nand_scan() which calls nand_scan_ident() + nand_scan_tail().
 > 
-> "i2c_imx->use_dma == true" be equivalent to "i2c_imx->dma != NULL &&
-> !i2c_imx_dma_request()"
+> * Call nand_scan_ident() to identify the NAND device geometry, do some
+>   driver specific initialization, fill some hooks, and finally call
+>   nand_scan_tail() to complete the initialization.
+> 
+> You driver call nand_scan_ident() and then does some bad block scan, and
+> fills some callbacks on its own, but never calls nand_scan_tail().
+> 
+> The call to nand_scan_tail() would remove the need to export those NAND
+> core functions, and remove the need to scan and print the bad blocks.
+> I don't know if you have a real reason for not doing it this way, or
+> maybe it's the way this driver was originally written.
+> 
+> Care to review this and re-spin the driver? You'll have a more nicer
+> driver, and more framework-compliant.
 
-+       /* Init DMA config if support*/
-+       i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
-+                                       GFP_KERNEL);
-+       if (!i2c_imx->dma) {
-+               dev_info(&pdev->dev,
-+                               "can't allocate dma struct faild use dma.\n");
-+               i2c_imx->use_dma = false;
-+       } else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr)) {
-+               dev_info(&pdev->dev,
-+                               "can't request dma chan, faild use dma.\n");
-+               i2c_imx->use_dma = false;
-+       } else {
-+               i2c_imx->use_dma = true;
-+       }
+A hearty +1 to this. You are avoiding much of the core of the NAND
+framework by avoiding the nand_chip callbacks and nand_scan_tail(), and
+by reimplementing the BBT. I will have to NAK to some of the patches
+that EXPORT the nand_base private core (e.g., nand_get_device()), and I
+will most likely NAK the custom BBT implementation (please improve
+nand_bbt.c as needed).
 
-OK, looking at this one more time, why don't you wrap the allocation of i2c_imx-
->dma into i2c_imx_dma_request() ? Even better, you can allocate *dma as a local 
-variable in i2c_imx_dma_request() and then assign it into i2c_imx->dma only at 
-the end of the i2c_imx_dma_request() function , at the point where you are sure 
-nothing failed. Then you can check i2c_imx->dma != NULL throughout the code to 
-check if the DMA is available, no ?
+> Also, if you plan to target v3.16 on this, I'd suggest that you pick
+> some pack of features and submit those first, reducing the amount of code
+> to be reviewed. For instance, you may choose to leave some of the ECC bits
+> aside for now.
+> 
+> It's just a suggestion to get at least some of the code merged quicker,
+> don't take me too seriously on this.
 
-Shawn, Wolfram, am I talking nonsense or am I just not connecting ?
+That's a possible approach if it still leaves your driver functional.
+But I wouldn't trim the driver too much just for sake of reviewing.
 
-Best regards,
-Marek Vasut
+BTW, why do you call this driver stm_nand_bch? BCH is a particular type
+of ECC algorithm, not unique at all to ST's hardware. Can you drop the
+_bch and make it just stm_nand? Also, you might want to change the
+namespacing on some of your functions; for instance, I don't think you
+can own the name bch_write(). Possibly prefix things with stm_* or
+stm_nand_* where reasonable.
+
+Brian
