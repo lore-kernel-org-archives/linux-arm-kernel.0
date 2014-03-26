@@ -1,117 +1,135 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 26 Mar 2014 15:00:39 +0100
-Subject: [PATCH v2 1/5] pinctrl: pfc: r8a7790: add i2c0 muxing
-In-Reply-To: <1395773789-17249-2-git-send-email-wsa@the-dreams.de>
-References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
- <1395773789-17249-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <3524931.MdjU7RgFNq@avalon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Mar 2014 19:27:46 +0530
+Subject: [RFC PATCH 06/12] arm: dra7xx: Add hwmod data for pcie1 phy and pcie2
+ phy
+In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
+References: <1395842272-15267-1-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-7-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Added hwmod data for pcie1 and pcie2 phy present in DRA7xx SOC.
+Also added the missing CLKCTRL OFFSET macro and CONTEXT OFFSET macro
+for pcie1 phy and pcie2 phy.
 
-Thank you for the patch.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/cm2_7xx.h             |    4 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   57 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm7xx.h              |    4 ++
+ 3 files changed, 65 insertions(+)
 
-On Tuesday 25 March 2014 19:56:25 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Add the muxing for the last missing i2c rcar core. Fix the sorting for
-> SH_PFC_PIN_NAMED while we are here.
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> Change since V1:
-> 
-> * sorted SH_PFC_PIN_NAMED pins
-> 
->  drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c index c381ae63c508..bcb47d138b02
-> 100644
-> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> @@ -782,6 +782,7 @@ enum {
->  	USB1_PWEN_MARK, AUDIO_CLKOUT_D_MARK, USB1_OVC_MARK,
->  	TCLK1_B_MARK,
-> 
-> +	I2C0_SCL_MARK, I2C0_SDA_MARK,
->  	I2C3_SCL_MARK, I2C3_SDA_MARK,
->  	PINMUX_MARK_END,
->  };
-> @@ -1722,6 +1723,9 @@ static const u16 pinmux_data[] = {
->  	PINMUX_IPSR_DATA(IP16_7, USB1_OVC),
->  	PINMUX_IPSR_MODSEL_DATA(IP16_7, TCLK1_B, SEL_TMU1_1),
-> 
-> +	PINMUX_DATA(I2C0_SCL_MARK, FN_SEL_IIC0_1),
-> +	PINMUX_DATA(I2C0_SDA_MARK, FN_SEL_IIC0_1),
-> +
->  	PINMUX_DATA(I2C3_SCL_MARK, FN_SEL_IICDVFS_1),
->  	PINMUX_DATA(I2C3_SDA_MARK, FN_SEL_IICDVFS_1),
->  };
-> @@ -1735,8 +1739,10 @@ static const struct sh_pfc_pin pinmux_pins[] = {
->  	PINMUX_GPIO_GP_ALL(),
-> 
->  	/* Pins not associated with a GPIO port */
-> -	SH_PFC_PIN_NAMED(ROW_GROUP_A('J'), 15, AJ15),
-> +	SH_PFC_PIN_NAMED(ROW_GROUP_A('F'), 15, AF15),
-> +	SH_PFC_PIN_NAMED(ROW_GROUP_A('G'), 15, AG15),
->  	SH_PFC_PIN_NAMED(ROW_GROUP_A('H'), 15, AH15),
-> +	SH_PFC_PIN_NAMED(ROW_GROUP_A('J'), 15, AJ15),
->  };
-> 
->  /* - AUDIO CLOCK
-> ------------------------------------------------------------ */ @@ -2054,6
-> +2060,14 @@ static const unsigned int hscif1_ctrl_b_pins[] = { static const
-> unsigned int hscif1_ctrl_b_mux[] = {
->  	HRTS1_N_B_MARK, HCTS1_N_B_MARK,
->  };
-> +/* - I2C0
-> ------------------------------------------------------------------- */
-> +static const unsigned int i2c0_pins[] = {
-> +	/* SCL, SDA */
-> +	PIN_A_NUMBER('G', 15), PIN_A_NUMBER('F', 15),
-> +};
-> +static const unsigned int i2c0_mux[] = {
-> +	I2C0_SCL_MARK, I2C0_SDA_MARK,
-> +};
->  /* - I2C1
-> ------------------------------------------------------------------- */
-> static const unsigned int i2c1_pins[] = {
->  	/* SCL, SDA */
-> @@ -3626,6 +3640,7 @@ static const struct sh_pfc_pin_group pinmux_groups[] =
-> { SH_PFC_PIN_GROUP(hscif1_data_b),
->  	SH_PFC_PIN_GROUP(hscif1_clk_b),
->  	SH_PFC_PIN_GROUP(hscif1_ctrl_b),
-> +	SH_PFC_PIN_GROUP(i2c0),
->  	SH_PFC_PIN_GROUP(i2c1),
->  	SH_PFC_PIN_GROUP(i2c1_b),
->  	SH_PFC_PIN_GROUP(i2c1_c),
-> @@ -3895,6 +3910,10 @@ static const char * const hscif1_groups[] = {
->  	"hscif1_ctrl_b",
->  };
-> 
-> +static const char * const i2c0_groups[] = {
-> +	"i2c0",
-> +};
-> +
->  static const char * const i2c1_groups[] = {
->  	"i2c1",
->  	"i2c1_b",
-> @@ -4203,6 +4222,7 @@ static const struct sh_pfc_function pinmux_functions[]
-> = { SH_PFC_FUNCTION(eth),
->  	SH_PFC_FUNCTION(hscif0),
->  	SH_PFC_FUNCTION(hscif1),
-> +	SH_PFC_FUNCTION(i2c0),
->  	SH_PFC_FUNCTION(i2c1),
->  	SH_PFC_FUNCTION(i2c2),
->  	SH_PFC_FUNCTION(i2c3),
-
+diff --git a/arch/arm/mach-omap2/cm2_7xx.h b/arch/arm/mach-omap2/cm2_7xx.h
+index 9ad7594..e966e3a 100644
+--- a/arch/arm/mach-omap2/cm2_7xx.h
++++ b/arch/arm/mach-omap2/cm2_7xx.h
+@@ -357,6 +357,10 @@
+ #define DRA7XX_CM_L3INIT_SATA_CLKCTRL				DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x0088)
+ #define DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET				0x00a0
+ #define DRA7XX_CM_PCIE_STATICDEP_OFFSET				0x00a4
++#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET			0x00b0
++#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b0)
++#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET			0x00b8
++#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b8)
+ #define DRA7XX_CM_GMAC_CLKSTCTRL_OFFSET				0x00c0
+ #define DRA7XX_CM_GMAC_STATICDEP_OFFSET				0x00c4
+ #define DRA7XX_CM_GMAC_DYNAMICDEP_OFFSET			0x00c8
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index befe7ce..9397265 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1290,6 +1290,45 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+ };
+ 
+ /*
++ * 'PCIE PHY' class
++ *
++ */
++
++static struct omap_hwmod_class dra7xx_pcie_phy_hwmod_class = {
++	.name	= "pcie-phy",
++};
++
++/* pcie1 phy */
++static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
++	.name		= "pcie1-phy",
++	.class		= &dra7xx_pcie_phy_hwmod_class,
++	.clkdm_name	= "l3init_clkdm",
++	.main_clk	= "l4_root_clk_div",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/* pcie2 phy */
++static struct omap_hwmod dra7xx_pcie2_phy_hwmod = {
++	.name		= "pcie2-phy",
++	.class		= &dra7xx_pcie_phy_hwmod_class,
++	.clkdm_name	= "l3init_clkdm",
++	.main_clk	= "l4_root_clk_div",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/*
+  * 'qspi' class
+  *
+  */
+@@ -2420,6 +2459,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_cfg -> pcie1 phy */
++static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
++	.master		= &dra7xx_l4_cfg_hwmod,
++	.slave		= &dra7xx_pcie1_phy_hwmod,
++	.clk		= "l4_root_clk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* l4_cfg -> pcie2 phy */
++static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2_phy = {
++	.master		= &dra7xx_l4_cfg_hwmod,
++	.slave		= &dra7xx_pcie2_phy_hwmod,
++	.clk		= "l4_root_clk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_addr_space dra7xx_qspi_addrs[] = {
+ 	{
+ 		.pa_start	= 0x4b300000,
+@@ -2769,6 +2824,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_cfg__mpu,
+ 	&dra7xx_l4_cfg__ocp2scp1,
+ 	&dra7xx_l4_cfg__ocp2scp3,
++	&dra7xx_l4_cfg__pcie1_phy,
++	&dra7xx_l4_cfg__pcie2_phy,
+ 	&dra7xx_l3_main_1__qspi,
+ 	&dra7xx_l4_cfg__sata,
+ 	&dra7xx_l4_cfg__smartreflex_core,
+diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
+index d92a840..4bb50fbf 100644
+--- a/arch/arm/mach-omap2/prm7xx.h
++++ b/arch/arm/mach-omap2/prm7xx.h
+@@ -374,6 +374,10 @@
+ #define DRA7XX_RM_L3INIT_IEEE1500_2_OCP_CONTEXT_OFFSET		0x007c
+ #define DRA7XX_PM_L3INIT_SATA_WKDEP_OFFSET			0x0088
+ #define DRA7XX_RM_L3INIT_SATA_CONTEXT_OFFSET			0x008c
++#define DRA7XX_PM_L3INIT_PCIESS1_WKDEP_OFFSET			0x00b0
++#define DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET		0x00b4
++#define DRA7XX_PM_L3INIT_PCIESS2_WKDEP_OFFSET			0x00b8
++#define DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET		0x00bc
+ #define DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET			0x00d4
+ #define DRA7XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET		0x00e4
+ #define DRA7XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET		0x00ec
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
