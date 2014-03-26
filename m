@@ -1,23 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Mar 2014 11:57:03 -0300
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Add USB Host1 support
-In-Reply-To: <26dd7d7d9b5f481588848b0fdd65fbbb@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <1395750922-3244-1-git-send-email-festevam@gmail.com>
- <07405bf6fc4841d5b0d22c07c582acb9@BL2PR03MB226.namprd03.prod.outlook.com>
- <CAOMZO5Da9poOv8KqCsSxnjs4eZkVbRPCmnJCj-OX3ps8=+y+Ww@mail.gmail.com>
- <26dd7d7d9b5f481588848b0fdd65fbbb@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <CAOMZO5AriA91au6heDFTJAdL5j020=MYb39YhEQ6APYH2MnT5w@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 26 Mar 2014 14:19:07 +0100
+Subject: [PATCH] ARM: ux500: u8500_defconfig: Enable PARTITION_ADVANCED
+Message-ID: <1395839947-2534-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 2:36 AM, Peter Chen <Peter.Chen@freescale.com> wrote:
+There are both (e)MMC/SD-card support in ux500, thus it's reasonable to
+support partitions for block devices as default.
 
-> For imx53, it can work since both usbotg and host 1 use utmi internal phy.
-> But for SoCs before than imx53 (including imx51), the host1 uses external
-> phy. At non-dt version, they should use ulpi phy driver.
+While updating the defconfig, we rebase it towards Kconfig changes.
 
-Ok, got it. Please check v2.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/configs/u8500_defconfig |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index 65f7788..1ee8da3 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -7,6 +7,7 @@ CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_U8500=y
+ CONFIG_MACH_HREFV60=y
+ CONFIG_MACH_SNOWBALL=y
+@@ -37,6 +38,8 @@ CONFIG_PHONET=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_CAIF=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_SENSORS_BH1780=y
+@@ -110,8 +113,6 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ # CONFIG_MISC_FILESYSTEMS is not set
+-- 
+1.7.9.5
