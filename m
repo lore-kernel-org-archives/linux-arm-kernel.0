@@ -1,62 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 26 Mar 2014 09:45:13 -0500
-Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <1395842272-15267-3-git-send-email-kishon@ti.com>
-References: <1395842272-15267-1-git-send-email-kishon@ti.com>
- <1395842272-15267-3-git-send-email-kishon@ti.com>
-Message-ID: <CAL_JsqKeQvbU24V2-3KQuFoLwkL31DEcEEVDenfTA0P++Hn_fQ@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 26 Mar 2014 11:48:05 -0300
+Subject: [PATCH v2 0/3] mv_xor: Spinlock cleanup
+In-Reply-To: <20140313191259.GB21811@arch.cereza>
+References: <1394221607-15064-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140313191259.GB21811@arch.cereza>
+Message-ID: <20140326144805.GA18322@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 8:57 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Added support for pcie controller in dra7xx. This driver re-uses
-> the designware core code that is already present in kernel.
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
->  drivers/pci/host/Kconfig                         |   10 +
->  drivers/pci/host/Makefile                        |    1 +
->  drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
->  4 files changed, 457 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
->  create mode 100644 drivers/pci/host/pcie-dra7xx.c
->
-> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> new file mode 100644
-> index 0000000..0528c47
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> @@ -0,0 +1,35 @@
-> +TI PCI Controllers
-> +
-> +PCIe Designware Controller
-> +This node should have the properties described in "designware-pcie.txt".
-> + - compatible: Should be "ti,dra7xx-pcie""
-> + - reg : Address and length of the register set for the device.
-> + - phys : the phandle for the PHY device (used by generic PHY framework)
-> + - phy-names : the names of the PHY corresponding to the PHYs present in the
-> +   *phy* phandle.
-> + - resets: phandle used if reset is handled be soc
+On Mar 13, Ezequiel Garcia wrote:
+> On Mar 07, Ezequiel Garcia wrote:
+> > Vinod, Dan,
+> > 
+> > This series is v2 of the one previously sent by Thomas Petazzoni [1].
+> > I've tried to address the comments made by Andi and Dan, and also kept
+> > Thomas' ultimate goal: get rid of the mv_xor_slot_cleanup() function
+> > (which takes the spinlock).
+> > 
+> > The first patch removes the unneeded call to mv_xor_clean_completed_slots(),
+> > in mv_xor_as explained by Dan [2].
+> > 
+> > The other two patches replace the calls to mv_xor_slot_cleanup() with
+> > calls to __mv_xor_slot_cleanup(). This allows to have the same "spinlock held"
+> > requirement on all callers.
+> > 
+> > The patchset is based on v3.14-rc5 and has been tested on an Armada XP GP board.
+> > 
+> > [1] http://www.spinics.net/lists/arm-kernel/msg297176.html
+> > [2] http://www.spinics.net/lists/arm-kernel/msg297518.html
+> > 
+> > Ezequiel Garcia (3):
+> >   dma: mv_xor: Remove unneeded mv_xor_clean_completed_slots() call
+> >   dma: mv_xor: Remove all callers of mv_xor_slot_cleanup()
+> >   dma: mv_xor: Rename __mv_xor_slot_cleanup() to mv_xor_slot_cleanup()
+> > 
+> >  drivers/dma/mv_xor.c | 24 +++++++++++-------------
+> >  1 file changed, 11 insertions(+), 13 deletions(-)
+> > 
+> 
+> Ping?
+> 
 
-s/be/by/ ?
+Ping^2 ?
 
-> + - reset-names: name given to the phandle
-> + - ti,device-type: Should be 1 - EP TYPE, 2 - LEG EP TYPE OR 3 - RC TYPE
-
-I don't think this makes sense. I'd imagine we'd need the binding to
-look quite a bit different if endpoint mode was actually supported. I
-think I would start defining endpoint mode with a different compatible
-string and go from there.
-
-> +
-> +Example:
-> +pcie at 51000000 {
-> +       compatible = "ti,dra7xx-pcie";
-> +       reg = <0x51002000 0x14c>, <0x51000000 0x2000>, <0x4A002540 0x1f>, <0x4A003c24 0x4>, <0x4AE07310 0x4>;
-
-This is different number of entries from your actual dts. You need to
-define how many reg entries, what they are, and the order.
-
-Rob
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
