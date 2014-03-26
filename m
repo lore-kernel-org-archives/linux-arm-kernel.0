@@ -1,71 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 20:49:54 +0530
-Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <CAL_JsqKeQvbU24V2-3KQuFoLwkL31DEcEEVDenfTA0P++Hn_fQ@mail.gmail.com>
-References: <1395842272-15267-1-git-send-email-kishon@ti.com>	<1395842272-15267-3-git-send-email-kishon@ti.com>
- <CAL_JsqKeQvbU24V2-3KQuFoLwkL31DEcEEVDenfTA0P++Hn_fQ@mail.gmail.com>
-Message-ID: <5332F01A.6090307@ti.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Wed, 26 Mar 2014 11:32:12 -0400
+Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
+References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
+ <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
+ <20140321232704.GB25519@cbox>
+ <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+ <20140323174431.GE30885@cbox>
+ <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
+Message-ID: <CAJ5Y-eaiuV=TijB8cj4i8GY8CoN+qOT9C2Jsq4-kJmfCpY7Ciw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On 24 March 2014 09:26, Rob Herring <rob.herring@linaro.org> wrote:
 
-On Wednesday 26 March 2014 08:15 PM, Rob Herring wrote:
-> On Wed, Mar 26, 2014 at 8:57 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Added support for pcie controller in dra7xx. This driver re-uses
->> the designware core code that is already present in kernel.
+>>>
+>>> My suggestion would be to have:
+>>> arch/arm/include/uapi/asm/psci.h
+>>> arch/arm64/include/uapi/asm/psci.h
 >>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
->>  drivers/pci/host/Kconfig                         |   10 +
->>  drivers/pci/host/Makefile                        |    1 +
->>  drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
->>  4 files changed, 457 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
->>  create mode 100644 drivers/pci/host/pcie-dra7xx.c
->>
->> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> new file mode 100644
->> index 0000000..0528c47
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> @@ -0,0 +1,35 @@
->> +TI PCI Controllers
->> +
->> +PCIe Designware Controller
->> +This node should have the properties described in "designware-pcie.txt".
->> + - compatible: Should be "ti,dra7xx-pcie""
->> + - reg : Address and length of the register set for the device.
->> + - phys : the phandle for the PHY device (used by generic PHY framework)
->> + - phy-names : the names of the PHY corresponding to the PHYs present in the
->> +   *phy* phandle.
->> + - resets: phandle used if reset is handled be soc
-> 
-> s/be/by/ ?
-> 
->> + - reset-names: name given to the phandle
->> + - ti,device-type: Should be 1 - EP TYPE, 2 - LEG EP TYPE OR 3 - RC TYPE
-> 
-> I don't think this makes sense. I'd imagine we'd need the binding to
-> look quite a bit different if endpoint mode was actually supported. I
+>> I think the suggestion was to move all this to include/uapi/linux/psci.h
+>> or something equivalent so also arm and arm64 can share these defines,
+>> but maybe I read too much into it.
+>
+> Yes. It is perfectly fine for a somewhat architecture specific header
+> to live in include/linux (or include/uapi/linux).
+>
+>
+While I'm aware that we wouldn't want to push seemingly irrelevant
+stuff into this header, I'm thinking of ways to unify the ARM and
+ARM64 PSCI code. A lot of it is reusable between the two.
+So, can this header also include all the common PSCI functions between
+ARM and ARM64? And can KVM possibly use these functions as well?
 
-right, it makes sense to remove the ti,device-type altogether as this driver
-only supports RC.
-> think I would start defining endpoint mode with a different compatible
-> string and go from there.
-> 
->> +
->> +Example:
->> +pcie at 51000000 {
->> +       compatible = "ti,dra7xx-pcie";
->> +       reg = <0x51002000 0x14c>, <0x51000000 0x2000>, <0x4A002540 0x1f>, <0x4A003c24 0x4>, <0x4AE07310 0x4>;
-> 
-> This is different number of entries from your actual dts. You need to
-> define how many reg entries, what they are, and the order.
+Alternately, is drivers/psci.c a more suitable place? In this case, at
+least one function will be guarded by CONFIG_ARM64.
 
-Ok. Will fix it.
-
-Thanks
-Kishon
+Cheers,
+Ashwin
