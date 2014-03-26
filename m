@@ -1,67 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 26 Mar 2014 13:59:48 +0100
-Subject: [PATCH v5 07/14] ARM: mvebu: Extend the pmsu registers
-In-Reply-To: <5332C267.3080908@gmail.com>
-References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
- <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
- <5332C267.3080908@gmail.com>
-Message-ID: <20140326135948.3f2669fc@skate>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 26 Mar 2014 14:30:53 +0100
+Subject: [PATCH] ARM: u300: u300_defconfig: Enable PARTITION_ADVANCED
+Message-ID: <1395840653-11518-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+Since there are SD-card support in u300, it's reasonable to
+support partitions for block devices as default.
 
-On Wed, 26 Mar 2014 13:04:55 +0100, Sebastian Hesselbarth wrote:
-> On 03/25/2014 11:48 PM, Gregory CLEMENT wrote:
-> > The initial binding for PMSU were wrong. It didn't take into account
-> > all the registers from the PMSU and moreover it referred to registers
-> > which are not part of PMSU.
-> >
-> > The Power Management Unit Service block also controls the Coherency
-> > Fabric subsystem. These registers are needed for the CPU idle
-> > implementation for the Armada 370/XP, it allows to enter a deep CPU
-> > idle state where the Coherency Fabric and the L2 cache are powered
-> > down.
-> >
-> > This commit add support for a new compatible for the PMSU node
-> > including the block related to the coherency fabric. It also keeps
-> > compatibility with the old binding
-> >
-> > This patch also adds warnings if one of the base registers set can't
-> > be ioremapped.
-> >
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---
-> >   arch/arm/mach-mvebu/pmsu.c | 47 +++++++++++++++++++++++++++++++++++++++++-----
-> >   1 file changed, 42 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> > index d71ef53107c4..865bcb651e01 100644
-> > --- a/arch/arm/mach-mvebu/pmsu.c
-> > +++ b/arch/arm/mach-mvebu/pmsu.c
-> [...]
-> > +static void __init armada_370_xp_pmsu_legacy_init(struct device_node *np)
-> > +{
-> > +	u32 addr;
-> > +	pr_warn("*** Warning ***  Using an old binding which will be deprecated\n");
-> > +	/* We just need the adress, we already know the size */
-> > +	addr = be32_to_cpu(*of_get_address(np, 0, NULL, NULL));
-> > +	addr -= PMSU_BASE_OFFSET;
-> > +	pmsu_mp_base = ioremap(addr, PMSU_REG_SIZE);
-> > +	of_node_put(np);
-> 
-> When messing with OF passed resources, I suggest to use
-> of_address_to_resource() and work on the struct resource
-> instead. The be32_to_cpu pointing to an immediate just looks
-> strange.
+While updating the defconfig, we rebase it towards Kconfig changes.
 
-I'm working on a revised patch set for these PMSU changes, as I also
-need them as a preparation for the SMP support on Armada 375/38x. And
-my revised patch set makes the manipulations on the 'struct resource',
-as you suggest.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/configs/u300_defconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thomas
+diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
+index fd81a1b..aaa95ab 100644
+--- a/arch/arm/configs/u300_defconfig
++++ b/arch/arm/configs/u300_defconfig
+@@ -11,6 +11,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_U300=y
+@@ -21,7 +22,6 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/ram0 rw rootfstype=rootfs console=ttyAMA0,115200n8 lpj=515072"
+ CONFIG_CPU_IDLE=y
+-CONFIG_FPE_NWFPE=y
+ # CONFIG_SUSPEND is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+@@ -64,8 +64,8 @@ CONFIG_TMPFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
+ # CONFIG_SCHED_DEBUG is not set
+ CONFIG_TIMER_STATS=y
+ # CONFIG_DEBUG_PREEMPT is not set
+-CONFIG_DEBUG_INFO=y
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
