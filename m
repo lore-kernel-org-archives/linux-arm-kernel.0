@@ -1,139 +1,281 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Mar 2014 10:41:37 +0000
-Subject: [PATCH 1/4] clocksource: mmp: add mmp timer driver
-In-Reply-To: <1395809563-31872-2-git-send-email-chao.xie@marvell.com>
-References: <1395809563-31872-1-git-send-email-chao.xie@marvell.com>
- <1395809563-31872-2-git-send-email-chao.xie@marvell.com>
-Message-ID: <20140326104137.GQ10341@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Mar 2014 11:56:30 +0100
+Subject: [PATCH] ARM: realview: basic device tree implementation
+In-Reply-To: <1395826060-26662-1-git-send-email-linus.walleij@linaro.org>
+References: <1395826060-26662-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4327457.yKTHVHA17K@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 04:52:40AM +0000, Chao Xie wrote:
-> From: Chao Xie <chao.xie@marvell.com>
->
-> MMP timer is attached to APB bus, It has the following
-> limitation.
-> 1. When get count of timer counter, it need some delay
->    to get a stable count.
-> 2. When set match register, it need disable the counter
->    first, and enable it after set the match register.
->    The disabling need wait for 2 clock cycle to take
->    effect.
->
-> To improve above #1, shadow register for count is added.
-> To improve above #2, CRSR register is added for quick updating.
->
-> So there are three types of timer.
-> timer1: old timer.
-> timer2: old timer with shadow register.
-> timer3: old timer with shadow and CRSR register.
->
-> This timer driver will be used for many SOCes.
-> 1. pxa168, pxa910, pxa988 pxa1088 have only timer1.
-> 2. pxa1L88, pxa1U88 have timer1 and timer3.
-> 3. pxa1928 has timer 2.
->
-> The driver supports DT and non-DT initialization.
-> The driver supports UP/SMP SOCes and 64 bit core.
->
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  .../devicetree/bindings/arm/mrvl/timer.txt         |  73 +-
->  drivers/clocksource/Makefile                       |   1 +
->  drivers/clocksource/timer-mmp.c                    | 866 +++++++++++++++++++++
->  3 files changed, 934 insertions(+), 6 deletions(-)
->  create mode 100644 drivers/clocksource/timer-mmp.c
->
-> diff --git a/Documentation/devicetree/bindings/arm/mrvl/timer.txt b/Documentation/devicetree/bindings/arm/mrvl/timer.txt
-> index 9a6e251..b9af4bf 100644
-> --- a/Documentation/devicetree/bindings/arm/mrvl/timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/mrvl/timer.txt
-> @@ -1,13 +1,74 @@
->  * Marvell MMP Timer controller
->
-> +Each timer have multiple counters, so the timer DT need include counter's
-> +description.
+On Wednesday 26 March 2014 10:27:40 Linus Walleij wrote:
+> This implements basic device tree boot support for the RealView
+> platforms, with a basic device tree for ARM PB1176 as an example.
+> 
+> The implementation is done with a new DT-specific board file
+> using only pre-existing bindings for the basic IRQ, timer and
+> serial port drivers. A new compatible type is added to the GIC
+> for the ARM1176.
+> 
+> This implementation uses the MFD syscon handle from day one to
+> access the system controller registers, and register the devices
+> using the SoC bus.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Ah, very nice!
 > +
-> +1. Timer
+> +ARM RealView Boards
+> +-------------------
+> +The RealView boards cover tailored evaluation boards that are used to explore
+> +the ARM11 and Cortex A-8 and Cortex A-9 processors.
 > +
->  Required properties:
-> -- compatible : Should be "mrvl,mmp-timer".
-> +- compatible : Should be "marvell,mmp-timer".
->  - reg : Address and length of the register set of timer controller.
-> -- interrupts : Should be the interrupt number.
-> +- marvell,timer-id : The index of the timer. The timer controller may
-> +  include several timers.
+> +Required properties (in root node):
+> +	/* RealView Emulation Baseboard */
+> +	compatible = "arm,realview-eb";
+> +	 /* RealView Platform Baseboard for ARM1176JZF-S */
+> +	compatible = "arm,realview-pb1176";
+> +	/* RealView Platform Baseboard for ARM11 MPCore */
+> +	compatible = "arm,realview-pb11mp";
+> +	/* RealView Platform Baseboard for Cortex A-8 */
+> +	compatible = "arm,realview-pba8";
+> +	/* RealView Platform Baseboard Explore for Cortex A-9 */
+> +	compatible = "arm,realview-pbx";
+> +
+> +Required nodes:
+> +
+> +- syscon: the root node of the Integrator platforms must have a
 
-Is this a single entry or a list?
+				    Realview
+> +		timer01: timer at 10104000 {
+> +			compatible = "arm,sp804", "arm,primecell";
+> +			reg = <0x10104000 0x1000>;
+> +			interrupt-parent = <&intc_dc1176>;
+> +			interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>, <0 9 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&timclk>, <&timclk>, <&pclk>;
+> +			clock-names = "timclk1", "timclk2", "apb_pclk";
+> +		};
 
-> +- marvell,timer-fastclk-frequency : The fast clock frequency of the timer.
-> +  Timer will have several clock inputs: fast clock, 32KHZ, 1KHZ. For all
-> +  SOCes use this timer controller, fast clock may not be same.
-> +- marvell,timer-apb-frequency : The fequency of the apb bus that the timer
-> +  attached to. This frequency and "marvell,timer-fastclk-frequency" are used
-> +  to calculated delay loops for clock operations.
-
-Wouldn't these be better described as clock inputs?
+In the binding, the clock names are "timer1", "timer2", "apb_pclk".
+What is going on here?
 
 > +
-> +Optional properties:
-> +- marvell,timer-has-crsr : This timer has CRSR register.
-> +- marvell,timer-has-shadow : This timer has shadow register.
+> +		pb1176_serial3: uart at 1010f000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0x1010f000 0x1000>;
+> +			interrupt-parent = <&intc_dc1176>;
+> +			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&uartclk>, <&pclk>;
+> +			clock-names = "uartclk", "apb_pclk";
+> +		};
+
+Here, the binding says:
+
+- clocks:  When present, must refer to exactly one clock named
+           "apb_pclk"
+
+
+> +static void __init realview_dt_init_machine(void)
+> +{
+> +	struct device_node *root;
+> +	struct device_node *syscon;
+> +	struct soc_device *soc_dev;
+> +	struct soc_device_attribute *soc_dev_attr;
+> +	struct device *parent;
+> +	u32 coreid;
+> +	int ret;
 > +
-> +2. Counter
+> +#ifdef CONFIG_CACHE_L2X0
+> +	if (of_machine_is_compatible("arm,realview-eb"))
+> +		/*
+> +		 * 1MB (128KB/way), 8-way associativity,
+> +		 * evmon/parity/share enabled
+> +		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
+> +		 */
+> +		l2x0_of_init(0x00790000, 0xfe000fff);
+> +	else if (of_machine_is_compatible("arm,realview-pb1176"))
+> +		/*
+> +		 * 128Kb (16Kb/way) 8-way associativity.
+> +		 * evmon/parity/share enabled.
+> +		 */
+> +		l2x0_of_init(0x00730000, 0xfe000fff);
+> +	else if (of_machine_is_compatible("arm,realview-pb11mp"))
+> +		/*
+> +		 * 1MB (128KB/way), 8-way associativity,
+> +		 * evmon/parity/share enabled
+> +		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
+> +		 */
+> +		l2x0_of_init(0x00730000, 0xfe000fff);
+> +	else if (of_machine_is_compatible("arm,realview-pbx"))
+> +		/*
+> +		 * 16KB way size, 8-way associativity, parity disabled
+> +		 * Bits:  .. 0 0 0 0 1 00 1 0 1 001 0 000 0 .... .... ....
+> +		 */
+> +		l2x0_of_init(0x02520000, 0xc0000fff);
+> +#endif
+
+Russell just posted a long series of l2x0 cleanup patches. One
+of the things coming out of that was that we should never need to
+pass values like this here. The registers are typically initialized
+to a hardwired default that should be ok, and if not, the boot loader
+should set them up correctly. Can you print out the boot-time values
+to see if realview gets this wrong?
+
+If Linux has to override the register, we should have the correct
+setting in DT and make l2x0_of_init do the right thing itself.
+
+> +        /* Here we create an SoC device for the root node */
+> +	root = of_find_node_by_path("/");
+> +	if (!root)
+> +		return;
+> +	syscon = of_find_matching_node(root, realview_syscon_match);
+> +	if (!syscon)
+> +		return;
 > +
-> +Required properties:
-> +- compatible : It can be
-> +      "marvell,timer-counter-clkevt" : The counter is used for clock event
-> +                                       device.
-> +      "marvell,timer-counter-clksrc" : The counter is used for clock source.
-> +      "marvell,timer-counter-delay" : The counter is used for delay timer.
+> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +	if (!soc_dev_attr)
+> +		return;
+> +	ret = of_property_read_string(root, "compatible",
+> +				      &soc_dev_attr->soc_id);
+> +	if (ret)
+> +		return;
+> +	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
+> +        if (ret)
+> +		return;
+> +	soc_dev_attr->family = "RealView";
+> +	soc_dev = soc_device_register(soc_dev_attr);
+> +	if (IS_ERR(soc_dev)) {
+> +		kfree(soc_dev_attr);
+> +		return;
+> +	}
+> +	parent = soc_device_to_device(soc_dev);
+> +	ret = of_platform_populate(root, of_default_bus_match_table,
+> +				   NULL, parent);
+> +	if (ret) {
+> +		pr_crit("could not populate device tree\n");
+> +		return;
+> +	}
+> +
+> +	syscon_regmap = syscon_node_to_regmap(syscon);
+> +	if (IS_ERR(syscon_regmap)) {
+> +		pr_crit("could not locate syscon regmap\n");
+> +		return;
+> +	}
+> +	ret = regmap_read(syscon_regmap, REALVIEW_SYS_ID_OFFSET, &coreid);
+> +	if (ret)
+> +		return;
+> +	pr_info("RealView Syscon Core ID: 0x%08x\n", coreid);
+> +	/* FIXME: add attributes for SoC to sysfs */
+> +}
 
-These are _not_ hardware properties. Why can the driver not choose how
-to use each of the counter sub-blocks?
 
-How would blocks with each of these strings actually differ?
+I would not register a "soc" device for the root node, but rather
+reorganize the DT to put all soc specific nodes under a combined
+soc node. I suppose that could actually be the syscon node itself.
 
-> +- marvell,timer-counter-id : The counter index in this timer.
+> +static void realview_dt_fixup(struct tag *tags, char **from,
+> +				struct meminfo *meminfo)
+> +{
+> +	/*
+> +	 * RealView PB1176 only has 128MB of RAM mapped at 0.
+> +	 */
+> +	if (of_machine_is_compatible("arm,realview-pb1176")) {
+> +		meminfo->bank[0].start = 0;
+> +		meminfo->bank[0].size = SZ_128M;
+> +		meminfo->nr_banks = 1;
+> +	}
 
-Perhaps use a reg for this?
+This one should come right from DT I think.
 
->
-> -Example:
-> -       timer0: timer at d4014000 {
-> -               compatible = "mrvl,mmp-timer";
-> -               reg = <0xd4014000 0x100>;
-> +Optional properties:
-> +- interrupts : The counters may have different IRQs or share same IRQs.
-> +  Only valid for "marvell,timer-counter-clkevt".
+> +#ifdef CONFIG_SPARSEMEM
+> +	/*
+> +	 * Memory configuration with SPARSEMEM enabled on RealView PBX (see
+> +	 * asm/mach/memory.h for more information).
+> +	 */
+> +	else if (of_machine_is_compatible("arm,realview-pbx")) {
+> +		meminfo->bank[0].start = 0;
+> +		meminfo->bank[0].size = SZ_256M;
+> +		meminfo->bank[1].start = 0x20000000;
+> +		meminfo->bank[1].size = SZ_512M;
+> +		meminfo->bank[2].start = 0x80000000;
+> +		meminfo->bank[2].size = SZ_256M;
+> +		meminfo->nr_banks = 3;
+> +	}
+> +#endif
 
-Describe what the interrupt is logically.
+This one too, but I'm not completely sure about it. Do you see a reason
+for the kernel to override the memory location on PBX?
 
-What is the interrupt logically?
+> +	/*
+> +	 * Generic RealView fixup
+> +	 * Most RealView platforms have 512MB contiguous RAM at 0x70000000.
+> +	 * Half of this is mirrored at 0.
+> +	 */
+> +	else {
+> +#ifdef CONFIG_REALVIEW_HIGH_PHYS_OFFSET
+> +		meminfo->bank[0].start = 0x70000000;
+> +		meminfo->bank[0].size = SZ_512M;
+> +		meminfo->nr_banks = 1;
+> +#else
+> +		meminfo->bank[0].start = 0;
+> +		meminfo->bank[0].size = SZ_256M;
+> +		meminfo->nr_banks = 1;
+> +#endif
+> +	}
+> +}
 
-> +- marvell,timer-counter-cpu : which CPU the counter is bound. Only valid for
-> +  "marvell,timer-counter-clkevt".
+And this one is where it gets tricky. We don't have a good way
+to describe memory aliases in DT, but we need the start of memory
+to match PHYS_OFFSET if CONFIG_SPARSEMEM is set (which implies
+!CONFIG_REALVIEW_HIGH_PHYS_OFFSET), or if we are running a no-MMU
+kernel. I have to think about this some more.
 
-How is the counter bound to a particular CPU? Is there really a
-relationship in hardware between a given CPU and counter?
+> +static void realview_dt_restart(enum reboot_mode mode, const char *cmd)
+> +{
+> +	if (IS_ERR(syscon_regmap))
+> +		return;
+> +
+> +	/* Unlock the reset register */
+> +	regmap_write(syscon_regmap, REALVIEW_SYS_LOCK_OFFSET,
+> +		     REALVIEW_SYS_LOCK_VAL);
+> +	/* Then hit reset on the different machines */
+> +	if (of_machine_is_compatible("arm,realview-eb")) {
+> +		regmap_write(syscon_regmap,
+> +			     REALVIEW_SYS_RESETCTL_OFFSET, 0x0008);
+> +	} else if (of_machine_is_compatible("arm,realview-pb1176")) {
+> +		regmap_write(syscon_regmap,
+> +			     REALVIEW_SYS_RESETCTL_OFFSET, 0x0100);
+> +	} else if (of_machine_is_compatible("arm,realview-pb11mp") ||
+> +		   of_machine_is_compatible("arm,realview-pba8")) {
+> +		regmap_write(syscon_regmap, REALVIEW_SYS_RESETCTL_OFFSET,
+> +			     0x0000);
+> +		regmap_write(syscon_regmap, REALVIEW_SYS_RESETCTL_OFFSET,
+> +			     0x0004);
+> +	} else if (of_machine_is_compatible("arm,realview-pbx")) {
+> +		regmap_write(syscon_regmap, REALVIEW_SYS_RESETCTL_OFFSET,
+> +			     0x00f0);
+> +		regmap_write(syscon_regmap, REALVIEW_SYS_RESETCTL_OFFSET,
+> +			     0x00f4);
+> +	}
+> +	dsb();
+> +}
 
-> +- "marvell,timer-counter-rating" : The rating when register clock event device
-> +  or clock source. Only valid for "marvell,timer-counter-clkevt" and
-> +  "marvell,timer-counter-clksrc".
+I'd be much happier if we had a separate device node to match against,
+rather than using of_machine_is_compatible(). That would allow us to
+later move this code out into a separate driver. Note that I'd still
+hope to one day have an empty directory for all the ARM reference
+platforms.
 
-What does this mean? This seems like another leak of Linux internals.
+> +DT_MACHINE_START(REALVIEW_DT, "ARM RealView Machine (Device Tree Support)")
+> +	.fixup		= realview_dt_fixup,
+> +	.map_io		= realview_dt_map_io,
+> +	.init_machine	= realview_dt_init_machine,
+> +#ifdef CONFIG_ZONE_DMA
+> +	.dma_zone_size	= SZ_256M,
+> +#endif
+> +	.dt_compat	= realview_dt_platform_compat,
+> +	.restart	= realview_dt_restart,
 
-> +- marvell,timer-counter-broadcast : When this counter acts as clock event
-> +  device. It is broadcast clock event device.
-> +  Only valid for "marvell,timer-counter-clkevt".
+This isn't specific to the DT version of realview, but what happens if
+CONFIG_ZONE_DMA is disabled? 
 
-This does not seem like a hardware property. Why can Linux not decide
-which counter (if any) to use as the broadcast source?
-
-> +- marvell,timer-counter-nodynirq : When this counter acts as broadcast clock
-> +  event device, it cannot switch the IRQ of broadcast clock event to any CPU.
-> +  Only valid for "marvell,timer-counter-clkevt".
-
-Likewise this does not sound like a hardware property.
-
-Mark.
+	Arnd
