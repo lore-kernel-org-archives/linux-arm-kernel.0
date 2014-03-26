@@ -1,49 +1,97 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 26 Mar 2014 11:48:05 -0300
-Subject: [PATCH v2 0/3] mv_xor: Spinlock cleanup
-In-Reply-To: <20140313191259.GB21811@arch.cereza>
-References: <1394221607-15064-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140313191259.GB21811@arch.cereza>
-Message-ID: <20140326144805.GA18322@arch.cereza>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Mar 2014 11:54:38 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx51-babbage: Add USB Host1 support
+Message-ID: <1395845679-5744-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 13, Ezequiel Garcia wrote:
-> On Mar 07, Ezequiel Garcia wrote:
-> > Vinod, Dan,
-> > 
-> > This series is v2 of the one previously sent by Thomas Petazzoni [1].
-> > I've tried to address the comments made by Andi and Dan, and also kept
-> > Thomas' ultimate goal: get rid of the mv_xor_slot_cleanup() function
-> > (which takes the spinlock).
-> > 
-> > The first patch removes the unneeded call to mv_xor_clean_completed_slots(),
-> > in mv_xor_as explained by Dan [2].
-> > 
-> > The other two patches replace the calls to mv_xor_slot_cleanup() with
-> > calls to __mv_xor_slot_cleanup(). This allows to have the same "spinlock held"
-> > requirement on all callers.
-> > 
-> > The patchset is based on v3.14-rc5 and has been tested on an Armada XP GP board.
-> > 
-> > [1] http://www.spinics.net/lists/arm-kernel/msg297176.html
-> > [2] http://www.spinics.net/lists/arm-kernel/msg297518.html
-> > 
-> > Ezequiel Garcia (3):
-> >   dma: mv_xor: Remove unneeded mv_xor_clean_completed_slots() call
-> >   dma: mv_xor: Remove all callers of mv_xor_slot_cleanup()
-> >   dma: mv_xor: Rename __mv_xor_slot_cleanup() to mv_xor_slot_cleanup()
-> > 
-> >  drivers/dma/mv_xor.c | 24 +++++++++++-------------
-> >  1 file changed, 11 insertions(+), 13 deletions(-)
-> > 
-> 
-> Ping?
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Ping^2 ?
+Signed-off by: Dave Ebright <dave.ebright@parsons.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Does not touch the common imx51.dtsi file and provide the usbphy node locally
 
+ arch/arm/boot/dts/imx51-babbage.dts | 55 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 121dadd..1084607 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -119,6 +119,35 @@
+ 			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio2 5 0>;
++			enable-active-high;
++		};
++	};
++
++	usbphy {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "simple-bus";
++
++		usbh1phy: usbh1phy at 0 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			clocks = <&clks 0>;
++			clock-names = "main_clk";
++		};
++	};
+ };
+ 
+ &esdhc1 {
+@@ -461,6 +490,23 @@
+ 				MX51_PAD_EIM_D24__UART3_CTS		0x1c5
+ 			>;
+ 		};
++
++		pinctrl_usbh1: usbh1grp {
++			fsl,pins = <
++				MX51_PAD_USBH1_CLK__USBH1_CLK		0x80000000
++				MX51_PAD_USBH1_DIR__USBH1_DIR		0x80000000
++				MX51_PAD_USBH1_NXT__USBH1_NXT		0x80000000
++				MX51_PAD_USBH1_DATA0__USBH1_DATA0	0x80000000
++				MX51_PAD_USBH1_DATA1__USBH1_DATA1	0x80000000
++				MX51_PAD_USBH1_DATA2__USBH1_DATA2	0x80000000
++				MX51_PAD_USBH1_DATA3__USBH1_DATA3	0x80000000
++				MX51_PAD_USBH1_DATA4__USBH1_DATA4	0x80000000
++				MX51_PAD_USBH1_DATA5__USBH1_DATA5	0x80000000
++				MX51_PAD_USBH1_DATA6__USBH1_DATA6	0x80000000
++				MX51_PAD_USBH1_DATA7__USBH1_DATA7	0x80000000
++				MX51_PAD_EIM_D21__GPIO2_5		0x80000000
++			>;
++		};
+ 	};
+ };
+ 
+@@ -529,3 +575,12 @@
+ 		>;
+ 	status = "okay";
+ };
++
++&usbh1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbh1>;
++	vbus-supply = <&reg_usb_vbus>;
++	fsl,usbphy = <&usbh1phy>;
++	phy_type = "ulpi";
++	status = "okay";
++};
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.2
