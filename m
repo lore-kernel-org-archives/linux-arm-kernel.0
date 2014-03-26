@@ -1,85 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 26 Mar 2014 22:52:27 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140326214259.GA12330@obsidianresearch.com>
-References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
- <20140325202249.GA10378@obsidianresearch.com>
- <20140325213638.5aba54b6@skate>
- <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
- <20140325222404.GC14718@obsidianresearch.com>
- <20140325223510.GD14718@obsidianresearch.com>
- <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
- <20140326201243.GA1536@obsidianresearch.com>
- <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
-Message-ID: <20140326225227.4630e947@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Mar 2014 22:54:40 +0100
+Subject: [PATCH 0/3] Fix stmmac-socfpga allmodconfig breakage in arm-soc
+In-Reply-To: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
+References: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
+Message-ID: <201403262254.41069.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Wed, 26 Mar 2014 15:42:59 -0600, Jason Gunthorpe wrote:
-> On Wed, Mar 26, 2014 at 08:34:19PM +0000, Neil Greatorex wrote:
-> > Thanks. Here's the relevant output with that patch:
-> > 
-> > [    0.135772] mvebu-pcie pcie-controller.3: ICR is 0
-> > [    0.160889] mvebu-pcie pcie-controller.3: Vendor ID is ffffffff
-> > [    0.160897] mvebu-pcie pcie-controller.3: ICR is 800200
-> > [    1.170215] mvebu-pcie pcie-controller.3: Try 2: Vendor ID is 15218086
-> > [    1.170228] mvebu-pcie pcie-controller.3: ICR is 0
+On Wednesday 26 March 2014, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Okay, this looks better..
+> Hi,
 > 
-> Thomas: Can you verify the decoding of the ICR register (offset
-> 0x1900)?
+> These 3 patches are based on Arnd's patch to fix the allmodconfig for the
+> dwmac-socfpga implementation. I just broke the patch out into drivers,
+> dts, and dts documentation.
 > 
-> My Kirkwood manual says 0x800200 is 'Non-Fatal Error Detected' and 'Link
-> Failure Indication' - the latter seems very strange.
+> The original patch is here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241518.html
+> 
+> Arnd mentioned that he was thinking about just removing the dwmac-socfpga
+> and send out the new verion to the netdev tree, but I haven't seen it. So
+> just in case this solution might work, here are the patches.
+> 
+> These patches are based on arm-soc/for-next.
 
-Decoding is:
+Hi Dinh,
 
- bit 0, TxReqInDIdownErr
- bit 1, MDis
- bit 2, reserved
- bit 3, ErrWrToReg
- bit 4, HitDfltWinErr
- bit 5, reserved
- bit 6, RxRamParErr
- bit 7, TxRamParErr
- bit 8, CorErrDet
- bit 9, NFErrDet
- bit 10, FErrDet
- bit 11, DstateChange
- bit 12, BIST
- bit 13, reserved
- bit 14, FlowCtrlProtocol
- bit 15, RcvUrCaErr
- bit 16, RcvErrFatal
- bit 17, RcvErrNonFatal
- bit 18, RcvErrCor
- bit 19, RcvCRS
- bit 20, PexSlvHotReset
- bit 21, PexSlvDisLink
- bit 22, PexSlvLb
- bit 23, PexLinkFail
- bit 24, RcvIntA
- bit 25, RcvIntB
- bit 26, RcvIntC
- bit 27, RcvIntD
- bit 28, RcvPmPme
- bit 29, RcvTurnOff
- bit 30, reserved
- bit 31, RcvMsi
+Thanks for putting these patches together. The problem I see with these
+is that we have multiple conflicts between my changes and the other
+patches that went into the netdev tree.
 
-So 800200 = bit 23 and bit 9, which means:
+Originally, the idea was that David Miller gave his Ack to have
+the patches merged through arm-soc, but I think that was a mistake,
+and they should have been treated like the other patches for
+the same driver, i.e. put the driver and binding changes into
+netdev, and the dt changes into arm-soc.
 
- * bit 9, NFErrDet, Non fatal error detected
- * bit 23, PexLinkFail
+If I apply your patches on top of the next/drivers branch, we get
+conflicts for a handful of files, and get Linus to resolve them.
+I tried applying my patch on Sunday, but backed it out because 
+of this.
 
-So it's the same as Kirkwood, at least for these bits. 
+My preferred solution at this point would be to revert the driver
+addition in the arm-soc tree and have David put the new version
+in, but I don't know if he still takes patches like that for 3.15.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
