@@ -1,29 +1,34 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 26 Mar 2014 12:29:41 -0400
-Subject: [PATCH] ata: fix Marvell SATA driver dependencies
-In-Reply-To: <5138028.BSQbEP7RRB@amdc1032>
-References: <5138028.BSQbEP7RRB@amdc1032>
-Message-ID: <20140326162941.GH7171@htj.dyndns.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 26 Mar 2014 10:35:13 -0600
+Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
+ <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+ <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+Message-ID: <20140326163513.GB2440@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 05:19:02PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Make sata_mv host driver depend on PCI || ARCH_KIRKWOOD || ARCH_MVEBU ||
-> ARCH_ORION5X config options as Marvell SATA support covers both Marvell
-> PCI devices and Marvell Kirkwood, Armada 370/XP and Orion5x SoCs (for
-> non-PCI devices the driver to work requires suitable device tree node to
-> be defined).  Additionally allow the driver build if COMPILE_TEST config
-> option is set.
-> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On Wed, Mar 26, 2014 at 09:28:42AM -0500, Rob Herring wrote:
 
-Patch doesn't apply to libata/for-3.15.
+> Where is the right place for config space? This binding has it here
+> and others have it in ranges. 
 
-Thanks.
+I think all the drivers in drivers/pci/host use 'reg', this was
+discussed in the dt-bindings list and AFAIK no new drivers have used
+ranges since it was brought up.
 
--- 
-tejun
+> Given that config space type is defined for ranges, I would think
+> that is the right place. But Liviu's patches do not process config
+> space entries in ranges. Perhaps we need a config space resource
+> populated in the bridge struct.
+
+When we talked about this earlier on the DT bindings list the
+consensus seemed to be that configuration MMIO ranges should only be
+used if the underlying memory was exactly ECAM, and was not to be used
+for random configuration related register blocks.
+
+The rational being that generic code, upon seeing that ranges entry,
+could just go ahead and assume ECAM mapping.
+
+Jason
