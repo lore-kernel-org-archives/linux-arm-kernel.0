@@ -1,42 +1,64 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 26 Mar 2014 11:32:12 -0400
-Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
-In-Reply-To: <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
-References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
- <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
- <20140321232704.GB25519@cbox>
- <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
- <20140323174431.GE30885@cbox>
- <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
-Message-ID: <CAJ5Y-eaiuV=TijB8cj4i8GY8CoN+qOT9C2Jsq4-kJmfCpY7Ciw@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 26 Mar 2014 15:35:11 +0000
+Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
+ <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+ <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+Message-ID: <20140326153511.GR17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Mar 26, 2014 at 02:28:42PM +0000, Rob Herring wrote:
+> On Wed, Mar 19, 2014 at 6:12 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> > This patch adds the device tree nodes for APM X-Gene PCIe controller and
+> > PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
+> > nodes are added.
+> 
+> [snip]
+> 
+> > +               pcie0: pcie at 1f2b0000 {
+> > +                       status = "disabled";
+> > +                       device_type = "pci";
+> > +                       compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+> > +                       #interrupt-cells = <1>;
+> > +                       #size-cells = <2>;
+> > +                       #address-cells = <3>;
+> > +                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+> > +                               0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+> 
+> Where is the right place for config space? This binding has it here
+> and others have it in ranges. Given that config space type is defined
+> for ranges, I would think that is the right place. But Liviu's patches
+> do not process config space entries in ranges. Perhaps we need a
+> config space resource populated in the bridge struct.
 
-On 24 March 2014 09:26, Rob Herring <rob.herring@linaro.org> wrote:
+Rob,
 
->>>
->>> My suggestion would be to have:
->>> arch/arm/include/uapi/asm/psci.h
->>> arch/arm64/include/uapi/asm/psci.h
->>
->> I think the suggestion was to move all this to include/uapi/linux/psci.h
->> or something equivalent so also arm and arm64 can share these defines,
->> but maybe I read too much into it.
->
-> Yes. It is perfectly fine for a somewhat architecture specific header
-> to live in include/linux (or include/uapi/linux).
->
->
-While I'm aware that we wouldn't want to push seemingly irrelevant
-stuff into this header, I'm thinking of ways to unify the ARM and
-ARM64 PSCI code. A lot of it is reusable between the two.
-So, can this header also include all the common PSCI functions between
-ARM and ARM64? And can KVM possibly use these functions as well?
+Have a look at the discussion between Will and Arnd on the subject of virtual PCI
+host controller for arm 32bit. My understanding is that config space is described
+via reg entries.
 
-Alternately, is drivers/psci.c a more suitable place? In this case, at
-least one function will be guarded by CONFIG_ARM64.
+See here: http://archive.arm.linux.org.uk/lurker/message/20140205.190947.b3c3e464.en.html
 
-Cheers,
-Ashwin
+Best regards,
+Liviu
+
+> 
+> Rob
+> 
+> 
+> > +                       reg-names = "csr", "cfg";
+> > +                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+> > +                                 0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
