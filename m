@@ -1,174 +1,209 @@
-From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
-Date: Wed, 26 Mar 2014 08:59:52 -0500
-Subject: [PATCH v4] ARM: sun4i: spi: Allow transfers larger than FIFO size
-In-Reply-To: <20140322175053.GU27873@lukather>
-References: <20140322175053.GU27873@lukather>
-Message-ID: <1395842392-31491-1-git-send-email-mr.nuke.me@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Mar 2014 15:02:30 +0100
+Subject: [PATCH v2 2/5] pinctrl: pfc: r8a7790: add mux data for IIC(B)
+ cores
+In-Reply-To: <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
+References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
+ <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <1573801.ZCY1H3qPEP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI transfers were limited to one FIFO depth, which is 64 bytes.
-This was an artificial limitation, however, as the hardware can handle
-much larger bursts. To accommodate this, we enable the interrupt when
-the Rx FIFO is 3/4 full, and drain the FIFO within the interrupt
-handler. The 3/4 ratio was chosen arbitrarily, with the intention to
-reduce the potential number of interrupts.
+Hi Wolfram,
 
-Since the SUN4I_CTL_TP bit is set, the hardware will pause
-transmission whenever the FIFO is full, so there is no risk of losing
-data if we can't service the interrupt in time.
+Thank you for the patch.
 
-For the Tx side, enable and use the Tx FIFO 3/4 empty interrupt to
-replenish the FIFO on large SPI bursts. This requires more care in
-when the interrupt is left enabled, as this interrupt will continually
-trigger when the FIFO is less than 1/4 full, even though we
-acknowledge it.
+On Tuesday 25 March 2014 19:56:26 Wolfram Sang wrote:
+> From: Wolfram Sang <wsa@sang-engineering.com>
+> 
+> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 
-Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
----
- drivers/spi/spi-sun4i.c | 72 ++++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 65 insertions(+), 7 deletions(-)
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index 3f82705..1557528 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -47,6 +47,8 @@
- #define SUN4I_CTL_TP				BIT(18)
- 
- #define SUN4I_INT_CTL_REG		0x0c
-+#define SUN4I_INT_CTL_RF_F34			BIT(4)
-+#define SUN4I_INT_CTL_TF_E34			BIT(12)
- #define SUN4I_INT_CTL_TC			BIT(16)
- 
- #define SUN4I_INT_STA_REG		0x10
-@@ -62,11 +64,14 @@
- #define SUN4I_CLK_CTL_CDR1(div)			(((div) & SUN4I_CLK_CTL_CDR1_MASK) << 8)
- #define SUN4I_CLK_CTL_DRS			BIT(12)
- 
-+#define SUN4I_MAX_XFER_SIZE			0xffffff
-+
- #define SUN4I_BURST_CNT_REG		0x20
--#define SUN4I_BURST_CNT(cnt)			((cnt) & 0xffffff)
-+#define SUN4I_BURST_CNT(cnt)			((cnt) & SUN4I_MAX_XFER_SIZE)
- 
- #define SUN4I_XMIT_CNT_REG		0x24
--#define SUN4I_XMIT_CNT(cnt)			((cnt) & 0xffffff)
-+#define SUN4I_XMIT_CNT(cnt)			((cnt) & SUN4I_MAX_XFER_SIZE)
-+
- 
- #define SUN4I_FIFO_STA_REG		0x28
- #define SUN4I_FIFO_STA_RF_CNT_MASK		0x7f
-@@ -97,6 +102,28 @@ static inline void sun4i_spi_write(struct sun4i_spi *sspi, u32 reg, u32 value)
- 	writel(value, sspi->base_addr + reg);
- }
- 
-+static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
-+{
-+	u32 reg;
-+	reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
-+	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
-+	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
-+}
-+
-+static inline void sun4i_spi_enable_interrupt(struct sun4i_spi *sspi, u32 mask)
-+{
-+	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
-+	reg |= mask;
-+	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
-+}
-+
-+static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 mask)
-+{
-+	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
-+	reg &= ~mask;
-+	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
-+}
-+
- static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
- {
- 	u32 reg, cnt;
-@@ -119,8 +146,15 @@ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
- 
- static inline void sun4i_spi_fill_fifo(struct sun4i_spi *sspi, int len)
- {
-+	u32 cnt;
- 	u8 byte;
- 
-+	/* See how much data we can fit */
-+	cnt = SUN4I_FIFO_DEPTH - sun4i_spi_get_tx_fifo_count(sspi);
-+
-+	if (len > cnt)
-+		len = cnt;
-+
- 	if (len > sspi->len)
- 		len = sspi->len;
- 
-@@ -175,8 +209,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	int ret = 0;
- 	u32 reg;
- 
--	/* We don't support transfer larger than the FIFO */
--	if (tfr->len > SUN4I_FIFO_DEPTH)
-+	/* This is the maximum SPI burst size supported by the hardware */
-+	if (tfr->len > SUN4I_MAX_XFER_SIZE)
- 		return -EINVAL;
- 
- 	reinit_completion(&sspi->done);
-@@ -274,7 +308,10 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
- 
- 	/* Enable the interrupts */
--	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
-+	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34);
-+	/* Only enable Tx FIFO interrupt if we really need it */
-+	if (tx_len > SUN4I_FIFO_DEPTH)
-+		sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
- 
- 	/* Start the transfer */
- 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
-@@ -287,8 +324,6 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 		goto out;
- 	}
- 
--	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
--
- out:
- 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, 0);
- 
-@@ -303,10 +338,33 @@ static irqreturn_t sun4i_spi_handler(int irq, void *dev_id)
- 	/* Transfer complete */
- 	if (status & SUN4I_INT_CTL_TC) {
- 		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TC);
-+		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
- 		complete(&sspi->done);
- 		return IRQ_HANDLED;
- 	}
- 
-+	/* Receive FIFO 3/4 full */
-+	if (status & SUN4I_INT_CTL_RF_F34) {
-+		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
-+		/* Only clear the interrupt _after_ draining the FIFO */
-+		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_RF_F34);
-+		return IRQ_HANDLED;
-+	}
-+
-+	/* Transmit FIFO 3/4 empty */
-+	if (status & SUN4I_INT_CTL_TF_E34) {
-+		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
-+
-+		if(!sspi->len)
-+			/* nothing left to transmit */
-+			sun4i_spi_disable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
-+
-+		/* Only clear the interrupt _after_ re-seeding the FIFO */
-+		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TF_E34);
-+
-+		return IRQ_HANDLED;
-+	}
-+
- 	return IRQ_NONE;
- }
- 
+> ---
+> Change since V1:
+> 
+> * renamed i2c4-7 to iic0-3
+> 
+>  drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 118
+> ++++++++++++++++++++++++++++++++++- 1 file changed, 116 insertions(+), 2
+> deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c index bcb47d138b02..99b62b1ee752
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+> @@ -782,8 +782,8 @@ enum {
+>  	USB1_PWEN_MARK, AUDIO_CLKOUT_D_MARK, USB1_OVC_MARK,
+>  	TCLK1_B_MARK,
+> 
+> -	I2C0_SCL_MARK, I2C0_SDA_MARK,
+> -	I2C3_SCL_MARK, I2C3_SDA_MARK,
+> +	IIC0_SCL_MARK, IIC0_SDA_MARK, I2C0_SCL_MARK, I2C0_SDA_MARK,
+> +	IIC3_SCL_MARK, IIC3_SDA_MARK, I2C3_SCL_MARK, I2C3_SDA_MARK,
+>  	PINMUX_MARK_END,
+>  };
+> 
+> @@ -1723,9 +1723,13 @@ static const u16 pinmux_data[] = {
+>  	PINMUX_IPSR_DATA(IP16_7, USB1_OVC),
+>  	PINMUX_IPSR_MODSEL_DATA(IP16_7, TCLK1_B, SEL_TMU1_1),
+> 
+> +	PINMUX_DATA(IIC0_SCL_MARK, FN_SEL_IIC0_0),
+> +	PINMUX_DATA(IIC0_SDA_MARK, FN_SEL_IIC0_0),
+>  	PINMUX_DATA(I2C0_SCL_MARK, FN_SEL_IIC0_1),
+>  	PINMUX_DATA(I2C0_SDA_MARK, FN_SEL_IIC0_1),
+> 
+> +	PINMUX_DATA(IIC3_SCL_MARK, FN_SEL_IICDVFS_0),
+> +	PINMUX_DATA(IIC3_SDA_MARK, FN_SEL_IICDVFS_0),
+>  	PINMUX_DATA(I2C3_SCL_MARK, FN_SEL_IICDVFS_1),
+>  	PINMUX_DATA(I2C3_SDA_MARK, FN_SEL_IICDVFS_1),
+>  };
+> @@ -2134,6 +2138,80 @@ static const unsigned int i2c3_pins[] = {
+>  static const unsigned int i2c3_mux[] = {
+>  	I2C3_SCL_MARK, I2C3_SDA_MARK,
+>  };
+> +/* - IIC0 (I2C4)
+> ------------------------------------------------------------ */ +static
+> const unsigned int iic0_pins[] = {
+> +	/* SCL, SDA */
+> +	PIN_A_NUMBER('G', 15), PIN_A_NUMBER('F', 15),
+> +};
+> +static const unsigned int iic0_mux[] = {
+> +	IIC0_SCL_MARK, IIC0_SDA_MARK,
+> +};
+> +/* - IIC1 (I2C5)
+> ------------------------------------------------------------ */ +static
+> const unsigned int iic1_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(1, 16), RCAR_GP_PIN(1, 17),
+> +};
+> +static const unsigned int iic1_mux[] = {
+> +	IIC1_SCL_MARK, IIC1_SDA_MARK,
+> +};
+> +static const unsigned int iic1_b_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(3, 6), RCAR_GP_PIN(3, 7),
+> +};
+> +static const unsigned int iic1_b_mux[] = {
+> +	IIC1_SCL_B_MARK, IIC1_SDA_B_MARK,
+> +};
+> +static const unsigned int iic1_c_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(4, 30), RCAR_GP_PIN(4, 27),
+> +};
+> +static const unsigned int iic1_c_mux[] = {
+> +	IIC1_SCL_C_MARK, IIC1_SDA_C_MARK,
+> +};
+> +/* - IIC2 (I2C6)
+> ------------------------------------------------------------ */ +static
+> const unsigned int iic2_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(5, 5), RCAR_GP_PIN(5, 6),
+> +};
+> +static const unsigned int iic2_mux[] = {
+> +	IIC2_SCL_MARK, IIC2_SDA_MARK,
+> +};
+> +static const unsigned int iic2_b_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(4, 0), RCAR_GP_PIN(4, 1),
+> +};
+> +static const unsigned int iic2_b_mux[] = {
+> +	IIC2_SCL_B_MARK, IIC2_SDA_B_MARK,
+> +};
+> +static const unsigned int iic2_c_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(0, 6), RCAR_GP_PIN(0, 7),
+> +};
+> +static const unsigned int iic2_c_mux[] = {
+> +	IIC2_SCL_C_MARK, IIC2_SDA_C_MARK,
+> +};
+> +static const unsigned int iic2_d_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 15),
+> +};
+> +static const unsigned int iic2_d_mux[] = {
+> +	IIC2_SCL_D_MARK, IIC2_SDA_D_MARK,
+> +};
+> +static const unsigned int iic2_e_pins[] = {
+> +	/* SCL, SDA */
+> +	RCAR_GP_PIN(2, 18), RCAR_GP_PIN(2, 19),
+> +};
+> +static const unsigned int iic2_e_mux[] = {
+> +	IIC2_SCL_E_MARK, IIC2_SDA_E_MARK,
+> +};
+> +/* - IIC3 (I2C7)
+> ------------------------------------------------------------ */ +static
+> const unsigned int iic3_pins[] = {
+> +/* SCL, SDA */
+> +	PIN_A_NUMBER('J', 15), PIN_A_NUMBER('H', 15),
+> +};
+> +static const unsigned int iic3_mux[] = {
+> +	IIC3_SCL_MARK, IIC3_SDA_MARK,
+> +};
+>  /* - INTC
+> ------------------------------------------------------------------- */
+> static const unsigned int intc_irq0_pins[] = {
+>  	/* IRQ */
+> @@ -3650,6 +3728,16 @@ static const struct sh_pfc_pin_group pinmux_groups[]
+> = { SH_PFC_PIN_GROUP(i2c2_d),
+>  	SH_PFC_PIN_GROUP(i2c2_e),
+>  	SH_PFC_PIN_GROUP(i2c3),
+> +	SH_PFC_PIN_GROUP(iic0),
+> +	SH_PFC_PIN_GROUP(iic1),
+> +	SH_PFC_PIN_GROUP(iic1_b),
+> +	SH_PFC_PIN_GROUP(iic1_c),
+> +	SH_PFC_PIN_GROUP(iic2),
+> +	SH_PFC_PIN_GROUP(iic2_b),
+> +	SH_PFC_PIN_GROUP(iic2_c),
+> +	SH_PFC_PIN_GROUP(iic2_d),
+> +	SH_PFC_PIN_GROUP(iic2_e),
+> +	SH_PFC_PIN_GROUP(iic3),
+>  	SH_PFC_PIN_GROUP(intc_irq0),
+>  	SH_PFC_PIN_GROUP(intc_irq1),
+>  	SH_PFC_PIN_GROUP(intc_irq2),
+> @@ -3932,6 +4020,28 @@ static const char * const i2c3_groups[] = {
+>  	"i2c3",
+>  };
+> 
+> +static const char * const iic0_groups[] = {
+> +	"iic0",
+> +};
+> +
+> +static const char * const iic1_groups[] = {
+> +	"iic1",
+> +	"iic1_b",
+> +	"iic1_c",
+> +};
+> +
+> +static const char * const iic2_groups[] = {
+> +	"iic2",
+> +	"iic2_b",
+> +	"iic2_c",
+> +	"iic2_d",
+> +	"iic2_e",
+> +};
+> +
+> +static const char * const iic3_groups[] = {
+> +	"iic3",
+> +};
+> +
+>  static const char * const intc_groups[] = {
+>  	"intc_irq0",
+>  	"intc_irq1",
+> @@ -4226,6 +4336,10 @@ static const struct sh_pfc_function
+> pinmux_functions[] = { SH_PFC_FUNCTION(i2c1),
+>  	SH_PFC_FUNCTION(i2c2),
+>  	SH_PFC_FUNCTION(i2c3),
+> +	SH_PFC_FUNCTION(iic0),
+> +	SH_PFC_FUNCTION(iic1),
+> +	SH_PFC_FUNCTION(iic2),
+> +	SH_PFC_FUNCTION(iic3),
+>  	SH_PFC_FUNCTION(intc),
+>  	SH_PFC_FUNCTION(mmc0),
+>  	SH_PFC_FUNCTION(mmc1),
+
 -- 
-1.8.5.3
+Regards,
+
+Laurent Pinchart
