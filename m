@@ -1,58 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 10:53:26 +0100
-Subject: [PATCH v5 00/14] CPU idle for Armada XP
-In-Reply-To: <20140326004223.GL28304@titan.lakedaemon.net>
-References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
- <20140326004223.GL28304@titan.lakedaemon.net>
-Message-ID: <5332A396.50802@free-electrons.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 26 Mar 2014 09:55:46 +0000
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <4392030.XayIa35sfH@wuerfel>
+References: <1395670496-17381-1-git-send-email-zhangfei.gao@linaro.org>
+ <21873900.AIOr1ryy37@wuerfel>
+ <CAGVrzcZNM2gUHqq2m2jcaqs-AoWKo_DszYu5ozs2vTR6kFY0kA@mail.gmail.com>
+ <4392030.XayIa35sfH@wuerfel>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D0F6E9407@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/2014 01:42, Jason Cooper wrote:
-> Gregory,
+From: Arnd Bergmann
+> On Tuesday 25 March 2014 10:16:28 Florian Fainelli wrote:
+> >
+> > Ok, well that's really unfortunate, to achieve the best of everything,
+> > the workaround should probably look like:
+> >
+> > - keep reclaiming TX buffers in ndo_start_xmit() in case you push more
+> > packets to the NICs than your timer can free
+> > - reclaim TX buffers in NAPI poll() context for "symetrical" workloads
+> > where e.g: TCP ACKs received allow you to complete TX buffers
+> > - have a timer like you suggest which should help with transmit only
+> > workloads at a slow rate
 > 
-> On Tue, Mar 25, 2014 at 11:48:11PM +0100, Gregory CLEMENT wrote:
-> ...
->> The first patch should go through ARM subsystem and should be taken by
->> Russell King. I made few change on it following Lorenzo advice and
->> now it will reuse the cpu v7 suspend and resume function and just do
->> specific operation before calling them.
->>
->> The 13th patch 'cpuidle: mvebu: Add initial cpu idle support for
->> Armada 370/XP SoC' is the only one who should go to the cpuidle
->> subsystem. But of course I would like that Daniel Lezcano or Rafael
->> J. Wysocki have a look on the whole series and especially patches 10,
->> 12 and 14.
-> 
-> Ok, I'm tired.  :)  Help me out here.  Patches 1 and 13 are depended on
-> by the other patches and vice-versa, right?  In that case, I'm thinking
-> it's best to seek Acks from the other maintainers and keep the whole
-> branch together.  Please tell me if I'm wrong.
-> 
+> Yes, that is what I was thinking, but with orphaning the tx skbs,
+> we can probably be a little smarter. Note that in order to check
+> the state of the queue, we have to do a read from uncached memory,
+> since the hardware also doesn't support cache coherent DMA.
+> We don't want to do that too often.
 
-Actually for the build there is no dependencies between patch 1, 13 and the
-other ones.
+Possibly you can check for all the pending transmits having
+completed - the most likely case. Instead of checking them
+individually?
 
-About running the kernel obviously you need the full series to have the CPU
-idle working, but if patch 13 is not applied or if it is applied alone, the
-kernel won't crash, the only consequence will be that the cpu idle driver won't
-be loaded.
+You should limit the number of tx bytes as well as the number
+of tx frames - buffering a ring full of large frames subverts
+some of the algorithms higher up the stack.
 
-If all patches are applied except patch 1 then we could experiment some issues.
-However, now the the amount of code is very small in this patch, I planed
-to submit it to Russell King's patch system soon.
-
-About patch 13, I agree that if Daniel and Rafael agree to give their acked-by,
-it will be easier to handle if you can take it in a single series, but it is not
-mandatory.
-
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	David
