@@ -1,89 +1,48 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Wed, 26 Mar 2014 10:12:31 +0000
-Subject: [PATCH v5 2/9] PCI: host: rcar: Add MSI support
-In-Reply-To: <5331B733.8090802@codethink.co.uk>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <1395766604-30926-3-git-send-email-phil.edworthy@renesas.com>
- <5331B733.8090802@codethink.co.uk>
-Message-ID: <OF62BCE896.5AFD55D6-ON80257CA7.0037C4A7-80257CA7.00381353@eu.necel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 26 Mar 2014 07:12:27 -0300
+Subject: [PATCH] ARM: machine_power_off should not return
+In-Reply-To: <20140326005115.GW7528@n2100.arm.linux.org.uk>
+References: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
+ <20140325224554.GC12185@arch.cereza>
+ <20140326005115.GW7528@n2100.arm.linux.org.uk>
+Message-ID: <20140326101227.GC941@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Russell,
 
-On: 25/03/2014 17:05, Ben wrote:
-> Subject: Re: [PATCH v5 2/9] PCI: host: rcar: Add MSI support
-> 
-> On 25/03/14 16:56, Phil Edworthy wrote:
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> > ---
-> > v5:
-> >   - Return IRQ_NONE from MSI isr when there is no pending MSI
-> >   - Add additional interrupt bindings
-> > +
-> > +static void rcar_msi_free(struct rcar_msi *chip, unsigned long irq)
-> > +{
-> > +   struct device *dev = chip->chip.dev;
-> > +
-> > +   mutex_lock(&chip->lock);
-> > +
-> > +   if (!test_bit(irq, chip->used))
-> > +      dev_err(dev, "trying to free unused MSI#%lu\n", irq);
-> 
-> Does the upper level not check for this?
-Yes, the default_teardown_msi_irqs function checks for unused MSIs, so we 
-don't really need to check here.
+Thanks for the reply!
 
-
-> > +   else
-> > +      clear_bit(irq, chip->used);
-> > +
-> > +   mutex_unlock(&chip->lock);
+On Mar 26, Russell King - ARM Linux wrote:
+> On Tue, Mar 25, 2014 at 07:45:55PM -0300, Ezequiel Garcia wrote:
+> > 
+> > Without this patch we got the heartbeat's reboot_notifier called twice while
+> > testing the recent hibernation patches, which was unexpected and produced a
+> > kernel panic: https://lkml.org/lkml/2014/3/19/363
 > 
+> I don't see why we should make this change.  kernel/reboot.c handles
+> this function returning, so other places should do too.
 > 
-> > +}
-> > +
-> > +static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
-> > +{
-> > +   struct rcar_pcie *pcie = data;
-> > +   struct rcar_msi *msi = &pcie->msi;
-> > +   unsigned long reg;
-> > +
-> > +   reg = pci_read_reg(pcie, PCIEMSIFR);
-> > +
-> > +   /* MSI & INTx share an interrupt - we only handle MSI here */
-> > +   if (!reg)
-> > +      return IRQ_NONE;
-> > +
-> > +   while (reg) {
-> > +      unsigned int index = find_first_bit(&reg, 32);
-> > +      unsigned int irq;
-> > +
-> > +      /* clear the interrupt */
-> > +      pci_write_reg(pcie, 1 << index, PCIEMSIFR);
-> > +
-> > +      irq = irq_find_mapping(msi->domain, index);
-> > +      if (irq) {
-> > +         if (test_bit(index, msi->used))
-> > +            generic_handle_irq(irq);
-> > +         else
-> > +            dev_info(pcie->dev, "unhandled MSI\n");
-> > +      } else {
-> > +         /*
-> > +          * that's weird who triggered this?
-> > +          * just clear it
-> > +          */
-> > +         dev_info(pcie->dev, "unexpected MSI\n");
-> > +      }
+> Even on x86, this function can return:
 > 
-> You may want to change this to something that is either rate-limited
-> or is say debug level so it does not spam the console if something
-> does go wrong.
-I'll change that to debug level.
+[..]
+> 
+> Therefore, I'd say... it's a bug in the hibernation code - or we probably
+> have many buggy architectures.  I'd suggest fixing the hibernation code
+> rather than stuffing some workaround like an endless loop into every
+> architecture.
+> 
 
-> Also the comment could easily be made one line
->    /* Weird, unknown MSI IRQ, just clear it */
-Sure!
+Which is exactly what Sebastian did first:
 
-Thanks
-Phil
+https://lkml.org/lkml/2014/3/20/605
+
+But Pavel asked to fix ARM's machine_power_off instead.
+
+Also, looking at the other architectures, it seems this API is not well
+defined: some of them have an infinite loop, some don't. So it's hard to
+say the function is supposed to return or not.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
