@@ -1,110 +1,118 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Mar 2014 13:48:03 +0000
-Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
-In-Reply-To: <20140326132318.GA30750@linaro.org>
-References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
- <20140326102317.GA26040@linaro.org>
- <20140326110141.GY7528@n2100.arm.linux.org.uk>
- <20140326132318.GA30750@linaro.org>
-Message-ID: <20140326134803.GA7528@n2100.arm.linux.org.uk>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Wed, 26 Mar 2014 14:53:33 +0100
+Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator
+ for NFC v1.
+In-Reply-To: <20120911071715.GB18243@pengutronix.de>
+References: <1345811288.2848.308.camel@sauron.fi.intel.com>
+ <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+ <201209061056.12386.jbe@pengutronix.de> <504DF9BB.8050509@gmail.com>
+ <20120911071715.GB18243@pengutronix.de>
+Message-ID: <5332DBDD.4090802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 01:23:19PM +0000, Steve Capper wrote:
-> On Wed, Mar 26, 2014 at 11:01:41AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Mar 26, 2014 at 10:23:19AM +0000, Steve Capper wrote:
-> > > If there are no objections, I was going to put the following into
-> > > Russell's patch system:
-> > > 	arm: mm: Double logical invert for pte accessors
-> > > 	arm: mm: Switch back to L_PTE_WRITE
-> > 
-> > I'm not all that happy with double inversions - I think they just serve
-> > to cause confusion (and it was confusing, which is why I removed it.)
-> > I'll only take them if you have a really good reason why you want to
-> > bring it back.
-> 
-> Hi Russell,
-> The problem I'm trying to solve is for LPAE, where we have flags in the
-> upper 32 bits of a page table entry that are tested for with a bitwise
-> and, then subsequently downcast by a store to 32-bit integer:
-> 
-> 	gather_stats(page, md, pte_dirty(*pte), 1);
-> and,
-> 
-> 	static inline unsigned long huge_pte_write(pte_t pte)
-> 	{
-> 		return pte_write(pte);
-> 	}
-> 
-> (and other cases that may arise in future).
+Hi,
+On 09/11/2012 09:17 AM, Sascha Hauer wrote:
+> On Mon, Sep 10, 2012 at 04:31:23PM +0200, Ga?tan Carlier wrote:
+>> Hi Juergen,
+>> On 09/06/2012 10:56 AM, Juergen Beisert wrote:
+>>> Hi Ga?tan,
+>>>
+>>> Ga?tan Carlier wrote:
+>>>> Any comments for this patch ?
+>>>
+>>> Sorry, a little bit late.
+>>>
+>>>> Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
+>>>> in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+>>>> Warning: The same solution needs to be applied to the boot loader and the
+>>>> flash programmer.
+>>>
+>>> What sense does it make to swap the bytes at offset 0x7D0 and 0x835?
+>>>
+>>> Background: the NFC in the i.MX27/i.MX31 (NFCv1) and i.MX25/i.MX35 (NFCv2) can
+>>> only handle 512 byte pages with 16 bit OOB at once. To get them work with 2 k
+>>> page NANDs they only do the 512 + 16 step four times. The result is, a 2 k
+>>> page NAND is not handled as 2 k data and 64 bytes OOB, its handled instead as
+>>> a stream of 2112 bytes:
+>>>
+>>>                 |<-------- 2112 bytes --------->|
+>>>                 512+16 | 512+16 | 512+16 | 512+16
+>>>
+>>> Which means the NFC mixes data and OOB/checksums into its internal SRAM. But
+>>> all upper routines still use this SRAM content with a 2048 (data) + 64 (OOB)
+>>> bytes layout (to be more precise also the NFC hardware uses this layout).
+>>> Result is, the factory bad block markers are lost, because the NFC stores the
+>>> first 48 bytes from each OOB into the SRAM's data area (beginning with offset
+>>> 2000 (= 0x7D0) in the data area).
+>>>
+>>> So, the main goal of this swap patch should be to keep the factory bad block
+>>> markers _and_ to make use of them.
+>>>
+>>> But the i.MX driver does not register its own bad block pattern description,
+>>> so the default one is used with the BBM at position NAND_LARGE_BADBLOCK_POS
+>>> (which means offset 0 in the OOB area).
+>>>
+>>> So, I think, all upper layers still search for the BBM at offset 0 of the OOB
+>>> area, which results to SRAM's offset 0x800 (for NFCv1) and not 0x835. This
+>>> means this patch keeps the factory bad block markers, but they won't still be
+>>> used as expected.
+>>>
+>>> IMHO the bytes at SRAM's offset 0x7D0 and 0x800 for the NFCv1 must be swapped
+>>> (and 0x7D0 and 0x1000 for the NFCv2) to keep the factory bad block markers
+>>> _and_ to make use of them. Or am I wrong?
+>>>
+>>> Regards,
+>>> Juergen
+>>>
+>> The point is not the necessity of swapping bytes if factory bad
+>> block markers are not used.
+>> In my case, the bytes must be swapped because all previous
+>> operations on flash swapped these bytes :
+>> * Flashes redboot (bootloader) via JTAG using OpenOCD which swaps bytes;
+>> * Writes kernel and rootfs via TFTP using redboot which swaps bytes;
+>> So to be able to read rootfs partition, mxc-nand driver have to swap
+>> bytes otherwise, JFFS2 detects error on partition and is unable to
+>> mount it.
+>
+> I am all in favour to be able to swap the factory bad block marker with
+> the position the mtd framework expects it.
+>
+> That according to our understanding are bytes 0x7d0 in the main area
+> and byte 0x0 in the spare area.
+>
+>>
+>> I have not chosen to swap these bytes. In a training, I received
+>> redboot and kernel 2.6.22 with set of patches to support i.MX27 and
+>> these patches included swap of bytes in nand driver. So I start my
+>> development with this workaround and it is now impossible to get
+>> back because boards are already in production.
+>
+> So you are swapping the factory bad block marker with some position
+> where the mtd layer does not expect the bad block marker. With this
+> you preserve the factor bad block marker, but do not use it to detect
+> bad blocks.
+I don't see where the problem is. The fact that bad block marker are 
+used or not, is not related to "my" patch. This patch just places data 
+where they should be. If I take the Nand and connect it to a not-bugged 
+NFC controller, all data will be read correctly with data is main area 
+and OOB is spare area.
+>
+> In this form the patch is simply not correct and should be dropped.
+>
+Now I want to adapt and publish my platform file to latest kernel 
+version and I am still stopped with this biswap patch that is not 
+applied. As I said before, I must not be the only that have used this 
+damned original patch from Freescale that swaps byte in their ATK 
+programming soft, redboot and Kernel and it is impossible to fallback to 
+current NAND handling (without swapping).
 
-I think I have already said that these cases should be dealt with by
-ensuring that they return sensible values in such cases.  The official
-return type for pte_write() and pte_dirty() if they aren't a macro is
-"int", and that makes a 64-bit AND operation returning a bit set in
-the high 32-bits incorrect behaviour.
-
-So, the return value from all these functions must fit within "int" and
-be of the appropriate true/false indication according to C rules depending
-on the test.
-
-While we can use the shortcut of doing a 32-bit AND to test a bit in the
-32-bit case, we can't use this with LPAE nor 64-bit PTEs where "int" is
-not 64-bit - in that case, these functions must adjust the value
-appropriately.
-
-> I had tried to create a helper macro, pte_isset, but this didn't attract
-> any positive comments:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235380.html
-
-It imposes overhead for _everyone_ whether they need that overhead or not.
-
-The problem with !!value is that the compiler has to generate more code
-to convert "value" into a one-or-zero in /every/ case, because by doing
-that, you've told the compiler not "I want a true/false" value but "I
-want a one or zero value".  So, what you end up with in the 32-bit case
-is:
-
-	load pte
-	test pte bit
-	set another register to 0 if test was zero
-	set register to 1 if test was non-zero
-	test register for zero or non-zero
-	... do something ...
-
-which is rather inefficient when you're doing that lots of times.  As I
-say, we only need this if the bit being tested is not representable
-within 32-bit.
-
-So, rather than:
-
-+#define pte_isset(pte, val)    (!!(pte_val(pte) & (val)))
-
-maybe:
-
-#define pte_isset(pte, val) ((u32)(val) == (val) ? pte_val(pte) & (val) : !!(pte_val(pte) & (val)))
-
-What this says is, if the bit fits within 32-bit, use our existing logic,
-otherwise use the new logic.  Since "val" will always be a constant, the
-compiler should be able to optimise this, completely eliminating one or
-other branches.  It would be worth checking the assembly from the above
-on 32-bit LPAE, because the compiler will probably do a 64-bit test even
-for values which fit in 32-bit - this may create even better code:
-
-#define pte_isset(pte, val) ((u32)(val) == (val) ? (u32)pte_val(pte) & (u32)(val) : !!(pte_val(pte) & (val)))
-
-but again, it needs the assembly read to work out how it behaves.
-
-Also, it may be worth considering a pte_isclear() macro, since we don't
-need the logic in that case - it can just be a plain and simple:
-
-#define pte_isclear(pte, val) (!(pte_val(pte) & (val)))
-
-since we always need the negation.  Again, as per the above, it may be
-better on 32-bit LPAE whether a similar trick here would be worth it -
-there's no point testing both halves of a 64-bit register pair when you
-know that one half is always zero.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Is there any chance that if I send this patch against linux-next/master 
+branch, it will be finally accepted. Only people that needs it will use 
+it. There is so much option in menuconfig with so little explaination 
+and mark as "Only say Yes if you known what you do".
+> Sascha
+>
+Thank you.
+Best regards,
+Ga?tan Carlier.
