@@ -1,49 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 26 Mar 2014 00:57:52 +0100
-Subject: [PATCH 2/2] pinctrl: rockchip: handle first half of rk3188-bank0
- correctly
-In-Reply-To: <1647754.qr1tAySXax@diego>
-References: <1395700561-3793-1-git-send-email-b.galvani@gmail.com>
- <20140325194357.GA27520@gmail.com> <1647754.qr1tAySXax@diego>
-Message-ID: <1405109.Gq1eC4TnP1@diego>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 26 Mar 2014 01:00:14 +0100
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <53321311.8060604@ahsoftware.de>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>	<1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>	<20140316070917.GA3094@arch.cereza>	<CADHgK6s58EJyJxB-47K8w26H8ZCBFQ2zu7PGAQU9O+2g7=fPwA@mail.gmail.com>	<20140317204410.GA1118@arch.cereza>	<CADHgK6tHngKVZS=jo=VYt3Nt3dhiEmiWr28iDy7q_uR9goBj=Q@mail.gmail.com>	<20140319154434.GA3488@arch.cereza>	<CADHgK6vLB3h0zrdpve=ZyjNu2pe1VYsGxrYgv=2C-JV37vE9tQ@mail.gmail.com>
+ <CADHgK6vkwjXyJxRcOXjJpJJaR0-YR869NpPZ+CBBS8kEdE0qCQ@mail.gmail.com>
+ <5331CD43.1010601@ahsoftware.de> <53321311.8060604@ahsoftware.de>
+Message-ID: <5332188E.7050302@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first half of pinbank 0 only has one muxing function (as gpios) and
-does not have a special mux-register.
+Am 26.03.2014 00:36, schrieb Alexander Holler:
+> Am 25.03.2014 19:38, schrieb Alexander Holler:
+>
+>> reboot too. Another solution would be to unregister the reboot_notifier
+>> in the reboot_nofifier itself. I've just seen one watchdog driver
+>> (drivers/rtc/rtc-m41t80.c) which does that. But I still think such
+>
+> That, btw. is broken. ;)
+>
+> Right after having send the mail, I've became that intuition, had a look
+> and ... notifier.h does state the following:
+>
+>   * atomic_notifier_chain_unregister(),
+> blocking_notifier_chain_unregister(),
+>   * and srcu_notifier_chain_unregister() _must not_ be called from within
+>   * the call chain.
+>
+> (The reboot-notifier chain is of type blocking_notifier_chain)
+>
+> So I've picked up one user of reboot_notifier by random and had the luck
+> to choose a broken one. ;)
+>
+> I will make a patch and will have a look if the same failure can be
+> found elsewhere. There aren't that much users of the reboot-notifier, so
+> it shouldn't cost me that much time.
 
-Therefore ensure that no other mux function can be selected and also do not
-write to a non-existent register.
+Hmm, and either I was confused, or have looked at some other user of the 
+reboot_notifier, but rtc-m41t80.c doesn't call unregister from it's 
+notifier. And unfortunately there are a bit more users of the 
+reboot_notifier than I first thought. :/
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/pinctrl/pinctrl-rockchip.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+I will check if I can find out at least at which driver I had a look at 
+which did call unregister_notifier from the notifier itself.
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 80e28e5..ffcd4f4 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -350,6 +350,20 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
- 	u8 bit;
- 	u32 data;
- 
-+	/*
-+	 * The first 16 pins of rk3188_bank0 are always gpios and do not have
-+	 * a mux register at all.
-+	 */
-+	if (bank->bank_type == RK3188_BANK0 && pin < 16) {
-+		if (mux != RK_FUNC_GPIO) {
-+			dev_err(info->dev,
-+				"pin %d only supports a gpio mux\n", pin);
-+			return -ENOTSUPP;
-+		} else {
-+			return 0;
-+		}
-+	}
-+
- 	dev_dbg(info->dev, "setting mux of GPIO%d-%d to %d\n",
- 						bank->bank_num, pin, mux);
- 
--- 
-1.9.0
+Regards,
+
+Alexander Holler
