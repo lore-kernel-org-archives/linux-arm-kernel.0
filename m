@@ -1,67 +1,199 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 26 Mar 2014 15:30:23 -0500
-Subject: [PATCH 04/44] ARM: l2c: add helper for L2 cache controller DT IDs
-In-Reply-To: <E1WPLBf-0002bz-9b@rmk-PC.arm.linux.org.uk>
-References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
- <E1WPLBf-0002bz-9b@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqJNxHsaD13SQEuS7mriVmK+7QhUX-gPqzjU2UXWbF3+eA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Mar 2014 17:34:33 -0300
+Subject: [PATCH] clk: register fixed-clock only if #clock-cells property
+ is present
+In-Reply-To: <533337BD.5070901@free-electrons.com>
+References: <1395858127-18730-1-git-send-email-s.nawrocki@samsung.com>
+ <CAOMZO5DJPKvha7A-foktsB2dEw9xGXL_++uBXj_3ScAPTXNOkw@mail.gmail.com>
+ <53333145.4080903@gmail.com>
+ <CAOMZO5AEry8sJW_+0aJS8ush+sYPPWk9LRU0b8RUUGa-hO_G1A@mail.gmail.com>
+ <533337BD.5070901@free-electrons.com>
+Message-ID: <CAOMZO5BY3GhherGK+n-XEaazRRVwPU8s6X-DQg6_V62mVj8fjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 16, 2014 at 7:13 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Make it easier to declare L2 cache controller DT IDs by using a macro.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mm/cache-l2x0.c | 23 ++++++++++-------------
->  1 file changed, 10 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index f9985e5a208c..ac410b21edfb 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -946,20 +946,17 @@ static const struct l2x0_of_data bcm_l2x0_data = {
->         },
->  };
->
-> +#define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
+On Wed, Mar 26, 2014 at 5:25 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-This would useful globally. It probably needs to be without the & in that case.
+> However, Fabio, could you apply the following patch without the patch
+> "clk: reverse default clk provider initialization order in
+> of_clk_init()" and then sent me the traces. I would like to be sure
+> that there is not any side effect.
 
-Rob
+Here is the result, thanks.
 
->  static const struct of_device_id l2x0_ids[] __initconst = {
-> -       { .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
-> -       { .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
-> -       { .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
-> -       { .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
-> -         .data = (void *)&bcm_l2x0_data},
-> -       { .compatible = "brcm,bcm11351-a2-pl310-cache",
-> -         .data = (void *)&bcm_l2x0_data},
-> -       { .compatible = "marvell,aurora-outer-cache",
-> -         .data = (void *)&aurora_with_outer_data},
-> -       { .compatible = "marvell,aurora-system-cache",
-> -         .data = (void *)&aurora_no_outer_data},
-> -       { .compatible = "marvell,tauros3-cache",
-> -         .data = (void *)&tauros3_data },
-> +       L2C_ID("arm,l210-cache", l2x0_data),
-> +       L2C_ID("arm,l220-cache", l2x0_data),
-> +       L2C_ID("arm,pl310-cache", pl310_data),
-> +       L2C_ID("brcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
-> +       L2C_ID("marvell,aurora-outer-cache", aurora_with_outer_data),
-> +       L2C_ID("marvell,aurora-system-cache", aurora_no_outer_data),
-> +       L2C_ID("marvell,tauros3-cache", tauros3_data),
-> +       /* Deprecated IDs */
-> +       L2C_ID("bcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
->         {}
->  };
->
-> --
-> 1.8.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hierarchical RCU implementation.
+NR_IRQS:16 nr_irqs:16 16
+L310 cache controller enabled
+l2x0: 16 ways, CACHE_ID 0x410000c7, AUX_CTRL 0x32070000, Cache size: 1024 kB
+parent_ready: Testing ccm
+parent_ready: Ready
+of_clk_init: Initializing ccm
+Switching to timer-based delay loop
+Division by zero in kernel.
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc8-next-20140326+ #951
+Backtrace:
+[<80011cd4>] (dump_backtrace) from [<80011e70>] (show_stack+0x18/0x1c)
+ r6:00000000 r5:00000000 r4:00000000 r3:00000000
+[<80011e58>] (show_stack) from [<8064cc60>] (dump_stack+0x88/0xa4)
+[<8064cbd8>] (dump_stack) from [<80011a94>] (__div0+0x18/0x20)
+ r5:00000000 r4:00000000
+[<80011a7c>] (__div0) from [<8029582c>] (Ldiv0_64+0x8/0x18)
+[<8007e854>] (clocks_calc_mult_shift) from [<8089a8d0>]
+(sched_clock_register+0x60/0x238)
+ r10:f0018074 r9:00000000 r8:80020ba0 r7:00000020 r6:00000000 r5:80932eac
+ r4:00000000
+[<8089a870>] (sched_clock_register) from [<80884588>]
+(mxc_timer_init+0xf8/0x190)
+ r10:f0018074 r9:00000000 r8:00000057 r7:f0020024 r6:ee022b80 r5:80932eac
+ r4:00000000
+[<80884490>] (mxc_timer_init) from [<808910b0>]
+(imx6q_clocks_init+0x2c00/0x2d24)
+ r8:00000004 r7:809334d0 r6:808c7380 r5:ee7ccbe8 r4:f0020000
+[<8088e4b0>] (imx6q_clocks_init) from [<808b02c4>] (of_clk_init+0x150/0x208)
+ r10:809234d4 r9:00000000 r8:ee7ce5b0 r7:ee002ac0 r6:ee002b00 r5:fffffffe
+ r4:00000001
+[<808b0174>] (of_clk_init) from [<80880364>] (time_init+0x2c/0x38)
+ r10:ef7fc9c0 r9:412fc09a r8:808d6880 r7:808bd800 r6:ffffffff r5:809329c0
+ r4:00000001
+[<80880338>] (time_init) from [<8087ca2c>] (start_kernel+0x1f8/0x388)
+[<8087c834>] (start_kernel) from [<10008074>] (0x10008074)
+ r10:00000000 r8:1000406a r7:808db644 r6:808bd7fc r5:808d692c r4:10c5387d
+sched_clock: 32 bits at 0 Hz, resolution 0ns, wraps every 0ns
+Division by zero in kernel.
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc8-next-20140326+ #951
+Backtrace:
+[<80011cd4>] (dump_backtrace) from [<80011e70>] (show_stack+0x18/0x1c)
+ r6:ee011a00 r5:00000000 r4:00000000 r3:00000000
+[<80011e58>] (show_stack) from [<8064cc60>] (dump_stack+0x88/0xa4)
+[<8064cbd8>] (dump_stack) from [<80011a94>] (__div0+0x18/0x20)
+ r5:00000000 r4:00000000
+[<80011a7c>] (__div0) from [<8029582c>] (Ldiv0_64+0x8/0x18)
+[<8007ea84>] (__clocksource_updatefreq_scale) from [<8007ec3c>]
+(__clocksource_register_scale+0x14/0x54)
+ r10:000000c8 r9:00000000 r8:f0020024 r7:807b3e68 r6:ee0119c0 r5:00000000
+ r4:ee011a00
+[<8007ec28>] (__clocksource_register_scale) from [<808ae6f8>]
+(clocksource_mmio_init+0x8c/0xa8)
+ r4:ffffffff r3:00000001
+[<808ae66c>] (clocksource_mmio_init) from [<808845ac>]
+(mxc_timer_init+0x11c/0x190)
+ r10:f0018074 r8:00000057 r7:f0020024 r6:ee022b80 r5:80932eac r4:808dc900
+[<80884490>] (mxc_timer_init) from [<808910b0>]
+(imx6q_clocks_init+0x2c00/0x2d24)
+ r8:00000004 r7:809334d0 r6:808c7380 r5:ee7ccbe8 r4:f0020000
+[<8088e4b0>] (imx6q_clocks_init) from [<808b02c4>] (of_clk_init+0x150/0x208)
+ r10:809234d4 r9:00000000 r8:ee7ce5b0 r7:ee002ac0 r6:ee002b00 r5:fffffffe
+ r4:00000001
+[<808b0174>] (of_clk_init) from [<80880364>] (time_init+0x2c/0x38)
+ r10:ef7fc9c0 r9:412fc09a r8:808d6880 r7:808bd800 r6:ffffffff r5:809329c0
+ r4:00000001
+[<80880338>] (time_init) from [<8087ca2c>] (start_kernel+0x1f8/0x388)
+[<8087c834>] (start_kernel) from [<10008074>] (0x10008074)
+ r10:00000000 r8:1000406a r7:808db644 r6:808bd7fc r5:808d692c r4:10c5387d
+Division by zero in kernel.
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc8-next-20140326+ #951
+Backtrace:
+[<80011cd4>] (dump_backtrace) from [<80011e70>] (show_stack+0x18/0x1c)
+ r6:ee011a00 r5:00000000 r4:00000000 r3:00000000
+[<80011e58>] (show_stack) from [<8064cc60>] (dump_stack+0x88/0xa4)
+[<8064cbd8>] (dump_stack) from [<80011a94>] (__div0+0x18/0x20)
+ r5:00000000 r4:00000000
+[<80011a7c>] (__div0) from [<8029582c>] (Ldiv0_64+0x8/0x18)
+[<8007e854>] (clocks_calc_mult_shift) from [<8007eb28>]
+(__clocksource_updatefreq_scale+0xa4/0x1a4)
+ r10:00000001 r9:a3d70a3d r8:70a3d70a r7:0000000b r6:ee011a00 r5:00000001
+ r4:00000001
+[<8007ea84>] (__clocksource_updatefreq_scale) from [<8007ec3c>]
+(__clocksource_register_scale+0x14/0x54)
+ r10:000000c8 r9:00000000 r8:f0020024 r7:807b3e68 r6:ee0119c0 r5:00000000
+ r4:ee011a00
+[<8007ec28>] (__clocksource_register_scale) from [<808ae6f8>]
+(clocksource_mmio_init+0x8c/0xa8)
+ r4:ffffffff r3:00000001
+[<808ae66c>] (clocksource_mmio_init) from [<808845ac>]
+(mxc_timer_init+0x11c/0x190)
+ r10:f0018074 r8:00000057 r7:f0020024 r6:ee022b80 r5:80932eac r4:808dc900
+[<80884490>] (mxc_timer_init) from [<808910b0>]
+(imx6q_clocks_init+0x2c00/0x2d24)
+ r8:00000004 r7:809334d0 r6:808c7380 r5:ee7ccbe8 r4:f0020000
+[<8088e4b0>] (imx6q_clocks_init) from [<808b02c4>] (of_clk_init+0x150/0x208)
+ r10:809234d4 r9:00000000 r8:ee7ce5b0 r7:ee002ac0 r6:ee002b00 r5:fffffffe
+ r4:00000001
+[<808b0174>] (of_clk_init) from [<80880364>] (time_init+0x2c/0x38)
+ r10:ef7fc9c0 r9:412fc09a r8:808d6880 r7:808bd800 r6:ffffffff r5:809329c0
+ r4:00000001
+[<80880338>] (time_init) from [<8087ca2c>] (start_kernel+0x1f8/0x388)
+[<8087c834>] (start_kernel) from [<10008074>] (0x10008074)
+ r10:00000000 r8:1000406a r7:808db644 r6:808bd7fc r5:808d692c r4:10c5387d
+Division by zero in kernel.
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc8-next-20140326+ #951
+Backtrace:
+[<80011cd4>] (dump_backtrace) from [<80011e70>] (show_stack+0x18/0x1c)
+ r6:ee022b80 r5:00000000 r4:00000000 r3:00000000
+[<80011e58>] (show_stack) from [<8064cc60>] (dump_stack+0x88/0xa4)
+[<8064cbd8>] (dump_stack) from [<80011a94>] (__div0+0x18/0x20)
+ r5:808dc900 r4:00000000
+[<80011a7c>] (__div0) from [<8029582c>] (Ldiv0_64+0x8/0x18)
+[<80082314>] (clockevents_config) from [<800823b4>]
+(clockevents_config_and_register+0x1c/0x28)
+ r5:80932eac r4:808dc900
+[<80082398>] (clockevents_config_and_register) from [<808845d8>]
+(mxc_timer_init+0x148/0x190)
+ r4:808dc900 r3:fffffffe
+[<80884490>] (mxc_timer_init) from [<808910b0>]
+(imx6q_clocks_init+0x2c00/0x2d24)
+ r8:00000004 r7:809334d0 r6:808c7380 r5:ee7ccbe8 r4:f0020000
+[<8088e4b0>] (imx6q_clocks_init) from [<808b02c4>] (of_clk_init+0x150/0x208)
+ r10:809234d4 r9:00000000 r8:ee7ce5b0 r7:ee002ac0 r6:ee002b00 r5:fffffffe
+ r4:00000001
+[<808b0174>] (of_clk_init) from [<80880364>] (time_init+0x2c/0x38)
+ r10:ef7fc9c0 r9:412fc09a r8:808d6880 r7:808bd800 r6:ffffffff r5:809329c0
+ r4:00000001
+[<80880338>] (time_init) from [<8087ca2c>] (start_kernel+0x1f8/0x388)
+[<8087c834>] (start_kernel) from [<10008074>] (0x10008074)
+ r10:00000000 r8:1000406a r7:808db644 r6:808bd7fc r5:808d692c r4:10c5387d
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at kernel/time/clockevents.c:44 cev_delta2ns+0xe8/0x104()
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc8-next-20140326+ #951
+Backtrace:
+[<80011cd4>] (dump_backtrace) from [<80011e70>] (show_stack+0x18/0x1c)
+ r6:80081cb8 r5:00000000 r4:00000000 r3:00000000
+[<80011e58>] (show_stack) from [<8064cc60>] (dump_stack+0x88/0xa4)
+[<8064cbd8>] (dump_stack) from [<80028f78>] (warn_slowpath_common+0x70/0x94)
+ r5:00000009 r4:00000000
+[<80028f08>] (warn_slowpath_common) from [<80028fc0>]
+(warn_slowpath_null+0x24/0x2c)
+ r8:000000ff r7:000000ff r6:00000000 r5:808dc900 r4:00000000
+[<80028f9c>] (warn_slowpath_null) from [<80081cb8>] (cev_delta2ns+0xe8/0x104)
+[<80081bd0>] (cev_delta2ns) from [<80082374>] (clockevents_config+0x60/0x84)
+ r9:00000000 r8:00000057 r7:f0020024 r6:ee022b80 r5:808dc900 r4:00000000
+[<80082314>] (clockevents_config) from [<800823b4>]
+(clockevents_config_and_register+0x1c/0x28)
+ r5:80932eac r4:808dc900
+[<80082398>] (clockevents_config_and_register) from [<808845d8>]
+(mxc_timer_init+0x148/0x190)
+ r4:808dc900 r3:fffffffe
+[<80884490>] (mxc_timer_init) from [<808910b0>]
+(imx6q_clocks_init+0x2c00/0x2d24)
+ r8:00000004 r7:809334d0 r6:808c7380 r5:ee7ccbe8 r4:f0020000
+[<8088e4b0>] (imx6q_clocks_init) from [<808b02c4>] (of_clk_init+0x150/0x208)
+ r10:809234d4 r9:00000000 r8:ee7ce5b0 r7:ee002ac0 r6:ee002b00 r5:fffffffe
+ r4:00000001
+[<808b0174>] (of_clk_init) from [<80880364>] (time_init+0x2c/0x38)
+ r10:ef7fc9c0 r9:412fc09a r8:808d6880 r7:808bd800 r6:ffffffff r5:809329c0
+ r4:00000001
+[<80880338>] (time_init) from [<8087ca2c>] (start_kernel+0x1f8/0x388)
+[<8087c834>] (start_kernel) from [<10008074>] (0x10008074)
+ r10:00000000 r8:1000406a r7:808db644 r6:808bd7fc r5:808d692c r4:10c5387d
+---[ end trace 3406ff24bd97382e ]---
+parent_ready: Testing osc
+parent_ready: Ready
+of_clk_init: Initializing osc
+parent_ready: Testing ckih1
+parent_ready: Ready
+of_clk_init: Initializing ckih1
+parent_ready: Testing ckil
+parent_ready: Ready
+of_clk_init: Initializing ckil
