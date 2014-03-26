@@ -1,81 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 17:02:40 +0100
-Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
-References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
- <531068F4.3060903@free-electrons.com> <20140321035233.32624.98694@quantum>
- <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
-Message-ID: <5332FA20.4010206@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Mar 2014 11:08:09 -0500
+Subject: [PATCH v5 02/11] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <CAJ5Y-eaiuV=TijB8cj4i8GY8CoN+qOT9C2Jsq4-kJmfCpY7Ciw@mail.gmail.com>
+References: <1395406414-11707-1-git-send-email-anup.patel@linaro.org>
+ <1395406414-11707-3-git-send-email-anup.patel@linaro.org>
+ <20140321232704.GB25519@cbox>
+ <CALrVBkvRqRWnnzgBYCLGwYbiOy-JnezgE=89nq8O3rvdv7RqFw@mail.gmail.com>
+ <20140323174431.GE30885@cbox>
+ <CABGGisxYq6+4ZBni8EyU_w7WzivBKjRHT2LZu_bJMnNa=jWF-w@mail.gmail.com>
+ <CAJ5Y-eaiuV=TijB8cj4i8GY8CoN+qOT9C2Jsq4-kJmfCpY7Ciw@mail.gmail.com>
+Message-ID: <CAL_JsqJF9wJnszmwnAkqQe_h5Jinp9jYZzRfOP2VnmjdWAHTPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/2014 16:19, Kevin Hilman wrote:
-> [+ imx6 maintainers ]
-> 
-> On Thu, Mar 20, 2014 at 8:52 PM, Mike Turquette <mturquette@linaro.org> wrote:
->> Quoting Gregory CLEMENT (2014-02-28 02:46:12)
->>> Hi Mike,
->>>
->>> On 24/02/2014 19:10, Gregory CLEMENT wrote:
->>>> Until now the clock providers were initialized in the order found in
->>>> the device tree. This led to have the dependencies between the clocks
->>>> not respected: children clocks could be initialized before their
->>>> parent clocks.
+On Wed, Mar 26, 2014 at 10:32 AM, Ashwin Chaugule
+<ashwin.chaugule@linaro.org> wrote:
+> Hello,
+>
+> On 24 March 2014 09:26, Rob Herring <rob.herring@linaro.org> wrote:
+>
 >>>>
->>>> Instead of forcing each platform to manage its own initialization order,
->>>> this patch adds this work inside the framework itself.
->>>>
->>>> Using the data of the device tree the of_clk_init function now delayed
->>>> the initialization of a clock provider if its parent provider was not
->>>> ready yet.
->>>>
->>>> The strict dependency check (all parents of a given clk must be
->>>> initialized) was added by Boris BREZILLON
+>>>> My suggestion would be to have:
+>>>> arch/arm/include/uapi/asm/psci.h
+>>>> arch/arm64/include/uapi/asm/psci.h
 >>>
->>> Are you ok with this version?
->>> Will you take it for 3.15?
->>> Or maybe you expected that it will be part of a pull request?
->>>
->>> However as it is modifying the core of the framework I thought that you
->>> would take it and apply yourself.
+>>> I think the suggestion was to move all this to include/uapi/linux/psci.h
+>>> or something equivalent so also arm and arm64 can share these defines,
+>>> but maybe I read too much into it.
 >>
->> Hi Gregory,
+>> Yes. It is perfectly fine for a somewhat architecture specific header
+>> to live in include/linux (or include/uapi/linux).
 >>
->> I have taken this into clk-next. If no regressions pop up over the next
->> few days then it should go into 3.15.
-> 
-> $SUBJECT patch (as commit 1771b10d605) is in -next has been fingered
-> by bisection to be the reason behind boot failures[1] on imx6 wand
-> boards in the last several -next kernels.
-> 
-> Reverting the patch on top of next/master gets these boards booting again.
-> 
-> The boot failures result in no console output, so I haven't done any
-> further debugging.
+>>
+> While I'm aware that we wouldn't want to push seemingly irrelevant
+> stuff into this header, I'm thinking of ways to unify the ARM and
+> ARM64 PSCI code. A lot of it is reusable between the two.
+> So, can this header also include all the common PSCI functions between
+> ARM and ARM64? And can KVM possibly use these functions as well?
 
-I don't have any imx6 board, but should it be possible for you or the imx6
-maintainer to add earlyprintk to see exactly what happen here?
+Anything under uapi should be related to the PSCI ABI. If there are
+headers to be shared that are just kernel implementation specific,
+then they can go in include/linux/.
 
+> Alternately, is drivers/psci.c a more suitable place? In this case, at
+> least one function will be guarded by CONFIG_ARM64.
 
-Thanks,
+No. For .c files, I don't think we have a good solution. Some of the
+kvm stuff does ../../ type includes back to arch/arm, but that's not a
+very clean solution.
 
-Gregory
-
-
-> 
-> Kevin
-> 
-> [1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002927.html
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Rob
