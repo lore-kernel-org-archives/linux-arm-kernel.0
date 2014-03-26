@@ -1,58 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 11:34:18 +0100
-Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <OF61E4A09E.4D57F668-ON80257CA7.0035A569-80257CA7.00367A70@eu.necel.com>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <14997425.EPjrKhVy10@wuerfel>
- <OF61E4A09E.4D57F668-ON80257CA7.0035A569-80257CA7.00367A70@eu.necel.com>
-Message-ID: <5768554.vihmtytclA@wuerfel>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed, 26 Mar 2014 12:35:53 +0200
+Subject: [PATCH 0/4] ARM: OMAP: raw read and write endian fix
+In-Reply-To: <20140108003927.GJ5074@atomide.com>
+References: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAArO44vC4WKGHSqHX3+Mo5+jcNuyJLkh94+SPd4H+aZYAroYzw@mail.gmail.com>
+ <20140108003927.GJ5074@atomide.com>
+Message-ID: <5332AD89.8030802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 March 2014 09:55:04 Phil.Edworthy at renesas.com wrote:
-> Hi Arnd,
+On 01/08/2014 02:39 AM, Tony Lindgren wrote:
+> * Taras Kondratiuk <taras.kondratiuk@linaro.org> [131223 10:20]:
+>> On 23 December 2013 20:10, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
+>>> This series does trivial replacement of __raw_xxx functions with xxx_relaxed
+>>> endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
+>>> Some code here most probably won't be used in BE mode (like debug-leds for
+>>> OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
+>>> completely and simplify future grep'ing for new __raw_xxx() entries.
 > 
-> On: 25/03/2014 18:42, Arnd wrote:
-> > Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes 
-> for R8A7790
-> > 
-> > On Tuesday 25 March 2014 16:56:41 Phil Edworthy wrote:
-> > > +               /* Map all possible DDR as inbound ranges */
-> > > +               dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 
-> 0x80000000
-> > > +                             0x43000000 1 0x80000000 1 0x80000000 0 
-> 0x80000000>;
-> > 
-> > Typo: 0x43000000 should be 0x42000000 I guess.
-> I used 0x43000000 as this is a 64-bit type. The OF PCI range code 
-> currently treats both 32 and 64-bit types the same way, but I thought it 
-> would be good to set this in case we ever need to use it.
+> Sorry for the delay on these, applying into omap-for-v3.14/be.
+> These are trivial, and it's actually nice that you left out the
+> assembly related changes as those should be acked by the PM
+> people in case there are some issues dealing with the ROM code
+> etc.
 
-Ah, I forgot about the space identifier. It looks correct then, but
-it seems  a little strange to use a 32-bit identifier in one case
-and a 64-bit one in the other.
+Hi Tony,
 
-> > Since you control the mapping, I wonder if you could also do this as
-> > 
-> >                dma-ranges = <0x42000000 0 0x00000000 0 0x40000000 0 
-> 0x80000000
-> >                              0x43000000 0 0x80000000 1 0x80000000 0 
-> 0x80000000>;
-> > 
-> > i.e. map all the RAM into PCI bus addresses below the 32-bit boundary.
-> > This would be really nice from the perspective that now all PCI
-> > devices could access all of RAM without using an IOMMU or the
-> > relying on 64-bit master capability.
-> > 
-> > The downside of this is that you'd probably need a custom dma_map_ops
-> > wrapper.
-> Since the OF PCi range code treats both 32 and 64-bit types the same way, 
-> my PCIe driver only creates 64-bit mappings. In addition, the PCIe 
-> controller has to use a 64-bit mapping for anything over 2GiB. Based on 
-> this, I think it's sensible to leave the mappings as 1-to-1.
+It seems omap-for-v3.14/be didn't get into 3.14-rc8.
+Is there any issue with them?
 
-I'm not following, sorry. What is the hardware requirement in the
-controller?
-
-	Arnd
+-- 
+Taras Kondratiuk
