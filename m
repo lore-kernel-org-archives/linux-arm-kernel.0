@@ -1,70 +1,62 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Wed, 26 Mar 2014 22:22:35 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <CAL_JsqLfH7Er-s5wjA5JGE4+-SGtTOvYTyQ=cYk+1ekHo39Crg@mail.gmail.com>
-References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
- <1395132017-15928-4-git-send-email-zhangfei.gao@linaro.org>
- <20140318104616.GT21483@n2100.arm.linux.org.uk>
- <CAMj5BkiCXVZZPS-VyVxejCY0aiGD_HQjUdWd-FKD_ER_y_0wxQ@mail.gmail.com>
- <CAL_JsqLfH7Er-s5wjA5JGE4+-SGtTOvYTyQ=cYk+1ekHo39Crg@mail.gmail.com>
-Message-ID: <CAMj5Bkg1_a=tAw1sxOTzSG6eWUHT8QVPXOzx2C+oCyf+dPr7Uw@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 26 Mar 2014 13:23:19 +0000
+Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
+In-Reply-To: <20140326110141.GY7528@n2100.arm.linux.org.uk>
+References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
+ <20140326102317.GA26040@linaro.org>
+ <20140326110141.GY7528@n2100.arm.linux.org.uk>
+Message-ID: <20140326132318.GA30750@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob
+On Wed, Mar 26, 2014 at 11:01:41AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 26, 2014 at 10:23:19AM +0000, Steve Capper wrote:
+> > If there are no objections, I was going to put the following into
+> > Russell's patch system:
+> > 	arm: mm: Double logical invert for pte accessors
+> > 	arm: mm: Switch back to L_PTE_WRITE
+> 
+> I'm not all that happy with double inversions - I think they just serve
+> to cause confusion (and it was confusing, which is why I removed it.)
+> I'll only take them if you have a really good reason why you want to
+> bring it back.
 
-On Mon, Mar 24, 2014 at 10:17 PM, Rob Herring <robherring2@gmail.com> wrote:
+Hi Russell,
+The problem I'm trying to solve is for LPAE, where we have flags in the
+upper 32 bits of a page table entry that are tested for with a bitwise
+and, then subsequently downcast by a store to 32-bit integer:
 
->
->>>> +             dma_map_single(&ndev->dev, skb->data,
->>>> +                     RX_BUF_SIZE, DMA_FROM_DEVICE);
->>>
->>> This is incorrect.
->>>
->>> buf = buffer alloc()
->>> /* CPU owns buffer and can read/write it, device does not */
->>> dev_addr = dma_map_single(dev, buf, ..., DMA_FROM_DEVICE);
->>> /* Device owns buffer and can write it, CPU does not access it */
->>> dma_unmap_single(dev, dev_addr, ..., DMA_FROM_DEVICE);
->>> /* CPU owns buffer again and can read/write it, device does not */
->>>
->>> Please turn on DMA API debugging in the kernel debug options and verify
->>> whether your driver causes it to complain (it will.)
->>
->> Yes, you are right.
->> After change to dma_map/unmap_single, however, still get warning like
->> "DMA-API: device driver failed to check map error", not sure whether
->> it can be ignored?
->
-> If it could be ignored, there would be no warning. So yes you should
-> check the error. I guess correct error handling would be throwing away
-> the packet.
+	gather_stats(page, md, pte_dirty(*pte), 1);
+and,
 
-The warning is solved via adding dma_mapping_error check after every
-dma_map_single.
+	static inline unsigned long huge_pte_write(pte_t pte)
+	{
+		return pte_write(pte);
+	}
 
->
->
->>>> +             dma_map_single(&ndev->dev, buf, RX_BUF_SIZE, DMA_TO_DEVICE);
->>>> +             hip04_set_recv_desc(priv, virt_to_phys(buf));
->>>
->>> No need for virt_to_phys() here - dma_map_single() returns the device
->>> address.
->> Got it.
->> Use virt_to_phys since find same result come out, it should be
->> different for iommu case.
->>
->> In fact, the hardware can help to do the cache flushing, the function
->> still not be enabled now.
->> Then dma_map/unmap_single may be ignored.
->
-> If you don't need cache flushing, you should setup different
-> dma_map_ops for the device such as arm_coherent_dma_ops. The driver
-> should always have the dma_map calls. See highbank and mvebu for
-> examples.
+(and other cases that may arise in future).
 
-That would be very helpful, still not sure how to enable this feature.
-Could you help clarify which file.
-Not find highbank and mvebu under drivers/iommu/.
+We erroneously get false returned in situations where we shouldn't, and
+it's tricky to track this down.
 
-Thanks
+My reasoning was that applying double logical inverts to all the pte
+accessors that don't already have one ensures that we get values that
+are safe to downcast, and this is safe for cases where new accessors
+are added and the convention is followed and for where bit layouts are
+changed.
+
+I agree that this is confusing (and does look rather ugly), and I would
+happily try alternatives.
+
+I had tried to create a helper macro, pte_isset, but this didn't attract
+any positive comments:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235380.html
+
+I tried bool types, but it looked a little too cumbersome to me.
+
+Would the double logical invert be more acceptable if it were better
+commented?
+
+Cheers,
+-- 
+Steve
