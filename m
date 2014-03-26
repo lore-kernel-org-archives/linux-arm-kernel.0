@@ -1,59 +1,54 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 26 Mar 2014 12:55:02 +0100
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <5332AEE7.2040402@freescale.com>
-References: <532BCFCC.4080205@freescale.com>
- <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
- <20140324095902.GB11377@localhost>
- <20140326095156.3e5585b8@ipc1.ka-ro>
- <5332AEE7.2040402@freescale.com>
-Message-ID: <20140326125502.0e8d0657@ipc1.ka-ro>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 26 Mar 2014 13:04:55 +0100
+Subject: [PATCH v5 07/14] ARM: mvebu: Extend the pmsu registers
+In-Reply-To: <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+ <1395787705-31061-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5332C267.3080908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/25/2014 11:48 PM, Gregory CLEMENT wrote:
+> The initial binding for PMSU were wrong. It didn't take into account
+> all the registers from the PMSU and moreover it referred to registers
+> which are not part of PMSU.
+>
+> The Power Management Unit Service block also controls the Coherency
+> Fabric subsystem. These registers are needed for the CPU idle
+> implementation for the Armada 370/XP, it allows to enter a deep CPU
+> idle state where the Coherency Fabric and the L2 cache are powered
+> down.
+>
+> This commit add support for a new compatible for the PMSU node
+> including the block related to the coherency fabric. It also keeps
+> compatibility with the old binding
+>
+> This patch also adds warnings if one of the base registers set can't
+> be ioremapped.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>   arch/arm/mach-mvebu/pmsu.c | 47 +++++++++++++++++++++++++++++++++++++++++-----
+>   1 file changed, 42 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index d71ef53107c4..865bcb651e01 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+[...]
+> +static void __init armada_370_xp_pmsu_legacy_init(struct device_node *np)
+> +{
+> +	u32 addr;
+> +	pr_warn("*** Warning ***  Using an old binding which will be deprecated\n");
+> +	/* We just need the adress, we already know the size */
+> +	addr = be32_to_cpu(*of_get_address(np, 0, NULL, NULL));
+> +	addr -= PMSU_BASE_OFFSET;
+> +	pmsu_mp_base = ioremap(addr, PMSU_REG_SIZE);
+> +	of_node_put(np);
 
-Huang Shijie wrote:
-> ? 2014?03?26? 16:51, Lothar Wa?mann ??:
-> > I don't see why this should not be supported on i.MX28 (i.MX23 doesn't
-> > do byteswapping anyway, so this wouldn't change anything for i.MX23).
-> > The partitions used by Linux need not necessarily be accessible for the
-> > Boot ROM code (and vice versa).
-> But the first partition used to store the u-boot is accessible for the ROM.
-> 
-Whether this partition is available to Linux depends on the partition table
-passed in the DT.
+When messing with OF passed resources, I suggest to use
+of_address_to_resource() and work on the struct resource
+instead. The be32_to_cpu pointing to an immediate just looks
+strange.
 
-> Please see "Figure 12-13" in the 12.12.1.12:
->    "In order to preserve the BI (bad block information), flash updater 
-> or gang programmer
-> applications need to swap Bad Block Information (BI) data to byte 0 of 
-> metadata area for
-> every page before programming NAND Flash. ROM when loading firmware, 
-> copies back
-> the value at metadata[0] to BI offset in page data. The following figure 
-> shows how the
-> factory bad block marker is preserved."
-> 
-The inspection of the BB markers is only a fallback for the case that
-there is no DBBT. From the same chapter that you quoted above:
-| ROM uses DBBT to skip any bad block that falls within firmware data
-| on NAND Flash device.
-| If the address of DBBT Search Area in FCB is 0, ROM will rely on
-| factory marked bad block markers to find out if a block is good or bad.
-
-Thus, even the boot ROM of i.MX28 can well live without blockmark
-swapping.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Sebastian
