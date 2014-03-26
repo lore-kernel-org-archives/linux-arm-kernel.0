@@ -1,46 +1,32 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 19:27:50 +0530
-Subject: [RFC PATCH 10/12] ARM: dts: dra7: Add dt data for PCIe PHY
+Date: Wed, 26 Mar 2014 19:27:52 +0530
+Subject: [RFC PATCH 12/12] ARM: OMAP: Enable PCI for DRA7
 In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
 References: <1395842272-15267-1-git-send-email-kishon@ti.com>
-Message-ID: <1395842272-15267-11-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-13-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added dt data for PCIe PHY as a child node of ocp2scp3.
-The documention for this node can be found @ ../bindings/phy/ti-phy.txt.
+Now that we have added PCIe driver for DRA7 SOCs, enable PCI on
+DRA7 SOCs.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-omap2/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 73c61d0..7ac372b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -683,6 +683,22 @@
- 				clock-names = "sysclk";
- 				#phy-cells = <0>;
- 			};
-+
-+			pcie1_phy: pciephy at 4a094000 {
-+				compatible = "ti,phy-pipe3-pcie";
-+				ctrl-module = <&omap_control_pcie1phy>;
-+				clocks = <&dpll_pcie_ref_ck>,
-+					 <&dpll_pcie_ref_m2ldo_ck>,
-+					 <&optfclk_pciephy_32khz>,
-+					 <&optfclk_pciephy_clk>,
-+					 <&optfclk_pciephy_div_clk>,
-+					 <&optfclk_pciephy_div>;
-+				clock-names = "dpll_ref", "dpll_ref_m2",
-+					      "wkupclk", "refclk",
-+					      "div-clk", "phy-div";
-+				#phy-cells = <0>;
-+				ti,hwmods = "pcie1-phy";
-+			};
- 		};
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 46f8c53..352f252 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -86,6 +86,8 @@ config SOC_DRA7XX
+ 	select HAVE_SMP
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select IRQ_CROSSBAR
++	select MIGHT_HAVE_PCI
++	select ARCH_SUPPORTS_MSI
  
- 		sata: sata at 4a141100 {
+ config ARCH_OMAP2PLUS
+ 	bool
 -- 
 1.7.9.5
