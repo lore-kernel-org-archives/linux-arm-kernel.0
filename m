@@ -1,119 +1,95 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Wed, 26 Mar 2014 11:34:41 +0000
-Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <5228683.eofaEcInBi@wuerfel>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <5768554.vihmtytclA@wuerfel>
- <OF5271824A.6BF6DD0C-ON80257CA7.003BC04D-80257CA7.003C95A1@eu.necel.com>
- <5228683.eofaEcInBi@wuerfel>
-Message-ID: <OF362EF259.A035C442-ON80257CA7.003E97FF-80257CA7.003F9959@eu.necel.com>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Wed, 26 Mar 2014 17:16:14 +0530
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+Message-ID: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Sonny Rao <sonnyrao@chromium.org>
 
-On: 26/03/2014 11:14, Arnd wrote:
-> Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes 
-for R8A7790
-> 
-> On Wednesday 26 March 2014 11:01:46 Phil.Edworthy at renesas.com wrote:
-> > On: 26/03/2014 10:34, Arnd wrote:
-> > > Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree 
-nodes 
-> > for R8A7790
-> > > 
-> > > On Wednesday 26 March 2014 09:55:04 Phil.Edworthy at renesas.com wrote:
-> > > > Hi Arnd,
-> > > > 
-> > > > On: 25/03/2014 18:42, Arnd wrote:
-> > > > > Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree 
-> > nodes 
-> > > > for R8A7790
-> > > > > 
-> > > > > On Tuesday 25 March 2014 16:56:41 Phil Edworthy wrote:
-> > > > > > +               /* Map all possible DDR as inbound ranges */
-> > > > > > +               dma-ranges = <0x42000000 0 0x40000000 0 
-0x40000000 
-> > 0 
-> > > > 0x80000000
-> > > > > > +                             0x43000000 1 0x80000000 1 
-0x80000000 
-> > 0 
-> > > > 0x80000000>;
-> > > > > 
-> > > > > Typo: 0x43000000 should be 0x42000000 I guess.
-> > > > I used 0x43000000 as this is a 64-bit type. The OF PCI range code 
-> > > > currently treats both 32 and 64-bit types the same way, but I 
-thought 
-> > it 
-> > > > would be good to set this in case we ever need to use it.
-> > > 
-> > > Ah, I forgot about the space identifier. It looks correct then, but
-> > > it seems  a little strange to use a 32-bit identifier in one case
-> > > and a 64-bit one in the other.
-> > 
-> > If the OF PCI range code allowed the PCIe host driver to determine if 
-it's 
-> > a 32-bit mapping, we could use that and get a small performance 
-> > improvement with PCIe throughput.
-> 
-> I don't think it's supposed to care. Soem of the upper bits of the 
-ranges
-> only really make sense of PCI device registers, not for the top-level
-> ranges property. The driver can however still look at the address itself
-> to get that information.
+This patch changes the fifo reset code to follow the reset procedure
+outlined in the documentation of Synopsys  Mobile storage host databook
+7.2.13.
+Without this patch, we could able to see eMMC was not detected after
+multiple reboots due to driver hangs while eMMC tuning for HS200.
 
-Ah, yes that is a possibility.
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
+---
+ drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/dw_mmc.h |    1 +
+ 2 files changed, 48 insertions(+), 1 deletion(-)
 
-
-> > > > Since the OF PCi range code treats both 32 and 64-bit types the 
-same 
-> > way, 
-> > > > my PCIe driver only creates 64-bit mappings. In addition, the PCIe 
-
-> > > > controller has to use a 64-bit mapping for anything over 2GiB. 
-Based 
-> > on 
-> > > > this, I think it's sensible to leave the mappings as 1-to-1.
-> > > 
-> > > I'm not following, sorry. What is the hardware requirement in the
-> > > controller?
-> > With this controller, you can only specify maps whose size are a power 
-of 
-> > two, and the size must be less than or equal to the cpu address 
-alignment. 
-> > Further, when the size is 4GiB, you have to use a 64-bit mapping. 
-Thinking 
-> > about it, the 4GiB case is not relevant to our discussion about 32-bit 
-vs 
-> > 64-bit mappings.
-> 
-> But the ranges you specified in the property don't actually fit in those
-> constraints: you have a range with size 0x8000000 and start 0x40000000,
-> which you say can't be programmed into the hardware.
-
-Actually, the driver checks the dma-ranges against these constraints, and 
-if necessary will create multiple mappings to fulfil the requested 
-dma-ranges.
-
-
-> > Still, my comment about the OF PCI range code treating both 32 and 
-64-bit 
-> > types the same way means that PCIe host driver has to assume it's a 
-64-bit 
-> > mapping.
-> 
-> I was thinking more of PCI devices than the host itself. If the host
-> driver can verify that all mappings are in the first 4GB and cover all 
-of
-> RAM, we won't have to use an swiotlb for devices that don't support 
-64-bit
-> DMA, which is a very significant performance difference.
-Ok, I think I understand. However, all the other PCI host drivers just do 
-1-to-1 mapping between PCI and CPU addresses, right? Whilst it might be 
-nice be able to support mapping CPU addresses > 4GiB to PCI addresses 
-under 4GiB, can that be something to consider later on?
-
-Thanks
-Phil
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 32dd81d..1d77431 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+ 		host->sg = NULL;
+ 	}
+ 
+-	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
++	/*
++	 * The recommended method for resetting is to always reset the
++	 * controller and the fifo, but differs slightly depending on the mode.
++	 * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
++	 */
++	if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
++		unsigned long timeout = jiffies + msecs_to_jiffies(500);
++		u32 status, rint;
++
++		/* if using dma we wait for dma_req to clear */
++		if (host->using_dma) {
++			do {
++				status = mci_readl(host, STATUS);
++				if (!(status & SDMMC_STATUS_DMA_REQ))
++					break;
++				cpu_relax();
++			} while (time_before(jiffies, timeout));
++
++			if (status & SDMMC_STATUS_DMA_REQ)
++				dev_err(host->dev,
++					"%s: Timeout waiting for dma_req to "
++					"clear during reset", __func__);
++
++			/* when using DMA next we reset the fifo again */
++			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
++		}
++		/*
++		 * In all cases we clear the RAWINTS register to clear any
++		 * interrupts.
++		 */
++		rint = mci_readl(host, RINTSTS);
++		rint = rint & (~mci_readl(host, MINTSTS));
++		if (rint)
++			mci_writel(host, RINTSTS, rint);
++
++	} else
++		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
++
++ #ifdef CONFIG_MMC_DW_IDMAC
++	/* It is also recommended that we reset and reprogram idmac */
++	dw_mci_idmac_reset(host);
++ #endif
++
++	/* After a CTRL reset we need to have CIU set clock registers  */
++	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
++
++	return true;
+ }
+ 
+ static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 738fa24..037e47a 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -129,6 +129,7 @@
+ #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
+ /* Status register defines */
+ #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
++#define SDMMC_STATUS_DMA_REQ		BIT(31)
+ /* FIFOTH register defines */
+ #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+ 					 ((r) & 0xFFF) << 16 | \
+-- 
+1.7.10.4
