@@ -1,140 +1,46 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 25 Mar 2014 21:54:00 -0700
-Subject: [RFC PATCH] Remove CONFIG_DCACHE_WORD_ACCESS
-In-Reply-To: <1394570240.4840.48.camel@pasglop>
-References: <1393964591.20435.58.camel@joe-AO722>
- <1394570240.4840.48.camel@pasglop>
-Message-ID: <1395809640.3726.7.camel@joe-AO722>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 26 Mar 2014 14:09:35 +0900
+Subject: [PATCH V2 1/5] ARM: shmobile: r8a7791: add IIC0/1 clock macros
+In-Reply-To: <9236675.ot3B0M2rgc@avalon>
+References: <1394450820-8158-1-git-send-email-wsa@the-dreams.de>
+ <9236675.ot3B0M2rgc@avalon>
+Message-ID: <CANqRtoSYTSZV-wxXBeGWYnPLPGZNL3WEtXgHh1U8CQxAEhx5zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-03-12 at 07:37 +1100, Benjamin Herrenschmidt wrote:
-> On Tue, 2014-03-04 at 12:23 -0800, Joe Perches wrote:
-> > It seems to duplicate CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-> > so use that instead.
-> > 
-> > This changes the !CPU_LITTLE_ENDIAN powerpc arch to use unaligned
-> > accesses in fs/dcache.c and fs/namei.c as
-> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is enabled for that arch.
-> > 
-> > Remove the now unused DCACHE_WORD_ACCESS defines & uses.
-> 
-> Interesting.. we have word-at-a-time but we never enabled
-> DCACHE_WORD_ACCESS, I wonder why that is. In fact, we should
-> probably do it for LE as well for P8 if we can make a P8
-> only config option...
-> 
-> Anton, what do you reckon here ?
+Hi Simon, Wolfram, Laurent, everyone,
 
-Anton, do you have an opinion here?
+On Mon, Mar 10, 2014 at 8:36 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Wolfram,
+>
+> Thank you for the patches.
+>
+> For the whole series,
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> Cheers,
-> Ben.
-> 
-> > Signed-off-by: Joe Perches <joe@perches.com>
-> > ---
-> >  arch/arm/Kconfig                      | 1 -
-> >  arch/arm/include/asm/word-at-a-time.h | 4 ++--
-> >  arch/arm64/Kconfig                    | 1 -
-> >  arch/x86/Kconfig                      | 1 -
-> >  fs/Kconfig                            | 4 ----
-> >  fs/dcache.c                           | 2 +-
-> >  fs/namei.c                            | 2 +-
-> >  7 files changed, 4 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 623a272..d5a2e60 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -12,7 +12,6 @@ config ARM
-> >  	select BUILDTIME_EXTABLE_SORT if MMU
-> >  	select CLONE_BACKWARDS
-> >  	select CPU_PM if (SUSPEND || CPU_IDLE)
-> > -	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
-> >  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
-> >  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> >  	select GENERIC_IDLE_POLL_SETUP
-> > diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
-> > index a6d0a29..778b2ad 100644
-> > --- a/arch/arm/include/asm/word-at-a-time.h
-> > +++ b/arch/arm/include/asm/word-at-a-time.h
-> > @@ -54,7 +54,7 @@ static inline unsigned long find_zero(unsigned long mask)
-> >  #include <asm-generic/word-at-a-time.h>
-> >  #endif
-> >  
-> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
-> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-> >  
-> >  /*
-> >   * Load an unaligned word from kernel space.
-> > @@ -94,5 +94,5 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
-> >  	return ret;
-> >  }
-> >  
-> > -#endif	/* DCACHE_WORD_ACCESS */
-> > +#endif	/* HAVE_EFFICIENT_UNALIGNED_ACCESS */
-> >  #endif /* __ASM_ARM_WORD_AT_A_TIME_H */
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 764d682..2d6978c 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -13,7 +13,6 @@ config ARM64
-> >  	select CLONE_BACKWARDS
-> >  	select COMMON_CLK
-> >  	select CPU_PM if (SUSPEND || CPU_IDLE)
-> > -	select DCACHE_WORD_ACCESS
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> >  	select GENERIC_IOMAP
-> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> > index abb261e..60cfa073 100644
-> > --- a/arch/x86/Kconfig
-> > +++ b/arch/x86/Kconfig
-> > @@ -98,7 +98,6 @@ config X86
-> >  	select CLKEVT_I8253
-> >  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-> >  	select GENERIC_IOMAP
-> > -	select DCACHE_WORD_ACCESS
-> >  	select GENERIC_SMP_IDLE_THREAD
-> >  	select ARCH_WANT_IPC_PARSE_VERSION if X86_32
-> >  	select HAVE_ARCH_SECCOMP_FILTER
-> > diff --git a/fs/Kconfig b/fs/Kconfig
-> > index 312393f..7511271 100644
-> > --- a/fs/Kconfig
-> > +++ b/fs/Kconfig
-> > @@ -4,10 +4,6 @@
-> >  
-> >  menu "File systems"
-> >  
-> > -# Use unaligned word dcache accesses
-> > -config DCACHE_WORD_ACCESS
-> > -       bool
-> > -
-> >  if BLOCK
-> >  
-> >  source "fs/ext2/Kconfig"
-> > diff --git a/fs/dcache.c b/fs/dcache.c
-> > index 265e0ce..4e3c195 100644
-> > --- a/fs/dcache.c
-> > +++ b/fs/dcache.c
-> > @@ -163,7 +163,7 @@ int proc_nr_dentry(ctl_table *table, int write, void __user *buffer,
-> >   * Compare 2 name strings, return 0 if they match, otherwise non-zero.
-> >   * The strings are both count bytes long, and count is non-zero.
-> >   */
-> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
-> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-> >  
-> >  #include <asm/word-at-a-time.h>
-> >  /*
-> > diff --git a/fs/namei.c b/fs/namei.c
-> > index 385f781..1ee33ca 100644
-> > --- a/fs/namei.c
-> > +++ b/fs/namei.c
-> > @@ -1618,7 +1618,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
-> >   *   the final mask". Again, that could be replaced with a
-> >   *   efficient population count instruction or similar.
-> >   */
-> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
-> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-> >  
-> >  #include <asm/word-at-a-time.h>
+I've now given the patches in this series a spin on top of
+renesas-devel-v3.14-rc8-20140325v2.
+
+To clarify, I can't seem to find any cover letter for this series, so
+instead I will with this email reply to [1/1]. Here is also a list of
+the patches that I believe are part of this series, please correct me
+if I'm wrong:
+
+[PATCH V2 1/5] ARM: shmobile: r8a7791: add IIC0/1 clock macros
+[PATCH V2 2/5] ARM: shmobile: r8a7791: add IIC(B) clocks to dtsi
+[PATCH V2 3/5] ARM: shmobile: r8a7791: add IIC(B) cores to dtsi
+[PATCH V2 4/5] ARM: shmobile: koelsch: make i2c2-pfc node unique
+[PATCH V2 5/5] ARM: shmobile: koelsch: activate i2c6 bus
+
+They all look good to me!
+
+Acked-by: Magnus Damm <damm@opensource.se>
+
+Simon, can you please pick up these changes? I believe there are no
+special dependencies.
+
+Thanks,
+
+/ magnus
