@@ -1,122 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Mar 2014 21:25:33 +0100
-Subject: [PATCH] clk: register fixed-clock only if #clock-cells property
- is present
-In-Reply-To: <CAOMZO5AEry8sJW_+0aJS8ush+sYPPWk9LRU0b8RUUGa-hO_G1A@mail.gmail.com>
-References: <1395858127-18730-1-git-send-email-s.nawrocki@samsung.com>	<CAOMZO5DJPKvha7A-foktsB2dEw9xGXL_++uBXj_3ScAPTXNOkw@mail.gmail.com>	<53333145.4080903@gmail.com>
- <CAOMZO5AEry8sJW_+0aJS8ush+sYPPWk9LRU0b8RUUGa-hO_G1A@mail.gmail.com>
-Message-ID: <533337BD.5070901@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Mar 2014 15:30:23 -0500
+Subject: [PATCH 04/44] ARM: l2c: add helper for L2 cache controller DT IDs
+In-Reply-To: <E1WPLBf-0002bz-9b@rmk-PC.arm.linux.org.uk>
+References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
+ <E1WPLBf-0002bz-9b@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_JsqJNxHsaD13SQEuS7mriVmK+7QhUX-gPqzjU2UXWbF3+eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/2014 21:14, Fabio Estevam wrote:
-> On Wed, Mar 26, 2014 at 4:57 PM, Sylwester Nawrocki
-> <sylvester.nawrocki@gmail.com> wrote:
-> 
->> Perhaps a change as below helps ?
->>
->> From 85ee85e4a92b42442354f3f2454be50c173e1c59 Mon Sep 17 00:00:00 2001
->> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Date: Wed, 26 Mar 2014 20:54:13 +0100
->> Subject: [PATCH] clk: reverse default clk provider initialization order in
->> of_clk_init()
->>
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  drivers/clk/clk.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index fb3c40b..d30809c 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -2608,7 +2608,7 @@ void __init of_clk_init(const struct of_device_id
->> *matches)
->>
->>                 parent->clk_init_cb = match->data;
->>                 parent->np = np;
->> -               list_add(&parent->node, &clk_provider_list);
->> +               list_add_tail(&parent->node, &clk_provider_list);
->>         }
->>
->>         while (!list_empty(&clk_provider_list)) {
-> 
-> Thanks, Sylwester!
-> 
-> This makes my imx6q-wandboard to boot again.
-> 
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-Hi Fabio, Sylwester,
+On Sun, Mar 16, 2014 at 7:13 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Make it easier to declare L2 cache controller DT IDs by using a macro.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/cache-l2x0.c | 23 ++++++++++-------------
+>  1 file changed, 10 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index f9985e5a208c..ac410b21edfb 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -946,20 +946,17 @@ static const struct l2x0_of_data bcm_l2x0_data = {
+>         },
+>  };
+>
+> +#define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
 
-I am happy there was a solution!
+This would useful globally. It probably needs to be without the & in that case.
 
-However, Fabio, could you apply the following patch without the patch
-"clk: reverse default clk provider initialization order in
-of_clk_init()" and then sent me the traces. I would like to be sure
-that there is not any side effect.
+Rob
 
-Thanks!
-
----
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fb3c40b4fbe2..0824cf38f79a 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2558,6 +2558,7 @@ static int parent_ready(struct device_node *np)
-
- 	while (true) {
- 		struct clk *clk = of_clk_get(np, i);
-+		pr_warn("%s: Testing %s \n", __func__, np->name);
-
- 		/* this parent is ready we can check the next one */
- 		if (!IS_ERR(clk)) {
-@@ -2567,8 +2568,10 @@ static int parent_ready(struct device_node *np)
- 		}
-
- 		/* at least one parent is not ready, we exit now */
--		if (PTR_ERR(clk) == -EPROBE_DEFER)
-+		if (PTR_ERR(clk) == -EPROBE_DEFER) {
-+			pr_warn("%s: Not ready \n", __func__);
- 			return 0;
-+		}
-
- 		/*
- 		 * Here we make assumption that the device tree is
-@@ -2578,6 +2581,7 @@ static int parent_ready(struct device_node *np)
- 		 * parent, no need to wait for them, then we can
- 		 * consider their absence as being ready
- 		 */
-+		pr_warn("%s: Ready \n", __func__);
- 		return 1;
- 	}
- }
-@@ -2616,6 +2620,7 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		list_for_each_entry_safe(clk_provider, next,
- 					&clk_provider_list, node) {
- 			if (force || parent_ready(clk_provider->np)) {
-+				pr_warn("%s: Initializing %s \n", __func__, clk_provider->np->name);
- 				clk_provider->clk_init_cb(clk_provider->np);
- 				list_del(&clk_provider->node);
- 				kfree(clk_provider);
-@@ -2629,8 +2634,10 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		 * initialize all the remaining ones unconditionally
- 		 * in case the clock parent was not mandatory
- 		 */
--		if (!is_init_done)
-+		if (!is_init_done) {
-+			pr_warn("%s: Now force the initialization of the remaning clocks\n", __func__);
- 			force = true;
-+		}
-
- 	}
- }
--- 
-1.8.1.2
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>  static const struct of_device_id l2x0_ids[] __initconst = {
+> -       { .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
+> -       { .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
+> -       { .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
+> -       { .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
+> -         .data = (void *)&bcm_l2x0_data},
+> -       { .compatible = "brcm,bcm11351-a2-pl310-cache",
+> -         .data = (void *)&bcm_l2x0_data},
+> -       { .compatible = "marvell,aurora-outer-cache",
+> -         .data = (void *)&aurora_with_outer_data},
+> -       { .compatible = "marvell,aurora-system-cache",
+> -         .data = (void *)&aurora_no_outer_data},
+> -       { .compatible = "marvell,tauros3-cache",
+> -         .data = (void *)&tauros3_data },
+> +       L2C_ID("arm,l210-cache", l2x0_data),
+> +       L2C_ID("arm,l220-cache", l2x0_data),
+> +       L2C_ID("arm,pl310-cache", pl310_data),
+> +       L2C_ID("brcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
+> +       L2C_ID("marvell,aurora-outer-cache", aurora_with_outer_data),
+> +       L2C_ID("marvell,aurora-system-cache", aurora_no_outer_data),
+> +       L2C_ID("marvell,tauros3-cache", tauros3_data),
+> +       /* Deprecated IDs */
+> +       L2C_ID("bcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
+>         {}
+>  };
+>
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
