@@ -1,95 +1,51 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
-Date: Wed, 26 Mar 2014 17:16:14 +0530
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-Message-ID: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 26 Mar 2014 12:52:40 +0100
+Subject: [PATCH v5 03/14] ARM: mvebu: ll_set_cpu_coherent always uses
+ the current CPU
+In-Reply-To: <1395787705-31061-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1395787705-31061-1-git-send-email-gregory.clement@free-electrons.com>
+ <1395787705-31061-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5332BF88.5020401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sonny Rao <sonnyrao@chromium.org>
+On 03/25/2014 11:48 PM, Gregory CLEMENT wrote:
+> ll_set_cpu_coherent is always used on the current CPU, so instead of
+> passing the CPU id as argument, ll_set_cpu_coherent() can find it by
+> itself.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+[...]
+> diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+> index 1f2bcd4b5424..6cb26b919787 100644
+> --- a/arch/arm/mach-mvebu/coherency_ll.S
+> +++ b/arch/arm/mach-mvebu/coherency_ll.S
+> @@ -24,9 +24,7 @@
+>   #include <asm/cp15.h>
+>
+>   	.text
+> -/*
+> - * r0: HW CPU id
+> - */
+> +
+>   ENTRY(ll_set_cpu_coherent)
+>   	mrc	p15, 0, r1, c1, c0, 0
+>   	tst	r1, #CR_M @ Check MMU bit enabled
+> @@ -43,9 +41,11 @@ ENTRY(ll_set_cpu_coherent)
+>   	ldr	r0, [r0]
+>   2:
+>   	/* Create bit by cpu index */
+> -	mov	r3, #(1 << 24)
+> -	lsl	r1, r3, r1
+> -ARM_BE8(rev	r1, r1)
+> +	mrc	15, 0, r1, cr0, cr0, 5
+> +	and	r1, r1, #15
+> +	mov	r2, #(1 << 24)
+> +	lsl	r1, r2, r1
+> +	ARM_BE8(rev	r1, r1)
 
-This patch changes the fifo reset code to follow the reset procedure
-outlined in the documentation of Synopsys  Mobile storage host databook
-7.2.13.
-Without this patch, we could able to see eMMC was not detected after
-multiple reboots due to driver hangs while eMMC tuning for HS200.
+nit: re-indent ARM_BE8 to the beginning of the line?
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
----
- drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
- drivers/mmc/host/dw_mmc.h |    1 +
- 2 files changed, 48 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 32dd81d..1d77431 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
- 		host->sg = NULL;
- 	}
- 
--	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-+	/*
-+	 * The recommended method for resetting is to always reset the
-+	 * controller and the fifo, but differs slightly depending on the mode.
-+	 * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
-+	 */
-+	if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
-+		unsigned long timeout = jiffies + msecs_to_jiffies(500);
-+		u32 status, rint;
-+
-+		/* if using dma we wait for dma_req to clear */
-+		if (host->using_dma) {
-+			do {
-+				status = mci_readl(host, STATUS);
-+				if (!(status & SDMMC_STATUS_DMA_REQ))
-+					break;
-+				cpu_relax();
-+			} while (time_before(jiffies, timeout));
-+
-+			if (status & SDMMC_STATUS_DMA_REQ)
-+				dev_err(host->dev,
-+					"%s: Timeout waiting for dma_req to "
-+					"clear during reset", __func__);
-+
-+			/* when using DMA next we reset the fifo again */
-+			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-+		}
-+		/*
-+		 * In all cases we clear the RAWINTS register to clear any
-+		 * interrupts.
-+		 */
-+		rint = mci_readl(host, RINTSTS);
-+		rint = rint & (~mci_readl(host, MINTSTS));
-+		if (rint)
-+			mci_writel(host, RINTSTS, rint);
-+
-+	} else
-+		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
-+
-+ #ifdef CONFIG_MMC_DW_IDMAC
-+	/* It is also recommended that we reset and reprogram idmac */
-+	dw_mci_idmac_reset(host);
-+ #endif
-+
-+	/* After a CTRL reset we need to have CIU set clock registers  */
-+	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-+
-+	return true;
- }
- 
- static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 738fa24..037e47a 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -129,6 +129,7 @@
- #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
- /* Status register defines */
- #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
-+#define SDMMC_STATUS_DMA_REQ		BIT(31)
- /* FIFOTH register defines */
- #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
- 					 ((r) & 0xFFF) << 16 | \
--- 
-1.7.10.4
+Sebastian
