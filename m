@@ -1,49 +1,110 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 26 Mar 2014 14:30:53 +0100
-Subject: [PATCH] ARM: u300: u300_defconfig: Enable PARTITION_ADVANCED
-Message-ID: <1395840653-11518-1-git-send-email-ulf.hansson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Mar 2014 13:48:03 +0000
+Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
+In-Reply-To: <20140326132318.GA30750@linaro.org>
+References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
+ <20140326102317.GA26040@linaro.org>
+ <20140326110141.GY7528@n2100.arm.linux.org.uk>
+ <20140326132318.GA30750@linaro.org>
+Message-ID: <20140326134803.GA7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there are SD-card support in u300, it's reasonable to
-support partitions for block devices as default.
+On Wed, Mar 26, 2014 at 01:23:19PM +0000, Steve Capper wrote:
+> On Wed, Mar 26, 2014 at 11:01:41AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Mar 26, 2014 at 10:23:19AM +0000, Steve Capper wrote:
+> > > If there are no objections, I was going to put the following into
+> > > Russell's patch system:
+> > > 	arm: mm: Double logical invert for pte accessors
+> > > 	arm: mm: Switch back to L_PTE_WRITE
+> > 
+> > I'm not all that happy with double inversions - I think they just serve
+> > to cause confusion (and it was confusing, which is why I removed it.)
+> > I'll only take them if you have a really good reason why you want to
+> > bring it back.
+> 
+> Hi Russell,
+> The problem I'm trying to solve is for LPAE, where we have flags in the
+> upper 32 bits of a page table entry that are tested for with a bitwise
+> and, then subsequently downcast by a store to 32-bit integer:
+> 
+> 	gather_stats(page, md, pte_dirty(*pte), 1);
+> and,
+> 
+> 	static inline unsigned long huge_pte_write(pte_t pte)
+> 	{
+> 		return pte_write(pte);
+> 	}
+> 
+> (and other cases that may arise in future).
 
-While updating the defconfig, we rebase it towards Kconfig changes.
+I think I have already said that these cases should be dealt with by
+ensuring that they return sensible values in such cases.  The official
+return type for pte_write() and pte_dirty() if they aren't a macro is
+"int", and that makes a 64-bit AND operation returning a bit set in
+the high 32-bits incorrect behaviour.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/configs/u300_defconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+So, the return value from all these functions must fit within "int" and
+be of the appropriate true/false indication according to C rules depending
+on the test.
 
-diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
-index fd81a1b..aaa95ab 100644
---- a/arch/arm/configs/u300_defconfig
-+++ b/arch/arm/configs/u300_defconfig
-@@ -11,6 +11,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
- # CONFIG_IOSCHED_CFQ is not set
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_U300=y
-@@ -21,7 +22,6 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=/dev/ram0 rw rootfstype=rootfs console=ttyAMA0,115200n8 lpj=515072"
- CONFIG_CPU_IDLE=y
--CONFIG_FPE_NWFPE=y
- # CONFIG_SUSPEND is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
-@@ -64,8 +64,8 @@ CONFIG_TMPFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_TIMER_STATS=y
- # CONFIG_DEBUG_PREEMPT is not set
--CONFIG_DEBUG_INFO=y
+While we can use the shortcut of doing a 32-bit AND to test a bit in the
+32-bit case, we can't use this with LPAE nor 64-bit PTEs where "int" is
+not 64-bit - in that case, these functions must adjust the value
+appropriately.
+
+> I had tried to create a helper macro, pte_isset, but this didn't attract
+> any positive comments:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235380.html
+
+It imposes overhead for _everyone_ whether they need that overhead or not.
+
+The problem with !!value is that the compiler has to generate more code
+to convert "value" into a one-or-zero in /every/ case, because by doing
+that, you've told the compiler not "I want a true/false" value but "I
+want a one or zero value".  So, what you end up with in the 32-bit case
+is:
+
+	load pte
+	test pte bit
+	set another register to 0 if test was zero
+	set register to 1 if test was non-zero
+	test register for zero or non-zero
+	... do something ...
+
+which is rather inefficient when you're doing that lots of times.  As I
+say, we only need this if the bit being tested is not representable
+within 32-bit.
+
+So, rather than:
+
++#define pte_isset(pte, val)    (!!(pte_val(pte) & (val)))
+
+maybe:
+
+#define pte_isset(pte, val) ((u32)(val) == (val) ? pte_val(pte) & (val) : !!(pte_val(pte) & (val)))
+
+What this says is, if the bit fits within 32-bit, use our existing logic,
+otherwise use the new logic.  Since "val" will always be a constant, the
+compiler should be able to optimise this, completely eliminating one or
+other branches.  It would be worth checking the assembly from the above
+on 32-bit LPAE, because the compiler will probably do a 64-bit test even
+for values which fit in 32-bit - this may create even better code:
+
+#define pte_isset(pte, val) ((u32)(val) == (val) ? (u32)pte_val(pte) & (u32)(val) : !!(pte_val(pte) & (val)))
+
+but again, it needs the assembly read to work out how it behaves.
+
+Also, it may be worth considering a pte_isclear() macro, since we don't
+need the logic in that case - it can just be a plain and simple:
+
+#define pte_isclear(pte, val) (!(pte_val(pte) & (val)))
+
+since we always need the negation.  Again, as per the above, it may be
+better on 32-bit LPAE whether a similar trick here would be worth it -
+there's no point testing both halves of a 64-bit register pair when you
+know that one half is always zero.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
