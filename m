@@ -1,49 +1,47 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 26 Mar 2014 05:36:08 +0000
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Add USB Host1 support
-In-Reply-To: <CAOMZO5Da9poOv8KqCsSxnjs4eZkVbRPCmnJCj-OX3ps8=+y+Ww@mail.gmail.com>
-References: <1395750922-3244-1-git-send-email-festevam@gmail.com>
- <07405bf6fc4841d5b0d22c07c582acb9@BL2PR03MB226.namprd03.prod.outlook.com>
- <CAOMZO5Da9poOv8KqCsSxnjs4eZkVbRPCmnJCj-OX3ps8=+y+Ww@mail.gmail.com>
-Message-ID: <26dd7d7d9b5f481588848b0fdd65fbbb@BL2PR03MB226.namprd03.prod.outlook.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 26 Mar 2014 14:39:06 +0900
+Subject: [PATCH v5 9/9] ARM: koelsch: Add HAVE_ARM_ARCH_TIMER to defconfig
+In-Reply-To: <1395766604-30926-10-git-send-email-phil.edworthy@renesas.com>
+References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
+ <1395766604-30926-10-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <CANqRtoRCK8rLKDuy9kuyES=Y0Ek00BVnzzTdCeTKpPjrxiP7RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 26, 2014 at 1:56 AM, Phil Edworthy
+<phil.edworthy@renesas.com> wrote:
+> This is fixes a boot problem when the R-Car PCIe driver is enabled.
+>
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> ---
+>  arch/arm/configs/koelsch_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+> index ec14547..67666b6 100644
+> --- a/arch/arm/configs/koelsch_defconfig
+> +++ b/arch/arm/configs/koelsch_defconfig
+> @@ -15,6 +15,7 @@ CONFIG_MACH_KOELSCH=y
+>  CONFIG_CPU_BPREDICT_DISABLE=y
+>  CONFIG_PL310_ERRATA_588369=y
+>  CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_HAVE_ARM_ARCH_TIMER=y
 
- 
-> 
-> On Tue, Mar 25, 2014 at 11:00 PM, Peter Chen <Peter.Chen@freescale.com>
-> wrote:
-> 
-> >> +
-> >> +             usbphy1: usbphy at 1 {
-> >> +                     compatible = "usb-nop-xceiv";
-> >> +                     reg = <1>;
-> >> +                     clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-> >> +                     clock-names = "main_clk";
-> >> +             };
-> >>       };
-> >>
-> >
-> > You are using usb nop phy driver (phy-generic.c) for ulpi phy, Are you
-> > sure your phy doesn't need any configurations from viewport?
-> 
-> I am not sure I understood your comment.
-> 
-> This node is the same like we do on mx53 and other i.mx SoCs.
-> 
+Hi Phil,
 
-For imx53, it can work since both usbotg and host 1 use utmi internal phy.
-But for SoCs before than imx53 (including imx51), the host1 uses external
-phy. At non-dt version, they should use ulpi phy driver.
+Thanks for your patches! I appreciate that you send out a whole series
+with broken out patches, that makes it easier to see what is going on.
 
-Peter
+However, regarding this particular patch I'm not so sure if your fix
+is correct. The issue is most likely there, no doubt about that, but
+this "select" does not match well with how we currently handle timers
+for the rest of the SoCs in mach-shmobile. We for instance want to be
+able to boot with CMT only.
 
-> Both USB host and OTG are functional.
-> 
-> Could you please explain your concern?
-> 
-> Regards,
-> 
-> Fabio Estevam
-> 
+So here's a gentle "NAK" on this particular patch. I think this shows
+that either deferred probing or a different init ordering is needed
+somehow.
+
+Thanks,
+
+/ magnus
