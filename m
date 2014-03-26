@@ -1,57 +1,71 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Mar 2014 08:19:39 -0700
-Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <20140321035233.32624.98694@quantum>
-References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
- <531068F4.3060903@free-electrons.com>
- <20140321035233.32624.98694@quantum>
-Message-ID: <CAGa+x85XLDZqCkz9R95d2Vj9eODx4q8W=9QhmMfivdPf2GdsaQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 26 Mar 2014 20:49:54 +0530
+Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for
+ pcie-dra7xx controller
+In-Reply-To: <CAL_JsqKeQvbU24V2-3KQuFoLwkL31DEcEEVDenfTA0P++Hn_fQ@mail.gmail.com>
+References: <1395842272-15267-1-git-send-email-kishon@ti.com>	<1395842272-15267-3-git-send-email-kishon@ti.com>
+ <CAL_JsqKeQvbU24V2-3KQuFoLwkL31DEcEEVDenfTA0P++Hn_fQ@mail.gmail.com>
+Message-ID: <5332F01A.6090307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ imx6 maintainers ]
 
-On Thu, Mar 20, 2014 at 8:52 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Gregory CLEMENT (2014-02-28 02:46:12)
->> Hi Mike,
+
+On Wednesday 26 March 2014 08:15 PM, Rob Herring wrote:
+> On Wed, Mar 26, 2014 at 8:57 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Added support for pcie controller in dra7xx. This driver re-uses
+>> the designware core code that is already present in kernel.
 >>
->> On 24/02/2014 19:10, Gregory CLEMENT wrote:
->> > Until now the clock providers were initialized in the order found in
->> > the device tree. This led to have the dependencies between the clocks
->> > not respected: children clocks could be initialized before their
->> > parent clocks.
->> >
->> > Instead of forcing each platform to manage its own initialization order,
->> > this patch adds this work inside the framework itself.
->> >
->> > Using the data of the device tree the of_clk_init function now delayed
->> > the initialization of a clock provider if its parent provider was not
->> > ready yet.
->> >
->> > The strict dependency check (all parents of a given clk must be
->> > initialized) was added by Boris BREZILLON
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
+>>  drivers/pci/host/Kconfig                         |   10 +
+>>  drivers/pci/host/Makefile                        |    1 +
+>>  drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
+>>  4 files changed, 457 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
+>>  create mode 100644 drivers/pci/host/pcie-dra7xx.c
 >>
->> Are you ok with this version?
->> Will you take it for 3.15?
->> Or maybe you expected that it will be part of a pull request?
->>
->> However as it is modifying the core of the framework I thought that you
->> would take it and apply yourself.
->
-> Hi Gregory,
->
-> I have taken this into clk-next. If no regressions pop up over the next
-> few days then it should go into 3.15.
+>> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+>> new file mode 100644
+>> index 0000000..0528c47
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+>> @@ -0,0 +1,35 @@
+>> +TI PCI Controllers
+>> +
+>> +PCIe Designware Controller
+>> +This node should have the properties described in "designware-pcie.txt".
+>> + - compatible: Should be "ti,dra7xx-pcie""
+>> + - reg : Address and length of the register set for the device.
+>> + - phys : the phandle for the PHY device (used by generic PHY framework)
+>> + - phy-names : the names of the PHY corresponding to the PHYs present in the
+>> +   *phy* phandle.
+>> + - resets: phandle used if reset is handled be soc
+> 
+> s/be/by/ ?
+> 
+>> + - reset-names: name given to the phandle
+>> + - ti,device-type: Should be 1 - EP TYPE, 2 - LEG EP TYPE OR 3 - RC TYPE
+> 
+> I don't think this makes sense. I'd imagine we'd need the binding to
+> look quite a bit different if endpoint mode was actually supported. I
 
-$SUBJECT patch (as commit 1771b10d605) is in -next has been fingered
-by bisection to be the reason behind boot failures[1] on imx6 wand
-boards in the last several -next kernels.
+right, it makes sense to remove the ti,device-type altogether as this driver
+only supports RC.
+> think I would start defining endpoint mode with a different compatible
+> string and go from there.
+> 
+>> +
+>> +Example:
+>> +pcie at 51000000 {
+>> +       compatible = "ti,dra7xx-pcie";
+>> +       reg = <0x51002000 0x14c>, <0x51000000 0x2000>, <0x4A002540 0x1f>, <0x4A003c24 0x4>, <0x4AE07310 0x4>;
+> 
+> This is different number of entries from your actual dts. You need to
+> define how many reg entries, what they are, and the order.
 
-Reverting the patch on top of next/master gets these boards booting again.
+Ok. Will fix it.
 
-The boot failures result in no console output, so I haven't done any
-further debugging.
-
-Kevin
-
-[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002927.html
+Thanks
+Kishon
