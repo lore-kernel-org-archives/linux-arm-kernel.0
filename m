@@ -1,99 +1,39 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 19:27:47 +0530
-Subject: [RFC PATCH 07/12] arm: dra7xx: Add hwmod data for pcie1 and pcie2
- subsystems
+Date: Wed, 26 Mar 2014 19:27:49 +0530
+Subject: [RFC PATCH 09/12] ARM: dts: dra7: Add dt data for PCIe PHY control
+ module
 In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
 References: <1395842272-15267-1-git-send-email-kishon@ti.com>
-Message-ID: <1395842272-15267-8-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-10-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
+Added dt data for PCIe PHY control module used by PCIe PHY.
+The documention for this node can be found @ ../bindings/phy/ti-phy.txt
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   55 +++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 9397265..c789b00 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
- };
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index f3565ac..73c61d0 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -656,6 +656,14 @@
+ 			clock-names = "sysclk";
+ 		};
  
- /*
-+ * 'PCIE' class
-+ *
-+ */
++		omap_control_pcie1phy: omap-control-pciephy at 0x4a003c40 {
++			compatible = "ti,control-phy-pipe3";
++			reg = <0x4a003c40 0x4>;
++			reg-names = "power";
++			clocks = <&sys_clkin1>;
++			clock-names = "sysclk";
++		};
 +
-+static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
-+	.name	= "pcie",
-+};
-+
-+/* pcie1 */
-+static struct omap_hwmod dra7xx_pcie1_hwmod = {
-+	.name		= "pcie1",
-+	.class		= &dra7xx_pcie_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/* pcie2 */
-+static struct omap_hwmod dra7xx_pcie2_hwmod = {
-+	.name		= "pcie2",
-+	.class		= &dra7xx_pcie_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'PCIE PHY' class
-  *
-  */
-@@ -2459,6 +2496,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_cfg -> pcie1 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_cfg -> pcie2 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_cfg -> pcie1 phy */
- static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
- 	.master		= &dra7xx_l4_cfg_hwmod,
-@@ -2824,6 +2877,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_cfg__mpu,
- 	&dra7xx_l4_cfg__ocp2scp1,
- 	&dra7xx_l4_cfg__ocp2scp3,
-+	&dra7xx_l4_cfg__pcie1,
-+	&dra7xx_l4_cfg__pcie2,
- 	&dra7xx_l4_cfg__pcie1_phy,
- 	&dra7xx_l4_cfg__pcie2_phy,
- 	&dra7xx_l3_main_1__qspi,
+ 		/* OCP2SCP3 */
+ 		ocp2scp at 4a090000 {
+ 			compatible = "ti,omap-ocp2scp";
 -- 
 1.7.9.5
