@@ -1,135 +1,218 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 19:27:46 +0530
-Subject: [RFC PATCH 06/12] arm: dra7xx: Add hwmod data for pcie1 phy and pcie2
- phy
+Date: Wed, 26 Mar 2014 19:27:41 +0530
+Subject: [RFC PATCH 01/12] phy: phy-omap-pipe3: Add support for PCIe PHY
 In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
 References: <1395842272-15267-1-git-send-email-kishon@ti.com>
-Message-ID: <1395842272-15267-7-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added hwmod data for pcie1 and pcie2 phy present in DRA7xx SOC.
-Also added the missing CLKCTRL OFFSET macro and CONTEXT OFFSET macro
-for pcie1 phy and pcie2 phy.
+PCIe PHY uses an external pll instead of the internal pll used by SATA
+and USB3. So added support in pipe3 PHY to use external pll
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/cm2_7xx.h             |    4 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   57 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm7xx.h              |    4 ++
- 3 files changed, 65 insertions(+)
+ Documentation/devicetree/bindings/phy/ti-phy.txt |    8 +-
+ drivers/phy/phy-ti-pipe3.c                       |   99 +++++++++++++++++-----
+ 2 files changed, 84 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2_7xx.h b/arch/arm/mach-omap2/cm2_7xx.h
-index 9ad7594..e966e3a 100644
---- a/arch/arm/mach-omap2/cm2_7xx.h
-+++ b/arch/arm/mach-omap2/cm2_7xx.h
-@@ -357,6 +357,10 @@
- #define DRA7XX_CM_L3INIT_SATA_CLKCTRL				DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x0088)
- #define DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET				0x00a0
- #define DRA7XX_CM_PCIE_STATICDEP_OFFSET				0x00a4
-+#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET			0x00b0
-+#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b0)
-+#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET			0x00b8
-+#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b8)
- #define DRA7XX_CM_GMAC_CLKSTCTRL_OFFSET				0x00c0
- #define DRA7XX_CM_GMAC_STATICDEP_OFFSET				0x00c4
- #define DRA7XX_CM_GMAC_DYNAMICDEP_OFFSET			0x00c8
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index befe7ce..9397265 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1290,6 +1290,45 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+index 788fb0f..e628a23 100644
+--- a/Documentation/devicetree/bindings/phy/ti-phy.txt
++++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+@@ -49,8 +49,8 @@ usb2phy at 4a0ad080 {
+ TI PIPE3 PHY
+ 
+ Required properties:
+- - compatible: Should be "ti,phy-usb3" or "ti,phy-pipe3-sata".
+-   "ti,omap-usb3" is deprecated.
++ - compatible: Should be "ti,phy-usb3", "ti,phy-pipe3-sata" or
++   "ti,phy-pipe3-pcie. "ti,omap-usb3" is deprecated.
+  - reg : Address and length of the register set for the device.
+  - reg-names: The names of the register addresses corresponding to the registers
+    filled in "reg".
+@@ -62,6 +62,10 @@ Required properties:
+    * "wkupclk" - wakeup clock.
+    * "sysclk" - system clock.
+    * "refclk" - reference clock.
++   * "dpll_ref" - external dpll ref clk
++   * "dpll_ref_m2" - external dpll ref clk
++   * "phy-div" - divider for apll
++   * "div-clk" - apll clock
+ 
+ Optional properties:
+  - ctrl-module : phandle of the control module used by PHY driver to power on
+diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+index 5913676..d43019d 100644
+--- a/drivers/phy/phy-ti-pipe3.c
++++ b/drivers/phy/phy-ti-pipe3.c
+@@ -80,6 +80,7 @@ struct ti_pipe3 {
+ 	struct clk		*wkupclk;
+ 	struct clk		*sys_clk;
+ 	struct clk		*refclk;
++	struct clk		*div_clk;
+ 	struct pipe3_dpll_map	*dpll_map;
  };
  
- /*
-+ * 'PCIE PHY' class
-+ *
-+ */
-+
-+static struct omap_hwmod_class dra7xx_pcie_phy_hwmod_class = {
-+	.name	= "pcie-phy",
-+};
-+
-+/* pcie1 phy */
-+static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
-+	.name		= "pcie1-phy",
-+	.class		= &dra7xx_pcie_phy_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/* pcie2 phy */
-+static struct omap_hwmod dra7xx_pcie2_phy_hwmod = {
-+	.name		= "pcie2-phy",
-+	.class		= &dra7xx_pcie_phy_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'qspi' class
-  *
-  */
-@@ -2420,6 +2459,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+@@ -215,6 +216,9 @@ static int ti_pipe3_init(struct phy *x)
+ 	u32 val;
+ 	int ret = 0;
  
-+/* l4_cfg -> pcie1 phy */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie1_phy_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
++	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
++		return 0;
 +
-+/* l4_cfg -> pcie2 phy */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2_phy = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie2_phy_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
+ 	/* Bring it out of IDLE if it is IDLE */
+ 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+ 	if (val & PLL_IDLE) {
+@@ -238,8 +242,11 @@ static int ti_pipe3_exit(struct phy *x)
+ 	u32 val;
+ 	unsigned long timeout;
+ 
+-	/* SATA DPLL can't be powered down due to Errata i783 */
+-	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata"))
++	/* SATA DPLL can't be powered down due to Errata i783 and PCIe
++	 * does not have internal DPLL
++	 */
++	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata") ||
++	    of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
+ 		return 0;
+ 
+ 	/* Put DPLL in IDLE mode */
+@@ -286,32 +293,41 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 	struct device_node *control_node;
+ 	struct platform_device *control_pdev;
+ 	const struct of_device_id *match;
+-
+-	match = of_match_device(of_match_ptr(ti_pipe3_id_table), &pdev->dev);
+-	if (!match)
+-		return -EINVAL;
++	struct clk *clk;
+ 
+ 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+ 	if (!phy) {
+ 		dev_err(&pdev->dev, "unable to alloc mem for TI PIPE3 PHY\n");
+ 		return -ENOMEM;
+ 	}
++	phy->dev		= &pdev->dev;
+ 
+-	phy->dpll_map = (struct pipe3_dpll_map *)match->data;
+-	if (!phy->dpll_map) {
+-		dev_err(&pdev->dev, "no DPLL data\n");
+-		return -EINVAL;
+-	}
++	if (!of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
++		match = of_match_device(of_match_ptr(ti_pipe3_id_table),
++					&pdev->dev);
++		if (!match)
++			return -EINVAL;
+ 
+-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pll_ctrl");
+-	phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(phy->pll_ctrl_base))
+-		return PTR_ERR(phy->pll_ctrl_base);
++		phy->dpll_map = (struct pipe3_dpll_map *)match->data;
++		if (!phy->dpll_map) {
++			dev_err(&pdev->dev, "no DPLL data\n");
++			return -EINVAL;
++		}
+ 
+-	phy->dev		= &pdev->dev;
++		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++						   "pll_ctrl");
++		phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
++		if (IS_ERR(phy->pll_ctrl_base))
++			return PTR_ERR(phy->pll_ctrl_base);
+ 
+-	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
++		phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
++		if (IS_ERR(phy->sys_clk)) {
++			dev_err(&pdev->dev, "unable to get sysclk\n");
++			return -EINVAL;
++		}
++	}
+ 
++	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
+ 		phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
+ 		if (IS_ERR(phy->wkupclk)) {
+ 			dev_err(&pdev->dev, "unable to get wkupclk\n");
+@@ -328,10 +344,35 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 		phy->refclk = ERR_PTR(-ENODEV);
+ 	}
+ 
+-	phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
+-	if (IS_ERR(phy->sys_clk)) {
+-		dev_err(&pdev->dev, "unable to get sysclk\n");
+-		return -EINVAL;
++	if (of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
++		clk = devm_clk_get(phy->dev, "dpll_ref");
++		if (IS_ERR(clk)) {
++			dev_err(&pdev->dev, "unable to get dpll ref clk\n");
++			return PTR_ERR(clk);
++		}
++		clk_set_rate(clk, 1500000000);
 +
- static struct omap_hwmod_addr_space dra7xx_qspi_addrs[] = {
- 	{
- 		.pa_start	= 0x4b300000,
-@@ -2769,6 +2824,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_cfg__mpu,
- 	&dra7xx_l4_cfg__ocp2scp1,
- 	&dra7xx_l4_cfg__ocp2scp3,
-+	&dra7xx_l4_cfg__pcie1_phy,
-+	&dra7xx_l4_cfg__pcie2_phy,
- 	&dra7xx_l3_main_1__qspi,
- 	&dra7xx_l4_cfg__sata,
- 	&dra7xx_l4_cfg__smartreflex_core,
-diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
-index d92a840..4bb50fbf 100644
---- a/arch/arm/mach-omap2/prm7xx.h
-+++ b/arch/arm/mach-omap2/prm7xx.h
-@@ -374,6 +374,10 @@
- #define DRA7XX_RM_L3INIT_IEEE1500_2_OCP_CONTEXT_OFFSET		0x007c
- #define DRA7XX_PM_L3INIT_SATA_WKDEP_OFFSET			0x0088
- #define DRA7XX_RM_L3INIT_SATA_CONTEXT_OFFSET			0x008c
-+#define DRA7XX_PM_L3INIT_PCIESS1_WKDEP_OFFSET			0x00b0
-+#define DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET		0x00b4
-+#define DRA7XX_PM_L3INIT_PCIESS2_WKDEP_OFFSET			0x00b8
-+#define DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET		0x00bc
- #define DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET			0x00d4
- #define DRA7XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET		0x00e4
- #define DRA7XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET		0x00ec
++		clk = devm_clk_get(phy->dev, "dpll_ref_m2");
++		if (IS_ERR(clk)) {
++			dev_err(&pdev->dev, "unable to get dpll ref m2 clk\n");
++			return PTR_ERR(clk);
++		}
++		clk_set_rate(clk, 100000000);
++
++		clk = devm_clk_get(phy->dev, "phy-div");
++		if (IS_ERR(clk)) {
++			dev_err(&pdev->dev, "unable to get phy-div clk\n");
++			return PTR_ERR(clk);
++		}
++		clk_set_rate(clk, 100000000);
++
++		phy->div_clk = devm_clk_get(phy->dev, "div-clk");
++		if (IS_ERR(phy->div_clk)) {
++			dev_err(&pdev->dev, "unable to get div-clk\n");
++			return PTR_ERR(phy->div_clk);
++		}
++	} else {
++		phy->div_clk = ERR_PTR(-ENODEV);
+ 	}
+ 
+ 	control_node = of_parse_phandle(node, "ctrl-module", 0);
+@@ -387,6 +428,8 @@ static int ti_pipe3_runtime_suspend(struct device *dev)
+ 		clk_disable_unprepare(phy->wkupclk);
+ 	if (!IS_ERR(phy->refclk))
+ 		clk_disable_unprepare(phy->refclk);
++	if (!IS_ERR(phy->div_clk))
++		clk_disable_unprepare(phy->div_clk);
+ 
+ 	return 0;
+ }
+@@ -412,8 +455,19 @@ static int ti_pipe3_runtime_resume(struct device *dev)
+ 		}
+ 	}
+ 
++	if (!IS_ERR(phy->div_clk)) {
++		ret = clk_prepare_enable(phy->div_clk);
++		if (ret) {
++			dev_err(phy->dev, "Failed to enable div_clk %d\n", ret);
++			goto err3;
++		}
++	}
+ 	return 0;
+ 
++err3:
++	if (!IS_ERR(phy->wkupclk))
++		clk_disable_unprepare(phy->wkupclk);
++
+ err2:
+ 	if (!IS_ERR(phy->refclk))
+ 		clk_disable_unprepare(phy->refclk);
+@@ -446,6 +500,9 @@ static const struct of_device_id ti_pipe3_id_table[] = {
+ 		.compatible = "ti,phy-pipe3-sata",
+ 		.data = dpll_map_sata,
+ 	},
++	{
++		.compatible = "ti,phy-pipe3-pcie",
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, ti_pipe3_id_table);
 -- 
 1.7.9.5
