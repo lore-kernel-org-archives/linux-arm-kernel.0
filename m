@@ -1,63 +1,18 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 26 Mar 2014 15:35:24 -0500
-Subject: [PATCH 39/44] ARM: l2c: highbank: implement new write_sec method
-In-Reply-To: <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
-References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
- <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+9at=D5nnZdBLwRq5RVx8NbHnJuvvYLZzsrBmKwwzVvg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 26 Mar 2014 16:53:37 -0400 (EDT)
+Subject: [PATCH 0/2] net: mvneta: fix usage as a module
+In-Reply-To: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140326.165337.1180144527449449235.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 16, 2014 at 7:16 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> With the write_sec method, we no longer need to override the default L2C
-> disable method.  This can be handled via the write_sec method instead.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Wed, 26 Mar 2014 00:25:40 +0100
 
-Acked-by: Rob Herring <robh@kernel.org>
+> The following set of two patches fix the usage of the mvneta driver
+> when built as a module, and used in RGMII configurations. It is
+> somewhat similar to a previous fix that was made by Arnaud Patard, but
+> which was limited to SGMII configurations.
 
-> ---
->  arch/arm/mach-highbank/highbank.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> index c7de89b263dd..d6b803594358 100644
-> --- a/arch/arm/mach-highbank/highbank.c
-> +++ b/arch/arm/mach-highbank/highbank.c
-> @@ -51,11 +51,13 @@ static void __init highbank_scu_map_io(void)
->  }
->
->
-> -static void highbank_l2x0_disable(void)
-> +static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
->  {
-> -       outer_flush_all();
-> -       /* Disable PL310 L2 Cache controller */
-> -       highbank_smc1(0x102, 0x0);
-> +       if (reg == L2X0_CTRL)
-> +               highbank_smc1(0x102, val);
-> +       else
-> +               WARN_ONCE(1, "Highbank L2C310: ignoring write to reg 0x%x\n",
-> +                         reg);
->  }
->
->  static void __init highbank_init_irq(void)
-> @@ -69,8 +71,8 @@ static void __init highbank_init_irq(void)
->         if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
->             of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
->                 highbank_smc1(0x102, 0x1);
-> +               outer_cache.write_sec = highbank_l2x0_write_sec;
->                 l2x0_of_init(0, ~0UL);
-> -               outer_cache.disable = highbank_l2x0_disable;
->         }
->  }
->
-> --
-> 1.8.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Series applied, thanks.
