@@ -1,84 +1,87 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Wed, 26 Mar 2014 07:15:55 +0000
-Subject: [RFC 08/47] mtd: nand: stm_nand_bch: supply clock support
-In-Reply-To: <1395735604-26706-9-git-send-email-lee.jones@linaro.org>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAB5BD9@DBDE04.ent.ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 26 Mar 2014 08:26:27 +0100
+Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <8984936f9e914442995d79039543cb58@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
+ <201403260726.36812.marex@denx.de>
+ <8984936f9e914442995d79039543cb58@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <201403260826.28114.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Lee Jones [mailto:lee.jones at linaro.org]
->
->Add support for clocks when, and only when, they are supplied. It is
->not yet compulsory to provide the BCH and EMI clocks, as Common Clk isn't
->supported Mainline yet. Until an implementation lands upstream all clocks
->located on STM boards default to always-on.
->
-Good to put this information in comments tagged with "FixMe" at relevant place in the code.
+On Wednesday, March 26, 2014 at 08:08:28 AM, Yao Yuan wrote:
+> On Wednesday, March 26, 2014 at 02:27:46 PM, Marek Vasut wrote:
+> > On Wednesday, March 26, 2014 at 06:56:34 AM, Yao Yuan wrote:
+> > > On Wednesday, March 26, 2014 at 11:43:27 AM, Marek Vasut wrote:
+> > > > On Wednesday, March 26, 2014 at 04:08:27 AM, Yao Yuan wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > > > +		i2c_imx->use_dma = false;
+> > > > > > > +	} else if (i2c_imx_dma_request(i2c_imx,
+> > > > > > > +(dma_addr_t)phy_addr))
+> > > > 
+> > > > {
+> > > > 
+> > > > > > > +		dev_info(&pdev->dev,
+> > > > > > > +				"can't request dma chan, faild use dma.
+> > 
+> > \n");
+> > 
+> > > > > > > +		i2c_imx->use_dma = false;
+> > > > > > > +	} else {
+> > > > > > > +		i2c_imx->use_dma = true;
+> > > > > > > +	}
+> > > > > > 
+> > > > > > Can you not just check if i2c_imx->dma is valid pointer or NULL
+> > > > 
+> > > > pointer ?
+> > > > 
+> > > > > > Then you won't need a separate variable, for this purpose ...
+> > 
+> > right ?
+> > 
+> > > > > Sorry and I think what I know is just to check whether it is NULL.
+> > > > > Then for the second question, maybe there are some other ways, But
+> > > > > I think it is more tidy and easier understanding for using a
+> > > > > separate variable, for this purpose.
+> > > > 
+> > > > You are just wasting space and duplicating data, unless I am wrong.
+> > > 
+> > > Well, Do you have a better idea? Although I think it's necessary.
+> > 
+> > I think we disconnected here, sorry. Why can you not use (i2c_imx->dma !=
+> > NULL) instead of (i2c_imx->use_dma == true) please ?
+> 
+> But there are two judge conditions. But only the "i2c_imx->dma", but also
+> whether "i2c_imx_dma_request" success.
+> 
+> "i2c_imx->use_dma == true" be equivalent to "i2c_imx->dma != NULL &&
+> !i2c_imx_dma_request()"
 
->Signed-off-by: Lee Jones <lee.jones@linaro.org>
->---
-> drivers/mtd/nand/stm_nand_bch.c | 49 +++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 49 insertions(+)
->
->diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
->index 1a93f8d..cc0159e 100644
->--- a/drivers/mtd/nand/stm_nand_bch.c
->+++ b/drivers/mtd/nand/stm_nand_bch.c
->@@ -16,6 +16,7 @@
-> #include <linux/module.h>
-> #include <linux/delay.h>
-> #include <linux/io.h>
->+#include <linux/clk.h>
-> #include <linux/interrupt.h>
-> #include <linux/device.h>
-> #include <linux/platform_device.h>
->@@ -28,6 +29,9 @@
-> struct nandi_controller {
-> 	void __iomem		*base;		/* Controller base*/
-> 	void __iomem		*dma;		/* DMA control base */
->+
->+	struct clk		*bch_clk;
->+	struct clk		*emi_clk;
-> 						/* IRQ-triggered Completions: */
-> 	struct completion	seq_completed;	/*   SEQ Over */
-> 	struct completion	rbn_completed;	/*   RBn */
->@@ -103,6 +107,44 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
-> 	writel(val, nandi->base + NANDBCH_INT_EN);
-> }
->
->+static void nandi_clk_enable(struct nandi_controller *nandi)
->+{
->+	if (nandi->emi_clk)
->+		clk_prepare_enable(nandi->emi_clk);
->+	if (nandi->bch_clk)
->+		clk_prepare_enable(nandi->bch_clk);
->+}
->+
-You are using nandi_clk_enable() only in your PM patch.
-So better introduce above functions there ..
-	[RFC 11/47] mtd: nand: stm_nand_bch: add Power Management
++       /* Init DMA config if support*/
++       i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
++                                       GFP_KERNEL);
++       if (!i2c_imx->dma) {
++               dev_info(&pdev->dev,
++                               "can't allocate dma struct faild use dma.\n");
++               i2c_imx->use_dma = false;
++       } else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr)) {
++               dev_info(&pdev->dev,
++                               "can't request dma chan, faild use dma.\n");
++               i2c_imx->use_dma = false;
++       } else {
++               i2c_imx->use_dma = true;
++       }
 
-Also, you have some un-related comment changes for nandi_clk_enable()
-in below patch. All that can be merges into single one.
-	[RFC 14/47] mtd: nand: stm_nand_bch: configure BCH and FLEX by ONFI timing mode
+OK, looking at this one more time, why don't you wrap the allocation of i2c_imx-
+>dma into i2c_imx_dma_request() ? Even better, you can allocate *dma as a local 
+variable in i2c_imx_dma_request() and then assign it into i2c_imx->dma only at 
+the end of the i2c_imx_dma_request() function , at the point where you are sure 
+nothing failed. Then you can check i2c_imx->dma != NULL throughout the code to 
+check if the DMA is available, no ?
 
+Shawn, Wolfram, am I talking nonsense or am I just not connecting ?
 
->+static void nandi_clk_disable(struct nandi_controller *nandi)
->+{
->+	if (nandi->emi_clk)
->+		clk_disable_unprepare(nandi->emi_clk);
->+	if (nandi->bch_clk)
->+		clk_disable_unprepare(nandi->bch_clk);
->+}
->+
-same, please move this to
-	[RFC 11/47] mtd: nand: stm_nand_bch: add Power Management
-
-Also as Ezequiel suggested.
-You can trim down the number of patches by submitting only the main portion
-of driver first. PM other features can be added as separate patch-set.
-
-
-with regards, pekon
+Best regards,
+Marek Vasut
