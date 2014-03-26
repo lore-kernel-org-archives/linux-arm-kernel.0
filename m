@@ -1,40 +1,26 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Wed, 26 Mar 2014 08:54:44 +0000
-Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <20140325210319.GE27673@verge.net.au>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <1395766604-30926-7-git-send-email-phil.edworthy@renesas.com>
- <20140325210319.GE27673@verge.net.au>
-Message-ID: <OF088BE275.2B86FE6F-ON80257CA7.0030CD8C-80257CA7.0030F45E@eu.necel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 26 Mar 2014 10:05:18 +0100
+Subject: [PATCH 0/2] ARM: mvebu: add a clock for mdio nodes on Armada
+ 370/38x/XP
+In-Reply-To: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140326090518.GB25349@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, Mar 26, 2014 at 12:33:57AM +0100, Thomas Petazzoni wrote:
+> Jason, Andrew, Gregory, Sebastian,
+> 
+> Here is a set of two patches that add a clock specification to the
+> mdio node on Armada 370/XP and Armada 38x. This allows the mvmdio
+> driver to work properly when loaded as a module, before mvneta is
+> loaded.
+> 
+> I've separated the Armada 370/XP and Armada 38x fixes in two patches,
+> because the Armada 370/XP fix should be pushed to stable, while the
+> Armada 38x does not need to be pushed to stable since Armada 38x
+> support only appears in 3.15.
 
-On: 25/03/2014 21:03, Simon wrote:
-> Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes 
-for R8A7790
-> 
-> On Tue, Mar 25, 2014 at 04:56:41PM +0000, Phil Edworthy wrote:
-> > This patch adds the device tree nodes for R8A7790
-> > 
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> 
-> Please split this patch into two patches.
-> 
-> 1. A patch that updates arch/arm/boot/dts/r8a7790.dtsi
-> 
->    I suggest calling that patch
->    "ARM: shmobile: r8a7791: Add PCI device nodes"
-> 
-> 2. A patch that updates arch/arm/boot/dts/r8a7790-lager.dts
-> 
->    I suggest calling that patch
->    "ARM: shmobile: lager: Add PCI device nodes"
-> 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-For this, and your other comments, will do!
-
-Thanks
-Phil
+	  Andrew
