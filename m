@@ -1,87 +1,164 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Wed, 26 Mar 2014 11:01:46 +0000
-Subject: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes for
- R8A7790
-In-Reply-To: <5768554.vihmtytclA@wuerfel>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>
- <14997425.EPjrKhVy10@wuerfel>
- <OF61E4A09E.4D57F668-ON80257CA7.0035A569-80257CA7.00367A70@eu.necel.com>
- <5768554.vihmtytclA@wuerfel>
-Message-ID: <OF5271824A.6BF6DD0C-ON80257CA7.003BC04D-80257CA7.003C95A1@eu.necel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Mar 2014 12:03:16 +0100
+Subject: [PATCH 2/2] ARM: clps711x: Switch CLPS711X subarch to use cpuidle
+ driver
+In-Reply-To: <1395467076-29462-2-git-send-email-shc_work@mail.ru>
+References: <1395467076-29462-1-git-send-email-shc_work@mail.ru>
+ <1395467076-29462-2-git-send-email-shc_work@mail.ru>
+Message-ID: <5332B3F4.4010408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 03/22/2014 06:44 AM, Alexander Shiyan wrote:
+> This patch removes old support for cpuidle and switches all current
+> users to use new cpuidle driver.
+>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-On: 26/03/2014 10:34, Arnd wrote:
-> Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree nodes 
-for R8A7790
-> 
-> On Wednesday 26 March 2014 09:55:04 Phil.Edworthy at renesas.com wrote:
-> > Hi Arnd,
-> > 
-> > On: 25/03/2014 18:42, Arnd wrote:
-> > > Subject: Re: [PATCH v5 6/9] ARM: shmobile: Add PCIe device tree 
-nodes 
-> > for R8A7790
-> > > 
-> > > On Tuesday 25 March 2014 16:56:41 Phil Edworthy wrote:
-> > > > +               /* Map all possible DDR as inbound ranges */
-> > > > +               dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 
-0 
-> > 0x80000000
-> > > > +                             0x43000000 1 0x80000000 1 0x80000000 
-0 
-> > 0x80000000>;
-> > > 
-> > > Typo: 0x43000000 should be 0x42000000 I guess.
-> > I used 0x43000000 as this is a 64-bit type. The OF PCI range code 
-> > currently treats both 32 and 64-bit types the same way, but I thought 
-it 
-> > would be good to set this in case we ever need to use it.
-> 
-> Ah, I forgot about the space identifier. It looks correct then, but
-> it seems  a little strange to use a 32-bit identifier in one case
-> and a 64-bit one in the other.
+Hi Alexander,
 
-If the OF PCI range code allowed the PCIe host driver to determine if it's 
-a 32-bit mapping, we could use that and get a small performance 
-improvement with PCIe throughput.
-
-> > > Since you control the mapping, I wonder if you could also do this as
-> > > 
-> > >                dma-ranges = <0x42000000 0 0x00000000 0 0x40000000 0 
-> > 0x80000000
-> > >                              0x43000000 0 0x80000000 1 0x80000000 0 
-> > 0x80000000>;
-> > > 
-> > > i.e. map all the RAM into PCI bus addresses below the 32-bit 
-boundary.
-> > > This would be really nice from the perspective that now all PCI
-> > > devices could access all of RAM without using an IOMMU or the
-> > > relying on 64-bit master capability.
-> > > 
-> > > The downside of this is that you'd probably need a custom 
-dma_map_ops
-> > > wrapper.
-> > Since the OF PCi range code treats both 32 and 64-bit types the same 
-way, 
-> > my PCIe driver only creates 64-bit mappings. In addition, the PCIe 
-> > controller has to use a 64-bit mapping for anything over 2GiB. Based 
-on 
-> > this, I think it's sensible to leave the mappings as 1-to-1.
-> 
-> I'm not following, sorry. What is the hardware requirement in the
-> controller?
-With this controller, you can only specify maps whose size are a power of 
-two, and the size must be less than or equal to the cpu address alignment. 
-Further, when the size is 4GiB, you have to use a 64-bit mapping. Thinking 
-about it, the 4GiB case is not relevant to our discussion about 32-bit vs 
-64-bit mappings.
-
-Still, my comment about the OF PCI range code treating both 32 and 64-bit 
-types the same way means that PCIe host driver has to assume it's a 64-bit 
-mapping.
+this patch does not apply. Could you respin it against 3.14-rc8.
 
 Thanks
-Phil
+   -- Daniel
+
+> ---
+>   arch/arm/mach-clps711x/board-autcpu12.c |  1 -
+>   arch/arm/mach-clps711x/board-cdb89712.c |  1 -
+>   arch/arm/mach-clps711x/board-clep7312.c |  1 -
+>   arch/arm/mach-clps711x/board-edb7211.c  |  1 -
+>   arch/arm/mach-clps711x/board-p720t.c    |  1 -
+>   arch/arm/mach-clps711x/common.c         | 12 ------------
+>   arch/arm/mach-clps711x/common.h         |  1 -
+>   arch/arm/mach-clps711x/devices.c        | 10 ++++++++++
+>   8 files changed, 10 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+> index d62ca16..45abf6b 100644
+> --- a/arch/arm/mach-clps711x/board-autcpu12.c
+> +++ b/arch/arm/mach-clps711x/board-autcpu12.c
+> @@ -266,7 +266,6 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
+>   	/* Maintainer: Thomas Gleixner */
+>   	.atag_offset	= 0x20000,
+>   	.map_io		= clps711x_map_io,
+> -	.init_early	= clps711x_init_early,
+>   	.init_irq	= clps711x_init_irq,
+>   	.init_time	= clps711x_timer_init,
+>   	.init_machine	= autcpu12_init,
+> diff --git a/arch/arm/mach-clps711x/board-cdb89712.c b/arch/arm/mach-clps711x/board-cdb89712.c
+> index e261a47..1ec378c 100644
+> --- a/arch/arm/mach-clps711x/board-cdb89712.c
+> +++ b/arch/arm/mach-clps711x/board-cdb89712.c
+> @@ -140,7 +140,6 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+>   	/* Maintainer: Ray Lehtiniemi */
+>   	.atag_offset	= 0x100,
+>   	.map_io		= clps711x_map_io,
+> -	.init_early	= clps711x_init_early,
+>   	.init_irq	= clps711x_init_irq,
+>   	.init_time	= clps711x_timer_init,
+>   	.init_machine	= cdb89712_init,
+> diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
+> index 221b9de..1f3b403 100644
+> --- a/arch/arm/mach-clps711x/board-clep7312.c
+> +++ b/arch/arm/mach-clps711x/board-clep7312.c
+> @@ -38,7 +38,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+>   	.atag_offset	= 0x0100,
+>   	.fixup		= fixup_clep7312,
+>   	.map_io		= clps711x_map_io,
+> -	.init_early	= clps711x_init_early,
+>   	.init_irq	= clps711x_init_irq,
+>   	.init_time	= clps711x_timer_init,
+>   	.restart	= clps711x_restart,
+> diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
+> index 0776098..fa4580f 100644
+> --- a/arch/arm/mach-clps711x/board-edb7211.c
+> +++ b/arch/arm/mach-clps711x/board-edb7211.c
+> @@ -180,7 +180,6 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+>   	.fixup		= fixup_edb7211,
+>   	.reserve	= edb7211_reserve,
+>   	.map_io		= clps711x_map_io,
+> -	.init_early	= clps711x_init_early,
+>   	.init_irq	= clps711x_init_irq,
+>   	.init_time	= clps711x_timer_init,
+>   	.init_machine	= edb7211_init,
+> diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
+> index 67b7337..4a2ec28 100644
+> --- a/arch/arm/mach-clps711x/board-p720t.c
+> +++ b/arch/arm/mach-clps711x/board-p720t.c
+> @@ -365,7 +365,6 @@ MACHINE_START(P720T, "ARM-Prospector720T")
+>   	.atag_offset	= 0x100,
+>   	.fixup		= fixup_p720t,
+>   	.map_io		= clps711x_map_io,
+> -	.init_early	= clps711x_init_early,
+>   	.init_irq	= clps711x_init_irq,
+>   	.init_time	= clps711x_timer_init,
+>   	.init_machine	= p720t_init,
+> diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+> index aee81fa..2a6323b 100644
+> --- a/arch/arm/mach-clps711x/common.c
+> +++ b/arch/arm/mach-clps711x/common.c
+> @@ -193,15 +193,3 @@ void clps711x_restart(enum reboot_mode mode, const char *cmd)
+>   {
+>   	soft_restart(0);
+>   }
+> -
+> -static void clps711x_idle(void)
+> -{
+> -	clps_writel(1, HALT);
+> -	asm("mov r0, r0");
+> -	asm("mov r0, r0");
+> -}
+> -
+> -void __init clps711x_init_early(void)
+> -{
+> -	arm_pm_idle = clps711x_idle;
+> -}
+> diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
+> index 7489139..f881899 100644
+> --- a/arch/arm/mach-clps711x/common.h
+> +++ b/arch/arm/mach-clps711x/common.h
+> @@ -13,7 +13,6 @@ extern void clps711x_map_io(void);
+>   extern void clps711x_init_irq(void);
+>   extern void clps711x_timer_init(void);
+>   extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
+> -extern void clps711x_init_early(void);
+>
+>   /* drivers/irqchip/irq-clps711x.c */
+>   void clps711x_intc_init(phys_addr_t, resource_size_t);
+> diff --git a/arch/arm/mach-clps711x/devices.c b/arch/arm/mach-clps711x/devices.c
+> index 2001488..0c689d3 100644
+> --- a/arch/arm/mach-clps711x/devices.c
+> +++ b/arch/arm/mach-clps711x/devices.c
+> @@ -14,6 +14,15 @@
+>
+>   #include <mach/hardware.h>
+>
+> +static const struct resource clps711x_cpuidle_res __initconst =
+> +	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + HALT, SZ_128);
+> +
+> +static void __init clps711x_add_cpuidle(void)
+> +{
+> +	platform_device_register_simple("clps711x-cpuidle", PLATFORM_DEVID_NONE,
+> +					&clps711x_cpuidle_res, 1);
+> +}
+> +
+>   static const phys_addr_t clps711x_gpios[][2] __initconst = {
+>   	{ PADR, PADDR },
+>   	{ PBDR, PBDDR },
+> @@ -83,6 +92,7 @@ static void __init clps711x_add_uart(void)
+>
+>   void __init clps711x_devices_init(void)
+>   {
+> +	clps711x_add_cpuidle();
+>   	clps711x_add_gpio();
+>   	clps711x_add_syscon();
+>   	clps711x_add_uart();
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
