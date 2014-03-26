@@ -1,49 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 22:54:40 +0100
-Subject: [PATCH 0/3] Fix stmmac-socfpga allmodconfig breakage in arm-soc
-In-Reply-To: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
-References: <1395790482-3957-1-git-send-email-dinguyen@altera.com>
-Message-ID: <201403262254.41069.arnd@arndb.de>
+Date: Wed, 26 Mar 2014 23:06:43 +0100
+Subject: [PATCH 1/3] IXP4xx: Fix Goramo Multilink GPIO conversion.
+In-Reply-To: <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
+References: <m3siq9iyt2.fsf@intrepid.localdomain>
+ <m3bnwxiwhj.fsf@intrepid.localdomain>
+ <CACRpkdaNdQjgAJv=mxn6MXS+kGKFoE4wmNHxYt_5WdM9sa6vxA@mail.gmail.com>
+Message-ID: <201403262306.43920.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 March 2014, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Monday 24 March 2014, Linus Walleij wrote:
+> On Sun, Mar 23, 2014 at 1:34 AM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
 > 
-> Hi,
+> > arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'set_scl':
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:82: error: implicit declaration of function 'gpio_line_set'
+> >
+> > arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'output_control':
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: implicit declaration of function 'gpio_line_config'
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:111: error: 'IXP4XX_GPIO_OUT' undeclared
+> >
+> > arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'hss_dcd_irq':
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:155: error: implicit declaration of function 'gpio_line_get'
+> >
+> > arch/arm/mach-ixp4xx/goramo_mlr.c: In function 'gmlr_init':
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:416: error: 'IXP4XX_GPIO_OUT' undeclared
+> > arch/arm/mach-ixp4xx/goramo_mlr.c:421: error: 'IXP4XX_GPIO_IN' undeclared
+> >
+> > Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 > 
-> These 3 patches are based on Arnd's patch to fix the allmodconfig for the
-> dwmac-socfpga implementation. I just broke the patch out into drivers,
-> dts, and dts documentation.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> The original patch is here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241518.html
+> Mea culpa.
 > 
-> Arnd mentioned that he was thinking about just removing the dwmac-socfpga
-> and send out the new verion to the netdev tree, but I haven't seen it. So
-> just in case this solution might work, here are the patches.
+> Arnd: can you apply this one patch directly for ARM SoC fixes and
+> Cc: stable at vger.kernel.org on this one?
 > 
-> These patches are based on arm-soc/for-next.
+> Alternatively can you send this for fixes to arm at kernel.org with Cc:
+> stable added Krzysztof?
 
-Hi Dinh,
+I reverted my earlier patch and applied this instead. Thanks a lot!
 
-Thanks for putting these patches together. The problem I see with these
-is that we have multiple conflicts between my changes and the other
-patches that went into the netdev tree.
-
-Originally, the idea was that David Miller gave his Ack to have
-the patches merged through arm-soc, but I think that was a mistake,
-and they should have been treated like the other patches for
-the same driver, i.e. put the driver and binding changes into
-netdev, and the dt changes into arm-soc.
-
-If I apply your patches on top of the next/drivers branch, we get
-conflicts for a handful of files, and get Linus to resolve them.
-I tried applying my patch on Sunday, but backed it out because 
-of this.
-
-My preferred solution at this point would be to revert the driver
-addition in the arm-soc tree and have David put the new version
-in, but I don't know if he still takes patches like that for 3.15.
+Did not add a stable tag, as suggested by Krzysztof.
 
 	Arnd
