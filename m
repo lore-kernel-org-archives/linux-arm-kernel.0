@@ -1,21 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Mar 2014 23:12:35 +0100
-Subject: [PATCH] ARM: nspire: Fix compiler warning
-In-Reply-To: <1395339911-30009-1-git-send-email-shc_work@mail.ru>
-References: <1395339911-30009-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201403262312.35470.arnd@arndb.de>
+Date: Wed, 26 Mar 2014 23:13:49 +0100
+Subject: [PATCH] ARM: tegra: fix board DT pinmux setup
+In-Reply-To: <1395360361-17130-1-git-send-email-swarren@wwwdotorg.org>
+References: <1395360361-17130-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201403262313.49387.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 March 2014, Alexander Shiyan wrote:
-> CC      arch/arm/mach-nspire/nspire.o
-> arch/arm/mach-nspire/nspire.c:79:2: warning: initialization from incompatible pointer type [enabled by default]
-> arch/arm/mach-nspire/nspire.c:79:2: warning: (near initialization for '__mach_desc_NSPIRE.restart') [enabled by default]
+On Friday 21 March 2014, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-nspire/nspire.c | 2 +-
+> Neither Tegra114 nor Tegra124 allow "low power mode" to be configured
+> on SDIO1 or SDIO3 drive groups. Remove the attempt to configure that
+> option from the Dalmore and Venice2 DTs.
+> 
+> The Venice2 DT contained duplicate configurations for most sdmmc1_*
+> pins. Remove the duplicate pins from one of the nodes, and fix the
+> configuration since the remaining clk pin is output-only.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Applied to fixes branch, thanks!
+Applied to fixes-non-critical.
 
-	Arnd
+Thanks,
+
+	ARnd
