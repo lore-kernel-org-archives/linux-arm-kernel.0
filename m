@@ -1,37 +1,73 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 26 Mar 2014 10:23:19 +0000
-Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
-In-Reply-To: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
-References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140326102317.GA26040@linaro.org>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Wed, 26 Mar 2014 10:25:52 +0000
+Subject: [RFC 07/47] mtd: nand: stm_nand_bch: initialise the BCH Controller
+In-Reply-To: <1395735604-26706-8-git-send-email-lee.jones@linaro.org>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAB5CB7@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 11:38:51AM +0000, Steve Capper wrote:
-> This series fixes a couple of problems that I have come across:
->  1) Some pte accessors for arm and arm64 can have their results
->     cancelled out by a downcast. This is addressed by the first two
->     patches.
-> 
->  2) On arm with LPAE it is impossible to distinguish between clean
->     writable ptes and read only ptes. This is addressed by the third
->     patch.
-> 
-> As the third patch depends on the first patch, all three patches are
-> bundled together in the same series.
-> 
-> I have reviewed Will and Russell's patch:
->  b6ccb9803e90 ("ARM: 7954/1: mm: remove remaining domain support
-> 	from ARMv6")
-> And I believe that the L_PTE_WRITE logic should be compatible with this
-> patch. It applies cleanly and compiles; but I would be greatful if
-> someone could please give it a test.
+Hi Lee,
 
-If there are no objections, I was going to put the following into
-Russell's patch system:
-	arm: mm: Double logical invert for pte accessors
-	arm: mm: Switch back to L_PTE_WRITE
+>From: Lee Jones [mailto:lee.jones at linaro.org]
+missing commit log :-)
+Though $subject is self-explanatory, but you can add more description about
+assumption and hardware caveats about the controller, and its use.
 
-Cheers,
--- 
-Steve
+>
+>Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>---
+> drivers/mtd/nand/stm_nand_bch.c | 56 +++++++++++++++++++++++++++++++++++++++++
+> include/linux/mtd/stm_nand.h    | 20 +++++++++++++++
+> 2 files changed, 76 insertions(+)
+>
+>diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
+>index 76a0d02..1a93f8d 100644
+>--- a/drivers/mtd/nand/stm_nand_bch.c
+>+++ b/drivers/mtd/nand/stm_nand_bch.c
+>@@ -14,6 +14,7 @@
+>
+> #include <linux/kernel.h>
+> #include <linux/module.h>
+>+#include <linux/delay.h>
+> #include <linux/io.h>
+> #include <linux/interrupt.h>
+> #include <linux/device.h>
+>@@ -102,6 +103,56 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
+> 	writel(val, nandi->base + NANDBCH_INT_EN);
+> }
+>
+>+static void nandi_init_bch(struct nandi_controller *nandi, int emi_bank)
+>+{
+>+	dev_dbg(nandi->dev, "%s\n", __func__);
+>+
+>+	/* Initialise BCH Controller */
+>+	emiss_nandi_select(STM_NANDI_BCH);
+>+
+>+	/* Reset and disable boot-mode controller */
+>+	writel(BOOT_CFG_RESET, nandi->base + NANDBCH_BOOTBANK_CFG);
+>+	udelay(1);
+>+	writel(0x00000000, nandi->base + NANDBCH_BOOTBANK_CFG);
+
+Why using 'udelay' ?
+Isn't there any status register which tells you that controller is reset / initialized ?
+Or may be polling on NANDBCH_BOOTBANK_CFG may itself give you status.
+
+>+
+>+	/* Reset AFM controller */
+>+	writel(CFG_RESET, nandi->base + NANDBCH_CONTROLLER_CFG);
+>+	udelay(1);
+>+	writel(0x00000000, nandi->base + NANDBCH_CONTROLLER_CFG);
+>+
+>+	/* Set EMI Bank */
+>+	writel(0x1 << emi_bank, nandi->base + NANDBCH_FLEX_MUXCTRL);
+>+
+>+	/* Reset ECC stats */
+>+	writel(0x7f0, nandi->base + NANDBCH_CONTROLLER_CFG);
+>+	udelay(1);
+>+
+"0x7f0" ?? please use Macro instead.
+
+
+with regards, pekon
