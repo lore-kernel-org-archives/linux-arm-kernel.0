@@ -1,62 +1,63 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Wed, 26 Mar 2014 20:34:19 +0000
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140326201243.GA1536@obsidianresearch.com>
-References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
- <20140325202249.GA10378@obsidianresearch.com> <20140325213638.5aba54b6@skate>
- <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
- <20140325222404.GC14718@obsidianresearch.com>
- <20140325223510.GD14718@obsidianresearch.com>
- <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
- <20140326201243.GA1536@obsidianresearch.com>
-Message-ID: <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Mar 2014 15:35:24 -0500
+Subject: [PATCH 39/44] ARM: l2c: highbank: implement new write_sec method
+In-Reply-To: <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
+References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
+ <E1WPLEY-0002eW-Io@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+9at=D5nnZdBLwRq5RVx8NbHnJuvvYLZzsrBmKwwzVvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Wed, Mar 26, 2014 at 8:12 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
+On Sun, Mar 16, 2014 at 7:16 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> With the write_sec method, we no longer need to override the default L2C
+> disable method.  This can be handled via the write_sec method instead.
 >
-> So, we need a result that actually reads the vendor id..
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  arch/arm/mach-highbank/highbank.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 >
-> Here is a revision, I suspect the error with the debugging was not
-> calling mvebu_pcie_set_local_bus_nr, so a type 1 transaction was being
-> produced. I am looking for the 2nd Vendor ID to return 80861521.
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index c7de89b263dd..d6b803594358 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -51,11 +51,13 @@ static void __init highbank_scu_map_io(void)
+>  }
 >
-
-Thanks. Here's the relevant output with that patch:
-
-[    0.135772] mvebu-pcie pcie-controller.3: ICR is 0
-[    0.160889] mvebu-pcie pcie-controller.3: Vendor ID is ffffffff
-[    0.160897] mvebu-pcie pcie-controller.3: ICR is 800200
-[    1.170215] mvebu-pcie pcie-controller.3: Try 2: Vendor ID is 15218086
-[    1.170228] mvebu-pcie pcie-controller.3: ICR is 0
-[    1.170290] mvebu-pcie pcie-controller.3: ICR is 0
-[    1.170299] mvebu-pcie pcie-controller.3: Vendor ID is 10091b73
-[    1.170306] mvebu-pcie pcie-controller.3: ICR is 0
-[    2.180207] mvebu-pcie pcie-controller.3: Try 2: Vendor ID is 10091b73
-[    2.180215] mvebu-pcie pcie-controller.3: ICR is 0
-
-Success! For reference, the full dmesg is at https://gist.github.com/9792618
-
-> Also, are you using the "reset-gpios" DT property?
 >
-
-I'm appending arch/arm/boot/dts/armada-370-mirabox.dtb to the kernel
-image as the bootloader on the Mirabox is ancient and doesn't support
-DTs. As far as I can see, there's no reset-gpios property anywhere in
-that DT.
-
-With regards to the bootloader, in case the information helps, it prints out:
-
-PEX 0: Root Complex Interface, Detected Link X1
-PEX 1: Root Complex Interface, Detected Link X1
-
-As I am booting from the SD card, which is internally connected via
-USB, the boot loader is obviously initialising the XHCI controller.
-I'm guessing this is why it is detected immediately without needing
-the delay.
-
-Cheers,
-Neil
+> -static void highbank_l2x0_disable(void)
+> +static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
+>  {
+> -       outer_flush_all();
+> -       /* Disable PL310 L2 Cache controller */
+> -       highbank_smc1(0x102, 0x0);
+> +       if (reg == L2X0_CTRL)
+> +               highbank_smc1(0x102, val);
+> +       else
+> +               WARN_ONCE(1, "Highbank L2C310: ignoring write to reg 0x%x\n",
+> +                         reg);
+>  }
+>
+>  static void __init highbank_init_irq(void)
+> @@ -69,8 +71,8 @@ static void __init highbank_init_irq(void)
+>         if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
+>             of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
+>                 highbank_smc1(0x102, 0x1);
+> +               outer_cache.write_sec = highbank_l2x0_write_sec;
+>                 l2x0_of_init(0, ~0UL);
+> -               outer_cache.disable = highbank_l2x0_disable;
+>         }
+>  }
+>
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
