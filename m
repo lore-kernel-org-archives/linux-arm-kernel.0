@@ -1,218 +1,514 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 26 Mar 2014 19:27:41 +0530
-Subject: [RFC PATCH 01/12] phy: phy-omap-pipe3: Add support for PCIe PHY
+Date: Wed, 26 Mar 2014 19:27:42 +0530
+Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for pcie-dra7xx
+ controller
 In-Reply-To: <1395842272-15267-1-git-send-email-kishon@ti.com>
 References: <1395842272-15267-1-git-send-email-kishon@ti.com>
-Message-ID: <1395842272-15267-2-git-send-email-kishon@ti.com>
+Message-ID: <1395842272-15267-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCIe PHY uses an external pll instead of the internal pll used by SATA
-and USB3. So added support in pipe3 PHY to use external pll
+Added support for pcie controller in dra7xx. This driver re-uses
+the designware core code that is already present in kernel.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/phy/ti-phy.txt |    8 +-
- drivers/phy/phy-ti-pipe3.c                       |   99 +++++++++++++++++-----
- 2 files changed, 84 insertions(+), 23 deletions(-)
+ Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
+ drivers/pci/host/Kconfig                         |   10 +
+ drivers/pci/host/Makefile                        |    1 +
+ drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
+ 4 files changed, 457 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
+ create mode 100644 drivers/pci/host/pcie-dra7xx.c
 
-diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-index 788fb0f..e628a23 100644
---- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-@@ -49,8 +49,8 @@ usb2phy at 4a0ad080 {
- TI PIPE3 PHY
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+new file mode 100644
+index 0000000..0528c47
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -0,0 +1,35 @@
++TI PCI Controllers
++
++PCIe Designware Controller
++This node should have the properties described in "designware-pcie.txt".
++ - compatible: Should be "ti,dra7xx-pcie""
++ - reg : Address and length of the register set for the device.
++ - phys : the phandle for the PHY device (used by generic PHY framework)
++ - phy-names : the names of the PHY corresponding to the PHYs present in the
++   *phy* phandle.
++ - resets: phandle used if reset is handled be soc
++ - reset-names: name given to the phandle
++ - ti,device-type: Should be 1 - EP TYPE, 2 - LEG EP TYPE OR 3 - RC TYPE
++
++Example:
++pcie at 51000000 {
++	compatible = "ti,dra7xx-pcie";
++	reg = <0x51002000 0x14c>, <0x51000000 0x2000>, <0x4A002540 0x1f>, <0x4A003c24 0x4>, <0x4AE07310 0x4>;
++	interrupts = <0 129 0x4>, <0 134 0x4>;
++	#address-cells = <3>;
++	#size-cells = <2>;
++	device_type = "pci";
++	ti,device_type = <3>;
++	ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* Configuration Space */
++		  0x81000000 0 0          0x20003000 0 0x00010000  /* IO Space */
++		  0x82000000 0 0x20013000 0x20013000 0 0xffed000>; /* MEM Space */
++	#interrupt-cells = <1>;
++	num-lanes = <1>;
++	interrupt-map-mask = <0 0 0 0>;
++	interrupt-map = <0x0 0 &gic 134>;
++	ti,hwmods = "pcie1";
++	phys = <&pcie1_phy>;
++	phy-names = "pcie-phy";
++	resets = <&prm_resets &device_reset>;
++	reset-names = "reset";
++};
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 47d46c6..5066a3c 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -1,6 +1,16 @@
+ menu "PCI host controller drivers"
+ 	depends on PCI
  
- Required properties:
-- - compatible: Should be "ti,phy-usb3" or "ti,phy-pipe3-sata".
--   "ti,omap-usb3" is deprecated.
-+ - compatible: Should be "ti,phy-usb3", "ti,phy-pipe3-sata" or
-+   "ti,phy-pipe3-pcie. "ti,omap-usb3" is deprecated.
-  - reg : Address and length of the register set for the device.
-  - reg-names: The names of the register addresses corresponding to the registers
-    filled in "reg".
-@@ -62,6 +62,10 @@ Required properties:
-    * "wkupclk" - wakeup clock.
-    * "sysclk" - system clock.
-    * "refclk" - reference clock.
-+   * "dpll_ref" - external dpll ref clk
-+   * "dpll_ref_m2" - external dpll ref clk
-+   * "phy-div" - divider for apll
-+   * "div-clk" - apll clock
- 
- Optional properties:
-  - ctrl-module : phandle of the control module used by PHY driver to power on
-diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index 5913676..d43019d 100644
---- a/drivers/phy/phy-ti-pipe3.c
-+++ b/drivers/phy/phy-ti-pipe3.c
-@@ -80,6 +80,7 @@ struct ti_pipe3 {
- 	struct clk		*wkupclk;
- 	struct clk		*sys_clk;
- 	struct clk		*refclk;
-+	struct clk		*div_clk;
- 	struct pipe3_dpll_map	*dpll_map;
- };
- 
-@@ -215,6 +216,9 @@ static int ti_pipe3_init(struct phy *x)
- 	u32 val;
- 	int ret = 0;
- 
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
++config PCIE_DRA7XX
++	bool "TI DRA7xx PCIe controller"
++	select PCIE_DW
++	depends on OF || HAS_IOMEM || TI_PIPE3
++	help
++	 Enables support for the PCIE controller present in DRA7xx SoC. There
++	 are two instances of PCIE controller in DRA7xx. This controller can
++	 act both as EP and RC. This reuses the same Designware core as used
++	 by other SoCs.
++
+ config PCI_MVEBU
+ 	bool "Marvell EBU PCIe controller"
+ 	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index 13fb333..90a275d 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_PCIE_DW) += pcie-designware.o
++obj-$(CONFIG_PCIE_DRA7XX) += pcie-dra7xx.o
+ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+ obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
+ obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+diff --git a/drivers/pci/host/pcie-dra7xx.c b/drivers/pci/host/pcie-dra7xx.c
+new file mode 100644
+index 0000000..69f3720
+--- /dev/null
++++ b/drivers/pci/host/pcie-dra7xx.c
+@@ -0,0 +1,411 @@
++/*
++ * pcie-dra7xx - PCIe controller driver for TI DRA7xx SoCs
++ *
++ * Copyright (C) 2013-2014 Texas Instruments Incorporated - http://www.ti.com
++ *
++ * Authors: Kishon Vijay Abraham I <kishon@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/reset.h>
++#include <linux/resource.h>
++#include <linux/types.h>
++
++#include "pcie-designware.h"
++
++/* PCIe controller wrapper TI configuration registers */
++
++#define	PCIECTRL_TI_CONF_IRQSTATUS_MAIN		0x0024
++#define	PCIECTRL_TI_CONF_IRQENABLE_SET_MAIN	0x0028
++#define	ERR_SYS					BIT(0)
++#define	ERR_FATAL				BIT(1)
++#define	ERR_NONFATAL				BIT(2)
++#define	ERR_COR					BIT(3)
++#define	ERR_AXI					BIT(4)
++#define	ERR_ECRC				BIT(5)
++#define	PME_TURN_OFF				BIT(8)
++#define	PME_TO_ACK				BIT(9)
++#define	PM_PME					BIT(10)
++#define	LINK_REQ_RST				BIT(11)
++#define	LINK_UP_EVT				BIT(12)
++#define	CFG_BME_EVT				BIT(13)
++#define	CFG_MSE_EVT				BIT(14)
++#define	INTERRUPTS (ERR_SYS | ERR_FATAL | ERR_NONFATAL | ERR_COR | ERR_AXI | \
++			ERR_ECRC | PME_TURN_OFF | PME_TO_ACK | PM_PME | \
++			LINK_REQ_RST | LINK_UP_EVT | CFG_BME_EVT | CFG_MSE_EVT)
++
++#define	PCIECTRL_TI_CONF_IRQSTATUS_MSI		0x0034
++#define	PCIECTRL_TI_CONF_IRQENABLE_SET_MSI	0x0038
++#define	INTA					BIT(0)
++#define	INTB					BIT(1)
++#define	INTC					BIT(2)
++#define	INTD					BIT(3)
++#define	MSI					BIT(4)
++#define	LEG_EP_INTERRUPTS (INTA | INTB | INTC | INTD)
++
++#define	PCIECTRL_TI_CONF_DEVICE_TYPE		0x0100
++#define	DEVICE_TYPE_EP				0x0
++#define	DEVICE_TYPE_LEG_EP			0x1
++#define	DEVICE_TYPE_RC				0x4
++
++#define	PCIECTRL_TI_CONF_DEVICE_CMD		0x0104
++#define	LTSSM_EN				0x1
++
++#define	PCIECTRL_TI_CONF_PHY_CS			0x010C
++#define	LINK_UP					BIT(16)
++
++struct dra7xx_pcie {
++	void __iomem		*base;
++	struct phy		*phy;
++	struct device		*dev;
++	struct pcie_port	pp;
++};
++
++#define to_dra7xx_pcie(x)	container_of((x), struct dra7xx_pcie, pp)
++
++enum dra7xx_pcie_device_type {
++	DRA7XX_PCIE_UNKNOWN_TYPE,
++	DRA7XX_PCIE_EP_TYPE,
++	DRA7XX_PCIE_LEG_EP_TYPE,
++	DRA7XX_PCIE_RC_TYPE,
++};
++
++static inline u32 dra7xx_pcie_readl(void __iomem *base, u32 offset)
++{
++	return readl(base + offset);
++}
++
++static inline void dra7xx_pcie_writel(void __iomem *base, u32 offset, u32 value)
++{
++	writel(value, base + offset);
++}
++
++static int dra7xx_pcie_link_up(struct pcie_port *pp)
++{
++	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
++	u32 reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_PHY_CS);
++
++	if (reg & LINK_UP)
++		return true;
++	return false;
++}
++
++static int dra7xx_pcie_establish_link(struct pcie_port *pp)
++{
++	u32 reg;
++	int retries = 1000;
++	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
++
++	if (dw_pcie_link_up(pp)) {
++		dev_err(pp->dev, "link is already up\n");
 +		return 0;
-+
- 	/* Bring it out of IDLE if it is IDLE */
- 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
- 	if (val & PLL_IDLE) {
-@@ -238,8 +242,11 @@ static int ti_pipe3_exit(struct phy *x)
- 	u32 val;
- 	unsigned long timeout;
- 
--	/* SATA DPLL can't be powered down due to Errata i783 */
--	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata"))
-+	/* SATA DPLL can't be powered down due to Errata i783 and PCIe
-+	 * does not have internal DPLL
-+	 */
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata") ||
-+	    of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
- 		return 0;
- 
- 	/* Put DPLL in IDLE mode */
-@@ -286,32 +293,41 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 	struct device_node *control_node;
- 	struct platform_device *control_pdev;
- 	const struct of_device_id *match;
--
--	match = of_match_device(of_match_ptr(ti_pipe3_id_table), &pdev->dev);
--	if (!match)
--		return -EINVAL;
-+	struct clk *clk;
- 
- 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
- 	if (!phy) {
- 		dev_err(&pdev->dev, "unable to alloc mem for TI PIPE3 PHY\n");
- 		return -ENOMEM;
- 	}
-+	phy->dev		= &pdev->dev;
- 
--	phy->dpll_map = (struct pipe3_dpll_map *)match->data;
--	if (!phy->dpll_map) {
--		dev_err(&pdev->dev, "no DPLL data\n");
--		return -EINVAL;
--	}
-+	if (!of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
-+		match = of_match_device(of_match_ptr(ti_pipe3_id_table),
-+					&pdev->dev);
-+		if (!match)
-+			return -EINVAL;
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pll_ctrl");
--	phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(phy->pll_ctrl_base))
--		return PTR_ERR(phy->pll_ctrl_base);
-+		phy->dpll_map = (struct pipe3_dpll_map *)match->data;
-+		if (!phy->dpll_map) {
-+			dev_err(&pdev->dev, "no DPLL data\n");
-+			return -EINVAL;
-+		}
- 
--	phy->dev		= &pdev->dev;
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "pll_ctrl");
-+		phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(phy->pll_ctrl_base))
-+			return PTR_ERR(phy->pll_ctrl_base);
- 
--	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
-+		phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
-+		if (IS_ERR(phy->sys_clk)) {
-+			dev_err(&pdev->dev, "unable to get sysclk\n");
-+			return -EINVAL;
-+		}
 +	}
- 
-+	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
- 		phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
- 		if (IS_ERR(phy->wkupclk)) {
- 			dev_err(&pdev->dev, "unable to get wkupclk\n");
-@@ -328,10 +344,35 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 		phy->refclk = ERR_PTR(-ENODEV);
- 	}
- 
--	phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
--	if (IS_ERR(phy->sys_clk)) {
--		dev_err(&pdev->dev, "unable to get sysclk\n");
--		return -EINVAL;
-+	if (of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
-+		clk = devm_clk_get(phy->dev, "dpll_ref");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get dpll ref clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 1500000000);
 +
-+		clk = devm_clk_get(phy->dev, "dpll_ref_m2");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get dpll ref m2 clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 100000000);
++	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_DEVICE_CMD);
++	reg |= LTSSM_EN;
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_DEVICE_CMD, reg);
 +
-+		clk = devm_clk_get(phy->dev, "phy-div");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get phy-div clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 100000000);
++	while (--retries) {
++		reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_PHY_CS);
++		if (reg & LINK_UP)
++			break;
++		usleep_range(10, 20);
++	}
 +
-+		phy->div_clk = devm_clk_get(phy->dev, "div-clk");
-+		if (IS_ERR(phy->div_clk)) {
-+			dev_err(&pdev->dev, "unable to get div-clk\n");
-+			return PTR_ERR(phy->div_clk);
-+		}
-+	} else {
-+		phy->div_clk = ERR_PTR(-ENODEV);
- 	}
- 
- 	control_node = of_parse_phandle(node, "ctrl-module", 0);
-@@ -387,6 +428,8 @@ static int ti_pipe3_runtime_suspend(struct device *dev)
- 		clk_disable_unprepare(phy->wkupclk);
- 	if (!IS_ERR(phy->refclk))
- 		clk_disable_unprepare(phy->refclk);
-+	if (!IS_ERR(phy->div_clk))
-+		clk_disable_unprepare(phy->div_clk);
- 
- 	return 0;
- }
-@@ -412,8 +455,19 @@ static int ti_pipe3_runtime_resume(struct device *dev)
- 		}
- 	}
- 
-+	if (!IS_ERR(phy->div_clk)) {
-+		ret = clk_prepare_enable(phy->div_clk);
++	if (retries <= 0) {
++		dev_err(pp->dev, "link is not up\n");
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
++static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
++{
++	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
++
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MAIN,
++		~INTERRUPTS);
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_IRQENABLE_SET_MAIN,
++		INTERRUPTS);
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MSI,
++		~LEG_EP_INTERRUPTS & ~MSI);
++
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dra7xx_pcie_writel(dra7xx->base,
++			PCIECTRL_TI_CONF_IRQENABLE_SET_MSI, MSI);
++	else
++		dra7xx_pcie_writel(dra7xx->base,
++			PCIECTRL_TI_CONF_IRQENABLE_SET_MSI, LEG_EP_INTERRUPTS);
++}
++
++static void dra7xx_pcie_host_init(struct pcie_port *pp)
++{
++	dw_pcie_setup_rc(pp);
++	dra7xx_pcie_establish_link(pp);
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dw_pcie_msi_init(pp);
++	dra7xx_pcie_enable_interrupts(pp);
++}
++
++static struct pcie_host_ops dra7xx_pcie_host_ops = {
++	.link_up = dra7xx_pcie_link_up,
++	.host_init = dra7xx_pcie_host_init,
++};
++
++static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
++{
++	struct pcie_port *pp = arg;
++	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
++	u32 reg;
++
++	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MSI);
++	dw_handle_msi_irq(pp);
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MSI, reg);
++
++	return IRQ_HANDLED;
++}
++
++
++static irqreturn_t dra7xx_pcie_irq_handler(int irq, void *arg)
++{
++	struct dra7xx_pcie *dra7xx = arg;
++	u32 reg;
++
++	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MAIN);
++
++	if (reg & ERR_SYS)
++		dev_dbg(dra7xx->dev, "System Error\n");
++
++	if (reg & ERR_FATAL)
++		dev_dbg(dra7xx->dev, "Fatal Error\n");
++
++	if (reg & ERR_NONFATAL)
++		dev_dbg(dra7xx->dev, "Non Fatal Error\n");
++
++	if (reg & ERR_COR)
++		dev_dbg(dra7xx->dev, "Correctable Error\n");
++
++	if (reg & ERR_AXI)
++		dev_dbg(dra7xx->dev, "AXI tag lookup fatal Error\n");
++
++	if (reg & ERR_ECRC)
++		dev_dbg(dra7xx->dev, "ECRC Error\n");
++
++	if (reg & PME_TURN_OFF)
++		dev_dbg(dra7xx->dev,
++			"Power Management Event Turn-Off message received\n");
++
++	if (reg & PME_TO_ACK)
++		dev_dbg(dra7xx->dev,
++		"Power Management Event Turn-Off Ack message received\n");
++
++	if (reg & PM_PME)
++		dev_dbg(dra7xx->dev,
++			"PM Power Management Event message received\n");
++
++	if (reg & LINK_REQ_RST)
++		dev_dbg(dra7xx->dev, "Link Request Reset\n");
++
++	if (reg & LINK_UP_EVT)
++		dev_dbg(dra7xx->dev, "Link-up state change\n");
++
++	if (reg & CFG_BME_EVT)
++		dev_dbg(dra7xx->dev, "CFG 'Bus Master Enable' change\n");
++
++	if (reg & CFG_MSE_EVT)
++		dev_dbg(dra7xx->dev, "CFG 'Memory Space Enable' change\n");
++
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_IRQSTATUS_MAIN, reg);
++
++	return IRQ_HANDLED;
++}
++
++static int add_pcie_port(struct dra7xx_pcie *dra7xx,
++	struct platform_device *pdev)
++{
++	int ret;
++	struct pcie_port *pp;
++	struct resource *res;
++	struct device *dev = &pdev->dev;
++
++	pp = &dra7xx->pp;
++	pp->dev = dev;
++	pp->ops = &dra7xx_pcie_host_ops;
++
++	spin_lock_init(&pp->conf_lock);
++
++	pp->irq = platform_get_irq(pdev, 1);
++	if (pp->irq < 0) {
++		dev_err(dev, "missing IRQ resource\n");
++		return -EINVAL;
++	}
++
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		ret = devm_request_irq(&pdev->dev, pp->irq,
++				       dra7xx_pcie_msi_irq_handler, IRQF_SHARED,
++				       "pcie-msi", pp);
 +		if (ret) {
-+			dev_err(phy->dev, "Failed to enable div_clk %d\n", ret);
-+			goto err3;
++			dev_err(&pdev->dev, "failed to request irq\n");
++			return ret;
 +		}
 +	}
- 	return 0;
- 
-+err3:
-+	if (!IS_ERR(phy->wkupclk))
-+		clk_disable_unprepare(phy->wkupclk);
 +
- err2:
- 	if (!IS_ERR(phy->refclk))
- 		clk_disable_unprepare(phy->refclk);
-@@ -446,6 +500,9 @@ static const struct of_device_id ti_pipe3_id_table[] = {
- 		.compatible = "ti,phy-pipe3-sata",
- 		.data = dpll_map_sata,
- 	},
-+	{
-+		.compatible = "ti,phy-pipe3-pcie",
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbics");
++	pp->dbi_base = devm_ioremap_nocache(dev, res->start,
++		resource_size(res));
++	if (!pp->dbi_base)
++		return -ENOMEM;
++
++	ret = dw_pcie_host_init(pp);
++	if (ret) {
++		dev_err(dra7xx->dev, "failed to initialize host\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int __init dra7xx_pcie_probe(struct platform_device *pdev)
++{
++	u32 reg;
++	int ret;
++	int irq;
++	struct phy *phy;
++	void __iomem *base;
++	struct resource *res;
++	struct dra7xx_pcie *dra7xx;
++	int device_type = 0;
++	struct device *dev = &pdev->dev;
++	struct device_node *node = pdev->dev.of_node;
++	struct reset_control *rstc;
++
++	dra7xx = devm_kzalloc(&pdev->dev, sizeof(*dra7xx), GFP_KERNEL);
++	if (!dra7xx)
++		return -ENOMEM;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(dev, "missing IRQ resource\n");
++		return -EINVAL;
++	}
++
++	ret = devm_request_irq(&pdev->dev, irq, dra7xx_pcie_irq_handler,
++			       IRQF_SHARED, "pcie-main", dra7xx);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to request irq\n");
++		return ret;
++	}
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ti_conf");
++	base = devm_ioremap_nocache(dev, res->start, resource_size(res));
++	if (!base)
++		return -ENOMEM;
++
++	rstc = devm_reset_control_get(dev, "reset");
++	if (IS_ERR(rstc))
++		return PTR_ERR(rstc);
++
++	ret = reset_control_deassert(rstc);
++	if (ret)
++		return ret;
++
++	phy = devm_phy_get(dev, "pcie-phy");
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	ret = phy_init(phy);
++	if (ret < 0)
++		return ret;
++
++	ret = phy_power_on(phy);
++	if (ret < 0) {
++		phy_exit(phy);
++		return ret;
++	}
++
++	dra7xx->base = base;
++	dra7xx->phy = phy;
++	dra7xx->dev = dev;
++
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(dev, "pm_runtime_get_sync failed\n");
++		return ret;
++	}
++
++	of_property_read_u32(node, "ti,device-type", &device_type);
++	switch (device_type) {
++	case DRA7XX_PCIE_RC_TYPE:
++		dra7xx_pcie_writel(dra7xx->base,
++			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_RC);
++		break;
++	case DRA7XX_PCIE_EP_TYPE:
++		dra7xx_pcie_writel(dra7xx->base,
++			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_EP);
++		break;
++	case DRA7XX_PCIE_LEG_EP_TYPE:
++		dra7xx_pcie_writel(dra7xx->base,
++			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_LEG_EP);
++		break;
++	default:
++		dev_dbg(dev, "UNKNOWN device type %d\n", device_type);
++	}
++
++	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_TI_CONF_DEVICE_CMD);
++	reg &= ~LTSSM_EN;
++	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_TI_CONF_DEVICE_CMD, reg);
++
++	ret = add_pcie_port(dra7xx, pdev);
++	if (ret < 0)
++		return ret;
++
++	platform_set_drvdata(pdev, dra7xx);
++	return 0;
++}
++
++static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
++{
++	struct dra7xx_pcie *dra7xx = platform_get_drvdata(pdev);
++
++	pm_runtime_put(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	phy_power_off(dra7xx->phy);
++	phy_exit(dra7xx->phy);
++
++	return 0;
++}
++
++static const struct of_device_id of_dra7xx_pcie_match[] = {
++	{ .compatible = "ti,dra7xx-pcie", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, of_dra7xx_pcie_match);
++
++static struct platform_driver dra7xx_pcie_driver = {
++	.remove		= __exit_p(dra7xx_pcie_remove),
++	.driver = {
++		.name	= "dra7xx-pcie",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_dra7xx_pcie_match,
 +	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, ti_pipe3_id_table);
++};
++
++module_platform_driver_probe(dra7xx_pcie_driver, dra7xx_pcie_probe);
++
++MODULE_AUTHOR("Kishon Vijay Abraham I <kishon@ti.com>");
++MODULE_DESCRIPTION("TI PCIe controller driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
