@@ -1,26 +1,70 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 26 Mar 2014 10:21:29 -0400
-Subject: [PATCH] ata: fix R-Car SATA driver dependencies
-In-Reply-To: <4494466.bbG3GqUbue@amdc1032>
-References: <4494466.bbG3GqUbue@amdc1032>
-Message-ID: <20140326142129.GD7171@htj.dyndns.org>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Wed, 26 Mar 2014 22:22:35 +0800
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <CAL_JsqLfH7Er-s5wjA5JGE4+-SGtTOvYTyQ=cYk+1ekHo39Crg@mail.gmail.com>
+References: <1395132017-15928-1-git-send-email-zhangfei.gao@linaro.org>
+ <1395132017-15928-4-git-send-email-zhangfei.gao@linaro.org>
+ <20140318104616.GT21483@n2100.arm.linux.org.uk>
+ <CAMj5BkiCXVZZPS-VyVxejCY0aiGD_HQjUdWd-FKD_ER_y_0wxQ@mail.gmail.com>
+ <CAL_JsqLfH7Er-s5wjA5JGE4+-SGtTOvYTyQ=cYk+1ekHo39Crg@mail.gmail.com>
+Message-ID: <CAMj5Bkg1_a=tAw1sxOTzSG6eWUHT8QVPXOzx2C+oCyf+dPr7Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 03:19:23PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Make sata_rcar host driver depend on ARCH_SHMOBILE config option as
-> Renesas R-Car SATA support is specific to Renesas SoCs and the driver
-> to work requires suitable device tree node (or platform device) to be
-> defined.  Additionally allow the driver build if COMPILE_TEST config
-> option is set.
-> 
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Dear Rob
 
-Applied to libata/for-3.15.
+On Mon, Mar 24, 2014 at 10:17 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-Thanks.
+>
+>>>> +             dma_map_single(&ndev->dev, skb->data,
+>>>> +                     RX_BUF_SIZE, DMA_FROM_DEVICE);
+>>>
+>>> This is incorrect.
+>>>
+>>> buf = buffer alloc()
+>>> /* CPU owns buffer and can read/write it, device does not */
+>>> dev_addr = dma_map_single(dev, buf, ..., DMA_FROM_DEVICE);
+>>> /* Device owns buffer and can write it, CPU does not access it */
+>>> dma_unmap_single(dev, dev_addr, ..., DMA_FROM_DEVICE);
+>>> /* CPU owns buffer again and can read/write it, device does not */
+>>>
+>>> Please turn on DMA API debugging in the kernel debug options and verify
+>>> whether your driver causes it to complain (it will.)
+>>
+>> Yes, you are right.
+>> After change to dma_map/unmap_single, however, still get warning like
+>> "DMA-API: device driver failed to check map error", not sure whether
+>> it can be ignored?
+>
+> If it could be ignored, there would be no warning. So yes you should
+> check the error. I guess correct error handling would be throwing away
+> the packet.
 
--- 
-tejun
+The warning is solved via adding dma_mapping_error check after every
+dma_map_single.
+
+>
+>
+>>>> +             dma_map_single(&ndev->dev, buf, RX_BUF_SIZE, DMA_TO_DEVICE);
+>>>> +             hip04_set_recv_desc(priv, virt_to_phys(buf));
+>>>
+>>> No need for virt_to_phys() here - dma_map_single() returns the device
+>>> address.
+>> Got it.
+>> Use virt_to_phys since find same result come out, it should be
+>> different for iommu case.
+>>
+>> In fact, the hardware can help to do the cache flushing, the function
+>> still not be enabled now.
+>> Then dma_map/unmap_single may be ignored.
+>
+> If you don't need cache flushing, you should setup different
+> dma_map_ops for the device such as arm_coherent_dma_ops. The driver
+> should always have the dma_map calls. See highbank and mvebu for
+> examples.
+
+That would be very helpful, still not sure how to enable this feature.
+Could you help clarify which file.
+Not find highbank and mvebu under drivers/iommu/.
+
+Thanks
